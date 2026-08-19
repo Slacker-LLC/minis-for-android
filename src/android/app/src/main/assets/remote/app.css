@@ -100,3 +100,29 @@ code.inline{background:var(--elevated);border:1px solid var(--line);border-radiu
 .messages{min-height:0}
 .tool-tab.active{min-height:0}
 @media(max-width:720px){.app{grid-template-rows:none}}
+
+
+/* --- 模型管理 --- */
+.models-tab{background:var(--bg)}
+.models-toolbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.models-toolbar .secondary{min-height:32px;border-radius:9px;padding:5px 12px;font-size:12px}
+.models-msg{font-size:11px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.models-msg.error-text{color:var(--danger)}
+.models-body{overflow:auto;flex:1;min-height:0;padding-bottom:20px}
+.models-empty{padding:14px 16px;color:var(--muted);font-size:12px;line-height:1.5}
+.model-card{margin:0 14px 10px;background:var(--card);border:1px solid var(--line-soft);border-radius:12px;overflow:hidden}
+.model-card-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line-soft)}
+.model-card-head strong{font-size:13px;font-weight:550;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+.model-dot.on{background:#34c759}
+.model-type{font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.mini{border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:7px;padding:3px 9px;font-size:11px;white-space:nowrap}
+.mini:hover{color:var(--text);border-color:var(--info)}
+.mini:disabled{opacity:.5}
+.model-list{max-height:220px;overflow:auto}
+.model-row{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;border-bottom:1px solid var(--line-soft)}
+.model-row:last-child{border-bottom:0}
+.model-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-more{color:var(--muted);font-size:11px}
+.model-flag{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.model-flag.primary{color:var(--info);border-color:var(--info)}

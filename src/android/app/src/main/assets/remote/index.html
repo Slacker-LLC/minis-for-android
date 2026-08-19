@@ -71,6 +71,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="files">文件</button>
         <button class="tab" data-tab="shell">终端</button>
+        <button class="tab" data-tab="models">模型</button>
         <button class="tab" data-tab="settings">设置</button>
       </div>
 
@@ -89,6 +90,13 @@
         <div class="shell-input"><textarea id="shellCommand" rows="2" placeholder="例如：pwd && ls -la"></textarea><button id="shellRun" class="primary wide">运行</button></div>
       </section>
 
+      <section id="modelsTab" class="tool-tab models-tab">
+        <div class="models-toolbar">
+          <button id="modelsRefresh" class="secondary">刷新</button>
+          <span id="modelsMsg" class="models-msg"></span>
+        </div>
+        <div id="modelsBody" class="models-body"></div>
+      </section>
       <section id="settingsTab" class="tool-tab settings-tab">
         <div class="settings-scroll">
           <div class="settings-heading"><h2>远程控制</h2><p>这里修改 Web Remote 自身的网络、登录和 Tunnel 设置。模型 API Key 不会下发到网页。</p></div>

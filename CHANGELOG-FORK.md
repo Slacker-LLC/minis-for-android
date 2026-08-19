@@ -99,8 +99,12 @@
 
 **原因**：消息只做 `esc()` 转义就塞进 DOM。
 
-**改法**：新增 `assets/remote/md.js`，手写的轻量渲染器（页面在严格 CSP 下从 APK assets 里
-出，CDN 一律不可达，只能自带）。两个实现期 bug 值得记：
+**改法**：最终用 **marked**(MIT) + **DOMPurify**(MPL-2.0/Apache-2.0) 渲染，
+`md.js` 只剩薄封装。两者以单文件 UMD 随 APK 分发 —— 页面在严格 CSP 下从 assets 出，
+CDN 一律不可达。
+
+先前自己写过一版解析器，后来换掉了：这类东西没有自造的价值，成熟库在边界情况上
+稳得多。不过那一版暴露的两个 bug 仍值得记，同类实现都会踩：
 
 - **代码高亮把自己的 HTML 吐成了文本**：关键字表里有 `class`，关键字替换把前面生成的
   `<span class="tok-str">` 里的 `class` 又包了一层，标签就碎了。改成先把字符串和注释藏进
@@ -108,7 +112,7 @@
 - **引用块识别不到**：先 `esc()` 再解析，`>` 早已变成 `&gt;`。顺带把 `render` 拆成「转义」
   和「解析」两层，否则引用递归会双重转义。
 
-渲染器带 17 条断言的测试，覆盖 XSS（`<script>`、`<img onerror>`、`javascript:` 链接）。
+换库后同样跑了浏览器实测：列表/粗体/代码块/表格/引用/链接全部渲染，`<script>` 被移除、`onerror` 被剥离。
 
 ### 7. Web 端没有流式、还闪
 
@@ -128,6 +132,37 @@
   默认 `newline=None` → `os.linesep`），一行改动显示成全文件 diff → 统一按 LF 写回
 - 同一脚本的锚点正则 `(?m)^(\s*)`，`\s` 含换行会把上一行的换行也吃进 indent 分组，导致插入
   的每一行前面都多一个空行 → 收紧为 `[^\S\n]*`
+
+### 9. 自动恢复在冷启动时被系统拒绝
+
+**现象**：给 Web Remote 加了进程重建/开机自动恢复之后，重装 App 再打开，
+端口依然没有监听。
+
+**日志**：
+
+```
+W RemoteAccessService: restore failed: startForegroundService() not allowed
+  due to mAllowStartForeground false
+```
+
+**原因**：`MinisApp.onCreate()` 执行时进程状态是 `CEM` 而不是 `TOP`，
+Android 12+ 把这算作后台启动前台服务，直接拒绝。`runCatching` 接住了异常
+所以没崩，但服务也就没起来。
+
+**改法**：恢复点补到 `MainActivity.onResume()` —— 那一刻 App 确定在前台，
+启动一定被允许。Application 与开机广播里的两处调用保留：前者覆盖进程被杀后
+重建、后者有系统豁免，三处合起来才覆盖全部路径。
+
+### 10. Web 端复用 App 内部的 RPC
+
+网页要管模型和供应商，与其为 `provider.instances.create`、`models.refresh`、
+`groups.setDefault` 等二十来个方法逐一写 REST 路由，不如把 App 已有的
+`DebugRPCHandler` 转发出去 —— 一条 `/api/rpc` 就接管了全部能力。
+
+但**必须白名单**：`debug.` 族下面是 `tap` / `inputText` / `screenshot` /
+`writeFile`，合起来等于远程操控这台手机。Web Remote 可以经隧道暴露到公网，
+所以那一族整个挡在外面，只放行 `provider.` / `chat.` / `rpc.discover`。
+要用那些方法，仍然只能走本机的 127.0.0.1:5321 调试端口。
 
 ---
 

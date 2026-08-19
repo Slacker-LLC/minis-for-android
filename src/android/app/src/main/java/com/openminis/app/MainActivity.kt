@@ -155,6 +155,21 @@ class MainActivity : ComponentActivity() {
         }, 1200L)
     }
 
+    /**
+     * Restore the optional background services once the app is actually in the
+     * foreground.
+     *
+     * MinisApp.onCreate() also tries this, but a cold start driven by the
+     * system leaves the process in a non-TOP state, and Android 12+ rejects a
+     * foreground-service start from there ("mAllowStartForeground false").
+     * By onResume the app is TOP, so the start is always permitted.
+     */
+    override fun onResume() {
+        super.onResume()
+        com.openminis.app.remote.RemoteAccessService.startIfEnabled(this)
+        com.openminis.app.pet.PetBridge.startIfEnabled(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

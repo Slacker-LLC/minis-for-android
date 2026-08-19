@@ -161,7 +161,7 @@ $('#connectBtn').onclick=login;$('#passwordInput').onkeydown=e=>{if(e.key==='Ent
 $('#sendBtn').onclick=send;$('#prompt').oninput=autoGrow;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};$('#cancelBtn').onclick=cancel;
 $('#newChat').onclick=()=>{state.sessionId=null;renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
 $('#filePath').onkeydown=e=>{if(e.key==='Enter')loadFiles($('#filePath').value)};$('#fileUp').onclick=()=>{const p=state.filePath.replace(/\/$/,'').split('/').slice(0,-1).join('/')||'/';loadFiles(p)};$('#closeEditor').onclick=()=>$('#editor').classList.add('hidden');$('#saveFile').onclick=saveFile;$('#shellRun').onclick=runShell;
-$$('.tab').forEach(b=>b.onclick=async()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===b));$$('.tool-tab').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.tab+'Tab').classList.add('active');if(b.dataset.tab==='settings')await loadSettings()});
+$$('.tab').forEach(b=>b.onclick=async()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===b));$$('.tool-tab').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.tab+'Tab').classList.add('active');if(b.dataset.tab==='settings')await loadSettings();if(b.dataset.tab==='models')await loadModels()});
 $('#saveSettings').onclick=saveSettings;$('#restartRemote').onclick=restartRemote;$('#mobileMenu').onclick=()=>$('.sidebar').classList.toggle('open');$('#toolsToggle').onclick=()=>$('.tools-pane').classList.toggle('open');
 $('#messages').addEventListener('click',async e=>{
   const btn=e.target.closest('.code-copy');if(!btn)return;
@@ -176,6 +176,139 @@ $('#messages').addEventListener('click',async e=>{
   setTimeout(()=>{btn.textContent='复制'},1200);
 });
 
+// ---------------------------------------------------------------- 模型管理
+// 走 /api/rpc 转发到 App 自己的 provider.* 方法，不另造一套后端逻辑。
+async function rpc(method, params = {}) {
+  const d = await api('/api/rpc', {
+    method: 'POST',
+    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+  });
+  if (d.error) throw new Error(d.error.message || ('RPC ' + d.error.code));
+  return d.result;
+}
+
+function modelsMsg(text, isError) {
+  const el = $('#modelsMsg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('error-text', !!isError);
+}
+
+async function loadModels() {
+  const root = $('#modelsBody');
+  if (!root) return;
+  modelsMsg('加载中…');
+  try {
+    const [inst, groups] = await Promise.all([
+      rpc('provider.instances.list'),
+      rpc('provider.groups.list'),
+    ]);
+    const instances = inst?.instances || inst?.items || [];
+    const groupList = groups?.groups || groups?.items || [];
+    state.instances = instances;
+
+    // 逐个实例取模型；串行请求即可，实例数量是个位数
+    const blocks = [];
+    for (const it of instances) {
+      let models = [];
+      try {
+        const m = await rpc('provider.models.list', { instanceId: it.id });
+        models = m?.models || m?.entries || m?.items || [];
+      } catch (e) {
+        models = [];
+      }
+      blocks.push({ inst: it, models });
+    }
+
+    root.innerHTML = renderModels(blocks, groupList);
+    bindModelActions();
+    modelsMsg('');
+  } catch (e) {
+    root.innerHTML = '<div class="error">' + esc(e.message) + '</div>';
+    modelsMsg('加载失败', true);
+  }
+}
+
+function renderModels(blocks, groups) {
+  let html = '';
+
+  html += '<div class="settings-section-title" style="padding:16px 16px 8px">供应商</div>';
+  if (!blocks.length) {
+    html += '<div class="models-empty">还没有配置任何供应商。请在手机 App 里添加，或使用下方的导入。</div>';
+  }
+  blocks.forEach(({ inst, models }) => {
+    const enabled = inst.isEnabled !== false;
+    html += '<div class="model-card">' +
+      '<div class="model-card-head">' +
+        '<span class="model-dot ' + (enabled ? 'on' : '') + '"></span>' +
+        '<strong>' + esc(inst.label || inst.name || inst.id) + '</strong>' +
+        '<span class="model-type">' + esc(inst.providerType || inst.type || '') + '</span>' +
+        '<button class="mini" data-act="test" data-id="' + esc(inst.id) + '">测试</button>' +
+        '<button class="mini" data-act="refresh" data-id="' + esc(inst.id) + '">刷新模型</button>' +
+      '</div>';
+    if (models.length) {
+      html += '<div class="model-list">';
+      models.slice(0, 60).forEach(m => {
+        const name = m.displayName || m.name || m.model?.name || m.model?.id || m.id;
+        html += '<div class="model-row"><span class="model-name">' + esc(name) + '</span>' +
+                (m.isHidden ? '<span class="model-flag">隐藏</span>' : '') + '</div>';
+      });
+      if (models.length > 60) html += '<div class="model-row model-more">…共 ' + models.length + ' 个</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="model-list"><div class="model-row model-more">（无模型，点「刷新模型」拉取）</div></div>';
+    }
+    html += '</div>';
+  });
+
+  html += '<div class="settings-section-title" style="padding:20px 16px 8px">模型组</div>';
+  if (!groups.length) {
+    html += '<div class="models-empty">还没有模型组。</div>';
+  }
+  groups.forEach(g => {
+    html += '<div class="model-card"><div class="model-card-head">' +
+      '<strong>' + esc(g.name || g.id) + '</strong>' +
+      (g.isDefault ? '<span class="model-flag primary">默认</span>' : '') +
+      '<span class="model-type">' + ((g.memberEntryIds || g.members || []).length) + ' 个成员</span>' +
+      (g.isDefault ? '' : '<button class="mini" data-act="setDefault" data-id="' + esc(g.id) + '">设为默认</button>') +
+      '</div></div>';
+  });
+
+  return html;
+}
+
+function bindModelActions() {
+  $$('#modelsBody .mini').forEach(btn => {
+    btn.onclick = async () => {
+      const act = btn.dataset.act, id = btn.dataset.id;
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = '…';
+      try {
+        if (act === 'test') {
+          const r = await rpc('provider.instances.test', { instanceId: id });
+          modelsMsg(r?.ok === false ? ('连接失败：' + (r.error || r.message || '')) : '连接正常', r?.ok === false);
+        } else if (act === 'refresh') {
+          const r = await rpc('provider.models.refresh', { instanceId: id });
+          modelsMsg('已刷新 ' + (r?.count ?? r?.added ?? '') + ' 个模型');
+          await loadModels();
+          return;
+        } else if (act === 'setDefault') {
+          await rpc('provider.groups.setDefault', { groupId: id });
+          modelsMsg('已设为默认');
+          await loadModels();
+          return;
+        }
+      } catch (e) {
+        modelsMsg(e.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    };
+  });
+}
+
 // DeepSeek 的 token 用 body[data-ds-dark-theme] 整体切换暗色，跟随系统即可。
 function applyTheme(){
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -184,6 +317,7 @@ function applyTheme(){
 applyTheme();
 try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); }catch{}
 
+$('#modelsRefresh') && ($('#modelsRefresh').onclick = loadModels);
 boot();
 
 /* ---------------------------------------------------------------------------

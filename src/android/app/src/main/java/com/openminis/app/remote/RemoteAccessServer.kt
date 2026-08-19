@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.debug.ChatDebugMethods
+import com.openminis.app.debug.DebugRPCHandler
 import com.openminis.app.debug.ChatMutationMethods
 import com.openminis.app.sandbox.ExecutionCoordinator
 import com.openminis.app.sandbox.PRootKernel
@@ -345,6 +346,24 @@ class RemoteAccessServer(
             }
             // ---- 手机端已有能力的 Web 侧入口 ----
             // 全部转调既有的 Debug RPC 方法，避免第二套会话逻辑。
+            "/api/rpc" -> {
+                // 转发到 App 内部的 JSON-RPC 分发器，但只放行白名单方法。
+                val rpcBody = JSONObject(req.body)
+                val method = rpcBody.optString("method")
+                if (!isRpcMethodAllowed(method)) {
+                    respondJson(
+                        out, 403,
+                        JSONObject()
+                            .put("error", "method not allowed over web remote: $method")
+                            .put("allowed", JSONArray(RPC_ALLOWED_PREFIXES.toList())),
+                    )
+                } else {
+                    if (!rpcBody.has("jsonrpc")) rpcBody.put("jsonrpc", "2.0")
+                    if (!rpcBody.has("id")) rpcBody.put("id", 1)
+                    val raw = DebugRPCHandler(appContext).handle(rpcBody.toString())
+                    respond(out, 200, "application/json; charset=utf-8", raw)
+                }
+            }
             "/api/models" -> {
                 respondJson(out, 200, ChatDebugMethods.modelsList(appContext, JSONObject()))
             }
@@ -692,6 +711,23 @@ class RemoteAccessServer(
     /** ChatRepository once the app has finished booting; used by the title route. */
     private fun android.content.Context.chatRepositoryOrThrow() =
         (applicationContext as com.openminis.app.MinisApp).chatRepository
+
+
+    /**
+     * Method families reachable from the browser.
+     *
+     * Deliberately excludes the whole `debug.` family: it carries tap,
+     * inputText, screenshot, ls, readFile and writeFile, which together amount
+     * to remote control of the phone. Web Remote can be published to the open
+     * internet through a tunnel, so that surface stays off it entirely —
+     * the local debug server on 127.0.0.1:5321 remains the way to reach them.
+     */
+    private val RPC_ALLOWED_PREFIXES = arrayOf("provider.", "chat.", "rpc.discover")
+
+    private fun isRpcMethodAllowed(method: String): Boolean =
+        method.isNotEmpty() && RPC_ALLOWED_PREFIXES.any {
+            if (it.endsWith(".")) method.startsWith(it) else method == it
+        }
 
     private fun respondJson(
         out: BufferedOutputStream,
