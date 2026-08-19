@@ -1,0 +1,36 @@
+# 全仓库统一 LF。
+#
+# 构建只在 Linux / WSL 上进行，而 gradlew、deps/*.sh、scripts/*.sh 一旦被检出成
+# CRLF，shebang 会带上 \r，Linux 直接报 "bad interpreter: /usr/bin/env bash^M"。
+# Windows 上开发时 Git 的 core.autocrlf=true 正是会这么干，所以在这里强制约定。
+* text=auto eol=lf
+
+# 必须 LF，否则无法执行
+*.sh    text eol=lf
+gradlew text eol=lf
+
+# Windows 批处理反过来，必须 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制：一律不做行尾转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.tar  binary
+*.jar  binary
+*.apk  binary
+*.aar  binary
+*.so   binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.keystore binary
+*.jks  binary

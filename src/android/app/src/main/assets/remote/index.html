@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <title>OpenMinis Remote</title>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div id="login" class="login-shell">
+    <main class="login-card">
+      <div class="brand-mark">M</div>
+      <div class="eyebrow">OPENMINIS</div>
+      <h1>Web 远程控制</h1>
+      <p>登录后可操作这台手机上的同一套会话、Agent、文件和 Persistent Shell。</p>
+      <label class="field-label">用户名
+        <input id="usernameInput" type="text" autocomplete="username" value="admin" />
+      </label>
+      <label class="field-label">密码
+        <input id="passwordInput" type="password" autocomplete="current-password" />
+      </label>
+      <button id="connectBtn" class="primary wide">登录</button>
+      <div id="loginError" class="error" role="alert"></div>
+      <div class="login-note">密码只提交给你的手机 Web Remote；浏览器随后使用 HttpOnly 会话 Cookie。</div>
+    </main>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-mark small">M</div>
+        <div><strong>OpenMinis</strong><span>Remote</span></div>
+      </div>
+      <button id="newChat" class="new-chat">＋ 新会话</button>
+      <div class="section-label">会话</div>
+      <div id="sessions" class="sessions"></div>
+      <div class="sidebar-foot">
+        <span id="serverDot" class="dot"></span><span id="serverState">已连接</span>
+        <button id="logoutBtn" class="icon-button" title="退出">退出</button>
+      </div>
+    </aside>
+
+    <main class="chat-pane">
+      <header class="topbar">
+        <button id="mobileMenu" class="ghost mobile-only">☰</button>
+        <div class="chat-title"><strong id="title">选择一个会话</strong><span id="model"></span></div>
+        <div class="top-actions">
+          <button id="toolsToggle" class="ghost tools-toggle">工具</button>
+          <span id="runState" class="status-pill">idle</span>
+          <button id="cancelBtn" class="ghost danger" disabled>停止</button>
+        </div>
+      </header>
+      <div id="messages" class="messages">
+        <div class="empty-state"><h2>手机 Agent，网页继续</h2><p>左侧选择会话，或者直接创建新会话。</p></div>
+      </div>
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="prompt" rows="1" placeholder="给 Minis 发消息…"></textarea>
+          <button id="sendBtn" class="send" title="发送">↑</button>
+        </div>
+        <div class="composer-note">网页与 Android 原生界面共享 Session、Agent Loop 和 Persistent Shell</div>
+      </div>
+    </main>
+
+    <aside class="tools-pane">
+      <div class="tabs">
+        <button class="tab active" data-tab="files">文件</button>
+        <button class="tab" data-tab="shell">终端</button>
+        <button class="tab" data-tab="settings">设置</button>
+      </div>
+
+      <section id="filesTab" class="tool-tab active">
+        <div class="pathbar"><button id="fileUp" class="ghost">←</button><input id="filePath" value="/var/minis/workspace" /></div>
+        <div id="fileList" class="file-list"></div>
+        <div id="editor" class="editor hidden">
+          <div class="editor-head"><span id="editorPath"></span><button id="closeEditor" class="ghost">×</button></div>
+          <textarea id="fileContent" spellcheck="false"></textarea>
+          <button id="saveFile" class="primary editor-save">保存文件</button>
+        </div>
+      </section>
+
+      <section id="shellTab" class="tool-tab">
+        <div id="shellOutput" class="shell-output">$ 选择会话后可执行 Persistent Shell</div>
+        <div class="shell-input"><textarea id="shellCommand" rows="2" placeholder="例如：pwd && ls -la"></textarea><button id="shellRun" class="primary wide">运行</button></div>
+      </section>
+
+      <section id="settingsTab" class="tool-tab settings-tab">
+        <div class="settings-scroll">
+          <div class="settings-heading"><h2>远程控制</h2><p>这里修改 Web Remote 自身的网络、登录和 Tunnel 设置。模型 API Key 不会下发到网页。</p></div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">登录</div>
+            <div class="settings-card">
+              <label class="settings-field">用户名<input id="settingsUsername" type="text" autocomplete="username" /></label>
+              <div class="settings-separator"></div>
+              <label class="settings-field">当前密码<input id="settingsCurrentPassword" type="password" autocomplete="current-password" placeholder="修改用户名或密码时需要" /></label>
+              <div class="settings-separator"></div>
+              <label class="settings-field">新密码<input id="settingsNewPassword" type="password" autocomplete="new-password" placeholder="留空则不修改" /></label>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">监听</div>
+            <div class="settings-card">
+              <label class="settings-field">端口<input id="settingsPort" type="number" min="1024" max="65535" /></label>
+              <div class="settings-separator"></div>
+              <label class="switch-row"><span><strong>局域网访问</strong><small>关闭时仅监听 127.0.0.1；Cloudflare Tunnel 不需要打开</small></span><input id="settingsLan" type="checkbox" /></label>
+            </div>
+            <div class="settings-footer">修改端口或局域网监听后需要重启远程服务。</div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-title">CLOUDFLARE TUNNEL</div>
+            <div class="settings-card">
+              <label class="switch-row"><span><strong>启用 Tunnel</strong><small id="tunnelStatusText">未连接</small></span><input id="settingsTunnelEnabled" type="checkbox" /></label>
+              <div class="settings-separator"></div>
+              <label class="settings-field">公开域名<input id="settingsHostname" type="text" placeholder="remote.example.com" /></label>
+              <div class="settings-separator"></div>
+              <label class="settings-field">Tunnel Token<input id="settingsTunnelToken" type="password" autocomplete="off" placeholder="已配置时留空；输入新值可替换" /></label>
+            </div>
+            <div class="settings-footer">Cloudflare 控制面中的 Published Application 仍需指向此手机的 <code>http://127.0.0.1:&lt;端口&gt;</code>。</div>
+          </div>
+
+          <div id="settingsMessage" class="settings-message"></div>
+          <button id="saveSettings" class="primary wide">保存设置</button>
+          <button id="restartRemote" class="secondary wide hidden">重启 Web Remote</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <script src="/md.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
