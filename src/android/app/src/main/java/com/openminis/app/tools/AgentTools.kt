@@ -36,6 +36,7 @@ object AgentTools {
             add(ReadImageTool.definition())
         }
         add(browserUseDefinition())
+        add(subagentDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
@@ -135,5 +136,30 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
+    )
+
+    /**
+     * Delegation. Kept deliberately narrow: one self-contained task in, one
+     * answer out. The child starts with a blank context, so the description
+     * hammers on writing a standalone prompt — the single most common way
+     * delegation goes wrong is assuming the child can see this conversation.
+     */
+    private fun subagentDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "subagent",
+        description = "Delegate a self-contained sub-task to a child agent that runs in its own session with its own context, " +
+            "then return only its final answer. Use this for work that would otherwise flood your own context with " +
+            "intermediate output \u2014 searching across many files, reading long logs, exploring an unfamiliar codebase, " +
+            "or any independent investigation whose details you do not need to keep. " +
+            "The child CANNOT see this conversation: write `prompt` as a complete, standalone task including all needed " +
+            "paths, names and constraints, and state exactly what it should report back. " +
+            "The child has the same tools you do (shell, file read/write/edit, browser). " +
+            "Do NOT delegate trivial work you can finish in one step, and do not delegate something that needs your " +
+            "in-flight context. Delegation is capped at 3 levels deep.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the delegated task, shown to the user (e.g. 'Search codebase for auth logic'). Use the same language as the user."),
+            "prompt" to AgentToolParam("string", "The complete, self-contained task for the child agent, including every path/name/constraint it needs and exactly what to report back. It has no access to the current conversation."),
+        ),
+        required = listOf("tool_title", "prompt"),
+        propertyOrdering = listOf("tool_title", "prompt"),
     )
 }

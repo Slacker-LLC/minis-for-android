@@ -295,6 +295,8 @@ class RemoteAccessServer(
             "/md.js" -> "remote/md.js"
             "/marked.js" -> "remote/marked.js"
             "/purify.js" -> "remote/purify.js"
+            "/ds-tokens.css" -> "remote/ds-tokens.css"
+            "/ds-scrollbar.css" -> "remote/ds-scrollbar.css"
             else -> null
         }
         if (asset == null) {
@@ -340,6 +342,59 @@ class RemoteAccessServer(
             "/api/session/status" -> {
                 val sid = requireQuery(req, "sessionId")
                 respondJson(out, 200, ChatMutationMethods.status(appContext, JSONObject().put("sessionId", sid)))
+            }
+            // ---- 手机端已有能力的 Web 侧入口 ----
+            // 全部转调既有的 Debug RPC 方法，避免第二套会话逻辑。
+            "/api/models" -> {
+                respondJson(out, 200, ChatDebugMethods.modelsList(appContext, JSONObject()))
+            }
+            "/api/usage" -> {
+                val sid = requireQuery(req, "sessionId")
+                val perTurn = req.query["perTurn"] == "true"
+                respondJson(
+                    out, 200,
+                    ChatDebugMethods.sessionsUsage(
+                        appContext,
+                        JSONObject().put("sessionId", sid).put("perTurn", perTurn),
+                    ),
+                )
+            }
+            "/api/session/model" -> {
+                requireMethod(req, "POST")
+                val body = JSONObject(req.body)
+                respondJson(out, 200, ChatMutationMethods.selectModel(appContext, body))
+            }
+            "/api/session/delete" -> {
+                requireMethod(req, "POST")
+                // confirm 由服务端强制补上：删除是不可逆的，但确认已经发生在
+                // 网页的对话框里，不该让前端漏传就变成静默失败。
+                val body = JSONObject(req.body).put("confirm", true)
+                respondJson(out, 200, ChatMutationMethods.delete(appContext, body))
+            }
+            "/api/session/title" -> {
+                requireMethod(req, "POST")
+                val body = JSONObject(req.body)
+                val sid = body.optString("sessionId", "")
+                val title = body.optString("title", "").trim()
+                if (sid.isEmpty() || title.isEmpty()) {
+                    respondJson(out, 400, JSONObject().put("error", "sessionId and title are required"))
+                } else {
+                    kotlinx.coroutines.runBlocking {
+                        appContext.chatRepositoryOrThrow().updateSessionTitle(sid, title.take(120))
+                    }
+                    respondJson(out, 200, JSONObject().put("ok", true).put("title", title.take(120)))
+                }
+            }
+            "/api/session/new" -> {
+                requireMethod(req, "POST")
+                val sid = kotlinx.coroutines.runBlocking {
+                    com.openminis.app.debug.HeadlessChatRunner.ensureSession(appContext, null)
+                }
+                respondJson(out, 200, JSONObject().put("sessionId", sid))
+            }
+            "/api/compact" -> {
+                requireMethod(req, "POST")
+                respondJson(out, 200, ChatMutationMethods.compactBefore(appContext, JSONObject(req.body)))
             }
             "/api/prompt" -> {
                 requireMethod(req, "POST")
@@ -633,6 +688,10 @@ class RemoteAccessServer(
         }.toMap()
     }
     private fun decode(v: String): String = URLDecoder.decode(v, StandardCharsets.UTF_8.name())
+
+    /** ChatRepository once the app has finished booting; used by the title route. */
+    private fun android.content.Context.chatRepositoryOrThrow() =
+        (applicationContext as com.openminis.app.MinisApp).chatRepository
 
     private fun respondJson(
         out: BufferedOutputStream,

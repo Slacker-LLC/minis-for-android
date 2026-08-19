@@ -25,6 +25,7 @@ iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMi
 |---|---|---|---|
 | [marked](https://github.com/markedjs/marked) | 15.0.12 | **MIT** | Markdown 解析（`marked.js`，许可证全文见 `assets/remote/LICENSE-marked.md`） |
 | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.14 | **MPL-2.0 OR Apache-2.0** | 渲染前净化模型输出，防 XSS（`purify.js`，许可证全文见 `assets/remote/LICENSE-dompurify`） |
+| [@deepseek-ai/dsh-client-ui-theme](https://www.npmjs.com/package/@deepseek-ai/dsh-client-ui-theme) | 0.0.1-rc.1 | **BSD-3-Clause** | 设计 token 与滚动条样式（`ds-tokens.css` / `ds-scrollbar.css`，取自公开 npm 包，许可证全文见 `assets/remote/LICENSE-deepseek-theme`）。BSD-3 第三条：不得以原作者名义为本项目背书——本项目与 DeepSeek 无任何关联。 |
 
 页面在严格 CSP 下从 APK assets 提供，无法访问任何 CDN，因此两者随包分发而非外链。
 

@@ -57,6 +57,7 @@ import com.openminis.app.tools.FileReadTool
 import com.openminis.app.tools.FileWriteTool
 import com.openminis.app.tools.MemoryTools
 import com.openminis.app.tools.ReadImageTool
+import com.openminis.app.tools.SubagentTool
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.internal.ShellOutputTruncator
 import com.openminis.app.offload.OffloadPermissionManager
@@ -8191,6 +8192,7 @@ class ChatViewModel(
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)
             "memory_get" -> executeMemoryGetTool(argsJson)
+            SubagentTool.NAME -> SubagentTool.execute(argsJson, activeSessionId, context)
             else -> ToolExecutionResult("Unknown tool: $name", false)
         }
     }
@@ -11183,6 +11185,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         "read_image" -> "Read Image"
         "memory_write" -> "Write Memory"
         "memory_get" -> "Read Memory"
+        "subagent" -> "Delegate Subtask"
         "web_search" -> "Search Web"
         else -> toolName
             .split('_')

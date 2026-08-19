@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="dark light" />
   <title>OpenMinis Remote</title>
+  <link rel="stylesheet" href="/ds-tokens.css">
+  <link rel="stylesheet" href="/ds-scrollbar.css">
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
@@ -44,10 +46,12 @@
     <main class="chat-pane">
       <header class="topbar">
         <button id="mobileMenu" class="ghost mobile-only">☰</button>
-        <div class="chat-title"><strong id="title">选择一个会话</strong><span id="model"></span></div>
+        <div class="chat-title"><strong id="title">选择一个会话</strong><button id="model" class="model-chip" title="点击切换模型"></button></div>
         <div class="top-actions">
+          <span id="usagePill" class="status-pill" title="本会话 token 用量"></span>
+          <button id="compactBtn" class="ghost" title="压缩上下文，保留摘要">压缩</button>
           <button id="toolsToggle" class="ghost tools-toggle">工具</button>
-          <span id="runState" class="status-pill">idle</span>
+          <span id="runState" class="status-pill">空闲</span>
           <button id="cancelBtn" class="ghost danger" disabled>停止</button>
         </div>
       </header>
@@ -128,6 +132,16 @@
         </div>
       </section>
     </aside>
+  </div>
+  <div id="modelSheet" class="sheet hidden">
+    <div class="sheet-card">
+      <div class="sheet-head"><strong>选择模型</strong><button id="modelSheetClose" class="ghost">关闭</button></div>
+      <div id="modelList" class="sheet-list"></div>
+    </div>
+  </div>
+  <div id="sessionMenu" class="ctx-menu hidden">
+    <button data-act="rename">重命名</button>
+    <button data-act="delete" class="danger">删除会话</button>
   </div>
   <script src="/marked.js"></script>
   <script src="/purify.js"></script>

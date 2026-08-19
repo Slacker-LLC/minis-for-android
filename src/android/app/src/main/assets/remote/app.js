@@ -175,4 +175,164 @@ $('#messages').addEventListener('click',async e=>{
   }
   setTimeout(()=>{btn.textContent='复制'},1200);
 });
+
+// DeepSeek 的 token 用 body[data-ds-dark-theme] 整体切换暗色，跟随系统即可。
+function applyTheme(){
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  document.body.toggleAttribute('data-ds-dark-theme', mq.matches);
+}
+applyTheme();
+try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); }catch{}
+
 boot();
+
+/* ---------------------------------------------------------------------------
+ * 手机端已有能力的网页入口：模型切换、token 用量、压缩上下文、会话重命名/删除。
+ * 后端全部转调既有的 Debug RPC 方法，这里只负责界面。
+ * ------------------------------------------------------------------------- */
+
+state.models = [];
+state.menuFor = null;
+
+function fmtTokens(n) {
+  if (!n && n !== 0) return '';
+  if (n < 1000) return n + '';
+  if (n < 1000000) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + 'k';
+  return (n / 1000000).toFixed(1) + 'M';
+}
+
+async function loadUsage() {
+  if (!state.sessionId) return;
+  try {
+    const d = await api('/api/usage?sessionId=' + encodeURIComponent(state.sessionId));
+    // 后端字段名随版本略有出入，取第一个像总数的
+    // ?? 与 || 不能混写（JS 规范禁止），最后一项本身已保证是数字
+    const total = d.totalTokens ?? d.total ?? d.tokens ??
+      ((d.inputTokens || 0) + (d.outputTokens || 0));
+    $('#usagePill').textContent = total ? fmtTokens(total) + ' tok' : '';
+  } catch { $('#usagePill').textContent = ''; }
+}
+
+async function openModelSheet() {
+  if (!state.sessionId) return alert('请先选择会话');
+  const sheet = $('#modelSheet');
+  const list = $('#modelList');
+  list.innerHTML = '<div class="sheet-empty">正在加载…</div>';
+  sheet.classList.remove('hidden');
+  try {
+    const d = await api('/api/models');
+    state.models = d.models || d.entries || [];
+    if (!state.models.length) { list.innerHTML = '<div class="sheet-empty">没有可用模型</div>'; return; }
+    list.innerHTML = state.models.map(m => {
+      const id = m.entryId || m.id || '';
+      const name = m.displayName || m.name || m.model || id;
+      const sub = [m.providerName || m.provider || '', m.model || ''].filter(Boolean).join(' · ');
+      return '<button class="sheet-row" data-id="' + esc(id) + '">' +
+        '<span class="sheet-row-main">' + esc(name) + '</span>' +
+        (sub ? '<span class="sheet-row-sub">' + esc(sub) + '</span>' : '') + '</button>';
+    }).join('');
+    $$('#modelList .sheet-row').forEach(b => b.onclick = () => pickModel(b.dataset.id));
+  } catch (e) {
+    list.innerHTML = '<div class="sheet-empty">加载失败：' + esc(e.message) + '</div>';
+  }
+}
+
+async function pickModel(entryId) {
+  try {
+    await api('/api/session/model', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: state.sessionId, modelEntryId: entryId }),
+    });
+    $('#modelSheet').classList.add('hidden');
+    await loadSessions();
+    const s = state.sessions.find(x => x.id === state.sessionId);
+    if (s) $('#model').textContent = s.modelName || s.modelId || '';
+  } catch (e) { alert('切换模型失败：' + e.message); }
+}
+
+async function doCompact() {
+  if (!state.sessionId) return;
+  if (!confirm('压缩当前上下文？之前的对话会被摘要替代，可在手机端撤销。')) return;
+  const btn = $('#compactBtn');
+  btn.disabled = true; btn.textContent = '压缩中…';
+  try {
+    await api('/api/compact', { method: 'POST', body: JSON.stringify({ sessionId: state.sessionId }) });
+    await loadMessages();
+  } catch (e) { alert('压缩失败：' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '压缩'; }
+}
+
+async function newSession() {
+  try {
+    const d = await api('/api/session/new', { method: 'POST', body: '{}' });
+    await loadSessions();
+    if (d.sessionId) await selectSession(d.sessionId);
+  } catch (e) { alert('新建会话失败：' + e.message); }
+}
+
+function openSessionMenu(ev, id) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  state.menuFor = id;
+  const m = $('#sessionMenu');
+  m.classList.remove('hidden');
+  // 贴着点击位置，但不越出视口右/下边缘
+  const mw = 160, mh = 88;
+  m.style.left = Math.min(ev.clientX, window.innerWidth - mw - 8) + 'px';
+  m.style.top = Math.min(ev.clientY, window.innerHeight - mh - 8) + 'px';
+}
+
+async function renameSession() {
+  const id = state.menuFor; if (!id) return;
+  const cur = state.sessions.find(x => x.id === id);
+  const name = prompt('新的会话名称', cur?.title || '');
+  if (name == null || !name.trim()) return;
+  try {
+    await api('/api/session/title', { method: 'POST', body: JSON.stringify({ sessionId: id, title: name.trim() }) });
+    await loadSessions();
+    if (id === state.sessionId) $('#title').textContent = name.trim();
+  } catch (e) { alert('重命名失败：' + e.message); }
+}
+
+async function deleteSession() {
+  const id = state.menuFor; if (!id) return;
+  const cur = state.sessions.find(x => x.id === id);
+  if (!confirm('删除会话「' + (cur?.title || id) + '」？此操作不可撤销。')) return;
+  try {
+    await api('/api/session/delete', { method: 'POST', body: JSON.stringify({ sessionId: id }) });
+    if (id === state.sessionId) { state.sessionId = null; $('#messages').innerHTML = ''; }
+    await loadSessions();
+    if (state.sessionId == null && state.sessions.length) await selectSession(state.sessions[0].id);
+  } catch (e) { alert('删除失败：' + e.message); }
+}
+
+$('#model').onclick = openModelSheet;
+$('#modelSheetClose').onclick = () => $('#modelSheet').classList.add('hidden');
+$('#modelSheet').onclick = e => { if (e.target.id === 'modelSheet') $('#modelSheet').classList.add('hidden'); };
+$('#compactBtn').onclick = doCompact;
+$('#newChat').onclick = newSession;
+$('#sessionMenu').onclick = e => {
+  const act = e.target.dataset.act;
+  $('#sessionMenu').classList.add('hidden');
+  if (act === 'rename') renameSession();
+  if (act === 'delete') deleteSession();
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('#sessionMenu')) $('#sessionMenu').classList.add('hidden');
+});
+// 会话项：右键（桌面）与长按（触屏）都能唤出菜单
+$('#sessions').addEventListener('contextmenu', e => {
+  const row = e.target.closest('.session');
+  if (row) openSessionMenu(e, row.dataset.id);
+});
+let pressTimer = null;
+$('#sessions').addEventListener('touchstart', e => {
+  const row = e.target.closest('.session');
+  if (!row) return;
+  pressTimer = setTimeout(() => {
+    const t = e.touches[0];
+    openSessionMenu({ preventDefault(){}, stopPropagation(){}, clientX: t.clientX, clientY: t.clientY }, row.dataset.id);
+  }, 500);
+}, { passive: true });
+['touchend', 'touchmove', 'touchcancel'].forEach(ev =>
+  $('#sessions').addEventListener(ev, () => clearTimeout(pressTimer), { passive: true }));
