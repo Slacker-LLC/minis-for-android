@@ -128,7 +128,6 @@ src/android/app/src/main/jniLibs/arm64-v8a/*.so
 # or rebuilt from anything in this tree. See deps/build_proot.sh.
 !src/android/app/src/main/jniLibs/arm64-v8a/libproot-loader.so
 !src/android/app/src/main/jniLibs/arm64-v8a/libproot-loader32.so
-deps/lame-build/
 deps/lame-3.100/**/.libs/
 
 # LAME autotools output (./configure writes absolute build paths into these)
@@ -142,8 +141,7 @@ deps/lame-3.100/**/*.lai
 deps/lame-3.100/**/.libs/
 deps/lame-3.100/**/.deps/
 
-# 分叉说明：deps/proot 与 deps/ish 是 .gitmodules 里声明的 submodule。
+# 分叉说明：deps/proot 是 .gitmodules 里声明的 submodule。
 # 本地目录里放了它们的内容以便直接构建，但仓库中不提交，
 # 由 `git clone --recursive` 或 `git submodule update --init` 取得。
 deps/proot/
-deps/ish/

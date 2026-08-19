@@ -293,6 +293,8 @@ class RemoteAccessServer(
             "/app.css" -> "remote/app.css"
             "/app.js" -> "remote/app.js"
             "/md.js" -> "remote/md.js"
+            "/marked.js" -> "remote/marked.js"
+            "/purify.js" -> "remote/purify.js"
             else -> null
         }
         if (asset == null) {

@@ -72,3 +72,17 @@ code.inline{background:var(--elevated);border:1px solid var(--line);border-radiu
 .bubble th,.bubble td{padding:8px 11px;text-align:left;border-bottom:1px solid var(--line)}
 .bubble th{background:var(--elevated);font-weight:600;white-space:nowrap}
 .bubble tr:last-child td{border-bottom:0}
+
+
+/* --- 布局收缩修正 ---
+ * flex / grid 子项的 min-height 默认是 auto，会阻止它们收缩到内容高度以下。
+ * 于是消息区一旦长出代码块、表格这类高内容，就会把整个 grid 行撑高，
+ * 连带把侧边栏顶出视口（表现为左侧只剩底部那一条）。
+ * 让各栏都能收缩，滚动交给 .messages / .sessions 自己。
+ */
+.app{overflow:hidden;grid-template-rows:100vh}
+.app>*{min-height:0}
+.sidebar,.chat-pane,.tools-pane{min-height:0}
+.messages{min-height:0}
+.tool-tab.active{min-height:0}
+@media(max-width:720px){.app{grid-template-rows:none}}
