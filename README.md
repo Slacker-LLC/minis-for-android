@@ -118,15 +118,23 @@ my-pet.zip
 
 ### 三、Web 远程控制
 
-浏览器里管手机上的 Agent，和 Android 原生界面**共享同一个 Session、Agent Loop 和
-Persistent Shell**——不是另开一套会话：
+浏览器里管手机上的 Agent，和 Android 原生界面**共享同一个 Session、同一
+`ChatViewModel`、Agent Loop 和 Persistent Shell**——不是另开一套会话。网页修改模型或
+思考强度时，改的是该会话在原生聊天页正在使用的绑定，而不是网页自己的副本：
 
 - 会话列表、对话、Markdown 渲染（代码块带复制按钮、表格、列表、公式）
-- 回复逐段增长的流式观感
+- **真实会话事件流**：初始只取一次会话快照，随后通过认证 WebSocket 接收带单调 `seq`
+  的 `session/event`；文本、思考、工具调用和完成状态按事件增量更新对应节点。断线以
+  `afterSeq` 回放，发现保留窗口外的游标时重新取快照，而不会定时拉整段消息或重建聊天 DOM
 - 文件浏览 / 在线编辑、Shell 执行
-- **Agent 工作台**：网页可直接编辑与启停目标、计划、待办；查看/停止 Harness
-  后台任务，并显示手机沙箱与运行状态。它们与 Android 聊天页是同一状态源，不会
-  产生另一份网页专用任务
+- **Harness 风格会话工作台**：目标、计划、待办与产出以按需 Details Inspector 呈现；
+  网页可直接编辑并与 Android 聊天页共享同一状态源，不会产生另一份网页专用任务。
+  作业区只呈现 App 当前已登记的项；它不是一个已完成的通用、持久化后台作业平台
+- **执行轨迹与工具检查器**：工具调用/结果兼容当前 `toolUse` 与历史
+  `tool_use` 持久化格式，聊天流中保持紧凑，点开即可看输入、输出、状态并从该步骤
+  重跑；回答支持复制、重试和反馈
+- **工作区**：文件树、在线编辑、Persistent Shell、交付物与最近 Agent Activity
+  通过「工作区」按需全屏打开，不会永久挤窄聊天区；支持文件拖放或从剪贴板粘贴附件
 - 技能、记忆（含 SOUL.md）、MCP 服务器、定时任务四个管理页签：列表、启停、
   删除都在网页上完成；记忆文件可以直接在线编辑，定时任务还能一键「立即运行」
 - 登录鉴权：PBKDF2-HMAC-SHA256（210k 轮）+ 12 小时 HttpOnly Session Cookie，
@@ -140,8 +148,11 @@ Web 端复用的是 App 内部的 RPC 通道，但**按前缀白名单放行**�
 `debug.inputText`、`debug.screenshot`、`debug.writeFile` 这类等于远程操控手机的
 方法被整个挡在网页之外，要用只能走本机 127.0.0.1:5321 调试端口。
 
-页面采用更紧凑的 DeepSeek 风格三栏工作台：会话、对话、操作面板各自独立滚动，
-所有主题资源随 APK 内置，离线可用。
+页面根据本地官方 DeepSeek Harness `0.1.0-rc.8` 的 **MIT 源码**做了 source-adapted
+实现：会话栏可收起为 56px rail，聊天始终是默认主区，Details Inspector 默认关闭并在
+空间不足时优先收起；任务、轨迹、设置和文件工作区均按需打开。没有把 Harness 的
+React/Cordis bundle 塞进 APK，也不冒充与 DeepSeek 有关联；主题与交互资源随 APK 内置，
+离线可用。
 
 ## 装了之后
 

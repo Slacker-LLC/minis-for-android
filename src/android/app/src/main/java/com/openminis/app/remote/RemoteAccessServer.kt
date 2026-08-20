@@ -13,14 +13,20 @@ import com.openminis.app.tools.FileWriteTool
 import com.openminis.app.tools.internal.ShellOutputTruncator
 import com.openminis.app.tools.internal.FileRevision
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -30,14 +36,18 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Production remote-control HTTP bridge. It intentionally exposes only a small
@@ -67,6 +77,12 @@ class RemoteAccessServer(
         private const val SESSION_TTL_MS = 12L * 60L * 60L * 1000L
         private const val LOGIN_LOCK_MS = 60_000L
         private const val SESSION_COOKIE = "minis_session"
+        private const val WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        private const val WEBSOCKET_SUBPROTOCOL = "minis.session.v1"
+        private const val MAX_WEBSOCKET_FRAME_BYTES = 256 * 1024
+        private const val WEBSOCKET_MAX_LIFETIME_MS = 10L * 60L * 1000L
+        private const val WEBSOCKET_PING_INTERVAL_MS = 20_000L
+        private const val WEBSOCKET_PONG_GRACE_MS = 50_000L
 
         fun constantTimeTokenEquals(expected: String, provided: String?): Boolean {
             if (expected.isEmpty() || provided == null || expected.length != provided.length) return false
@@ -188,6 +204,24 @@ class RemoteAccessServer(
                     val auth = authenticate(req)
                     if (auth == AuthKind.NONE) {
                         respondJson(output, 401, JSONObject().put("error", "unauthorized"))
+                        return
+                    }
+                    // WebSocket upgrades are GETs, so the normal mutating-
+                    // request origin guard would not cover them.  A browser
+                    // carrying an HttpOnly session cookie must prove it came
+                    // from this exact Remote origin before it can subscribe to
+                    // the live session event log (CSWSH protection).
+                    if (req.path == "/api/events/session" && isWebSocketUpgrade(req)) {
+                        if (auth == AuthKind.COOKIE && !sameWebSocketOrigin(req)) {
+                            respondJson(output, 403, JSONObject().put("error", "cross-origin websocket rejected"))
+                            return
+                        }
+                        // The WebSocket reader must not time out halfway
+                        // through a masked frame.  Its own ping/pong deadline
+                        // below detects dead peers, and socket.use{} closes a
+                        // blocked read when the bounded event stream ends.
+                        s.soTimeout = 0
+                        routeWebSocket(req, input, output)
                         return
                     }
                     if (auth == AuthKind.COOKIE && isMutating(req.method) && !sameOrigin(req)) {
@@ -342,6 +376,16 @@ class RemoteAccessServer(
         return origin.equals("$scheme://$host", ignoreCase = true)
     }
 
+    /** A strict check for cookie-authenticated WebSocket upgrades. */
+    private fun sameWebSocketOrigin(req: Request): Boolean =
+        !req.headers["origin"].isNullOrBlank() && sameOrigin(req)
+
+    private fun isWebSocketUpgrade(req: Request): Boolean =
+        req.headers["upgrade"]?.equals("websocket", ignoreCase = true) == true &&
+            req.headers["connection"]
+                ?.split(',')
+                ?.any { it.trim().equals("upgrade", ignoreCase = true) } == true
+
     private fun routeStatic(req: Request, out: BufferedOutputStream) {
         if (req.method != "GET") {
             respond(out, 405, "text/plain; charset=utf-8", "Method Not Allowed")
@@ -354,11 +398,6 @@ class RemoteAccessServer(
             "/md.js" -> "remote/md.js"
             "/marked.js" -> "remote/marked.js"
             "/purify.js" -> "remote/purify.js"
-            "/workbench-tab.js" -> "remote/workbench-tab.js"
-            "/skills-tab.js" -> "remote/skills-tab.js"
-            "/memory-tab.js" -> "remote/memory-tab.js"
-            "/mcp-tab.js" -> "remote/mcp-tab.js"
-            "/scheduled-tab.js" -> "remote/scheduled-tab.js"
             "/ds-tokens.css" -> "remote/ds-tokens.css"
             "/ds-scrollbar.css" -> "remote/ds-scrollbar.css"
             else -> null
@@ -401,7 +440,25 @@ class RemoteAccessServer(
             "/api/messages" -> {
                 val sid = requireQuery(req, "sessionId")
                 val limit = (req.query["limit"]?.toIntOrNull() ?: 500).coerceIn(1, 2000)
-                respondJson(out, 200, ChatDebugMethods.messagesList(appContext, JSONObject().put("sessionId", sid).put("limit", limit).put("includeTools", true)))
+                val includeReasoning = req.query["includeReasoning"].equals("true", ignoreCase = true)
+                respondJson(out, 200, ChatDebugMethods.messagesList(appContext, JSONObject()
+                    .put("sessionId", sid)
+                    .put("limit", limit)
+                    .put("includeTools", true)
+                    .put("includeReasoning", includeReasoning)))
+            }
+            // The browser event transport is an authenticated WebSocket
+            // upgrade at this same path.  Keep an explicit HTTP response for
+            // accidental fetches so clients discover that a persistent event
+            // channel, rather than another polling route, is required.
+            "/api/events/session" -> {
+                requireMethod(req, "GET")
+                respondJson(
+                    out,
+                    426,
+                    JSONObject().put("error", "websocket upgrade required").put("endpoint", "/api/events/session"),
+                    mapOf("Upgrade" to "websocket"),
+                )
             }
             "/api/session/status" -> {
                 val sid = requireQuery(req, "sessionId")
@@ -445,6 +502,10 @@ class RemoteAccessServer(
                 requireMethod(req, "POST")
                 val body = JSONObject(req.body)
                 respondJson(out, 200, ChatMutationMethods.selectModel(appContext, body))
+            }
+            "/api/session/thinking" -> {
+                requireMethod(req, "POST")
+                respondJson(out, 200, ChatMutationMethods.selectThinkingLevel(appContext, JSONObject(req.body)))
             }
             "/api/session/delete" -> {
                 requireMethod(req, "POST")
@@ -788,6 +849,446 @@ class RemoteAccessServer(
     private fun requireQuery(req: Request, key: String): String = req.query[key]?.takeIf { it.isNotBlank() }
         ?: throw IllegalArgumentException("missing query parameter: $key")
 
+    /**
+     * Browser-facing transport for the append-only session event log.
+     *
+     * The WebSocket carries native [SessionEvent] wire envelopes (`session/event`)
+     * in sequence order, with [afterSeq] supplying replay after a reconnect.
+     * A subscription without a cursor gets one atomically waterlined
+     * `session/snapshot`; an unavailable replay cursor gets
+     * `session/subscribed { reset: true }` so the client can rehydrate.
+     */
+    private fun routeWebSocket(
+        req: Request,
+        input: BufferedInputStream,
+        out: BufferedOutputStream,
+    ) = runBlocking {
+        when (req.path) {
+            "/api/events/session" -> streamSessionEventsWebSocket(req, input, out)
+            else -> respondJson(out, 404, JSONObject().put("error", "websocket endpoint not found"))
+        }
+    }
+
+    private suspend fun streamSessionEventsWebSocket(
+        req: Request,
+        input: BufferedInputStream,
+        out: BufferedOutputStream,
+    ) {
+        requireMethod(req, "GET")
+        val sessionId = requireQuery(req, "sessionId")
+        requireExistingSession(sessionId)
+        val afterSeq = parseWebSocketAfterSeq(req)
+        val handshake = webSocketHandshake(req)
+        beginWebSocket(out, handshake.acceptKey, handshake.subprotocol)
+
+        val peer = WebSocketPeer(out)
+        val includeReasoning = req.query["includeReasoning"].equals("true", ignoreCase = true)
+        // From here onward HTTP has already switched protocols. Any failure
+        // must be expressed as a WebSocket close frame rather than letting the
+        // outer HTTP error handler append a second response after the 101.
+        // The connection is server-push only, but a browser automatically
+        // replies to pings and can initiate a normal close.  Keep that reader
+        // separate from the outbound event loop so an idle client can never
+        // stall token/tool delivery.  socket.use{} closes the stream when this
+        // method returns, unblocking this daemon reader if it is waiting.
+        Thread(
+            { receiveWebSocketControlFrames(input, peer) },
+            "remote-ws-control",
+        ).apply {
+            isDaemon = true
+            start()
+        }
+
+        // An absent cursor (or explicit snapshot=1) is a subscription, not a
+        // request for `eventsSince(null)`: that call intentionally means
+        // "start at latest" in the journal and would lose the tiny interval
+        // between a REST hydrate and this socket opening. The snapshot builder
+        // captures a sequence fence and its materialized event-tail overlay in
+        // the same event-log critical section, then this socket replays only
+        // events strictly after that fence.
+        val needsSnapshot = afterSeq == null || req.query["snapshot"] == "1"
+        var cursor = afterSeq ?: 0L
+        if (needsSnapshot) {
+            // The materialized event-tail overlay and this watermark are
+            // captured under the session-event lock. It includes raw provider
+            // chunks and tool transitions before Compose's intentionally
+            // throttled state receives them, so replaying only > fence can
+            // neither duplicate nor drop a token at the snapshot boundary.
+            val captured = try {
+                com.openminis.app.debug.HeadlessChatRunner
+                    .sessionSnapshotWithWatermark(appContext, sessionId, includeReasoning)
+            } catch (t: Throwable) {
+                Log.w(TAG, "websocket snapshot failed: ${t.message}")
+                peer.close(1011, "snapshot failed")
+                return
+            }
+            val fence = captured.lastSeq
+            val snapshot = captured.value
+            peer.sendText(JSONObject().apply {
+                put("type", "session/snapshot")
+                put("sessionId", sessionId)
+                put("lastSeq", fence)
+                put("snapshot", snapshot.put("lastSeq", fence))
+            }.toString())
+            cursor = fence
+        }
+
+        var nextPingAt = System.currentTimeMillis() + WEBSOCKET_PING_INTERVAL_MS
+        val expiresAt = System.currentTimeMillis() + WEBSOCKET_MAX_LIFETIME_MS
+        try {
+        coroutineScope {
+            while (peer.isOpen() && System.currentTimeMillis() < expiresAt) {
+                // Subscribe before reading the bounded journal.  If an event
+                // lands during the replay read it is either in that replay or
+                // already queued in [wake], so no edge is lost between the
+                // event-log snapshot and the live notification flow.
+                val awaitAfter = cursor
+                val wake = async(start = CoroutineStart.UNDISPATCHED) {
+                    com.openminis.app.ui.chat.SessionEventHub.events
+                        .filter { it.sessionId == sessionId && it.seq > awaitAfter }
+                        .first()
+                }
+                val replay = com.openminis.app.debug.HeadlessChatRunner.sessionEvents(appContext, sessionId, cursor)
+                if (replay.resetRequired) {
+                    peer.sendText(JSONObject().apply {
+                        put("type", "session/subscribed")
+                        put("sessionId", sessionId)
+                        put("lastSeq", replay.latestSeq)
+                        put("oldestAvailableSeq", replay.oldestAvailableSeq)
+                        put("reset", true)
+                    }.toString())
+                    // The browser must rehydrate a durable snapshot. Keep
+                    // this socket alive and forward everything after its new
+                    // waterline while that fetch is in flight.
+                    cursor = replay.latestSeq
+                } else {
+                    if (!needsSnapshot && cursor == afterSeq) {
+                        peer.sendText(JSONObject().apply {
+                            put("type", "session/subscribed")
+                            put("sessionId", sessionId)
+                            put("lastSeq", replay.latestSeq)
+                            put("oldestAvailableSeq", replay.oldestAvailableSeq)
+                            put("reset", false)
+                        }.toString())
+                    }
+                    replay.events.forEach { event ->
+                        if (peer.isOpen()) peer.sendText(event.toWireEnvelope().toString())
+                    }
+                    cursor = replay.latestSeq
+                }
+
+                val now = System.currentTimeMillis()
+                if (now >= nextPingAt) {
+                    if (now - peer.lastPongAt() > WEBSOCKET_PONG_GRACE_MS) {
+                        peer.close(1001, "pong timeout")
+                        break
+                    }
+                    peer.sendPing()
+                    nextPingAt = now + WEBSOCKET_PING_INTERVAL_MS
+                }
+                // Wait for a journal append, or only until the next ping
+                // deadline. This is a true push path: the browser receives
+                // typed native events without a timer polling messages or
+                // rebuilding a conversation snapshot.
+                val waitMs = (nextPingAt - System.currentTimeMillis()).coerceAtLeast(1L)
+                withTimeoutOrNull(waitMs) { wake.await() }
+                wake.cancel()
+            }
+        }
+        } catch (t: Throwable) {
+            if (peer.isOpen()) {
+                Log.w(TAG, "websocket event stream failed: ${t.message}")
+                peer.close(1011, "event stream failed")
+            }
+        } finally {
+            if (peer.isOpen()) peer.close(1001, "reconnect")
+        }
+    }
+
+    private data class WebSocketHandshake(val acceptKey: String, val subprotocol: String?)
+
+    private fun parseWebSocketAfterSeq(req: Request): Long? {
+        val raw = req.query["afterSeq"] ?: return null
+        return raw.toLongOrNull()?.takeIf { it >= 0L }
+            ?: throw IllegalArgumentException("afterSeq must be a non-negative integer")
+    }
+
+    private fun webSocketHandshake(req: Request): WebSocketHandshake {
+        if (!isWebSocketUpgrade(req)) throw IllegalArgumentException("websocket upgrade required")
+        if (req.headers["sec-websocket-version"] != "13") {
+            throw IllegalArgumentException("unsupported websocket version")
+        }
+        val key = req.headers["sec-websocket-key"]?.trim().orEmpty()
+        val decoded = runCatching { Base64.getDecoder().decode(key) }.getOrNull()
+        if (decoded == null || decoded.size != 16) {
+            throw IllegalArgumentException("invalid Sec-WebSocket-Key")
+        }
+        val accept = Base64.getEncoder().encodeToString(
+            MessageDigest.getInstance("SHA-1")
+                .digest((key + WEBSOCKET_GUID).toByteArray(StandardCharsets.US_ASCII)),
+        )
+        val requestedProtocols = req.headers["sec-websocket-protocol"]
+            ?.split(',')
+            ?.map { it.trim() }
+            .orEmpty()
+        return WebSocketHandshake(
+            acceptKey = accept,
+            subprotocol = WEBSOCKET_SUBPROTOCOL.takeIf { it in requestedProtocols },
+        )
+    }
+
+    private fun beginWebSocket(out: BufferedOutputStream, acceptKey: String, subprotocol: String?) {
+        val headers = buildString {
+            append("HTTP/1.1 101 Switching Protocols\r\n")
+            append("Upgrade: websocket\r\n")
+            append("Connection: Upgrade\r\n")
+            append("Sec-WebSocket-Accept: ").append(acceptKey).append("\r\n")
+            subprotocol?.let { append("Sec-WebSocket-Protocol: ").append(it).append("\r\n") }
+            append("Cache-Control: no-store\r\n")
+            append("X-Content-Type-Options: nosniff\r\n")
+            append("Referrer-Policy: no-referrer\r\n")
+            append("X-Frame-Options: DENY\r\n")
+            append("\r\n")
+        }.toByteArray(StandardCharsets.US_ASCII)
+        out.write(headers)
+        out.flush()
+    }
+
+    private data class WebSocketFrame(
+        val fin: Boolean,
+        val opcode: Int,
+        val payload: ByteArray,
+    )
+
+    private class WebSocketProtocolException(message: String) : IllegalArgumentException(message)
+
+    /** A synchronized writer because the reader may send a pong while the event loop writes text. */
+    private class WebSocketPeer(private val out: BufferedOutputStream) {
+        private val writeLock = Any()
+        private val open = AtomicBoolean(true)
+        private val sentClose = AtomicBoolean(false)
+        private val lastPong = AtomicLong(System.currentTimeMillis())
+
+        fun isOpen(): Boolean = open.get()
+        fun lastPongAt(): Long = lastPong.get()
+        fun recordPong() = lastPong.set(System.currentTimeMillis())
+
+        /**
+         * Browser WebSocket implementations reassemble fragmented text
+         * messages before firing `message`, so a 2,000-message initial
+         * snapshot need not be artificially truncated to the frame cap. Hold
+         * the writer lock across the fragments; control frames may legally
+         * interleave but another data message may not.
+         */
+        fun sendText(payload: String) {
+            if (!open.get()) return
+            val bytes = payload.toByteArray(StandardCharsets.UTF_8)
+            try {
+                synchronized(writeLock) {
+                    var offset = 0
+                    var first = true
+                    do {
+                        val length = minOf(MAX_WEBSOCKET_FRAME_BYTES, bytes.size - offset)
+                        val final = offset + length >= bytes.size
+                        writeFrameLocked(
+                            opcode = if (first) 0x1 else 0x0,
+                            payload = bytes,
+                            offset = offset,
+                            length = length,
+                            fin = final,
+                        )
+                        offset += length
+                        first = false
+                    } while (offset < bytes.size)
+                }
+            } catch (_: Exception) {
+                open.set(false)
+            }
+        }
+
+        fun sendPing() = sendFrame(0x9, ByteArray(0))
+        fun sendPong(payload: ByteArray) = sendFrame(0xA, payload)
+
+        fun close(code: Int, reason: String) {
+            val source = reason.toByteArray(StandardCharsets.UTF_8)
+            // A close control frame is capped at 125 bytes and uses two for
+            // its code. All server-authored reasons are ASCII, so bounded
+            // copying cannot split a multi-byte sequence here.
+            val reasonBytes = source.copyOf(minOf(source.size, 123))
+            val payload = ByteArray(2 + reasonBytes.size)
+            payload[0] = (code ushr 8).toByte()
+            payload[1] = code.toByte()
+            reasonBytes.copyInto(payload, destinationOffset = 2)
+            sendClose(payload)
+        }
+
+        fun acknowledgeClose(payload: ByteArray) = sendClose(payload)
+
+        private fun sendClose(payload: ByteArray) {
+            if (!sentClose.compareAndSet(false, true)) {
+                open.set(false)
+                return
+            }
+            try {
+                writeFrame(0x8, payload)
+            } finally {
+                open.set(false)
+            }
+        }
+
+        private fun sendFrame(opcode: Int, payload: ByteArray) {
+            if (!open.get()) return
+            try {
+                writeFrame(opcode, payload)
+            } catch (_: Exception) {
+                open.set(false)
+            }
+        }
+
+        private fun writeFrame(opcode: Int, payload: ByteArray) = synchronized(writeLock) {
+            writeFrameLocked(opcode, payload, 0, payload.size, fin = true)
+        }
+
+        private fun writeFrameLocked(
+            opcode: Int,
+            payload: ByteArray,
+            offset: Int,
+            length: Int,
+            fin: Boolean,
+        ) {
+            require(length in 0..MAX_WEBSOCKET_FRAME_BYTES) { "websocket frame too large" }
+            require(offset >= 0 && offset + length <= payload.size) { "invalid websocket payload range" }
+            if ((opcode and 0x08) != 0) require(fin && length <= 125) { "invalid websocket control frame" }
+            out.write((if (fin) 0x80 else 0x00) or (opcode and 0x0F))
+            when {
+                length <= 125 -> out.write(length)
+                length <= 0xFFFF -> {
+                    out.write(126)
+                    out.write(length ushr 8)
+                    out.write(length)
+                }
+                else -> {
+                    out.write(127)
+                    val size = length.toLong()
+                    for (shift in 56 downTo 0 step 8) out.write((size ushr shift).toInt() and 0xFF)
+                }
+            }
+            out.write(payload, offset, length)
+            out.flush()
+        }
+    }
+
+    private fun receiveWebSocketControlFrames(input: BufferedInputStream, peer: WebSocketPeer) {
+        try {
+            while (peer.isOpen()) {
+                val frame = try {
+                    readWebSocketFrame(input)
+                } catch (_: SocketTimeoutException) {
+                    continue
+                }
+                if (frame == null) {
+                    peer.close(1001, "client disconnected")
+                    return
+                }
+                when (frame.opcode) {
+                    0x8 -> {
+                        validateClosePayload(frame.payload)
+                        peer.acknowledgeClose(frame.payload)
+                        return
+                    }
+                    0x9 -> peer.sendPong(frame.payload)
+                    0xA -> peer.recordPong()
+                    // The event endpoint subscribes through its URL.  It never
+                    // accepts application data on the socket, which keeps the
+                    // WebSocket surface read-only even for bearer clients.
+                    0x0, 0x1, 0x2 -> {
+                        peer.close(1003, "server push only")
+                        return
+                    }
+                    else -> throw WebSocketProtocolException("unsupported websocket opcode")
+                }
+            }
+        } catch (e: WebSocketProtocolException) {
+            peer.close(1002, "protocol error")
+        } catch (_: Exception) {
+            if (peer.isOpen()) peer.close(1011, "websocket read failed")
+        }
+    }
+
+    private fun readWebSocketFrame(input: BufferedInputStream): WebSocketFrame? {
+        val first = input.read()
+        if (first < 0) return null
+        val second = input.read()
+        if (second < 0) throw WebSocketProtocolException("truncated websocket header")
+        if ((first and 0x70) != 0) throw WebSocketProtocolException("websocket extensions are not supported")
+        val fin = (first and 0x80) != 0
+        val opcode = first and 0x0F
+        val masked = (second and 0x80) != 0
+        if (!masked) throw WebSocketProtocolException("client websocket frames must be masked")
+
+        var length = (second and 0x7F).toLong()
+        when (length) {
+            126L -> {
+                length = ((readWebSocketByte(input).toLong() shl 8) or readWebSocketByte(input).toLong())
+            }
+            127L -> {
+                var parsed = 0L
+                repeat(8) { index ->
+                    val b = readWebSocketByte(input)
+                    if (index == 0 && (b and 0x80) != 0) {
+                        throw WebSocketProtocolException("invalid websocket length")
+                    }
+                    parsed = (parsed shl 8) or b.toLong()
+                }
+                length = parsed
+            }
+        }
+        if (length > MAX_WEBSOCKET_FRAME_BYTES.toLong()) {
+            throw WebSocketProtocolException("websocket frame too large")
+        }
+        val isControl = opcode and 0x08 != 0
+        if (isControl && (!fin || length > 125L)) {
+            throw WebSocketProtocolException("invalid control frame")
+        }
+        val mask = ByteArray(4)
+        readWebSocketFully(input, mask)
+        val payload = ByteArray(length.toInt())
+        readWebSocketFully(input, payload)
+        for (index in payload.indices) payload[index] = (payload[index].toInt() xor mask[index % 4].toInt()).toByte()
+        return WebSocketFrame(fin = fin, opcode = opcode, payload = payload)
+    }
+
+    private fun readWebSocketByte(input: BufferedInputStream): Int {
+        val value = input.read()
+        if (value < 0) throw WebSocketProtocolException("truncated websocket frame")
+        return value and 0xFF
+    }
+
+    private fun readWebSocketFully(input: BufferedInputStream, target: ByteArray) {
+        var offset = 0
+        while (offset < target.size) {
+            val read = input.read(target, offset, target.size - offset)
+            if (read < 0) throw WebSocketProtocolException("truncated websocket frame")
+            offset += read
+        }
+    }
+
+    private fun validateClosePayload(payload: ByteArray) {
+        if (payload.size == 1) throw WebSocketProtocolException("invalid close frame")
+        if (payload.size < 2) return
+        val code = ((payload[0].toInt() and 0xFF) shl 8) or (payload[1].toInt() and 0xFF)
+        val validCode = (code in 1000..1014 && code !in setOf(1004, 1005, 1006)) || code in 3000..4999
+        if (!validCode) throw WebSocketProtocolException("invalid close code")
+        try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(payload, 2, payload.size - 2))
+        } catch (_: Exception) {
+            throw WebSocketProtocolException("invalid close reason")
+        }
+    }
+
     private class BodyTooLargeException : RuntimeException()
 
     private fun readRequest(input: BufferedInputStream, remoteAddress: String? = null): Request? {
@@ -923,7 +1424,7 @@ class RemoteAccessServer(
         val reason = when (code) {
             200 -> "OK"; 204 -> "No Content"; 400 -> "Bad Request"; 401 -> "Unauthorized";
             403 -> "Forbidden"; 404 -> "Not Found"; 405 -> "Method Not Allowed";
-            413 -> "Payload Too Large"; 429 -> "Too Many Requests"; 503 -> "Service Unavailable";
+            413 -> "Payload Too Large"; 426 -> "Upgrade Required"; 429 -> "Too Many Requests"; 503 -> "Service Unavailable";
             else -> "Error"
         }
         val headers = buildString {
@@ -936,7 +1437,7 @@ class RemoteAccessServer(
             append("Referrer-Policy: no-referrer\r\n")
             append("X-Frame-Options: DENY\r\n")
             append("Permissions-Policy: camera=(), microphone=(), geolocation=()\r\n")
-            append("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'\r\n")
+            append("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'\r\n")
             for ((name, value) in extraHeaders) append(name).append(": ").append(value).append("\r\n")
             append("\r\n")
         }.toByteArray(StandardCharsets.UTF_8)

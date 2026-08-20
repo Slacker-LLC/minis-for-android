@@ -245,6 +245,24 @@ internal object ChatMutationMethods {
     }
 
     /**
+     * Applies the compose-model thinking selector to the shared session VM.
+     * The VM persists the override to the same Room row the native UI restores,
+     * so a Web selection is immediately visible on Android and survives reload.
+     */
+    suspend fun selectThinkingLevel(context: Context, params: JSONObject): JSONObject {
+        val sessionId = params.optString("sessionId", "").ifEmpty {
+            throw RPCException(-32602, "Missing 'sessionId' param")
+        }
+        val level = parseThinkingLevel(params)
+            ?: throw RPCException(-32602, "Missing 'thinkingLevel' param")
+        val actual = HeadlessChatRunner.selectThinkingLevel(context, sessionId, level)
+        return JSONObject().apply {
+            put("sessionId", sessionId)
+            put("thinkingLevel", actual)
+        }
+    }
+
+    /**
      * Mirrors iOS `chat.compact.before` ([DebugRPCChat.compactBefore]).
      *
      * iOS supports two modes:

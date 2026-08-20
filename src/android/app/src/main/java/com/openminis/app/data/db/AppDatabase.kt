@@ -14,8 +14,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CompactMarkerEntity::class,
         WebAppShortcutEntity::class,
         FolderEntity::class,
+        SessionEventEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -200,6 +201,37 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Durable, bounded replay window for the DSH-style session event log.
+         * Existing messages remain the initial snapshot; this additive table
+         * carries only live state transitions after a snapshot cursor.
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS session_events (
+                        session_id TEXT NOT NULL,
+                        seq INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at INTEGER NOT NULL,
+                        PRIMARY KEY(session_id, seq),
+                        FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_session_events_session_id_seq " +
+                        "ON session_events(session_id, seq)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_session_events_created_at " +
+                        "ON session_events(created_at)",
+                )
+            }
+        }
+
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // sessions: add iOS-parity columns
@@ -237,7 +269,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "minis.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .build()
                     .also { INSTANCE = it }
             }

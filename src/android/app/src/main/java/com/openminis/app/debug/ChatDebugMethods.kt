@@ -136,19 +136,20 @@ internal object ChatDebugMethods {
         if (parts != null) {
             obj.put("parts", parts)
             val sb = StringBuilder()
-            val tools = JSONArray()
             val attachments = JSONArray()
             for (i in 0 until parts.length()) {
                 val p = parts.optJSONObject(i) ?: continue
                 when (p.optString("type")) {
                     "text" -> sb.append(p.optString("value", ""))
-                    "tool_call", "tool_use" -> if (includeTools) tools.put(p)
-                    "tool_result" -> if (includeTools) tools.put(p)
                     "image", "file", "attachment" -> attachments.put(p)
                 }
             }
             if (sb.isNotEmpty()) obj.put("content", sb.toString())
-            if (tools.length() > 0) obj.put("toolCalls", tools)
+            if (includeTools) {
+                val trajectory = ChatToolTrajectoryNormalizer.collect(parts)
+                if (trajectory.toolCalls.length() > 0) obj.put("toolCalls", trajectory.toolCalls)
+                if (trajectory.toolResults.length() > 0) obj.put("toolResults", trajectory.toolResults)
+            }
             if (attachments.length() > 0) obj.put("attachments", attachments)
         } else {
             // Legacy/unstructured payload — return raw.
@@ -277,5 +278,113 @@ internal object ChatDebugMethods {
         val entry = cfg.modelEntries.firstOrNull { it.baseModel.id == modelId || it.id == modelId }
             ?: return modelId
         return entry.model.displayName
+    }
+}
+
+/**
+ * Gives remote clients one stable tool-event shape while retaining the raw
+ * persisted block. Android stores [toolUse]/[toolResult] with their fields
+ * nested under `value`; older imported sessions use flat OpenAI-style
+ * `tool_call`/`tool_use`/`tool_result` blocks.
+ */
+internal object ChatToolTrajectoryNormalizer {
+
+    data class Trajectory(
+        val toolCalls: JSONArray,
+        val toolResults: JSONArray,
+    )
+
+    fun collect(parts: JSONArray): Trajectory {
+        val toolCalls = JSONArray()
+        val toolResults = JSONArray()
+        for (i in 0 until parts.length()) {
+            val block = parts.optJSONObject(i) ?: continue
+            when (block.optString("type")) {
+                "toolUse", "tool_call", "tool_use" -> toolCalls.put(normalizeCall(block))
+                "toolResult", "tool_result" -> toolResults.put(normalizeResult(block))
+            }
+        }
+        return Trajectory(toolCalls = toolCalls, toolResults = toolResults)
+    }
+
+    private fun normalizeCall(block: JSONObject): JSONObject {
+        val payload = payloadOf(block)
+        return normalizedBase(block, kind = "call").apply {
+            putAlias(this, "id", payload, block, "id", "toolUseId", "tool_use_id", "toolCallId", "tool_call_id", "callId", "call_id")
+            putAlias(this, "toolUseId", payload, block, "toolUseId", "tool_use_id", "toolCallId", "tool_call_id", "callId", "call_id", "id")
+            putToolName(this, payload, block)
+            putAlias(this, "input", payload, block, "input", "arguments", "args", "parameters")
+            putAlias(this, "description", payload, block, "description", "title", "toolTitle", "tool_title")
+            putAlias(this, "pageURL", payload, block, "pageURL", "pageUrl", "page_url")
+            putAlias(this, "imageFilePath", payload, block, "imageFilePath", "image_file_path")
+            putAlias(this, "thoughtSignature", payload, block, "thoughtSignature", "thought_signature")
+        }
+    }
+
+    private fun normalizeResult(block: JSONObject): JSONObject {
+        val payload = payloadOf(block)
+        return normalizedBase(block, kind = "result").apply {
+            putAlias(this, "id", payload, block, "id", "toolUseId", "tool_use_id", "toolCallId", "tool_call_id", "callId", "call_id")
+            putAlias(this, "toolUseId", payload, block, "toolUseId", "tool_use_id", "toolCallId", "tool_call_id", "callId", "call_id", "id")
+            putToolName(this, payload, block)
+            putAlias(this, "output", payload, block, "output", "content", "result")
+            putAlias(this, "snapshot", payload, block, "snapshot")
+            putAlias(this, "error", payload, block, "error")
+
+            val isError = booleanValue(firstValue(payload, block, "isError", "is_error"))
+            if (isError != null) put("isError", isError)
+            val success = booleanValue(firstValue(payload, block, "success"))
+            when {
+                success != null -> put("success", success)
+                isError != null -> put("success", !isError)
+            }
+        }
+    }
+
+    private fun normalizedBase(block: JSONObject, kind: String): JSONObject = JSONObject().apply {
+        put("type", block.optString("type"))
+        put("kind", kind)
+        // Keep both representations available for existing API consumers and
+        // for diagnostics of malformed historical records.
+        if (block.has("value")) put("value", block.get("value"))
+        put("raw", block)
+    }
+
+    private fun payloadOf(block: JSONObject): JSONObject = block.optJSONObject("value") ?: block
+
+    private fun putToolName(target: JSONObject, primary: JSONObject, fallback: JSONObject) {
+        val name = firstValue(primary, fallback, "name", "toolName", "tool_name") ?: return
+        target.put("name", name)
+        target.put("toolName", name)
+    }
+
+    private fun putAlias(
+        target: JSONObject,
+        canonicalName: String,
+        primary: JSONObject,
+        fallback: JSONObject,
+        vararg aliases: String,
+    ) {
+        firstValue(primary, fallback, *aliases)?.let { target.put(canonicalName, it) }
+    }
+
+    private fun firstValue(primary: JSONObject, fallback: JSONObject, vararg names: String): Any? {
+        for (source in arrayOf(primary, fallback)) {
+            for (name in names) {
+                if (source.has(name) && !source.isNull(name)) return source.get(name)
+            }
+        }
+        return null
+    }
+
+    private fun booleanValue(value: Any?): Boolean? = when (value) {
+        is Boolean -> value
+        is Number -> value.toInt() != 0
+        is String -> when {
+            value.equals("true", ignoreCase = true) || value == "1" -> true
+            value.equals("false", ignoreCase = true) || value == "0" -> false
+            else -> null
+        }
+        else -> null
     }
 }

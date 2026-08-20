@@ -4,6 +4,25 @@
 
 ---
 
+## 2026-08-21：Harness RC8 source-adapted Web 工作台与事件流
+
+- 以本地官方 DeepSeek Harness `0.1.0-rc.8` 的 **MIT 源码**为信息架构、会话事件与
+  交互细节的参照；原生改写 `index.html`、`app.css`、`app.js`，不复制或捆绑其
+  React/Cordis bundle；
+- 聊天工作台采用 AppFrame 的阅读优先原则：会话栏可收起、Details 默认关闭、工作区与
+  控制中心按需打开；消息、工具行和检查器均用稳定 id 局部更新；
+- Web Remote 首次以快照建立页面，随后从认证 WebSocket
+  `/api/events/session` 接收带单调 `seq` 的 `session/event`。重连带 `afterSeq`，
+  事件缺口或过期游标会重新取得快照，不再定时轮询整段会话；
+- 事件桥接的是 Android 正在运行的 `ChatViewModel`：网页与手机共享流式文本、思考、
+  工具状态、会话模型和思考强度；
+- `ChatToolTrajectoryNormalizer` 统一 `toolUse/toolResult` 与历史 snake_case 工具块，
+  并加 JVM 回归测试；`/api/messages` 可按需返回 reasoning；
+- 加入 DeepSeek Harness MIT notice，保留 DeepSeek theme BSD-3 notice。项目不与
+  DeepSeek 关联或获其背书。
+
+---
+
 ## 新增文件
 
 ### 桌面宠物 `app/src/main/java/com/openminis/app/pet/`
@@ -116,11 +135,13 @@ CDN 一律不可达。
 
 ### 7. Web 端没有流式、还闪
 
-**原因**：每 1600ms 把整个消息列表 `innerHTML` 重建一次——既看不到增长，又会闪、丢失选中
-的文本和滚动位置。
+**历史原因**：早期页面用整段会话刷新驱动 UI，导致流式文本不连续，并破坏选中、展开状态和
+滚动位置。
 
-**改法**：按消息 id 增量更新，只重绘内容变化的那一条；生成中轮询 450ms、空闲 2500ms，会话
-列表每 4 次才拉一次。滚动只在读者本来就在底部时才跟随，否则流式回复会一直把视图拽走。
+**当前改法**：页面先建立带水位的会话快照，再订阅认证 WebSocket
+`/api/events/session` 的单调 `seq` 事件。`assistant/chunk`、工具调用/结果和回合状态都按稳定
+消息 id 局部投影；断线以 `afterSeq` 回放，游标失效则重取快照。页面不再以定时整段会话刷新作为
+流式路径。
 
 ### 8. 其它
 
@@ -180,9 +201,9 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
 | `mcp.` | `list` / `toggle` / `delete` | MCP 服务器列表、启用/停用、删除 |
 | `scheduled.` | `list` / `toggle` / `delete` / `run` | 定时任务列表、启停、删除、立即运行 |
 
-前端按页拆成 `skills-tab.js` / `memory-tab.js` / `mcp-tab.js` / `scheduled-tab.js`，
-与 `app.js` 的懒加载表 `TAB_LOADERS` 挂接，切到对应标签才请求数据；新建/导入类操作
-仍然保留在手机端，网页只做查看、编辑、启停和删除，避免把管理面撑得过大。
+当前控制中心由主工作台 `app.js` 统一协调：切换到相应控制面后才读取其数据，不再依赖旧的
+分标签静态脚本。新建/导入类操作仍然保留在手机端；网页只做现有 RPC 所支持的查看、编辑、启停
+和删除，避免把管理面扩展成第二套运行时。
 
 **白名单**：`RPC_ALLOWED_PREFIXES` 放行 `skills.` / `memory.` / `soul.` / `mcp.` /
 `scheduled.`，这四个族内部都做了参数校验（技能/服务器/任务 id 必须存在，记忆文件名
@@ -201,7 +222,7 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
    （1–5 层）与单任务超时（1–30 分钟），`SubagentTool` 由硬编码改为读
    `SubagentLimits`。改动只影响之后新建的会话，运行中会话保持原配置。
 2. **模型提问卡片**：新增模型工具 `ask_user_question`（暂停回合、等待用户回答），
-   Web Remote 轮询 `chat.question.pending` 渲染提问卡（单选/多选/自定义/跳过），
+   Web Remote 通过已有 `chat.question.*` RPC 读取并提交回答（单选/多选/自定义/跳过），
    `chat.question.answer` 恢复回合；超时/跳过会明确告知模型。
 3. **会话全文搜索**：新增 `chat.search`，复用 `minis-sessions-cli search`
 同一套参数化 LIKE + Kotlin 侧文本抽取（工具元数据误命中会被过滤），
@@ -244,10 +265,9 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
 App 原生 UI：
 
 1. **提问卡片**：新增 `ChatAgentStateUI.kt` 的 `AskUserQuestionDialog`，
-   流式期间轮询同一个 `QuestionCenter`，手机直接弹卡回答（单选即答、
-   多选/自定义/跳过），对话恢复。
+   使用同一个 `QuestionCenter`，手机直接弹卡回答（单选即答、多选/自定义/跳过），对话恢复。
 2. **目标 / 待办 / 计划 / 产出文件条**：`AgentStateBars` 浮在输入框上方，
-   轮询同一个 `AgentStateStore`，可暂停/恢复/清除目标，显示待办与产出。
+   使用同一个 `AgentStateStore`，可暂停/恢复/清除目标，显示待办与产出。
 3. **消息反馈 👍/👎**：`MessageFeedbackRow` 挂到每条 assistant 消息底部，
    写入同一个 `MessageFeedbackStore`。
 4. **权限预设**：Web 远程设置页新增「权限预设」分区（Workspace Write /
@@ -272,47 +292,32 @@ MinisTextButton、SettingsRow/SettingsSection、MaterialTheme 排版），
 
 ### 16. Web Remote 按 DeepSeek Harness 布局重写
 
-从本机 DeepSeek Harness 的 `dsh-web-frontend/dist` 提取真实设计系统
-（`--dsw-alias-*` / `--dsw-specific-*`：bg-base/layer、border-l1/l2、
-label-primary/secondary/tertiary、sidebar-fill、bubble、button-primary、
-shadow-lv1/2/3、markdown-code-block 等），整体重写 `app.css`：
+以本地官方 DeepSeek Harness `0.1.0-rc.8` 的 MIT 源码为参照，按 source-adapted
+方式重写本项目工作台，而不是提取或嵌入其前端 bundle：
 
-- 三栏骨架：侧边栏（264px）| 会话主区 | 工具面板（340px）；
-- 侧边栏：DeepSeek 式 nav-item（激活项带蓝色强调条）、胶囊搜索框、
-  会话行 10px 圆角 + hover 背景；
-- 会话主区：顶栏 56px + 居中 760px 会话流 + sticky 输入 Dock
-  （22px 圆角胶囊输入框、聚焦描边、lv2 阴影）；
-- 工具面板：胶囊 Tab（active 用 ghost-active 填充 + inset 描边）、
-  16px 圆角卡片、表格/表单/终端全部按 token 统一；
-- 用户气泡用 `--dsw-specific-bubble`，assistant 纯文本，Markdown
-  代码块/表格/引用按 DSW 排版；弹层 24px 圆角 + lv3 阴影；
-- 窄屏（≤1180px）工具面板变右侧抽屉，≤860px 侧边栏变左侧抽屉，
-  原 `.open` 切换逻辑不变。
+- 会话 rail 可收起，聊天始终是默认主区；Details Inspector、活动、控制中心和 Workspace
+  仅在需要时打开；
+- 会话行、消息、工具轨迹和详情面板使用本项目自己的 HTML/CSS/JS；主题 token 与本地
+  Markdown/净化资源随 APK 分发；
+- 布局在窄屏下优先保住聊天阅读区，并将附属面板切换为临时层；
+- 工作台逻辑收敛到主 `app.js`，不再依赖旧的分栏或分标签静态模块。
 
-JS 逻辑与全部 DOM id 保持不变，只重写结构与样式。
+Harness 贡献的是信息架构、事件语义和交互原则，不是可直接嵌入的 UI 代码。
 
 ### 17. 深度对照 DeepSeek 前端：交互细节补齐
 
-逐项对照 `dsh-web-frontend` 的组件词汇（menu / toast / tool presentation /
-sidebar nav / popupSelect / skeleton）补齐：
+本次重点不是复制某一套视觉细节，而是让交互遵从真实会话事件：
 
-1. **Toast**：新增 DeepSeek 风格顶部 Toast（圆角 14px、lv3 阴影、淡入
-   淡出动画、error 变体），全部 `alert()` 错误提示替换为 Toast；
-2. **Composer 命令菜单**：输入框左侧新增 `+`，弹出 popupSelect 式菜单
-   （新会话 / 压缩上下文 / 计划模式 / 打开工具面板），12px 圆角菜单、
-   item hover、menu-in 动画；
-3. **会话行 hover 操作**：会话行右侧出现 ⋯，点击唤出重命名/删除菜单，
-   触屏设备常显；
-4. **工具卡片状态**：工具卡升级为「状态点 + 工具 + 数量」头部，流式时
-   蓝点脉冲，名称胶囊式排列；
-5. **模型弹层**：改为底部弹出式 popover（轻遮罩 + 上滑动画），替代整屏
-   对话框；
-6. **骨架屏**：搜索加载时显示 shimmer 骨架行；
-7. **微交互**：菜单/弹层/按钮统一 0.12–0.18s ease 过渡与 keyframes。
+1. **流式消息**：`assistant/chunk` 只更新对应文本或 reasoning 块；最终
+   `assistant/message` 收束该消息；
+2. **工具轨迹**：`tool/call` / `tool/result` 在同一 assistant turn 中更新，详情检查器可
+   展示已有输入、输出和状态；
+3. **会话操作**：会话菜单、命令入口、Toast 与按需 Workspace/Details 使用稳定 DOM
+   节点，不用全量聊天刷新修复状态；
+4. **重连**：以 `afterSeq` 回放；缺口或过期游标触发快照恢复。
 
-**遗落清单（暂缓，需更大改动）**：轨迹回放页、子代理目录树、会话日志
-ZIP 导出、tooltip/hovercard、新用户 onboarding、计划模式强制审批、
-动态命令目录（当前为固定菜单）。其余 DeepSeek 前端词汇已覆盖。
+尚未列为承诺的功能包括通用任务队列、完整轨迹回放、子代理目录树、会话日志 ZIP 导出、
+动态命令目录和强制审批工作流。不要把这些待评估项目记为已经由 Harness 移植完成。
 
 ### 18. 默认数字助手 + 手机端计划入口同步（1.12-pet.10）
 
@@ -390,7 +395,7 @@ ZIP 导出、tooltip/hovercard、新用户 onboarding、计划模式强制审批
   `/var/minis/workspace`，Full Access 放开
 
 **其它**：设置页 ON_RESUME 状态同步（通知栏停止后开关不再显示旧值）；
-app.js 三处（matchedCount 转义、死代码清理、用量徽标接入轮询）；
+app.js 三处（matchedCount 转义、死代码清理、用量徽标状态接入）；
 build.gradle release 签名警告（勿用 debug keystore 分发）；
 契约文档与实现字段漂移注记。
 

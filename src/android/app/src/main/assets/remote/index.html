@@ -4,242 +4,183 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#ffffff" />
   <title>OpenMinis Remote</title>
-  <link rel="stylesheet" href="/ds-tokens.css">
-  <link rel="stylesheet" href="/ds-scrollbar.css">
+  <!-- DSH rc.8 MIT design-token and scrollbar sheets are intentionally kept
+       ahead of the Remote implementation stylesheet. -->
+  <link rel="stylesheet" href="/ds-tokens.css" />
+  <link rel="stylesheet" href="/ds-scrollbar.css" />
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
   <div id="login" class="login-shell">
-    <main class="login-card">
-      <div class="brand-mark">M</div>
-      <div class="eyebrow">OPENMINIS</div>
-      <h1>Web 远程控制</h1>
-      <p>登录后可操作这台手机上的同一套会话、Agent、文件和 Persistent Shell。</p>
-      <label class="field-label">用户名
+    <main class="login-card" aria-labelledby="loginTitle">
+      <div class="login-mark" aria-hidden="true">M</div>
+      <p class="login-kicker">OPENMINIS REMOTE</p>
+      <h1 id="loginTitle">继续你的会话</h1>
+      <p class="login-copy">网页与手机共享同一会话、模型、流式回复、工具轨迹和工作区。</p>
+      <label class="login-field">用户名
         <input id="usernameInput" type="text" autocomplete="username" value="admin" />
       </label>
-      <label class="field-label">密码
+      <label class="login-field">密码
         <input id="passwordInput" type="password" autocomplete="current-password" />
       </label>
-      <button id="connectBtn" class="primary wide">登录</button>
-      <div id="loginError" class="error" role="alert"></div>
-      <div class="login-note">密码只提交给你的手机 Web Remote；浏览器随后使用 HttpOnly 会话 Cookie。</div>
+      <button id="connectBtn" class="button button-primary login-submit">登录</button>
+      <p id="loginError" class="login-error" role="alert"></p>
+      <p class="login-note">凭据仅提交给这台手机；登录后使用 HttpOnly 会话 Cookie。</p>
     </main>
   </div>
 
-  <div id="app" class="app hidden">
-    <aside class="sidebar">
-      <div class="sidebar-head">
-        <div class="brand-mark small">M</div>
-        <div><strong>OpenMinis</strong><span>Remote</span></div>
+  <div id="app" class="remote-app hidden" data-phase="blank" data-details-open="false">
+    <aside id="sidebar" class="sidebar" aria-label="会话导航">
+      <div class="sidebar-brand-row">
+        <button id="sidebarCollapse" class="icon-button sidebar-collapse" aria-label="收起会话栏" title="收起会话栏">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="brand-lockup"><span class="brand-mark">M</span><span>OpenMinis</span></div>
       </div>
-      <button id="newChat" class="new-chat">＋ 新会话</button>
-      <div class="search-box">
-        <input id="searchQuery" type="search" placeholder="搜索会话…" autocomplete="off" />
-        <button id="searchGo" class="search-go" title="搜索">⌕</button>
+
+      <div class="sidebar-actions">
+        <button id="newChat" class="new-session-button"><span aria-hidden="true">＋</span><b>新会话</b><kbd>⌘ K</kbd></button>
+        <button id="searchToggle" class="sidebar-search-button"><span class="svg-icon" aria-hidden="true">⌕</span><span>搜索会话</span><kbd>⌘ /</kbd></button>
       </div>
-      <div id="searchResults" class="search-results hidden"></div>
-      <div class="section-label">会话</div>
-      <div id="sessions" class="sessions"></div>
-      <div class="sidebar-foot">
-        <span id="serverDot" class="dot"></span><span id="serverState">已连接</span>
-        <button id="logoutBtn" class="icon-button" title="退出">退出</button>
+
+      <div id="sidebarSearch" class="sidebar-search hidden">
+        <div class="search-input-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索所有会话" autocomplete="off" /><button id="searchClose" class="icon-button" aria-label="关闭搜索">×</button></div>
+        <div id="searchResults" class="search-results"></div>
+      </div>
+
+      <div class="sidebar-section-head"><span>会话</span><button id="sessionsRefresh" class="quiet-icon" title="刷新会话" aria-label="刷新会话">↻</button></div>
+      <div id="sessions" class="session-list" role="list"></div>
+
+      <div class="sidebar-footer">
+        <button id="workspaceButton" class="sidebar-footer-button"><span aria-hidden="true">▱</span><span>工作区</span></button>
+        <button id="controlButton" class="sidebar-footer-button"><span aria-hidden="true">⚙</span><span>控制中心</span></button>
+        <div class="connection-status"><span id="serverDot" class="status-dot"></span><span id="serverState">已连接到手机</span></div>
+        <button id="logoutBtn" class="sidebar-footer-button subtle"><span aria-hidden="true">↪</span><span>退出登录</span></button>
       </div>
     </aside>
 
-    <main class="chat-pane">
-      <header class="topbar">
-        <button id="mobileMenu" class="ghost mobile-only">☰</button>
-        <div class="chat-title"><strong id="title">选择一个会话</strong><button id="model" class="model-chip" title="点击切换模型"></button></div>
-        <div class="top-actions">
-          <span id="usagePill" class="status-pill" title="本会话 token 用量"></span>
-          <button id="compactBtn" class="ghost" title="压缩上下文，保留摘要">压缩</button>
-          <button id="toolsToggle" class="ghost tools-toggle">工具</button>
-          <span id="runState" class="status-pill">空闲</span>
-          <button id="cancelBtn" class="ghost danger" disabled>停止</button>
+    <main class="conversation-shell" aria-label="会话">
+      <header class="conversation-header">
+        <div class="header-leading">
+          <button id="mobileMenu" class="icon-button mobile-menu" aria-label="打开会话栏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <button id="sidebarExpand" class="icon-button sidebar-expand" aria-label="展开会话栏" title="展开会话栏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <div class="session-crumbs"><span class="crumb-root">OpenMinis</span><span class="crumb-separator">/</span><strong id="sessionTitle" class="session-title">新会话</strong></div>
+        </div>
+        <div class="header-actions">
+          <span id="usagePill" class="usage-pill" title="本会话 token 用量"></span>
+          <button id="compactBtn" class="header-button" title="压缩上下文">压缩</button>
+          <button id="workspaceTopButton" class="header-button" title="工作区">工作区</button>
+          <button id="detailsButton" class="header-button header-button-icon" aria-pressed="false" title="打开详情">详情</button>
+          <button id="sessionMore" class="icon-button" title="会话操作" aria-label="会话操作">•••</button>
         </div>
       </header>
-      <div id="messages" class="messages">
-        <div class="empty-state"><h2>手机 Agent，网页继续</h2><p>左侧选择会话，或者直接创建新会话。</p></div>
-      </div>
-      <div id="planBanner" class="plan-banner hidden"></div>
-      <div id="goalBar" class="agent-bar hidden"></div>
-      <div id="todoBar" class="agent-bar hidden"></div>
-      <div id="deliverablesBar" class="agent-bar hidden"></div>
-      <div id="questionCard" class="question-card hidden"></div>
-      <div id="approvalCard" class="question-card hidden"></div>
-      <div class="composer-wrap composer-dock">
-        <div class="composer">
-          <button id="commandBtn" class="ghost composer-command" title="命令">+</button>
-          <button id="attachBtn" class="ghost composer-attach" title="添加附件">📎</button>
-          <input id="attachInput" type="file" class="hidden" multiple />
-          <textarea id="prompt" rows="1" placeholder="给 Minis 发消息…"></textarea>
-          <button id="sendBtn" class="send" title="发送">↑</button>
+
+      <section id="conversationScroll" class="conversation-scroll" aria-live="polite">
+        <div id="emptyHero" class="empty-hero">
+          <div class="hero-glow" aria-hidden="true"></div>
+          <p class="hero-kicker">OPENMINIS AGENT</p>
+          <h1>从手机继续，或从这里开始。</h1>
+          <p>消息、模型选择、流式输出和工具执行实时同步到同一个 Android 会话。</p>
         </div>
-        <div id="attachChips" class="attach-chips hidden"></div>
-        <div class="composer-note">网页与 Android 原生界面共享 Session、Agent Loop 和 Persistent Shell</div>
-      </div>
+
+        <div id="chatFlow" class="chat-flow" data-chat-flow=""></div>
+        <button id="backToBottom" class="back-to-bottom hidden" aria-label="回到底部" title="回到底部">↓</button>
+
+        <div id="takeover" class="takeover-stack" aria-live="assertive"></div>
+
+        <div id="composerSeat" class="composer-seat" data-composer-seat="">
+          <div id="attachmentChips" class="attachment-chips hidden"></div>
+          <div id="composerCard" class="composer-card" data-composer-card="">
+            <textarea id="prompt" rows="1" placeholder="给 Minis 发消息…" aria-label="消息"></textarea>
+            <div class="composer-toolbar">
+              <div class="composer-tools">
+                <button id="attachButton" class="composer-add" title="添加附件" aria-label="添加附件">＋</button>
+                <input id="attachmentInput" type="file" class="hidden" multiple />
+                <button id="commandButton" class="composer-chip" title="快捷命令">/ 命令</button>
+                <button id="planButton" class="composer-chip" aria-pressed="false" title="切换计划模式">计划</button>
+              </div>
+              <div class="composer-trailing">
+                <div id="modelSelect" class="model-select">
+                  <button id="modelButton" class="model-trigger" aria-haspopup="menu" aria-expanded="false" title="选择模型"><span id="modelLabel">选择模型</span><span class="model-effort" id="thinkingLabel"></span><span class="chevron">⌄</span></button>
+                  <div id="modelMenu" class="model-menu hidden" role="menu"></div>
+                </div>
+                <button id="stopButton" class="stop-button hidden" title="停止生成" aria-label="停止生成">■</button>
+                <button id="sendButton" class="send-button" title="发送" aria-label="发送">↑</button>
+              </div>
+            </div>
+          </div>
+          <div class="composer-foot"><span id="composerStatus">与手机上的会话实时同步</span><span>Enter 发送 · Shift + Enter 换行</span></div>
+        </div>
+      </section>
     </main>
 
-    <aside class="tools-pane">
-      <div class="tabs">
-        <button class="tab active" data-tab="workbench">工作台</button>
-        <button class="tab" data-tab="files">文件</button>
-        <button class="tab" data-tab="shell">终端</button>
-        <button class="tab" data-tab="models">模型</button>
-        <button class="tab" data-tab="skills">技能</button>
-        <button class="tab" data-tab="memory">记忆</button>
-        <button class="tab" data-tab="mcp">MCP</button>
-        <button class="tab" data-tab="scheduled">定时任务</button>
-        <button class="tab" data-tab="settings">设置</button>
-      </div>
-
-      <section id="workbenchTab" class="tool-tab active workbench-tab">
-        <div class="models-toolbar workbench-toolbar">
-          <div><strong>Agent 工作台</strong><span>与手机上的同一 Agent Loop 实时同步</span></div>
-          <button id="workbenchRefresh" class="secondary">刷新</button>
-        </div>
-        <div id="workbenchBody" class="models-body"></div>
-      </section>
-
-      <section id="filesTab" class="tool-tab">
-        <div class="pathbar"><button id="fileUp" class="ghost">←</button><input id="filePath" value="/var/minis/workspace" /></div>
-        <div id="fileList" class="file-list"></div>
-        <div id="editor" class="editor hidden">
-          <div class="editor-head"><span id="editorPath"></span><button id="closeEditor" class="ghost">×</button></div>
-          <textarea id="fileContent" spellcheck="false"></textarea>
-          <button id="saveFile" class="primary editor-save">保存文件</button>
-        </div>
-      </section>
-
-      <section id="shellTab" class="tool-tab">
-        <div id="shellOutput" class="shell-output">$ 选择会话后可执行 Persistent Shell</div>
-        <div class="shell-input"><textarea id="shellCommand" rows="2" placeholder="例如：pwd && ls -la"></textarea><button id="shellRun" class="primary wide">运行</button></div>
-      </section>
-
-      <section id="modelsTab" class="tool-tab models-tab">
-        <div class="models-toolbar">
-          <button id="modelsRefresh" class="secondary">刷新</button>
-          <span id="modelsMsg" class="models-msg"></span>
-        </div>
-        <div id="modelsBody" class="models-body"></div>
-      </section>
-
-      <section id="skillsTab" class="tool-tab">
-        <div class="models-toolbar">
-          <button id="skillsRefresh" class="secondary">刷新</button>
-          <span id="skillsMsg" class="models-msg"></span>
-        </div>
-        <div id="skillsBody" class="models-body"></div>
-      </section>
-
-      <section id="memoryTab" class="tool-tab">
-        <div class="models-toolbar">
-          <button id="memoryRefresh" class="secondary">刷新</button>
-          <span id="memoryMsg" class="models-msg"></span>
-        </div>
-        <div id="memoryBody" class="models-body"></div>
-      </section>
-
-      <section id="mcpTab" class="tool-tab">
-        <div class="models-toolbar">
-          <button id="mcpRefresh" class="secondary">刷新</button>
-          <span id="mcpMsg" class="models-msg"></span>
-        </div>
-        <div id="mcpBody" class="models-body"></div>
-      </section>
-
-      <section id="scheduledTab" class="tool-tab">
-        <div class="models-toolbar">
-          <button id="scheduledRefresh" class="secondary">刷新</button>
-          <span id="scheduledMsg" class="models-msg"></span>
-        </div>
-        <div id="scheduledBody" class="models-body"></div>
-      </section>
-
-      <section id="settingsTab" class="tool-tab settings-tab">
-        <div class="settings-scroll">
-          <div class="settings-heading"><h2>远程控制</h2><p>这里修改 Web Remote 自身的网络、登录和 Tunnel 设置。模型 API Key 不会下发到网页。</p></div>
-
-          <div class="settings-section">
-            <div class="settings-section-title">登录</div>
-            <div class="settings-card">
-              <label class="settings-field">用户名<input id="settingsUsername" type="text" autocomplete="username" /></label>
-              <div class="settings-separator"></div>
-              <label class="settings-field">当前密码<input id="settingsCurrentPassword" type="password" autocomplete="current-password" placeholder="修改用户名或密码时需要" /></label>
-              <div class="settings-separator"></div>
-              <label class="settings-field">新密码<input id="settingsNewPassword" type="password" autocomplete="new-password" placeholder="留空则不修改" /></label>
-            </div>
-          </div>
-
-          <div class="settings-section">
-            <div class="settings-section-title">监听</div>
-            <div class="settings-card">
-              <label class="settings-field">端口<input id="settingsPort" type="number" min="1024" max="65535" /></label>
-              <div class="settings-separator"></div>
-              <label class="switch-row"><span><strong>局域网访问</strong><small>关闭时仅监听 127.0.0.1；Cloudflare Tunnel 不需要打开</small></span><input id="settingsLan" type="checkbox" /></label>
-            </div>
-            <div class="settings-footer">修改端口或局域网监听后需要重启远程服务。</div>
-          </div>
-
-          <div class="settings-section">
-            <div class="settings-section-title">CLOUDFLARE TUNNEL</div>
-            <div class="settings-card">
-              <label class="switch-row"><span><strong>启用 Tunnel</strong><small id="tunnelStatusText">未连接</small></span><input id="settingsTunnelEnabled" type="checkbox" /></label>
-              <div class="settings-separator"></div>
-              <label class="settings-field">公开域名<input id="settingsHostname" type="text" placeholder="remote.example.com" /></label>
-              <div class="settings-separator"></div>
-              <label class="settings-field">Tunnel Token<input id="settingsTunnelToken" type="password" autocomplete="off" placeholder="已配置时留空；输入新值可替换" /></label>
-            </div>
-            <div class="settings-footer">Cloudflare 控制面中的 Published Application 仍需指向此手机的 <code>http://127.0.0.1:&lt;端口&gt;</code>。</div>
-          </div>
-
-          <div class="settings-section">
-            <div class="settings-section-title">权限预设</div>
-            <div class="settings-card">
-              <label class="settings-field">远程权限<select id="permissionPreset" class="settings-select">
-                <option value="workspace-write">Workspace Write（默认）</option>
-                <option value="danger-full-access">Danger Full Access</option>
-              </select></label>
-              <div class="settings-separator"></div>
-              <div class="settings-footer" id="permissionNote">workspace-write：沙箱化 shell + 工作区文件读写 + RPC。</div>
-              <button id="permissionSave" class="secondary wide">保存权限预设</button>
-            </div>
-          </div>
-
-          <div id="settingsMessage" class="settings-message"></div>
-          <button id="saveSettings" class="primary wide">保存设置</button>
-          <button id="restartRemote" class="secondary wide hidden">重启 Web Remote</button>
-        </div>
-      </section>
+    <aside id="detailsPanel" class="details-panel" aria-label="会话详情" aria-hidden="true">
+      <header class="details-header"><div><p class="details-kicker">SESSION DETAILS</p><strong id="detailsTitle">任务</strong></div><button id="detailsClose" class="icon-button" aria-label="关闭详情">×</button></header>
+      <nav id="detailsTabs" class="details-tabs" aria-label="详情视图">
+        <button class="details-tab active" data-view="task">任务</button>
+        <button class="details-tab" data-view="trajectory">轨迹</button>
+        <button class="details-tab" data-view="inspect">检查器</button>
+      </nav>
+      <div id="detailsContent" class="details-content"></div>
     </aside>
   </div>
-  <div id="modelSheet" class="sheet hidden">
-    <div class="sheet-card">
-      <div class="sheet-head"><strong>选择模型</strong><button id="modelSheetClose" class="ghost">关闭</button></div>
-      <div id="modelList" class="sheet-list"></div>
-    </div>
+
+  <div id="workspaceLayer" class="overlay-layer hidden" aria-hidden="true">
+    <section class="workspace-shell" aria-label="工作区">
+      <header class="workspace-header"><div class="workspace-header-leading"><button id="workspaceClose" class="icon-button" aria-label="关闭工作区">←</button><div><p class="details-kicker">OPENMINIS / WORKSPACE</p><strong>工作区</strong><span id="workspaceSession" class="workspace-session"></span></div></div><button id="workspaceDetails" class="header-button">查看任务</button></header>
+      <div class="workspace-layout">
+        <nav class="workspace-rail" aria-label="工作区导航">
+          <button class="workspace-nav active" data-workspace="files"><span>▱</span><span>文件</span></button>
+          <button class="workspace-nav" data-workspace="terminal"><span>›_</span><span>终端</span></button>
+          <button class="workspace-nav" data-workspace="deliverables"><span>□</span><span>产出</span></button>
+        </nav>
+        <section id="workspaceContent" class="workspace-content"></section>
+        <aside class="workspace-activity"><header><span>Agent activity</span><button id="workspaceRefresh" class="quiet-icon" title="刷新">↻</button></header><div id="workspaceActivityBody" class="workspace-activity-body"></div></aside>
+      </div>
+    </section>
   </div>
-  <div id="sessionMenu" class="ctx-menu hidden">
-    <button data-act="rename">重命名</button>
-    <button data-act="delete" class="danger">删除会话</button>
+
+  <div id="controlLayer" class="overlay-layer control-layer hidden" aria-hidden="true">
+    <section class="control-shell" aria-label="控制中心">
+      <header class="control-header"><div><p class="details-kicker">OPENMINIS CONTROL</p><strong>控制中心</strong></div><button id="controlClose" class="icon-button" aria-label="关闭控制中心">×</button></header>
+      <div class="control-layout">
+        <nav id="controlNav" class="control-nav" aria-label="控制中心导航">
+          <button class="control-nav-item active" data-control="models">模型与 Agent</button>
+          <button class="control-nav-item" data-control="skills">技能</button>
+          <button class="control-nav-item" data-control="memory">记忆与 SOUL</button>
+          <button class="control-nav-item" data-control="mcp">MCP</button>
+          <button class="control-nav-item" data-control="scheduled">定时任务</button>
+          <button class="control-nav-item" data-control="settings">远程设置</button>
+        </nav>
+        <section id="controlContent" class="control-content"></section>
+      </div>
+    </section>
   </div>
-  <div id="commandMenu" class="ctx-menu command-menu hidden">
-    <button data-act="newChat">＋ 新会话</button>
-    <button data-act="compact">压缩上下文</button>
-    <button data-act="plan">计划模式</button>
-    <button data-act="settings">打开工具面板</button>
+
+  <div id="sessionMenu" class="floating-menu hidden" role="menu">
+    <button data-session-action="rename">重命名</button>
+    <button data-session-action="duplicate" disabled title="Android 尚未提供复制会话接口">复制会话</button>
+    <button data-session-action="delete" class="danger">删除会话</button>
   </div>
-  <div id="toasts" class="toasts"></div>
+  <div id="commandMenu" class="floating-menu command-menu hidden" role="menu">
+    <p>快速操作</p>
+    <button data-command="new"><kbd>/new</kbd>新会话</button>
+    <button data-command="plan"><kbd>/plan</kbd>切换计划模式</button>
+    <button data-command="workspace"><kbd>/workspace</kbd>打开工作区</button>
+    <button data-command="details"><kbd>/details</kbd>打开任务详情</button>
+    <button data-command="compact"><kbd>/compact</kbd>压缩上下文</button>
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
   <script src="/marked.js"></script>
   <script src="/purify.js"></script>
   <script src="/md.js"></script>
   <script src="/app.js"></script>
-  <script src="/workbench-tab.js"></script>
-  <script src="/skills-tab.js"></script>
-  <script src="/memory-tab.js"></script>
-  <script src="/mcp-tab.js"></script>
-  <script src="/scheduled-tab.js"></script>
 </body>
 </html>

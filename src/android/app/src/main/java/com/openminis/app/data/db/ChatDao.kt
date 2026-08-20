@@ -89,6 +89,35 @@ interface ChatDao {
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun deleteSession(id: String)
 
+    // ─── Bounded append-only session event log ────────────────────────────
+
+    /** Insert is idempotent because reconnect/persistence retries may replay a batch. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSessionEvents(events: List<SessionEventEntity>)
+
+    @Query(
+        "SELECT * FROM session_events WHERE session_id = :sessionId AND seq > :afterSeq " +
+            "ORDER BY seq ASC LIMIT :limit",
+    )
+    suspend fun sessionEventsAfter(sessionId: String, afterSeq: Long, limit: Int): List<SessionEventEntity>
+
+    @Query("SELECT COALESCE(MIN(seq), 0) FROM session_events WHERE session_id = :sessionId")
+    suspend fun oldestSessionEventSeq(sessionId: String): Long
+
+    @Query("SELECT COALESCE(MAX(seq), 0) FROM session_events WHERE session_id = :sessionId")
+    suspend fun latestSessionEventSeq(sessionId: String): Long
+
+    /** Keep the newest [keep] rows per session (called asynchronously in append batches). */
+    @Query(
+        "DELETE FROM session_events WHERE session_id = :sessionId AND seq <= (" +
+            "SELECT seq FROM session_events WHERE session_id = :sessionId " +
+            "ORDER BY seq DESC LIMIT 1 OFFSET :keep)",
+    )
+    suspend fun trimSessionEvents(sessionId: String, keep: Int)
+
+    @Query("DELETE FROM session_events WHERE session_id = :sessionId")
+    suspend fun deleteSessionEvents(sessionId: String)
+
     // Full-text search across session titles and message content
     @Query("""
         SELECT DISTINCT s.* FROM sessions s

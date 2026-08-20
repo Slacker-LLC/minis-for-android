@@ -387,6 +387,10 @@ class MinisApp : Application(), ImageLoaderFactory {
         try {
         database = AppDatabase.getInstance(this)
         chatRepository = ChatRepository(database.chatDao())
+        // DSH-style append-only session events use the same database as chat
+        // snapshots. The hub performs writes asynchronously, so raw model
+        // chunks never block the main/UI thread.
+        com.openminis.app.ui.chat.SessionEventHub.installDurableStore(database.chatDao())
         providerRepository = ProviderRepository(this)
         envVarRepository = EnvVarRepository(this)
         // [T-android-safemode-lateinit-crash-147] SkillRepository parses

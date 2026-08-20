@@ -3313,8 +3313,41 @@ class ChatViewModel(
     /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
     internal var realSessionId: String = if (isDraft) "" else sessionId
 
+    /**
+     * DSH-style event projection of this exact native VM. It does not own any
+     * chat state: messages / streamingById remain canonical; the emitter only
+     * records their ordered state transitions for remote replay.
+     */
+    private val sessionEventEmitter = ChatSessionEventEmitter {
+        realSessionId.ifEmpty { sessionId }
+    }
+
     init {
+        // Existing sessions need their durable event high-water mark before
+        // any event can be framed. A send racing this small IO read simply
+        // queues unsequenced intents inside SessionEventHub; activation drains
+        // them in source order. Draft sessions activate in ensureSession().
+        if (!isDraft) {
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching { SessionEventHub.activateSession(chatRepository.dao, sessionId) }
+                    .onFailure { Log.w(TAG, "event log activation failed: ${it.message}") }
+            }
+        }
         loadSession()
+        viewModelScope.launch {
+            var observedInitial = false
+            isStreaming.collect { running ->
+                if (!observedInitial) {
+                    observedInitial = true
+                    if (!running) return@collect
+                }
+                sessionEventEmitter.runStatus(
+                    isRunning = running,
+                    modelName = modelName.value,
+                    thinkingLevel = thinkingLevel.value.name,
+                )
+            }
+        }
         // [T-session-paused-badge-active-false-positive] Drive the session-list
         // PAUSED badge directly off canResume — the authoritative "this session
         // is interrupted (tap Resume)" flag. This is the single chokepoint over
@@ -3520,6 +3553,13 @@ class ChatViewModel(
             memoryEnabled = _memoryEnabled.value,
         )
         realSessionId = session.id
+        // Held draft events now have a real FK target. Keep their source order
+        // and allocate sequence numbers only after Room's high-water mark is
+        // known, so a process restart cannot collide with old rows.
+        SessionEventHub.rename(sessionId, session.id)
+        withContext(Dispatchers.IO) {
+            SessionEventHub.activateSession(chatRepository.dao, session.id)
+        }
         // "New Chat in Group": file the just-promoted draft into its folder.
         // Unconditional (vs iOS setFolderIfUnfiled) — the session is seconds
         // old and nothing else can have filed it yet.
@@ -4575,6 +4615,9 @@ class ChatViewModel(
         _streamingById.value = emptyMap()
         // Memory state — match iOS clearChat() field list one-for-one.
         _messages.value = emptyList()
+        // A clear creates a fresh conversation projection. Preserve the
+        // session's monotonic next sequence but make old deltas unreplayable.
+        SessionEventHub.clear(sid)
         agentHistory.clear()
         _error.value = null
         _cachedLatestMarker = null
@@ -5314,6 +5357,7 @@ class ChatViewModel(
             queuedPromptId = prompt.id,
         )
         _messages.value = _messages.value + chatMsg
+        sessionEventEmitter.messageCreated(chatMsg)
         clearAttachments()
         Log.i(TAG, "Enqueued prompt (${trimmed.length}ch, ${pendingAttachments.size} attachments), queue=${_promptQueue.value.size}")
     }
@@ -5481,6 +5525,8 @@ class ChatViewModel(
                 thinkingLevel = _thinkingLevel.value,
             )
             _messages.value = _messages.value + queuedUserMsg + nextAssistantMsg
+            sessionEventEmitter.messageCreated(queuedUserMsg)
+            sessionEventEmitter.messageCreated(nextAssistantMsg)
             // Note: ChatScreen's `lastUserAppendMs` (the trailing-row
             // ScrollPin send-grace window) is updated reactively by
             // ChatScreen's `LaunchedEffect(messages.size)` user-send hook
@@ -5714,6 +5760,7 @@ class ChatViewModel(
                 attachmentUris = prepared.nonImageUris,
             )
             _messages.value = _messages.value + userMsg
+            sessionEventEmitter.messageCreated(userMsg)
             val imageParts = prepared.imageParts
 
             // T132: build the user contentParts in iOS order — caption first
@@ -6734,11 +6781,13 @@ class ChatViewModel(
         // forced-reasoning model still streams reasoning_content.
         val turnThinkingLevel = _thinkingLevel.value
         withContext(Dispatchers.Main) {
-            _messages.value = _messages.value + ChatMessage(
+            val assistantPlaceholder = ChatMessage(
                 id = assistantId, role = "assistant", content = "", isStreaming = true,
                 isAwaitingModelResponse = true,
                 thinkingLevel = turnThinkingLevel,
             )
+            _messages.value = _messages.value + assistantPlaceholder
+            sessionEventEmitter.messageCreated(assistantPlaceholder)
         }
 
         // Tracks whether the loop was exited via a `break` (any reason — no
@@ -6991,6 +7040,14 @@ class ChatViewModel(
                     ).collect { chunk ->
                 when (chunk) {
                     is LLMStreamChunk.ThinkingDelta -> {
+                        // Record the provider's raw delta before the
+                        // throttled Compose projection mutates. The remote
+                        // snapshot fence can therefore include every token.
+                        sessionEventEmitter.rawReasoningChunk(
+                            assistantId,
+                            "thinking_$turn",
+                            chunk.text,
+                        )
                         turnThinking.append(chunk.text)
                         // Update thinking block in UI
                         val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
@@ -7009,6 +7066,10 @@ class ChatViewModel(
                         }
                     }
                     is LLMStreamChunk.Text -> {
+                        // Same ordering as reasoning: the append-only event
+                        // is authoritative for the raw token stream, while
+                        // `_streamingById` stays intentionally throttled.
+                        sessionEventEmitter.rawTextChunk(assistantId, chunk.text)
                         // Mark thinking block as done when text starts flowing
                         val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
                         if (thinkIdx >= 0 && allToolBlocks[thinkIdx].toolStatus != ToolBlockStatus.SUCCESS) {
@@ -7116,6 +7177,15 @@ class ChatViewModel(
                         // ToolCallComplete / ToolInputDelta lookups and ends
                         // up as the persisted tool_call_id on the next request.
                         val toolUseId = dedupeToolStartId(chunk.id)
+                        val toolStartedAtMs = System.currentTimeMillis()
+                        // Emit the semantic tool boundary before it reaches
+                        // the mutable UI block list.
+                        sessionEventEmitter.toolCall(
+                            assistantId,
+                            toolUseId,
+                            chunk.name,
+                            toolStartedAtMs,
+                        )
                         android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolUseStart id=$toolUseId name=${chunk.name}")
                         // Mark thinking block as done when tool use starts
                         val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
@@ -7170,7 +7240,7 @@ class ChatViewModel(
                                 toolName = chunk.name,
                                 toolStatus = ToolBlockStatus.STREAMING,
                                 toolTitle = friendlyToolTitle(chunk.name),
-                                startTimeMs = System.currentTimeMillis(),
+                                startTimeMs = toolStartedAtMs,
                             ))
                             withContext(Dispatchers.Main) {
                                 updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
@@ -7182,6 +7252,11 @@ class ChatViewModel(
                         // renamed id so the per-tool ring + block lookup match
                         // the block that ToolUseStart created.
                         val toolInputId = dedupeToolInputId(chunk.id)
+                        sessionEventEmitter.rawToolInput(
+                            assistantId,
+                            toolInputId,
+                            chunk.accumulated,
+                        )
                         android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolInputDelta id=$toolInputId len=${chunk.accumulated.length}")
                         // Maintain a per-tool ring of the most recent `accumulated`
                         // snapshots so the preflight validator below can dump them
@@ -7243,6 +7318,13 @@ class ChatViewModel(
                         // the downstream tool-result join all key on the
                         // same value (matches the rename applied at start).
                         val toolCompleteId = dedupeToolCompleteId(chunk.id)
+                        // Providers that do not emit a final ToolInputDelta
+                        // still get a complete, replayable argument stream.
+                        sessionEventEmitter.rawToolInput(
+                            assistantId,
+                            toolCompleteId,
+                            chunk.args.toString(),
+                        )
                         android.util.Log.d("ToolChain[VM]", "[turn=$turn] ToolCallComplete id=$toolCompleteId name=${chunk.name} args=${chunk.args.toString().take(300)}")
                         toolCalls.add(Triple(toolCompleteId, chunk.name, chunk.args))
                         // [T-android-gemini3-thoughtsig / #179] Stash the Gemini
@@ -7811,6 +7893,7 @@ class ChatViewModel(
                             content = "Blocked: arguments were truncated in transit",
                             durationMs = elapsed,
                         )
+                        sessionEventEmitter.toolResult(assistantId, allToolBlocks[refusedIdx])
                         withContext(Dispatchers.Main) {
                             updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
                         }
@@ -7855,6 +7938,7 @@ class ChatViewModel(
                             content = blockedMsg,
                             durationMs = elapsed,
                         )
+                        sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])
                     }
                     // Record the blocked attempt so consecutive blocks still
                     // count toward the unknown-tool / circuit-breaker windows.
@@ -7904,6 +7988,7 @@ class ChatViewModel(
                             content = uiMessage,
                             durationMs = elapsedPre,
                         )
+                        sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdxPre])
                     }
                     toolLoopDetector.record(
                         toolName = name, params = paramsMap,
@@ -7997,6 +8082,7 @@ class ChatViewModel(
                         browserURL = result.pageURL ?: allToolBlocks[blockIdx].browserURL,
                         imageFilePath = result.imageFilePath ?: allToolBlocks[blockIdx].imageFilePath,
                     )
+                    sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])
                 }
 
                 // [T-truncated-args-visibility #119] Tell the MODEL its own
@@ -8628,6 +8714,14 @@ class ChatViewModel(
                     val idx = toolBlocks.indexOfFirst { it.id == toolId }
                     if (idx >= 0) {
                         val current = toolBlocks[idx].content
+                        // Preserve every native stdout line in the session
+                        // event log before the UI trims its visible 50-line
+                        // projection below.
+                        sessionEventEmitter.rawToolOutput(
+                            assistantId,
+                            toolId,
+                            if (current.isEmpty()) cleanedLine else "\n$cleanedLine",
+                        )
                         val updated = if (current.isEmpty()) cleanedLine else "$current\n$cleanedLine"
                         // Keep last 50 lines for display
                         val trimmed = updated.lines().takeLast(50).joinToString("\n")
@@ -8942,6 +9036,11 @@ class ChatViewModel(
                 unflushed >= NEWLINE_FLUSH_MIN_CHARS
 
             fun publish(text: String, blocks: List<AssistantBlock>, awaiting: Boolean) {
+                // The event journal is the unthrottled transport source. Log
+                // the exact structural projection before exposing the Compose
+                // state so a snapshot fence never observes UI content whose
+                // corresponding sequence has not been allocated.
+                sessionEventEmitter.streamingUpdate(id, text, blocks, awaiting)
                 _streamingById.value = _streamingById.value + (
                     id to StreamingDelta(
                         content = text,
@@ -9023,6 +9122,7 @@ class ChatViewModel(
             if (_streamingById.value.containsKey(id)) {
                 _streamingById.value = _streamingById.value - id
             }
+            sessionEventEmitter.clearMessage(id)
             return
         }
         val updated = current.toMutableList()
@@ -9036,6 +9136,14 @@ class ChatViewModel(
         if (_streamingById.value.containsKey(id)) {
             _streamingById.value = _streamingById.value - id
         }
+        // `assistant/message` is emitted only once the native canonical row
+        // is settled, making it an idempotent final projection for replay.
+        sessionEventEmitter.messageSettled(
+            messageId = id,
+            content = content,
+            blocks = toolBlocks,
+            isAwaitingModelResponse = isAwaitingModelResponse,
+        )
     }
 
     /**
