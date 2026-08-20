@@ -24,6 +24,39 @@ Android 以 `applicationId` 作为安装身份，所以装了这个不会覆盖�
 iOS 相关代码（`src/ios/`、iSH 沙盒、FFmpeg/LAME）已从本仓库移除——只做 Android，留着
 徒增体积和困惑。要 iOS 版请用[官方仓库](https://github.com/OpenMinis/OpenMinis)。
 
+## 2026-08-21 安全加固与设计分享
+
+一次全量审查（5 CRITICAL / 20 HIGH / 47 MEDIUM / 70+ LOW）驱动的大修，核心设计：
+
+- **凭据 fail-closed**：加密存储失败时**绝不回退明文**（返回空内存 store，凭据视为
+  未配置、功能拒绝启动）——宁可要求重新录入，也不让 API Key 裸奔
+- **调试端口全连接 token**：DebugServer（0.0.0.0:5321）**loopback 也要 token**
+  （Android 上 127.0.0.1 任何进程/网页都能摸，旧豁免等于无锁后门）；同步去 CORS、
+  加请求上限、单连接异常不再崩进程
+- **Web 白名单 deny 列表**：`provider.export` / `provider.import`（携带完整
+  API Key）等敏感方法永久封禁，不再经公网隧道外泄
+- **文件路径 canonical 守卫**：词法 `..` 检查之外加真实路径（跟随 symlink）
+  归属校验——沙盒内建个链接也逃不出会话目录
+- **权限预设真实生效**：默认 Workspace Write 模式下网页写入/编辑仅限
+  `/var/minis/workspace`，Full Access 才放开
+- **LLM 请求日志脱敏**：authorization / x-api-key 等 7 类敏感头的值在记录时剥离
+- **子代理超时真取消**：不再"假装超时、底层继续烧 token"；回答 60k 截断
+- **登录限流 per-IP 分桶**：并发绕过和邻居反锁两个洞一起堵
+
+每条设计的动机、实现、对使用者的影响见
+[docs/DESIGN-HARDENING-2026-08-21.md](docs/DESIGN-HARDENING-2026-08-21.md)；
+完整审查报告见 [docs/find-fault-report.md](docs/find-fault-report.md)。
+
+**给使用者的行为变化**：
+
+- Web Remote 默认模式下网页文件面板**只能写 `/var/minis/workspace`**，需要全路径
+  写权限请切 Danger Full Access
+- 极端情况下（系统 Keystore 失效）需要重新录入 API Key / 重设 Web Remote 密码
+- 调试端口（5321）不再免 token：`adb shell run-as dev.openminispet.android cat
+  files/debug_server_token` 获取，`minis-debug` CLI 已自动处理
+
+---
+
 ## 加了什么
 
 ### 一、桌面宠物
