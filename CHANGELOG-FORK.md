@@ -190,6 +190,23 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
 `debug.tap` / `debug.inputText` / `debug.screenshot` / `debug.writeFile` 这类等于远程
 操控手机的交互式方法，仍被整体挡在 Web 端之外。
 
+### 12. 主代理 / 子代理设置 + 提问卡片 + 会话全文搜索
+
+参考 DeepSeek Harness（`dsh-agent-presets` / `dsh-subagent` / `dsh-client-ui-subagent`）
+做了三件事：
+
+1. **主代理 / 子代理设置**：模型页新增「代理设置」卡片。`provider.groups.list`
+   返回 `defaultSubGroupId` 与每组 `isSub`；新增 `provider.groups.setSubDefault`
+   （`null` = 继承主代理）；新增 `agent.settings.get/set` 配置子代理委派深度
+   （1–5 层）与单任务超时（1–30 分钟），`SubagentTool` 由硬编码改为读
+   `SubagentLimits`。改动只影响之后新建的会话，运行中会话保持原配置。
+2. **模型提问卡片**：新增模型工具 `ask_user_question`（暂停回合、等待用户回答），
+   Web Remote 轮询 `chat.question.pending` 渲染提问卡（单选/多选/自定义/跳过），
+   `chat.question.answer` 恢复回合；超时/跳过会明确告知模型。
+3. **会话全文搜索**：新增 `chat.search`，复用 `minis-sessions-cli search`
+   同一套参数化 LIKE + Kotlin 侧文本抽取（工具元数据误命中会被过滤），
+   词项 AND、按会话分组、每个会话最多 3 条命中；Web 侧边栏提供搜索框与结果面板。
+
 ---
 
 ## 未验证 / 已知问题

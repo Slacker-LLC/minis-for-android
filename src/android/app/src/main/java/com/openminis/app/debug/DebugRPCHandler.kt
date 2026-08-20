@@ -164,6 +164,11 @@ class DebugRPCHandler(private val context: Context) {
             "chat.compact.markers.list" -> ChatMutationMethods.compactMarkersList(context, params)
             "chat.compact.revert" -> ChatMutationMethods.compactRevert(context, params)
 
+            // Web question cards (ask_user_question tool) + cross-session search
+            "chat.question.pending" -> QuestionRpcMethods.pending(context, params)
+            "chat.question.answer" -> QuestionRpcMethods.answer(context, params)
+            "chat.search" -> ChatSearchRpcMethods.search(context, params)
+
             // Skills
             "skills.list" -> SkillRpcMethods.list(context)
             "skills.get" -> SkillRpcMethods.get(context, params)

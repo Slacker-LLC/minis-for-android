@@ -37,6 +37,7 @@ object AgentTools {
         }
         add(browserUseDefinition())
         add(subagentDefinition())
+        add(askUserQuestionDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
@@ -161,5 +162,36 @@ object AgentTools {
         ),
         required = listOf("tool_title", "prompt"),
         propertyOrdering = listOf("tool_title", "prompt"),
+    )
+
+    private fun askUserQuestionDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = AskUserQuestionTool.NAME,
+        description = "Pause and ask the user a concise question when you need confirmation, a choice, or missing " +
+            "information to continue. The user answers through the web UI and the answer comes back as a structured " +
+            "tool result. Use sparingly: one question at a time, only when you truly cannot proceed with a " +
+            "reasonable assumption. Never use it for rhetorical questions or things you can decide yourself.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the question, shown to the user."),
+            "question" to AgentToolParam("string", "The question to ask the user, in the user's language."),
+            "options" to AgentToolParam(
+                type = "array",
+                description = "Optional answer choices. Each item: {label, value, recommended?}. Omit for free-form questions.",
+                items = AgentToolParam(
+                    type = "object",
+                    description = "One answer choice.",
+                    properties = mapOf(
+                        "label" to AgentToolParam("string", "Human-readable label shown to the user."),
+                        "value" to AgentToolParam("string", "Stable machine-readable value returned to you."),
+                        "recommended" to AgentToolParam("boolean", "Optional hint shown to the user."),
+                    ),
+                    requiredProperties = listOf("label", "value"),
+                ),
+            ),
+            "multiple" to AgentToolParam("boolean", "Allow multiple selections (default false)."),
+            "allowCustom" to AgentToolParam("boolean", "Allow a free-form custom answer (default true)."),
+            "timeoutMinutes" to AgentToolParam("integer", "How long to wait for the user (1-30, default 10)."),
+        ),
+        required = listOf("tool_title", "question"),
+        propertyOrdering = listOf("tool_title", "question", "options", "multiple", "allowCustom", "timeoutMinutes"),
     )
 }

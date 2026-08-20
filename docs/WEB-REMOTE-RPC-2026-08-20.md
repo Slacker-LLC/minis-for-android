@@ -121,6 +121,20 @@ Web「代理设置」卡片里的深度与超时输入即时生效；子代理�
 模型组，无独立人设，与 DeepSeek「子代理加入父代理组装」的继承模型一致。
 `agent.` 前缀已加入 Web Remote 白名单。
 
+### 2.9 提问卡片与全文搜索（chat.*）
+
+**提问卡片**：新增模型工具 `ask_user_question`，参数
+`{question, options:[{label,value,recommended?}], multiple, allowCustom, timeoutMinutes}`。
+工具注册进 [QuestionCenter](src/android/app/src/main/java/com/openminis/app/tools/QuestionCenter.kt)
+并挂起；Web 端轮询 `chat.question.pending`、提交 `chat.question.answer`
+（`selected` / `custom` / `skipped`）后回合恢复，答案作为结构化工具结果返回给模型。
+超时（默认 10 分钟）或跳过都会以明确文案告知模型，避免它反复追问。
+
+**全文搜索**：`chat.search {query, limit?, sessionId?}` → 按会话分组的命中结果。
+实现复用 `ChatRepository.searchMessages`（`parts_json LIKE` 参数化 + Kotlin 侧
+文本抽取），词项 AND、字面匹配、无通配符注入；每个会话最多 3 条命中，
+每条 snippet 约 200 字符。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：

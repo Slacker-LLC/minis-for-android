@@ -52,6 +52,7 @@ import com.openminis.app.sandbox.ExecutionCoordinator
 import com.openminis.app.terminal.MinisOpenUrlBroker
 import com.openminis.app.terminal.MinisUrlMarker
 import com.openminis.app.tools.AgentTools
+import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.FileEditTool
 import com.openminis.app.tools.FileReadTool
 import com.openminis.app.tools.FileWriteTool
@@ -8193,6 +8194,7 @@ class ChatViewModel(
             "memory_write" -> executeMemoryWriteTool(argsJson)
             "memory_get" -> executeMemoryGetTool(argsJson)
             SubagentTool.NAME -> SubagentTool.execute(argsJson, activeSessionId, context)
+            AskUserQuestionTool.NAME -> AskUserQuestionTool.execute(argsJson, activeSessionId, context)
             else -> ToolExecutionResult("Unknown tool: $name", false)
         }
     }

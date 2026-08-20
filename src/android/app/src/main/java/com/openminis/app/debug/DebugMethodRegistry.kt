@@ -827,6 +827,41 @@ object DebugMethodRegistry {
             returns = "{sessionId, beforeMarkerCount, afterMarkerCount, removedMarkerId, newLatestMarkerId}",
             example = ex("sessionId" to "6D0F…"),
         ),
+
+        // ── Web question cards + cross-session search (chat.*) ──────────────
+        MethodSpec(
+            name = "chat.question.pending",
+            description = "List pending ask_user_question cards. The agent turn suspends until answered via chat.question.answer.",
+            params = listOf(
+                ParamSpec("sessionId", "string", required = false, description = "Restrict to one session; omit for all."),
+            ),
+            returns = "{questions:[{id, sessionId, prompt, options:[{value,label,recommended?}], multiple, allowCustom, createdAt}]}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+        MethodSpec(
+            name = "chat.question.answer",
+            description = "Answer a pending ask_user_question card and resume the paused agent turn.",
+            params = listOf(
+                ParamSpec("questionId", "string", required = true, description = "Question id from chat.question.pending."),
+                ParamSpec("selected", "[string]", required = false, description = "Selected option values."),
+                ParamSpec("custom", "string", required = false, description = "Free-form answer."),
+                ParamSpec("skipped", "bool", required = false, default = false, description = "Skip the question."),
+            ),
+            returns = "{ok:true, answered:true}",
+            example = ex("questionId" to "q1", "selected" to JSONArray().apply { put("yes") }),
+        ),
+        MethodSpec(
+            name = "chat.search",
+            description = "Cross-session full-text search over message content. Space-separated terms are ANDed and " +
+                "treated literally; results are grouped per session.",
+            params = listOf(
+                ParamSpec("query", "string", required = true, description = "Search text (literal phrase / AND terms)."),
+                ParamSpec("limit", "int", required = false, default = 20, description = "Max result sessions (1..50)."),
+                ParamSpec("sessionId", "string", required = false, description = "Restrict to one session."),
+            ),
+            returns = "{query, count, total, results:[{sessionId, title, matchedCount, snippet, hits:[{messageId, role, createdAt, content}]}]}",
+            example = ex("query" to "DeepSeek 设计", "limit" to 20),
+        ),
         MethodSpec(
             name = "chat.session.delete",
             description = "Permanently delete a session and its messages. Cancels any in-flight run first.",

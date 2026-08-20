@@ -32,7 +32,7 @@ async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{
 
 async function loadSessions(){const d=await api('/api/sessions?limit=200');state.sessions=d.sessions||[];renderSessions();if(!state.sessionId&&state.sessions.length)selectSession(state.sessions[0].id)}
 function renderSessions(){const root=$('#sessions');root.innerHTML=state.sessions.map(s=>`<button class="session ${s.id===state.sessionId?'active':''}" data-id="${esc(s.id)}"><span class="${s.isRunning?'run-dot':''}"></span><span class="session-text"><div class="session-title">${esc(s.title||'新会话')}</div><div class="session-meta">${esc(s.modelName||s.modelId||'')}</div></span></button>`).join('');$$('.session').forEach(x=>x.onclick=()=>selectSession(x.dataset.id))}
-async function selectSession(id){state.sessionId=id;renderSessions();$('.sidebar').classList.remove('open');const s=state.sessions.find(x=>x.id===id);$('#title').textContent=s?.title||'新会话';$('#model').textContent=s?.modelName||'';await Promise.all([loadMessages(),loadFiles()]);$('#prompt').focus()}
+async function selectSession(id){clearQuestionCard();state.sessionId=id;renderSessions();$('.sidebar').classList.remove('open');const s=state.sessions.find(x=>x.id===id);$('#title').textContent=s?.title||'新会话';$('#model').textContent=s?.modelName||'';await Promise.all([loadMessages(),loadFiles()]);$('#prompt').focus()}
 function textOf(m){if(m.content)return m.content;if(Array.isArray(m.parts))return m.parts.filter(p=>p.type==='text').map(p=>p.value||p.text||'').join('');return''}
 function toolsHtml(m){
   if(!Array.isArray(m.toolCalls)||!m.toolCalls.length)return '';
@@ -92,7 +92,7 @@ async function loadMessages(){
   if(atBottom)root.scrollTop=root.scrollHeight;
 }
 async function loadStatus(){if(!state.sessionId)return;try{const s=await api('/api/session/status?sessionId='+encodeURIComponent(state.sessionId));state.running=!!s.isRunning;$('#runState').textContent=s.isRunning?'生成中':'空闲';$('#runState').classList.toggle('running',!!s.isRunning);$('#cancelBtn').disabled=!s.isRunning}catch{}}
-async function send(){const text=$('#prompt').value.trim();if(!text)return;$('#sendBtn').disabled=true;try{const body={prompt:text,wait:false};if(state.sessionId)body.sessionId=state.sessionId;const d=await api('/api/prompt',{method:'POST',body:JSON.stringify(body)});$('#prompt').value='';autoGrow();if(!state.sessionId)state.sessionId=d.sessionId;await loadSessions();await loadMessages();await loadStatus()}catch(e){alert(e.message)}finally{$('#sendBtn').disabled=false}}
+async function send(){if(!$('#questionCard').classList.contains('hidden'))return;const text=$('#prompt').value.trim();if(!text)return;$('#sendBtn').disabled=true;try{const body={prompt:text,wait:false};if(state.sessionId)body.sessionId=state.sessionId;const d=await api('/api/prompt',{method:'POST',body:JSON.stringify(body)});$('#prompt').value='';autoGrow();if(!state.sessionId)state.sessionId=d.sessionId;await loadSessions();await loadMessages();await loadStatus()}catch(e){alert(e.message)}finally{$('#sendBtn').disabled=false}}
 async function cancel(){if(!state.sessionId)return;await api('/api/cancel',{method:'POST',body:JSON.stringify({sessionId:state.sessionId})});await loadStatus()}
 
 async function loadFiles(path=state.filePath){if(!state.sessionId)return;state.filePath=path;$('#filePath').value=path;try{const d=await api('/api/files?sessionId='+encodeURIComponent(state.sessionId)+'&path='+encodeURIComponent(path));$('#fileList').innerHTML=(d.items||[]).map(f=>`<div class="file-row" data-path="${esc(f.path)}" data-dir="${f.directory}"><span class="file-icon">${f.directory?'▸':'·'}</span><span class="file-name">${esc(f.name)}</span><span class="file-size">${f.directory?'':size(f.size)}</span></div>`).join('');$$('.file-row').forEach(x=>x.onclick=()=>x.dataset.dir==='true'?loadFiles(x.dataset.path):openFile(x.dataset.path))}catch(e){
@@ -148,7 +148,7 @@ function startPoll(){
         // The session list only changes on create/rename, so it does not need
         // the fast cadence the running reply does.
         if(sessionTick++%4===0)await loadSessions();
-        if(state.sessionId){await loadStatus();await loadMessages()}
+        if(state.sessionId){await loadStatus();await loadMessages();if(state.running)await pollQuestions()}
       }catch{}
     }
     state.poll=setTimeout(tick,state.running?450:2500);
@@ -157,9 +157,135 @@ function startPoll(){
 }
 function autoGrow(){const t=$('#prompt');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,180)+'px'}
 
+// ── 模型提问卡片（ask_user_question） ─────────────────────────────────────
+function clearQuestionCard(){
+  const card=$('#questionCard');
+  if(card)card.classList.add('hidden');
+  state.question=null;
+  const sendBtn=$('#sendBtn');
+  if(sendBtn)sendBtn.disabled=false;
+}
+
+async function pollQuestions(){
+  if(!state.sessionId)return;
+  const card=$('#questionCard');
+  if(!card)return;
+  try{
+    const d=await rpc('chat.question.pending',{sessionId:state.sessionId});
+    const list=d?.questions||[];
+    const q=list.find(x=>x.id!==state.question?.id)||list[0];
+    if(q){
+      if(state.question?.id!==q.id)renderQuestionCard(q);
+      $('#sendBtn').disabled=true;
+    }else if(!state.question){
+      clearQuestionCard();
+    }
+  }catch{}
+}
+
+function renderQuestionCard(q){
+  state.question={id:q.id,multiple:!!q.multiple};
+  const card=$('#questionCard');
+  const opts=(q.options||[]).map((o,i)=>{
+    const id='qopt_'+q.id+'_'+i;
+    const tag=o.recommended?' <span class="q-rec">推荐</span>':'';
+    return '<label class="q-option"><input type="'+(q.multiple?'checkbox':'radio')+'" name="q_'+esc(q.id)+'" value="'+esc(o.value)+'" />'+
+      '<span>'+esc(o.label||o.value)+tag+'</span></label>';
+  }).join('');
+  const custom=q.allowCustom===false?'':'<label class="q-custom"><span>自定义答案</span><textarea id="qCustom" rows="2" placeholder="输入自己的答案…"></textarea></label>';
+  const submit=q.multiple?'<button id="qSubmit" class="primary">提交答案</button>':'';
+  card.innerHTML='<div class="question-card-inner">'+
+    '<div class="question-card-head"><span class="dot-on"></span><strong>模型在等你回答</strong>'+
+    '<button id="qSkip" class="ghost">跳过</button></div>'+
+    '<div class="question-card-body">'+esc(q.prompt||'')+'</div>'+
+    (opts?'<div class="q-options">'+opts+'</div>':'')+
+    custom+
+    (submit?'<div class="btn-row">'+submit+'</div>':'')+
+    '</div>';
+  card.classList.remove('hidden');
+  $('#sendBtn').disabled=true;
+  card.querySelectorAll('.q-option input').forEach(inp=>{
+    inp.onchange=()=>{
+      if(!q.multiple)submitQuestion(false,[inp.value],'');
+    };
+  });
+  $('#qSkip').onclick=()=>submitQuestion(true,[],'');
+  const qSubmit=$('#qSubmit');
+  if(qSubmit)qSubmit.onclick=()=>{
+    const sel=Array.from(card.querySelectorAll('.q-option input:checked')).map(x=>x.value);
+    const custom=$('#qCustom')?.value?.trim()||'';
+    if(sel.length===0&&!custom){alert('请至少选择一个选项或填写自定义答案');return;}
+    submitQuestion(false,sel,custom);
+  };
+}
+
+async function submitQuestion(skipped,selected,custom){
+  const q=state.question;
+  if(!q)return;
+  state.question=null;
+  try{
+    const body={questionId:q.id,skipped:!!skipped};
+    if(selected&&selected.length)body.selected=selected;
+    if(custom)body.custom=custom;
+    await rpc('chat.question.answer',body);
+  }catch(e){
+    alert(e.message||'提交答案失败');
+  }finally{
+    clearQuestionCard();
+  }
+}
+
+// ── 会话全文搜索 ──────────────────────────────────────────────────────────
+async function doSearch(){
+  const q=$('#searchQuery').value.trim();
+  const box=$('#searchResults');
+  if(!q)return;
+  box.classList.remove('hidden');
+  box.innerHTML='<div class="search-note">搜索中…</div>';
+  try{
+    const d=await rpc('chat.search',{query:q,limit:20});
+    renderSearchResults(d);
+  }catch(e){
+    box.innerHTML='<div class="search-note error">'+esc(e.message||'搜索失败')+'</div>';
+  }
+}
+
+function renderSearchResults(d){
+  const box=$('#searchResults');
+  const list=d?.results||[];
+  box.innerHTML='<div class="search-head"><span>'+(d?.count||0)+' 个会话命中</span><button id="searchClear" class="ghost">清空</button></div>'+
+    (list.length?list.map(r=>{
+      const hits=(r.hits||[]).map(h=>
+        '<div class="search-hit"><span class="search-role">'+esc(h.role||'')+'</span>'+
+        '<span class="search-time">'+new Date(h.createdAt||Date.now()).toLocaleString()+'</span>'+
+        '<div class="search-snippet">'+esc(h.content||'')+'</div></div>'
+      ).join('');
+      return '<div class="search-row" data-id="'+esc(r.sessionId)+'">'+
+        '<div class="search-title">'+esc(r.title||'未命名会话')+' <span class="tag">'+r.matchedCount+' 条</span></div>'+
+        '<div class="search-snippet">'+esc(r.snippet||'')+'</div>'+
+        (hits?'<div class="search-hits">'+hits+'</div>':'')+
+        '</div>';
+    }).join(''):'<div class="search-note">没有匹配的会话。</div>');
+  box.querySelectorAll('.search-row').forEach(row=>{
+    row.onclick=()=>{
+      selectSession(row.dataset.id);
+      clearSearchResults();
+    };
+  });
+  $('#searchClear').onclick=clearSearchResults;
+}
+
+function clearSearchResults(){
+  const box=$('#searchResults');
+  if(box)box.classList.add('hidden');
+  const input=$('#searchQuery');
+  if(input)input.value='';
+}
+
 $('#connectBtn').onclick=login;$('#passwordInput').onkeydown=e=>{if(e.key==='Enter')login()};$('#logoutBtn').onclick=logout;
 $('#sendBtn').onclick=send;$('#prompt').oninput=autoGrow;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};$('#cancelBtn').onclick=cancel;
-$('#newChat').onclick=()=>{state.sessionId=null;renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
+$('#searchGo').onclick=doSearch;$('#searchQuery').onkeydown=e=>{if(e.key==='Enter')doSearch()};
+$('#newChat').onclick=()=>{state.sessionId=null;clearQuestionCard();renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
 $('#filePath').onkeydown=e=>{if(e.key==='Enter')loadFiles($('#filePath').value)};$('#fileUp').onclick=()=>{const p=state.filePath.replace(/\/$/,'').split('/').slice(0,-1).join('/')||'/';loadFiles(p)};$('#closeEditor').onclick=()=>$('#editor').classList.add('hidden');$('#saveFile').onclick=saveFile;$('#shellRun').onclick=runShell;
 // 各工具页的懒加载器；分页脚本（skills/memory/mcp/scheduled）加载后自行注册。
 const TAB_LOADERS={settings:loadSettings,models:loadModels};

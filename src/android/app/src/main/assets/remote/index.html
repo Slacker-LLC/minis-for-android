@@ -35,6 +35,11 @@
         <div><strong>OpenMinis</strong><span>Remote</span></div>
       </div>
       <button id="newChat" class="new-chat">＋ 新会话</button>
+      <div class="search-box">
+        <input id="searchQuery" type="search" placeholder="搜索会话…" autocomplete="off" />
+        <button id="searchGo" class="search-go" title="搜索">⌕</button>
+      </div>
+      <div id="searchResults" class="search-results hidden"></div>
       <div class="section-label">会话</div>
       <div id="sessions" class="sessions"></div>
       <div class="sidebar-foot">
@@ -58,6 +63,7 @@
       <div id="messages" class="messages">
         <div class="empty-state"><h2>手机 Agent，网页继续</h2><p>左侧选择会话，或者直接创建新会话。</p></div>
       </div>
+      <div id="questionCard" class="question-card hidden"></div>
       <div class="composer-wrap">
         <div class="composer">
           <textarea id="prompt" rows="1" placeholder="给 Minis 发消息…"></textarea>
