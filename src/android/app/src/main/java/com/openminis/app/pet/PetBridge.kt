@@ -9,8 +9,18 @@ import android.util.Log
 object PetBridge {
     private const val TAG = "PetBridge"
 
+    /** Throttle identical state broadcasts so a fast agent progress burst
+     *  (tool status flapping every few hundred ms) cannot spam the overlay
+     *  with startForegroundService calls. */
+    @Volatile private var lastState: PetState? = null
+    @Volatile private var lastStateAt = 0L
+
     fun setState(context: Context, state: PetState) {
         if (!PetPreferences.isEnabled(context)) return
+        val now = System.currentTimeMillis()
+        if (state == lastState && now - lastStateAt < 500L) return
+        lastState = state
+        lastStateAt = now
         val intent = Intent(context, PetOverlayService::class.java).apply {
             action = PetOverlayService.ACTION_SET_STATE
             putExtra(PetOverlayService.EXTRA_STATE, state.name)

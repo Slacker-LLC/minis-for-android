@@ -53,14 +53,19 @@ import com.openminis.app.terminal.MinisOpenUrlBroker
 import com.openminis.app.terminal.MinisUrlMarker
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
+import com.openminis.app.tools.ContextPressure
 import com.openminis.app.tools.FileEditTool
 import com.openminis.app.tools.FileReadTool
 import com.openminis.app.tools.FileWriteTool
 import com.openminis.app.tools.GoalTools
+import com.openminis.app.tools.JobTools
 import com.openminis.app.tools.MemoryTools
 import com.openminis.app.tools.ReadImageTool
 import com.openminis.app.tools.RalphTool
+import com.openminis.app.tools.ApprovalSeam
+import com.openminis.app.tools.DangerousCommandPolicy
 import com.openminis.app.tools.SubagentTool
+import com.openminis.app.tools.ToolCheckpointStore
 import com.openminis.app.tools.TodoTool
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.internal.ShellOutputTruncator
@@ -2218,7 +2223,33 @@ class ChatViewModel(
      * cannot fix.
      */
     private fun effectiveAgentHistory(): List<LLMMessage> =
-        dropOrphanedToolParts(effectiveAgentHistoryUncounted())
+        injectUnknownOutcomes(dropOrphanedToolParts(effectiveAgentHistoryUncounted()))
+
+    /**
+     * Recover interrupted tool executions (DSH session-checkpoint-policy
+     * TOOL_OUTCOME_UNKNOWN): if the process died while a tool was running,
+     * the persisted intent has no result. Inject a model-visible message so
+     * the agent does not blindly re-run a call that may already have had
+     * side effects. Drain-once: reported intents are not re-injected.
+     */
+    private fun injectUnknownOutcomes(history: List<LLMMessage>): List<LLMMessage> {
+        val sid = activeSessionId ?: return history
+        val pending = ToolCheckpointStore.drainPending(context, sid)
+        if (pending.isEmpty()) return history
+        return history + pending.map { rec ->
+            val text = "[tool outcome unknown] The tool '" + rec.toolName +
+                "' was interrupted before its result could be persisted (the app process " +
+                "died mid-execution). Whether it took effect is UNKNOWN. Do not blindly " +
+                "re-run it — if the call could have side effects (file writes, external " +
+                "API calls, payments), verify the actual state first (e.g. read the file / " +
+                "check the workspace) or ask the user."
+            LLMMessage(
+                role = LLMMessage.Role.ASSISTANT,
+                content = text,
+                contentParts = listOf(AgentContentPart.Text(text)),
+            )
+        }
+    }
 
     private fun effectiveAgentHistoryUncounted(): List<LLMMessage> {
         val summary = _compactSummary.value
@@ -2991,6 +3022,10 @@ class ChatViewModel(
      * so we only warn via [appendSystemInfo] at the `needsCompact` /
      * `exhausted` boundaries and still allow the send. That gives the user
      * a signal to invoke `/compact` explicitly without blocking their turn.
+     * A [ContextPressure] advisory (dsh-token-meter port) is also surfaced
+     * through the same channel whenever the fixed-heuristic estimate crosses
+     * 80% of the model's context window — advisory only; the compaction flow
+     * below is left untouched.
      */
     private fun checkContextBeforeSend(): PreSendContextAction {
         val tokens = _lastTurnContextTokens.value
@@ -2998,6 +3033,18 @@ class ChatViewModel(
         // [T-context-window-live-read] Live window (entry re-resolved + group
         // contextLimitTokens folded in) — not the currentModel snapshot.
         val window = effectiveContextWindowTokens() ?: return PreSendContextAction.PROCEED
+        // [Token Meter] Fixed-heuristic context pressure (dsh-token-meter
+        // port) over the exact history this send would carry. Advisory only:
+        // when the estimate crosses 80% of the window we surface the
+        // percentage through the existing warning channel (appendSystemInfo);
+        // the compaction flow below is unchanged.
+        val pressure = ContextPressure.compute(window, effectiveAgentHistory())
+        if (pressure.needsCompact) {
+            appendSystemInfo(
+                text = "[system] 当前上下文压力约 ${pressure.percent}%（模型窗口 $window）——如果继续可能超限，考虑 /compact",
+                iconKind = "compact",
+            )
+        }
         val policy = ContextPolicy.forContextWindow(window)
         return when (policy.check(tokens, window)) {
             ContextPolicy.CheckResult.OK -> PreSendContextAction.PROCEED
@@ -8167,6 +8214,14 @@ class ChatViewModel(
         // bridge, which is now where checkPermission runs.
         val toolTitle = try { JSONObject(argsJson).optString("tool_title", name) } catch (_: Exception) { name }
 
+        // Execution-intent checkpoint (DSH session-checkpoint-policy): persist
+        // BEFORE the tool body runs so a process death mid-tool leaves a
+        // recoverable "outcome unknown" signal for the next turn.
+        val sid = activeSessionId
+        if (!sid.isNullOrBlank()) {
+            ToolCheckpointStore.recordIntent(context, sid, toolId, name, argsJson)
+        }
+
         // Unified per-tool timeout (DeepSeek Harness
         // dsh-tool-call-timeout-policy): tools declare timeoutMs on their
         // AgentToolDefinition; the executor enforces a cooperative deadline
@@ -8189,6 +8244,9 @@ class ChatViewModel(
             timedOut = true,
             toolTitle = toolTitle,
         )
+        if (!sid.isNullOrBlank()) {
+            ToolCheckpointStore.markDone(context, sid, toolId, result.success)
+        }
         return applyRepeatGuard(name, argsJson, result)
     }
 
@@ -8243,6 +8301,10 @@ class ChatViewModel(
         AskUserQuestionTool.NAME -> AskUserQuestionTool.execute(argsJson, activeSessionId, context)
         "get_goal", "create_goal", "update_goal" ->
             GoalTools.execute(name, argsJson, activeSessionId, context)
+        // Job system (DeepSeek Harness dsh-tool-jobs, minimal port).
+        JobTools.NAME_OUTPUT -> JobTools.execute(name, argsJson, activeSessionId, context)
+        JobTools.NAME_LIST -> JobTools.execute(name, argsJson, activeSessionId, context)
+        JobTools.NAME_KILL -> JobTools.execute(name, argsJson, activeSessionId, context)
         TodoTool.NAME -> TodoTool.execute(argsJson, activeSessionId, context)
         else -> ToolExecutionResult("Unknown tool: $name", false)
     }
@@ -8446,6 +8508,34 @@ class ChatViewModel(
 
             if (command.isBlank()) {
                 return ToolExecutionResult("Error: 'command' is required", false, toolTitle = toolTitle)
+            }
+
+            // One-time approval for destructive commands (DSH
+            // dsh-user-approval seam). Never blocks forever: no responder
+            // within the window resolves as cancelled and the command is
+            // NOT run.
+            DangerousCommandPolicy.dangerousReason(command)?.let { reason ->
+                val decision = ApprovalSeam.request(
+                    context = context,
+                    sessionId = activeSessionId.orEmpty(),
+                    toolName = "shell_execute",
+                    summary = "执行危险命令：$reason\n\n$command",
+                )
+                when (decision.decision) {
+                    "allowed-once" -> { /* approved; run */ }
+                    "rejected" -> return ToolExecutionResult(
+                        "Error: command rejected by the user (approval denied): $command",
+                        false, toolTitle = toolTitle,
+                    )
+                    "cancelled" -> return ToolExecutionResult(
+                        "Error: approval request timed out with no answer; the destructive command was NOT run: $command",
+                        false, toolTitle = toolTitle,
+                    )
+                    else -> return ToolExecutionResult(
+                        "Error: command requires approval but none was available: $command",
+                        false, toolTitle = toolTitle,
+                    )
+                }
             }
 
             // [T-android-overlay-finalize item 1] Removed the

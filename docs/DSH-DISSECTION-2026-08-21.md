@@ -252,15 +252,18 @@ Phase 1 ✅ 已实施（2026-08-21）
   - ⏳ Output Retainer 库落地到 file_read/ls/grep（P2-10，地基）
   - ✅ 附赠：Ralph 循环（P0-1，复用 subagent 管线，见 tools/RalphTool.kt）
 
-Phase 2（再一版，中改动）
-  - 工具结果剪枝器（压缩时 head/tail 改写）（P1-4）
-  - Token Meter + 上下文压力条（P1-7）
-
-Phase 3（后续，需要设计评审）
-  - 会话检查点 + TOOL_OUTCOME_UNKNOWN 恢复语义（P1-5）
-  - 作业系统（job_output/list/kill + 通知）（P1-6）
-  - 通用 Spill 策略（P2-8）
-  - 工具审批 seam（ask/never + 审计）（P2-9）
+Phase 2 ✅ 已实施（2026-08-21）
+  - ✅ 工具结果剪枝器（ToolResultPruner：8192 阈值、4096 头/1024 尾、幂等）
+  - ✅ Token Meter + ContextPressure（4 字符/token + 结构开销；发送前压力提示，
+     80% 警告 / 95% 危险）
+  - ✅ 会话检查点（ToolCheckpointStore：JSONL 执行意图表；进程崩溃后注入
+     TOOL_OUTCOME_UNKNOWN，防重复执行有副作用调用）
+  - ✅ 作业系统（JobRegistry + job_output/job_list/job_kill + agent.jobs.* RPC）
+  - ✅ 通用 Spill 策略（SpillPolicy：纯文本结果超限落盘 + head/tail 预览 + 取回指引）
+  - ✅ 输出保留库（OutputRetainer：TextRetainer/ItemRetainer，代理对安全、
+     精确省略计数，14 个单测全过）
+  - ✅ 工具审批 seam（ApprovalSeam：ask/never + 审计 + agent.approval.* RPC；
+     DangerousCommandPolicy 检测破坏性 shell 命令并拦截审批）
 
 ---
 

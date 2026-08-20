@@ -43,6 +43,10 @@ object AgentTools {
         add(createGoalDefinition())
         add(updateGoalDefinition())
         add(todoWriteDefinition())
+        // Job system (DeepSeek Harness dsh-tool-jobs, minimal port).
+        add(JobTools.jobOutputDefinition())
+        add(JobTools.jobListDefinition())
+        add(JobTools.jobKillDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())

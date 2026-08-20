@@ -183,6 +183,14 @@ class DebugRPCHandler(private val context: Context) {
             "agent.deliverables.list" -> AgentStateRpcMethods.deliverablesList(context, params)
             "agent.deliverables.clear" -> AgentStateRpcMethods.deliverablesClear(context, params)
 
+            // Approvals (one-time dangerous-operation consent)
+            "agent.approval.list" -> AgentRpcMethods.approvalsList(context, params)
+            "agent.approval.answer" -> AgentRpcMethods.approvalsAnswer(context, params)
+
+            // Jobs (DeepSeek Harness dsh-tool-jobs, minimal port)
+            "agent.jobs.list" -> AgentRpcMethods.jobsList(context, params)
+            "agent.jobs.cancel" -> AgentRpcMethods.jobsCancel(context, params)
+
             // Settings (permission presets / sandbox introspection)
             "settings.permissionPreset.get" -> SettingsRpcMethods.permissionPresetGet(context, params)
             "settings.permissionPreset.set" -> SettingsRpcMethods.permissionPresetSet(context, params)

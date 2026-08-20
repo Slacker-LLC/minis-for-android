@@ -16,8 +16,21 @@ class AssistSession(
     service: AssistSessionService,
 ) : VoiceInteractionSession(service) {
 
+    companion object {
+        /** Debounce: repeated assistant invocations within this window are
+         *  collapsed into one launch (long-press Home mashing). */
+        private const val LAUNCH_DEBOUNCE_MS = 1_500L
+        @Volatile private var lastLaunchAt = 0L
+    }
+
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
+        val now = System.currentTimeMillis()
+        if (now - lastLaunchAt < LAUNCH_DEBOUNCE_MS) {
+            finish()
+            return
+        }
+        lastLaunchAt = now
         runCatching {
             val intent = Intent(appContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

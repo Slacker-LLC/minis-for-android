@@ -1,7 +1,9 @@
 package com.openminis.app.debug
 
 import android.content.Context
+import com.openminis.app.tools.JobRegistry
 import com.openminis.app.tools.SubagentLimits
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -21,6 +23,31 @@ internal object AgentRpcMethods {
         put("timeoutMinutes", SubagentLimits.timeoutMs(context) / 60_000L)
     }
 
+    fun approvalsList(context: Context, params: JSONObject): JSONObject {
+        val sessionId = params.optString("sessionId", "").ifEmpty { null }
+        val arr = JSONArray()
+        for (r in com.openminis.app.tools.ApprovalSeam.pendingFor(sessionId)) {
+            arr.put(JSONObject().apply {
+                put("id", r.id)
+                put("sessionId", r.sessionId)
+                put("tool", r.toolName)
+                put("summary", r.summary)
+                put("createdAt", r.createdAt)
+            })
+        }
+        return JSONObject().put("approvals", arr)
+    }
+
+    fun approvalsAnswer(context: Context, params: JSONObject): JSONObject {
+        val id = params.optString("approvalId", "").ifEmpty {
+            throw RPCException(-32602, "Missing 'approvalId' param")
+        }
+        if (!params.has("allowed")) throw RPCException(-32602, "Missing 'allowed' param")
+        val ok = com.openminis.app.tools.ApprovalSeam.answer(id, params.optBoolean("allowed", false))
+        if (!ok) throw RPCException(-32001, "No pending approval with id $id")
+        return JSONObject().put("ok", true)
+    }
+
     fun settingsSet(context: Context, params: JSONObject): JSONObject {
         val maxDepth = params.optInt("maxDepth", SubagentLimits.DEFAULT_MAX_DEPTH)
         val timeoutMinutes = params.optLong("timeoutMinutes", SubagentLimits.DEFAULT_TIMEOUT_MINUTES)
@@ -35,6 +62,44 @@ internal object AgentRpcMethods {
             put("ok", true)
             put("maxDepth", maxDepth)
             put("timeoutMinutes", timeoutMinutes)
+        }
+    }
+
+    // ── Jobs (DeepSeek Harness dsh-tool-jobs, minimal port) ────────────────
+
+    /** agent.jobs.list: all tracked jobs, newest first, as JSON. */
+    fun jobsList(context: Context, params: JSONObject): JSONObject {
+        val arr = JSONArray()
+        for (job in JobRegistry.list()) {
+            arr.put(JSONObject().apply {
+                put("id", job.id)
+                put("kind", job.kind)
+                put("label", job.label)
+                put("status", job.status.name)
+                put("detail", job.detail)
+                put("startedAt", job.startedAt)
+                put("finishedAt", job.finishedAt ?: JSONObject.NULL)
+                put("output", JobRegistry.output(job.id) ?: "")
+            })
+        }
+        return JSONObject().apply {
+            put("jobs", arr)
+            put("count", arr.length())
+        }
+    }
+
+    /** agent.jobs.cancel: request cancellation of a running job by id. */
+    fun jobsCancel(context: Context, params: JSONObject): JSONObject {
+        val id = params.optString("id", "").ifEmpty {
+            throw RPCException(-32602, "Missing 'id' param")
+        }
+        val job = JobRegistry.get(id)
+            ?: throw RPCException(-32602, "Job not found: $id")
+        val canceled = JobRegistry.kill(id, params.optString("reason", ""))
+        return JSONObject().apply {
+            put("id", id)
+            put("canceled", canceled)
+            put("status", (JobRegistry.get(id) ?: job).status.name)
         }
     }
 }

@@ -73,7 +73,8 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
     var apiToken by remember { mutableStateOf(RemoteAccessPrefs.token(context)) }
     var permissionPreset by remember { mutableStateOf(RemotePermissionPolicy.preset(context)) }
     var pendingDangerConfirm by remember { mutableStateOf(false) }
-    val lanIp = remember { localIpv4Address() ?: "<phone-ip>" }
+    // Refreshed on ON_RESUME below so a Wi-Fi switch updates the shown IP.
+    var lanIp by remember { mutableStateOf(localIpv4Address() ?: "<phone-ip>") }
 
     LaunchedEffect(Unit) { CloudflareTunnelManager.refresh(context) }
 
@@ -94,6 +95,7 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
                 tunnelTokenConfigured = RemoteAccessPrefs.hasCloudflareTunnelToken(context)
                 hostname = RemoteAccessPrefs.cloudflareHostname(context)
                 permissionPreset = RemotePermissionPolicy.preset(context)
+                lanIp = localIpv4Address() ?: "<phone-ip>"
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
