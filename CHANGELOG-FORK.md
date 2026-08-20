@@ -164,6 +164,32 @@ Android 12+ 把这算作后台启动前台服务，直接拒绝。`runCatching` 
 所以那一族整个挡在外面，只放行 `provider.` / `chat.` / `rpc.discover`。
 要用那些方法，仍然只能走本机的 127.0.0.1:5321 调试端口。
 
+### 11. Web 端补上技能 / 记忆 / MCP / 定时任务管理页
+
+Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端已有的技能、记忆、MCP、
+定时任务四个设置入口在网页上没有对应页面。
+
+**改法**：沿用第 10 条的思路——不为这些页面新造 REST 路由，而是在 `DebugRPCHandler`
+里各加一组薄封装，把 App 仓库层的能力直接转发出去：
+
+| 前缀 | RPC | 能力 |
+|---|---|---|
+| `skills.` | `list` / `get` / `toggle` / `delete` | 技能列表、查看 SKILL.md、启用/停用、删除 |
+| `memory.` | `files.list` / `files.read` / `files.write` / `files.delete`、`globalToggle` / `setGlobalEnabled` | 记忆文件浏览/编辑/删除、全局记忆开关 |
+| `soul.` | `get` / `save` | SOUL.md 人设的读取与保存 |
+| `mcp.` | `list` / `toggle` / `delete` | MCP 服务器列表、启用/停用、删除 |
+| `scheduled.` | `list` / `toggle` / `delete` / `run` | 定时任务列表、启停、删除、立即运行 |
+
+前端按页拆成 `skills-tab.js` / `memory-tab.js` / `mcp-tab.js` / `scheduled-tab.js`，
+与 `app.js` 的懒加载表 `TAB_LOADERS` 挂接，切到对应标签才请求数据；新建/导入类操作
+仍然保留在手机端，网页只做查看、编辑、启停和删除，避免把管理面撑得过大。
+
+**白名单**：`RPC_ALLOWED_PREFIXES` 放行 `skills.` / `memory.` / `soul.` / `mcp.` /
+`scheduled.`，这四个族内部都做了参数校验（技能/服务器/任务 id 必须存在，记忆文件名
+拒绝路径穿越）；另放行只读诊断方法 `debug.appInfo` / `debug.logs.*` / `debug.crash.*`。
+`debug.tap` / `debug.inputText` / `debug.screenshot` / `debug.writeFile` 这类等于远程
+操控手机的交互式方法，仍被整体挡在 Web 端之外。
+
 ---
 
 ## 未验证 / 已知问题

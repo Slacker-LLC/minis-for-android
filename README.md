@@ -75,6 +75,14 @@ my-pet.zip
 `/var/minis/offloads/tools/`，Agent 后面还能用 `file_read` 翻回来。截断按 Unicode
 码点回退，不会从一个 UTF-8 字符或 emoji 中间砍断。
 
+**子代理委派**（`subagent`）
+
+把一个自包含的子任务丢给独立会话去跑：子代理有自己的上下文和完整工具链
+（复用 App 自己的 Agent 循环与 Persistent Shell），父会话只拿到最终答案。
+「读 40 个文件然后告诉我 X 在哪里」这种长探索烧的是子代理的上下文，不会撑爆
+当前会话。委派深度上限 3 层，单个子任务超时 10 分钟，子会话会以「↳ 标题」的
+形式出现在会话列表里，方便事后查看。
+
 ### 三、Web 远程控制
 
 浏览器里管手机上的 Agent，和 Android 原生界面**共享同一个 Session、Agent Loop 和
@@ -83,10 +91,20 @@ Persistent Shell**——不是另开一套会话：
 - 会话列表、对话、Markdown 渲染（代码块带复制按钮、表格、列表、公式）
 - 回复逐段增长的流式观感
 - 文件浏览 / 在线编辑、Shell 执行
+- 技能、记忆（含 SOUL.md）、MCP 服务器、定时任务四个管理页签：列表、启停、
+  删除都在网页上完成；记忆文件可以直接在线编辑，定时任务还能一键「立即运行」
 - 登录鉴权：PBKDF2-HMAC-SHA256（210k 轮）+ 12 小时 HttpOnly Session Cookie，
   **没设密码就拒绝启动**；默认只监听 `127.0.0.1`，要开局域网得显式打开
 - Cloudflare Tunnel 管理，没有公网 IP 也能用域名访问
 - 重启手机后自动恢复
+
+Web 端复用的是 App 内部的 RPC 通道，但**按前缀白名单放行**：`provider.` /
+`chat.` / `skills.` / `memory.` / `soul.` / `mcp.` / `scheduled.` 以及少量诊断
+方法（`debug.logs.*`、`debug.crash.*`、`debug.appInfo`）。`debug.tap`、
+`debug.inputText`、`debug.screenshot`、`debug.writeFile` 这类等于远程操控手机的
+方法被整个挡在网页之外，要用只能走本机 127.0.0.1:5321 调试端口。
+
+页面沿用了 DeepSeek 设计 token 主题（随 APK 内置，离线可用）。
 
 ## 装了之后
 

@@ -827,6 +827,180 @@ object DebugMethodRegistry {
             returns = "{sessionId, deleted}",
             example = ex("sessionId" to "6D0F…", "confirm" to true),
         ),
+
+        // ── Skills (web remote: skills.*) ─────────────────────────────────────
+        MethodSpec(
+            name = "skills.list",
+            description = "List installed skills with their metadata. Creation/import stays on-device.",
+            params = emptyList(),
+            returns = "{skills:[{id, name, description, version, importSource, isEnabled, installedAt, updatedAt, useCount}]}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "skills.get",
+            description = "Return one installed skill, including its full body source.",
+            params = listOf(
+                ParamSpec("skillId", "string", required = true, description = "Skill identifier."),
+            ),
+            returns = "Same shape as a skills.list item, plus {body}.",
+            example = ex("skillId" to "pet-chat"),
+        ),
+        MethodSpec(
+            name = "skills.toggle",
+            description = "Enable or disable an installed skill.",
+            params = listOf(
+                ParamSpec("skillId", "string", required = true, description = "Skill identifier."),
+                ParamSpec("enabled", "bool", required = true, description = "New enabled state."),
+            ),
+            returns = "{ok:true}",
+            example = ex("skillId" to "pet-chat", "enabled" to true),
+        ),
+        MethodSpec(
+            name = "skills.delete",
+            description = "Permanently remove an installed skill.",
+            params = listOf(
+                ParamSpec("skillId", "string", required = true, description = "Skill identifier."),
+            ),
+            returns = "{ok:true}",
+            example = ex("skillId" to "pet-chat"),
+        ),
+
+        // ── Memory (web remote: memory.*, soul.*) ─────────────────────────────
+        MethodSpec(
+            name = "memory.files.list",
+            description = "List memory Markdown files the Agent reads/writes between runs.",
+            params = emptyList(),
+            returns = "{files:[{name, isGlobal, modifiedDate, fileSize, preview}]}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "memory.files.read",
+            description = "Read one memory file. GLOBAL.md is the global memory file. Rejects path traversal.",
+            params = listOf(
+                ParamSpec("name", "string", required = true, description = "File name (no '/' or '..')."),
+            ),
+            returns = "{name, content, isGlobal}",
+            example = ex("name" to "GLOBAL.md"),
+        ),
+        MethodSpec(
+            name = "memory.files.write",
+            description = "Write (create or replace) one memory file. Rejects path traversal.",
+            params = listOf(
+                ParamSpec("name", "string", required = true, description = "File name (no '/' or '..')."),
+                ParamSpec("content", "string", required = true, description = "Full file content."),
+            ),
+            returns = "{ok:true}",
+            example = ex("name" to "GLOBAL.md", "content" to "## 长期记忆\n…"),
+        ),
+        MethodSpec(
+            name = "memory.files.delete",
+            description = "Delete one memory file. Cannot delete files the store protects.",
+            params = listOf(
+                ParamSpec("name", "string", required = true, description = "File name (no '/' or '..')."),
+            ),
+            returns = "{ok:true}",
+            example = ex("name" to "notes.md"),
+        ),
+        MethodSpec(
+            name = "memory.globalToggle",
+            description = "Return whether global memory is enabled.",
+            params = emptyList(),
+            returns = "{enabled:boolean}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "memory.setGlobalEnabled",
+            description = "Enable or disable global memory for all sessions.",
+            params = listOf(
+                ParamSpec("enabled", "bool", required = true, description = "New enabled state."),
+            ),
+            returns = "{ok:true, enabled}",
+            example = ex("enabled" to true),
+        ),
+        MethodSpec(
+            name = "soul.get",
+            description = "Read SOUL.md: persona name, style, language, and body.",
+            params = emptyList(),
+            returns = "{name, style, lang, body}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "soul.save",
+            description = "Save SOUL.md. Omitted fields keep their current values.",
+            params = listOf(
+                ParamSpec("name", "string", required = false, description = "Persona name."),
+                ParamSpec("style", "string", required = false, description = "Persona style."),
+                ParamSpec("lang", "string", required = false, description = "Persona language."),
+                ParamSpec("body", "string", required = false, description = "SOUL.md body."),
+            ),
+            returns = "{ok:true}",
+            example = ex("name" to "Pi", "lang" to "zh", "body" to "你是…"),
+        ),
+
+        // ── MCP (web remote: mcp.*) ───────────────────────────────────────────
+        MethodSpec(
+            name = "mcp.list",
+            description = "List configured MCP servers. Creation stays on-device.",
+            params = emptyList(),
+            returns = "{servers:[{id, note, enabled, url, command, args, env, headers, startupTimeoutSeconds, createdAt}]}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "mcp.toggle",
+            description = "Enable or disable an MCP server.",
+            params = listOf(
+                ParamSpec("serverId", "string", required = true, description = "MCP server identifier."),
+                ParamSpec("enabled", "bool", required = true, description = "New enabled state."),
+            ),
+            returns = "{ok:true}",
+            example = ex("serverId" to "mcp-1", "enabled" to true),
+        ),
+        MethodSpec(
+            name = "mcp.delete",
+            description = "Permanently remove an MCP server.",
+            params = listOf(
+                ParamSpec("serverId", "string", required = true, description = "MCP server identifier."),
+            ),
+            returns = "{ok:true}",
+            example = ex("serverId" to "mcp-1"),
+        ),
+
+        // ── Scheduled tasks (web remote: scheduled.*) ─────────────────────────
+        MethodSpec(
+            name = "scheduled.list",
+            description = "List scheduled tasks, newest run history included. Creation stays on-device.",
+            params = emptyList(),
+            returns = "{tasks:[task.toJson()]}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "scheduled.toggle",
+            description = "Enable or disable a scheduled task.",
+            params = listOf(
+                ParamSpec("taskId", "string", required = true, description = "Scheduled task identifier."),
+                ParamSpec("enabled", "bool", required = true, description = "New enabled state."),
+            ),
+            returns = "{ok:true}",
+            example = ex("taskId" to "task-1", "enabled" to true),
+        ),
+        MethodSpec(
+            name = "scheduled.delete",
+            description = "Permanently remove a scheduled task.",
+            params = listOf(
+                ParamSpec("taskId", "string", required = true, description = "Scheduled task identifier."),
+            ),
+            returns = "{ok:true}",
+            example = ex("taskId" to "task-1"),
+        ),
+        MethodSpec(
+            name = "scheduled.run",
+            description = "Trigger a scheduled task immediately in the background and return instantly.",
+            params = listOf(
+                ParamSpec("taskId", "string", required = true, description = "Scheduled task identifier."),
+            ),
+            returns = "{ok:true} (async trigger)",
+            example = ex("taskId" to "task-1"),
+        ),
     )
 
     private fun encode(method: MethodSpec): JSONObject {

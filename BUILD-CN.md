@@ -12,7 +12,7 @@
 
 `applicationId` 是 `dev.openminispet.android`，与官方版 `com.openminis.app` **不冲突，可同时安装**。
 
-改造细节见 `MERGE_REPORT.md` 与 `V2_MERGE_REPORT.md`。
+改动清单与踩坑记录见 [CHANGELOG-FORK.md](CHANGELOG-FORK.md)，项目说明见 [README.md](README.md)。
 
 ## 已验证
 

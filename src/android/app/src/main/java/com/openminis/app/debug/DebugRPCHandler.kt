@@ -163,6 +163,33 @@ class DebugRPCHandler(private val context: Context) {
             "chat.compact.markers.list" -> ChatMutationMethods.compactMarkersList(context, params)
             "chat.compact.revert" -> ChatMutationMethods.compactRevert(context, params)
 
+            // Skills
+            "skills.list" -> SkillRpcMethods.list(context)
+            "skills.get" -> SkillRpcMethods.get(context, params)
+            "skills.toggle" -> SkillRpcMethods.toggle(context, params)
+            "skills.delete" -> SkillRpcMethods.delete(context, params)
+
+            // Memory
+            "memory.files.list" -> MemoryRpcMethods.filesList(context)
+            "memory.files.read" -> MemoryRpcMethods.filesRead(context, params)
+            "memory.files.write" -> MemoryRpcMethods.filesWrite(context, params)
+            "memory.files.delete" -> MemoryRpcMethods.filesDelete(context, params)
+            "memory.globalToggle" -> MemoryRpcMethods.globalToggle(context)
+            "memory.setGlobalEnabled" -> MemoryRpcMethods.setGlobalEnabled(context, params)
+            "soul.get" -> MemoryRpcMethods.soulGet(context)
+            "soul.save" -> MemoryRpcMethods.soulSave(context, params)
+
+            // MCP
+            "mcp.list" -> McpRpcMethods.list(context)
+            "mcp.toggle" -> McpRpcMethods.toggle(context, params)
+            "mcp.delete" -> McpRpcMethods.delete(context, params)
+
+            // Scheduled Tasks
+            "scheduled.list" -> ScheduledTaskRpcMethods.list(context)
+            "scheduled.toggle" -> ScheduledTaskRpcMethods.toggle(context, params)
+            "scheduled.delete" -> ScheduledTaskRpcMethods.delete(context, params)
+            "scheduled.run" -> ScheduledTaskRpcMethods.run(context, params)
+
             // Debug-only: direct CLI / offload-handler invocation (T344).
             // Registered solely on DEBUG builds so release APKs cannot expose it.
             "debug.shizuku.exec" -> {

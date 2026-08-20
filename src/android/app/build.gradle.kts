@@ -37,7 +37,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 24
-        versionName = "1.12-pet.1"
+        versionName = "1.12-pet.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

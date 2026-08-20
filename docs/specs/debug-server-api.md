@@ -1760,6 +1760,314 @@ print('Saved screenshot.png')
 | `-32602` | Invalid params         |
 | `-32000` | Internal server error  |
 
+---
+
+## Android: Skills / Memory / MCP / Scheduled Tasks
+
+These families are registered by `DebugRPCHandler` on the Android build
+(`app/src/main/java/com/openminis/app/debug/`). They are reachable on the local
+debug server, and — with the exception of `soul.save` and `memory.files.write`
+being gated by the same whitelist rules below — through the Web Remote
+`/api/rpc` proxy.
+
+### Web Remote whitelist
+
+The Web Remote RPC proxy (`RemoteAccessServer.RPC_ALLOWED_PREFIXES`) only
+forwards these method prefixes:
+
+```text
+provider.    chat.        rpc.discover
+skills.      memory.      soul.
+mcp.         scheduled.
+debug.logs.  debug.crash. debug.appInfo
+```
+
+Everything else under `debug.*` — `debug.tap`, `debug.inputText`,
+`debug.screenshot`, `debug.writeFile`, and friends — is blocked on the Web
+surface because the page may be reachable through a public Cloudflare Tunnel.
+Use the local `127.0.0.1:5321` debug port for those methods.
+
+`soul.save` and `memory.files.write` modify files that the Agent reads on every
+run; they are intentionally included so remote users can manage their pet's
+memory, but they are subject to the same login/password requirement as every
+other Web Remote call.
+
+### Skills (`skills.*`)
+
+Read-only listing plus toggle/delete. **Creating or importing skills stays
+on-device.**
+
+#### `skills.list`
+
+**Response:**
+
+```json
+{
+  "skills": [
+    {
+      "id": "…",
+      "name": "…",
+      "description": "…",
+      "version": "…",
+      "importSource": "…",
+      "isEnabled": true,
+      "installedAt": 0,
+      "updatedAt": 0,
+      "useCount": 0
+    }
+  ]
+}
+```
+
+#### `skills.get`
+
+**Params:**
+
+| Name     | Type     | Description                        |
+|----------|----------|------------------------------------|
+| `skillId` | `string` | **Required.** Skill identifier.    |
+
+**Response:** same shape as a `skills.list` item, plus the full `body` source.
+
+**Errors:** `-32602` when `skillId` is missing or the skill is not found.
+
+#### `skills.toggle`
+
+**Params:**
+
+| Name      | Type      | Description                          |
+|-----------|-----------|--------------------------------------|
+| `skillId` | `string`  | **Required.** Skill identifier.      |
+| `enabled` | `boolean` | **Required.** New enabled state.     |
+
+**Response:** `{ "ok": true }`
+
+**Errors:** `-32602` when a parameter is missing or the skill is not found.
+
+#### `skills.delete`
+
+**Params:** `skillId` as above.
+
+**Response:** `{ "ok": true }`
+
+**Errors:** `-32602` when the skill is not found.
+
+### Memory (`memory.*`) and Soul (`soul.*`)
+
+Memory files are the Markdown files the Agent reads/writes between runs.
+`GLOBAL.md` is special-cased as the global memory file.
+
+#### `memory.files.list`
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "name": "GLOBAL.md",
+      "isGlobal": true,
+      "modifiedDate": "2026-08-20 09:00",
+      "fileSize": 0,
+      "preview": "…"
+    }
+  ]
+}
+```
+
+#### `memory.files.read`
+
+**Params:**
+
+| Name   | Type     | Description                                              |
+|--------|----------|----------------------------------------------------------|
+| `name` | `string` | **Required.** File name. `GLOBAL.md` is the global file.  |
+
+**Response:** `{ "name": …, "content": …, "isGlobal": bool }`
+
+**Errors:** `-32602` when `name` is missing or contains `/` or `..` (path
+traversal guard).
+
+#### `memory.files.write`
+
+**Params:**
+
+| Name      | Type     | Description                                      |
+|-----------|----------|--------------------------------------------------|
+| `name`    | `string` | **Required.** File name (same traversal guard).  |
+| `content` | `string` | **Required.** Full new file content.             |
+
+`GLOBAL.md` is persisted through the global-memory path; other names are saved
+as regular memory files.
+
+**Response:** `{ "ok": true }`
+
+#### `memory.files.delete`
+
+**Params:** `name` as above.
+
+**Response:** `{ "ok": true }`
+
+**Errors:** `-32602` for invalid names, `-32000` when the file cannot be
+deleted.
+
+#### `memory.globalToggle`
+
+**Response:** `{ "enabled": bool }` — current global memory switch state.
+
+#### `memory.setGlobalEnabled`
+
+**Params:**
+
+| Name      | Type      | Description                       |
+|-----------|-----------|-----------------------------------|
+| `enabled` | `boolean` | **Required.** New global state.   |
+
+**Response:** `{ "ok": true, "enabled": bool }`
+
+#### `soul.get`
+
+Ensures `SOUL.md` exists, then returns its metadata and body:
+
+```json
+{
+  "name": "…",
+  "style": "…",
+  "lang": "…",
+  "body": "…"
+}
+```
+
+#### `soul.save`
+
+**Params** (all optional; omitted fields keep their current value):
+
+| Name    | Type     | Description                          |
+|---------|----------|--------------------------------------|
+| `name`  | `string` | Display name (empty keeps current).  |
+| `style` | `string` | Writing-style hint.                  |
+| `lang`  | `string` | Language hint.                       |
+| `body`  | `string` | Full `SOUL.md` body.                 |
+
+**Response:** `{ "ok": true }`
+
+### MCP (`mcp.*`)
+
+Listing, toggle, and delete of configured MCP servers. **Creating/importing MCP
+servers stays on-device.**
+
+#### `mcp.list`
+
+**Response:**
+
+```json
+{
+  "servers": [
+    {
+      "id": "…",
+      "note": null,
+      "enabled": true,
+      "url": null,
+      "command": null,
+      "args": [],
+      "env": {},
+      "headers": {},
+      "startupTimeoutSeconds": null,
+      "createdAt": 0
+    }
+  ]
+}
+```
+
+#### `mcp.toggle`
+
+**Params:** `serverId` (`string`, required), `enabled` (`boolean`, required).
+
+**Response:** `{ "ok": true }`
+
+**Errors:** `-32602` when a parameter is missing or the server is not found.
+
+#### `mcp.delete`
+
+**Params:** `serverId` as above.
+
+**Response:** `{ "ok": true }`
+
+### Scheduled Tasks (`scheduled.*`)
+
+Tasks scheduled via AlarmManager. **Creating tasks stays on-device**; the Web
+surface can list, enable/disable, delete, and trigger an immediate run.
+
+#### `scheduled.list`
+
+**Response:**
+
+```json
+{
+  "tasks": [
+    {
+      "id": "…",
+      "label": "…",
+      "hour": 9,
+      "minute": 0,
+      "repeatMode": "DAILY",
+      "customDays": "",
+      "prompt": "…",
+      "targetMode": "NEW_SESSION",
+      "modelId": null,
+      "modelBinding": null,
+      "enabled": true,
+      "createdAt": 0,
+      "startDateMs": null,
+      "endDateMs": null,
+      "lastFiredAt": null,
+      "lastResultPreview": null,
+      "lastResultSessionId": null,
+      "runHistory": []
+    }
+  ]
+}
+```
+
+Nullable fields (`modelId`, `modelBinding`, `startDateMs`, `endDateMs`,
+`lastFiredAt`, `lastResultPreview`, `lastResultSessionId`, `runHistory`) are
+omitted when absent.
+
+#### `scheduled.toggle`
+
+**Params:** `taskId` (`string`, required), `enabled` (`boolean`, required).
+
+**Response:** `{ "ok": true }`
+
+**Errors:** `-32602` when a parameter is missing or the task is not found.
+
+#### `scheduled.delete`
+
+**Params:** `taskId` as above.
+
+**Response:** `{ "ok": true }`
+
+#### `scheduled.run`
+
+**Params:** `taskId` as above.
+
+**Response:** `{ "ok": true }` — returned **immediately**; the run happens
+fire-and-forget in a background scope and may take up to about 10 minutes. The
+task's `lastFiredAt` / `lastResult*` fields on a later `scheduled.list` reflect
+the outcome.
+
+**Errors:** `-32602` when the task is not found.
+
+### Security notes for the Web surface
+
+- Credential material (API keys, OAuth tokens) is **never** returned by any of
+  these methods — the same write-only rule as the rest of the RPC surface.
+- `memory.files.write`, `soul.save`, and `scheduled.run` mutate state or launch
+  Agent work; they are only reachable after the Web Remote login (PBKDF2 +
+  HttpOnly session cookie).
+- Memory file names are validated against `/` and `..` before any read/write/
+  delete to prevent path traversal.
+
 ### Browser-Specific Errors
 
 | Message                      | Cause                                         |

@@ -72,6 +72,10 @@
         <button class="tab active" data-tab="files">文件</button>
         <button class="tab" data-tab="shell">终端</button>
         <button class="tab" data-tab="models">模型</button>
+        <button class="tab" data-tab="skills">技能</button>
+        <button class="tab" data-tab="memory">记忆</button>
+        <button class="tab" data-tab="mcp">MCP</button>
+        <button class="tab" data-tab="scheduled">定时任务</button>
         <button class="tab" data-tab="settings">设置</button>
       </div>
 
@@ -97,6 +101,39 @@
         </div>
         <div id="modelsBody" class="models-body"></div>
       </section>
+
+      <section id="skillsTab" class="tool-tab">
+        <div class="models-toolbar">
+          <button id="skillsRefresh" class="secondary">刷新</button>
+          <span id="skillsMsg" class="models-msg"></span>
+        </div>
+        <div id="skillsBody" class="models-body"></div>
+      </section>
+
+      <section id="memoryTab" class="tool-tab">
+        <div class="models-toolbar">
+          <button id="memoryRefresh" class="secondary">刷新</button>
+          <span id="memoryMsg" class="models-msg"></span>
+        </div>
+        <div id="memoryBody" class="models-body"></div>
+      </section>
+
+      <section id="mcpTab" class="tool-tab">
+        <div class="models-toolbar">
+          <button id="mcpRefresh" class="secondary">刷新</button>
+          <span id="mcpMsg" class="models-msg"></span>
+        </div>
+        <div id="mcpBody" class="models-body"></div>
+      </section>
+
+      <section id="scheduledTab" class="tool-tab">
+        <div class="models-toolbar">
+          <button id="scheduledRefresh" class="secondary">刷新</button>
+          <span id="scheduledMsg" class="models-msg"></span>
+        </div>
+        <div id="scheduledBody" class="models-body"></div>
+      </section>
+
       <section id="settingsTab" class="tool-tab settings-tab">
         <div class="settings-scroll">
           <div class="settings-heading"><h2>远程控制</h2><p>这里修改 Web Remote 自身的网络、登录和 Tunnel 设置。模型 API Key 不会下发到网页。</p></div>
@@ -155,5 +192,9 @@
   <script src="/purify.js"></script>
   <script src="/md.js"></script>
   <script src="/app.js"></script>
+  <script src="/skills-tab.js"></script>
+  <script src="/memory-tab.js"></script>
+  <script src="/mcp-tab.js"></script>
+  <script src="/scheduled-tab.js"></script>
 </body>
 </html>

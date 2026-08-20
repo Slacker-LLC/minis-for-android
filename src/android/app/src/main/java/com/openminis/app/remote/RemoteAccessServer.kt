@@ -296,6 +296,10 @@ class RemoteAccessServer(
             "/md.js" -> "remote/md.js"
             "/marked.js" -> "remote/marked.js"
             "/purify.js" -> "remote/purify.js"
+            "/skills-tab.js" -> "remote/skills-tab.js"
+            "/memory-tab.js" -> "remote/memory-tab.js"
+            "/mcp-tab.js" -> "remote/mcp-tab.js"
+            "/scheduled-tab.js" -> "remote/scheduled-tab.js"
             "/ds-tokens.css" -> "remote/ds-tokens.css"
             "/ds-scrollbar.css" -> "remote/ds-scrollbar.css"
             else -> null
@@ -716,13 +720,24 @@ class RemoteAccessServer(
     /**
      * Method families reachable from the browser.
      *
-     * Deliberately excludes the whole `debug.` family: it carries tap,
-     * inputText, screenshot, ls, readFile and writeFile, which together amount
-     * to remote control of the phone. Web Remote can be published to the open
-     * internet through a tunnel, so that surface stays off it entirely —
-     * the local debug server on 127.0.0.1:5321 remains the way to reach them.
+     * The `debug.` family is only allowed for the read-only diagnostic subset:
+     * logs, crash reports, and app metadata. Everything that amounts to remote
+     * control of the phone — tap, inputText, screenshot, ls, readFile,
+     * writeFile, shellExecute and the browser/UI-inspection methods — stays off
+     * this surface. Web Remote can be published to the open internet through a
+     * tunnel, so the local debug server on 127.0.0.1:5321 remains the only way
+     * to reach those methods.
+     *
+     * The writable families below (skills/memory/soul/mcp/scheduled) can change
+     * or delete on-device data, so the Web Remote login password is the
+     * boundary protecting them when a tunnel is enabled.
      */
-    private val RPC_ALLOWED_PREFIXES = arrayOf("provider.", "chat.", "rpc.discover")
+    private val RPC_ALLOWED_PREFIXES = arrayOf(
+        "provider.", "chat.", "rpc.discover",
+        "skills.", "memory.", "soul.",
+        "mcp.", "scheduled.",
+        "debug.logs.", "debug.crash.", "debug.appInfo"
+    )
 
     private fun isRpcMethodAllowed(method: String): Boolean =
         method.isNotEmpty() && RPC_ALLOWED_PREFIXES.any {

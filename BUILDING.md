@@ -16,12 +16,14 @@ ordered by dependency, and skipping one produces confusing link errors later.
 
 ## Common setup
 
-Clone with submodules — the PRoot fork is a submodule, and a clone
-without them will fail at the native build step:
+This is the **OpenMinis Pet** fork (only Android; the `src/ios/` tree and
+iSH/FFmpeg/LAME dependencies are removed). Clone **this fork** with its
+submodules — the PRoot fork is a submodule, and a clone without them will
+fail at the native build step:
 
 ```sh
-git clone --recurse-submodules https://github.com/OpenMinis/OpenMinis.git
-cd OpenMinis
+git clone --recurse-submodules https://github.com/limuzi013/OpenMinis-Pet.git
+cd OpenMinis-Pet
 
 # Already cloned without --recurse-submodules?
 git submodule update --init --recursive

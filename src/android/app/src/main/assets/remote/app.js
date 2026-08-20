@@ -161,7 +161,9 @@ $('#connectBtn').onclick=login;$('#passwordInput').onkeydown=e=>{if(e.key==='Ent
 $('#sendBtn').onclick=send;$('#prompt').oninput=autoGrow;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};$('#cancelBtn').onclick=cancel;
 $('#newChat').onclick=()=>{state.sessionId=null;renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
 $('#filePath').onkeydown=e=>{if(e.key==='Enter')loadFiles($('#filePath').value)};$('#fileUp').onclick=()=>{const p=state.filePath.replace(/\/$/,'').split('/').slice(0,-1).join('/')||'/';loadFiles(p)};$('#closeEditor').onclick=()=>$('#editor').classList.add('hidden');$('#saveFile').onclick=saveFile;$('#shellRun').onclick=runShell;
-$$('.tab').forEach(b=>b.onclick=async()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===b));$$('.tool-tab').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.tab+'Tab').classList.add('active');if(b.dataset.tab==='settings')await loadSettings();if(b.dataset.tab==='models')await loadModels()});
+// 各工具页的懒加载器；分页脚本（skills/memory/mcp/scheduled）加载后自行注册。
+const TAB_LOADERS={settings:loadSettings,models:loadModels};
+$$('.tab').forEach(b=>b.onclick=async()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===b));$$('.tool-tab').forEach(x=>x.classList.remove('active'));$('#'+b.dataset.tab+'Tab').classList.add('active');const fn=TAB_LOADERS[b.dataset.tab];if(fn)await fn()});
 $('#saveSettings').onclick=saveSettings;$('#restartRemote').onclick=restartRemote;$('#mobileMenu').onclick=()=>$('.sidebar').classList.toggle('open');$('#toolsToggle').onclick=()=>$('.tools-pane').classList.toggle('open');
 $('#messages').addEventListener('click',async e=>{
   const btn=e.target.closest('.code-copy');if(!btn)return;
