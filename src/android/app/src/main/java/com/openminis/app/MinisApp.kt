@@ -815,11 +815,21 @@ class MinisApp : Application(), ImageLoaderFactory {
             }.getOrDefault(false)
             if (migrationOk) migrated++ else skipped++
         }
-        // Clear the blob unconditionally — entries we couldn't replay are
-        // still useless ghosts, and leaving the blob would re-trigger
-        // migration on every launch.
-        prefs.edit().remove("alarms_json").apply()
-        Log.i("MinisApp", "T268 ghost alarm migration: migrated=$migrated skipped=$skipped (prefs cleared)")
+        // Clear the blob ONLY when every entry was either migrated or is a
+        // genuinely expired ghost. Entries that were skipped because the
+        // migration call failed (e.g. startActivity blocked by Android's
+        // background-activity limits when the process was pulled up by a
+        // BOOT_COMPLETED broadcast) must be kept so a later foreground
+        // launch can retry them — clearing them here would permanently
+        // delete alarms the user never got.
+        if (skipped == 0) {
+            prefs.edit().remove("alarms_json").apply()
+            Log.i("MinisApp", "T268 ghost alarm migration: migrated=$migrated skipped=$skipped (prefs cleared)")
+        } else {
+            // Try again on the next process start; the log makes the
+            // pending-retry state visible.
+            Log.w("MinisApp", "T268 ghost alarm migration: migrated=$migrated skipped=$skipped (kept for retry)")
+        }
     }
 
     /**
@@ -859,9 +869,14 @@ class MinisApp : Application(), ImageLoaderFactory {
      *   - COMPLETE: additionally tear down the offscreen KaTeX WebView, which
      *     is itself a large native allocation. It is recreated on next render.
      *
-     * RUNNING_MODERATE is intentionally NOT acted on: it fires routinely on
-     * healthy devices, and re-rendering formulas on every mild dip would trade a
-     * real user-visible cost for little memory.
+     * Level policy (keep in sync with the when() below):
+     *   - MODERATE and above: drop the formula bitmap caches. These are
+     *     reconstructible by re-rendering, so releasing them is cheap; the
+     *     historical note "MODERATE is intentionally NOT acted on" predates
+     *     the bitmap caches and no longer matches the implementation.
+     *   - COMPLETE (and any BACKGROUND-class level): additionally tear down
+     *     the offscreen KaTeX WebView, a large native allocation recreated
+     *     on next render.
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)

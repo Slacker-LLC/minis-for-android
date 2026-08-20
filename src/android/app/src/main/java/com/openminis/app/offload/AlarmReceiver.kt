@@ -19,6 +19,25 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        // The boot branch does DB work (rescheduleAll) plus up to two
+        // startForegroundService calls; the alarm branch reads/writes prefs
+        // and posts a notification. BroadcastReceiver.onReceive runs on the
+        // main thread with a ~10s budget — do the work on a background
+        // thread via goAsync() so a slow device cannot ANR on boot or on
+        // every alarm fire.
+        val pending = goAsync()
+        Thread {
+            try {
+                handle(context, intent)
+            } catch (t: Throwable) {
+                AppLogger.warning(TAG, "alarm/boot handling failed: ${t.message}")
+            } finally {
+                pending.finish()
+            }
+        }.apply { name = "alarm-receiver" }.start()
+    }
+
+    private fun handle(context: Context, intent: Intent) {
         // BOOT_COMPLETED arrives with no extras; it just keeps the receiver
         // resident so the AlarmManager re-fires the persisted alarms after
         // a reboot. Nothing to clean up in that branch.
@@ -42,6 +61,15 @@ class AlarmReceiver : BroadcastReceiver() {
                 com.openminis.app.remote.RemoteAccessService.startIfEnabled(context)
             } catch (t: Throwable) {
                 AppLogger.warning(TAG, "web remote restore failed: ${t.message}")
+            }
+            // The floating pet is a foreground overlay the user enabled; bring
+            // it back on boot too (startIfEnabled is a no-op when disabled).
+            // Wrapped: OEM ROMs may reject the background FGS start, and the
+            // pet must never take the boot path down with it.
+            try {
+                com.openminis.app.pet.PetBridge.startIfEnabled(context)
+            } catch (t: Throwable) {
+                AppLogger.warning(TAG, "pet restore failed: ${t.message}")
             }
             return
         }

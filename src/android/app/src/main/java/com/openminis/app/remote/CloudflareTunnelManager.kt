@@ -26,6 +26,15 @@ import java.util.concurrent.TimeUnit
  */
 object CloudflareTunnelManager {
     private const val TAG = "CloudflareTunnel"
+    // Supply-chain note (audit 2026-08-21): "latest" means the download is
+    // not byte-reproducible and no pinned SHA-256 can be checked. Transport
+    // integrity is HTTPS (GitHub), size is capped (MAX_BINARY_BYTES), and the
+    // binary is executed only after `cloudflared version` runs inside PRoot -
+    // an unexpected/backdoored binary would at worst fail that check or act
+    // as the user's own tunnel connector. Pinning a version would require
+    // updating this constant on every release; evaluated as proportionate for
+    // a sideloaded self-use app. If this ever ships to a broader audience,
+    // pin version + digest and verify before renameTo().
     private const val DOWNLOAD_URL =
         "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
     private const val MAX_BINARY_BYTES = 80L * 1024L * 1024L

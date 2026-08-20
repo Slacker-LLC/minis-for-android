@@ -124,18 +124,17 @@ class AgentForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // Safe-mode bail-out. When CrashFrequencyDetector tripped in
-        // MinisApp.onCreate, the Application skipped its lateinit init
-        // for repositories — but a sticky FG service that was running
-        // pre-crash will still be re-created by the system on the next
-        // process spawn. Reading MinisApp.backgroundSettingsRepository
-        // from ToolOverlayController.<init> here would throw
-        // UninitializedPropertyAccessException and write a second crash
-        // log, which is exactly the "detection logic recursively
-        // crashing" pattern. Skip the overlay observer and let
-        // onStartCommand satisfy the FG-deadline + stopSelf.
-        if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
-            Log.w(TAG, "safe-mode ON — skipping overlay/wake-lock bring-up")
+        // Safe-mode bail-out. Gate on the Application's authoritative
+        // subsystemsReady() flag — NOT CrashFrequencyDetector.isSafeMode(),
+        // which flips back to false as soon as the crash dialog is dismissed
+        // while the lateinit repositories are never re-assigned. A sticky FG
+        // service re-created after a mid-init crash would then pass the gate
+        // and read an unassigned lateinit (UninitializedPropertyAccessException),
+        // re-triggering the burst detector — the exact "detection logic
+        // recursively crashing" loop GH#147 was about. buildNotification
+        // already uses this same predicate; keep them in sync.
+        if (!((applicationContext as? com.openminis.app.MinisApp)?.subsystemsReady() == true)) {
+            Log.w(TAG, "subsystems not ready — skipping overlay/wake-lock bring-up")
             createNotificationChannel()
             return
         }
@@ -152,7 +151,9 @@ class AgentForegroundService : Service() {
         // with a stub notification, then unwind. The crash share dialog
         // owns the UX from here; running a background service in this
         // state would re-trip the lateinit access that brought us down.
-        if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
+        // Gate on subsystemsReady() for the same reason as onCreate — see
+        // the comment there; isSafeMode() is NOT a stable predicate.
+        if (!((applicationContext as? com.openminis.app.MinisApp)?.subsystemsReady() == true)) {
             try {
                 val stub = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Minis")

@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -43,6 +45,8 @@ import com.openminis.app.remote.RemoteAccessPrefs
 import com.openminis.app.remote.RemotePermissionPolicy
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.remote.RemoteAccessService
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -72,6 +76,29 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
     val lanIp = remember { localIpv4Address() ?: "<phone-ip>" }
 
     LaunchedEffect(Unit) { CloudflareTunnelManager.refresh(context) }
+
+    // Re-read persisted state whenever the screen comes back to the
+    // foreground: the notification-bar "Stop" action and the Web /api/settings
+    // PATCH both write prefs behind this screen's back, and the remember{}
+    // snapshots above would otherwise keep showing stale switches.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                enabled = RemoteAccessPrefs.isEnabled(context)
+                portText = RemoteAccessPrefs.port(context).toString()
+                lanAccess = RemoteAccessPrefs.lanAccessEnabled(context)
+                username = RemoteAccessPrefs.username(context)
+                passwordConfigured = RemoteAccessPrefs.hasPassword(context)
+                tunnelEnabled = RemoteAccessPrefs.cloudflareTunnelEnabled(context)
+                tunnelTokenConfigured = RemoteAccessPrefs.hasCloudflareTunnelToken(context)
+                hostname = RemoteAccessPrefs.cloudflareHostname(context)
+                permissionPreset = RemotePermissionPolicy.preset(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     fun restartIfEnabled() {

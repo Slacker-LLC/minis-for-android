@@ -448,10 +448,14 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling) -->
+        <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling).
+             exported=false: BOOT_COMPLETED is a protected broadcast that the
+             system still delivers to non-exported receivers, while exported=true
+             let ANY third-party app send an explicit ComponentName broadcast to
+             fake a "Minis Alarm" notification or delete persisted alarm entries. -->
         <receiver
             android:name=".offload.AlarmReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>

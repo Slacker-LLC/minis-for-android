@@ -43,12 +43,23 @@ class RemoteAccessService : Service() {
          * ForegroundServiceStartNotAllowedException, and remote access failing
          * to come up must never take the whole app down with it.
          */
+        /** In-flight guard so boot-time MinisApp + AlarmReceiver + user toggle
+         *  can't triple-start the service (each startForegroundService would
+         *  otherwise re-run onStartCommand and rebuild the server socket). */
+        @Volatile private var startInFlight = false
+
         fun startIfEnabled(context: Context) {
             if (!RemoteAccessPrefs.isEnabled(context)) return
             // Never expose remote control without a password, even on restore.
             if (!RemoteAccessPrefs.hasPassword(context)) return
-            runCatching { start(context) }
-                .onFailure { Log.w("RemoteAccessService", "restore failed: ${it.message}") }
+            if (startInFlight) return
+            startInFlight = true
+            try {
+                runCatching { start(context) }
+                    .onFailure { Log.w("RemoteAccessService", "restore failed: ${it.message}") }
+            } finally {
+                startInFlight = false
+            }
         }
 
         /** Apply a bind-address/port/security change without changing the enabled preference. */

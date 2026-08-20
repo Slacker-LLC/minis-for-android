@@ -410,17 +410,35 @@ internal object ChatMutationMethods {
     private fun parseAttachments(context: Context, params: JSONObject): List<InputAttachment> {
         val arr = params.optJSONArray("attachments") ?: return emptyList()
         if (arr.length() == 0) return emptyList()
+        if (arr.length() > 8) throw RPCException(-32602, "Too many attachments (max 8)")
         val out = mutableListOf<InputAttachment>()
         val cacheDir = File(context.cacheDir, "rpc-attachments").also { it.mkdirs() }
+        // Cap the whole attachment batch so a single RPC can't exhaust disk.
+        var totalBytes = 0L
         for (i in 0 until arr.length()) {
             val obj = arr.optJSONObject(i) ?: continue
-            val name = obj.optString("name", "").ifEmpty { "attachment-$i" }
+            // Sanitize the file name: it is concatenated into a host path, so
+            // "a/../../x" or "..\\..\\x" would escape cacheDir. Keep only the
+            // final path segment and forbid path separators / traversal.
+            val rawName = obj.optString("name", "").ifEmpty { "attachment-$i" }
+            val name = rawName.substringAfterLast('/').substringAfterLast('\\')
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                .take(64)
+                .ifEmpty { "attachment-$i" }
             val data = obj.optString("data", "")
             if (data.isEmpty()) continue
             val mime = obj.optString("mime", "").ifEmpty { guessMime(name) }
             val bytes = try {
                 android.util.Base64.decode(data, android.util.Base64.NO_WRAP)
             } catch (_: Exception) { null } ?: continue
+            if (bytes.isEmpty()) continue
+            if (bytes.size > 16 * 1024 * 1024) {
+                throw RPCException(-32602, "Attachment is too large (max 16 MiB): $name")
+            }
+            totalBytes += bytes.size
+            if (totalBytes > 32L * 1024 * 1024) {
+                throw RPCException(-32602, "Total attachment size exceeds 32 MiB")
+            }
             val file = File(cacheDir, "${System.currentTimeMillis()}-$name")
             file.outputStream().use { it.write(bytes) }
             // Use FileProvider so the URI is consumable by Android components

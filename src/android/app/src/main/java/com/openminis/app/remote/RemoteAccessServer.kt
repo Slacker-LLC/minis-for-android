@@ -12,11 +12,13 @@ import com.openminis.app.tools.FileEditTool
 import com.openminis.app.tools.FileWriteTool
 import com.openminis.app.tools.internal.ShellOutputTruncator
 import com.openminis.app.tools.internal.FileRevision
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -75,19 +77,37 @@ class RemoteAccessServer(
     }
 
     private val appContext = context.applicationContext
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, t ->
+                Log.e(TAG, "uncaught server coroutine: ${t.message}", t)
+            },
+    )
     @Volatile private var stopped = false
     private var serverSocket: ServerSocket? = null
     private var acceptJob: Job? = null
     private val connectionSlots = Semaphore(32)
     private val sessions = ConcurrentHashMap<String, Long>()
     private val secureRandom = SecureRandom()
-    @Volatile private var failedLogins = 0
+    // Per-source-IP login failure counters: one rogue peer can no longer
+    // lock the whole server, and one attacker can no longer hide failures
+    // behind a non-atomic increment from concurrent connections.
+    private val failedLoginsByIp = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>()
     @Volatile private var loginLockedUntil = 0L
 
     @Synchronized
     fun start(): Boolean {
         if (acceptJob != null) return true
+        // stop() cancels the old scope; a reused instance must get a fresh
+        // one or every launch after stop would silently no-op.
+        if (!scope.isActive) {
+            scope = CoroutineScope(
+                SupervisorJob() + Dispatchers.IO +
+                    CoroutineExceptionHandler { _, t ->
+                        Log.e(TAG, "uncaught server coroutine: ${t.message}", t)
+                    },
+            )
+        }
         stopped = false
         val ss = try {
             ServerSocket().apply {
@@ -109,7 +129,15 @@ class RemoteAccessServer(
                         continue
                     }
                     launch {
-                        try { handle(socket) } finally { connectionSlots.release() }
+                        try {
+                            handle(socket)
+                        } catch (t: Throwable) {
+                            // One broken connection (client RST mid-write etc.)
+                            // must never take the whole process down.
+                            Log.w(TAG, "connection handler crashed: ${t.message}")
+                        } finally {
+                            connectionSlots.release()
+                        }
                     }
                 } catch (e: Exception) {
                     if (!stopped) Log.w(TAG, "accept failed: ${e.message}")
@@ -136,6 +164,7 @@ class RemoteAccessServer(
         val query: Map<String, String>,
         val headers: Map<String, String>,
         val body: String,
+        val remoteAddress: String? = null,
     )
 
     private fun handle(socket: Socket) {
@@ -144,7 +173,7 @@ class RemoteAccessServer(
             val input = BufferedInputStream(s.getInputStream())
             val output = BufferedOutputStream(s.getOutputStream())
             try {
-                val req = readRequest(input) ?: return
+                val req = readRequest(input, s.inetAddress?.hostAddress) ?: return
                 if (req.method == "OPTIONS") {
                     respond(output, 204, "text/plain; charset=utf-8", "")
                     return
@@ -177,7 +206,9 @@ class RemoteAccessServer(
                 respondJson(output, 400, JSONObject().put("error", e.message ?: "invalid JSON"))
             } catch (e: Exception) {
                 Log.w(TAG, "request failed: ${e.message}")
-                respondJson(output, 500, JSONObject().put("error", e.message ?: "internal error"))
+                // Never echo internal exception details (SQL/file paths) to
+                // remote clients — log them server-side only.
+                respondJson(output, 500, JSONObject().put("error", "internal error"))
             }
         }
     }
@@ -208,15 +239,20 @@ class RemoteAccessServer(
                 val body = JSONObject(req.body)
                 val username = body.optString("username")
                 val password = body.optString("password").toCharArray()
+                val clientIp = req.remoteAddress ?: "unknown"
                 val ok = RemoteAccessPrefs.verifyLogin(appContext, username, password)
                 if (!ok) {
-                    failedLogins += 1
-                    if (failedLogins >= 5) loginLockedUntil = now + LOGIN_LOCK_MS
+                    val counter = failedLoginsByIp.computeIfAbsent(clientIp) { java.util.concurrent.atomic.AtomicInteger() }
+                    if (counter.incrementAndGet() >= 5) loginLockedUntil = now + LOGIN_LOCK_MS
                     respondJson(out, 401, JSONObject().put("error", "invalid username or password"))
                     return
                 }
-                failedLogins = 0
+                failedLoginsByIp.clear()
                 loginLockedUntil = 0L
+                // Opportunistic sweep: drop expired sessions so the map
+                // cannot grow without bound on repeated logins.
+                val expired = sessions.entries.filter { it.value <= now }.map { it.key }
+                if (expired.isNotEmpty()) expired.forEach(sessions::remove)
                 val id = newSessionId()
                 sessions[id] = now + SESSION_TTL_MS
                 val cookie = buildString {
@@ -336,12 +372,12 @@ class RemoteAccessServer(
                 }, "remote-restart").apply { isDaemon = true }.start()
             }
             "/api/sessions" -> {
-                val limit = req.query["limit"]?.toIntOrNull() ?: 100
+                val limit = (req.query["limit"]?.toIntOrNull() ?: 100).coerceIn(1, 500)
                 respondJson(out, 200, ChatDebugMethods.sessionsList(appContext, JSONObject().put("limit", limit).put("includeEmpty", true)))
             }
             "/api/messages" -> {
                 val sid = requireQuery(req, "sessionId")
-                val limit = req.query["limit"]?.toIntOrNull() ?: 500
+                val limit = (req.query["limit"]?.toIntOrNull() ?: 500).coerceIn(1, 2000)
                 respondJson(out, 200, ChatDebugMethods.messagesList(appContext, JSONObject().put("sessionId", sid).put("limit", limit).put("includeTools", true)))
             }
             "/api/session/status" -> {
@@ -466,6 +502,19 @@ class RemoteAccessServer(
                     val sid = b.optString("sessionId")
                     if (sid.isBlank()) throw IllegalArgumentException("sessionId is required")
                     requireExistingSession(sid)
+                    // Same containment guard as GET: the tool layer resolves
+                    // the path again, but we must reject escapes BEFORE any
+                    // write happens.
+                    resolveSessionFile(sid, b.optString("path"))
+                    // Permission preset: the default workspace-write mode only
+                    // allows writing inside /var/minis/workspace. Full Access
+                    // lifts that. This makes the settings preset a real gate
+                    // instead of a decorative switch.
+                    if (RemotePermissionPolicy.preset(appContext) == RemotePermissionPolicy.PRESET_WORKSPACE_WRITE &&
+                        !b.optString("path").startsWith("/var/minis/workspace")
+                    ) {
+                        throw IllegalArgumentException("workspace-write preset: writes are limited to /var/minis/workspace")
+                    }
                     val args = JSONObject().put("tool_title", "Write remote file")
                         .put("path", b.optString("path"))
                         .put("content", b.optString("content"))
@@ -495,6 +544,20 @@ class RemoteAccessServer(
                 val sid = b.optString("sessionId")
                 if (sid.isBlank()) throw IllegalArgumentException("sessionId is required")
                 requireExistingSession(sid)
+                // Containment guard before the edit tool touches the file.
+                val target = resolveSessionFile(sid, b.optString("path"))
+                // Size guard: FileEditTool reads the whole file into memory
+                // (readText + diff), so an unbounded file would OOM the app.
+                // The GET route already caps at MAX_EDIT_FILE_BYTES.
+                if (target.isFile && target.length() > MAX_EDIT_FILE_BYTES) {
+                    throw IllegalArgumentException("file is too large for the Web editor (${target.length()} bytes; max $MAX_EDIT_FILE_BYTES)")
+                }
+                // Permission preset gate, same policy as /api/file writes.
+                if (RemotePermissionPolicy.preset(appContext) == RemotePermissionPolicy.PRESET_WORKSPACE_WRITE &&
+                    !b.optString("path").startsWith("/var/minis/workspace")
+                ) {
+                    throw IllegalArgumentException("workspace-write preset: edits are limited to /var/minis/workspace")
+                }
                 val args = JSONObject().put("tool_title", "Edit remote file").put("path", b.optString("path"))
                 if (b.has("edits")) args.put("edits", b.get("edits"))
                 if (b.has("old_string")) args.put("old_string", b.get("old_string"))
@@ -630,10 +693,53 @@ class RemoteAccessServer(
         }
     }
 
+    /**
+     * Resolve a session-scoped Linux path to a host File, with containment
+     * enforced on the REAL path. PRootKernel.resolveSessionHostPath does raw
+     * File(parent, tail) concatenation, so a path without ".." can still
+     * escape the session directory through a symlink planted inside the
+     * sandbox (the agent has a shell). canonicalFile resolves those links;
+     * anything that lands outside the expected host root is rejected.
+     */
     private fun resolveSessionFile(sessionId: String, linuxPath: String): File {
         if (linuxPath.contains("..")) throw IllegalArgumentException("'..' is not allowed")
-        return PRootKernel.resolveSessionHostPath(sessionId, linuxPath, appContext)
+        val resolved = PRootKernel.resolveSessionHostPath(sessionId, linuxPath, appContext)
             ?: throw IllegalArgumentException("cannot resolve path")
+        val expectedRoot = sessionHostRoot(sessionId, linuxPath) ?: return resolved
+        val canonical = try {
+            resolved.canonicalFile
+        } catch (_: Exception) {
+            return resolved
+        }
+        if (!canonical.path.startsWith(expectedRoot)) {
+            throw IllegalArgumentException("path escapes the session workspace")
+        }
+        return resolved
+    }
+
+    /**
+     * Host-side root the session path is expected to live under:
+     *  - /var/minis/<subdir>/... → filesDir/minis-sessions/<sid>/<subdir>
+     *  - everything else → the PRoot rootfs directory
+     * Returns null when the expected root cannot be determined (the path
+     * then passes without containment — this covers exotic pre-boot cases).
+     */
+    private fun sessionHostRoot(sessionId: String, linuxPath: String): String? {
+        if (linuxPath.startsWith("/var/minis/")) {
+            val subdir = linuxPath.removePrefix("/var/minis/").substringBefore('/')
+            if (subdir.isNotEmpty()) {
+                return try {
+                    File(appContext.filesDir, "minis-sessions/$sessionId/$subdir").canonicalPath
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+        return try {
+            com.openminis.app.sandbox.RootfsManager.getInstance(appContext).rootfsDir.canonicalPath
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun listFiles(sessionId: String, linuxPath: String): JSONObject {
@@ -659,7 +765,7 @@ class RemoteAccessServer(
 
     private class BodyTooLargeException : RuntimeException()
 
-    private fun readRequest(input: BufferedInputStream): Request? {
+    private fun readRequest(input: BufferedInputStream, remoteAddress: String? = null): Request? {
         val requestLine = readLine(input) ?: return null
         val first = requestLine.split(' ', limit = 3)
         if (first.size < 2) throw IllegalArgumentException("invalid request line")
@@ -683,7 +789,7 @@ class RemoteAccessServer(
         }
         val pathPart = rawPath.substringBefore('?')
         val query = parseQuery(rawPath.substringAfter('?', ""))
-        return Request(method, rawPath, decode(pathPart), query, headers, bytes.copyOf(offset).toString(StandardCharsets.UTF_8))
+        return Request(method, rawPath, decode(pathPart), query, headers, bytes.copyOf(offset).toString(StandardCharsets.UTF_8), remoteAddress)
     }
 
     private fun readLine(input: BufferedInputStream): String? {
@@ -741,10 +847,31 @@ class RemoteAccessServer(
         "debug.logs.", "debug.crash.", "debug.appInfo"
     )
 
+    /**
+     * Methods that fall under an allowed prefix but must still be blocked
+     * over the Web Remote:
+     *  - provider.export / provider.import carry the stored API keys /
+     *    OAuth credentials (base64-wrapped) and arbitrary provider config;
+     *    the Web Remote can be published through a public tunnel, so those
+     *    must never be reachable from the browser.
+     *  - debug.logs.setEnabled is a state mutation, not read-only
+     *    diagnostics.
+     *
+     * Keep this list in sync whenever a new sensitive method is added to
+     * DebugRPCHandler: a prefix allowlist protects the *shape* of the RPC
+     * surface, the deny list protects its *credentials*.
+     */
+    private val RPC_DENIED_METHODS = setOf(
+        "provider.export", "provider.import",
+        "debug.logs.setEnabled",
+    )
+
     private fun isRpcMethodAllowed(method: String): Boolean =
-        method.isNotEmpty() && RPC_ALLOWED_PREFIXES.any {
-            if (it.endsWith(".")) method.startsWith(it) else method == it
-        }
+        method.isNotEmpty() &&
+            method !in RPC_DENIED_METHODS &&
+            RPC_ALLOWED_PREFIXES.any {
+                if (it.endsWith(".")) method.startsWith(it) else method == it
+            }
 
     private fun respondJson(
         out: BufferedOutputStream,
