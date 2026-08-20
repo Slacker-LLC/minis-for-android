@@ -34,6 +34,10 @@ button{cursor:pointer}
 .session{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:6px 10px;border:none;border-radius:10px;background:transparent;text-align:left;color:var(--dsw-alias-label-secondary);cursor:pointer}
 .session:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .session.active{background:var(--dsw-specific-sidebar-nav-item-active);color:var(--dsw-alias-label-primary);box-shadow:inset 2px 0 0 var(--dsw-static-deepseek-450)}
+.session-more{display:none;flex:none;width:22px;height:22px;align-items:center;justify-content:center;border:none;border-radius:7px;background:transparent;color:var(--dsw-alias-label-tertiary);font-size:14px;cursor:pointer}
+.session:hover .session-more,.session.active .session-more{display:inline-flex}
+.session-more:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+@media (hover:none){.session-more{display:inline-flex}}
 .run-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-success-primary)}
 .session-text{flex:1;min-width:0}
 .session-title{font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -86,6 +90,14 @@ button{cursor:pointer}
 .user .bubble{background:var(--dsw-specific-bubble);border:1px solid var(--dsw-alias-border-l1);padding:10px 14px;border-radius:16px 16px 4px 16px}
 .assistant .bubble{max-width:100%}
 .tool-card{margin-top:9px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:8px 10px;color:var(--dsw-alias-label-secondary);font:12px/18px var(--ds-font-family-code);max-height:140px;overflow:auto}
+.tool-card-head{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dsw-alias-label-tertiary);margin-bottom:4px}
+.tool-card-head span:nth-child(2){flex:1}
+.tool-count{font-size:10px;color:var(--dsw-alias-label-tertiary)}
+.tool-dot{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);flex:none}
+.tool-dot.running{background:var(--dsw-static-deepseek-450);animation:dsh-dot-pulse 1s infinite}
+@keyframes dsh-dot-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.tool-card-list{display:flex;flex-wrap:wrap;gap:4px}
+.tool-sep{color:var(--dsw-alias-label-dimmed)}
 .feedback-bar{display:flex;align-items:center;gap:4px;margin-top:8px;opacity:.6;font-size:12px}
 .feedback-bar:hover{opacity:1}
 .feedback-bar button{border:none;background:transparent;font-size:14px;padding:2px 6px;border-radius:8px;filter:grayscale(1);cursor:pointer}
@@ -260,6 +272,25 @@ button.ghost.danger,button.secondary.danger,.danger-ghost{color:var(--dsw-alias-
 .ctx-menu button{display:block;width:100%;min-height:36px;padding:6px 10px;border:none;border-radius:8px;background:transparent;text-align:left;font-size:13px;color:var(--dsw-alias-label-primary);cursor:pointer}
 .ctx-menu button:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .ctx-menu button.danger{color:var(--dsw-alias-state-error-primary)}
+.command-menu{min-width:180px}
+.ctx-menu{animation:menu-in .14s var(--ds-ease-in-out,ease)}
+@keyframes menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ── Toast（DeepSeek 风格） ───────────────────────────────────────────── */
+.toasts{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{max-width:min(560px,calc(100vw - 48px));padding:10px 16px;border-radius:14px;background:var(--dsw-alias-button-contrast-fill);color:var(--dsw-alias-label-primary-inverted);font-size:13px;line-height:20px;box-shadow:var(--dsw-shadow-lv3);opacity:0;transform:translateY(-6px);transition:opacity .16s ease,transform .16s ease}
+.toast.show{opacity:1;transform:none}
+.toast-error{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-foreground)}
+
+/* ── 骨架屏 ───────────────────────────────────────────────────────────── */
+.skeleton{height:48px;margin:8px 10px;border-radius:10px;background:linear-gradient(90deg,var(--dsw-alias-bg-layer-1) 25%,var(--dsw-alias-bg-layer-2) 37%,var(--dsw-alias-bg-layer-1) 63%);background-size:400% 100%;animation:dsh-skeleton 1.4s ease infinite}
+@keyframes dsh-skeleton{0%{background-position:100% 50%}to{background-position:0 50%}}
+
+/* ── 弹层微交互 ───────────────────────────────────────────────────────── */
+#modelSheet{background:var(--dsw-alias-bg-mask-2);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#modelSheet .sheet-card{animation:sheet-up .18s var(--ds-ease-in-out,ease)}
+@keyframes sheet-up{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.tab,.session,.mini,.ghost,.secondary,.primary{transition:background .12s ease,color .12s ease,border-color .12s ease}
 
 /* ── Markdown ─────────────────────────────────────────────────────────── */
 .bubble h1{font-size:22px;line-height:32px;font-weight:700}

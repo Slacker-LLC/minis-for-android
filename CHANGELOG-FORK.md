@@ -291,6 +291,29 @@ shadow-lv1/2/3、markdown-code-block 等），整体重写 `app.css`：
 
 JS 逻辑与全部 DOM id 保持不变，只重写结构与样式。
 
+### 17. 深度对照 DeepSeek 前端：交互细节补齐
+
+逐项对照 `dsh-web-frontend` 的组件词汇（menu / toast / tool presentation /
+sidebar nav / popupSelect / skeleton）补齐：
+
+1. **Toast**：新增 DeepSeek 风格顶部 Toast（圆角 14px、lv3 阴影、淡入
+   淡出动画、error 变体），全部 `alert()` 错误提示替换为 Toast；
+2. **Composer 命令菜单**：输入框左侧新增 `+`，弹出 popupSelect 式菜单
+   （新会话 / 压缩上下文 / 计划模式 / 打开工具面板），12px 圆角菜单、
+   item hover、menu-in 动画；
+3. **会话行 hover 操作**：会话行右侧出现 ⋯，点击唤出重命名/删除菜单，
+   触屏设备常显；
+4. **工具卡片状态**：工具卡升级为「状态点 + 工具 + 数量」头部，流式时
+   蓝点脉冲，名称胶囊式排列；
+5. **模型弹层**：改为底部弹出式 popover（轻遮罩 + 上滑动画），替代整屏
+   对话框；
+6. **骨架屏**：搜索加载时显示 shimmer 骨架行；
+7. **微交互**：菜单/弹层/按钮统一 0.12–0.18s ease 过渡与 keyframes。
+
+**遗落清单（暂缓，需更大改动）**：轨迹回放页、子代理目录树、会话日志
+ZIP 导出、tooltip/hovercard、新用户 onboarding、计划模式强制审批、
+动态命令目录（当前为固定菜单）。其余 DeepSeek 前端词汇已覆盖。
+
 ---
 
 ## 未验证 / 已知问题
