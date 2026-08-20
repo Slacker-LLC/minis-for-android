@@ -30,7 +30,7 @@ object FileReadTool {
             val args = JSONObject(argsJson)
             val path = args.optString("path", "")
             val toolTitle = args.optString("tool_title", NAME)
-            val offset = args.optInt("offset", 1).coerceAtLeast(1)
+            val offset = args.optInt("offset", 1).coerceAtLeast(0)
             // T-FILEREAD-CAP: hard upper bound on returned content length.
             // Pre-cap, the agent could ask for `max_length=1_000_000` and we
             // would happily inline a 400 KB base64 image into a tool_result —
@@ -43,7 +43,7 @@ object FileReadTool {
             // full file size so it can paginate with offset/lines if needed.
             // iOS mirrors this cap in AIChatViewModel.executeFileRead.
             val MAX_LENGTH_HARD_CAP = 80_000
-            val maxLength = args.optInt("max_length", 15000).coerceAtMost(MAX_LENGTH_HARD_CAP)
+            val maxLength = args.optInt("max_length", 15000).coerceAtLeast(0).coerceAtMost(MAX_LENGTH_HARD_CAP)
             val direction = args.optString("direction", "head")
 
             if (path.isBlank()) {
@@ -64,9 +64,18 @@ object FileReadTool {
 
             val size = file.length()
 
+            // Refuse to read very large files: readLines() loads the whole file
+            // into memory.
+            if (size > 50L * 1024 * 1024) {
+                return ToolExecutionResult(
+                    "Error: File too large to read ($size bytes): $path",
+                    false, toolTitle = toolTitle,
+                )
+            }
+
             // Binary detection: check first 8192 bytes for null bytes
             val isBinary = file.inputStream().use { input ->
-                val buf = ByteArray(minOf(8192, size.toInt()))
+                val buf = ByteArray(minOf(8192L, size).toInt())
                 val read = input.read(buf)
                 if (read > 0) buf.take(read).any { it == 0.toByte() } else false
             }
@@ -81,7 +90,7 @@ object FileReadTool {
             val allLines = file.readLines()
             val totalLines = allLines.size
 
-            val requestedLines = if (args.has("lines")) args.optInt("lines") else null
+            val requestedLines = if (args.has("lines")) args.optInt("lines").coerceAtLeast(0) else null
 
             val selectedLines = if (direction == "tail") {
                 val count = requestedLines ?: totalLines

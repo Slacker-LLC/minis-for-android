@@ -97,15 +97,19 @@ object FileWriteTool {
                     parent.mkdirs()
                 }
 
+                // Snapshot the pre-write size so a mount write can be verified
+                // afterwards: the old file.length() == bytes comparison was a
+                // tautology (both sides were read AFTER the write).
+                val oldBytes = if (file.exists()) file.length() else -1L
                 if (append) file.appendText(content) else file.writeText(content)
 
                 val bytes = file.length()
                 if (path.startsWith("/var/minis/mounts/")) {
-                    val landed = file.exists() && file.length() == bytes
+                    val landed = file.exists() && file.length() != oldBytes
                     com.openminis.app.logging.AppLogger.info(
                         "FileWrite",
                         "mount write path=$path host=${file.absolutePath} bytes=$bytes " +
-                            "exists=${file.exists()} landedOk=$landed",
+                            "oldBytes=$oldBytes exists=${file.exists()} landedOk=$landed",
                     )
                     if (!landed) {
                         com.openminis.app.logging.AppLogger.warning(

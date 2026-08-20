@@ -64,37 +64,63 @@ object ReadImageTool {
                 return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             }
 
-            val original = BitmapFactory.decodeFile(file.absolutePath)
+            // Read dimensions without decoding pixels first, so an oversized
+            // image cannot blow up the heap before we get a chance to subsample.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
+            }
+
+            // Subsample so the decoded bitmap's longest edge is at most 4000 px;
+            // the exact 2000 px scale below is then cheap and memory-safe.
+            val decodeMaxEdge = 4000
+            var inSampleSize = 1
+            while (bounds.outWidth / inSampleSize > decodeMaxEdge ||
+                bounds.outHeight / inSampleSize > decodeMaxEdge
+            ) {
+                inSampleSize *= 2
+            }
+            val decodeOpts = BitmapFactory.Options()
+            decodeOpts.inSampleSize = inSampleSize
+            val original = BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
                 ?: return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
 
             val maxEdge = 2000
-            val scaled = if (original.width > maxEdge || original.height > maxEdge) {
-                val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
-                val w = (original.width * scale).toInt()
-                val h = (original.height * scale).toInt()
-                Bitmap.createScaledBitmap(original, w, h, true)
-            } else {
-                original
+            var scaled: Bitmap? = null
+            try {
+                val s = if (original.width > maxEdge || original.height > maxEdge) {
+                    val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
+                    val w = (original.width * scale).toInt()
+                    val h = (original.height * scale).toInt()
+                    Bitmap.createScaledBitmap(original, w, h, true)
+                } else {
+                    original
+                }
+                scaled = s
+
+                val out = ByteArrayOutputStream()
+                s.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                val imageBytes = out.toByteArray()
+
+                val metadata = "[$path | ${original.width}x${original.height} | ${file.length()} bytes]"
+                ToolExecutionResult(
+                    output = metadata,
+                    success = true,
+                    imageData = imageBytes,
+                    imageMimeType = "image/jpeg",
+                    toolTitle = toolTitle,
+                    // Surface the source file for inline preview in the tool result UI
+                    // (mirrors iOS ToolLiveSheet.readImageTool case).
+                    imageFilePath = file.absolutePath,
+                )
+            } finally {
+                // Always release the full-size bitmap, even when the 2000 px
+                // scale (or JPEG compress) throws.
+                val s = scaled
+                if (s != null && s !== original) s.recycle()
+                original.recycle()
             }
-
-            val out = ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            val imageBytes = out.toByteArray()
-
-            if (scaled !== original) scaled.recycle()
-            original.recycle()
-
-            val metadata = "[$path | ${original.width}x${original.height} | ${file.length()} bytes]"
-            ToolExecutionResult(
-                output = metadata,
-                success = true,
-                imageData = imageBytes,
-                imageMimeType = "image/jpeg",
-                toolTitle = toolTitle,
-                // Surface the source file for inline preview in the tool result UI
-                // (mirrors iOS ToolLiveSheet.readImageTool case).
-                imageFilePath = file.absolutePath,
-            )
         } catch (e: Exception) {
             ToolExecutionResult("Error reading image: ${e.message}", false)
         }

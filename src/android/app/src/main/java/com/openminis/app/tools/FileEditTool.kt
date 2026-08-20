@@ -76,10 +76,16 @@ object FileEditTool {
                     val old = args.optString("old_string", "")
                     val new = args.optString("new_string", "")
                     if (old.isEmpty()) return@withFile ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
-                    val count = Regex.escape(old).toRegex().findAll(content).count()
+                    // CRLF files: match on the LF-normalized text so old_string
+                    // written with \n still finds lines in a \r\n file, then
+                    // restore the original line-ending style afterwards.
+                    val normalized = FileEditEngine.normalizeLf(content)
+                    val normalizedOld = FileEditEngine.normalizeLf(old)
+                    val count = Regex.escape(normalizedOld).toRegex().findAll(normalized).count()
                     if (count == 0) return@withFile ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
-                    val updated = content.replace(old, new)
-                    file.writeText(updated)
+                    val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
+                    val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
+                    file.writeText(restored)
                     return@withFile ToolExecutionResult("Edited $path ($count replacements, ${file.length()} bytes)", true, toolTitle = toolTitle)
                 }
 
@@ -87,7 +93,7 @@ object FileEditTool {
                 file.writeText(result.newContent)
                 val fuzzyNote = if (result.fuzzyMatchCount > 0) ", ${result.fuzzyMatchCount} fuzzy match(es)" else ""
                 val lineNote = result.firstChangedLine?.let { ", first changed line $it" }.orEmpty()
-                val diff = result.diff.take(MAX_DIFF_CHARS)
+                val diff = takeCodePoints(result.diff, MAX_DIFF_CHARS)
                 val diffNote = if (result.diff.length > MAX_DIFF_CHARS) "\n[diff truncated to $MAX_DIFF_CHARS chars]" else ""
                 ToolExecutionResult(
                     "Edited $path (${result.replacementCount} block(s)$fuzzyNote$lineNote, ${file.length()} bytes)" +
@@ -99,6 +105,22 @@ object FileEditTool {
         } catch (e: Exception) {
             ToolExecutionResult("Error editing file: ${e.message}", false)
         }
+    }
+
+    /**
+     * Take at most [max] UTF-16 code units of [text] without splitting a
+     * surrogate pair (a raw take() can leave a dangling high surrogate, which
+     * then decodes to U+FFFD in the tool result).
+     */
+    private fun takeCodePoints(text: String, max: Int): String {
+        if (text.length <= max) return text
+        var end = max
+        if (Character.isHighSurrogate(text[end - 1]) && end < text.length &&
+            Character.isLowSurrogate(text[end])
+        ) {
+            end -= 1
+        }
+        return text.substring(0, end)
     }
 
     private fun parseEdits(args: JSONObject): List<FileEditEngine.Edit> {

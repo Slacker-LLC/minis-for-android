@@ -61,7 +61,15 @@ object FileEditEngine {
 
         // Fuzzy fallback copied in spirit from Pi: tolerate Unicode punctuation,
         // special spaces, and trailing whitespace without making arbitrary edits.
-        val fuzzyNeedle = normalizeFuzzy(old)
+        // The trailing-newline rule is unified for both sides: each side is
+        // reduced to its newline-trimmed body for the content comparison, and
+        // the trailing-newline counts may differ by at most one. (trimEnd of ALL
+        // trailing newlines used to let a multi-line block match a shorter
+        // needle no matter how many blank lines followed — the replacement
+        // region then swallowed those blank lines.)
+        val oldTrimmed = old.trimEnd('\n')
+        val oldTrailingNewlines = old.length - oldTrimmed.length
+        val fuzzyNeedle = normalizeFuzzy(oldTrimmed)
         val lineSpans = lineSpans(content)
         val oldLineCount = old.split('\n').size
         val fuzzyMatches = mutableListOf<Pair<Int, Int>>()
@@ -69,9 +77,17 @@ object FileEditEngine {
             val endLine = (startLine + oldLineCount - 1).coerceAtMost(lineSpans.lastIndex)
             val start = lineSpans[startLine].first
             val end = lineSpans[endLine].second
-            val candidate = content.substring(start, end).trimEnd('\n')
-            if (normalizeFuzzy(candidate) == fuzzyNeedle) {
-                val effectiveEnd = if (old.endsWith("\n")) end else start + candidate.length
+            val block = content.substring(start, end)
+            val blockTrimmed = block.trimEnd('\n')
+            val blockTrailingNewlines = block.length - blockTrimmed.length
+            if (normalizeFuzzy(blockTrimmed) == fuzzyNeedle &&
+                kotlin.math.abs(blockTrailingNewlines - oldTrailingNewlines) <= 1
+            ) {
+                // Keep only as many trailing newlines as the needle itself has
+                // (capped by what the block provides) so blank lines that merely
+                // followed the match are not deleted by the edit.
+                val effectiveEnd = start + blockTrimmed.length +
+                    minOf(oldTrailingNewlines, blockTrailingNewlines)
                 fuzzyMatches += start to effectiveEnd
             }
         }

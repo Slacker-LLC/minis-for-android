@@ -1,6 +1,7 @@
 package com.openminis.app.tools
 
 import android.content.Context
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -21,10 +22,14 @@ object MessageFeedbackStore {
     private fun file(context: Context): File =
         File(context.filesDir, "web-message-feedback.json")
 
+    /** Set when [loadAll] hit a parse error: the on-disk file is corrupt and
+     *  must be backed up as .corrupt before the next write overwrites it. */
+    private var corruptFile = false
+
     private fun loadAll(context: Context): MutableMap<String, Feedback> {
         val f = file(context)
         if (!f.exists()) return mutableMapOf()
-        return runCatching {
+        return try {
             val obj = JSONObject(f.readText())
             val out = mutableMapOf<String, Feedback>()
             val keys = obj.keys()
@@ -37,8 +42,15 @@ object MessageFeedbackStore {
                     at = v.optLong("at", System.currentTimeMillis()),
                 )
             }
+            corruptFile = false
             out
-        }.getOrElse { mutableMapOf() }
+        } catch (e: Exception) {
+            // Never silently clear a corrupt sidecar: keep the original file so
+            // the damage is not compounded, and let the next save back it up.
+            Log.w("MessageFeedbackStore", "failed to parse feedback file: ${e.message}", e)
+            corruptFile = true
+            mutableMapOf()
+        }
     }
 
     @Synchronized
@@ -51,7 +63,28 @@ object MessageFeedbackStore {
                 put("at", fb.at)
             })
         }
-        runCatching { file(context).writeText(obj.toString()) }
+        runCatching {
+            val f = file(context)
+            if (corruptFile && f.exists()) {
+                // Preserve the damaged file before overwriting it.
+                val backup = File(f.parentFile, f.name + ".corrupt")
+                if (!backup.exists() || backup.delete()) f.renameTo(backup)
+            }
+            writeAtomic(f, obj.toString())
+        }
+        corruptFile = false
+    }
+
+    /** Write [content] to [f] via a temp file + rename (atomic replace). */
+    private fun writeAtomic(f: File, content: String) {
+        val tmp = File(f.parentFile, f.name + ".tmp")
+        tmp.writeText(content)
+        if (!tmp.renameTo(f)) {
+            // renameTo can fail when the target already exists on some
+            // filesystems; fall back to a plain write.
+            f.writeText(content)
+            tmp.delete()
+        }
     }
 
     @Synchronized

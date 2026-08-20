@@ -202,6 +202,10 @@ object VisionGroupResolver {
             } catch (e: TimeoutCancellationException) {
                 failures.add(name to "timed out after ${PER_ATTEMPT_TIMEOUT_MS / 1000}s")
                 android.util.Log.w("VisionGroup", "[Vision] candidate ${idx + 1} (${entry.model.id}) timed out — trying next")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Never swallow genuine cancellation (e.g. the agent run being
+                // cancelled) — only the per-attempt timeout above is recoverable.
+                throw e
             } catch (e: Exception) {
                 val reason = e.message ?: e.toString()
                 failures.add(name to reason)

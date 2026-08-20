@@ -25,8 +25,17 @@ object GoalTools {
                 )
             }
             "create_goal", "update_goal" -> {
-                val text = args.optString("goal").trim().ifEmpty {
-                    return ToolExecutionResult("goal: `goal` is required", false)
+                val text = args.optString("goal").trim()
+                if (text.isBlank()) {
+                    // Empty text clears the goal.
+                    AgentStateStore.goalSet(sid, "")
+                    return ToolExecutionResult("Goal cleared", true)
+                }
+                if (name == "create_goal" && AgentStateStore.goalGet(sid).text.isNotBlank()) {
+                    return ToolExecutionResult("goal already exists", false)
+                }
+                if (name == "update_goal" && AgentStateStore.goalGet(sid).text.isBlank()) {
+                    return ToolExecutionResult("no goal exists", false)
                 }
                 val g = AgentStateStore.goalSet(sid, text)
                 ToolExecutionResult("Goal set (${if (g.active) "active" else "paused"}): ${g.text}", true)

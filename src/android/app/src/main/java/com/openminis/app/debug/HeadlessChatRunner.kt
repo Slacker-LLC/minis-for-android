@@ -231,7 +231,12 @@ internal object HeadlessChatRunner {
                 vm.isStreaming.first { !it }
             }
             true
-        } ?: false
+        } ?: run {
+            // Timeout: cancel the underlying stream so it does not keep running
+            // (and holding the session busy) after the caller gave up waiting.
+            vm.cancelStream()
+            false
+        }
 
         // Best-effort: read the last assistant text from the DB so we don't
         // depend on the in-memory UI list (which may not have flushed yet).
@@ -298,7 +303,12 @@ internal object HeadlessChatRunner {
                 vm.isStreaming.first { !it }
             }
             true
-        } ?: false
+        } ?: run {
+            // Timeout: cancel the underlying stream so it does not keep running
+            // after the caller gave up waiting.
+            vm.cancelStream()
+            false
+        }
         val msgs = app.chatRepository.dao.loadMessages(sessionId)
         val lastAssistant = msgs.lastOrNull { it.role == "assistant" }
         val responseText = lastAssistant?.let { extractText(it.partsJson) }

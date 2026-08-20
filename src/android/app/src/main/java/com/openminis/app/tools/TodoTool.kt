@@ -14,6 +14,8 @@ object TodoTool {
 
     const val NAME = "todo_write"
 
+    private val ALLOWED_STATUSES = setOf("pending", "in_progress", "completed", "skipped")
+
     suspend fun execute(argsJson: String, sessionId: String?, context: Context): ToolExecutionResult {
         val sid = sessionId ?: return ToolExecutionResult("todo: no active session", false)
         val args = runCatching { JSONObject(argsJson) }.getOrNull()
@@ -28,7 +30,8 @@ object TodoTool {
                     AgentStateStore.TodoItem(
                         id = o.optString("id", UUID.randomUUID().toString()),
                         title = title,
-                        status = o.optString("status", "pending"),
+                        status = o.optString("status", "pending")
+                            .takeIf { it in ALLOWED_STATUSES } ?: "pending",
                     )
                 )
             }

@@ -20,7 +20,9 @@ object ShellOutputTruncator {
     ): Result {
         val totalBytes = text.toByteArray(Charsets.UTF_8).size
         val allLines = text.split('\n')
-        val totalLines = allLines.size
+        // split('\n') appends a phantom empty line when text ends with '\n';
+        // count the actual newline separators instead.
+        val totalLines = text.count { it == '\n' } + (if (text.endsWith('\n')) 0 else 1)
         if (totalBytes <= maxBytes && totalLines <= maxLines) {
             return Result(text, false, totalLines, totalBytes, totalLines, totalBytes)
         }
@@ -40,14 +42,20 @@ object ShellOutputTruncator {
                 start -= chars
                 usedBytes += cpBytes
             }
+            val before = candidate
             candidate = candidate.substring(start)
             // When the byte cut landed in the middle of a line and there is a
             // later complete line, discard the partial prefix. For one very
             // long line keep the valid UTF-8 suffix instead of returning empty.
+            // Only discard when the cut is NOT at a line start: if the previous
+            // char was '\n' the first candidate line is already complete.
             val nl = candidate.indexOf('\n')
-            if (start > 0 && nl >= 0 && nl < candidate.lastIndex) candidate = candidate.substring(nl + 1)
+            if (start > 0 && before[start - 1] != '\n' && nl >= 0 && nl < candidate.lastIndex) {
+                candidate = candidate.substring(nl + 1)
+            }
         }
         val outBytes = candidate.toByteArray(Charsets.UTF_8).size
-        return Result(candidate, true, totalLines, totalBytes, candidate.split('\n').size, outBytes)
+        val outputLines = candidate.count { it == '\n' } + (if (candidate.endsWith('\n')) 0 else 1)
+        return Result(candidate, true, totalLines, totalBytes, outputLines, outBytes)
     }
 }

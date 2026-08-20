@@ -55,7 +55,16 @@ object QuestionCenter {
      */
     fun answer(questionId: String, answer: QuestionAnswer): Boolean {
         val q = questions[questionId] ?: return false
-        return q.deferred.complete(answer)
+        val completed = q.deferred.complete(answer)
+        // A successfully answered question is no longer pending; drop it so the
+        // registry does not accumulate answered cards until the run ends.
+        if (completed) questions.remove(questionId)
+        return completed
+    }
+
+    /** Drop a single question from the registry (e.g. after it timed out). */
+    fun remove(questionId: String) {
+        questions.remove(questionId)
     }
 
     /** Drop all questions for a session (e.g. when the run is cancelled). */

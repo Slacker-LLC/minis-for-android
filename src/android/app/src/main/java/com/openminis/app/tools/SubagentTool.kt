@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 object SubagentTool {
     const val NAME = "subagent"
     private const val TAG = "SubagentTool"
+    private const val MAX_ANSWER_CHARS = 60_000
 
     /**
      * sessionId → delegation depth. Process-scoped on purpose: the cap only has
@@ -74,7 +75,7 @@ object SubagentTool {
         val app = context.applicationContext as? MinisApp
             ?: return ToolExecutionResult("subagent: app not initialized", false, toolTitle = title)
 
-        return runCatching {
+        return try {
             val childId = HeadlessChatRunner.ensureSession(context)
             markChild(childId, depth)
 
@@ -95,7 +96,13 @@ object SubagentTool {
                 timeoutMs = SubagentLimits.timeoutMs(context),
             )
 
-            val answer = result.responseText?.trim().orEmpty()
+            val rawAnswer = result.responseText?.trim().orEmpty()
+            // Cap the child's answer so an unbounded response cannot flood the
+            // parent's context; flag the cut so the model knows it is partial.
+            val answer = if (rawAnswer.length > MAX_ANSWER_CHARS) {
+                rawAnswer.take(MAX_ANSWER_CHARS) +
+                    "\n\n[truncated: child answer exceeded $MAX_ANSWER_CHARS characters]"
+            } else rawAnswer
             val ok = result.status == "completed" && answer.isNotEmpty() && !result.timedOut
 
             if (ok) {
@@ -117,7 +124,11 @@ object SubagentTool {
                     timedOut = result.timedOut,
                 )
             }
-        }.getOrElse { t ->
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Never swallow coroutine cancellation (e.g. the agent run being
+            // cancelled); it must propagate to the caller.
+            throw e
+        } catch (t: Throwable) {
             Log.w(TAG, "subagent failed: ${t.message}", t)
             ToolExecutionResult("subagent failed: ${t.message}", false, toolTitle = title)
         }

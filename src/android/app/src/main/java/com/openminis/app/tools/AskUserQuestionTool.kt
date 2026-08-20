@@ -62,6 +62,9 @@ object AskUserQuestionTool {
 
         val answer = withTimeoutOrNull(timeoutMinutes * 60_000L) { deferred.await() }
         if (answer == null) {
+            // The card is no longer pending — drop it so the registry does not
+            // keep a stale question around after the timeout.
+            QuestionCenter.remove(questionId)
             return ToolExecutionResult(
                 "ask_user_question timed out after $timeoutMinutes minute(s) with no answer. " +
                     "Do not ask again; proceed with the most reasonable assumption.",
