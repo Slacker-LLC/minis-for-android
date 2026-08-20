@@ -73,6 +73,10 @@ class PetOverlayService : Service() {
     private val readAloudPlayer by lazy { com.openminis.app.speech.ReadAloudPlayer(this) }
     private var askJob: Job? = null
     private var inputMode = false
+    /** True while a voice-capture start is still resolving; a second tap clears it to cancel. */
+    @Volatile private var voiceStarting = false
+    /** Non-null while the spritesheet decode/attach is in flight. */
+    private var petLoadJob: Job? = null
 
     private val randomMood = object : Runnable {
         override fun run() {
@@ -278,48 +282,64 @@ class PetOverlayService : Service() {
             return
         }
 
+        // A second tap while the async start is still resolving counts as cancel.
+        if (voiceStarting) {
+            voiceStarting = false
+            return
+        }
+        voiceStarting = true
+
         // Resolve the engine/model on EVERY capture from the app's canonical
         // provider configuration. The pet owns no ASR API key or model setting.
         serviceScope.launch {
-            val app = applicationContext as? MinisApp
-            val repository = app?.providerRepositoryOrNull
-            if (repository == null) {
-                window.setStatus("App 模型配置还没有初始化")
-                return@launch
-            }
-            if (withTimeoutOrNull(8_000L) { repository.awaitConfigLoaded(); true } != true) {
-                window.setStatus("语音模型配置加载超时")
-                return@launch
-            }
-            repository.ensureDefaultVoiceInputGroup()
-            repository.ensureDefaultVoiceOutputGroup()
-            val choice = repository.resolveVoiceInputChoice()
-            SpeechRecognitionManager.selectEngine(if (choice.isSystem) "system" else "provider")
-            (SpeechRecognitionManager.availableEngines()
-                .firstOrNull { it.id == "system" } as? SystemSpeechRecognitionEngine)
-                ?.preferOffline = (choice.systemPreferOffline == true)
-            SpeechRecognitionManager.refreshSupportedLocales()
+            runCatching {
+                val app = applicationContext as? MinisApp
+                val repository = app?.providerRepositoryOrNull
+                if (repository == null) {
+                    window.setStatus("App 模型配置还没有初始化")
+                    return@launch
+                }
+                if (withTimeoutOrNull(8_000L) { repository.awaitConfigLoaded(); true } != true) {
+                    window.setStatus("语音模型配置加载超时")
+                    return@launch
+                }
+                repository.ensureDefaultVoiceInputGroup()
+                repository.ensureDefaultVoiceOutputGroup()
+                val choice = repository.resolveVoiceInputChoice()
+                SpeechRecognitionManager.selectEngine(if (choice.isSystem) "system" else "provider")
+                (SpeechRecognitionManager.availableEngines()
+                    .firstOrNull { it.id == "system" } as? SystemSpeechRecognitionEngine)
+                    ?.preferOffline = (choice.systemPreferOffline == true)
+                SpeechRecognitionManager.refreshSupportedLocales()
 
-            window.setVoiceActive(true)
-            SpeechRecognitionManager.startRecording(
-                onPartialOrFinal = { text, isFinal ->
-                    main.post {
-                        val active = chatWindow ?: return@post
-                        active.setInputText(text)
-                        if (isFinal) {
-                            active.setVoiceActive(false)
-                            if (text.isNotBlank()) ask(text.trim(), fromVoice = true)
+                // Re-check right before recording: a cancel tap cleared the flag.
+                if (!voiceStarting) return@launch
+                window.setVoiceActive(true)
+                SpeechRecognitionManager.startRecording(
+                    onPartialOrFinal = { text, isFinal ->
+                        main.post {
+                            val active = chatWindow ?: return@post
+                            active.setInputText(text)
+                            if (isFinal) {
+                                active.setVoiceActive(false)
+                                if (text.isNotBlank()) ask(text.trim(), fromVoice = true)
+                            }
                         }
-                    }
-                },
-                onError = { error, message ->
-                    main.post {
-                        chatWindow?.setVoiceActive(false)
-                        chatWindow?.setStatus(voiceErrorText(error, message))
-                        android.util.Log.w(TAG, "speech error=${error.name} msg=$message")
-                    }
-                },
-            )
+                    },
+                    onError = { error, message ->
+                        main.post {
+                            chatWindow?.setVoiceActive(false)
+                            chatWindow?.setStatus(voiceErrorText(error, message))
+                            android.util.Log.w(TAG, "speech error=${error.name} msg=$message")
+                        }
+                    },
+                )
+                voiceStarting = false
+            }.onFailure { error ->
+                voiceStarting = false
+                android.util.Log.w(TAG, "voice toggle failed: ${error.message}")
+                chatWindow?.setStatus(error.message ?: "语音启动失败")
+            }
         }
     }
 
@@ -357,6 +377,7 @@ class PetOverlayService : Service() {
     }
 
     private fun stopVoiceCapture() {
+        voiceStarting = false
         runCatching {
             if (SpeechRecognitionManager.state.value != RecognitionState.IDLE) {
                 SpeechRecognitionManager.stopRecording()
@@ -460,7 +481,7 @@ class PetOverlayService : Service() {
     // ------------------------------------------------------------- overlay
 
     private fun showPetIfPossible() {
-        if (petView != null) return
+        if (petView != null || petLoadJob?.isActive == true) return
         if (!PetPreferences.isEnabled(this)) return
         if (!Settings.canDrawOverlays(this)) return
         val selected = PetPackageManager.selected(this) ?: return
@@ -488,66 +509,75 @@ class PetOverlayService : Service() {
         // atlas — must not take the whole app down: MinisApp.onCreate() starts
         // this service on every cold start once the pet is enabled, so an
         // escaping throw here would be a boot loop, not a one-off crash.
-        val view = runCatching {
-            PetOverlayView(this).apply {
-                setSpriteSize(spriteWidth, spriteHeight)
-                sprite.animationSpeed = PetPreferences.speed(this@PetOverlayService)
-                sprite.loadPet(selected)
-                sprite.setState(baseState)
+        val view = PetOverlayView(this).apply {
+            setSpriteSize(spriteWidth, spriteHeight)
+            sprite.animationSpeed = PetPreferences.speed(this@PetOverlayService)
+            sprite.setState(baseState)
+        }
+
+        // The ~11.5 MB spritesheet is decoded off the main thread; the overlay
+        // is mounted only once the bitmap is ready. Decode failures (corrupt
+        // sheet, OOM) are caught here instead of on the main thread, so the
+        // boot-loop protection above still holds. A fresh onStartCommand while
+        // this is in flight is ignored (petLoadJob), and hidePet() cancels it.
+        petLoadJob = serviceScope.launch {
+            val decoded = withContext(Dispatchers.IO) {
+                runCatching { view.sprite.loadPet(selected) }
             }
-        }.getOrElse {
-            android.util.Log.w(TAG, "Unable to load pet sprites: ${it.message}")
-            return
-        }
-
-        view.onMenuAction = { action -> handleMenu(action) }
-        view.onOutsideTouch = {
-            if (view.isMenuVisible()) {
-                view.setMenuVisible(false)
-                refreshOutsideWatch()
+            if (decoded.isFailure) {
+                android.util.Log.w(TAG, "Unable to load pet sprites: ${decoded.exceptionOrNull()?.message}")
+                return@launch
             }
-        }
 
-        val engine = PetBehavior(
-            position = { params?.let { it.x to it.y } ?: (0 to 0) },
-            size = {
-                val v = petView
-                val w = v?.width?.takeIf { it > 0 } ?: spriteWidth
-                val h = v?.height?.takeIf { it > 0 } ?: spriteHeight
-                w to h
-            },
-            bounds = { screenBounds() },
-            moveTo = { x, y -> moveWindow(x, y) },
-            setState = { state -> petView?.sprite?.setState(state) },
-            restingState = { baseState },
-            isAgentBusy = { baseState != PetState.IDLE || inputMode || askJob?.isActive == true },
-            onTuckChanged = { tucked -> if (tucked) petView?.hideBubble() },
-        ).apply {
-            setDensity(density)
-            wanderEnabled = PetPreferences.wanderEnabled(this@PetOverlayService)
-            edgeSnapEnabled = PetPreferences.edgeSnapEnabled(this@PetOverlayService)
-            autoHideEnabled = PetPreferences.autoHideEnabled(this@PetOverlayService)
-        }
-        behavior = engine
+            view.onMenuAction = { action -> handleMenu(action) }
+            view.onOutsideTouch = {
+                if (view.isMenuVisible()) {
+                    view.setMenuVisible(false)
+                    refreshOutsideWatch()
+                }
+            }
 
-        installTouch(view, lp)
-        clampPosition(lp)
-        val attached = runCatching {
-            windowManager.addView(view, lp)
-            true
-        }.getOrElse {
-            android.util.Log.w(TAG, "Unable to attach pet overlay: ${it.message}")
-            false
+            val engine = PetBehavior(
+                position = { params?.let { it.x to it.y } ?: (0 to 0) },
+                size = {
+                    val v = petView
+                    val w = v?.width?.takeIf { it > 0 } ?: spriteWidth
+                    val h = v?.height?.takeIf { it > 0 } ?: spriteHeight
+                    w to h
+                },
+                bounds = { screenBounds() },
+                moveTo = { x, y -> moveWindow(x, y) },
+                setState = { state -> petView?.sprite?.setState(state) },
+                restingState = { baseState },
+                isAgentBusy = { baseState != PetState.IDLE || inputMode || askJob?.isActive == true },
+                onTuckChanged = { tucked -> if (tucked) petView?.hideBubble() },
+            ).apply {
+                setDensity(density)
+                wanderEnabled = PetPreferences.wanderEnabled(this@PetOverlayService)
+                edgeSnapEnabled = PetPreferences.edgeSnapEnabled(this@PetOverlayService)
+                autoHideEnabled = PetPreferences.autoHideEnabled(this@PetOverlayService)
+            }
+            behavior = engine
+
+            installTouch(view, lp)
+            clampPosition(lp)
+            val attached = runCatching {
+                windowManager.addView(view, lp)
+                true
+            }.getOrElse {
+                android.util.Log.w(TAG, "Unable to attach pet overlay: ${it.message}")
+                false
+            }
+            if (!attached) {
+                behavior = null
+                return@launch
+            }
+            params = lp
+            petView = view
+            engine.reset()
+            main.removeCallbacks(randomMood)
+            main.postDelayed(randomMood, 3_500L)
         }
-        if (!attached) {
-            behavior = null
-            return
-        }
-        params = lp
-        petView = view
-        engine.reset()
-        main.removeCallbacks(randomMood)
-        main.postDelayed(randomMood, 3_500L)
     }
 
     private fun handleMenu(action: PetMenuAction) {
@@ -713,6 +743,7 @@ class PetOverlayService : Service() {
     }
 
     private fun hidePet() {
+        petLoadJob?.cancel()
         if (inputMode || chatWindow != null) setInputMode(false)
         behavior?.stop()
         behavior = null

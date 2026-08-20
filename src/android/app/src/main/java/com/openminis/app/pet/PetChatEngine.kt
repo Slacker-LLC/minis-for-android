@@ -5,6 +5,7 @@ import com.openminis.app.MinisApp
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.ProviderFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -47,7 +48,7 @@ internal class PetChatEngine(private val context: Context) {
      * Ask the default model. Runs on a background dispatcher chosen by the
      * caller — this method blocks on network I/O.
      */
-    suspend fun ask(question: String): Result<String> = runCatching {
+    suspend fun ask(question: String): Result<String> = try {
         val app = context.applicationContext as? MinisApp
             ?: error("应用尚未初始化")
         val repo = app.providerRepositoryOrNull
@@ -80,17 +81,19 @@ internal class PetChatEngine(private val context: Context) {
         val provider = ProviderFactory.create(instance, apiKey, entry.model, context)
         val messages = history.toList() + LLMMessage(role = LLMMessage.Role.USER, content = question)
 
-        val response = provider.sendMessage(
-            messages = messages,
-            systemPrompt = SYSTEM_PROMPT,
-            // A reasoning model needs headroom to finish thinking before it can
-            // emit even a short answer, the same budget shape title-gen uses.
-            maxTokens = if (entry.model.supportsReasoning == true) 2048 else 400,
-            // null, not a number — the gpt-5.x family rejects any temperature
-            // other than 1 and would 400 the whole request.
-            temperature = null,
-            thinkingLevel = ThinkingLevel.OFF,
-        )
+        val response = withTimeoutOrNull(60_000L) {
+            provider.sendMessage(
+                messages = messages,
+                systemPrompt = SYSTEM_PROMPT,
+                // A reasoning model needs headroom to finish thinking before it can
+                // emit even a short answer, the same budget shape title-gen uses.
+                maxTokens = if (entry.model.supportsReasoning == true) 2048 else 400,
+                // null, not a number — the gpt-5.x family rejects any temperature
+                // other than 1 and would 400 the whole request.
+                temperature = null,
+                thinkingLevel = ThinkingLevel.OFF,
+            )
+        } ?: error("模型响应超时，请稍后再试")
 
         val raw = response.text.trim()
         if (raw.isEmpty()) error("模型没有返回内容")
@@ -101,7 +104,15 @@ internal class PetChatEngine(private val context: Context) {
         // disagree about what was said.
         runCatching { persist(app, entry, question, reply) }
             .onFailure { android.util.Log.w("PetChatEngine", "persist failed: ${it.message}") }
-        reply
+        // The try block must itself yield a Result for the expression to type
+        // as Result<String> alongside the failure branch.
+        Result.success(reply)
+    } catch (e: CancellationException) {
+        // A cancelled ask() (superseded by a newer one) must keep propagating
+        // instead of running onFailure over the new request's UI.
+        throw e
+    } catch (t: Throwable) {
+        Result.failure(t)
     }
 
     /**
@@ -177,12 +188,30 @@ internal class PetChatEngine(private val context: Context) {
             .trim()
         if (flat.length <= MAX_REPLY_CHARS) return flat
 
-        val cut = flat.take(MAX_REPLY_CHARS)
+        val cut = takeByCodePoints(flat, MAX_REPLY_CHARS)
         val lastStop = cut.indexOfLast { it in "。！？!?." }
         return if (lastStop >= MAX_REPLY_CHARS / 3) {
             cut.substring(0, lastStop + 1)
         } else {
             cut.trimEnd() + "…"
         }
+    }
+
+    /**
+     * Truncate by Unicode code points so an emoji surrogate pair is never split;
+     * backs off one char if the cut would land between a pair.
+     */
+    private fun takeByCodePoints(text: String, maxCodePoints: Int): String {
+        var end = 0
+        var count = 0
+        while (end < text.length && count < maxCodePoints) {
+            end += Character.charCount(text.codePointAt(end))
+            count++
+        }
+        // Defensive: never leave a dangling half of a surrogate pair behind.
+        if (end in 1 until text.length && Character.isLowSurrogate(text[end])) {
+            end--
+        }
+        return text.substring(0, end)
     }
 }

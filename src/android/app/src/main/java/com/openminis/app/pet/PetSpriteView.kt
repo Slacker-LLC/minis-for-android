@@ -91,8 +91,14 @@ class PetSpriteView(context: Context) : View(context) {
      * is drawn at, so the common case keeps full resolution.
      */
     private fun spriteSampleSize(m: PetManifest): Int {
+        // 144dp base size; the overlay applies the user's size setting through
+        // setSpriteSize and the view keeps no scale field, so scale is 1f here.
         val drawnPx = 144f * resources.displayMetrics.density
-        return if (m.cellWidth >= drawnPx * 2) 2 else 1
+        var sample = 1
+        while (sample < 8 && m.cellWidth / (sample * 2) >= drawnPx) {
+            sample *= 2
+        }
+        return sample
     }
 
     override fun onAttachedToWindow() {
@@ -103,6 +109,12 @@ class PetSpriteView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         main.removeCallbacks(tick)
+        // onDraw reads the field, so null it before recycling; both run on the
+        // main thread, so the null-check in onDraw is the only guard needed.
+        bitmap?.let {
+            bitmap = null
+            it.recycle()
+        }
         super.onDetachedFromWindow()
     }
 

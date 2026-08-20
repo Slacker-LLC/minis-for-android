@@ -31,7 +31,7 @@ data class PetManifest(
             val root = JSONObject(text)
             val format = root.optJSONObject("format")
             val id = root.getString("id").trim()
-            require(id.matches(Regex("[A-Za-z0-9._-]{1,64}"))) { "Invalid pet id" }
+            require(id.matches(Regex("[A-Za-z0-9][A-Za-z0-9_-]{0,63}"))) { "Invalid pet id" }
 
             val sprite = root.optString("spritesheetPath", "spritesheet.webp").trim()
             require(sprite.isNotEmpty()) { "spritesheetPath is empty" }
@@ -72,8 +72,8 @@ data class PetManifest(
 
             return PetManifest(
                 id = id,
-                displayName = root.optString("displayName", id).ifBlank { id },
-                description = root.optString("description").takeIf { it.isNotBlank() },
+                displayName = root.optString("displayName", id).ifBlank { id }.take(64),
+                description = root.optString("description").takeIf { it.isNotBlank() }?.take(512),
                 spritesheetPath = sprite,
                 columns = columns,
                 rows = rows,

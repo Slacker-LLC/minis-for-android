@@ -276,6 +276,11 @@ class PetOverlayView(context: Context) : LinearLayout(context) {
             return
         }
 
+        // A still-running fade-out (hideBubble's withEndAction) would hide the
+        // fresh bubble as soon as it appears — cancel it and pin full alpha.
+        bubble.animate().cancel()
+        bubble.alpha = 1f
+
         bubble.text = message
         if (bubble.visibility != View.VISIBLE) {
             bubble.alpha = 0f

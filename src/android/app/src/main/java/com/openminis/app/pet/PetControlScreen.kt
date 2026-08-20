@@ -42,6 +42,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
@@ -272,6 +276,9 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
 /** Live animated preview — reuses the exact view the overlay renders with. */
 @Composable
 private fun PetPreviewCard(pet: InstalledPet?) {
+    // Reload the preview only when the pet id changes; reloading on every
+    // recomposition would re-decode the spritesheet for each animated frame.
+    var loadedPetId by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -282,6 +289,7 @@ private fun PetPreviewCard(pet: InstalledPet?) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (pet == null) {
+            loadedPetId = null
             Icon(
                 imageVector = Icons.Outlined.Pets,
                 contentDescription = null,
@@ -298,9 +306,12 @@ private fun PetPreviewCard(pet: InstalledPet?) {
             AndroidView(
                 factory = { ctx -> PetSpriteView(ctx) },
                 update = { view ->
-                    runCatching {
-                        view.loadPet(pet)
-                        view.setState(PetState.IDLE)
+                    if (loadedPetId != pet.manifest.id) {
+                        loadedPetId = pet.manifest.id
+                        runCatching {
+                            view.loadPet(pet)
+                            view.setState(PetState.IDLE)
+                        }
                     }
                 },
                 modifier = Modifier.size(width = 120.dp, height = 130.dp),
