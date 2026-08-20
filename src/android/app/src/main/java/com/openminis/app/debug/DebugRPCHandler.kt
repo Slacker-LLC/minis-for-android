@@ -139,6 +139,7 @@ class DebugRPCHandler(private val context: Context) {
             "provider.groups.update" -> ProviderMutationMethods.groupsUpdate(context, params)
             "provider.groups.delete" -> ProviderMutationMethods.groupsDelete(context, params)
             "provider.groups.setDefault" -> ProviderMutationMethods.groupsSetDefault(context, params)
+            "provider.groups.setSubDefault" -> ProviderMutationMethods.groupsSetSubDefault(context, params)
             "provider.groups.setAgentLoop" -> ProviderMutationMethods.groupsSetAgentLoop(context, params)
 
             // Chat (read)
@@ -189,6 +190,10 @@ class DebugRPCHandler(private val context: Context) {
             "scheduled.toggle" -> ScheduledTaskRpcMethods.toggle(context, params)
             "scheduled.delete" -> ScheduledTaskRpcMethods.delete(context, params)
             "scheduled.run" -> ScheduledTaskRpcMethods.run(context, params)
+
+            // Agent settings (main/sub agent knobs for the Web Remote)
+            "agent.settings.get" -> AgentRpcMethods.settingsGet(context)
+            "agent.settings.set" -> AgentRpcMethods.settingsSet(context, params)
 
             // Debug-only: direct CLI / offload-handler invocation (T344).
             // Registered solely on DEBUG builds so release APKs cannot expose it.

@@ -155,3 +155,10 @@ code.inline{background:var(--elevated);border:1px solid var(--line);border-radiu
 .form-field input:focus,.form-field select:focus{border-color:var(--info)}
 .mem-edit{width:100%;min-height:220px;resize:vertical;background:var(--bg);border:1px solid var(--line);color:var(--text);outline:0;border-radius:10px;padding:10px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;box-sizing:border-box}
 .mem-edit:focus{border-color:var(--info)}
+
+/* ── 代理设置（主代理 / 子代理） ─────────────────────────────────────── */
+.agent-current{display:flex;flex-direction:column;gap:8px;padding:10px 14px}
+.agent-role{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--line-soft);border-radius:10px}
+.agent-roster{max-height:min(220px,32vh);overflow:auto;border-top:1px solid var(--line-soft)}
+.agent-roster .list-row{padding-left:14px;padding-right:14px}
+.agent-roster .mini{font-size:10px;padding:3px 7px}

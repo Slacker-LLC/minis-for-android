@@ -240,6 +240,7 @@ internal object ProviderDebugMethods {
                 put("strategy", group.strategy.name)
                 put("fallbackStrategy", group.fallbackStrategy.name)
                 put("isDefault", isDefault)
+                put("isSub", group.id == cfg.defaultSubGroupId)
                 put("inAgentLoop", group.id in cfg.agentLoopGroupIds)
                 val ids = JSONArray()
                 for (id in group.memberEntryIds) ids.put(id)
@@ -270,6 +271,7 @@ internal object ProviderDebugMethods {
         }
         return JSONObject().apply {
             put("defaultGroupId", cfg.defaultPrimaryGroupId ?: JSONObject.NULL)
+            put("defaultSubGroupId", cfg.defaultSubGroupId ?: JSONObject.NULL)
             put("count", arr.length())
             put("groups", arr)
         }

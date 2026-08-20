@@ -736,6 +736,7 @@ class RemoteAccessServer(
         "provider.", "chat.", "rpc.discover",
         "skills.", "memory.", "soul.",
         "mcp.", "scheduled.",
+        "agent.",
         "debug.logs.", "debug.crash.", "debug.appInfo"
     )
 

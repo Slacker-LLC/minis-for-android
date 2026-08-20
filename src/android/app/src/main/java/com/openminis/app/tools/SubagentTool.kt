@@ -28,16 +28,6 @@ object SubagentTool {
     private const val TAG = "SubagentTool"
 
     /**
-     * Absolute delegation depth. A child may delegate further, but only this
-     * many levels deep — without a cap, a model that likes delegating can spawn
-     * an unbounded tree and never do any work itself.
-     */
-    const val MAX_DEPTH = 3
-
-    /** Hard ceiling for one child run. */
-    private const val TIMEOUT_MS = 10L * 60 * 1000
-
-    /**
      * sessionId → delegation depth. Process-scoped on purpose: the cap only has
      * to hold within a live delegation chain, and a restart legitimately starts
      * a new one. Sessions never seen here are depth 0.
@@ -70,10 +60,11 @@ object SubagentTool {
             )
         }
 
+        val maxDepth = SubagentLimits.maxDepth(context)
         val depth = depthOf(parentSessionId)
-        if (depth >= MAX_DEPTH) {
+        if (depth >= maxDepth) {
             return ToolExecutionResult(
-                "subagent: delegation depth limit reached ($MAX_DEPTH). " +
+                "subagent: delegation depth limit reached ($maxDepth). " +
                     "Do this task directly instead of delegating further.",
                 false,
                 toolTitle = title,
@@ -101,7 +92,7 @@ object SubagentTool {
                 sessionId = childId,
                 text = prompt,
                 wait = true,
-                timeoutMs = TIMEOUT_MS,
+                timeoutMs = SubagentLimits.timeoutMs(context),
             )
 
             val answer = result.responseText?.trim().orEmpty()
@@ -114,7 +105,7 @@ object SubagentTool {
                 // partial answer away either — a child that did 90% of the work
                 // before hitting the timeout still has something worth reading.
                 val headline = when {
-                    result.timedOut -> "subagent timed out after ${TIMEOUT_MS / 1000}s"
+                    result.timedOut -> "subagent timed out after ${SubagentLimits.timeoutMs(context) / 1000}s"
                     answer.isEmpty() -> "subagent finished with no answer (status=${result.status})"
                     else -> "subagent did not complete (status=${result.status})"
                 }

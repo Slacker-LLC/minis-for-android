@@ -95,6 +95,32 @@ Web Remote（`app/src/main/assets/remote/`）此前只通过 `/api/rpc` 暴露
   returns、example），`rpc.discover` 会自动返回完整目录；
 - 注册表与分发器一一对应，后续新增方法必须两处同步。
 
+### 2.7 主代理 / 子代理（补充）
+
+Web「模型」页新增「代理设置」卡片，可分别指定：
+
+- **主代理（Primary）**：`provider.groups.setDefault`（沿用已有方法）；
+- **子代理（Sub）**：新增 `provider.groups.setSubDefault {groupId}`，传
+  `null` / 空值即清除、子任务继承主代理。
+
+`provider.groups.list` 同步补充返回 `defaultSubGroupId`，每个组增加
+`isSub` 标记；前端用「主代理 / 子代理」徽标和两个下拉框完成设置，
+沿用 DeepSeek 设计 token（卡片、tag、form-field）。
+
+### 2.8 子代理委派限制（agent.settings.*）
+
+参考 DeepSeek Harness 的 agent 旋钮，新增：
+
+| 方法 | 参数 | 返回 |
+|---|---|---|
+| `agent.settings.get` | 无 | `{maxDepth, timeoutMinutes}` |
+| `agent.settings.set` | `maxDepth`（1..5）、`timeoutMinutes`（1..30） | `{ok:true, maxDepth, timeoutMinutes}` |
+
+`SubagentTool` 从硬编码改为读取 `SubagentLimits`（SharedPreferences），
+Web「代理设置」卡片里的深度与超时输入即时生效；子代理仍默认继承主代理
+模型组，无独立人设，与 DeepSeek「子代理加入父代理组装」的继承模型一致。
+`agent.` 前缀已加入 Web Remote 白名单。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：

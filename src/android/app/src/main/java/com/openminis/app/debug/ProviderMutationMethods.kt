@@ -564,6 +564,22 @@ internal object ProviderMutationMethods {
         return JSONObject().put("defaultGroupId", id ?: JSONObject.NULL)
     }
 
+    /**
+     * Set the "sub" (lightweight tasks, e.g. title generation) model group.
+     * Passing null / empty clears it so tasks inherit the primary group,
+     * mirroring the on-device ModelGroups "Default Sub" picker.
+     */
+    fun groupsSetSubDefault(context: Context, params: JSONObject): JSONObject {
+        val repo = repo(context)
+        if (!params.has("groupId")) throw RPCException(-32602, "Missing 'groupId' param")
+        val id = if (params.isNull("groupId")) null else params.optString("groupId", "").ifEmpty { null }
+        if (id != null && repo.group(id) == null) {
+            throw RPCException(-32602, "Group not found: $id")
+        }
+        repo.defaultSubGroupId = id
+        return JSONObject().put("defaultSubGroupId", id ?: JSONObject.NULL)
+    }
+
     fun groupsSetAgentLoop(context: Context, params: JSONObject): JSONObject {
         val repo = repo(context)
         val id = params.optString("groupId", "").ifEmpty {
@@ -600,6 +616,7 @@ internal object ProviderMutationMethods {
             put("strategy", group.strategy.name)
             put("fallbackStrategy", group.fallbackStrategy.name)
             put("isDefault", group.id == cfg.defaultPrimaryGroupId)
+            put("isSub", group.id == cfg.defaultSubGroupId)
             put("inAgentLoop", group.id in cfg.agentLoopGroupIds)
             val ids = JSONArray()
             for (m in group.memberEntryIds) ids.put(m)

@@ -201,13 +201,17 @@ async function loadModels() {
   if (!root) return;
   modelsMsg('加载中…');
   try {
-    const [inst, groups] = await Promise.all([
+    const [inst, groups, agent] = await Promise.all([
       rpc('provider.instances.list'),
       rpc('provider.groups.list'),
+      rpc('agent.settings.get').catch(() => ({})),
     ]);
     const instances = inst?.instances || inst?.items || [];
     const groupList = groups?.groups || groups?.items || [];
     state.instances = instances;
+    state.primaryGroupId = groups?.defaultGroupId || '';
+    state.subGroupId = groups?.defaultSubGroupId || '';
+    state.agentSettings = agent || {};
 
     // 逐个实例取模型；串行请求即可，实例数量是个位数
     const blocks = [];
@@ -222,8 +226,9 @@ async function loadModels() {
       blocks.push({ inst: it, models });
     }
 
-    root.innerHTML = renderModels(blocks, groupList);
+    root.innerHTML = renderModels(blocks, groupList, groups, agent);
     bindModelActions();
+    bindAgentDefaults();
     modelsMsg('');
   } catch (e) {
     root.innerHTML = '<div class="error">' + esc(e.message) + '</div>';
@@ -231,9 +236,10 @@ async function loadModels() {
   }
 }
 
-function renderModels(blocks, groups) {
+function renderModels(blocks, groups, groupsMeta = {}, agent = {}) {
   let html = '';
 
+  html += renderAgentDefaults(groupsMeta, groups, agent);
   html += '<div class="settings-section-title" style="padding:16px 16px 8px">供应商</div>';
   if (!blocks.length) {
     html += '<div class="models-empty">还没有配置任何供应商。请在手机 App 里添加，或使用下方的导入。</div>';
@@ -270,13 +276,107 @@ function renderModels(blocks, groups) {
   groups.forEach(g => {
     html += '<div class="model-card"><div class="model-card-head">' +
       '<strong>' + esc(g.name || g.id) + '</strong>' +
-      (g.isDefault ? '<span class="model-flag primary">默认</span>' : '') +
+      (g.isDefault ? '<span class="model-flag primary">主代理</span>' : '') +
+      (g.isSub ? '<span class="model-flag">子代理</span>' : '') +
       '<span class="model-type">' + ((g.memberEntryIds || g.members || []).length) + ' 个成员</span>' +
       (g.isDefault ? '' : '<button class="mini" data-act="setDefault" data-id="' + esc(g.id) + '">设为默认</button>') +
       '</div></div>';
   });
 
   return html;
+}
+
+function renderAgentDefaults(meta, groups, agent) {
+  const primaryId = meta?.defaultGroupId || '';
+  const subId = meta?.defaultSubGroupId || '';
+  const primary = (groups || []).find(g => g.id === primaryId);
+  const sub = (groups || []).find(g => g.id === subId);
+  const depth = (agent?.maxDepth != null ? agent.maxDepth : 3);
+  const timeout = (agent?.timeoutMinutes != null ? agent.timeoutMinutes : 10);
+  return '<div class="card-list">' +
+    '<div class="card-head">' +
+      '<span class="dot-on"></span>' +
+      '<strong>代理设置</strong>' +
+      '<span class="card-sub"><span class="tag primary">主代理</span><span class="tag">子代理</span></span>' +
+    '</div>' +
+    '<div class="agent-current">' +
+      '<div class="agent-role"><span class="tag primary">主代理</span>' +
+        '<div class="list-main"><div class="list-title">' + esc(primary?.name || '未设置') + '</div>' +
+        '<div class="list-desc">主要任务模型组</div></div></div>' +
+      '<div class="agent-role"><span class="tag">子代理</span>' +
+        '<div class="list-main"><div class="list-title">' + esc(sub?.name || '继承主代理') + '</div>' +
+        '<div class="list-desc">轻量任务（标题生成等）</div></div></div>' +
+    '</div>' +
+    '<div class="agent-roster">' + (groups || []).map(g =>
+      '<div class="list-row"><div class="list-main"><div class="list-title">' + esc(g.name || g.id) +
+        (g.isDefault ? ' <span class="tag primary">主</span>' : '') +
+        (g.isSub ? ' <span class="tag">子</span>' : '') + '</div>' +
+        '<div class="list-desc">' + ((g.members || []).length) + ' 个成员</div></div>' +
+        '<button class="mini" data-role="primary" data-id="' + esc(g.id) + '"' + (g.isDefault ? ' disabled' : '') + '>设为主代理</button>' +
+        '<button class="mini" data-role="sub" data-id="' + esc(g.id) + '"' + (g.isSub ? ' disabled' : '') + '>设为子代理</button>' +
+      '</div>'
+    ).join('') + '</div>' +
+    (subId ? '<div class="btn-row"><button class="secondary" id="clearSubBtn">子代理改回「继承主代理」</button></div>' : '') +
+    '<div class="settings-separator"></div>' +
+    '<div class="list-desc" style="padding:10px 14px 6px"><strong>子代理委派（subagent）</strong></div>' +
+    '<div class="form-grid">' +
+      '<label class="form-field">委派深度（层）<input id="agentMaxDepth" type="number" min="1" max="5" value="' + depth + '" /></label>' +
+      '<label class="form-field">单任务超时（分钟）<input id="agentTimeout" type="number" min="1" max="30" value="' + timeout + '" /></label>' +
+    '</div>' +
+    '<div class="btn-row"><button id="agentLimitsSave" class="primary">保存子代理限制</button></div>' +
+    '<div class="list-desc" style="padding:2px 14px 12px">' +
+      '主/子代理改动只影响之后新建的会话；子代理未设置时继承主代理。' +
+      '子代理复用主代理的模型组与工具，无独立人设。' +
+    '</div>' +
+  '</div>';
+}
+
+function bindAgentDefaults() {
+  const root = $('#modelsBody');
+  if (!root) return;
+  root.querySelectorAll('button[data-role]').forEach(btn => {
+    btn.onclick = async () => {
+      const role = btn.dataset.role, id = btn.dataset.id;
+      btn.disabled = true;
+      try {
+        if (role === 'primary') {
+          await rpc('provider.groups.setDefault', { groupId: id });
+          modelsMsg('主代理已更新');
+        } else {
+          await rpc('provider.groups.setSubDefault', { groupId: id });
+          modelsMsg('子代理已更新');
+        }
+        await loadModels();
+      } catch (e) {
+        modelsMsg(e.message, true);
+        btn.disabled = false;
+      }
+    };
+  });
+  const clearSub = $('#clearSubBtn');
+  if (clearSub) clearSub.onclick = async () => {
+    try {
+      await rpc('provider.groups.setSubDefault', { groupId: null });
+      modelsMsg('子代理已改回继承主代理');
+      await loadModels();
+    } catch (e) { modelsMsg(e.message, true); }
+  };
+  const save = $('#agentLimitsSave');
+  if (save) save.onclick = async () => {
+    const depth = parseInt($('#agentMaxDepth').value, 10);
+    const timeout = parseInt($('#agentTimeout').value, 10);
+    if (!depth || depth < 1 || depth > 5) { modelsMsg('委派深度需在 1–5 之间', true); return; }
+    if (!timeout || timeout < 1 || timeout > 30) { modelsMsg('超时需在 1–30 分钟之间', true); return; }
+    save.disabled = true;
+    try {
+      await rpc('agent.settings.set', { maxDepth: depth, timeoutMinutes: timeout });
+      modelsMsg('子代理限制已保存');
+      await loadModels();
+    } catch (e) {
+      modelsMsg(e.message, true);
+      save.disabled = false;
+    }
+  };
 }
 
 function bindModelActions() {

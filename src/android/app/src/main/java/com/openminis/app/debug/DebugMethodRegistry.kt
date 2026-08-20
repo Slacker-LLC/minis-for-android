@@ -480,7 +480,7 @@ object DebugMethodRegistry {
             params = listOf(
                 ParamSpec("includeMembers", "bool", required = false, default = true, description = "Include resolved member summaries in each group."),
             ),
-            returns = "{defaultGroupId, count, groups:[{id, name, strategy, fallbackStrategy, isDefault, inAgentLoop, memberEntryIds, members?}]}",
+            returns = "{defaultGroupId, defaultSubGroupId, count, groups:[{id, name, strategy, fallbackStrategy, isDefault, isSub, inAgentLoop, memberEntryIds, members?}]}",
             example = JSONObject(),
         ),
 
@@ -701,6 +701,16 @@ object DebugMethodRegistry {
                 ParamSpec("groupId", "string", required = true, description = "Target group UUID, or null to clear."),
             ),
             returns = "{defaultGroupId}",
+            example = ex("groupId" to "grp_xyz"),
+        ),
+        MethodSpec(
+            name = "provider.groups.setSubDefault",
+            description = "Set or clear the sub model group (lightweight tasks such as title generation). " +
+                "Clearing makes sub tasks inherit the primary group.",
+            params = listOf(
+                ParamSpec("groupId", "string", required = true, description = "Target group UUID, or null to clear."),
+            ),
+            returns = "{defaultSubGroupId}",
             example = ex("groupId" to "grp_xyz"),
         ),
         MethodSpec(
@@ -1000,6 +1010,27 @@ object DebugMethodRegistry {
             ),
             returns = "{ok:true} (async trigger)",
             example = ex("taskId" to "task-1"),
+        ),
+
+        // ── Agent settings (web remote: agent.settings.*) ─────────────────────
+        MethodSpec(
+            name = "agent.settings.get",
+            description = "Return the subagent delegation limits (depth cap and per-run timeout). " +
+                "Main/sub model groups are managed through provider.groups.*.",
+            params = emptyList(),
+            returns = "{maxDepth, timeoutMinutes}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "agent.settings.set",
+            description = "Update the subagent delegation limits. maxDepth is 1..5, " +
+                "timeoutMinutes is 1..30.",
+            params = listOf(
+                ParamSpec("maxDepth", "int", required = true, description = "Delegation depth cap (1..5)."),
+                ParamSpec("timeoutMinutes", "int", required = true, description = "Per-child run timeout in minutes (1..30)."),
+            ),
+            returns = "{ok:true, maxDepth, timeoutMinutes}",
+            example = ex("maxDepth" to 3, "timeoutMinutes" to 10),
         ),
     )
 
