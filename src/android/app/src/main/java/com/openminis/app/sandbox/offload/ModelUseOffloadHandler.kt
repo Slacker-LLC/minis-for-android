@@ -378,13 +378,15 @@ class ModelUseOffloadHandler(
 
         val response = try {
             runBlocking {
-                provider.sendMessage(
-                    messages = messages,
-                    systemPrompt = systemPrompt,
-                    maxTokens = maxTokens,
-                    temperature = temperature,
-                    imageParts = imageParts,
-                )
+                com.openminis.app.provider.LLMRetryPolicy.withRetry {
+                    provider.sendMessage(
+                        messages = messages,
+                        systemPrompt = systemPrompt,
+                        maxTokens = maxTokens,
+                        temperature = temperature,
+                        imageParts = imageParts,
+                    )
+                }
             }
         } catch (e: Throwable) {
             Log.w(TAG, "sendMessage failed for ${entry.model.id}: ${e.message}", e)

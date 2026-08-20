@@ -37,6 +37,7 @@ object AgentTools {
         }
         add(browserUseDefinition())
         add(subagentDefinition())
+        add(RalphTool.definition())
         add(askUserQuestionDefinition())
         add(getGoalDefinition())
         add(createGoalDefinition())
@@ -111,6 +112,7 @@ object AgentTools {
         ),
         required = listOf("tool_title", "action"),
         propertyOrdering = listOf("tool_title", "action", "tab_id", "url", "selector", "text", "coordinate_x", "coordinate_y", "direction", "amount", "scroll_count", "item_selector", "script", "user_agent", "max_depth", "keywords", "fuzzy", "cookies", "timeout", "viewport_width", "viewport_height", "reset"),
+        timeoutMs = 120_000L,
     )
 
     // Aligned with iOS AIChatViewModel.swift:5059-5067
@@ -127,6 +129,7 @@ object AgentTools {
         ),
         required = listOf("tool_title", "content"),
         propertyOrdering = listOf("tool_title", "content"),
+        timeoutMs = 30_000L,
     )
 
     // Aligned with iOS AIChatViewModel.swift:5069-5078
@@ -141,6 +144,7 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
+        timeoutMs = 30_000L,
     )
 
     /**
@@ -207,6 +211,7 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title"),
+        timeoutMs = 10_000L,
     )
 
     private fun createGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
@@ -219,6 +224,7 @@ object AgentTools {
         ),
         required = listOf("tool_title", "goal"),
         propertyOrdering = listOf("tool_title", "goal"),
+        timeoutMs = 10_000L,
     )
 
     private fun updateGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
@@ -256,5 +262,6 @@ object AgentTools {
         ),
         required = listOf("tool_title", "todos"),
         propertyOrdering = listOf("tool_title", "todos"),
+        timeoutMs = 10_000L,
     )
 }

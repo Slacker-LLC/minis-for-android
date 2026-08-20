@@ -37,6 +37,7 @@ object FileEditTool {
             ),
             required = listOf("tool_title", "path", "edits"),
             propertyOrdering = listOf("tool_title", "path", "edits", "old_string", "new_string", "replace_all"),
+            timeoutMs = 60_000L,
         )
     }
 

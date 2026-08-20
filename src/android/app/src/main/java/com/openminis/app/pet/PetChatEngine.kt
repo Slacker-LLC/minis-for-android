@@ -82,17 +82,21 @@ internal class PetChatEngine(private val context: Context) {
         val messages = history.toList() + LLMMessage(role = LLMMessage.Role.USER, content = question)
 
         val response = withTimeoutOrNull(60_000L) {
-            provider.sendMessage(
-                messages = messages,
-                systemPrompt = SYSTEM_PROMPT,
-                // A reasoning model needs headroom to finish thinking before it can
-                // emit even a short answer, the same budget shape title-gen uses.
-                maxTokens = if (entry.model.supportsReasoning == true) 2048 else 400,
-                // null, not a number — the gpt-5.x family rejects any temperature
-                // other than 1 and would 400 the whole request.
-                temperature = null,
-                thinkingLevel = ThinkingLevel.OFF,
-            )
+            // Transient network/5xx failures retried with jittered backoff
+            // (DeepSeek Harness LLMRetryPolicy) before the pet reports an error.
+            com.openminis.app.provider.LLMRetryPolicy.withRetry {
+                provider.sendMessage(
+                    messages = messages,
+                    systemPrompt = SYSTEM_PROMPT,
+                    // A reasoning model needs headroom to finish thinking before it can
+                    // emit even a short answer, the same budget shape title-gen uses.
+                    maxTokens = if (entry.model.supportsReasoning == true) 2048 else 400,
+                    // null, not a number — the gpt-5.x family rejects any temperature
+                    // other than 1 and would 400 the whole request.
+                    temperature = null,
+                    thinkingLevel = ThinkingLevel.OFF,
+                )
+            }
         } ?: error("模型响应超时，请稍后再试")
 
         val raw = response.text.trim()

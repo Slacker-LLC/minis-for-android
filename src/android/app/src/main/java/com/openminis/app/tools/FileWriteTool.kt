@@ -23,6 +23,7 @@ object FileWriteTool {
         ),
         required = listOf("tool_title", "path", "content"),
         propertyOrdering = listOf("tool_title", "path", "content", "append", "create_dirs"),
+        timeoutMs = 30_000L,
     )
 
     fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {

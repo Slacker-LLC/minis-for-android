@@ -59,6 +59,7 @@ import com.openminis.app.tools.FileWriteTool
 import com.openminis.app.tools.GoalTools
 import com.openminis.app.tools.MemoryTools
 import com.openminis.app.tools.ReadImageTool
+import com.openminis.app.tools.RalphTool
 import com.openminis.app.tools.SubagentTool
 import com.openminis.app.tools.TodoTool
 import com.openminis.app.tools.ToolExecutionResult
@@ -83,6 +84,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -2900,22 +2902,24 @@ class ChatViewModel(
         val maxOut = maxOf(1024, minOf(8192, contextWindow - estimatedInput))
         val provider = currentProvider
             ?: throw IllegalStateException("No LLM provider available for compaction")
-        val response = provider.sendMessage(
-            messages = listOf(
-                LLMMessage(role = LLMMessage.Role.USER, content = userMessage)
-            ),
-            systemPrompt = compactSummarySystemPrompt,
-            maxTokens = maxOut,
-            // Mirror iOS AIChatViewModel.swift:12926 — null lets the
-            // provider/model use its default. gpt-5.x family rejects any
-            // temperature != 1 with HTTP 400, and Android
-            // OpenAIProvider.buildRequestBody omits the field entirely when
-            // temperature is null.
-            temperature = null,
-            imageParts = emptyList(),
-            tools = emptyList(),
-            thinkingLevel = ThinkingLevel.OFF,
-        )
+        val response = com.openminis.app.provider.LLMRetryPolicy.withRetry {
+            provider.sendMessage(
+                messages = listOf(
+                    LLMMessage(role = LLMMessage.Role.USER, content = userMessage)
+                ),
+                systemPrompt = compactSummarySystemPrompt,
+                maxTokens = maxOut,
+                // Mirror iOS AIChatViewModel.swift:12926 — null lets the
+                // provider/model use its default. gpt-5.x family rejects any
+                // temperature != 1 with HTTP 400, and Android
+                // OpenAIProvider.buildRequestBody omits the field entirely when
+                // temperature is null.
+                temperature = null,
+                imageParts = emptyList(),
+                tools = emptyList(),
+                thinkingLevel = ThinkingLevel.OFF,
+            )
+        }
         return response.text
     }
 
@@ -8163,52 +8167,84 @@ class ChatViewModel(
         // bridge, which is now where checkPermission runs.
         val toolTitle = try { JSONObject(argsJson).optString("tool_title", name) } catch (_: Exception) { name }
 
-        val result = when (name) {
-            FileReadTool.NAME -> {
-                val result = FileReadTool.execute(argsJson, activeSessionId, context)
-                // Record skill usage when SKILL.md under /var/minis/skills/<id>/ is read.
-                if (result.success) {
-                    runCatching {
-                        val readPath = JSONObject(argsJson).optString("path", "")
-                        if (readPath.isNotEmpty()) {
-                            skillRepository?.skillIdFromPath(readPath)?.let { sid ->
-                                skillRepository.recordSkillUse(sid)
-                            }
+        // Unified per-tool timeout (DeepSeek Harness
+        // dsh-tool-call-timeout-policy): tools declare timeoutMs on their
+        // AgentToolDefinition; the executor enforces a cooperative deadline
+        // and returns a structured TOOL_TIMEOUT result instead of hanging
+        // the whole turn. Tools that manage their own budget (shell,
+        // subagent, ask_user_question) declare null and skip the wrapper.
+        val timeoutMs = agentTools.firstOrNull { it.name == name }?.timeoutMs
+        val dispatched: ToolExecutionResult? = if (timeoutMs != null) {
+            withTimeoutOrNull(timeoutMs) {
+                dispatchTool(name, argsJson, toolId, toolBlocks, assistantId, currentText)
+            }
+        } else {
+            dispatchTool(name, argsJson, toolId, toolBlocks, assistantId, currentText)
+        }
+
+        val result = dispatched ?: ToolExecutionResult(
+            output = "Error: tool call timed out after $timeoutMs ms. " +
+                "The call was aborted; retry with a narrower request or split the task.",
+            success = false,
+            timedOut = true,
+            toolTitle = toolTitle,
+        )
+        return applyRepeatGuard(name, argsJson, result)
+    }
+
+    /** The tool dispatch table, wrapped by [executeTool]'s timeout policy. */
+    private suspend fun dispatchTool(
+        name: String,
+        argsJson: String,
+        toolId: String,
+        toolBlocks: MutableList<AssistantBlock>,
+        assistantId: String,
+        currentText: String,
+    ): ToolExecutionResult = when (name) {
+        FileReadTool.NAME -> {
+            val result = FileReadTool.execute(argsJson, activeSessionId, context)
+            // Record skill usage when SKILL.md under /var/minis/skills/<id>/ is read.
+            if (result.success) {
+                runCatching {
+                    val readPath = JSONObject(argsJson).optString("path", "")
+                    if (readPath.isNotEmpty()) {
+                        skillRepository?.skillIdFromPath(readPath)?.let { sid ->
+                            skillRepository.recordSkillUse(sid)
                         }
                     }
                 }
-                result
             }
-            FileWriteTool.NAME -> FileWriteTool.execute(argsJson, activeSessionId, context).also {
-                if (it.success) {
-                    maybeReloadSkillsForPath(argsJson)
-                    recordDeliverable(argsJson, "write")
-                }
-            }
-            FileEditTool.NAME -> FileEditTool.execute(argsJson, activeSessionId, context).also {
-                if (it.success) {
-                    maybeReloadSkillsForPath(argsJson)
-                    recordDeliverable(argsJson, "edit")
-                }
-            }
-            // T178: pass sessionId + context so read_image routes through
-            // resolveSessionHostPath like file_read/write/edit do — without
-            // these, the tool consults the global last-writer-wins
-            // bindMounts map and would surface another session's
-            // /var/minis/{workspace,attachments,offloads,browser} files.
-            ReadImageTool.NAME -> executeReadImageTool(argsJson)
-            "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
-            "browser_use" -> executeBrowserUseTool(argsJson)
-            "memory_write" -> executeMemoryWriteTool(argsJson)
-            "memory_get" -> executeMemoryGetTool(argsJson)
-            SubagentTool.NAME -> SubagentTool.execute(argsJson, activeSessionId, context)
-            AskUserQuestionTool.NAME -> AskUserQuestionTool.execute(argsJson, activeSessionId, context)
-            "get_goal", "create_goal", "update_goal" ->
-                GoalTools.execute(name, argsJson, activeSessionId, context)
-            TodoTool.NAME -> TodoTool.execute(argsJson, activeSessionId, context)
-            else -> ToolExecutionResult("Unknown tool: $name", false)
+            result
         }
-        return applyRepeatGuard(name, argsJson, result)
+        FileWriteTool.NAME -> FileWriteTool.execute(argsJson, activeSessionId, context).also {
+            if (it.success) {
+                maybeReloadSkillsForPath(argsJson)
+                recordDeliverable(argsJson, "write")
+            }
+        }
+        FileEditTool.NAME -> FileEditTool.execute(argsJson, activeSessionId, context).also {
+            if (it.success) {
+                maybeReloadSkillsForPath(argsJson)
+                recordDeliverable(argsJson, "edit")
+            }
+        }
+        // T178: pass sessionId + context so read_image routes through
+        // resolveSessionHostPath like file_read/write/edit do — without
+        // these, the tool consults the global last-writer-wins
+        // bindMounts map and would surface another session's
+        // /var/minis/{workspace,attachments,offloads,browser} files.
+        ReadImageTool.NAME -> executeReadImageTool(argsJson)
+        "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
+        "browser_use" -> executeBrowserUseTool(argsJson)
+        "memory_write" -> executeMemoryWriteTool(argsJson)
+        "memory_get" -> executeMemoryGetTool(argsJson)
+        SubagentTool.NAME -> SubagentTool.execute(argsJson, activeSessionId, context)
+        RalphTool.NAME -> RalphTool.execute(argsJson, activeSessionId, context)
+        AskUserQuestionTool.NAME -> AskUserQuestionTool.execute(argsJson, activeSessionId, context)
+        "get_goal", "create_goal", "update_goal" ->
+            GoalTools.execute(name, argsJson, activeSessionId, context)
+        TodoTool.NAME -> TodoTool.execute(argsJson, activeSessionId, context)
+        else -> ToolExecutionResult("Unknown tool: $name", false)
     }
 
     // ── Repeat-tool reminder (DeepSeek Harness repeat-tool-guard) ──────────

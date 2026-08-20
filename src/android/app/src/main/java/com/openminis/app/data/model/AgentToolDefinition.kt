@@ -14,6 +14,15 @@ data class AgentToolDefinition(
     val parameters: Map<String, AgentToolParam>,
     val required: List<String> = emptyList(),
     val propertyOrdering: List<String>? = null,
+    /**
+     * Per-tool-call budget in milliseconds (DeepSeek Harness
+     * dsh-tool-call-timeout-policy contract). When set, the executor wraps
+     * the dispatch in a cooperative deadline and returns a structured
+     * TOOL_TIMEOUT result (timedOut=true) instead of hanging the turn.
+     * Tools that manage their own timeout (shell_execute, subagent,
+     * ask_user_question) leave this null.
+     */
+    val timeoutMs: Long? = null,
 ) {
     /** Anthropic format: {name, description, input_schema: {type:object, properties, required}} */
     fun toAnthropicJson(): JSONObject {

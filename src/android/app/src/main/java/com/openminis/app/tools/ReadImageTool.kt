@@ -22,6 +22,7 @@ object ReadImageTool {
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "prompt"),
+        timeoutMs = 60_000L,
     )
 
     /**

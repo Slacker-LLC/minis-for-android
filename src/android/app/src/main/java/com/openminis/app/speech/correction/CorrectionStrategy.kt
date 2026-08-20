@@ -81,14 +81,16 @@ class LlmCorrectionStrategy(
         )
 
         val prompt = buildPrompt(transcript, candidates, context)
-        val response = provider.sendMessage(
-            messages = listOf(LLMMessage(role = LLMMessage.Role.USER, content = prompt)),
-            systemPrompt = SYSTEM_PROMPT,
-            maxTokens = correctionMaxTokens(transcript.length, entry.model.maxOutputTokens),
-            // Reasoning traces add latency for no benefit here, and on some
-            // providers yield empty text with finish_reason=tool_calls.
-            thinkingLevel = ThinkingLevel.OFF,
-        )
+        val response = com.openminis.app.provider.LLMRetryPolicy.withRetry {
+            provider.sendMessage(
+                messages = listOf(LLMMessage(role = LLMMessage.Role.USER, content = prompt)),
+                systemPrompt = SYSTEM_PROMPT,
+                maxTokens = correctionMaxTokens(transcript.length, entry.model.maxOutputTokens),
+                // Reasoning traces add latency for no benefit here, and on some
+                // providers yield empty text with finish_reason=tool_calls.
+                thinkingLevel = ThinkingLevel.OFF,
+            )
+        }
 
         val cleaned = cleanResponse(response.text)
         if (cleaned.isEmpty()) throw CorrectionError.EmptyResponse

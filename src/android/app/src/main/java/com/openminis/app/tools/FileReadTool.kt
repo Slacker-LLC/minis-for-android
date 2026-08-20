@@ -23,6 +23,7 @@ object FileReadTool {
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "offset", "lines", "direction", "max_length"),
+        timeoutMs = 60_000L,
     )
 
     fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {

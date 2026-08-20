@@ -245,13 +245,14 @@ describeOmitted（exact/unknown）+ formatRetentionNotice（省略子句 + 恢�
 
 ## 四、建议路线图
 
-Phase 1（下一版，小改动高收益）
-  - AgentToolDefinition.timeoutMs + 统一 TOOL_TIMEOUT（P0-2）
-  - LLM 统一重试策略（normal mode + jitter）（P0-3）
-  - Output Retainer 库落地到 file_read/ls/grep（P2-10，地基）
+Phase 1 ✅ 已实施（2026-08-21）
+  - ✅ AgentToolDefinition.timeoutMs + 统一 TOOL_TIMEOUT（P0-2）
+  - ✅ LLM 统一重试策略（LLMRetryPolicy：normal mode + jitter，覆盖主循环外的
+     宠物/视觉组/纠错/模型用量/压缩摘要五处调用点）（P0-3）
+  - ⏳ Output Retainer 库落地到 file_read/ls/grep（P2-10，地基）
+  - ✅ 附赠：Ralph 循环（P0-1，复用 subagent 管线，见 tools/RalphTool.kt）
 
 Phase 2（再一版，中改动）
-  - Ralph 循环工具（复用 subagent 管线）（P0-1）
   - 工具结果剪枝器（压缩时 head/tail 改写）（P1-4）
   - Token Meter + 上下文压力条（P1-7）
 
