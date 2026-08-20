@@ -1,7 +1,12 @@
 package com.openminis.app.ui.settings
 
 import android.content.Intent
+import android.app.role.RoleManager
+import android.content.Context
+import android.widget.Toast
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +48,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
@@ -120,8 +126,23 @@ fun SettingsScreen(
     onAboutClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val roleManager = remember { context.getSystemService(Context.ROLE_SERVICE) as RoleManager }
+    val roleAssist = remember {
+        // AOSP uses android.app.role.Assist; Xiaomi/MIUI exposes
+        // android.app.role.ASSISTANT. Probe availability so the row works on
+        // both instead of hard-coding one name.
+        listOf("android.app.role.ASSISTANT", "android.app.role.Assist")
+            .firstOrNull { roleManager.isRoleAvailable(it) }
+            ?: "android.app.role.ASSISTANT"
+    }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var showSubagentLimits by remember { mutableStateOf(false) }
+    val roleHeld = remember { mutableStateOf(roleManager.isRoleHeld(roleAssist)) }
+    val roleAvailable = remember { roleManager.isRoleAvailable(roleAssist) }
+    val assistLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        roleHeld.value = roleManager.isRoleHeld(roleAssist)
+        Toast.makeText(context, if (roleHeld.value) "已设为默认数字助手" else "未设置为默认助手", Toast.LENGTH_SHORT).show()
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -233,6 +254,21 @@ fun SettingsScreen(
                     title = "子代理委派限制",
                     subtitle = "深度 ${SubagentLimits.maxDepth(context)} 层 · 单任务超时 ${SubagentLimits.timeoutMs(context) / 60_000L} 分钟",
                     onClick = { showSubagentLimits = true },
+                )
+                SettingsItem(
+                    icon = Icons.Outlined.RecordVoiceOver,
+                    iconColor = Color(0xFF30B0C7),
+                    title = "默认数字助手",
+                    subtitle = if (!roleAvailable) "此设备不支持切换默认助手"
+                        else if (roleHeld.value) "已是系统默认数字助手"
+                        else "设为默认后，长按 Home / 语音唤起会打开 App",
+                    onClick = {
+                        when {
+                            !roleAvailable -> Toast.makeText(context, "此设备不支持切换默认助手", Toast.LENGTH_SHORT).show()
+                            roleHeld.value -> Toast.makeText(context, "已是默认数字助手", Toast.LENGTH_SHORT).show()
+                            else -> assistLauncher.launch(roleManager.createRequestRoleIntent(roleAssist))
+                        }
+                    },
                 )
                 SettingsItem(
                     icon = Icons.Outlined.Terminal,

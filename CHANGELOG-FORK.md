@@ -314,6 +314,20 @@ sidebar nav / popupSelect / skeleton）补齐：
 ZIP 导出、tooltip/hovercard、新用户 onboarding、计划模式强制审批、
 动态命令目录（当前为固定菜单）。其余 DeepSeek 前端词汇已覆盖。
 
+### 18. 默认数字助手 + 手机端计划入口同步（1.12-pet.10）
+
+- **默认数字助手**：新增 `voice/AssistService` + `AssistSessionService` +
+  `AssistSession`（VoiceInteractionService 三件套），Manifest 声明
+  `BIND_VOICE_INTERACTION` / `BIND_VOICE_INTERACTION_SESSION` 与
+  `voice_interaction_service.xml`；设置 → Agent Runtime 新增「默认数字助手」
+  行，用 RoleManager 请求角色（自动兼容 AOSP `android.app.role.Assist` 与
+  MIUI `android.app.role.ASSISTANT`）。设为默认后长按 Home / 语音唤起会打开
+  App 主界面，会话随即结束（轻量实现）。
+- **计划模式入口**：手机聊天「⋯」菜单新增「计划模式 / 退出计划模式」，
+  与网页端共用 `AgentStateStore.planSet`。
+- 本版为发布版 `1.12-pet.10`（versionCode 31），发布说明见
+  `RELEASE-NOTES.md`。
+
 ---
 
 ## 未验证 / 已知问题

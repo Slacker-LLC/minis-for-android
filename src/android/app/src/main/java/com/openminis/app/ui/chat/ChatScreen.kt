@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
@@ -275,6 +276,7 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.tools.AgentStateStore
 import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.components.MinisTextButton
@@ -2660,6 +2662,23 @@ fun ChatScreen(
                                     },
                                 )
                             }
+                            // Plan mode (soft) — same AgentStateStore as Web Remote
+                            val planModeOn = AgentStateStore.planGet(sessionId).mode == "plan"
+                            DropdownMenuItem(
+                                text = { Text(if (planModeOn) "退出计划模式" else "计划模式") },
+                                onClick = {
+                                    showChatMenu = false
+                                    AgentStateStore.planSet(sessionId, if (planModeOn) "off" else "plan")
+                                    Toast.makeText(
+                                        context,
+                                        if (planModeOn) "已退出计划模式" else "已进入计划模式",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Schedule, contentDescription = null)
+                                },
+                            )
                             MinisMenuDivider()
                             // Token Usage (iOS parity)
                             DropdownMenuItem(
@@ -6517,4 +6536,3 @@ private fun ThinkingLevelSheet(
         }
     }
 }
-
