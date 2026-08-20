@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +43,10 @@ import com.openminis.app.tools.PendingQuestion
 import com.openminis.app.tools.QuestionAnswer
 import com.openminis.app.tools.QuestionCenter
 import com.openminis.app.ui.components.MinisTextButton
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -178,10 +184,13 @@ fun AgentStateBars(
     sessionId: String,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var goal by remember { mutableStateOf(AgentStateStore.Goal()) }
     var todo by remember { mutableStateOf(AgentStateStore.TodoList()) }
     var plan by remember { mutableStateOf(AgentStateStore.Plan()) }
     var deliverables by remember { mutableStateOf<List<AgentStateStore.Deliverable>>(emptyList()) }
+    var editingGoal by remember { mutableStateOf(false) }
+    var goalDraft by remember { mutableStateOf("") }
 
     LaunchedEffect(sessionId) {
         while (isActive) {
@@ -225,6 +234,10 @@ fun AgentStateBars(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
+                        MinisTextButton(
+                            onClick = { AgentStateStore.planSet(sessionId, "off") },
+                            contentPadding = PaddingValues(horizontal = 6.dp),
+                        ) { Text("退出", style = MaterialTheme.typography.labelMedium) }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                 }
@@ -239,6 +252,13 @@ fun AgentStateBars(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
+                        MinisTextButton(
+                            onClick = {
+                                goalDraft = goal.text
+                                editingGoal = true
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp),
+                        ) { Text("编辑", style = MaterialTheme.typography.labelMedium) }
                         MinisTextButton(
                             onClick = { AgentStateStore.goalSetActive(sessionId, !goal.active) },
                             contentPadding = PaddingValues(horizontal = 6.dp),
@@ -269,12 +289,73 @@ fun AgentStateBars(
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                 }
                 if (deliverables.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("📄", fontSize = 14.sp)
+                        Spacer(Modifier.width(8.dp))
+                        deliverables.take(4).forEach { d ->
+                            Text(
+                                text = d.path.substringAfterLast('/'),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        cm.setPrimaryClip(ClipData.newPlainText("deliverable", d.path))
+                                        Toast.makeText(context, "已复制路径：${d.path}", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (editingGoal) {
+        Dialog(
+            onDismissRequest = { editingGoal = false },
+            properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                ) {
                     Text(
-                        text = "📄 本轮产出：${deliverables.take(4).joinToString("  ") { it.path.substringAfterLast('/') }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        text = "编辑目标",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = goalDraft,
+                        onValueChange = { goalDraft = it.take(500) },
+                        label = { Text("目标") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        MinisTextButton(onClick = { editingGoal = false }) { Text("取消") }
+                        MinisTextButton(
+                            onClick = {
+                                AgentStateStore.goalSet(sessionId, goalDraft)
+                                editingGoal = false
+                            },
+                        ) { Text("保存") }
+                    }
                 }
             }
         }

@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BatteryFull
@@ -50,6 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -62,6 +65,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.openminis.app.tools.SubagentLimits
+import com.openminis.app.ui.components.MinisTextButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -113,6 +121,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var showFeedbackSheet by remember { mutableStateOf(false) }
+    var showSubagentLimits by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -217,6 +226,13 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_mcp),
                     subtitle = stringResource(R.string.settings_mcp_subtitle),
                     onClick = onMcpClick,
+                )
+                SettingsItem(
+                    icon = Icons.Outlined.AccountTree,
+                    iconColor = Color(0xFFAF52DE),
+                    title = "子代理委派限制",
+                    subtitle = "深度 ${SubagentLimits.maxDepth(context)} 层 · 单任务超时 ${SubagentLimits.timeoutMs(context) / 60_000L} 分钟",
+                    onClick = { showSubagentLimits = true },
                 )
                 SettingsItem(
                     icon = Icons.Outlined.Terminal,
@@ -361,6 +377,18 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (showSubagentLimits) {
+        SubagentLimitsDialog(
+            initialDepth = SubagentLimits.maxDepth(context),
+            initialTimeoutMinutes = SubagentLimits.timeoutMs(context) / 60_000L,
+            onSave = { depth, timeoutMinutes ->
+                SubagentLimits.save(context, depth, timeoutMinutes)
+                showSubagentLimits = false
+            },
+            onDismiss = { showSubagentLimits = false },
+        )
+    }
 }
 
 @Composable
@@ -388,6 +416,74 @@ private fun FeedbackSheetItem(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
+    }
+}
+
+@Composable
+private fun SubagentLimitsDialog(
+    initialDepth: Int,
+    initialTimeoutMinutes: Long,
+    onSave: (Int, Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var depth by remember { mutableStateOf(initialDepth.toString()) }
+    var timeout by remember { mutableStateOf(initialTimeoutMinutes.toString()) }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+    ) {
+        androidx.compose.material3.Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+            ) {
+                Text(
+                    text = "子代理委派限制",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = depth,
+                    onValueChange = { depth = it.filter(Char::isDigit).take(1) },
+                    label = { Text("委派深度（1–5 层）") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = timeout,
+                    onValueChange = { timeout = it.filter(Char::isDigit).take(2) },
+                    label = { Text("单任务超时（1–30 分钟）") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    MinisTextButton(onClick = onDismiss) { Text("取消") }
+                    MinisTextButton(
+                        onClick = {
+                            val d = depth.toIntOrNull() ?: SubagentLimits.DEFAULT_MAX_DEPTH
+                            val t = timeout.toLongOrNull() ?: SubagentLimits.DEFAULT_TIMEOUT_MINUTES
+                            onSave(
+                                d.coerceIn(SubagentLimits.MAX_DEPTH_RANGE.first, SubagentLimits.MAX_DEPTH_RANGE.last),
+                                t.coerceIn(SubagentLimits.TIMEOUT_MINUTES_RANGE.first, SubagentLimits.TIMEOUT_MINUTES_RANGE.last),
+                            )
+                        },
+                    ) { Text("保存") }
+                }
+            }
+        }
     }
 }
 
@@ -618,4 +714,3 @@ private fun SettingsItem(
         }
     }
 }
-

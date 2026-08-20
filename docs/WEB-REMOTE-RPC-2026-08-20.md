@@ -158,6 +158,11 @@ Web「代理设置」卡片里的深度与超时输入即时生效；子代理�
 > `MessageFeedbackRow`；Web 远程设置页新增「权限预设」分区。两端看到
 > 的目标、待办、计划、产出与提问卡是同一份数据。
 
+> 设置同步补充：手机「设置 → Agent Runtime」新增「子代理委派限制」（读写
+> `SubagentLimits`，与 `agent.settings.*` 同源）；聊天页目标条可编辑、
+> 计划条可退出、产出路径可复制。技能/记忆/SOUL/MCP/定时任务/模型组/
+> 会话搜索/附件在手机端原本已有原生入口，两端已对齐。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：

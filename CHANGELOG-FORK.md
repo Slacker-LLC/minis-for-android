@@ -258,6 +258,18 @@ UI 全部复用 App 现有原语（MinisAlertDialog 同款 Dialog+Surface 壳、
 MinisTextButton、SettingsRow/SettingsSection、MaterialTheme 排版），
 与源码 UI 保持一致。
 
+### 15. 继续补齐手机端同步
+
+- **子代理委派限制设置**：设置 → Agent Runtime 新增「子代理委派限制」行
+  （AccountTree 图标），点击弹出与 MinisAlertDialog 同款壳的数字输入对话框，
+  读写同一个 `SubagentLimits`（深度 1–5、超时 1–30 分钟），与网页端
+  `agent.settings.*` 完全同源。
+- **目标可编辑**：聊天页目标条新增「编辑」按钮，弹窗修改目标文本。
+- **计划可退出**：计划模式横幅新增「退出」按钮，`planSet(mode="off")`。
+- **产出文件可复制**：产出文件路径可点击复制到剪贴板并 Toast 提示。
+- 技能 / 记忆 / SOUL / MCP / 定时任务 / 模型组（主/子代理）/ 会话搜索 /
+  附件在手机 App 原本已有原生入口，无需重复移植；本次核对确认两端入口齐平。
+
 ---
 
 ## 未验证 / 已知问题
