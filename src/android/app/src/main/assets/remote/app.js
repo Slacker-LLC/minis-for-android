@@ -155,7 +155,7 @@ function startPoll(){
       try{
         // The session list only changes on create/rename, so it does not need
         // the fast cadence the running reply does.
-        if(sessionTick++%4===0){await loadSessions();await loadAgentBars()}
+        if(sessionTick++%4===0){await loadSessions();await loadAgentBars();await loadUsage()}
         if(state.sessionId){await loadStatus();await loadMessages();if(state.running)await pollQuestions()}
       }catch{}
     }

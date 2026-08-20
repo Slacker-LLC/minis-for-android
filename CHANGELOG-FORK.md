@@ -226,9 +226,9 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
 5. **消息反馈**：`chat.feedback.put/delete/listForMessages` + JSON sidecar；
    Web 每条 assistant 消息带 👍/👎。
 6. **权限预设**：`settings.permissionPreset.get/set` + `settings.sandbox.get`，
-   `RemotePermissionPolicy` 作为唯一策略归属（workspace-write 默认 /
-   danger-full-access，后者放开未来 admin 操作）；Web 设置页加选择卡，
-   选 Full Access 需二次确认。
+   `RemotePermissionPolicy` 作为唯一策略归属；workspace-write（默认）下网页
+   文件写入/编辑仅限 `/var/minis/workspace`，danger-full-access 放开全部路径；
+   Web 设置页加选择卡，选 Full Access 需二次确认。
 7. **重复工具提醒**：ChatViewModel 内统计连续完全相同参数的工具调用，
    第 4 次起在结果前注入提醒，阻止模型死循环重试。
 8. **附件**：复用 `chat.prompt` 既有 `attachments` 契约，Web composer
@@ -338,3 +338,61 @@ ZIP 导出、tooltip/hovercard、新用户 onboarding、计划模式强制审批
   云端引擎需要手动绑定 Voice Input 模型。代码路径正确，但没能在真机上跑通一次完整语音对话。
 - 宠物的息屏优化经过编译和逻辑验证，**没有做长时间耗电对比实测**。
 - Web 端 Markdown 渲染器有单元测试，但**没有在真机浏览器上逐项回归**。
+
+
+---
+
+## 2026-08-21 安全加固与可靠性修复（审查驱动）
+
+一次全量代码审查（5 CRITICAL / 20 HIGH / 47 MEDIUM / 70+ LOW）后的修复批次，
+设计决策与完整对照见 [docs/DESIGN-HARDENING-2026-08-21.md](docs/DESIGN-HARDENING-2026-08-21.md)，
+审查报告见 [docs/find-fault-report.md](docs/find-fault-report.md)。
+
+**安全**：
+
+- `EncryptedPrefsFactory` **fail-closed**：加密 store 连续失败不再回退明文
+  SharedPreferences（改返回空内存 store，凭据视为未配置）；失败时只删自己的
+  加密 XML，不再删共享 Tink keyset / 全局主密钥（原来一个 store 故障会让全部
+  加密凭据级联落明文）
+- `DebugServer`（0.0.0.0:5321）**所有连接一律要求 token**（含 loopback；
+  token 在 `files/debug_server_token`，adb run-as 可读）；移除 CORS `*`；
+  Content-Length 4 MiB / 行 16 KiB / header 数 100 上限；连接协程 catch(Throwable)；
+  token 不进 logcat；`minis-debug` CLI 同步带 `X-Minis-Token`
+- Web Remote RPC 白名单新增 **deny 列表**：`provider.export` / `provider.import`
+  （携带完整 API Key）/ `debug.logs.setEnabled`
+- `LLMRequestLog` 剥离 authorization / x-api-key / api-key / cookie 等敏感头
+  的**值**（保留名字）——`debug.llmRequests` 不再泄漏 API Key
+- Web 文件读写路径 **canonical 前缀校验 + 拒绝 symlink 逃逸**（GET/POST/edit
+  全部前置守卫）；attachments 文件名净化 + 16 MiB / 32 MiB / 8 个上限
+- `AlarmReceiver` `exported=false`（任意应用伪造报警通知的入口关闭）
+- 登录限流 **per-IP 分桶 + 原子计数**（原全局计数器可并发绕过、可被反锁）
+- `EncryptedPrefsFactory` 迁移竞态修复（token 生成加锁）
+- 500 错误不再回显内部异常；`/api/sessions|messages` limit 上限
+
+**可靠性**：
+
+- 子代理超时**真取消**（`cancelStream`）+ 回答 60k 截断 + 取消异常重抛
+- `QuestionCenter` 已回答/超时卡片即时删除（原残留导致网页重复弹卡）
+- `FileReadTool` 50 MB 守卫 / `ReadImageTool` 先读尺寸再降采样
+- `FileWriteTool` mount 写入恒真式修正（写前快照旧长度）
+- `FileEditEngine` fuzzy 尾部换行规则统一（不再误删尾随空行）；
+  `FileEditTool` legacy replace_all 支持 CRLF；diff/回答截断代理对安全
+- `ShellOutputTruncator` 行数 off-by-one 修正 + 行边界丢弃条件修正
+- `GoalTools` create/update 语义区分 + 空文本清除目标；`TodoTool` status 白名单
+- `MessageFeedbackStore` 原子写 + 损坏文件备份（不再静默清空反馈）
+- 宠物：取消语义（`CancellationException` 重抛）、60s 响应超时、spritesheet
+  IO 解码、密度采样按实际绘制尺寸、语音双击竞态、预览解码去重、气泡动画竞态、
+  `pet.json` id 正则收紧（禁 `.`/`..`）
+- `AgentForegroundService` 安全门统一 `subsystemsReady()`（修复崩溃环风险）
+- ghost 闹钟迁移失败保留 blob；宠物开机恢复路径；`startIfEnabled` 去重；
+  `RemoteAccessServer` stop 后可复用（scope 重建）
+- 权限预设**真实生效**：workspace-write 模式下 Web 写入/编辑仅限
+  `/var/minis/workspace`，Full Access 放开
+
+**其它**：设置页 ON_RESUME 状态同步（通知栏停止后开关不再显示旧值）；
+app.js 三处（matchedCount 转义、死代码清理、用量徽标接入轮询）；
+build.gradle release 签名警告（勿用 debug keystore 分发）；
+契约文档与实现字段漂移注记。
+
+验证：`compileDebugKotlin` 零错误；706 单测无新增失败（基线 42 个失败为
+配置缺失/环境问题，干净 worktree 对比确认）。

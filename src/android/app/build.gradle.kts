@@ -75,6 +75,23 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // !! SECURITY WARNING (fork audit 2026-08-21) !!
+            // Signing with the DEBUG keystore means anyone can re-sign a
+            // tampered "update" with the same key (the debug keystore's
+            // credentials are public knowledge), so an attacker could push a
+            // malicious higher-versionCode APK over this one on sideloaded
+            // devices. DO NOT distribute assembleRelease as-is. Use a real
+            // release keystore and point signingConfig at it:
+            //   signingConfig = signingConfigs.create("release") {
+            //       storeFile = file(System.getenv("RELEASE_KEYSTORE") ?: "")
+            //       storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+            //       keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            //       keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            //   }
+            // Also: the RELEASED artifact should be assembleRelease, NOT
+            // assembleDebug — debug builds start the DebugServer RPC surface
+            // (see MinisApp.onCreate / DebugServer), which is a serious
+            // remote-control exposure in a distributed APK.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

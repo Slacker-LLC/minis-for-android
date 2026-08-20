@@ -135,6 +135,7 @@ git clone --recursive https://github.com/limuzi013/OpenMinis-Pet.git
 - Release 里的 APK 用 debug 签名（沿用上游配置），仅供自用。
 
 完整改动清单和踩坑记录见 [CHANGELOG-FORK.md](CHANGELOG-FORK.md)。
+2026-08-21 安全加固与可靠性修复的设计决策见 [docs/DESIGN-HARDENING-2026-08-21.md](docs/DESIGN-HARDENING-2026-08-21.md)。
 
 ## License
 

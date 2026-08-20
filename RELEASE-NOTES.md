@@ -63,7 +63,7 @@ Persistent Shell：
 - **目标 / 待办 / 计划 / 产出文件条**：与手机端同一份状态源，目标可编辑，
   产出文件可点击打开
 - **消息反馈 👍/👎**、**附件上传**（图片/文档随消息发送）
-- **权限预设**（Workspace Write / Danger Full Access）
+- **权限预设**（Workspace Write / Danger Full Access）：默认 Workspace Write 模式下网页文件写入/编辑仅限 `/var/minis/workspace`，Full Access 放开全部路径
 - 文件浏览编辑、Shell
 - **布局按 DeepSeek Harness 设计系统重写**：三栏骨架、侧边栏导航、sticky
   输入 Dock、胶囊 Tab、Toast、命令菜单、骨架屏、微交互动画，亮暗自动跟随
