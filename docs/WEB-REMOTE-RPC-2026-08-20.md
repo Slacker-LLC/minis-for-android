@@ -153,6 +153,11 @@ Web「代理设置」卡片里的深度与超时输入即时生效；子代理�
 `chat.prompt` 的 `attachments:[{name,data,mime}]`（base64），Web composer
 新增附件按钮，后端零改动。
 
+> 手机 App 原生 UI 与网页端共用同一批进程内状态源：ChatScreen 挂载
+> `AskUserQuestionDialog` / `AgentStateBars`，每条 assistant 消息挂
+> `MessageFeedbackRow`；Web 远程设置页新增「权限预设」分区。两端看到
+> 的目标、待办、计划、产出与提问卡是同一份数据。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：

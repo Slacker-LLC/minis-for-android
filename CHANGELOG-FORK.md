@@ -237,6 +237,27 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
 状态均为进程内（AgentStateStore / MessageFeedbackStore），不改数据库；
 `rpc.discover` 已同步注册全部新方法。
 
+### 14. 网页端功能同步到手机 App
+
+第 13 节的功能之前在网页端独有，手机 App 缺少对应界面（尤其模型调用
+`ask_user_question` 时手机会一直挂着等不到回答）。本轮把同一套状态源接到
+App 原生 UI：
+
+1. **提问卡片**：新增 `ChatAgentStateUI.kt` 的 `AskUserQuestionDialog`，
+   流式期间轮询同一个 `QuestionCenter`，手机直接弹卡回答（单选即答、
+   多选/自定义/跳过），对话恢复。
+2. **目标 / 待办 / 计划 / 产出文件条**：`AgentStateBars` 浮在输入框上方，
+   轮询同一个 `AgentStateStore`，可暂停/恢复/清除目标，显示待办与产出。
+3. **消息反馈 👍/👎**：`MessageFeedbackRow` 挂到每条 assistant 消息底部，
+   写入同一个 `MessageFeedbackStore`。
+4. **权限预设**：Web 远程设置页新增「权限预设」分区（Workspace Write /
+   Danger Full Access 两行，勾选当前值；Full Access 需 MinisAlertDialog
+   二次确认），与网页端共用 `RemotePermissionPolicy`。
+
+UI 全部复用 App 现有原语（MinisAlertDialog 同款 Dialog+Surface 壳、
+MinisTextButton、SettingsRow/SettingsSection、MaterialTheme 排版），
+与源码 UI 保持一致。
+
 ---
 
 ## 未验证 / 已知问题

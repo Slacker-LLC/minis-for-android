@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.SettingsEthernet
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -38,6 +40,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.openminis.app.remote.CloudflareTunnelManager
 import com.openminis.app.remote.RemoteAccessPrefs
+import com.openminis.app.remote.RemotePermissionPolicy
+import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.remote.RemoteAccessService
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
@@ -63,6 +67,8 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
     var tunnelTokenConfigured by remember { mutableStateOf(RemoteAccessPrefs.hasCloudflareTunnelToken(context)) }
     var hostname by remember { mutableStateOf(RemoteAccessPrefs.cloudflareHostname(context)) }
     var apiToken by remember { mutableStateOf(RemoteAccessPrefs.token(context)) }
+    var permissionPreset by remember { mutableStateOf(RemotePermissionPolicy.preset(context)) }
+    var pendingDangerConfirm by remember { mutableStateOf(false) }
     val lanIp = remember { localIpv4Address() ?: "<phone-ip>" }
 
     LaunchedEffect(Unit) { CloudflareTunnelManager.refresh(context) }
@@ -306,6 +312,65 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
                 },
             )
         }
+
+        SettingsSection(
+            header = "权限预设",
+            footer = "workspace-write：沙箱化 shell + 工作区文件读写 + RPC（默认）。danger-full-access：放开全部能力，未来管理员操作不再拦截。",
+        ) {
+            SettingsRow(
+                title = "Workspace Write",
+                subtitle = "沙箱化 shell + 工作区文件读写 + RPC（默认）",
+                icon = Icons.Outlined.SettingsEthernet,
+                showChevron = false,
+                showDivider = true,
+                trailing = {
+                    if (permissionPreset == RemotePermissionPolicy.PRESET_WORKSPACE_WRITE) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                onClick = {
+                    if (RemotePermissionPolicy.setPreset(context, RemotePermissionPolicy.PRESET_WORKSPACE_WRITE)) {
+                        permissionPreset = RemotePermissionPolicy.PRESET_WORKSPACE_WRITE
+                        toast("权限预设已保存")
+                    }
+                },
+            )
+            SettingsRow(
+                title = "Danger Full Access",
+                subtitle = "放开全部能力（当前无额外管理员操作）",
+                icon = Icons.Outlined.SettingsEthernet,
+                showChevron = false,
+                showDivider = false,
+                trailing = {
+                    if (permissionPreset == RemotePermissionPolicy.PRESET_DANGER_FULL) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                onClick = {
+                    if (permissionPreset != RemotePermissionPolicy.PRESET_DANGER_FULL) {
+                        pendingDangerConfirm = true
+                    }
+                },
+            )
+        }
+    }
+
+    if (pendingDangerConfirm) {
+        MinisAlertDialog(
+            onDismissRequest = { pendingDangerConfirm = false },
+            title = "切换到 Danger Full Access？",
+            text = "放开全部远程能力。当前与默认一致，未来管理员操作将不再拦截。确定切换？",
+            confirmText = "切换",
+            dismissText = "取消",
+            onConfirm = {
+                if (RemotePermissionPolicy.setPreset(context, RemotePermissionPolicy.PRESET_DANGER_FULL)) {
+                    permissionPreset = RemotePermissionPolicy.PRESET_DANGER_FULL
+                    toast("权限预设已保存")
+                }
+                pendingDangerConfirm = false
+            },
+            onDismiss = { pendingDangerConfirm = false },
+        )
     }
 }
 

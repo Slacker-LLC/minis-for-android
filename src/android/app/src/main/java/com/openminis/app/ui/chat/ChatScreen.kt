@@ -3994,6 +3994,12 @@ fun ChatScreen(
                     }.collect { lastToolBlocks = it }
                 }
                 val allToolBlocks = lastToolBlocks
+                AgentStateBars(
+                    sessionId = sessionId,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 92.dp),
+                )
                 if (lastToolBlocks.isNotEmpty()) {
                     Box(
                         modifier = Modifier
@@ -6243,6 +6249,9 @@ fun ChatScreen(
     // Offload permission dialog
     OffloadPermissionDialog()
 
+    // Pending ask_user_question card (same QuestionCenter as the Web Remote)
+    AskUserQuestionDialog(sessionId = sessionId)
+
     // URL preview sheet — shown when a markdown link is tapped
     previewUrl?.let { url ->
         com.openminis.app.ui.components.UrlPreviewSheet(
@@ -6508,5 +6517,4 @@ private fun ThinkingLevelSheet(
         }
     }
 }
-
 

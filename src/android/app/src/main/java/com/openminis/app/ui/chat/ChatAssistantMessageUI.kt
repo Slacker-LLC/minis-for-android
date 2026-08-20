@@ -420,6 +420,9 @@ internal fun AssistantMessageView(message: ChatMessage, onRetry: (() -> Unit)? =
         if (message.error != null) {
             InlineErrorBanner(error = message.error, onRetry = onRetry)
         }
+
+        // 👍/👎 feedback (same MessageFeedbackStore as the Web Remote)
+        MessageFeedbackRow(message.id)
     }
 }
 
