@@ -270,6 +270,27 @@ MinisTextButton、SettingsRow/SettingsSection、MaterialTheme 排版），
 - 技能 / 记忆 / SOUL / MCP / 定时任务 / 模型组（主/子代理）/ 会话搜索 /
   附件在手机 App 原本已有原生入口，无需重复移植；本次核对确认两端入口齐平。
 
+### 16. Web Remote 按 DeepSeek Harness 布局重写
+
+从本机 DeepSeek Harness 的 `dsh-web-frontend/dist` 提取真实设计系统
+（`--dsw-alias-*` / `--dsw-specific-*`：bg-base/layer、border-l1/l2、
+label-primary/secondary/tertiary、sidebar-fill、bubble、button-primary、
+shadow-lv1/2/3、markdown-code-block 等），整体重写 `app.css`：
+
+- 三栏骨架：侧边栏（264px）| 会话主区 | 工具面板（340px）；
+- 侧边栏：DeepSeek 式 nav-item（激活项带蓝色强调条）、胶囊搜索框、
+  会话行 10px 圆角 + hover 背景；
+- 会话主区：顶栏 56px + 居中 760px 会话流 + sticky 输入 Dock
+  （22px 圆角胶囊输入框、聚焦描边、lv2 阴影）；
+- 工具面板：胶囊 Tab（active 用 ghost-active 填充 + inset 描边）、
+  16px 圆角卡片、表格/表单/终端全部按 token 统一；
+- 用户气泡用 `--dsw-specific-bubble`，assistant 纯文本，Markdown
+  代码块/表格/引用按 DSW 排版；弹层 24px 圆角 + lv3 阴影；
+- 窄屏（≤1180px）工具面板变右侧抽屉，≤860px 侧边栏变左侧抽屉，
+  原 `.open` 切换逻辑不变。
+
+JS 逻辑与全部 DOM id 保持不变，只重写结构与样式。
+
 ---
 
 ## 未验证 / 已知问题
