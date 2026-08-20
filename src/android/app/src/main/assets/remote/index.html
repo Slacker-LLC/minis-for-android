@@ -68,6 +68,7 @@
       <div id="todoBar" class="agent-bar hidden"></div>
       <div id="deliverablesBar" class="agent-bar hidden"></div>
       <div id="questionCard" class="question-card hidden"></div>
+      <div id="approvalCard" class="question-card hidden"></div>
       <div class="composer-wrap composer-dock">
         <div class="composer">
           <button id="commandBtn" class="ghost composer-command" title="命令">+</button>
@@ -83,7 +84,8 @@
 
     <aside class="tools-pane">
       <div class="tabs">
-        <button class="tab active" data-tab="files">文件</button>
+        <button class="tab active" data-tab="workbench">工作台</button>
+        <button class="tab" data-tab="files">文件</button>
         <button class="tab" data-tab="shell">终端</button>
         <button class="tab" data-tab="models">模型</button>
         <button class="tab" data-tab="skills">技能</button>
@@ -93,7 +95,15 @@
         <button class="tab" data-tab="settings">设置</button>
       </div>
 
-      <section id="filesTab" class="tool-tab active">
+      <section id="workbenchTab" class="tool-tab active workbench-tab">
+        <div class="models-toolbar workbench-toolbar">
+          <div><strong>Agent 工作台</strong><span>与手机上的同一 Agent Loop 实时同步</span></div>
+          <button id="workbenchRefresh" class="secondary">刷新</button>
+        </div>
+        <div id="workbenchBody" class="models-body"></div>
+      </section>
+
+      <section id="filesTab" class="tool-tab">
         <div class="pathbar"><button id="fileUp" class="ghost">←</button><input id="filePath" value="/var/minis/workspace" /></div>
         <div id="fileList" class="file-list"></div>
         <div id="editor" class="editor hidden">
@@ -226,6 +236,7 @@
   <script src="/purify.js"></script>
   <script src="/md.js"></script>
   <script src="/app.js"></script>
+  <script src="/workbench-tab.js"></script>
   <script src="/skills-tab.js"></script>
   <script src="/memory-tab.js"></script>
   <script src="/mcp-tab.js"></script>

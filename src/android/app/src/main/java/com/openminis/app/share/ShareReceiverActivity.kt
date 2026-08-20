@@ -4,7 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
 import com.openminis.app.logging.AppLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -35,6 +39,8 @@ class ShareReceiverActivity : ComponentActivity() {
     companion object {
         private const val TAG = "ShareReceiver"
         private const val INLINE_TEXT_LIMIT = 1000
+        private const val MAX_ATTACHMENT_BYTES = 16L * 1024L * 1024L
+        private const val MAX_BATCH_BYTES = 32L * 1024L * 1024L
     }
 
     // T-n01-andmenu-l10n: pre-Tiramisu locale override (see MainActivity).
@@ -44,17 +50,13 @@ class ShareReceiverActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val items = mutableListOf<PendingShare.Item>()
-        try {
-            when (intent?.action) {
-                Intent.ACTION_SEND -> handleSingleSend(intent, items)
-                Intent.ACTION_SEND_MULTIPLE -> handleMultipleSend(intent, items)
-                Intent.ACTION_VIEW -> handleView(intent, items)
-                else -> AppLogger.warning(TAG, "unhandled action: ${intent?.action}")
+        // Providers controlled by other apps may be slow or never terminate;
+        // staging them on the main thread turns a normal share Intent into an
+        // application-not-responding denial of service.
+        lifecycleScope.launch {
+            val items = withContext(Dispatchers.IO) {
+                extractSharedItems(intent)
             }
-        } catch (e: Throwable) {
-            AppLogger.error(TAG, "extraction failed: ${e.message}")
-        }
 
         // [T-android-json-open-provider-import-prompt] If exactly one item was
         // staged and it parses as a Provider-export JSON, offer a two-way
@@ -67,20 +69,40 @@ class ShareReceiverActivity : ComponentActivity() {
         // i.e. a hard crash of the app the user was merely sharing into. The
         // provider-JSON prompt is an optional nicety, so a failure here must
         // degrade to the normal attachment flow rather than take the app down.
-        val providerJson = try {
-            items.singleOrNull()?.let { providerExportJsonOrNull(it) }
-        } catch (t: Throwable) {
-            AppLogger.warning(TAG, "provider-JSON detection failed: ${t.message}")
-            null
-        }
-        if (providerJson != null) {
-            // showDialog reports whether the dialog actually reached the
-            // screen; if the window manager refused it, fall through so the
-            // share is not silently dropped.
-            if (promptProviderImportOrAttach(providerJson, items)) return
-        }
+            val providerJson = withContext(Dispatchers.IO) {
+                try {
+                    items.singleOrNull()?.let { providerExportJsonOrNull(it) }
+                } catch (t: Throwable) {
+                    AppLogger.warning(TAG, "provider-JSON detection failed: ${t.message}")
+                    null
+                }
+            }
+            if (providerJson != null) {
+                // showDialog reports whether the dialog actually reached the
+                // screen; if the window manager refused it, fall through so the
+                // share is not silently dropped.
+                if (promptProviderImportOrAttach(providerJson, items)) return@launch
+            }
 
-        finishWithAttachmentFlow(items)
+            finishWithAttachmentFlow(items)
+        }
+    }
+
+    private fun extractSharedItems(source: Intent?): List<PendingShare.Item> {
+        val items = mutableListOf<PendingShare.Item>()
+        val budget = ShareCopyBudget(MAX_BATCH_BYTES)
+        val intent = source ?: return items
+        try {
+            when (intent.action) {
+                Intent.ACTION_SEND -> handleSingleSend(intent, items, budget)
+                Intent.ACTION_SEND_MULTIPLE -> handleMultipleSend(intent, items, budget)
+                Intent.ACTION_VIEW -> handleView(intent, items, budget)
+                else -> AppLogger.warning(TAG, "unhandled action: ${intent.action}")
+            }
+        } catch (e: Throwable) {
+            AppLogger.error(TAG, "extraction failed: ${e.message}")
+        }
+        return items
     }
 
     /**
@@ -219,7 +241,7 @@ class ShareReceiverActivity : ComponentActivity() {
         android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    private fun handleSingleSend(intent: Intent, out: MutableList<PendingShare.Item>) {
+    private fun handleSingleSend(intent: Intent, out: MutableList<PendingShare.Item>, budget: ShareCopyBudget) {
         val type = intent.type ?: ""
         when {
             type == "text/plain" -> {
@@ -236,18 +258,18 @@ class ShareReceiverActivity : ComponentActivity() {
             }
             else -> {
                 val uri = getParcelableExtra<Uri>(intent, Intent.EXTRA_STREAM) ?: return
-                copyUriToStaging(uri, type)?.let {
+                copyUriToStaging(uri, type, budget)?.let {
                     out += PendingShare.Item(PendingShare.Item.Kind.ATTACHMENT, it)
                 }
             }
         }
     }
 
-    private fun handleMultipleSend(intent: Intent, out: MutableList<PendingShare.Item>) {
+    private fun handleMultipleSend(intent: Intent, out: MutableList<PendingShare.Item>, budget: ShareCopyBudget) {
         val type = intent.type ?: ""
         val uris = getParcelableArrayListExtra<Uri>(intent, Intent.EXTRA_STREAM) ?: return
         for (uri in uris) {
-            copyUriToStaging(uri, type)?.let {
+            copyUriToStaging(uri, type, budget)?.let {
                 out += PendingShare.Item(PendingShare.Item.Kind.ATTACHMENT, it)
             }
         }
@@ -259,7 +281,7 @@ class ShareReceiverActivity : ComponentActivity() {
      * caller declared, but Telegram and a few file managers leave it null,
      * so we fall back to ContentResolver's resolved type before staging.
      */
-    private fun handleView(intent: Intent, out: MutableList<PendingShare.Item>) {
+    private fun handleView(intent: Intent, out: MutableList<PendingShare.Item>, budget: ShareCopyBudget) {
         val uri = intent.data
         if (uri == null) {
             AppLogger.warning(TAG, "ACTION_VIEW with no data uri")
@@ -267,7 +289,7 @@ class ShareReceiverActivity : ComponentActivity() {
         }
         val type = intent.type ?: contentResolver.getType(uri) ?: ""
         AppLogger.info(TAG, "ACTION_VIEW uri=$uri type=$type")
-        copyUriToStaging(uri, type)?.let {
+        copyUriToStaging(uri, type, budget)?.let {
             out += PendingShare.Item(PendingShare.Item.Kind.ATTACHMENT, it)
         }
     }
@@ -275,7 +297,7 @@ class ShareReceiverActivity : ComponentActivity() {
     /** Copy a ContentResolver-backed URI to the staging dir. Returns
      *  the staged filename (relative to sharedFileDirectory) or null on
      *  failure. */
-    private fun copyUriToStaging(uri: Uri, mimeType: String): String? {
+    private fun copyUriToStaging(uri: Uri, mimeType: String, budget: ShareCopyBudget): String? {
         val ext = guessExtension(mimeType, uri)
         val prefix = when {
             mimeType.startsWith("image/") -> "shared-image"
@@ -284,14 +306,46 @@ class ShareReceiverActivity : ComponentActivity() {
         }
         val name = "$prefix-${shortId()}${if (ext.isNotEmpty()) ".$ext" else ""}"
         val dest = File(SharedShareStore.sharedFileDirectory(this), name)
+        val budgetBeforeCopy = budget.snapshot()
         return try {
-            contentResolver.openInputStream(uri)?.use { input ->
-                dest.outputStream().use { input.copyTo(it) }
-            }
+            val copied = contentResolver.openInputStream(uri)?.use { input ->
+                dest.outputStream().use { output -> copyBounded(input, output, budget) }
+            } ?: return null
+            if (copied <= 0L) return name
             name
         } catch (e: Exception) {
+            budget.restore(budgetBeforeCopy)
+            dest.delete()
             AppLogger.warning(TAG, "copyUriToStaging($uri): ${e.message}")
             null
+        }
+    }
+
+    private fun copyBounded(input: java.io.InputStream, output: java.io.OutputStream, budget: ShareCopyBudget): Long {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var copied = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return copied
+            copied += read
+            if (copied > MAX_ATTACHMENT_BYTES || !budget.tryConsume(read.toLong())) {
+                throw IllegalArgumentException("shared attachment exceeds the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB item or ${MAX_BATCH_BYTES / (1024 * 1024)} MiB batch limit")
+            }
+            output.write(buffer, 0, read)
+        }
+    }
+
+    private class ShareCopyBudget(private var remaining: Long) {
+        fun snapshot(): Long = remaining
+
+        fun restore(snapshot: Long) {
+            remaining = snapshot
+        }
+
+        fun tryConsume(bytes: Long): Boolean {
+            if (bytes > remaining) return false
+            remaining -= bytes
+            return true
         }
     }
 

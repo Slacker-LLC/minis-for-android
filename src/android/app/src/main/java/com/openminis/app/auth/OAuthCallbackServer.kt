@@ -3,12 +3,16 @@ package com.openminis.app.auth
 import android.util.Log
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
 
 class OAuthCallbackServer(
     private val port: Int,
     private val fallbackPorts: List<Int> = emptyList(),
+    private val expectedPath: String? = null,
+    private val expectedState: String? = null,
     private val onCode: (code: String, state: String?) -> Unit,
 ) {
     companion object {
@@ -43,7 +47,14 @@ class OAuthCallbackServer(
                 var bound = false
                 for (p in portsToTry) {
                     try {
-                        serverSocket = ServerSocket(p)
+                        // OAuth redirect URIs use localhost. Binding the
+                        // wildcard address makes an in-progress login
+                        // reachable (and abortable) by every LAN peer.
+                        serverSocket = ServerSocket().apply {
+                            reuseAddress = true
+                            soTimeout = 10_000
+                            bind(InetSocketAddress(InetAddress.getLoopbackAddress(), p))
+                        }
                         boundPort = p
                         bound = true
                         break
@@ -57,8 +68,13 @@ class OAuthCallbackServer(
                 }
                 Log.d(TAG, "Listening on port $boundPort")
                 while (running) {
-                    val socket = serverSocket?.accept() ?: break
+                    val socket = try {
+                        serverSocket?.accept() ?: break
+                    } catch (_: java.net.SocketTimeoutException) {
+                        continue
+                    }
                     try {
+                        socket.soTimeout = 10_000
                         val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
                         val requestLine = reader.readLine() ?: continue
                         Log.d(TAG, "Request: $requestLine")
@@ -108,6 +124,17 @@ class OAuthCallbackServer(
 
                             val code = params["code"]
                             val state = params["state"]
+
+                            if (expectedPath != null && uri.path != expectedPath) {
+                                socket.close()
+                                continue
+                            }
+                            if (expectedState != null && state != expectedState) {
+                                val response = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n"
+                                socket.getOutputStream().write(response.toByteArray())
+                                socket.close()
+                                continue
+                            }
 
                             // Send response
                             val html = "<html><body><h1>Authorization complete</h1><p>You can close this tab.</p><script>window.close()</script></body></html>"

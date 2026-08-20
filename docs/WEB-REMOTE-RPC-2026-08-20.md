@@ -163,6 +163,20 @@ Web「代理设置」卡片里的深度与超时输入即时生效；子代理�
 > 计划条可退出、产出路径可复制。技能/记忆/SOUL/MCP/定时任务/模型组/
 > 会话搜索/附件在手机端原本已有原生入口，两端已对齐。
 
+### 2.11 Agent 工作台（Web Remote）
+
+Web Remote 的首个工具页是「工作台」，用于把 Android 上的 Agent 状态集中为一个
+可操作的控制面，而不是只显示会话文本：
+
+- `agent.goal.get/set/setActive`：编辑并启停当前会话目标；
+- `agent.todo.get/replace`：增删待办、修改状态并同步到模型的 `todo_write` 状态；
+- `agent.plan.get/set`：在网页编辑计划，或切换计划模式；
+- `agent.jobs.list/cancel`：显示 DeepSeek Harness 风格后台任务、展开输出、停止运行中任务；
+- `settings.sandbox.get` / `debug.appInfo`：只读显示手机与权限预设摘要。
+
+工作台只调用既有白名单 RPC，所有状态仍由 App 的 `AgentStateStore`、`JobRegistry`
+和 `RemotePermissionPolicy` 持有；切回原生界面可立即看到相同结果。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：
@@ -196,6 +210,7 @@ debug.logs.  debug.crash.  debug.appInfo
 /memory-tab.js    -> remote/memory-tab.js
 /mcp-tab.js       -> remote/mcp-tab.js
 /scheduled-tab.js -> remote/scheduled-tab.js
+/workbench-tab.js -> remote/workbench-tab.js
 ```
 
 ### 2.6 版本号
@@ -222,6 +237,7 @@ debug.logs.  debug.crash.  debug.appInfo
 | `memory-tab.js` | 记忆页 + SOUL 人设编辑（新增） |
 | `mcp-tab.js` | MCP 页（新增） |
 | `scheduled-tab.js` | 定时任务页（新增） |
+| `workbench-tab.js` | Agent 工作台：目标、计划、待办、后台任务、沙箱摘要 |
 
 ### 3.2 功能
 
@@ -234,6 +250,8 @@ debug.logs.  debug.crash.  debug.appInfo
   停用、详情（env / headers 只显示键名）、删除（带确认）。
 - 定时任务：任务列表（按 `ScheduledTask.toJson()` 字段渲染，含时间、重复
   规则、目标会话、最近执行记录）、启用 / 停用、删除、立即运行（提示已触发）。
+- 工作台：目标、计划与待办直接编辑；后台任务可查看输出及停止；手机/沙箱摘要
+  只读展示。所有写操作都复用现有 Agent RPC。
 
 ### 3.3 前端安全
 

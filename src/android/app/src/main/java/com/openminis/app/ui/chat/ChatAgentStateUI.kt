@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.openminis.app.tools.AgentStateStore
+import com.openminis.app.tools.ApprovalSeam
 import com.openminis.app.tools.MessageFeedbackStore
 import com.openminis.app.tools.PendingQuestion
 import com.openminis.app.tools.QuestionAnswer
@@ -55,6 +56,7 @@ import kotlinx.coroutines.isActive
  * same primitives as the rest of the app (MinisAlertDialog-style Surface,
  * MaterialTheme typography, MinisTextButton):
  *  - [AskUserQuestionDialog]: pending `ask_user_question` card.
+ *  - [DangerousOperationApprovalDialog]: one-time approval for destructive tools.
  *  - [AgentStateBars]: goal / todo / plan / deliverables above the composer.
  *  - [MessageFeedbackRow]: 👍/👎 under assistant messages.
  */
@@ -173,6 +175,81 @@ fun AskUserQuestionDialog(sessionId: String) {
                         onClick = { submit(skip = false) },
                         enabled = q.multiple || selected.isNotEmpty() || custom.isNotBlank(),
                     ) { Text("提交") }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Native counterpart to Web Remote's `agent.approval.*` controls. A dangerous
+ * tool call is suspended by [ApprovalSeam] while this dialog polls the shared
+ * in-process request registry. Dismissal is deliberately a rejection: an
+ * unintentional back press must never execute the pending command.
+ */
+@Composable
+fun DangerousOperationApprovalDialog(sessionId: String) {
+    var request by remember { mutableStateOf<ApprovalSeam.ApprovalRequest?>(null) }
+
+    LaunchedEffect(sessionId) {
+        while (isActive) {
+            request = ApprovalSeam.pendingFor(sessionId).firstOrNull()
+            delay(350)
+        }
+    }
+
+    val pending = request ?: return
+    fun decide(allowed: Boolean) {
+        ApprovalSeam.answer(pending.id, allowed)
+        request = null
+    }
+
+    Dialog(
+        onDismissRequest = { decide(allowed = false) },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                Text(
+                    text = "需要你的批准",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Agent 想执行一项可能造成破坏的操作。请先核对以下内容：",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            text = pending.toolName,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = pending.summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    MinisTextButton(onClick = { decide(allowed = false) }) { Text("拒绝") }
+                    MinisTextButton(onClick = { decide(allowed = true) }) { Text("仅此一次允许") }
                 }
             }
         }

@@ -154,7 +154,7 @@
 
     <application
         android:name=".MinisApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
         android:preserveLegacyExternalStorage="true"

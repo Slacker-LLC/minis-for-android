@@ -6271,6 +6271,9 @@ fun ChatScreen(
     // Pending ask_user_question card (same QuestionCenter as the Web Remote)
     AskUserQuestionDialog(sessionId = sessionId)
 
+    // One-time dangerous-command approval (same ApprovalSeam as Web Remote).
+    DangerousOperationApprovalDialog(sessionId = sessionId)
+
     // URL preview sheet — shown when a markdown link is tapped
     previewUrl?.let { url ->
         com.openminis.app.ui.components.UrlPreviewSheet(

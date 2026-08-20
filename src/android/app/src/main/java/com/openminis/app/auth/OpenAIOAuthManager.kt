@@ -65,7 +65,11 @@ class OpenAIOAuthManager(context: Context, instanceId: String) : OAuthManager(co
         val accessToken = withContext(Dispatchers.IO) {
             // Step 1: Wait for callback code
             val (code, state) = suspendCancellableCoroutine<Pair<String, String?>> { cont ->
-                val server = OAuthCallbackServer(callbackPort) { receivedCode, receivedState ->
+                val server = OAuthCallbackServer(
+                    callbackPort,
+                    expectedPath = redirectPath,
+                    expectedState = expectedState,
+                ) { receivedCode, receivedState ->
                     if (cont.isActive) {
                         cont.resume(receivedCode to receivedState)
                     }
@@ -97,7 +101,7 @@ class OpenAIOAuthManager(context: Context, instanceId: String) : OAuthManager(co
                 "callback received: codeLen=${code.length} state=$state expected=$expectedState match=$stateMatches",
             )
             if (!stateMatches) {
-                AppLogger.warning(TAG, "state mismatch — proceeding anyway to mirror prior behaviour")
+                throw SecurityException("OAuth state mismatch — possible CSRF, refusing to exchange")
             }
 
             // Step 2: Exchange code for tokens (JSON body, matching iOS CodexOAuthManager)

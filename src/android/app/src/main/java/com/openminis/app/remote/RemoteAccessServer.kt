@@ -92,8 +92,8 @@ class RemoteAccessServer(
     // Per-source-IP login failure counters: one rogue peer can no longer
     // lock the whole server, and one attacker can no longer hide failures
     // behind a non-atomic increment from concurrent connections.
-    private val failedLoginsByIp = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>()
-    @Volatile private var loginLockedUntil = 0L
+    private val failedLoginsByClient = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>()
+    private val loginLockedUntilByClient = ConcurrentHashMap<String, Long>()
 
     @Synchronized
     fun start(): Boolean {
@@ -232,23 +232,30 @@ class RemoteAccessServer(
                     return
                 }
                 val now = System.currentTimeMillis()
-                if (now < loginLockedUntil) {
-                    respondJson(out, 429, JSONObject().put("error", "too many login attempts").put("retryAfterMs", loginLockedUntil - now))
+                val clientKey = loginClientKey(req)
+                val lockedUntil = loginLockedUntilByClient[clientKey]
+                if (lockedUntil != null && now < lockedUntil) {
+                    respondJson(out, 429, JSONObject().put("error", "too many login attempts").put("retryAfterMs", lockedUntil - now))
                     return
+                }
+                // Reset an expired bucket so a single typo an hour later does
+                // not immediately re-lock this client.
+                if (lockedUntil != null) {
+                    loginLockedUntilByClient.remove(clientKey, lockedUntil)
+                    failedLoginsByClient.remove(clientKey)
                 }
                 val body = JSONObject(req.body)
                 val username = body.optString("username")
                 val password = body.optString("password").toCharArray()
-                val clientIp = req.remoteAddress ?: "unknown"
                 val ok = RemoteAccessPrefs.verifyLogin(appContext, username, password)
                 if (!ok) {
-                    val counter = failedLoginsByIp.computeIfAbsent(clientIp) { java.util.concurrent.atomic.AtomicInteger() }
-                    if (counter.incrementAndGet() >= 5) loginLockedUntil = now + LOGIN_LOCK_MS
+                    val counter = failedLoginsByClient.computeIfAbsent(clientKey) { java.util.concurrent.atomic.AtomicInteger() }
+                    if (counter.incrementAndGet() >= 5) loginLockedUntilByClient[clientKey] = now + LOGIN_LOCK_MS
                     respondJson(out, 401, JSONObject().put("error", "invalid username or password"))
                     return
                 }
-                failedLoginsByIp.clear()
-                loginLockedUntil = 0L
+                failedLoginsByClient.remove(clientKey)
+                loginLockedUntilByClient.remove(clientKey)
                 // Opportunistic sweep: drop expired sessions so the map
                 // cannot grow without bound on repeated logins.
                 val expired = sessions.entries.filter { it.value <= now }.map { it.key }
@@ -293,6 +300,21 @@ class RemoteAccessServer(
         return AuthKind.COOKIE
     }
 
+    /**
+     * Direct LAN clients must be rate-limited by their socket address, not an
+     * easily forged HTTP header. Cloudflare Tunnel terminates locally, so only
+     * a loopback peer may contribute its trusted CF client-address header.
+     */
+    private fun loginClientKey(req: Request): String {
+        val peer = req.remoteAddress ?: "unknown"
+        val isLoopback = peer == "127.0.0.1" || peer == "::1"
+        return if (isLoopback) {
+            req.headers["cf-connecting-ip"]?.trim()?.takeIf { it.isNotEmpty() } ?: peer
+        } else {
+            peer
+        }
+    }
+
     private fun cookieValue(req: Request, name: String): String? =
         req.headers["cookie"]
             ?.split(';')
@@ -332,6 +354,7 @@ class RemoteAccessServer(
             "/md.js" -> "remote/md.js"
             "/marked.js" -> "remote/marked.js"
             "/purify.js" -> "remote/purify.js"
+            "/workbench-tab.js" -> "remote/workbench-tab.js"
             "/skills-tab.js" -> "remote/skills-tab.js"
             "/memory-tab.js" -> "remote/memory-tab.js"
             "/mcp-tab.js" -> "remote/mcp-tab.js"
@@ -711,10 +734,13 @@ class RemoteAccessServer(
         } catch (_: Exception) {
             return resolved
         }
-        if (!canonical.path.startsWith(expectedRoot)) {
+        val rootPrefix = expectedRoot.trimEnd(File.separatorChar) + File.separator
+        if (canonical.path != expectedRoot && !canonical.path.startsWith(rootPrefix)) {
             throw IllegalArgumentException("path escapes the session workspace")
         }
-        return resolved
+        // Continue with the canonical object: a second symlink resolution in a
+        // downstream File operation would otherwise reopen the escaped path.
+        return canonical
     }
 
     /**
@@ -744,8 +770,7 @@ class RemoteAccessServer(
 
     private fun listFiles(sessionId: String, linuxPath: String): JSONObject {
         if (linuxPath.contains("..")) throw IllegalArgumentException("'..' is not allowed")
-        val dir = PRootKernel.resolveSessionHostPath(sessionId, linuxPath, appContext)
-            ?: throw IllegalArgumentException("cannot resolve path")
+        val dir = resolveSessionFile(sessionId, linuxPath)
         if (!dir.exists() || !dir.isDirectory) throw IllegalArgumentException("not a directory: $linuxPath")
         val items = JSONArray()
         dir.listFiles()?.sortedWith(compareBy<File>({ !it.isDirectory }, { it.name.lowercase() }))?.take(1000)?.forEach { f ->

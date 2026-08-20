@@ -1,5 +1,25 @@
 # OpenMinis Pet 1.12-pet.10（Latest）
 
+## Unreleased · 1.12-pet.11-SNAPSHOT
+
+- Web Remote 新增「Agent 工作台」：网页可编辑/启停当前会话的目标、计划和待办，
+  查看后台任务输出并停止运行中任务；手机 App 与网页仍复用同一状态源。
+- Web Remote 的工具导航和卡片层级重新整理为更紧凑的三栏控制台体验。
+- 安全修复：分享附件限额与后台复制、OAuth loopback + state 校验、远程登录按客户端
+  限流、会话工作区 canonical 路径校验，以及禁用系统自动备份。
+- 手机与网页端均增加一次性危险操作审批卡片。
+
+> 本次构建产物为 debug APK，仅适合开发/自用测试；当前 release variant 使用 debug
+> keystore 签名，不能作为正式公开分发包。
+
+本次验证构建：`OpenMinis-Pet-pet.11-SNAPSHOT-arm64-debug.apk`（51,482,404 bytes）
+
+```text
+SHA-256: 04174dc0a48026e9fbb39c1f83acfb38ad47a6075a65ee4af95d6717f538325b
+```
+
+---
+
 OpenMinis 官方项目的非官方分支，只做了一点二次创作。
 Agent、PRoot 沙盒、模型接入、整个 App 骨架全部是原作者的功劳。有问题请在本仓库反馈，
 不要去打扰上游维护者。

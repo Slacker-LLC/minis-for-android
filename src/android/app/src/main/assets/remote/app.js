@@ -16,7 +16,9 @@ function toast(msg,type){const wrap=$('#toasts');if(!wrap)return;const el=docume
 function showLogin(){clearInterval(state.poll);$('#app').classList.add('hidden');$('#login').classList.remove('hidden');$('#passwordInput').value='';$('#passwordInput').focus()}
 async function showApp(){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
-  await loadSessions();startPoll();
+  await loadSessions();
+  document.querySelector('.tab[data-tab="workbench"]')?.click();
+  startPoll();
 }
 async function login(){
   $('#loginError').textContent='';
@@ -33,7 +35,7 @@ async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{
 
 async function loadSessions(){const d=await api('/api/sessions?limit=200');state.sessions=d.sessions||[];renderSessions();if(!state.sessionId&&state.sessions.length)selectSession(state.sessions[0].id)}
 function renderSessions(){const root=$('#sessions');root.innerHTML=state.sessions.map(s=>`<button class="session ${s.id===state.sessionId?'active':''}" data-id="${esc(s.id)}"><span class="${s.isRunning?'run-dot':''}"></span><span class="session-text"><div class="session-title">${esc(s.title||'新会话')}</div><div class="session-meta">${esc(s.modelName||s.modelId||'')}</div></span><span class="session-more" data-id="${esc(s.id)}" title="更多">⋯</span></button>`).join('');$$('.session').forEach(x=>x.onclick=()=>selectSession(x.dataset.id));$$('.session-more').forEach(x=>x.onclick=e=>{e.stopPropagation();const r=x.getBoundingClientRect();openSessionMenu({clientX:r.right-8,clientY:r.bottom+4,preventDefault(){},stopPropagation(){}},x.dataset.id)})}
-async function selectSession(id){clearQuestionCard();state.sessionId=id;renderSessions();$('.sidebar').classList.remove('open');const s=state.sessions.find(x=>x.id===id);$('#title').textContent=s?.title||'新会话';$('#model').textContent=s?.modelName||'';await Promise.all([loadMessages(),loadFiles()]);$('#prompt').focus()}
+async function selectSession(id){clearQuestionCard();clearApprovalCard();state.sessionId=id;renderSessions();$('.sidebar').classList.remove('open');const s=state.sessions.find(x=>x.id===id);$('#title').textContent=s?.title||'新会话';$('#model').textContent=s?.modelName||'';await Promise.all([loadMessages(),loadFiles(),document.querySelector('.tab[data-tab="workbench"]')?.classList.contains('active')?loadWorkbench():Promise.resolve()]);$('#prompt').focus()}
 function textOf(m){if(m.content)return m.content;if(Array.isArray(m.parts))return m.parts.filter(p=>p.type==='text').map(p=>p.value||p.text||'').join('');return''}
 function toolsHtml(m){
   if(!Array.isArray(m.toolCalls)||!m.toolCalls.length)return '';
@@ -155,8 +157,8 @@ function startPoll(){
       try{
         // The session list only changes on create/rename, so it does not need
         // the fast cadence the running reply does.
-        if(sessionTick++%4===0){await loadSessions();await loadAgentBars();await loadUsage()}
-        if(state.sessionId){await loadStatus();await loadMessages();if(state.running)await pollQuestions()}
+        if(sessionTick++%4===0){await loadSessions();await loadAgentBars();await loadUsage();if(document.querySelector('.tab[data-tab="workbench"]')?.classList.contains('active'))await loadWorkbench()}
+        if(state.sessionId){await loadStatus();await loadMessages();if(state.running){await pollQuestions();await pollApprovals()}}
       }catch{}
     }
     state.poll=setTimeout(tick,state.running?450:2500);
@@ -241,6 +243,40 @@ async function submitQuestion(skipped,selected,custom){
   }finally{
     clearQuestionCard();
   }
+}
+
+// ── 一次性危险操作审批（与手机端共享 ApprovalSeam） ──────────────────────
+function clearApprovalCard(){
+  const card=$('#approvalCard');
+  if(card)card.classList.add('hidden');
+  state.approval=null;
+}
+async function pollApprovals(){
+  if(!state.sessionId)return;
+  const card=$('#approvalCard');if(!card)return;
+  try{
+    const d=await rpc('agent.approval.list',{sessionId:state.sessionId});
+    const a=(d?.approvals||[])[0];
+    if(a){if(state.approval?.id!==a.id)renderApprovalCard(a)}
+    else clearApprovalCard();
+  }catch{}
+}
+function renderApprovalCard(a){
+  state.approval={id:a.id};
+  const card=$('#approvalCard');
+  card.innerHTML='<div class="question-card-inner approval-card-inner">'+
+    '<div class="question-card-head"><strong>需要批准危险操作</strong><span class="q-rec">仅本次</span></div>'+
+    '<p>Agent 想执行以下可能造成破坏的操作，请核对后决定。</p>'+
+    '<pre class="approval-summary">'+esc(a.tool||'tool')+'\n'+esc(a.summary||'')+'</pre>'+
+    '<div class="question-actions"><button class="mini danger-ghost" id="approvalDeny">拒绝</button><button class="mini" id="approvalAllow">仅此一次允许</button></div></div>';
+  card.classList.remove('hidden');
+  $('#approvalDeny').onclick=()=>answerApproval(a.id,false);
+  $('#approvalAllow').onclick=()=>answerApproval(a.id,true);
+}
+async function answerApproval(id,allowed){
+  try{await rpc('agent.approval.answer',{approvalId:id,allowed:!!allowed})}
+  catch(e){toast(e.message||'提交审批结果失败')}
+  finally{clearApprovalCard()}
 }
 
 // ── 会话全文搜索 ──────────────────────────────────────────────────────────
@@ -379,7 +415,7 @@ $('#permissionSave').onclick=async()=>{
   if(v==='danger-full-access'&&!confirm('Danger Full Access 会放开全部远程能力（当前与默认一致，未来管理员操作将不再拦截）。确定？'))return;
   try{await rpc('settings.permissionPreset.set',{preset:v});$('#settingsMessage').textContent='权限预设已保存';await loadSettings()}catch(e){$('#settingsMessage').textContent='保存失败：'+e.message}
 };
-$('#newChat').onclick=()=>{state.sessionId=null;clearQuestionCard();renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
+$('#newChat').onclick=()=>{state.sessionId=null;clearQuestionCard();clearApprovalCard();renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';if(document.querySelector('.tab[data-tab="workbench"]')?.classList.contains('active'))loadWorkbench();$('#prompt').focus()};
 $('#filePath').onkeydown=e=>{if(e.key==='Enter')loadFiles($('#filePath').value)};$('#fileUp').onclick=()=>{const p=state.filePath.replace(/\/$/,'').split('/').slice(0,-1).join('/')||'/';loadFiles(p)};$('#closeEditor').onclick=()=>$('#editor').classList.add('hidden');$('#saveFile').onclick=saveFile;$('#shellRun').onclick=runShell;
 // 各工具页的懒加载器；分页脚本（skills/memory/mcp/scheduled）加载后自行注册。
 const TAB_LOADERS={settings:loadSettings,models:loadModels};
