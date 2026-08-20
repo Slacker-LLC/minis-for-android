@@ -124,3 +124,28 @@ OpenMinis Pet 主界面。当前为轻量实现：唤起即进 App，不做系�
 
 GPL-3.0，跟随上游。移除 iSH 不改变义务——本分支是 OpenMinis 的派生作品。
 对应源码即本仓库。第三方组件许可见 `THIRD_PARTY_LICENSES.md`。
+
+
+---
+
+# 1.12-pet.11-SNAPSHOT（开发版，2026-08-21）
+
+> 未发布标记。基于 pet.10 的全部修复 + DSH 设计移植，构建产物：
+> `OpenMinis-Pet-pet.11-SNAPSHOT-arm64-debug.apk`（SHA-256 133d1699d057af0bdea1732e31095ba4d470f6015848a8728781bf57d8f1d9be）
+
+## 安全加固（审查驱动，详见 docs/DESIGN-HARDENING-2026-08-21.md）
+- 凭据 fail-closed（加密存储失败绝不落明文）；DebugServer 全连接 token；Web 白名单 deny 列表
+- canonical 路径守卫（symlink 逃逸拒绝）；per-IP 登录限流；LLM 日志脱敏；权限预设真实生效
+- AlarmReceiver 非导出；FGS 判据统一；attachments 净化；500 不泄漏内部异常
+
+## DeepSeek Harness 设计移植（详见 docs/DSH-DISSECTION-2026-08-21.md）
+- 工具调用统一超时（AgentToolDefinition.timeoutMs + TOOL_TIMEOUT）
+- LLM 统一重试（LLMRetryPolicy：指数退避 + jitter，覆盖宠物/视觉/纠错/摘要等调用点）
+- **Ralph 循环**（不可变目标 + 全新子代理轮换 + 结构化交接报告）
+- **会话检查点**（进程崩溃恢复注入 TOOL_OUTCOME_UNKNOWN，防重复执行副作用调用）
+- 作业系统（job_output/list/kill）；Token Meter + 上下文压力提示
+- 结果剪枝器 + 输出保留库 + Spill 泛化；审批 seam（危险 shell 命令执行前审批）
+
+## 注意
+- 开发版用 debug 签名与 debug 构建（含 DebugServer）；对外发布必须 assembleRelease + 正式 keystore
+- 审批 seam 的手机端弹窗未实现（Web Remote RPC 已可用）
