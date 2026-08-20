@@ -28,8 +28,14 @@ import java.net.SocketTimeoutException
  *
  * Registration is guarded by `BuildConfig.DEBUG` in MinisApp.kt so the
  * Release APK contains no trace of this command.
+ *
+ * Auth: since the 2026-08-21 hardening, DebugServer requires the
+ * per-install token from EVERY connection (loopback included). The token
+ * lives in filesDir/debug_server_token, written by DebugServer on first
+ * start; this handler reads it directly (it runs in the app process, not
+ * in the sandbox) and sends it as X-Minis-Token on every request.
  */
-class DebugOffloadHandler(@Suppress("UNUSED_PARAMETER") context: Context) : NativeOffloadHandler {
+class DebugOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
         val args = OffloadArgs(request.argv.drop(1), booleanFlags = BOOLEAN_FLAGS)
@@ -211,11 +217,22 @@ class DebugOffloadHandler(@Suppress("UNUSED_PARAMETER") context: Context) : Nati
             }
             socket.soTimeout = TIMEOUT_MS
 
+            // DebugServer requires the per-install token from every client
+            // since the 2026-08-21 hardening. The token file is written by
+            // DebugServer on first start; if it is missing the server itself
+            // has never started, which the connection error below reports.
+            val serverToken = runCatching {
+                java.io.File(context.filesDir, "debug_server_token").readText().trim()
+            }.getOrNull().orEmpty()
+
             val out: OutputStream = socket.getOutputStream()
             val req = buildString {
                 append("POST / HTTP/1.1\r\n")
                 append("Host: 127.0.0.1:$DEBUG_SERVER_PORT\r\n")
                 append("Content-Type: application/json\r\n")
+                if (serverToken.isNotEmpty()) {
+                    append("X-Minis-Token: $serverToken\r\n")
+                }
                 append("Content-Length: ${bodyBytes.size}\r\n")
                 append("Connection: close\r\n")
                 append("\r\n")

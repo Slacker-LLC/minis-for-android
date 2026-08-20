@@ -290,7 +290,9 @@ class DebugRPCHandler(private val context: Context) {
     // ── Screenshot ──────────────────────────────────────────────────────────
 
     private suspend fun handleScreenshot(params: JSONObject): JSONObject {
-        val scale = params.optDouble("scale", 1.0).toFloat()
+        // Clamp like handleScreenshotCapture: an unbounded scale would let a
+        // client request a TB-sized bitmap and OOM the process.
+        val scale = params.optDouble("scale", 1.0).toFloat().coerceIn(0.05f, 1.0f)
 
         val activity = currentActivity?.get()
             ?: throw RPCException(-32000, "No active Activity for screenshot")
@@ -320,9 +322,19 @@ class DebugRPCHandler(private val context: Context) {
                 val width = (rootView.width * scale).toInt().coerceAtLeast(1)
                 val height = (rootView.height * scale).toInt().coerceAtLeast(1)
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                // Timeout guard: PixelCopy's callback is not guaranteed to
+                // arrive (window destroyed etc.), which would otherwise leave
+                // the calling coroutine suspended forever.
+                val timeoutRunnable = Runnable {
+                    if (cont.isActive) {
+                        cont.resume(canvasCapture(rootView, scale))
+                    }
+                }
+                Handler(Looper.getMainLooper()).postDelayed(timeoutRunnable, 5_000L)
                 android.view.PixelCopy.request(
                     activity.window, bitmap,
                     { result ->
+                        Handler(Looper.getMainLooper()).removeCallbacks(timeoutRunnable)
                         if (result == android.view.PixelCopy.SUCCESS) {
                             cont.resume(bitmap)
                         } else {
@@ -440,12 +452,21 @@ class DebugRPCHandler(private val context: Context) {
         if (!hostFile.exists()) throw RPCException(-32602, "File not found: $path")
 
         val fileSize = hostFile.length()
-        val offset = params.optLong("offset", 0)
-        val limit = params.optInt("limit", 524_288)
+        val offset = params.optLong("offset", 0).coerceAtLeast(0)
+        val limit = params.optInt("limit", 524_288).coerceIn(0, 16 * 1024 * 1024)
         val forceBase64 = params.optBoolean("base64", false)
 
         val bytes = hostFile.inputStream().use { stream ->
-            if (offset > 0) stream.skip(offset)
+            if (offset > 0) {
+                // InputStream.skip is not guaranteed to skip the full amount;
+                // loop until the requested offset is reached.
+                var remaining = offset
+                while (remaining > 0) {
+                    val skipped = stream.skip(remaining)
+                    if (skipped <= 0) break
+                    remaining -= skipped
+                }
+            }
             stream.readNBytes(limit)
         }
 
@@ -495,8 +516,8 @@ class DebugRPCHandler(private val context: Context) {
         val content = AppLogger.readLog(name)
             ?: throw RPCException(-32602, "Log file not found: $name")
 
-        val offset = params.optInt("offset", 0)
-        val limit = params.optInt("limit", 524_288)
+        val offset = params.optInt("offset", 0).coerceAtLeast(0)
+        val limit = params.optInt("limit", 524_288).coerceIn(0, 16 * 1024 * 1024)
         val sliced = content.substring(
             offset.coerceAtMost(content.length),
             (offset + limit).coerceAtMost(content.length),

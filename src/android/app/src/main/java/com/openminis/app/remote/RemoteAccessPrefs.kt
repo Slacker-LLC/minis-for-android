@@ -129,7 +129,15 @@ object RemoteAccessPrefs {
         }
     }
 
-    /** Emergency/CLI bearer credential. The browser uses a session cookie. */
+    /**
+     * Emergency/CLI bearer credential. The browser uses a session cookie.
+     *
+     * Synchronized so concurrent callers (service start + CLI + settings UI)
+     * cannot race the one-time migration: two threads generating different
+     * tokens would overwrite each other and leave one caller with a token
+     * that no longer authenticates.
+     */
+    @Synchronized
     fun token(context: Context): String {
         val secret = secrets(context)
         val existing = secret.getString(SECRET_API_TOKEN, null)?.trim().orEmpty()

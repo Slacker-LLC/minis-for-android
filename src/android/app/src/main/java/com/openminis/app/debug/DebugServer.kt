@@ -2,9 +2,11 @@ package com.openminis.app.debug
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
@@ -14,7 +16,7 @@ import java.net.ServerSocket
 import java.net.Socket
 
 /**
- * Debug-only JSON-RPC 2.0 server on port 8321.
+ * Debug-only JSON-RPC 2.0 server on port 5321.
  * Listens on all interfaces (0.0.0.0) so it's reachable from the local network for debugging.
  * Mirrors the iOS DebugServer for parity with the debug-server CLI skill.
  *
@@ -29,20 +31,14 @@ class DebugServer(
 
         /**
          * [T-android-debugserver-auth] Remote-connection auth decision, kept
-         * pure for unit testing. Loopback connections (adb forward — the
-         * developer's own machine over USB) stay token-free so the local
-         * tooling keeps working unchanged; any NON-loopback (LAN) connection
-         * must present the device token. Rationale: Android debug builds are
-         * never distributed (release channel ships assembleRelease without
-         * this server), but the dev workflow leaves the device reachable on
-         * the LAN for remote-worker e2e — an unauthenticated 0.0.0.0 RPC
-         * surface there can read logs/files and burn API quota. The iOS
-         * protocol-v1 encrypted envelope (358e3ded) is deliberately NOT
-         * ported: with no distribution surface the token gate is the
-         * proportionate hardening (evaluated in the A8 batch report).
+         * pure for unit testing. EVERY connection must present the device
+         * token. Loopback is not exempt: on Android any local process or web
+         * page can reach 127.0.0.1, and this RPC surface can read files,
+         * export API keys, run shell commands and drive the UI — a loopback
+         * exemption would be an unauthenticated backdoor on the device.
+         * The developer workflow reads the token via adb run-as instead.
          */
         fun isAuthorized(isLoopback: Boolean, providedToken: String?, expectedToken: String): Boolean {
-            if (isLoopback) return true
             if (expectedToken.isEmpty()) return false
             val provided = providedToken ?: return false
             if (provided.length != expectedToken.length) return false
@@ -53,19 +49,31 @@ class DebugServer(
             }
             return diff == 0
         }
+
+        private const val MAX_BODY_BYTES = 4 * 1024 * 1024
+        private const val MAX_HEADER_LINE_BYTES = 16 * 1024
     }
 
     private var serverSocket: ServerSocket? = null
     private var acceptJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val connectionJobs = java.util.concurrent.ConcurrentHashMap.newKeySet<Job>()
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO +
+            CoroutineExceptionHandler { _, t ->
+                Log.e(TAG, "uncaught coroutine exception: ${t.message}", t)
+            },
+    )
     private val rpcHandler = DebugRPCHandler(context)
 
+
     /**
-     * [T-android-debugserver-auth] Per-install token required from
-     * non-loopback clients. Generated once, persisted in filesDir so the
-     * developer can read it with:
-     *   adb shell run-as com.openminis.app cat files/debug_server_token
-     * Also logged at startup (logcat is adb-only — not readable remotely).
+     * [T-android-debugserver-auth] Per-install token required from ALL
+     * clients (loopback included). Generated once, persisted in filesDir so
+     * the developer can read it with:
+     *   adb shell run-as <applicationId> cat files/debug_server_token
+     * The token value is intentionally never logged: logcat is readable by
+     * more than adb on many devices, and leaking it would void the only
+     * barrier protecting the RPC surface.
      */
     private val authToken: String by lazy {
         val f = java.io.File(context.filesDir, "debug_server_token")
@@ -87,8 +95,9 @@ class DebugServer(
     @Volatile
     private var stopped = false
 
+    @Synchronized
     fun start() {
-        if (serverSocket != null) return
+        if (acceptJob != null) return
         stopped = false
 
         acceptJob = scope.launch {
@@ -97,12 +106,24 @@ class DebugServer(
                 val ss = ServerSocket(port, 10)
                 serverSocket = ss
                 Log.i(TAG, "Debug server listening on port $port (all interfaces)")
-                Log.i(TAG, "Remote (non-loopback) clients must send X-Minis-Token: $authToken")
+                Log.i(TAG, "All clients must send X-Minis-Token (see files/debug_server_token)")
 
                 while (!stopped) {
                     try {
                         val client = ss.accept()
-                        launch { handleConnection(client) }
+                        var job: Job? = null
+                        job = scope.launch {
+                            try {
+                                handleConnection(client)
+                            } catch (t: Throwable) {
+                                // Never let one broken connection take the
+                                // whole process down (OOM aside).
+                                Log.w(TAG, "connection handler crashed: ${t.message}")
+                            } finally {
+                                job?.let(connectionJobs::remove)
+                            }
+                        }
+                        connectionJobs.add(job)
                     } catch (e: Exception) {
                         if (!stopped) Log.w(TAG, "Accept error: ${e.message}")
                     }
@@ -113,12 +134,15 @@ class DebugServer(
         }
     }
 
+    @Synchronized
     fun stop() {
         stopped = true
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
         acceptJob?.cancel()
         acceptJob = null
+        connectionJobs.forEach { it.cancel() }
+        connectionJobs.clear()
         Log.i(TAG, "Server stopped")
     }
 
@@ -129,8 +153,9 @@ class DebugServer(
                 val reader = BufferedReader(InputStreamReader(s.getInputStream()))
                 val writer = PrintWriter(s.getOutputStream(), true)
 
-                // Read HTTP request line
-                val requestLine = reader.readLine() ?: return
+                // Read HTTP request line (bounded — an unbounded readLine
+                // would let a peer allocate unbounded memory).
+                val requestLine = readBoundedLine(reader) ?: return
                 val parts = requestLine.split(" ", limit = 3)
                 if (parts.size < 2) {
                     sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Parse error"))
@@ -151,9 +176,15 @@ class DebugServer(
                 var contentLength = 0
                 var providedToken: String? = null
                 var accept = ""
+                var headerCount = 0
                 while (true) {
-                    val headerLine = reader.readLine() ?: break
+                    val headerLine = readBoundedLine(reader) ?: break
                     if (headerLine.isEmpty()) break
+                    headerCount++
+                    if (headerCount > 100) {
+                        sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Too many headers"))
+                        return
+                    }
                     val lower = headerLine.lowercase()
                     if (lower.startsWith("content-length:")) {
                         contentLength = headerLine.substringAfter(":").trim().toIntOrNull() ?: 0
@@ -175,14 +206,20 @@ class DebugServer(
                 }
 
                 // [T-android-debugserver-auth] Gate BEFORE any RPC dispatch:
-                // loopback (adb forward) is exempt; LAN clients need the token.
+                // every connection — loopback included — needs the token.
                 val isLoopback = s.inetAddress?.isLoopbackAddress == true
                 if (!isAuthorized(isLoopback, providedToken, authToken)) {
-                    Log.w(TAG, "401 unauthorized ${if (isLoopback) "loopback" else s.inetAddress?.hostAddress ?: "?"} (missing/wrong token)")
-                    sendResponse(writer, 401, rpcHandler.errorJSON(-32000, "Unauthorized — send X-Minis-Token (see `adb shell run-as com.openminis.app cat files/debug_server_token`)"))
+                    val peer = if (isLoopback) "loopback" else s.inetAddress?.hostAddress ?: "?"
+                    Log.w(TAG, "401 unauthorized $peer (missing/wrong token)")
+                    sendResponse(
+                        writer, 401,
+                        rpcHandler.errorJSON(
+                            -32000,
+                            "Unauthorized — send X-Minis-Token (see `adb shell run-as <applicationId> cat files/debug_server_token`)"
+                        ),
+                    )
                     return
                 }
-
                 // [T-android-debugserver-skill] Self-serve bootstrap routes,
                 // mirroring iOS: a client that only has curl can pull the manual
                 // and a working reference client straight off the device.
@@ -232,6 +269,10 @@ class DebugServer(
                     sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Empty body"))
                     return
                 }
+                if (contentLength > MAX_BODY_BYTES) {
+                    sendResponse(writer, 413, rpcHandler.errorJSON(-32700, "Request body too large"))
+                    return
+                }
 
                 // Read body
                 val body = CharArray(contentLength)
@@ -264,7 +305,10 @@ class DebugServer(
         } catch (_: Exception) {
             "?"
         }
-        return """{"app":"MinisApp","platform":"android","version":"$version",""" +
+        // Escape for JSON: a versionName containing a quote would otherwise
+        // break the schema document.
+        val escaped = version.replace("\\", "\\\\").replace("\"", "\\\"")
+        return """{"app":"MinisApp","platform":"android","version":"$escaped",""" +
             """"rpc":"jsonrpc-2.0","auth":"token-lan","transport":"plaintext",""" +
             """"rpc_path":"/","skill_path":"/skill"}"""
     }
@@ -334,22 +378,36 @@ class DebugServer(
         writer.print("Content-Type: $contentType\r\n")
         writer.print("Content-Length: ${bytes.size}\r\n")
         writer.print("Connection: close\r\n")
-        writer.print("Access-Control-Allow-Origin: *\r\n")
-        writer.print("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n")
-        writer.print("Access-Control-Allow-Headers: Content-Type, X-Minis-Token, Authorization\r\n")
         writer.print("\r\n")
         writer.print(body)
         writer.flush()
     }
 
     private fun sendCorsPreflightResponse(writer: PrintWriter) {
+        // Preflight answers 204 WITHOUT any Access-Control-Allow-* headers,
+        // so browsers refuse the cross-origin call outright.
         writer.print("HTTP/1.1 204 No Content\r\n")
-        writer.print("Access-Control-Allow-Origin: *\r\n")
-        writer.print("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n")
-        writer.print("Access-Control-Allow-Headers: Content-Type, X-Minis-Token, Authorization\r\n")
-        writer.print("Access-Control-Max-Age: 86400\r\n")
         writer.print("Connection: close\r\n")
         writer.print("\r\n")
         writer.flush()
+    }
+
+    /**
+     * Read one line with a hard byte cap. BufferedReader.readLine() has no
+     * limit, so a peer that never sends a newline could grow memory without
+     * bound; this keeps both the request line and every header line bounded.
+     */
+    private fun readBoundedLine(reader: BufferedReader): String? {
+        val sb = StringBuilder(256)
+        while (true) {
+            val ch = reader.read()
+            if (ch < 0) return if (sb.isEmpty()) null else sb.toString()
+            if (ch == '\n'.code) {
+                val len = sb.length
+                return if (len > 0 && sb[len - 1] == '\r') sb.deleteCharAt(len - 1).toString() else sb.toString()
+            }
+            sb.append(ch.toChar())
+            if (sb.length > MAX_HEADER_LINE_BYTES) throw IllegalArgumentException("header line too long")
+        }
     }
 }

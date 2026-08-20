@@ -146,3 +146,6 @@ deps/lame-3.100/**/.deps/
 # 本地目录里放了它们的内容以便直接构建，但仓库中不提交，
 # 由 `git clone --recursive` 或 `git submodule update --init` 取得。
 deps/proot/
+
+# Local build customization with real credential values (mirror ships only .example)
+src/android/app/provider-customization.properties

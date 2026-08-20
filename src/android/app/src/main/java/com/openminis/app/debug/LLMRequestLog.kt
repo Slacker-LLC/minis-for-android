@@ -38,6 +38,18 @@ object LLMRequestLog {
 
     private val entries = mutableListOf<Entry>()
 
+    /**
+     * Header names whose values are stripped before logging. The raw request
+     * headers contain the caller's credentials (Authorization: Bearer <key>,
+     * api-key, cookie, …); debug.llmRequests hands them to any local client
+     * that can reach the debug server, so the values must never be retained.
+     * Only the names are kept so request shape stays diagnosable.
+     */
+    private val SENSITIVE_HEADERS = setOf(
+        "authorization", "x-api-key", "api-key", "cookie", "set-cookie",
+        "x-minis-token", "proxy-authorization",
+    )
+
     @Synchronized
     fun add(entry: Entry) {
         // T302: belt-and-suspenders. Release builds short-circuit the whole
@@ -48,12 +60,18 @@ object LLMRequestLog {
         // each entry truncated to MAX_BODY_CHARS so even a single retained
         // entry can't push a memory-tight device over the line.
         if (!BuildConfig.DEBUG) return
+        // Strip credential-bearing header VALUES (keep names) before
+        // anything is retained in the ring buffer or serialized out.
+        val sanitizedHeaders = entry.requestHeaders.mapValues { (name, value) ->
+            if (SENSITIVE_HEADERS.contains(name.lowercase())) "[redacted]" else value
+        }
         val safeEntry = if (entry.requestBody.length > MAX_BODY_CHARS) {
             entry.copy(
+                requestHeaders = sanitizedHeaders,
                 requestBody = entry.requestBody.take(MAX_BODY_CHARS) +
                     "\n…[truncated ${entry.requestBody.length - MAX_BODY_CHARS} chars]",
             )
-        } else entry
+        } else entry.copy(requestHeaders = sanitizedHeaders)
         entries.add(safeEntry)
         if (entries.size > MAX_ENTRIES) {
             entries.removeAt(0)
