@@ -38,6 +38,10 @@ object AgentTools {
         add(browserUseDefinition())
         add(subagentDefinition())
         add(askUserQuestionDefinition())
+        add(getGoalDefinition())
+        add(createGoalDefinition())
+        add(updateGoalDefinition())
+        add(todoWriteDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
@@ -193,5 +197,64 @@ object AgentTools {
         ),
         required = listOf("tool_title", "question"),
         propertyOrdering = listOf("tool_title", "question", "options", "multiple", "allowCustom", "timeoutMinutes"),
+    )
+
+    private fun getGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "get_goal",
+        description = "Return the current session goal (text and active/paused state), or state that none is set.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of this call, shown to the user."),
+        ),
+        required = listOf("tool_title"),
+        propertyOrdering = listOf("tool_title"),
+    )
+
+    private fun createGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "create_goal",
+        description = "Set a new goal for this session. Use when the user states a clear target to work toward; " +
+            "the goal stays visible in the web UI until changed or cleared.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the goal, shown to the user."),
+            "goal" to AgentToolParam("string", "The goal text, in the user's language."),
+        ),
+        required = listOf("tool_title", "goal"),
+        propertyOrdering = listOf("tool_title", "goal"),
+    )
+
+    private fun updateGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "update_goal",
+        description = "Replace the current session goal with new text. Use when the user refines the target.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the change, shown to the user."),
+            "goal" to AgentToolParam("string", "The new goal text, in the user's language."),
+        ),
+        required = listOf("tool_title", "goal"),
+        propertyOrdering = listOf("tool_title", "goal"),
+    )
+
+    private fun todoWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "todo_write",
+        description = "Replace the session's todo list in one atomic call. Send the COMPLETE list every time — " +
+            "there are no partial updates. Use for multi-step work so the user can track progress in the web UI. " +
+            "Status values: pending / in_progress / completed / skipped.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the list change, shown to the user."),
+            "todos" to AgentToolParam(
+                type = "array",
+                description = "Full todo list. Each item: {title, status?, id?}.",
+                items = AgentToolParam(
+                    type = "object",
+                    description = "One todo item.",
+                    properties = mapOf(
+                        "title" to AgentToolParam("string", "Task description."),
+                        "status" to AgentToolParam("string", "pending / in_progress / completed / skipped."),
+                        "id" to AgentToolParam("string", "Stable item id (keep existing ids when updating)."),
+                    ),
+                    requiredProperties = listOf("title"),
+                ),
+            ),
+        ),
+        required = listOf("tool_title", "todos"),
+        propertyOrdering = listOf("tool_title", "todos"),
     )
 }

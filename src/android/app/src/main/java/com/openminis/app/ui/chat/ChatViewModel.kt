@@ -56,9 +56,11 @@ import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.FileEditTool
 import com.openminis.app.tools.FileReadTool
 import com.openminis.app.tools.FileWriteTool
+import com.openminis.app.tools.GoalTools
 import com.openminis.app.tools.MemoryTools
 import com.openminis.app.tools.ReadImageTool
 import com.openminis.app.tools.SubagentTool
+import com.openminis.app.tools.TodoTool
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.internal.ShellOutputTruncator
 import com.openminis.app.offload.OffloadPermissionManager
@@ -8161,7 +8163,7 @@ class ChatViewModel(
         // bridge, which is now where checkPermission runs.
         val toolTitle = try { JSONObject(argsJson).optString("tool_title", name) } catch (_: Exception) { name }
 
-        return when (name) {
+        val result = when (name) {
             FileReadTool.NAME -> {
                 val result = FileReadTool.execute(argsJson, activeSessionId, context)
                 // Record skill usage when SKILL.md under /var/minis/skills/<id>/ is read.
@@ -8178,10 +8180,16 @@ class ChatViewModel(
                 result
             }
             FileWriteTool.NAME -> FileWriteTool.execute(argsJson, activeSessionId, context).also {
-                if (it.success) maybeReloadSkillsForPath(argsJson)
+                if (it.success) {
+                    maybeReloadSkillsForPath(argsJson)
+                    recordDeliverable(argsJson, "write")
+                }
             }
             FileEditTool.NAME -> FileEditTool.execute(argsJson, activeSessionId, context).also {
-                if (it.success) maybeReloadSkillsForPath(argsJson)
+                if (it.success) {
+                    maybeReloadSkillsForPath(argsJson)
+                    recordDeliverable(argsJson, "edit")
+                }
             }
             // T178: pass sessionId + context so read_image routes through
             // resolveSessionHostPath like file_read/write/edit do — without
@@ -8195,7 +8203,53 @@ class ChatViewModel(
             "memory_get" -> executeMemoryGetTool(argsJson)
             SubagentTool.NAME -> SubagentTool.execute(argsJson, activeSessionId, context)
             AskUserQuestionTool.NAME -> AskUserQuestionTool.execute(argsJson, activeSessionId, context)
+            "get_goal", "create_goal", "update_goal" ->
+                GoalTools.execute(name, argsJson, activeSessionId, context)
+            TodoTool.NAME -> TodoTool.execute(argsJson, activeSessionId, context)
             else -> ToolExecutionResult("Unknown tool: $name", false)
+        }
+        return applyRepeatGuard(name, argsJson, result)
+    }
+
+    // ── Repeat-tool reminder (DeepSeek Harness repeat-tool-guard) ──────────
+    private var lastToolKey: String? = null
+    private var lastToolCount = 0
+
+    private fun applyRepeatGuard(
+        name: String,
+        argsJson: String,
+        result: ToolExecutionResult,
+    ): ToolExecutionResult {
+        // Ignore tools that are allowed to repeat (reads, questions, waits).
+        if (name == FileReadTool.NAME || name == "memory_get" ||
+            name == AskUserQuestionTool.NAME || name == "get_goal"
+        ) {
+            lastToolKey = null
+            lastToolCount = 0
+            return result
+        }
+        val key = name + "|" + argsJson.trim()
+        if (key == lastToolKey) {
+            lastToolCount++
+        } else {
+            lastToolKey = key
+            lastToolCount = 1
+        }
+        if (lastToolCount < 4) return result
+        val hint = when (lastToolCount) {
+            4 -> "[reminder] You have called $name with the exact same arguments ${lastToolCount} times in a row. " +
+                "Stop and re-read the previous result before trying again — switch approach or finish the task."
+            else -> "[reminder] Still repeating $name with identical arguments (${lastToolCount} times). " +
+                "Do NOT keep retrying the same call. Change strategy or conclude the task."
+        }
+        return result.copy(output = hint + "\n\n" + result.output)
+    }
+
+    private fun recordDeliverable(argsJson: String, action: String) {
+        val sid = activeSessionId ?: return
+        runCatching {
+            val path = JSONObject(argsJson).optString("path", "")
+            com.openminis.app.tools.AgentStateStore.recordDeliverable(sid, path, action)
         }
     }
 

@@ -1,5 +1,5 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const state={sessionId:null,sessions:[],poll:null,running:false,filePath:'/var/minis/workspace',editorRevision:null,settingsLoaded:false};
+const state={sessionId:null,sessions:[],poll:null,running:false,filePath:'/var/minis/workspace',editorRevision:null,settingsLoaded:false,attachFiles:[]};
 
 async function api(path,opt={}){
   const h={...(opt.headers||{})};
@@ -52,6 +52,10 @@ function messageEl(m){
   el.dataset.id=m.id||('tmp-'+Math.random());
   el.innerHTML='<div class="role">'+(m.role==='user'?'你':'Minis')+'</div><div class="bubble"></div>';
   el.querySelector('.bubble').innerHTML=bubbleHtml(m);
+  if(m.role==='assistant'&&m.id){
+    el.querySelector('.bubble').insertAdjacentHTML('beforeend',
+      '<div class="feedback-bar" data-fb="'+esc(m.id)+'"><button class="fb-up" title="有用">👍</button><button class="fb-down" title="不满意">👎</button></div>');
+  }
   el.dataset.sig=signatureOf(m);
   return el;
 }
@@ -92,7 +96,7 @@ async function loadMessages(){
   if(atBottom)root.scrollTop=root.scrollHeight;
 }
 async function loadStatus(){if(!state.sessionId)return;try{const s=await api('/api/session/status?sessionId='+encodeURIComponent(state.sessionId));state.running=!!s.isRunning;$('#runState').textContent=s.isRunning?'生成中':'空闲';$('#runState').classList.toggle('running',!!s.isRunning);$('#cancelBtn').disabled=!s.isRunning}catch{}}
-async function send(){if(!$('#questionCard').classList.contains('hidden'))return;const text=$('#prompt').value.trim();if(!text)return;$('#sendBtn').disabled=true;try{const body={prompt:text,wait:false};if(state.sessionId)body.sessionId=state.sessionId;const d=await api('/api/prompt',{method:'POST',body:JSON.stringify(body)});$('#prompt').value='';autoGrow();if(!state.sessionId)state.sessionId=d.sessionId;await loadSessions();await loadMessages();await loadStatus()}catch(e){alert(e.message)}finally{$('#sendBtn').disabled=false}}
+async function send(){if(!$('#questionCard').classList.contains('hidden'))return;const text=$('#prompt').value.trim();if(!text)return;$('#sendBtn').disabled=true;try{const body={prompt:text,wait:false};if(state.sessionId)body.sessionId=state.sessionId;const attach=state.attachFiles||[];if(attach.length){const attachments=[];for(const f of attach){try{attachments.push(await fileToAttachment(f))}catch{}}if(attachments.length)body.attachments=attachments;}const d=await api('/api/prompt',{method:'POST',body:JSON.stringify(body)});$('#prompt').value='';autoGrow();state.attachFiles=[];renderAttachChips();if(!state.sessionId)state.sessionId=d.sessionId;await loadSessions();await loadMessages();await loadStatus()}catch(e){alert(e.message)}finally{$('#sendBtn').disabled=false}}
 async function cancel(){if(!state.sessionId)return;await api('/api/cancel',{method:'POST',body:JSON.stringify({sessionId:state.sessionId})});await loadStatus()}
 
 async function loadFiles(path=state.filePath){if(!state.sessionId)return;state.filePath=path;$('#filePath').value=path;try{const d=await api('/api/files?sessionId='+encodeURIComponent(state.sessionId)+'&path='+encodeURIComponent(path));$('#fileList').innerHTML=(d.items||[]).map(f=>`<div class="file-row" data-path="${esc(f.path)}" data-dir="${f.directory}"><span class="file-icon">${f.directory?'▸':'·'}</span><span class="file-name">${esc(f.name)}</span><span class="file-size">${f.directory?'':size(f.size)}</span></div>`).join('');$$('.file-row').forEach(x=>x.onclick=()=>x.dataset.dir==='true'?loadFiles(x.dataset.path):openFile(x.dataset.path))}catch(e){
@@ -116,6 +120,7 @@ async function loadSettings(){
   $('#settingsTunnelEnabled').checked=!!d.cloudflareTunnelEnabled;$('#settingsHostname').value=d.cloudflareHostname||'';
   $('#settingsTunnelToken').placeholder=d.cloudflareTunnelTokenConfigured?'已安全保存；留空保持不变':'粘贴 Tunnel Token';renderTunnelStatus(d.tunnel);
   $('#settingsCurrentPassword').value='';$('#settingsNewPassword').value='';$('#restartRemote').classList.add('hidden');
+  try{const p=await rpc('settings.permissionPreset.get');if($('#permissionPreset'))$('#permissionPreset').value=p.preset||'workspace-write';if($('#permissionNote'))$('#permissionNote').textContent=p.danger?'danger-full-access：全部能力（当前无额外管理员操作）。':'workspace-write：沙箱化 shell + 工作区文件读写 + RPC。'}catch{}
 }
 async function saveSettings(){
   const b={
@@ -147,7 +152,7 @@ function startPoll(){
       try{
         // The session list only changes on create/rename, so it does not need
         // the fast cadence the running reply does.
-        if(sessionTick++%4===0)await loadSessions();
+        if(sessionTick++%4===0){await loadSessions();await loadAgentBars()}
         if(state.sessionId){await loadStatus();await loadMessages();if(state.running)await pollQuestions()}
       }catch{}
     }
@@ -282,9 +287,94 @@ function clearSearchResults(){
   if(input)input.value='';
 }
 
+// ── 附件（沿用 chat.prompt 的 attachments 契约） ─────────────────────────
+function fileToAttachment(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve({name:file.name,data:String(r.result).split(',')[1]||'',mime:file.type||'application/octet-stream'});
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+function renderAttachChips(){
+  const wrap=$('#attachChips');if(!wrap)return;
+  const files=state.attachFiles||[];
+  if(!files.length){wrap.classList.add('hidden');wrap.innerHTML='';return}
+  wrap.classList.remove('hidden');
+  wrap.innerHTML=files.map((f,i)=>'<span class="attach-chip">'+esc(f.name)+' <button data-i="'+i+'" title="移除">×</button></span>').join('');
+  wrap.querySelectorAll('button').forEach(b=>b.onclick=()=>{state.attachFiles.splice(+b.dataset.i,1);renderAttachChips()});
+}
+
+// ── 目标 / 待办 / 计划 / 产出文件条（DeepSeek Harness 风格） ──────────────
+async function loadAgentBars(){
+  if(!state.sessionId)return;
+  try{
+    const [g,t,p,d]=await Promise.all([
+      rpc('agent.goal.get',{sessionId:state.sessionId}),
+      rpc('agent.todo.get',{sessionId:state.sessionId}),
+      rpc('agent.plan.get',{sessionId:state.sessionId}),
+      rpc('agent.deliverables.list',{sessionId:state.sessionId}),
+    ]);
+    renderGoalBar(g||{});renderTodoBar(t||{});renderPlanBanner(p||{});renderDeliverablesBar(d||{});
+  }catch{}
+}
+
+function renderGoalBar(g){
+  const bar=$('#goalBar');if(!bar)return;
+  if(!g.text){bar.classList.add('hidden');return}
+  bar.classList.remove('hidden');
+  bar.innerHTML='<span class="agent-bar-icon">🎯</span><span class="agent-bar-text">'+esc(g.text)+'</span>'+
+    '<button class="mini" id="goalToggle">'+(g.active?'暂停':'恢复')+'</button>'+
+    '<button class="mini danger-ghost" id="goalClear">清除</button>';
+  $('#goalToggle').onclick=async()=>{try{await rpc('agent.goal.setActive',{sessionId:state.sessionId,active:!g.active});await loadAgentBars()}catch(e){alert(e.message)}};
+  $('#goalClear').onclick=async()=>{try{await rpc('agent.goal.set',{sessionId:state.sessionId,text:''});await loadAgentBars()}catch(e){alert(e.message)}};
+}
+
+function renderTodoBar(t){
+  const bar=$('#todoBar');if(!bar)return;
+  const items=t.items||[];
+  if(!items.length){bar.classList.add('hidden');return}
+  bar.classList.remove('hidden');
+  bar.innerHTML='<span class="agent-bar-icon">☑</span><div class="agent-bar-list">'+
+    items.slice(0,5).map(x=>'<span class="todo-item '+(x.status==='completed'?'done':(x.status==='in_progress'?'doing':''))+'">'+esc(x.title)+'</span>').join('')+
+    (items.length>5?'<span class="todo-more">+'+ (items.length-5) +'</span>':'')+'</div>';
+}
+
+function renderPlanBanner(p){
+  const bar=$('#planBanner');if(!bar)return;
+  if(p.mode!=='plan'){bar.classList.add('hidden');return}
+  bar.classList.remove('hidden');
+  bar.innerHTML='<span class="plan-tag">Plan</span><span class="agent-bar-text">'+esc(p.plan||'先计划，再执行。')+'</span>'+
+    '<button class="mini" id="planExit">退出计划</button>';
+  $('#planExit').onclick=async()=>{try{await rpc('agent.plan.set',{sessionId:state.sessionId,mode:'off'});$('#prompt').placeholder='给 Minis 发消息…';await loadAgentBars()}catch(e){alert(e.message)}};
+  $('#prompt').placeholder='描述你的任务以生成计划…';
+}
+
+function renderDeliverablesBar(d){
+  const bar=$('#deliverablesBar');if(!bar)return;
+  const files=d.files||[];
+  if(!files.length){bar.classList.add('hidden');return}
+  bar.classList.remove('hidden');
+  bar.innerHTML='<span class="agent-bar-icon">📄</span><span class="agent-bar-text">本轮产出：</span>'+
+    files.slice(0,5).map(f=>'<button class="mini deliverable-link" data-path="'+esc(f.path)+'">'+esc(f.path.split('/').pop())+'</button>').join('')+
+    (files.length>5?'<span class="todo-more">+'+ (files.length-5) +'</span>':'');
+  bar.querySelectorAll('.deliverable-link').forEach(b=>b.onclick=()=>{
+    const path=b.dataset.path;
+    document.querySelector('.tab[data-tab="files"]')?.click();
+    openFile(path);
+  });
+}
+
 $('#connectBtn').onclick=login;$('#passwordInput').onkeydown=e=>{if(e.key==='Enter')login()};$('#logoutBtn').onclick=logout;
 $('#sendBtn').onclick=send;$('#prompt').oninput=autoGrow;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};$('#cancelBtn').onclick=cancel;
 $('#searchGo').onclick=doSearch;$('#searchQuery').onkeydown=e=>{if(e.key==='Enter')doSearch()};
+$('#attachBtn').onclick=()=>$('#attachInput').click();
+$('#attachInput').onchange=()=>{state.attachFiles=Array.from($('#attachInput').files||[]);renderAttachChips();$('#attachInput').value=''};
+$('#permissionSave').onclick=async()=>{
+  const v=$('#permissionPreset').value;
+  if(v==='danger-full-access'&&!confirm('Danger Full Access 会放开全部远程能力（当前与默认一致，未来管理员操作将不再拦截）。确定？'))return;
+  try{await rpc('settings.permissionPreset.set',{preset:v});$('#settingsMessage').textContent='权限预设已保存';await loadSettings()}catch(e){$('#settingsMessage').textContent='保存失败：'+e.message}
+};
 $('#newChat').onclick=()=>{state.sessionId=null;clearQuestionCard();renderSessions();$('#title').textContent='新会话';$('#model').textContent='';$('#messages').innerHTML='<div class="empty-state"><h2>新会话</h2><p>发送第一条消息后会自动创建。</p></div>';$('#prompt').focus()};
 $('#filePath').onkeydown=e=>{if(e.key==='Enter')loadFiles($('#filePath').value)};$('#fileUp').onclick=()=>{const p=state.filePath.replace(/\/$/,'').split('/').slice(0,-1).join('/')||'/';loadFiles(p)};$('#closeEditor').onclick=()=>$('#editor').classList.add('hidden');$('#saveFile').onclick=saveFile;$('#shellRun').onclick=runShell;
 // 各工具页的懒加载器；分页脚本（skills/memory/mcp/scheduled）加载后自行注册。
@@ -302,6 +392,14 @@ $('#messages').addEventListener('click',async e=>{
     ta.remove();
   }
   setTimeout(()=>{btn.textContent='复制'},1200);
+});
+$('#messages').addEventListener('click',async e=>{
+  const btn=e.target.closest('.fb-up,.fb-down');if(!btn)return;
+  const bar=btn.closest('.feedback-bar');if(!bar)return;
+  const id=bar.dataset.fb;const kind=btn.classList.contains('fb-up')?'up':'down';
+  bar.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  try{await rpc('chat.feedback.put',{messageId:id,kind})}catch{}
 });
 
 // ---------------------------------------------------------------- 模型管理

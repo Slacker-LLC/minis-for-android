@@ -737,6 +737,7 @@ class RemoteAccessServer(
         "skills.", "memory.", "soul.",
         "mcp.", "scheduled.",
         "agent.",
+        "settings.",
         "debug.logs.", "debug.crash.", "debug.appInfo"
     )
 

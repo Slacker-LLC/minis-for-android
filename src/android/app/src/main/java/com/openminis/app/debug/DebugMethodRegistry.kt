@@ -863,6 +863,35 @@ object DebugMethodRegistry {
             example = ex("query" to "DeepSeek 设计", "limit" to 20),
         ),
         MethodSpec(
+            name = "chat.feedback.put",
+            description = "Set per-message feedback (up/down) with an optional note. Replaces any previous feedback for the message.",
+            params = listOf(
+                ParamSpec("messageId", "string", required = true, description = "Message id."),
+                ParamSpec("kind", "string", required = true, description = "'up' or 'down'."),
+                ParamSpec("note", "string", required = false, description = "Optional note."),
+            ),
+            returns = "{ok:true, kind, note, at}",
+            example = ex("messageId" to "msg_1", "kind" to "down", "note" to "答案太长了"),
+        ),
+        MethodSpec(
+            name = "chat.feedback.delete",
+            description = "Remove feedback for a message.",
+            params = listOf(
+                ParamSpec("messageId", "string", required = true, description = "Message id."),
+            ),
+            returns = "{ok:true}",
+            example = ex("messageId" to "msg_1"),
+        ),
+        MethodSpec(
+            name = "chat.feedback.listForMessages",
+            description = "List feedback for the given message ids (all when omitted).",
+            params = listOf(
+                ParamSpec("messageIds", "[string]", required = false, description = "Message ids; omit for all."),
+            ),
+            returns = "{feedback:[{messageId, kind, note, at}]}",
+            example = ex("messageIds" to JSONArray().apply { put("msg_1") }),
+        ),
+        MethodSpec(
             name = "chat.session.delete",
             description = "Permanently delete a session and its messages. Cancels any in-flight run first.",
             params = listOf(
@@ -1066,6 +1095,109 @@ object DebugMethodRegistry {
             ),
             returns = "{ok:true, maxDepth, timeoutMinutes}",
             example = ex("maxDepth" to 3, "timeoutMinutes" to 10),
+        ),
+
+        // ── Agent bars: goal / todo / plan / deliverables ───────────────────
+        MethodSpec(
+            name = "agent.goal.get",
+            description = "Return the session goal (text, active, updatedAt). Empty text = no goal.",
+            params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
+            returns = "{text, active, updatedAt}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+        MethodSpec(
+            name = "agent.goal.set",
+            description = "Set (or clear with blank text) the session goal.",
+            params = listOf(
+                ParamSpec("sessionId", "string", required = true, description = "Target session id."),
+                ParamSpec("text", "string", required = true, description = "Goal text; blank clears."),
+            ),
+            returns = "{text, active, updatedAt}",
+            example = ex("sessionId" to "6D0F…", "text" to "完成 Web Remote 设置页"),
+        ),
+        MethodSpec(
+            name = "agent.goal.setActive",
+            description = "Pause (active=false) or resume (active=true) the session goal.",
+            params = listOf(
+                ParamSpec("sessionId", "string", required = true, description = "Target session id."),
+                ParamSpec("active", "bool", required = true, description = "true=resume, false=pause."),
+            ),
+            returns = "{text, active, updatedAt}",
+            example = ex("sessionId" to "6D0F…", "active" to false),
+        ),
+        MethodSpec(
+            name = "agent.todo.get",
+            description = "Return the session todo list.",
+            params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
+            returns = "{items:[{id,title,status}], updatedAt}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+        MethodSpec(
+            name = "agent.todo.replace",
+            description = "Replace the session todo list in one atomic write.",
+            params = listOf(
+                ParamSpec("sessionId", "string", required = true, description = "Target session id."),
+                ParamSpec("items", "[{id,title,status}]", required = true, description = "Full replacement list."),
+            ),
+            returns = "{items:[{id,title,status}], updatedAt}",
+            example = ex("sessionId" to "6D0F…", "items" to JSONArray()),
+        ),
+        MethodSpec(
+            name = "agent.plan.get",
+            description = "Return plan-mode state (off/plan, plan text).",
+            params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
+            returns = "{mode, plan, updatedAt}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+        MethodSpec(
+            name = "agent.plan.set",
+            description = "Turn plan mode on ('plan') or off ('off') for a session. Soft mode: changes the web banner and composer hint.",
+            params = listOf(
+                ParamSpec("sessionId", "string", required = true, description = "Target session id."),
+                ParamSpec("mode", "string", required = true, description = "'plan' or 'off'."),
+                ParamSpec("plan", "string", required = false, description = "Plan text shown in the banner."),
+            ),
+            returns = "{mode, plan, updatedAt}",
+            example = ex("sessionId" to "6D0F…", "mode" to "plan", "plan" to "1. 先看需求 2. 再实现"),
+        ),
+        MethodSpec(
+            name = "agent.deliverables.list",
+            description = "Return files the agent modified in this session (newest first).",
+            params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
+            returns = "{count, files:[{path, action, at}]}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+        MethodSpec(
+            name = "agent.deliverables.clear",
+            description = "Clear the session deliverables list.",
+            params = listOf(ParamSpec("sessionId", "string", required = true, description = "Target session id.")),
+            returns = "{ok:true}",
+            example = ex("sessionId" to "6D0F…"),
+        ),
+
+        // ── Web-remote settings: permission presets ─────────────────────────
+        MethodSpec(
+            name = "settings.permissionPreset.get",
+            description = "Return the Web Remote permission preset (workspace-write | danger-full-access).",
+            params = emptyList(),
+            returns = "{preset, label, danger}",
+            example = ex(),
+        ),
+        MethodSpec(
+            name = "settings.permissionPreset.set",
+            description = "Change the Web Remote permission preset. danger-full-access lifts admin-op gates (none exist yet).",
+            params = listOf(
+                ParamSpec("preset", "string", required = true, description = "'workspace-write' or 'danger-full-access'."),
+            ),
+            returns = "{ok:true, preset}",
+            example = ex("preset" to "workspace-write"),
+        ),
+        MethodSpec(
+            name = "settings.sandbox.get",
+            description = "Report the resolved sandbox policy — one owner, one mode, one workspace root.",
+            params = emptyList(),
+            returns = "{owner, mode, workspaceRoot}",
+            example = ex(),
         ),
     )
 

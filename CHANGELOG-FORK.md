@@ -204,8 +204,38 @@ Web Remote 之前只覆盖了模型、用量、压缩与会话管理；手机端
    Web Remote 轮询 `chat.question.pending` 渲染提问卡（单选/多选/自定义/跳过），
    `chat.question.answer` 恢复回合；超时/跳过会明确告知模型。
 3. **会话全文搜索**：新增 `chat.search`，复用 `minis-sessions-cli search`
-   同一套参数化 LIKE + Kotlin 侧文本抽取（工具元数据误命中会被过滤），
-   词项 AND、按会话分组、每个会话最多 3 条命中；Web 侧边栏提供搜索框与结果面板。
+同一套参数化 LIKE + Kotlin 侧文本抽取（工具元数据误命中会被过滤），
+词项 AND、按会话分组、每个会话最多 3 条命中；Web 侧边栏提供搜索框与结果面板。
+
+### 13. DeepSeek Harness 好功能批量移植
+
+把 DeepSeek Harness（`dsh-goal` / `dsh-tool-todo` / `dsh-plan-mode` /
+`dsh-client-ui-deliverables` / `dsh-message-feedback` / `dsh-permission-presets` /
+`dsh-repeat-tool-reminder` / `dsh-attachment`）里适合 Web Remote 的部分一次搬过来：
+
+1. **目标条**：`agent.goal.get/set/setActive` + 模型工具 `get_goal` /
+   `create_goal` / `update_goal`；Web 在输入框上方渲染 🎯 目标条，
+   可暂停/恢复/清除。
+2. **待办条**：`agent.todo.get/replace` + 模型工具 `todo_write`（整表替换）；
+   Web 渲染 ☑ 待办条（pending / in_progress / completed 状态）。
+3. **计划模式（软）**：`agent.plan.get/set`；Web 显示 Plan 横幅、
+   输入框 placeholder 切换为「描述你的任务以生成计划…」，可一键退出。
+4. **产出文件行**：文件写入/编辑成功时在 [AgentStateStore] 记录
+   `agent.deliverables.list/clear`；Web 在输入框上方显示 📄 本轮产出，
+   点击直接打开文件。
+5. **消息反馈**：`chat.feedback.put/delete/listForMessages` + JSON sidecar；
+   Web 每条 assistant 消息带 👍/👎。
+6. **权限预设**：`settings.permissionPreset.get/set` + `settings.sandbox.get`，
+   `RemotePermissionPolicy` 作为唯一策略归属（workspace-write 默认 /
+   danger-full-access，后者放开未来 admin 操作）；Web 设置页加选择卡，
+   选 Full Access 需二次确认。
+7. **重复工具提醒**：ChatViewModel 内统计连续完全相同参数的工具调用，
+   第 4 次起在结果前注入提醒，阻止模型死循环重试。
+8. **附件**：复用 `chat.prompt` 既有 `attachments` 契约，Web composer
+   加 ＋ 附件按钮，发送时转 base64 随消息提交（无需新后端）。
+
+状态均为进程内（AgentStateStore / MessageFeedbackStore），不改数据库；
+`rpc.discover` 已同步注册全部新方法。
 
 ---
 

@@ -168,6 +168,25 @@ class DebugRPCHandler(private val context: Context) {
             "chat.question.pending" -> QuestionRpcMethods.pending(context, params)
             "chat.question.answer" -> QuestionRpcMethods.answer(context, params)
             "chat.search" -> ChatSearchRpcMethods.search(context, params)
+            "chat.feedback.put" -> FeedbackRpcMethods.put(context, params)
+            "chat.feedback.delete" -> FeedbackRpcMethods.delete(context, params)
+            "chat.feedback.listForMessages" -> FeedbackRpcMethods.listForMessages(context, params)
+
+            // Agent bars (goal / todo / plan / deliverables)
+            "agent.goal.get" -> AgentStateRpcMethods.goalGet(context, params)
+            "agent.goal.set" -> AgentStateRpcMethods.goalSet(context, params)
+            "agent.goal.setActive" -> AgentStateRpcMethods.goalSetActive(context, params)
+            "agent.todo.get" -> AgentStateRpcMethods.todoGet(context, params)
+            "agent.todo.replace" -> AgentStateRpcMethods.todoReplace(context, params)
+            "agent.plan.get" -> AgentStateRpcMethods.planGet(context, params)
+            "agent.plan.set" -> AgentStateRpcMethods.planSet(context, params)
+            "agent.deliverables.list" -> AgentStateRpcMethods.deliverablesList(context, params)
+            "agent.deliverables.clear" -> AgentStateRpcMethods.deliverablesClear(context, params)
+
+            // Settings (permission presets / sandbox introspection)
+            "settings.permissionPreset.get" -> SettingsRpcMethods.permissionPresetGet(context, params)
+            "settings.permissionPreset.set" -> SettingsRpcMethods.permissionPresetSet(context, params)
+            "settings.sandbox.get" -> SettingsRpcMethods.sandboxGet(context, params)
 
             // Skills
             "skills.list" -> SkillRpcMethods.list(context)

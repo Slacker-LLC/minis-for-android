@@ -135,6 +135,24 @@ Web「代理设置」卡片里的深度与超时输入即时生效；子代理�
 文本抽取），词项 AND、字面匹配、无通配符注入；每个会话最多 3 条命中，
 每条 snippet 约 200 字符。
 
+### 2.10 目标 / 待办 / 计划 / 产出文件 / 反馈 / 权限预设（DeepSeek 批量移植）
+
+| RPC | 说明 |
+|---|---|
+| `agent.goal.get/set/setActive` | 会话目标条（暂停/恢复/清除） |
+| `agent.todo.get/replace` | 会话待办整表读写（模型 `todo_write` 同源） |
+| `agent.plan.get/set` | 软计划模式（Web 横幅 + placeholder） |
+| `agent.deliverables.list/clear` | 本轮产出文件（写入/编辑成功时自动记录） |
+| `chat.feedback.put/delete/listForMessages` | 消息 👍/👎 反馈 sidecar |
+| `settings.permissionPreset.get/set` | Web Remote 权限预设（workspace-write / danger-full-access） |
+| `settings.sandbox.get` | 沙箱策略唯一归属 introspection |
+
+模型侧新增工具：`get_goal` / `create_goal` / `update_goal` / `todo_write`。
+状态存在进程内 `AgentStateStore`（goal/todo/plan/deliverables）与
+`MessageFeedbackStore`（JSON sidecar），不迁移数据库。附件复用既有
+`chat.prompt` 的 `attachments:[{name,data,mime}]`（base64），Web composer
+新增附件按钮，后端零改动。
+
 ### 2.4 Web Remote 白名单
 
 `RemoteAccessServer.RPC_ALLOWED_PREFIXES` 当前放行：
