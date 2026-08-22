@@ -10496,6 +10496,22 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			ctx.effect(() => () => {
 				loop.stop();
 			}, "runtime: connection stream loop");
+			// OpenMinis has a second, native Android surface. A folder/session can
+			// therefore change without a DSH host frame (for example when the user
+			// creates a chat or moves it into a group on the phone). Reconcile the
+			// authoritative baselines while this page is visible, and immediately
+			// after returning to it, so both surfaces truly share one live data set.
+			const refreshNativeChanges = () => {
+				if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+				sessions.refresh();
+				workspaces.refresh();
+			};
+			const nativeRefreshTimer = setInterval(refreshNativeChanges, 5e3);
+			if (typeof document !== "undefined") document.addEventListener("visibilitychange", refreshNativeChanges);
+			ctx.effect(() => () => {
+				clearInterval(nativeRefreshTimer);
+				if (typeof document !== "undefined") document.removeEventListener("visibilitychange", refreshNativeChanges);
+			}, "runtime: native Android baseline reconciliation");
 		}
 		//#endregion
 		exports.ConversationEventRegistry = ConversationEventRegistry;

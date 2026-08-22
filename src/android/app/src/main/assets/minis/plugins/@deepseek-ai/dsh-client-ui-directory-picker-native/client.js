@@ -60,7 +60,18 @@ window.__ModuleLoader__.load({
 		* @param ctx - client root context.
 		*/
 		function apply(ctx) {
-			const injected = () => ({ pick: () => ctx.workspaces.pickDirectory() });
+			// Android cannot launch its SAF picker from a remote browser. Treat the
+			// stock DSH "pick directory" flow as creation of an App conversation
+			// group instead; workspace.create maps this stable synthetic path to the
+			// same native FolderEntity used by the phone session list.
+			const injected = () => ({ pick: async () => {
+				const raw = window.prompt("输入工作区名称（会与手机会话分组同步）", "新工作区");
+				if (raw === null) return null;
+				const name = raw.trim();
+				if (name === "") throw new Error("工作区名称不能为空");
+				if (name.length > 120) throw new Error("工作区名称不能超过 120 个字符");
+				return `/var/minis/workspace/groups/${encodeURIComponent(name)}`;
+			} });
 			ctx.slots.inject("conversation.hero.workspace.directoryFlow", () => ctx.slots.inject("sidebar.workspaces.directoryFlow", function* () {
 				yield ctx.slots.register({
 					name: "conversation.hero.workspace.directoryFlow",

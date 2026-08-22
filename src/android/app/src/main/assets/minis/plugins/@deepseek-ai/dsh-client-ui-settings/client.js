@@ -207,13 +207,18 @@ window.__ModuleLoader__.load({
 			bind(spec) {
 				const ctx = this.ctx;
 				const connection = ctx.get("connection");
-				const controller = new SettingsScopeController(connection.api, spec, connection.isLoopback ? "host" : "memory");
+				// Minis Web is an authenticated administrative surface even when it is
+				// reached through a LAN address or Cloudflare hostname. Use the Host
+				// settings transport instead of falling back to browser-only memory, so
+				// theme/language/permission edits share Android's source of truth.
+				const controller = new SettingsScopeController(connection.api, spec, "host");
 				ctx.effect(() => {
 					const refresh = (namespace) => {
 						if (namespace !== void 0 && namespace !== spec.namespace) return;
 						controller.load();
 					};
-					const disposers = [ctx.get("remote").$on("settings/document-updated", refresh), ctx.on("connection/reset", () => {
+					const timer = window.setInterval(() => refresh(), 5000);
+					const disposers = [() => window.clearInterval(timer), ctx.get("remote").$on("settings/document-updated", refresh), ctx.on("connection/reset", () => {
 						refresh();
 					})];
 					controller.load();

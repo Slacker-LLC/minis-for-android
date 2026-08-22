@@ -195,19 +195,19 @@ window.__ModuleLoader__.load({
 		* imports are a build error anyway.
 		*
 		* This file is the browser-safe contract face (zero node imports): the
-		* `__DSH_BOOT__` wire types, the boot-manifest parser, and the boundaries around
+		* `__MINIS_BOOT__` wire types, the boot-manifest parser, and the boundaries around
 		* {@link ClientModuleSystem}. The package root is the host-side service that
 		* composes the wire.
 		*/
 		/**
-		* Parse `window.__DSH_BOOT__` into the two consumer views. Wire boundary:
+		* Parse `window.__MINIS_BOOT__` into the two consumer views. Wire boundary:
 		* a missing or malformed graph throws (the shell shows the loud failure —
 		* a page without a valid manifest cannot boot anything).
-		* @param wire - the raw `window.__DSH_BOOT__` value.
+		* @param wire - the raw `window.__MINIS_BOOT__` value.
 		* @returns the manifest with optional plugin-view fields normalized.
 		*/
 		function parseBootManifest(wire) {
-			if (typeof wire !== "object" || wire === null) throw new Error("client-modules: window.__DSH_BOOT__ is missing or not an object");
+			if (typeof wire !== "object" || wire === null) throw new Error("client-modules: window.__MINIS_BOOT__ is missing or not an object");
 			const graph = wire;
 			if (typeof graph.rev !== "string") throw new Error("client-modules: boot manifest rev must be a string");
 			if (!Array.isArray(graph.entries)) throw new Error("client-modules: boot manifest entries must be an array");
@@ -244,8 +244,8 @@ window.__ModuleLoader__.load({
 		* @param ctx - client root context.
 		*/
 		function apply(ctx) {
-			const modules = globalThis.__DSH_MODULES__;
-			if (modules === void 0) throw new Error("client-modules: window.__DSH_MODULES__ missing — the shell kernel must construct the module system before plugin boot");
+			const modules = globalThis.__MINIS_MODULES__;
+			if (modules === void 0) throw new Error("client-modules: window.__MINIS_MODULES__ missing — the shell kernel must construct the module system before plugin boot");
 			ctx.reflect.provide("modules", modules);
 		}
 		//#endregion
