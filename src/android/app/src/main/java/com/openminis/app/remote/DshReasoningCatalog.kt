@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 /**
  * Pure mapping of Android thinking tiers onto the DSH `modelReasoningSchema`
- * (`assets/minis/plugins/@deepseek-ai/dsh-client-connection/client.js`):
+ * (Web 工作台已下线,P2 后无 assets/minis;映射保留供本地 reasoning 测试与历史对齐):
  *
  *   reasoning: { efforts: [{ id, name, description? }].min(1), defaultEffort? }
  *
