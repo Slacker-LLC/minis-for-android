@@ -4,7 +4,7 @@
 
 ## 仓库与发布
 
-- Repository: `https://github.com/limuzi013/minis-for-android`
+- Repository: `https://github.com/Slacker-LLC/minis-for-android`
 - Branch: `master`
 - Release tag: `v1.01-beta.2`
 - Package: `dev.openminispet.android`
@@ -42,8 +42,8 @@
 ### Android Debug 工具链
 
 - `android_capabilities`/`android_app`/`android_ui`/`android_logs`/`android_diagnose`/
-  `android_deploy` 六个高内聚工具,复用现有 Accessibility、VisionGroupResolver、Shizuku、
-  PRoot、ApprovalSeam、JobRegistry、ToolCheckpointStore、SpillPolicy;
+  `android_deploy` 六个高内聚工具,复用现有 Accessibility、VisionGroupResolver、Root su、
+  ApprovalSeam、JobRegistry、ToolCheckpointStore、SpillPolicy(P2 后 PRoot/Shizuku 已停用);
 - 只读 capability resolver(root/privileged shell/UI/debug/execution/package visibility
   逐项探测,`uid=0` 不等同于全能力);
 - `PrivilegedCommandRunner`:Root `su` backend(被动检测 + 主动授权探测,CAP_SYS_CHROOT/ADMIN
@@ -54,13 +54,13 @@
   大输出走 SpillPolicy;
 - APK 部署按真实 Gradle output 发现 + archive 元数据,不猜固定路径;明确拒绝自覆盖安装
   (self-update continuous execution UNSUPPORTED);
-- native chroot/mount 仅提供实验性 probe,不替换 PRoot,不修改全局 SELinux。
+- native chroot 已由 P2 升级为默认执行环境(见下文「Root-only 重构」)。
 
 ### Android
 
 - 桌面宠物、默认数字助手、原生 Agent 状态条、提问/反馈/计划等同步;
-- PRoot Alpine 沙箱、持久会话 Shell、共享目录和 SAF 外部挂载;
-- Shizuku/AXManager/Sui 为可选 Android privileged bridge;普通 Agent 不依赖它;
+- **Ubuntu 24.04 chroot 沙箱(经 minisd)**,共享目录和 SAF 外部挂载(P2 起替代 PRoot Alpine);
+- Shizuku/AXManager/Sui 为可选 Android privileged bridge;普通 Agent 不依赖它(P2 后 Shizuku 停用);
 - 工具超时、执行意图检查点、后台作业、Token 计量、上下文压力、结果修剪/落盘。
 
 ## 验证记录
@@ -75,14 +75,14 @@
 
 ## 尚未交付
 
-- Ubuntu PRoot profile;
-- Native chroot/mount namespace 完整 backend(当前仅实验性 `probe_native_chroot`,
-  未启用为默认执行环境,未通过 parity tests);
-- Root su backend 的设备级授权验证(需真实 Magisk/KernelSU/APatch 场景);
-- QEMU/KVM 独立 Ubuntu kernel backend;
-- 完整 DSH Subagent 目录、通用持久 Job runtime 和队列编辑;
+- **Root-only 重构已交付(2026-08)**——以下为剩余项:
+- MCPProvider(Minis 主动连接外部 MCP Server);
+- 远程 MCP 公网验收(Cloudflare Tunnel 真机,需用户账号);
+- 26 项能力对照签字后删除 Web Remote 代码;
+- rootfs 升级策略(保护用户 pip/npm/venv 环境);
 - production release keystore、关闭 DebugServer 的正式 release APK;
-- cloudflared 固定版本与 SHA-256;
+- QEMU/KVM 独立 Ubuntu kernel backend(已否,不计划);
+- 完整 DSH Subagent 目录、通用持久 Job runtime 和队列编辑;
 - Provider 全量离线 fixture。
 
 ## 设备相关限制
@@ -99,11 +99,10 @@
 | 默认 Web | `src/android/app/src/main/assets/minis/` |
 | Minis Client Plugin 源码/构建 | `web/minis-client-plugin/` |
 | Android Debug 工具 | `src/android/app/src/main/java/com/openminis/app/tools/android/` |
-| Remote server | `src/android/app/src/main/java/com/openminis/app/remote/RemoteAccessServer.kt` |
-| DSH adapter | `src/android/app/src/main/java/com/openminis/app/remote/DshApiAdapter.kt` |
-| Session journal | `src/android/app/src/main/java/com/openminis/app/ui/chat/SessionEventHub.kt` |
-| Safe URL import | `src/android/app/src/main/java/com/openminis/app/debug/SafeRemoteImporter.kt` |
-| PRoot runtime | `src/android/app/src/main/java/com/openminis/app/sandbox/PRootKernel.kt` |
-| Rootfs manager | `src/android/app/src/main/java/com/openminis/app/sandbox/RootfsManager.kt` |
+| Root runtime | `src/native/minisd/`(Rust,根 broker) |
+| Ubuntu runtime (App 侧) | `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/` |
+| MCP Server | `src/android/app/src/main/java/com/openminis/app/mcp/server/` |
+| Tool Runtime | `src/android/app/src/main/java/com/openminis/app/tools/runtime/` |
+| Rootfs manager(壳) | `src/android/app/src/main/java/com/openminis/app/sandbox/RootfsManager.kt` |
 | Build | [`../BUILD-CN.md`](../BUILD-CN.md) |
 | Docs index | [`README.md`](README.md) |

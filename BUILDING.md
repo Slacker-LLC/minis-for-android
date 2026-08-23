@@ -21,18 +21,11 @@ Gradle distribution.
 ## Clone
 
 ```sh
-git clone --recurse-submodules https://github.com/limuzi013/minis-for-android.git
+git clone https://github.com/Slacker-LLC/minis-for-android.git
 cd OpenMinis-Pet
 ```
 
-For an existing non-recursive clone:
-
-```sh
-git submodule update --init --recursive
-```
-
-`deps/proot` is a pinned Git submodule. A source archive downloaded from GitHub does not include the
-submodule contents; clone recursively or populate it manually before building.
+No submodules: the minisd Rust broker lives in-tree at `src/native/minisd`.
 
 ## SDK and build customization
 
@@ -40,6 +33,7 @@ submodule contents; clone recursively or populate it manually before building.
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"  # adjust locally
+export PATH="$HOME/.cargo/bin:$PATH"  # Rust toolchain for minisd
 
 cp src/android/app/provider-customization.properties.example \
    src/android/app/provider-customization.properties
@@ -51,19 +45,16 @@ OAuth customization value fail explicitly at runtime; no private defaults are st
 ## Build the sandbox assets
 
 ```sh
-./deps/build_proot.sh
-./scripts/prepare_android_sandbox.sh
+# minisd Root Broker (needs: rustup target add aarch64-unknown-linux-musl)
+cargo build --release --target aarch64-unknown-linux-musl \
+    --manifest-path src/native/minisd/Cargo.toml
+
+# Ubuntu 24.04 arm64 rootfs (download + SHA-256 verify + tar)
+./scripts/build-ubuntu-rootfs.sh
 ```
 
-The first command builds PRoot from the pinned `OpenMinis/proot` source and writes the generated
-`proot-aarch64`/`libproot.so` artifacts. The two Android ELF loaders are pinned vendored Termux builds
-tracked by Git because the exact package has been retired and fork-built loaders regress on some
-ROMs; `build_proot.sh` verifies their SHA-256 values.
-
-The second command downloads the pinned Alpine 3.21.3 arm64 minirootfs, verifies its SHA-256, and checks
-that all required PRoot artifacts exist.
-
-Generated PRoot and Alpine artifacts are ignored by Git and must be recreated on a clean checkout.
+Generated minisd / Ubuntu rootfs artifacts are ignored by Git and must be recreated on a clean
+checkout. (PRoot/Alpine was removed in the P2 rebuild.)
 
 ## Build the Minis Web client plugin
 
@@ -122,9 +113,10 @@ public repository; do not remove them merely to produce a green unconfigured run
 
 ## Troubleshooting
 
-### `deps/proot/src` is missing
+### cargo cross-compilation fails
 
-Run `git submodule update --init --recursive`.
+Run `rustup target add aarch64-unknown-linux-musl` and ensure `$HOME/.cargo/bin` is on PATH.
+minisd links musl statically — the Android NDK is not needed for it.
 
 ### Android NDK not found
 
@@ -132,17 +124,15 @@ Set `ANDROID_NDK_HOME` to an installed r28+ directory containing `toolchains/llv
 
 ### The app starts but sandbox commands fail
 
-Rebuild and verify the sandbox artifacts:
+Check that minisd is installed at `/data/adb/minis/bin/minisd` (rooted device) and the Ubuntu
+rootfs is at `/data/adb/minis/rootfs`. The App auto-spawns the minisd watchdog on
+`UbuntuRuntime.ensureReady()`, so no manual daemon is needed. Execute a shell command and
+assert exit code 0:
 
 ```sh
-./deps/build_proot.sh
-./scripts/prepare_android_sandbox.sh
-unzip -l src/android/app/build/outputs/apk/debug/app-debug.apk \
-  | grep -E 'libproot|alpine-minirootfs'
+adb shell su -c "/data/adb/minis/bin/minisd --call --socket /data/adb/minis/run/minisd.sock"
+# feed: {"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
 ```
-
-The APK needs `libproot.so`, the 64-bit PRoot loader, and the Alpine rootfs. Starting the App alone is
-not a valid sandbox test; execute a shell command and assert exit code 0.
 
 ## Signing and production releases
 
@@ -151,5 +141,6 @@ acceptable only for development/self-test. A production release requires a prote
 a release variant that does not start DebugServer, a complete security/test pass, an immutable source
 tag, and published artifact hashes.
 
-See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the PRoot, loader, Alpine, Harness, and Android
+See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for minisd, the Ubuntu rootfs,
+cloudflared, Harness, and Android
 dependency licensing notes.

@@ -23,7 +23,7 @@ ASCII 路径。
 ## 1. 克隆源码
 
 ```bash
-git clone https://github.com/limuzi013/minis-for-android.git
+git clone https://github.com/Slacker-LLC/minis-for-android.git
 cd OpenMinis-Pet
 ```
 

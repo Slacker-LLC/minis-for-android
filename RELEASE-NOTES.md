@@ -1,10 +1,14 @@
 # Minis for Android `v1.01-beta.2`
 
-发布日期:2026-08-23。**1.01-beta.1 的图片回显热修**,Android arm64 开发/自测构建,与 tag [`v1.01-beta.2`](https://github.com/limuzi013/minis-for-android/tree/v1.01-beta.2) 源码对应。
+> **注意**：本发布说明描述 v1.01-beta.2（PRoot 时代的最后版本）。
+> master 已推进到 Root-only 重构（minisd + Ubuntu chroot + MCP Server），
+> 见 [CHANGELOG.md](CHANGELOG.md) 的 `[Unreleased]` 条目与 [README.md](README.md)。
+
+发布日期:2026-08-23。**1.01-beta.1 的图片回显热修**,Android arm64 开发/自测构建,与 tag [`v1.01-beta.2`](https://github.com/Slacker-LLC/minis-for-android/tree/v1.01-beta.2) 源码对应。
 
 ## 下载与校验
 
-- APK:[`OpenMinis-Pet-1.01-beta.2-arm64-debug.apk`](https://github.com/limuzi013/minis-for-android/releases/download/v1.01-beta.2/OpenMinis-Pet-1.01-beta.2-arm64-debug.apk)
+- APK:[`OpenMinis-Pet-1.01-beta.2-arm64-debug.apk`](https://github.com/Slacker-LLC/minis-for-android/releases/download/v1.01-beta.2/OpenMinis-Pet-1.01-beta.2-arm64-debug.apk)
 - applicationId:`dev.openminispet.android` · ABI:`arm64-v8a` · versionCode 39
 
 ```bash
@@ -23,11 +27,11 @@ sha256sum OpenMinis-Pet-1.01-beta.2-arm64-debug.apk
 ---
 # Minis for Android `v1.01-beta.1`
 
-发布日期:2026-08-23。**1.01-beta 的修复轮**,Android arm64 开发/自测构建,与 tag [`v1.01-beta.1`](https://github.com/limuzi013/minis-for-android/tree/v1.01-beta.1) 源码对应。
+发布日期:2026-08-23。**1.01-beta 的修复轮**,Android arm64 开发/自测构建,与 tag [`v1.01-beta.1`](https://github.com/Slacker-LLC/minis-for-android/tree/v1.01-beta.1) 源码对应。
 
 ## 下载与校验
 
-- APK：[`OpenMinis-Pet-1.01-beta.1-arm64-debug.apk`](https://github.com/limuzi013/minis-for-android/releases/download/v1.01-beta.1/OpenMinis-Pet-1.01-beta.1-arm64-debug.apk)
+- APK：[`OpenMinis-Pet-1.01-beta.1-arm64-debug.apk`](https://github.com/Slacker-LLC/minis-for-android/releases/download/v1.01-beta.1/OpenMinis-Pet-1.01-beta.1-arm64-debug.apk)
 - applicationId：`dev.openminispet.android`
 - ABI：`arm64-v8a` · versionCode 38
 
@@ -53,11 +57,11 @@ sha256sum OpenMinis-Pet-1.01-beta.1-arm64-debug.apk
 
 # v1.01-beta(历史版本)
 
-发布日期:2026-08-23。这是项目的 **1.01-beta 首个公开版本**,Android arm64 开发/自测构建,与 tag [`v1.01-beta`](https://github.com/limuzi013/minis-for-android/tree/v1.01-beta) 源码对应。
+发布日期:2026-08-23。这是项目的 **1.01-beta 首个公开版本**,Android arm64 开发/自测构建,与 tag [`v1.01-beta`](https://github.com/Slacker-LLC/minis-for-android/tree/v1.01-beta) 源码对应。
 
 ## 下载与校验
 
-- APK：[`OpenMinis-Pet-1.01-beta-arm64-debug.apk`](https://github.com/limuzi013/minis-for-android/releases/download/v1.01-beta/OpenMinis-Pet-1.01-beta-arm64-debug.apk)
+- APK：[`OpenMinis-Pet-1.01-beta-arm64-debug.apk`](https://github.com/Slacker-LLC/minis-for-android/releases/download/v1.01-beta/OpenMinis-Pet-1.01-beta-arm64-debug.apk)
 - applicationId：`dev.openminispet.android`
 - versionName：`1.01-beta`
 - versionCode：37

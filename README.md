@@ -1,7 +1,7 @@
 # Minis for Android
 
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/limuzi013/minis-for-android/releases)
-[![Release](https://img.shields.io/badge/release-v1.00--beta-blue)](https://github.com/limuzi013/minis-for-android/releases/tag/v1.01-beta)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/Slacker-LLC/minis-for-android/releases)
+[![Release](https://img.shields.io/badge/release-v1.00--beta-blue)](https://github.com/Slacker-LLC/minis-for-android/releases/tag/v1.01-beta)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a-orange)](#安装)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
@@ -31,7 +31,7 @@ Android 原生 App（唯一运行时与数据源）
 
 | 项目 | 值 |
 |---|---|
-| Release | [`v1.01-beta.2`](https://github.com/limuzi013/minis-for-android/releases/tag/v1.01-beta.2) |
+| Release | [`v1.01-beta.2`](https://github.com/Slacker-LLC/minis-for-android/releases/tag/v1.01-beta.2) |
 | Android 版本 | `1.01-beta.2`(versionCode 39) |
 | applicationId | `dev.openminispet.android` |
 | ABI | `arm64-v8a` |
@@ -42,8 +42,8 @@ Android 原生 App（唯一运行时与数据源）
 **当前 APK 使用 Android Debug 签名,仅供开发、自测与源码对应验证,不是生产发布包。**
 生产分发必须关闭 DebugServer、改用长期保管的 release keystore,并完成独立安全验收。
 
-- [下载 APK](https://github.com/limuzi013/minis-for-android/releases/download/v1.01-beta.2/OpenMinis-Pet-1.01-beta.2-arm64-debug.apk)
-- [查看对应源码](https://github.com/limuzi013/minis-for-android/tree/v1.01-beta.2)
+- [下载 APK](https://github.com/Slacker-LLC/minis-for-android/releases/download/v1.01-beta.2/OpenMinis-Pet-1.01-beta.2-arm64-debug.apk)
+- [查看对应源码](https://github.com/Slacker-LLC/minis-for-android/tree/v1.01-beta.2)
 - [发布说明](RELEASE-NOTES.md)
 
 ## 主要功能
@@ -156,7 +156,7 @@ adb install -r OpenMinis-Pet-1.01-beta-arm64-debug.apk
 仓库只构建 `arm64-v8a`。完整步骤见 [BUILD-CN.md](BUILD-CN.md) 或 [BUILDING.md](BUILDING.md)。
 
 ```bash
-git clone --recurse-submodules https://github.com/limuzi013/minis-for-android.git
+git clone --recurse-submodules https://github.com/Slacker-LLC/minis-for-android.git
 cd OpenMinis-Pet
 
 cp src/android/app/provider-customization.properties.example \
@@ -212,4 +212,4 @@ Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install 
 本项目整体按 [GPL-3.0](LICENSE) 分发。分发修改后的 APK 时必须同时提供对应源码。
 
 > 本项目与 DeepSeek 没有产品关联或官方合作关系。问题请提交到
-> [本仓库 Issues](https://github.com/limuzi013/minis-for-android/issues)。
+> [本仓库 Issues](https://github.com/Slacker-LLC/minis-for-android/issues)。
