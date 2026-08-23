@@ -53,6 +53,7 @@ import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
 import com.openminis.app.ui.settings.SettingsScreen
 import com.openminis.app.ui.settings.RemoteAccessSettingsScreen
+import com.openminis.app.ui.settings.CloudflareTunnelSettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
 import com.openminis.app.ui.settings.SessionStorageDetailScreen
 import com.openminis.app.ui.settings.SkillDetailScreen
@@ -165,6 +166,7 @@ object Routes {
     const val APPEARANCE = "appearance"
     const val BACKGROUND = "background"
     const val REMOTE_ACCESS = "remote_access"
+    const val REMOTE_ACCESS_TUNNEL = "remote_access_tunnel"
     const val ABOUT = "about"
     const val ONBOARDING_MODELS = "onboarding_models"
     /** T219-2: Mount external folders settings + detail. */
@@ -1196,6 +1198,15 @@ fun AppNavigation(
 
         composable(Routes.REMOTE_ACCESS) {
             RemoteAccessSettingsScreen(
+                onBack = { navController.safePopBackStack() },
+                onCloudflareTunnelClick = {
+                    navController.safeNavigate(Routes.REMOTE_ACCESS_TUNNEL)
+                },
+            )
+        }
+
+        composable(Routes.REMOTE_ACCESS_TUNNEL) {
+            CloudflareTunnelSettingsScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }

@@ -8897,14 +8897,19 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			constructor(rootCtx, api, remote, conversationRuntime) {
 				this.rootCtx = rootCtx;
 				this.selection = createSnapshotStore({}, { persist: { name: "dsh.sessions.current" } });
-				const restored = this.selection.getSnapshot();
+				// OpenMinis cold-start policy: a fresh page load lands on the
+				// Hero/new-task view — the persisted previous session must NOT
+				// be restored and auto-opened. The user opens a historical
+				// session explicitly. The persisted key is cleared so a stale
+				// id can never resurface on a later reconnect.
+				this.selection.set({});
 				const conversationEvents = rootCtx.get("conversationEvents");
 				const conversationViews = rootCtx.get("conversationViews");
 				const conversation = conversationRuntime ?? (conversationEvents === void 0 || conversationViews === void 0 ? void 0 : {
 					events: conversationEvents,
 					views: conversationViews
 				});
-				this.manager = new SessionManager(api, remote, restored.sessionId, restored.subagentAddress, conversation);
+				this.manager = new SessionManager(api, remote, void 0, void 0, conversation);
 				this.list = createSnapshotStore({
 					ids: [],
 					byId: {},
@@ -9872,11 +9877,14 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				return attempt;
 			}
 			/**
-			* Follow the first complete Workspace/Session baseline and select a default
-			* session exactly once. A restored current session wins; otherwise the most
-			* recent Workspace is connected (reusing or creating its blank session).
-			* Later explicit clears stay cleared instead of retriggering this startup
-			* policy. A failed connect may retry on the next baseline projection.
+			* Follow the first complete Workspace/Session baseline and mark the
+			* startup policy done. OpenMinis: a cold start deliberately does NOT
+			* auto-open any session (not even a recent Workspace's blank one) —
+			* the page lands on the Hero/new-task view and the user opens a
+			* historical session by clicking it. Workspace restore still applies
+			* (recentWorkspaceId is computed in the projection); only the
+			* auto-navigation is removed. Creating sessions at boot would also
+			* spawn useless blank rows on the Android side.
 			* @returns disposer for the baseline subscription; late work cannot navigate after disposal.
 			*/
 			startInitialSelection() {
@@ -9888,22 +9896,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					if (disposed || state !== "waiting") return;
 					const workspace = this.list.getSnapshot();
 					if (!workspace.baselinesReady) return;
-					const current = this.sessions.list.getSnapshot().current;
-					const target = workspace.recentWorkspaceId;
-					if (current !== void 0 || target === void 0) {
-						state = "done";
-						return;
-					}
-					state = "connecting";
-					this.connectWorkspace(target).then((sessionId) => {
-						if (disposed) return;
-						if (this.sessions.list.getSnapshot().current === void 0) this.sessions.open(sessionId);
-						state = "done";
-					}, (reason) => {
-						if (disposed) return;
-						state = "waiting";
-						console.warn("initial workspace selection failed:", reason);
-					});
+					// OpenMinis: baselines ready → stay in the no-session (Hero)
+					// view. The user navigates explicitly.
+					state = "done";
 				};
 				const unsubscribe = this.list.subscribe(reconcile);
 				reconcile();

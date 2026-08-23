@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
@@ -55,7 +57,11 @@ import java.util.Collections
 
 /** Web Remote settings built from the same grouped-card primitives as the app. */
 @Composable
-fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
+fun RemoteAccessSettingsScreen(
+    onBack: () -> Unit,
+    // 二级 Cloudflare 详情页入口（设置 → Web 远程控制 → Cloudflare Tunnel）
+    onCloudflareTunnelClick: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val tunnelStatus by CloudflareTunnelManager.status.collectAsState()
@@ -258,7 +264,33 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
                     restartIfEnabled()
                 },
             )
+            // 连接状态 → Cloudflare Tunnel 二级详情页（状态、诊断、日志、高级）
+            SettingsRow(
+                title = "Cloudflare Tunnel 连接状态",
+                subtitle = buildString {
+                    append(if (tunnelStatus.installed) tunnelStatus.phase else "未配置")
+                    val h = CloudflareTunnelManager.health.value
+                    if (h.edgeExpected > 0) append(" · ${h.edgeConnected}/${h.edgeExpected}")
+                    if (h.protocol.isNotBlank()) append(" · ${h.protocol}")
+                    hostname.takeIf { it.isNotBlank() }?.let { append(" · $it") }
+                },
+                icon = Icons.Outlined.Info,
+                onClick = onCloudflareTunnelClick,
+            )
             SettingsCardBlock {
+                // cloudflared 组件行（标准设置 Row 风格，不在保存按钮挤一行）
+                SettingsRow(
+                    title = "cloudflared 组件",
+                    subtitle = if (tunnelStatus.installed) "v${tunnelStatus.version.ifBlank { "已安装" }} · 已安装" else "未安装",
+                    icon = Icons.Outlined.Build,
+                    showDivider = true,
+                    onClick = {
+                        scope.launch {
+                            val result = CloudflareTunnelManager.installOrUpdate(context)
+                            toast(result.fold({ "cloudflared 已就绪" }, { it.message ?: "安装失败" }))
+                        }
+                    },
+                )
                 OutlinedTextField(
                     value = hostname,
                     onValueChange = { hostname = it },
@@ -292,15 +324,6 @@ fun RemoteAccessSettingsScreen(onBack: () -> Unit) {
                         },
                         modifier = Modifier.weight(1f),
                     ) { Text("保存") }
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                val result = CloudflareTunnelManager.installOrUpdate(context)
-                                toast(result.fold({ "cloudflared 已就绪" }, { it.message ?: "安装失败" }))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(if (tunnelStatus.installed) "更新组件" else "安装组件") }
                 }
                 Text(
                     text = buildString {

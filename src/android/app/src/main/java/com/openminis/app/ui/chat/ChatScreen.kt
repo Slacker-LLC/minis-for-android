@@ -136,6 +136,8 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import com.openminis.app.BuildConfig
 import com.openminis.app.R
@@ -144,6 +146,7 @@ import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisMenuDivider
+import com.openminis.app.ui.settings.SettingsRow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -236,6 +239,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -709,6 +713,7 @@ fun ChatScreen(
     var showThinkingLevelSheet by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
+    var showAgentPresetSheet by remember { mutableStateOf(false) }
     var showSkillsSheet by remember { mutableStateOf(false) }
     // [T-mcp-integration-android] MCPs-in-Session sheet visibility.
     var showMcpsSheet by remember { mutableStateOf(false) }
@@ -2668,15 +2673,47 @@ fun ChatScreen(
                                 text = { Text(if (planModeOn) "退出计划模式" else "计划模式") },
                                 onClick = {
                                     showChatMenu = false
-                                    AgentStateStore.planSet(sessionId, if (planModeOn) "off" else "plan")
+                                    val target = if (planModeOn) "off" else "plan"
+                                    AgentStateStore.planSet(sessionId, target)
+                                    // Same journal event the Web `/plan`
+                                    // handler emits: Android is the one plan
+                                    // state, the browser chip folds this
+                                    // frame. Without it the App→Web direction
+                                    // is silent while the Web chip keeps the
+                                    // old value until an unrelated event.
+                                    com.openminis.app.ui.chat.SessionEventHub.append(
+                                        sessionId, "plan/mode",
+                                        org.json.JSONObject().put("active", target == "plan"),
+                                    )
                                     Toast.makeText(
                                         context,
-                                        if (planModeOn) "已退出计划模式" else "已进入计划模式",
+                                        if (target == "off") "已退出计划模式" else "已进入计划模式",
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.Schedule, contentDescription = null)
+                                },
+                            )
+                            MinisMenuDivider()
+                            // Agent Preset（Android-authoritative；与 Web 首页/设置
+                            // 共用 AgentPresetRegistry，切换立即作用于当前会话）
+                            val presetId by remember(sessionId) {
+                                mutableStateOf(
+                                    com.openminis.app.remote.AgentPresetRegistry
+                                        .presetForSession(context, sessionId).id,
+                                )
+                            }
+                            val currentPreset = com.openminis.app.remote.AgentPresetRegistry
+                                .get(presetId)
+                            DropdownMenuItem(
+                                text = { Text("Agent 预设：${currentPreset?.name ?: presetId}") },
+                                onClick = {
+                                    showChatMenu = false
+                                    showAgentPresetSheet = true
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Person, contentDescription = null)
                                 },
                             )
                             MinisMenuDivider()
@@ -6017,6 +6054,55 @@ fun ChatScreen(
                     neutralText = stringResource(R.string.context_compact_and_enable_auto),
                     onNeutral = {
                         viewModel.compactAndSendPending(alsoEnableAutoCompact = true)
+                    },
+                )
+            }
+
+            // Agent Preset 选择（复用 App 现有对话框；与 Web 共用注册表）
+            if (showAgentPresetSheet) {
+                val ActivePreset = com.openminis.app.remote.AgentPresetRegistry
+                    .presetForSession(context, sessionId).id
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showAgentPresetSheet = false },
+                    title = { Text("Agent 预设") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "选择后立即应用于当前会话（与 Web 端同步同一份 Runtime 状态）",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            for (preset in com.openminis.app.remote.AgentPresetRegistry.list()) {
+                                SettingsRow(
+                                    title = preset.name,
+                                    subtitle = preset.description,
+                                    onClick = {
+                                        com.openminis.app.remote.AgentPresetRegistry
+                                            .applyToSession(context, sessionId, preset.id)
+                                        Toast.makeText(
+                                            context,
+                                            "已切换为 ${preset.name}（下一条消息生效）",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                        showAgentPresetSheet = false
+                                    },
+                                    trailing = {
+                                        if (preset.id == ActivePreset) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "当前使用",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showAgentPresetSheet = false }) {
+                            Text("关闭")
+                        }
                     },
                 )
             }

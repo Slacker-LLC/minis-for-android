@@ -203,21 +203,29 @@ object DshApiAdapter {
         val items = JSONArray()
         for (i in 0 until sessions.length()) {
             val s = sessions.getJSONObject(i)
-            items.put(sessionSummary(s))
+            items.put(sessionSummary(context, s))
         }
         return JSONObject().put("items", items)
     }
 
-    private fun sessionSummary(s: JSONObject): JSONObject = JSONObject().apply {
-        put("sessionId", s.optString("id", s.optString("sessionId")))
+    private suspend fun sessionSummary(context: Context, s: JSONObject): JSONObject = JSONObject().apply {
+        val sid = s.optString("id", s.optString("sessionId"))
+        put("sessionId", sid)
         put("updatedAt", s.optLong("updatedAt", System.currentTimeMillis()))
         put("running", s.optBoolean("isRunning", false))
         put("blank", s.optString("lastMessagePreview", "").isEmpty())
         put("cwd", WORKSPACE_PATH)
+        // Android-authoritative per-session preset (falls back to the default
+        // for new sessions; never null). Reads the same registry the App's
+        // preset picker writes, so both surfaces show one runtime state.
+        runCatching { AgentPresetRegistry.presetForSession(context, sid).id }
+            .getOrNull()
+            ?.let { put("agentPreset", it) }
         put("projections", projectionsBlock(
+            context,
             s.optString("title", ""),
             s.optString("modelName", ""),
-            s.optString("id", s.optString("sessionId", "")),
+            sid,
         ))
     }
 
@@ -225,8 +233,13 @@ object DshApiAdapter {
      * sessionProjectionsBlockSchema (client.js:5350) —
      * `{ asOfSeq: int >= -1, values: Record<string, unknown> }`.
      * `title` is the projection the sidebar reads for a session's label.
+     *
+     * `modelSelection` uses the shared [ModelSelectionResolver] — the real
+     * provider / entry id / display name — never a hard-coded `openminis`
+     * provider or a display name smuggled in as the model id.
      */
-    private fun projectionsBlock(
+    private suspend fun projectionsBlock(
+        context: Context,
         title: String,
         modelName: String,
         sessionId: String = "",
@@ -237,14 +250,53 @@ object DshApiAdapter {
         put("values", JSONObject().apply {
             if (title.isNotEmpty()) put("title", title)
             if (modelName.isNotEmpty()) {
-                put("modelSelection", JSONObject()
-                    .put("provider", "openminis")
-                    .put("model", modelName))
+                put("modelSelection", resolvedModelSelection(context, sessionId, modelName))
             }
             goalProjection(sessionId)?.let { put("goal", it) }
+            planProjection(sessionId)?.let { put("plan", it) }
             stats?.let { put("sessionStats", it) }
             usage?.let { put("tokenUsage", it) }
         })
+    }
+
+    /**
+     * Resolve the real provider/model identity for one session from its DB
+     * row. Falls back to a truthful placeholder (never a hard-coded
+     * `openminis` provider) when the row has no resolvable binding.
+     */
+    private suspend fun resolvedModelSelection(
+        context: Context,
+        sessionId: String,
+        fallbackModelName: String,
+    ): JSONObject = runCatching {
+        val app = context.applicationContext as? MinisApp ?: throw IllegalStateException("MinisApp not ready")
+        val modelId = app.chatRepository.getSession(sessionId)?.modelId
+        val identity = modelId?.let {
+            ModelSelectionResolver.resolve(app.providerRepository.config.value, it)
+        }
+        if (identity != null) {
+            ModelSelectionResolver.toWire(identity)
+        } else {
+            ModelSelectionResolver.toWire(
+                ModelSelectionResolver.placeholder().copy(displayName = fallbackModelName),
+            )
+        }
+    }.getOrElse {
+        ModelSelectionResolver.toWire(
+            ModelSelectionResolver.placeholder().copy(displayName = fallbackModelName),
+        )
+    }
+
+    /**
+     * Android plan-mode projection `{ active, pending }` — the plan chip reads
+     * this value; there is no client-side plan state to keep in sync.
+     */
+    private fun planProjection(sessionId: String): JSONObject? {
+        if (sessionId.isEmpty()) return null
+        val plan = com.openminis.app.tools.AgentStateStore.planGet(sessionId)
+        return JSONObject()
+            .put("active", plan.mode == "plan")
+            .put("pending", false)
     }
 
     /** Whole-value goal projection consumed by the stock DSH goal bar. */
@@ -284,18 +336,17 @@ object DshApiAdapter {
         }
         return JSONObject().apply {
             put("sessionId", sid)
-            if (requestedPreset != null) {
-                // Validate + persist + apply the preset for real (permission gate).
-                AgentPresetRegistry.applyToSession(context, sid, requestedPreset)
-                put("agentPreset", requestedPreset)
-            } else {
-                AgentPresetRegistry.defaultForNewSessions(context).let { preset ->
-                    if (preset.id != "default") {
-                        AgentPresetRegistry.applyToSession(context, sid, preset.id)
-                        put("agentPreset", preset.id)
-                    }
-                }
+            val applied = requestedPreset?.let {
+                AgentPresetRegistry.applyToSession(context, sid, it)
+            } ?: AgentPresetRegistry.defaultForNewSessions(context).let { default ->
+                // A new session ALWAYS carries an effective preset: the
+                // chosen one, or the default. `standard` is the canonical
+                // default and is applied too (not skipped), so the session
+                // row and both UIs agree on the runtime state without a
+                // special "unset" branch.
+                AgentPresetRegistry.applyToSession(context, sid, default.id)
             }
+            if (applied != null) put("agentPreset", applied.id)
         }
     }
 
@@ -387,6 +438,7 @@ object DshApiAdapter {
                     statsProjection.put("decodeTokens", usageProjection.optLong("outputTokens", 0L))
                 }
                 put("projections", projectionsBlock(
+                    context,
                     title,
                     modelName,
                     sid,
@@ -845,6 +897,35 @@ object DshApiAdapter {
         }
     }
 
+    /**
+     * Android-authoritative finished projection values to push when a native
+     * event advances them. Only keys the runtime actually owns are emitted;
+     * the browser expects `session/projection` frames with the exact wire
+     * shape `{ type, sessionId, key, value, seq }`.
+     */
+    fun projectionFramesForEvent(
+        sessionId: String,
+        event: JSONObject,
+        context: Context? = null,
+    ): List<JSONObject> {
+        val type = event.optString("type")
+        val seq = event.optLong("seq")
+        val frames = mutableListOf<JSONObject>()
+        if (type == "plan/mode" && sessionId.isNotEmpty()) {
+            val plan = com.openminis.app.tools.AgentStateStore.planGet(sessionId)
+            frames.add(JSONObject().apply {
+                put("type", "session/projection")
+                put("sessionId", sessionId)
+                put("key", "plan")
+                put("value", JSONObject()
+                    .put("active", plan.mode == "plan")
+                    .put("pending", false))
+                put("seq", seq)
+            })
+        }
+        return frames
+    }
+
     private fun plainDshEvent(type: String, seq: Long, time: Long, data: JSONObject): JSONObject =
         JSONObject().put("type", type).put("seq", seq).put("time", time).put("data", data)
 
@@ -1211,13 +1292,23 @@ object DshApiAdapter {
         }
     }
 
-    /** One modelCatalogModelSchema row (client.js:5316) with reasoning metadata. */
+    /**
+     * One modelCatalogModelSchema row (client.js:5316) with reasoning metadata.
+     *
+     * `supportsReasoning` is a TRI-state on the wire: JSONObject.NULL / missing
+     * means "unknown" (treated as reasoning-capable, mirroring
+     * [com.openminis.app.data.model.LLMModel.catalogMaxThinkingLevel]), `true`
+     * and `false` are explicit. `JSONObject.isNull()` returns a plain Boolean,
+     * so `isNull(...) ?: optBoolean(...)` would collapse the tri-state and
+     * invert explicit `true` into `false` — never do that. The split form
+     * below (and [maxThinkingLevelFor]) is the only correct mapping.
+     */
     private fun modelCatalogEntry(e: JSONObject, id: String, modelName: String): JSONObject = JSONObject().apply {
         put("id", id)
         put("name", modelName)
         put("description", e.optString("modelId", modelName))
         DshReasoningCatalog.reasoningBlock(
-            supportsReasoning = e.isNull("supportsReasoning") ?: e.optBoolean("supportsReasoning", false),
+            supportsReasoning = if (e.isNull("supportsReasoning")) null else e.optBoolean("supportsReasoning", false),
             maxCeiling = maxThinkingLevelFor(e),
         )?.let { put("reasoning", it) }
     }
@@ -1252,7 +1343,6 @@ object DshApiAdapter {
     private suspend fun sessionSelectModel(context: Context, payload: JSONObject): JSONObject {
         val sid = payload.optString("sessionId")
         val model = payload.optString("model")
-        val provider = payload.optString("provider", "")
         val effort = payload.optString("reasoningEffort", "")
 
         val result = ChatMutationMethods.selectModel(
@@ -1264,9 +1354,16 @@ object DshApiAdapter {
                 JSONObject().put("sessionId", sid).put("thinkingLevel", effort.lowercase()),
             )
         }
+        // Resolve the REAL provider from the config instead of echoing the
+        // caller's (possibly stale) provider string or a hard-coded
+        // "OpenMinis" — the App and Web must agree on the provider label.
+        val resolved = runCatching {
+            val app = context.applicationContext as? MinisApp ?: return@runCatching null
+            ModelSelectionResolver.resolve(app.providerRepository.config.value, model)
+        }.getOrNull()
         return JSONObject().put("selected", JSONObject().apply {
-            put("provider", provider.ifEmpty { "OpenMinis" })
-            put("model", result.optString("modelEntryId", model).ifEmpty { model })
+            put("provider", resolved?.provider ?: "OpenMinis")
+            put("model", resolved?.entryId ?: result.optString("modelEntryId", model).ifEmpty { model })
             if (effort.isNotEmpty()) put("reasoningEffort", effort)
         })
     }
@@ -1831,7 +1928,7 @@ object DshApiAdapter {
      */
     private fun agentPresetList(context: Context): JSONObject = JSONObject().apply {
         val presets = JSONArray()
-        val defaultId = try { AgentPresetRegistry.defaultForNewSessions(context).id } catch (_: Exception) { "default" }
+        val defaultId = try { AgentPresetRegistry.defaultForNewSessions(context).id } catch (_: Exception) { "standard" }
         for (preset in AgentPresetRegistry.list()) {
             presets.put(JSONObject().apply {
                 put("id", preset.id)
@@ -1848,7 +1945,7 @@ object DshApiAdapter {
 
     /** agentPresetReadValueSchema (client.js:5785). */
     private fun agentPresetRead(context: Context, payload: JSONObject): JSONObject {
-        val id = payload.optString("agentPreset", "default")
+        val id = payload.optString("agentPreset", "standard")
         val preset = AgentPresetRegistry.get(id)
         if (preset == null) throw IllegalArgumentException("agent preset not found: $id")
         return JSONObject().apply {
@@ -2043,7 +2140,7 @@ object DshApiAdapter {
                 Triple(
                     agentPresetSettingsSchema(),
                     JSONObject().put("default", default),
-                    JSONObject().put("default", "default"),
+                    JSONObject().put("default", "standard"),
                 )
             }
             "general" -> Triple(
@@ -2134,7 +2231,7 @@ object DshApiAdapter {
                 RemotePermissionPolicy.setPreset(context, preset)
             }
             "agent-presets" -> {
-                if (!AgentPresetRegistry.setDefaultForNewSessions(context, next.optString("default", "default"))) {
+                if (!AgentPresetRegistry.setDefaultForNewSessions(context, next.optString("default", "standard"))) {
                     throw IllegalArgumentException("unknown agent preset")
                 }
             }
@@ -2200,17 +2297,23 @@ object DshApiAdapter {
     }
 
     private fun agentPresetSettingsSchema(): JSONObject = JSONObject().apply {
-        put("uid", 3)
-        put("refs", JSONObject().apply {
-            put("1", JSONObject().put("type", "const")
-                .put("meta", JSONObject().put("description", "默认（不额外限制）"))
-                .put("value", "default"))
-            put("2", JSONObject().put("type", "const")
-                .put("meta", JSONObject().put("description", "工作区沙箱（仅限工作区写文件）"))
-                .put("value", "workspace-sandboxed"))
-            put("3", JSONObject().put("type", "union").put("list", JSONArray(listOf(1, 2))))
-            put("4", JSONObject().put("type", "object").put("dict", JSONObject().put("default", 3)))
-        })
+        val refs = JSONObject()
+        val list = JSONArray()
+        var uid = 1
+        for (preset in AgentPresetRegistry.list()) {
+            refs.put(uid.toString(), JSONObject()
+                .put("type", "const")
+                .put("meta", JSONObject().put("description", "${preset.name}：${preset.description}"))
+                .put("value", preset.id))
+            list.put(uid)
+            uid++
+        }
+        refs.put(uid.toString(), JSONObject().put("type", "union").put("list", list))
+        refs.put((uid + 1).toString(), JSONObject()
+            .put("type", "object")
+            .put("dict", JSONObject().put("default", uid)))
+        put("uid", uid + 1)
+        put("refs", refs)
     }
 
     private fun singleStringSchema(field: String): JSONObject = JSONObject().apply {
@@ -2337,7 +2440,9 @@ object DshApiAdapter {
     private suspend fun commandsList(context: Context, payload: JSONObject): JSONArray {
         val (_, agentId) = remoteArgs(payload)
         val list = JSONArray()
-        for (desc in hostCommandDirectory(context, agentId)) {
+        // Single Android-authoritative directory (AgentCommandRegistry). The
+        // Web never keeps its own business-command list.
+        for (desc in AgentCommandRegistry.directory(context, agentId)) {
             val entry = JSONObject()
                 .put("name", desc.name)
                 .put("description", desc.description)
@@ -2345,19 +2450,6 @@ object DshApiAdapter {
             list.put(entry)
         }
         return list
-    }
-
-    private data class CommandDescriptor(val name: String, val description: String, val hint: String? = null)
-
-    private fun hostCommandDirectory(context: Context, agentId: String): List<CommandDescriptor> {
-        val commands = mutableListOf(
-            CommandDescriptor("model", "查看或切换当前会话的模型与思考强度", "可选: 模型 id，或 `off`/`low`/`medium`/`high` 设置思考强度"),
-            CommandDescriptor("permission", "切换当前会话的 Agent 执行权限预设", "workspace-write | danger-full-access"),
-            CommandDescriptor("goal", "查看或设置当前会话的 Goal", "可选: 目标描述文本"),
-            CommandDescriptor("feedback", "查看当前会话的消息反馈状态"),
-            CommandDescriptor("export", "导出当前会话的 JSON 日志"),
-        )
-        return commands
     }
 
     /**
@@ -2377,17 +2469,20 @@ object DshApiAdapter {
             throw IllegalArgumentException("command must start with '/'")
         }
         val parsed = parseCommandLine(line)
-        val descriptor = hostCommandDirectory(context, agentId).firstOrNull { it.name == parsed.name }
-            ?: return JSONObject.NULL // unknown command → value omitted → client echoes error
+        // Single Android-authoritative directory (AgentCommandRegistry — not a
+        // second list). Unknown command → value omitted → client echoes error.
+        val descriptor = AgentCommandRegistry.directory(context, agentId)
+            .firstOrNull { it.name == parsed.name }
+            ?: return JSONObject.NULL
 
         val commandId = "cmd_${System.currentTimeMillis()}_${parsed.name}"
-        val runEvent = SessionEventHub.append(agentId, "command/run", JSONObject().apply {
+        SessionEventHub.append(agentId, "command/run", JSONObject().apply {
             put("commandId", commandId)
             put("name", parsed.name)
             if (parsed.arg.isNotEmpty()) put("args", parsed.arg)
         })
 
-        val outcome = executeHostCommand(context, agentId, parsed.name, parsed.arg)
+        val outcome = AgentCommandRegistry.execute(context, agentId, parsed.name, parsed.arg)
         val doneEvent = SessionEventHub.append(agentId, "command/done", JSONObject().apply {
             put("commandId", commandId)
             put("kind", if (outcome.ok) "success" else "error")
@@ -2417,111 +2512,6 @@ object DshApiAdapter {
         } else {
             ParsedCommand(body.substring(0, space).lowercase(), body.substring(space + 1).trim())
         }
-    }
-
-    private data class CommandOutcome(val ok: Boolean, val text: String = "")
-
-    private suspend fun executeHostCommand(
-        context: Context,
-        sessionId: String,
-        name: String,
-        arg: String,
-    ): CommandOutcome = try {
-        when (name) {
-            "model" -> commandModel(context, sessionId, arg)
-            "permission" -> commandPermission(context, sessionId, arg)
-            "goal" -> commandGoal(context, sessionId, arg)
-            "feedback" -> CommandOutcome(true, commandFeedbackText(context, sessionId))
-            "export" -> CommandOutcome(true, commandExport(context, sessionId))
-            else -> CommandOutcome(false, "unknown command: /$name")
-        }
-    } catch (e: Exception) {
-        CommandOutcome(false, e.message ?: "command failed")
-    }
-
-    /** `/model` — read the session's current model, or apply model/effort. */
-    private suspend fun commandModel(context: Context, sessionId: String, arg: String): CommandOutcome {
-        if (arg.isEmpty()) {
-            val status = runCatching {
-                ChatMutationMethods.status(context, JSONObject().put("sessionId", sessionId))
-            }.getOrNull()
-            val model = status?.optString("modelName", "").orEmpty()
-            val level = status?.optString("thinkingLevel", "").orEmpty()
-            return CommandOutcome(true, "当前模型: ${model.ifEmpty { "(未设置)" }}${if (level.isNotEmpty()) " · 思考强度: $level" else ""}")
-        }
-        val effort = when (arg.lowercase()) {
-            "off", "low", "medium", "high", "xhigh" -> arg.lowercase()
-            else -> null
-        }
-        if (effort != null) {
-            ChatMutationMethods.selectThinkingLevel(
-                context,
-                JSONObject().put("sessionId", sessionId).put("thinkingLevel", effort),
-            )
-            return CommandOutcome(true, "思考强度已切换为 $effort")
-        }
-        val result = ChatMutationMethods.selectModel(
-            context,
-            JSONObject().put("sessionId", sessionId).put("modelEntryId", arg),
-        )
-        val chosen = result.optString("modelEntryId", arg).ifEmpty { arg }
-        return CommandOutcome(true, "模型已切换: $chosen")
-    }
-
-    /** `/permission <preset>` — real per-session Agent permission switch. */
-    private fun commandPermission(context: Context, sessionId: String, arg: String): CommandOutcome {
-        val preset = arg.lowercase()
-        if (preset.isNotEmpty() && !SessionPermissionStore.isKnownPreset(preset)) {
-            return CommandOutcome(false, "未知权限预设: $preset (可用: workspace-write | danger-full-access)")
-        }
-        val effective = preset.ifEmpty { SessionPermissionStore.preset(context, sessionId) ?: "workspace-write" }
-        SessionPermissionStore.setPreset(context, sessionId, preset.ifEmpty { null })
-        // DSH permission projection is derived from these three events
-        // (see permissionSelectOf in dsh-client-connection/client.js).
-        val sandboxMode = if (effective == SessionPermissionStore.DANGER_FULL_ACCESS) "danger-full-access" else "workspace-write"
-        val approvalPolicy = if (effective == SessionPermissionStore.DANGER_FULL_ACCESS) "never" else "ask"
-        SessionEventHub.append(sessionId, "permission/preset", JSONObject().put("preset", effective))
-        SessionEventHub.append(sessionId, "sandbox/mode", JSONObject().put("mode", sandboxMode))
-        SessionEventHub.append(sessionId, "approval/policy", JSONObject().put("policy", approvalPolicy))
-        return if (preset.isEmpty()) {
-            CommandOutcome(true, "当前会话权限: $effective (未预设,按默认工作区写入)")
-        } else {
-            CommandOutcome(true, "当前会话权限已切换为 $effective；文件写入门禁已生效")
-        }
-    }
-
-    /** `/goal [text]` — show or set the session's Goal. */
-    private fun commandGoal(context: Context, sessionId: String, arg: String): CommandOutcome {
-        val current = com.openminis.app.tools.AgentStateStore.goalGet(sessionId)
-        if (arg.isEmpty()) {
-            if (current.text.isBlank()) return CommandOutcome(true, "当前会话未设置 Goal")
-            return CommandOutcome(true, "Goal (${current.phase}): ${current.text} (rounds ${current.maxGoalRounds})")
-        }
-        val goal = com.openminis.app.tools.AgentStateStore.goalSet(sessionId, arg)
-        appendGoalChange(sessionId, "create", goal)
-        return CommandOutcome(true, "Goal 已设置: ${goal.text}")
-    }
-
-    /** `/feedback` — summary of the session's feedback rows. */
-    private fun commandFeedbackText(context: Context, sessionId: String): String {
-        val items = MessageFeedbackStore.listForSession(context, sessionId)
-        if (items.isEmpty()) return "当前会话暂无消息反馈"
-        val positive = items.count { it.second.rating == "positive" }
-        val negative = items.count { it.second.rating == "negative" }
-        return "当前会话反馈: $positive 个赞同 / $negative 个反对 (共 ${items.size} 条)"
-    }
-
-    /** `/export` — surface the session's JSON export path (debugger endpoint). */
-    private suspend fun commandExport(context: Context, sessionId: String): String {
-        val target = File(context.cacheDir, "session_export_$sessionId.json").apply { parentFile?.mkdirs() }
-        val replay = runCatching { HeadlessChatRunner.sessionEvents(context, sessionId, null) }.getOrNull()
-        val array = JSONArray()
-        replay?.events?.forEach { array.put(it.toEventJson()) }
-        target.writeText(JSONObject()
-            .put("sessionId", sessionId)
-            .put("exportedAt", System.currentTimeMillis())
-            .put("events", array).toString(2))
-        return "会话已导出: ${target.absolutePath}"
     }
 
     // -------------------------------------------------- messageFeedback Remote

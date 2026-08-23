@@ -27,16 +27,25 @@ object AgentTools {
         // attempt those calls. Mirrors the iOS gate at
         // AIChatViewModel.makeAgentTools(memoryEnabled:).
         memoryEnabled: Boolean = true,
+        /**
+         * Agent preset's real tool configuration: `CORE` (minimal mode)
+         * exposes only the persistent shell + file triad; `FULL` keeps the
+         * whole capability set. This is the one knob that makes a preset a
+         * real runtime behavior difference, not a UI label.
+         */
+        presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
+            com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
     ): List<AgentToolDefinition> = buildList {
         add(shellExecuteDefinition())
+        add(FileReadTool.definition())
+        add(FileWriteTool.definition())
+        add(FileEditTool.definition())
+        if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) return@buildList
         // Android development/debug loop. These high-cohesion tools reuse the
         // existing AccessibilityService, Shizuku, PRoot, approval, checkpoint,
         // JobRegistry, and output-spill seams rather than creating parallel
         // runtimes.
         addAll(com.openminis.app.tools.android.AndroidAgentTools.definitions())
-        add(FileReadTool.definition())
-        add(FileWriteTool.definition())
-        add(FileEditTool.definition())
         if (supportsImageInput || visionGroupConfigured) {
             add(ReadImageTool.definition())
         }

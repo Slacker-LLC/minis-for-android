@@ -182,6 +182,25 @@ export class MinisSettingsController {
         case 'web-service': await this.api.patch('/api/settings', p); break
         case 'web-identity': await this.api.patch('/api/settings', p); message = '账号已更新，请重新登录'; break
         case 'web-tunnel': await this.api.patch('/api/settings', p); break
+        // Tunnel control goes through the SAME Android TunnelManager (never a
+        // second cloudflared); the browser only forwards operations.
+        case 'tunnel-start': await this.api.post('/api/tunnel/start'); message = 'Tunnel 启动中…'; break
+        case 'tunnel-stop': await this.api.post('/api/tunnel/stop'); message = 'Tunnel 已停止'; break
+        case 'tunnel-restart': await this.api.post('/api/tunnel/restart'); message = 'Tunnel 重启中…'; break
+        case 'tunnel-diagnose': {
+          const result = objectOf(await this.api.post('/api/tunnel/diagnose'))
+          this.updatePage('web', page => { page.diagnostics = result.checks ?? [] })
+          refresh = false
+          message = '诊断完成'
+          break
+        }
+        case 'tunnel-protocol': await this.api.post('/api/tunnel/protocol', p); message = '协议已更新（已按需重启 Tunnel）'; break
+        case 'web-tunnel-install': {
+          const result = objectOf(await this.api.post('/api/tunnel/install'))
+          if (!booleanOf(result.ok)) throw new Error(textOf(result.error, '安装失败'))
+          message = 'cloudflared 已就绪'
+          break
+        }
         case 'web-restart': await this.api.post('/api/settings/restart'); refresh = false; message = '正在重启'; break
         case 'logout':
           await this.api.post('/api/auth/logout')
@@ -370,7 +389,13 @@ export class MinisSettingsController {
           this.api.request('/api/settings', {}, signal),
           this.api.request('/api/status', {}, signal),
         ])
-        return { settings, status }
+        // Tunnel details/logs loaded lazily by the page component through the
+        // same authenticated seam (not here: the page must not open with
+        // hundreds of log lines).
+        const page: JsonObject = { settings, status }
+        const previous = this.store.getSnapshot().pages.web
+        if (previous?.diagnostics !== undefined) page.diagnostics = previous.diagnostics
+        return page
       }
       case 'device': return this.store.getSnapshot().pages.device ?? { tapMode: false, x: 0, y: 0 }
       case 'diagnostics': {

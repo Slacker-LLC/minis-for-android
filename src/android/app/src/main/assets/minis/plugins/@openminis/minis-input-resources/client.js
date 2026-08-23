@@ -105,6 +105,12 @@ window.__ModuleLoader__.load({
         }
       };
       scope.effect(() => inputTriggers.registerSource(source), "openminis: resources @ source");
+      const fullWidthSource = {
+        ...source,
+        trigger: "\uFF20",
+        name: "resources-fullwidth"
+      };
+      scope.effect(() => inputTriggers.registerSource(fullWidthSource), "openminis: resources \uFF20 source");
     }
     
     return module.exports;

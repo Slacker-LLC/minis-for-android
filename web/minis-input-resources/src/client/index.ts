@@ -164,9 +164,20 @@ export function apply(ctx: unknown): void {
         return Promise.resolve(ref)
       },
     },
-  }
+  } as Record<string, unknown>
 
   scope.effect(() => inputTriggers.registerSource(source), 'openminis: resources @ source')
+
+  // CJK IMEs substitute the full-width ＠ (U+FF20) when the user types `@` on
+  // a Chinese/Japanese keyboard layout — same source, same host catalog. The
+  // picker is registered twice with the same lookup the ASCII source uses, so
+  // the mention picker is truly one system on top of one resources/list.
+  const fullWidthSource = {
+    ...source,
+    trigger: '＠',
+    name: 'resources-fullwidth',
+  }
+  scope.effect(() => inputTriggers.registerSource(fullWidthSource), 'openminis: resources ＠ source')
 }
 
 export { FILE_PREFIX, SESSION_PREFIX }

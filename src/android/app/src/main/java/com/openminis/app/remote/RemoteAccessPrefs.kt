@@ -27,6 +27,7 @@ object RemoteAccessPrefs {
     private const val KEY_USERNAME = "username"
     private const val KEY_TUNNEL_ENABLED = "cloudflare_tunnel_enabled"
     private const val KEY_TUNNEL_HOSTNAME = "cloudflare_tunnel_hostname"
+    private const val KEY_TUNNEL_PROTOCOL = "cloudflare_tunnel_protocol"
 
     private const val SECRET_API_TOKEN = "api_token"
     private const val SECRET_PASSWORD_SALT = "login_password_salt"
@@ -180,6 +181,23 @@ object RemoteAccessPrefs {
         val clean = token?.trim().orEmpty()
         if (clean.isEmpty()) edit.remove(SECRET_TUNNEL_TOKEN) else edit.putString(SECRET_TUNNEL_TOKEN, clean)
         edit.apply()
+    }
+
+    /**
+     * Transport protocol policy. `auto` (default, and the current recommended
+     * mobile-networking default) resolves to HTTP/2 — carriers frequently pass
+     * cloudflared's short QUIC pre-check but drop the long-lived UDP/7844
+     * control stream. `quic` only when the user explicitly pins it.
+     */
+    fun cloudflareTunnelProtocol(context: Context): String =
+        prefs(context).getString(KEY_TUNNEL_PROTOCOL, "auto")?.takeIf { it == "auto" || it == "http2" || it == "quic" }
+            ?: "auto"
+
+    fun setCloudflareTunnelProtocol(context: Context, protocol: String) {
+        require(protocol == "auto" || protocol == "http2" || protocol == "quic") {
+            "tunnel protocol must be auto|http2|quic"
+        }
+        prefs(context).edit().putString(KEY_TUNNEL_PROTOCOL, protocol).apply()
     }
 
     private fun prefs(context: Context) =

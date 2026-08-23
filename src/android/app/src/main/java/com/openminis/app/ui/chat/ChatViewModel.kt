@@ -18,9 +18,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.ModelTraining
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.ThumbUp
 import com.openminis.app.data.BPETokenizer
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.ContextPolicy
@@ -852,6 +858,11 @@ class ChatViewModel(
                 providerRepository, context,
             ),
             memoryEnabled = _memoryEnabled.value,
+            // Agent preset is Android-authoritative runtime state: the
+            // session's effective preset (never null — falls back to the
+            // default for new sessions) chooses the real tool configuration.
+            presetToolset = com.openminis.app.remote.AgentPresetRegistry
+                .presetForSession(context, sessionId).toolset,
         )
 
     /**
@@ -1370,8 +1381,38 @@ class ChatViewModel(
 
     /** Static catalogue of available slash commands, in display order.
      *  Subtitles are placeholders here — [filteredSlashCommands] always
-     *  rebuilds them with the current localized state. */
+     *  rebuilds them with the current localized state.
+     *
+     *  The business command set is the SAME as the Web Remote's
+     *  `commands/list` (both are the Android-authoritative
+     *  [com.openminis.app.remote.AgentCommandRegistry]); the App renders its
+     *  own idioms, but every id dispatches to the same runtime handler.
+     */
     internal val availableSlashCommands: List<SlashCommand> = listOf(
+        SlashCommand(
+            id = "model",
+            icon = Icons.Default.ModelTraining,
+            title = "Model",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "permission",
+            icon = Icons.Outlined.Security,
+            title = "Permission",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "goal",
+            icon = Icons.Outlined.Flag,
+            title = "Goal",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "plan",
+            icon = Icons.Default.Schedule,
+            title = "Plan",
+            subtitle = "",
+        ),
         SlashCommand(
             id = "clear",
             icon = Icons.Default.Delete,
@@ -1394,6 +1435,18 @@ class ChatViewModel(
             id = "thinking",
             icon = Icons.Default.Lightbulb,
             title = "Thinking",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "feedback",
+            icon = Icons.Outlined.ThumbUp,
+            title = "Feedback",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "export",
+            icon = Icons.Outlined.FileDownload,
+            title = "Export",
             subtitle = "",
         ),
     )
@@ -1457,6 +1510,20 @@ class ChatViewModel(
             "memory" -> toggleMemoryEnabled()
             "thinking" -> toggleThinking()
             "clear" -> _clearChatConfirmRequested.value = true
+            // Unified Android-authoritative command set: identical id +
+            // handler as the Web Remote's commands/list; async work is
+            // dispatched on a fire-and-forget scope and reported through
+            // the same session journal the Web projection reads.
+            "model", "permission", "goal", "plan", "feedback", "export" -> {
+                viewModelScope.launch {
+                    val outcome = com.openminis.app.remote.AgentCommandRegistry.execute(
+                        context, sessionId, cmd.id, "",
+                    )
+                    if (outcome.text.isNotEmpty()) {
+                        appendSystemInfo(text = outcome.text, iconKind = "command")
+                    }
+                }
+            }
             else -> AppLogger.info(TAG, "[Slash] unrecognized id=${cmd.id} — no dispatch")
         }
         // [T-android-slash-menu-align-ios-prepend] Action command: restore the
@@ -1503,6 +1570,23 @@ class ChatViewModel(
             text = "Thinking set to ${newLevel.displayName.lowercase()}.",
             iconKind = "thinking",
         )
+    }
+
+    /**
+     * Command-facing toggle for the unified `AgentCommandRegistry` (Web
+     * `/thinking` executes through the same VM as the App's own slash menu;
+     * there is deliberately no second memory/thinking toggle path). Returns
+     * the new effective state so the host can report it honestly.
+     */
+    fun toggleMemoryForCommand(): Boolean {
+        toggleMemoryEnabled()
+        return _memoryEnabled.value
+    }
+
+    /** Command-facing `/thinking` toggle; returns the new effective level. */
+    fun toggleThinkingForCommand(): ThinkingLevel {
+        toggleThinking()
+        return _thinkingLevel.value
     }
 
     /**
@@ -9606,6 +9690,15 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
         return buildString {
             append(base)
+            // Agent preset prompt configuration is Android-authoritative and
+            // applied by the runtime itself — same preset, same prompt, on
+            // both App and Web (the Web never edits the prompt).
+            val presetPrompt = com.openminis.app.remote.AgentPresetRegistry
+                .presetForSession(context, sessionId).promptSection
+            if (presetPrompt != null) {
+                append("\n\n")
+                append(presetPrompt)
+            }
             if (skillFragment != null) {
                 append("\n\n")
                 append(skillFragment)

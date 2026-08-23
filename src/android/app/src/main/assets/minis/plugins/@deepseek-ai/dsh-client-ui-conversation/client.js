@@ -3400,6 +3400,19 @@ window.__ModuleLoader__.load({
 			const dragDepthRef = (0, react.useRef)(0);
 			const scrollRef = (0, react.useRef)(null);
 			const mirrorRef = (0, react.useRef)(null);
+			// OpenMinis: the composer `+` button opens the system file picker for
+			// image attachments (PNG/JPG/WebP/GIF via the existing image pipeline).
+			// It deliberately does NOT open the slash command menu — `/` is the
+			// only command trigger. The picker is a hidden input so re-renders
+			// reset its value and the same file can be picked twice.
+			const imagePickerRef = (0, react.useRef)(null);
+			const pickAttachments = (0, react.useCallback)(() => {
+				const el = imagePickerRef.current;
+				if (el !== null) {
+					el.value = "";
+					el.click();
+				}
+			}, []);
 			const safari = (0, react.useMemo)(() => isSafariBrowser(navigator), []);
 			const safariNativeShrinkRef = (0, react.useRef)(false);
 			const composingRef = (0, react.useRef)(false);
@@ -3616,6 +3629,10 @@ window.__ModuleLoader__.load({
 				t
 			]);
 			const canAcceptDrop = !locked && !machineBusy && addImages !== void 0;
+			// OpenMinis `+` → system file picker → existing image pipeline.
+			const onPickAttachments = (0, react.useCallback)((event) => {
+				intakeImages([...(event.target.files ?? [])]);
+			}, [intakeImages]);
 			(0, react.useEffect)(() => {
 				const hasFiles = (event) => event.dataTransfer?.types.includes("Files") ?? false;
 				const reset = () => {
@@ -3867,21 +3884,32 @@ window.__ModuleLoader__.load({
 								children: [(0, react_jsx_runtime.jsxs)("div", {
 									className: InputBar_module_css_default.tools,
 									children: [
+										// OpenMinis: `+` opens the attachment file picker. The
+										// slash command menu is reached by typing `/` (its own
+										// input trigger) — never through this button.
 										(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
-											label: t("input.commands"),
+											label: t("input.attach"),
 											side: "top",
 											delayMs: 500,
 											children: (0, react_jsx_runtime.jsx)("button", {
 												type: "button",
 												className: InputBar_module_css_default.add,
-												"aria-label": t("input.commands"),
-												"aria-haspopup": "listbox",
-												"aria-expanded": commandMenuOpen,
-												disabled: locked || toggleCommandMenu === void 0,
+												"aria-label": t("input.attach"),
+												disabled: locked || addImages === void 0,
 												onMouseDown: keepFocus,
-												onClick: onToggleCommandMenu,
+												onClick: pickAttachments,
 												children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 14 })
 											})
+										}),
+										(0, react_jsx_runtime.jsx)("input", {
+											ref: imagePickerRef,
+											type: "file",
+											accept: "image/png,image/jpeg,image/webp,image/gif",
+											multiple: true,
+											"aria-hidden": true,
+											tabIndex: -1,
+											onChange: onPickAttachments,
+											style: { display: "none" }
 										}),
 										(0, react_jsx_runtime.jsxs)("div", {
 											className: InputBar_module_css_default.modes,
@@ -5826,6 +5854,7 @@ window.__ModuleLoader__.load({
 			"placeholder.hero": "描述你想要构建的内容",
 			"placeholder.workspace": "选择一个工作区开始",
 			"input.commands": "命令",
+			"input.attach": "添加附件（图片）",
 			"input.stop": "停止生成",
 			"input.send": "发送消息",
 			"placeholder.steerQueue": "Cmd/Ctrl+Enter 插话发送全部排队消息",
@@ -5991,6 +6020,7 @@ window.__ModuleLoader__.load({
 			"placeholder.hero": "Describe what you want to build",
 			"placeholder.workspace": "Choose a workspace to start",
 			"input.commands": "Commands",
+			"input.attach": "Attach images",
 			"input.stop": "Stop generating",
 			"input.send": "Send message",
 			"placeholder.steerQueue": "Cmd/Ctrl+Enter steers all queued messages",

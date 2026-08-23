@@ -412,6 +412,39 @@ window.__ModuleLoader__.load({
             case "web-tunnel":
               await this.api.patch("/api/settings", p);
               break;
+            // Tunnel control goes through the SAME Android TunnelManager (never a
+            // second cloudflared); the browser only forwards operations.
+            case "tunnel-start":
+              await this.api.post("/api/tunnel/start");
+              message = "Tunnel \u542F\u52A8\u4E2D\u2026";
+              break;
+            case "tunnel-stop":
+              await this.api.post("/api/tunnel/stop");
+              message = "Tunnel \u5DF2\u505C\u6B62";
+              break;
+            case "tunnel-restart":
+              await this.api.post("/api/tunnel/restart");
+              message = "Tunnel \u91CD\u542F\u4E2D\u2026";
+              break;
+            case "tunnel-diagnose": {
+              const result = objectOf(await this.api.post("/api/tunnel/diagnose"));
+              this.updatePage("web", (page) => {
+                page.diagnostics = result.checks ?? [];
+              });
+              refresh = false;
+              message = "\u8BCA\u65AD\u5B8C\u6210";
+              break;
+            }
+            case "tunnel-protocol":
+              await this.api.post("/api/tunnel/protocol", p);
+              message = "\u534F\u8BAE\u5DF2\u66F4\u65B0\uFF08\u5DF2\u6309\u9700\u91CD\u542F Tunnel\uFF09";
+              break;
+            case "web-tunnel-install": {
+              const result = objectOf(await this.api.post("/api/tunnel/install"));
+              if (!booleanOf(result.ok)) throw new Error(textOf(result.error, "\u5B89\u88C5\u5931\u8D25"));
+              message = "cloudflared \u5DF2\u5C31\u7EEA";
+              break;
+            }
             case "web-restart":
               await this.api.post("/api/settings/restart");
               refresh = false;
@@ -621,7 +654,10 @@ window.__ModuleLoader__.load({
               this.api.request("/api/settings", {}, signal),
               this.api.request("/api/status", {}, signal)
             ]);
-            return { settings, status };
+            const page = { settings, status };
+            const previous = this.store.getSnapshot().pages.web;
+            if (previous?.diagnostics !== void 0) page.diagnostics = previous.diagnostics;
+            return page;
           }
           case "device":
             return this.store.getSnapshot().pages.device ?? { tapMode: false, x: 0, y: 0 };
@@ -690,7 +726,7 @@ window.__ModuleLoader__.load({
     };
     
     // src/client/settings/MinisSettings.tsx
-    var import_react2 = require("react");
+    var import_react3 = require("react");
     
     // src/client/settings/navigation.ts
     var NAVIGATION = [
@@ -728,7 +764,7 @@ window.__ModuleLoader__.load({
     var clsx_default = clsx;
     
     // src/client/settings/MinisSettings.module.css
-    var css = ".om_root_LfS8SW{box-sizing:border-box;width:100%;min-width:0;color:var(--dsw-alias-label-primary);font:var(--dsw-typography-body-2,14px/1.5 var(--dsw-font-family))}.om_root_LfS8SW *,.om_root_LfS8SW :before,.om_root_LfS8SW :after{box-sizing:border-box}.om_header_LfS8SW{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:center;gap:10px;min-height:52px;padding-bottom:12px;display:flex}.om_headerText_LfS8SW{min-width:0}.om_header_LfS8SW h2{margin:0;font-size:16px;font-weight:600;line-height:24px}.om_header_LfS8SW p{color:var(--dsw-alias-label-tertiary);margin:1px 0 0;font-size:12px;line-height:18px}.om_spacer_LfS8SW{flex:1}.om_repo_LfS8SW{color:var(--dsw-alias-state-business-primary);flex:none;font-size:12px;text-decoration:none}.om_repo_LfS8SW:hover{text-decoration:underline}.om_button_LfS8SW,.om_iconButton_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;transition:background-color var(--dsw-duration-fast,.12s), border-color var(--dsw-duration-fast,.12s);border-radius:8px}.om_button_LfS8SW{min-height:32px;padding:5px 11px}.om_iconButton_LfS8SW{flex:none;width:30px;height:30px;padding:0;font-size:18px;line-height:28px}.om_button_LfS8SW:hover,.om_iconButton_LfS8SW:hover{background:var(--dsw-alias-interactive-bg-hover)}.om_button_LfS8SW:focus-visible,.om_iconButton_LfS8SW:focus-visible,.om_navButton_LfS8SW:focus-visible,.om_input_LfS8SW:focus-visible,.om_select_LfS8SW:focus-visible,.om_textarea_LfS8SW:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.om_primary_LfS8SW{background:var(--dsw-alias-button-info-fill);color:var(--dsw-alias-label-on-color);border-color:#0000}.om_primary_LfS8SW:hover{background:var(--dsw-alias-button-info-hover)}.om_danger_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_small_LfS8SW{min-height:27px;padding:3px 8px;font-size:12px}.om_button_LfS8SW:disabled,.om_iconButton_LfS8SW:disabled{opacity:.5;cursor:wait}.om_navigation_LfS8SW{flex-wrap:wrap;gap:5px;padding:12px 0;display:flex}.om_navButton_LfS8SW{min-height:32px;color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;background:0 0;border:0;border-radius:8px;padding:5px 10px;font-size:13px}.om_navButton_LfS8SW:hover{background:var(--dsw-alias-interactive-bg-hover)}.om_navActive_LfS8SW{background:var(--dsw-specific-sidebar-nav-item-active);color:var(--dsw-alias-state-business-primary);font-weight:500}.om_mobileNavigation_LfS8SW{display:none}.om_content_LfS8SW{min-width:0;padding:2px 0 8px}.om_loading_LfS8SW,.om_errorState_LfS8SW{text-align:center;color:var(--dsw-alias-label-tertiary);padding:54px 12px}.om_errorState_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_grid_LfS8SW{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;display:grid}.om_card_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;min-width:0;padding:13px}.om_wide_LfS8SW{grid-column:1/-1}.om_card_LfS8SW h3{margin:0 0 5px;font-size:14px;font-weight:600}.om_card_LfS8SW p{color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere;margin:3px 0}.om_cardHead_LfS8SW{align-items:flex-start;gap:9px;display:flex}.om_cardHead_LfS8SW>:first-child{flex:1;min-width:0}.om_actions_LfS8SW{flex-wrap:wrap;justify-content:flex-end;gap:6px;display:flex}.om_badge_LfS8SW{background:var(--dsw-alias-bg-layer-3);min-height:20px;color:var(--dsw-alias-state-business-primary);border-radius:10px;align-items:center;padding:1px 7px;font-size:11px;display:inline-flex}.om_badgeOk_LfS8SW{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}.om_badgeOff_LfS8SW{color:var(--dsw-alias-label-tertiary)}.om_riskHigh_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_riskMedium_LfS8SW{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}.om_list_LfS8SW{gap:9px;display:grid}.om_sectionTitle_LfS8SW{align-items:center;gap:10px;margin:4px 0 11px;display:flex}.om_sectionTitle_LfS8SW:not(:first-child){margin-top:18px}.om_sectionTitle_LfS8SW h3{margin:0;font-size:15px}.om_sectionTitle_LfS8SW span{color:var(--dsw-alias-label-tertiary);font-size:12px}.om_form_LfS8SW{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:11px;display:grid}.om_form_LfS8SW .om_wide_LfS8SW{grid-column:1/-1}.om_field_LfS8SW{color:var(--dsw-alias-label-secondary);gap:5px;font-size:12px;display:grid}.om_input_LfS8SW,.om_select_LfS8SW,.om_textarea_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-specific-input-major,var(--dsw-alias-bg-layer-2));width:100%;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;padding:7px 9px;font-size:13px;line-height:1.4}.om_input_LfS8SW,.om_select_LfS8SW{height:34px}.om_textarea_LfS8SW{resize:vertical;min-height:106px;font-family:var(--dsw-font-family-mono,ui-monospace, monospace)}.om_check_LfS8SW{min-height:32px;color:var(--dsw-alias-label-secondary);align-items:center;gap:7px;display:flex}.om_muted_LfS8SW{color:var(--dsw-alias-label-tertiary);font-size:12px}.om_keyValues_LfS8SW{gap:6px;font-size:13px;display:grid}.om_keyValueRow_LfS8SW{grid-template-columns:minmax(105px,.42fr) 1fr;gap:11px;display:grid}.om_keyValueRow_LfS8SW dt{color:var(--dsw-alias-label-tertiary)}.om_keyValueRow_LfS8SW dd{overflow-wrap:anywhere;margin:0}.om_empty_LfS8SW{text-align:center;border:1px dashed var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);border-radius:10px;padding:30px 12px}.om_details_LfS8SW{border-top:1px solid var(--dsw-alias-border-l2);margin-top:9px;padding-top:8px}.om_details_LfS8SW>summary{cursor:pointer;color:var(--dsw-alias-label-secondary);font-size:12px}.om_code_LfS8SW{white-space:pre-wrap;background:var(--dsw-alias-bg-base);max-height:320px;color:var(--dsw-alias-label-secondary);font:12px/1.5 var(--dsw-font-family-mono,ui-monospace, monospace);border-radius:8px;padding:10px;overflow:auto}.om_note_LfS8SW{border-left:3px solid var(--dsw-alias-state-business-primary);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);border-radius:0 8px 8px 0;margin-bottom:11px;padding:9px 11px}.om_dangerNote_LfS8SW{border-left-color:var(--dsw-alias-state-error-primary)}.om_toast_LfS8SW{z-index:1200;background:var(--dsw-alias-bg-layer-3);max-width:min(440px,100% - 48px);color:var(--dsw-alias-label-on-color);box-shadow:var(--dsw-shadow-lv3);border-radius:9px;padding:10px 14px;position:fixed;bottom:20px;right:24px}.om_toastError_LfS8SW{background:var(--dsw-alias-state-error-primary)}.om_deviceStage_LfS8SW{gap:8px;margin:10px 0;display:grid}.om_deviceShot_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);cursor:crosshair;touch-action:manipulation;border-radius:10px;width:auto;max-width:100%;height:auto;max-height:70vh;margin:0 auto;display:block}.om_center_LfS8SW{text-align:center}@media (width<=760px){.om_header_LfS8SW{align-items:flex-start}.om_header_LfS8SW p,.om_repo_LfS8SW,.om_navigation_LfS8SW{display:none}.om_mobileNavigation_LfS8SW{width:100%;margin:11px 0;display:block}.om_form_LfS8SW,.om_grid_LfS8SW,.om_keyValueRow_LfS8SW{grid-template-columns:1fr}.om_form_LfS8SW .om_wide_LfS8SW,.om_wide_LfS8SW{grid-column:auto}.om_actions_LfS8SW{justify-content:flex-start}.om_cardHead_LfS8SW{flex-wrap:wrap}}@media (prefers-reduced-motion:reduce){.om_root_LfS8SW *{scroll-behavior:auto!important;transition:none!important}}";
+    var css = ".om_root_LfS8SW{box-sizing:border-box;width:100%;min-width:0;color:var(--dsw-alias-label-primary);font:var(--dsw-typography-body-2,14px/1.5 var(--dsw-font-family))}.om_root_LfS8SW *,.om_root_LfS8SW :before,.om_root_LfS8SW :after{box-sizing:border-box}.om_header_LfS8SW{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:center;gap:10px;min-height:52px;padding-bottom:12px;display:flex}.om_headerText_LfS8SW{min-width:0}.om_header_LfS8SW h2{margin:0;font-size:16px;font-weight:600;line-height:24px}.om_header_LfS8SW p{color:var(--dsw-alias-label-tertiary);margin:1px 0 0;font-size:12px;line-height:18px}.om_spacer_LfS8SW{flex:1}.om_repo_LfS8SW{color:var(--dsw-alias-state-business-primary);flex:none;font-size:12px;text-decoration:none}.om_repo_LfS8SW:hover{text-decoration:underline}.om_button_LfS8SW,.om_iconButton_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;transition:background-color var(--dsw-duration-fast,.12s), border-color var(--dsw-duration-fast,.12s);border-radius:8px}.om_button_LfS8SW{min-height:32px;padding:5px 11px}.om_iconButton_LfS8SW{flex:none;width:30px;height:30px;padding:0;font-size:18px;line-height:28px}.om_button_LfS8SW:hover,.om_iconButton_LfS8SW:hover{background:var(--dsw-alias-interactive-bg-hover)}.om_button_LfS8SW:focus-visible,.om_iconButton_LfS8SW:focus-visible,.om_navButton_LfS8SW:focus-visible,.om_input_LfS8SW:focus-visible,.om_select_LfS8SW:focus-visible,.om_textarea_LfS8SW:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.om_primary_LfS8SW{background:var(--dsw-alias-button-info-fill);color:var(--dsw-alias-label-on-color);border-color:#0000}.om_primary_LfS8SW:hover{background:var(--dsw-alias-button-info-hover)}.om_danger_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_small_LfS8SW{min-height:27px;padding:3px 8px;font-size:12px}.om_button_LfS8SW:disabled,.om_iconButton_LfS8SW:disabled{opacity:.5;cursor:wait}.om_navigation_LfS8SW{flex-wrap:wrap;gap:5px;padding:12px 0;display:flex}.om_navButton_LfS8SW{min-height:32px;color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;background:0 0;border:0;border-radius:8px;padding:5px 10px;font-size:13px}.om_navButton_LfS8SW:hover{background:var(--dsw-alias-interactive-bg-hover)}.om_navActive_LfS8SW{background:var(--dsw-specific-sidebar-nav-item-active);color:var(--dsw-alias-state-business-primary);font-weight:500}.om_mobileNavigation_LfS8SW{display:none}.om_content_LfS8SW{min-width:0;padding:2px 0 8px}.om_loading_LfS8SW,.om_errorState_LfS8SW{text-align:center;color:var(--dsw-alias-label-tertiary);padding:54px 12px}.om_errorState_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_grid_LfS8SW{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;display:grid}.om_card_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:12px;min-width:0;padding:13px}.om_wide_LfS8SW{grid-column:1/-1}.om_card_LfS8SW h3{margin:0 0 5px;font-size:14px;font-weight:600}.om_card_LfS8SW p{color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere;margin:3px 0}.om_cardHead_LfS8SW{align-items:flex-start;gap:9px;display:flex}.om_cardHead_LfS8SW>:first-child{flex:1;min-width:0}.om_actions_LfS8SW{flex-wrap:wrap;justify-content:flex-end;gap:6px;display:flex}.om_badge_LfS8SW{background:var(--dsw-alias-bg-layer-3);min-height:20px;color:var(--dsw-alias-state-business-primary);border-radius:10px;align-items:center;padding:1px 7px;font-size:11px;display:inline-flex}.om_badgeOk_LfS8SW{color:var(--dsw-alias-state-success-primary,var(--dsw-alias-state-business-primary))}.om_badgeOff_LfS8SW{color:var(--dsw-alias-label-tertiary)}.om_riskHigh_LfS8SW{color:var(--dsw-alias-state-error-primary)}.om_riskMedium_LfS8SW{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}.om_list_LfS8SW{gap:9px;display:grid}.om_sectionTitle_LfS8SW{align-items:center;gap:10px;margin:4px 0 11px;display:flex}.om_sectionTitle_LfS8SW:not(:first-child){margin-top:18px}.om_sectionTitle_LfS8SW h3{margin:0;font-size:15px}.om_sectionTitle_LfS8SW span{color:var(--dsw-alias-label-tertiary);font-size:12px}.om_form_LfS8SW{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:11px;display:grid}.om_form_LfS8SW .om_wide_LfS8SW{grid-column:1/-1}.om_field_LfS8SW{color:var(--dsw-alias-label-secondary);gap:5px;font-size:12px;display:grid}.om_input_LfS8SW,.om_select_LfS8SW,.om_textarea_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-specific-input-major,var(--dsw-alias-bg-layer-2));width:100%;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;padding:7px 9px;font-size:13px;line-height:1.4}.om_input_LfS8SW,.om_select_LfS8SW{height:34px}.om_textarea_LfS8SW{resize:vertical;min-height:106px;font-family:var(--dsw-font-family-mono,ui-monospace, monospace)}.om_check_LfS8SW{min-height:32px;color:var(--dsw-alias-label-secondary);align-items:center;gap:7px;display:flex}.om_muted_LfS8SW{color:var(--dsw-alias-label-tertiary);font-size:12px}.om_keyValues_LfS8SW{gap:6px;font-size:13px;display:grid}.om_keyValueRow_LfS8SW{grid-template-columns:minmax(105px,.42fr) 1fr;gap:11px;display:grid}.om_keyValueRow_LfS8SW dt{color:var(--dsw-alias-label-tertiary)}.om_keyValueRow_LfS8SW dd{overflow-wrap:anywhere;margin:0}.om_empty_LfS8SW{text-align:center;border:1px dashed var(--dsw-alias-border-l2);color:var(--dsw-alias-label-tertiary);border-radius:10px;padding:30px 12px}.om_details_LfS8SW{border-top:1px solid var(--dsw-alias-border-l2);margin-top:9px;padding-top:8px}.om_details_LfS8SW>summary{cursor:pointer;color:var(--dsw-alias-label-secondary);font-size:12px}.om_code_LfS8SW{white-space:pre-wrap;background:var(--dsw-alias-bg-base);max-height:320px;color:var(--dsw-alias-label-secondary);font:12px/1.5 var(--dsw-font-family-mono,ui-monospace, monospace);border-radius:8px;padding:10px;overflow:auto}.om_note_LfS8SW{border-left:3px solid var(--dsw-alias-state-business-primary);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);border-radius:0 8px 8px 0;margin-bottom:11px;padding:9px 11px}.om_dangerNote_LfS8SW{border-left-color:var(--dsw-alias-state-error-primary)}.om_toast_LfS8SW{z-index:1200;background:var(--dsw-alias-bg-layer-3);max-width:min(440px,100% - 48px);color:var(--dsw-alias-label-on-color);box-shadow:var(--dsw-shadow-lv3);border-radius:9px;padding:10px 14px;position:fixed;bottom:20px;right:24px}.om_toastError_LfS8SW{background:var(--dsw-alias-state-error-primary)}.om_deviceStage_LfS8SW{gap:8px;margin:10px 0;display:grid}.om_deviceShot_LfS8SW{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);cursor:crosshair;touch-action:manipulation;border-radius:10px;width:auto;max-width:100%;height:auto;max-height:70vh;margin:0 auto;display:block}.om_center_LfS8SW{text-align:center}.om_cardTitleRow_LfS8SW{justify-content:space-between;align-items:center;gap:10px;display:flex}.om_statusBadge_LfS8SW{border:1px solid var(--dsw-alias-border-l2);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}.om_status-neutral_LfS8SW{color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-interactive-bg-hover)}.om_status-normal_LfS8SW{color:var(--dsw-alias-state-success-label,var(--dsw-alias-label-secondary));background:var(--dsw-alias-state-success-bg,var(--dsw-alias-interactive-bg-hover))}.om_status-warning_LfS8SW{color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-bg,var(--dsw-alias-interactive-bg-hover))}.om_status-error_LfS8SW{color:var(--dsw-alias-state-error-label,var(--dsw-alias-state-error-primary));background:var(--dsw-alias-state-error-bg,var(--dsw-alias-interactive-bg-hover-danger))}.om_statGrid_LfS8SW{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:10px 0;display:grid}.om_statItem_LfS8SW{border:1px solid var(--dsw-alias-border-l2);border-radius:9px;flex-direction:column;gap:2px;padding:8px 10px;display:flex}.om_statItem_LfS8SW span{color:var(--dsw-alias-label-tertiary);font-size:11px}.om_statItem_LfS8SW strong{color:var(--dsw-alias-label-primary);overflow-wrap:anywhere;font-size:13px}.om_collapse_LfS8SW{border-top:1px solid var(--dsw-alias-border-l2);margin-top:9px;padding-top:8px}.om_collapse_LfS8SW>summary{cursor:pointer;color:var(--dsw-alias-label-secondary);font-size:12px}.om_detailRows_LfS8SW{gap:5px;margin:8px 0;font-size:13px;display:grid}.om_detailRows_LfS8SW>div{justify-content:space-between;gap:10px;display:flex}.om_detailRows_LfS8SW span{color:var(--dsw-alias-label-tertiary)}.om_detailRows_LfS8SW strong{overflow-wrap:anywhere;text-align:right}.om_eventList_LfS8SW{color:var(--dsw-alias-label-secondary);margin:8px 0;padding-left:18px;font-size:12px}.om_eventList_LfS8SW li{overflow-wrap:anywhere;margin:3px 0;list-style:outside}.om_diagList_LfS8SW{margin:8px 0;padding-left:0;font-size:13px}.om_diagList_LfS8SW li{align-items:baseline;gap:8px;margin:5px 0;display:flex}.om_diagList_LfS8SW .om_muted_LfS8SW{text-align:right;overflow-wrap:anywhere;margin-left:auto}.om_diagOk_LfS8SW{color:var(--dsw-alias-state-success-label,var(--dsw-alias-label-primary))}.om_diagFail_LfS8SW{color:var(--dsw-alias-state-error-label,var(--dsw-alias-state-error-primary))}@media (width<=760px){.om_statGrid_LfS8SW{grid-template-columns:repeat(2,minmax(0,1fr))}.om_header_LfS8SW{align-items:flex-start}.om_header_LfS8SW p,.om_repo_LfS8SW,.om_navigation_LfS8SW{display:none}.om_mobileNavigation_LfS8SW{width:100%;margin:11px 0;display:block}.om_form_LfS8SW,.om_grid_LfS8SW,.om_keyValueRow_LfS8SW{grid-template-columns:1fr}.om_form_LfS8SW .om_wide_LfS8SW,.om_wide_LfS8SW{grid-column:auto}.om_actions_LfS8SW{justify-content:flex-start}.om_cardHead_LfS8SW{flex-wrap:wrap}}@media (prefers-reduced-motion:reduce){.om_root_LfS8SW *{scroll-behavior:auto!important;transition:none!important}}";
     var tagId = "@openminis/minis-client-settings/MinisSettings.module.css";
     if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
       const tag = document.createElement("style");
@@ -737,7 +773,7 @@ window.__ModuleLoader__.load({
       tag.textContent = css;
       document.head.appendChild(tag);
     }
-    var MinisSettings_default = { "button": "om_button_LfS8SW", "spacer": "om_spacer_LfS8SW", "navButton": "om_navButton_LfS8SW", "errorState": "om_errorState_LfS8SW", "wide": "om_wide_LfS8SW", "repo": "om_repo_LfS8SW", "select": "om_select_LfS8SW", "iconButton": "om_iconButton_LfS8SW", "actions": "om_actions_LfS8SW", "navActive": "om_navActive_LfS8SW", "navigation": "om_navigation_LfS8SW", "field": "om_field_LfS8SW", "grid": "om_grid_LfS8SW", "primary": "om_primary_LfS8SW", "card": "om_card_LfS8SW", "cardHead": "om_cardHead_LfS8SW", "mobileNavigation": "om_mobileNavigation_LfS8SW", "danger": "om_danger_LfS8SW", "sectionTitle": "om_sectionTitle_LfS8SW", "riskHigh": "om_riskHigh_LfS8SW", "keyValues": "om_keyValues_LfS8SW", "keyValueRow": "om_keyValueRow_LfS8SW", "empty": "om_empty_LfS8SW", "root": "om_root_LfS8SW", "details": "om_details_LfS8SW", "loading": "om_loading_LfS8SW", "form": "om_form_LfS8SW", "dangerNote": "om_dangerNote_LfS8SW", "code": "om_code_LfS8SW", "note": "om_note_LfS8SW", "header": "om_header_LfS8SW", "toast": "om_toast_LfS8SW", "toastError": "om_toastError_LfS8SW", "deviceStage": "om_deviceStage_LfS8SW", "small": "om_small_LfS8SW", "content": "om_content_LfS8SW", "textarea": "om_textarea_LfS8SW", "deviceShot": "om_deviceShot_LfS8SW", "riskMedium": "om_riskMedium_LfS8SW", "list": "om_list_LfS8SW", "center": "om_center_LfS8SW", "badgeOff": "om_badgeOff_LfS8SW", "muted": "om_muted_LfS8SW", "badge": "om_badge_LfS8SW", "badgeOk": "om_badgeOk_LfS8SW", "headerText": "om_headerText_LfS8SW", "check": "om_check_LfS8SW", "input": "om_input_LfS8SW" };
+    var MinisSettings_default = { "detailRows": "om_detailRows_LfS8SW", "primary": "om_primary_LfS8SW", "diagFail": "om_diagFail_LfS8SW", "form": "om_form_LfS8SW", "mobileNavigation": "om_mobileNavigation_LfS8SW", "status-normal": "om_status-normal_LfS8SW", "repo": "om_repo_LfS8SW", "actions": "om_actions_LfS8SW", "details": "om_details_LfS8SW", "riskMedium": "om_riskMedium_LfS8SW", "riskHigh": "om_riskHigh_LfS8SW", "statGrid": "om_statGrid_LfS8SW", "statItem": "om_statItem_LfS8SW", "dangerNote": "om_dangerNote_LfS8SW", "cardTitleRow": "om_cardTitleRow_LfS8SW", "grid": "om_grid_LfS8SW", "diagList": "om_diagList_LfS8SW", "navButton": "om_navButton_LfS8SW", "deviceShot": "om_deviceShot_LfS8SW", "cardHead": "om_cardHead_LfS8SW", "root": "om_root_LfS8SW", "danger": "om_danger_LfS8SW", "badge": "om_badge_LfS8SW", "keyValueRow": "om_keyValueRow_LfS8SW", "spacer": "om_spacer_LfS8SW", "card": "om_card_LfS8SW", "muted": "om_muted_LfS8SW", "diagOk": "om_diagOk_LfS8SW", "loading": "om_loading_LfS8SW", "note": "om_note_LfS8SW", "navActive": "om_navActive_LfS8SW", "select": "om_select_LfS8SW", "field": "om_field_LfS8SW", "status-neutral": "om_status-neutral_LfS8SW", "status-error": "om_status-error_LfS8SW", "header": "om_header_LfS8SW", "collapse": "om_collapse_LfS8SW", "navigation": "om_navigation_LfS8SW", "eventList": "om_eventList_LfS8SW", "input": "om_input_LfS8SW", "check": "om_check_LfS8SW", "empty": "om_empty_LfS8SW", "code": "om_code_LfS8SW", "toastError": "om_toastError_LfS8SW", "center": "om_center_LfS8SW", "statusBadge": "om_statusBadge_LfS8SW", "textarea": "om_textarea_LfS8SW", "status-warning": "om_status-warning_LfS8SW", "button": "om_button_LfS8SW", "content": "om_content_LfS8SW", "list": "om_list_LfS8SW", "badgeOff": "om_badgeOff_LfS8SW", "sectionTitle": "om_sectionTitle_LfS8SW", "deviceStage": "om_deviceStage_LfS8SW", "small": "om_small_LfS8SW", "headerText": "om_headerText_LfS8SW", "toast": "om_toast_LfS8SW", "iconButton": "om_iconButton_LfS8SW", "keyValues": "om_keyValues_LfS8SW", "errorState": "om_errorState_LfS8SW", "badgeOk": "om_badgeOk_LfS8SW", "wide": "om_wide_LfS8SW" };
     
     // src/client/settings/components/Common.tsx
     var import_jsx_runtime = require("react/jsx-runtime");
@@ -1536,11 +1572,118 @@ window.__ModuleLoader__.load({
     }
     
     // src/client/settings/pages/WebPage.tsx
+    var import_react = require("react");
     var import_jsx_runtime10 = require("react/jsx-runtime");
+    function tunnelOf(data) {
+      const obj = objectOf(data);
+      return obj;
+    }
+    function phaseLabel(phase) {
+      switch (phase) {
+        case "unconfigured":
+          return "\u672A\u914D\u7F6E";
+        case "stopped":
+          return "\u5DF2\u505C\u6B62";
+        case "starting":
+          return "\u542F\u52A8\u4E2D";
+        case "connecting":
+          return "\u8FDE\u63A5\u4E2D";
+        case "healthy":
+          return "\u6B63\u5E38";
+        case "degraded":
+          return "\u8FDE\u63A5\u964D\u7EA7";
+        case "reconnecting":
+          return "\u91CD\u8FDE\u4E2D";
+        case "auth-failed":
+          return "\u8BA4\u8BC1\u5931\u8D25";
+        case "origin-down":
+          return "\u672C\u5730\u670D\u52A1\u5F02\u5E38";
+        case "edge-down":
+          return "\u8FDE\u63A5\u5F02\u5E38";
+        case "process-exited":
+          return "\u8FDB\u7A0B\u5F02\u5E38\u9000\u51FA";
+        case "error":
+          return "\u9519\u8BEF";
+        default:
+          return phase ?? "\u672A\u77E5";
+      }
+    }
+    function phaseTone(phase) {
+      switch (phase) {
+        case "healthy":
+          return "normal";
+        case "degraded":
+        case "reconnecting":
+        case "connecting":
+        case "starting":
+          return "warning";
+        case "error":
+        case "auth-failed":
+        case "origin-down":
+        case "edge-down":
+        case "process-exited":
+          return "error";
+        default:
+          return "neutral";
+      }
+    }
+    function fmtUptime(ms) {
+      if (!ms || ms <= 0) return "\u2014";
+      const totalMin = Math.floor(ms / 6e4);
+      if (totalMin < 60) return `${totalMin}m`;
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      if (h < 24) return `${h}h ${m}m`;
+      const d = Math.floor(h / 24);
+      return `${d}d ${h % 24}h`;
+    }
+    function fmtTime(ms) {
+      if (!ms || ms <= 0) return "\u2014";
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
     function WebPage({ data, busy, run }) {
       const settings = objectOf(data.settings);
       const status = objectOf(data.status);
-      const tunnel = objectOf(status.tunnel);
+      const tunnel = tunnelOf(status.tunnel);
+      const phase = tunnel.phase;
+      const tone = phaseTone(phase);
+      const isRunning = tunnel.running === true || phase === "healthy" || phase === "degraded" || phase === "reconnecting";
+      const isTransition = phase === "starting" || phase === "connecting" || phase === "reconnecting";
+      const diagnostics = arrayOf(data.diagnostics).map(objectOf);
+      const [showDetails, setShowDetails] = (0, import_react.useState)(false);
+      const [showDiagnostics, setShowDiagnostics] = (0, import_react.useState)(false);
+      const [showLogs, setShowLogs] = (0, import_react.useState)(false);
+      const [showAdvanced, setShowAdvanced] = (0, import_react.useState)(false);
+      const [logs, setLogs] = (0, import_react.useState)([]);
+      const [events, setEvents] = (0, import_react.useState)([]);
+      const loadTunnelDetails = (0, import_react.useCallback)(async () => {
+        try {
+          const raw = await fetch("/api/tunnel/status", { credentials: "same-origin" });
+          const body = objectOf(await raw.json());
+          setEvents(arrayOf(body.events).map(objectOf));
+        } catch {
+        }
+      }, []);
+      const loadLogs = (0, import_react.useCallback)(async () => {
+        try {
+          const raw = await fetch("/api/tunnel/logs?limit=60", { credentials: "same-origin" });
+          const body = objectOf(await raw.json());
+          setLogs(arrayOf(body.logs).map(objectOf));
+        } catch {
+        }
+      }, []);
+      (0, import_react.useEffect)(() => {
+        if (showDetails) void loadTunnelDetails();
+      }, [showDetails, loadTunnelDetails]);
+      (0, import_react.useEffect)(() => {
+        if (showLogs) void loadLogs();
+      }, [showLogs, loadLogs]);
+      const confirmAndRun = (command, confirmText) => {
+        if (window.confirm(confirmText)) run(command);
+      };
+      const hasToken = booleanOf(settings.cloudflareTunnelTokenConfigured);
       return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Note, { danger: true, children: "\u7AEF\u53E3\u6216\u5C40\u57DF\u7F51\u76D1\u542C\u53D8\u66F4\u9700\u8981\u91CD\u542F Web \u8FDC\u7A0B\u670D\u52A1\u3002\u4FEE\u6539\u8D26\u53F7\u6216\u5BC6\u7801\u4F1A\u6CE8\u9500\u6240\u6709\u7F51\u9875\u4F1A\u8BDD\u3002" }),
         /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(Grid, { children: [
@@ -1565,20 +1708,157 @@ window.__ModuleLoader__.load({
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(Card, { wide: true, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { children: "Cloudflare Tunnel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.cardTitleRow, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { children: "Cloudflare Tunnel" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: `${MinisSettings_default.statusBadge} ${MinisSettings_default[`status-${tone}`]}`, children: phaseLabel(phase) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: MinisSettings_default.muted, children: tunnel.hostname ? `https://${tunnel.hostname}` : "\u901A\u8FC7 Cloudflare Named Tunnel \u4ECE\u516C\u7F51\u5B89\u5168\u8BBF\u95EE\u6B64\u8BBE\u5907\u3002" }),
+            phase !== "unconfigured" && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.statGrid, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.statItem, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u8FDE\u63A5\u72B6\u6001" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: phaseLabel(phase) })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.statItem, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Edge \u8FDE\u63A5" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("strong", { children: [
+                  tunnel.edgeConnected ?? 0,
+                  " / ",
+                  tunnel.edgeExpected ?? 0
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.statItem, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u534F\u8BAE" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.connectedProtocol ?? "\u2014" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.statItem, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u8FD0\u884C\u65F6\u95F4" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: fmtUptime(tunnel.uptimeMs) })
+              ] })
+            ] }),
+            tunnel.detail && phase !== "unconfigured" && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: MinisSettings_default.muted, children: tunnel.detail }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.actions, children: [
+              isRunning ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { danger: true, disabled: busy || isTransition, onClick: () => confirmAndRun(
+                { kind: "tunnel-stop" },
+                "\u505C\u6B62 Cloudflare Tunnel\uFF1F\u5982\u679C\u4F60\u5F53\u524D\u901A\u8FC7\u8FD9\u4E2A\u516C\u7F51\u5730\u5740\u8BBF\u95EE\uFF0C\u505C\u6B62\u540E\u672C\u9875\u9762\u5C06\u65E0\u6CD5\u7EE7\u7EED\u63A7\u5236\u624B\u673A\u3002"
+              ), children: "\u505C\u6B62" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { primary: true, disabled: busy || isTransition || !hasToken, onClick: () => run({ kind: "tunnel-start" }), children: "\u542F\u52A8" }),
+              isRunning && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { disabled: busy || isTransition, onClick: () => confirmAndRun(
+                { kind: "tunnel-restart" },
+                "\u91CD\u542F Cloudflare Tunnel\uFF1F\u5F53\u524D\u8FDC\u7A0B\u8FDE\u63A5\u4F1A\u77ED\u6682\u4E2D\u65AD\u3002Tunnel \u6062\u590D\u540E\u9875\u9762\u5C06\u5C1D\u8BD5\u81EA\u52A8\u91CD\u65B0\u8FDE\u63A5\u3002"
+              ), children: "\u91CD\u542F" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { disabled: busy || isTransition, onClick: () => {
+                setShowDiagnostics((v) => !v);
+                if (!showDiagnostics) run({ kind: "tunnel-diagnose" });
+              }, children: "\u8FD0\u884C\u8BCA\u65AD" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { disabled: busy, onClick: () => setShowLogs((v) => !v), children: "\u67E5\u770B\u65E5\u5FD7" })
+            ] }),
+            phase !== "unconfigured" && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("details", { open: showDetails, className: MinisSettings_default.collapse, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("summary", { onClick: () => setShowDetails((v) => !v), children: "\u8FDE\u63A5\u8BE6\u60C5" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.detailRows, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "cloudflared" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.version || "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Transport" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.connectedProtocol ?? "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Edge Connections" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("strong", { children: [
+                    tunnel.edgeConnected ?? 0,
+                    " / ",
+                    tunnel.edgeExpected ?? 0
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Origin" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.origin ?? "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Origin Health" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.originHealth ?? "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Public Hostname" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.hostname || "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Public Health" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.publicHealth ?? "\u2014" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u542F\u52A8\u65F6\u95F4" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: fmtTime(tunnel.lastConnectedAtMs) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u6700\u8FD1\u65AD\u5F00" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: fmtTime(tunnel.lastDisconnectedAtMs) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u91CD\u8FDE\u6B21\u6570" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.reconnectCount ?? 0 })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u6700\u8FD1\u9519\u8BEF" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.lastError || "\u2014" })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: MinisSettings_default.muted, children: events.length === 0 ? "\u6682\u65E0\u751F\u547D\u5468\u671F\u4E8B\u4EF6" : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: MinisSettings_default.eventList, children: events.slice(-12).map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { children: [
+                fmtTime(numberOf(e.timeMs)),
+                " \xB7 ",
+                textOf(e.text)
+              ] }, i)) }) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("details", { open: showDiagnostics, className: MinisSettings_default.collapse, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("summary", { onClick: () => setShowDiagnostics((v) => !v), children: "\u8BCA\u65AD\u7ED3\u679C" }),
+              diagnostics.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: MinisSettings_default.muted, children: "\u70B9\u51FB\u300C\u8FD0\u884C\u8BCA\u65AD\u300D\u6267\u884C\u771F\u5B9E\u68C0\u67E5\uFF08DNS / TCP 7844 / UDP 7844 / Origin / \u516C\u7F51\u5165\u53E3\uFF09\u3002" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: MinisSettings_default.diagList, children: diagnostics.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: booleanOf(row.ok) ? MinisSettings_default.diagOk : MinisSettings_default.diagFail, children: booleanOf(row.ok) ? "\u2713" : "\xD7" }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: textOf(row.name) }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: MinisSettings_default.muted, children: textOf(row.detail) })
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("details", { open: showLogs, className: MinisSettings_default.collapse, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("summary", { onClick: () => setShowLogs((v) => !v), children: "\u6700\u8FD1\u4E8B\u4EF6\u4E0E\u65E5\u5FD7" }),
+              logs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: MinisSettings_default.muted, children: "\u65E5\u5FD7\u4E3A\u7A7A\uFF08\u70B9\u51FB\u300C\u67E5\u770B\u65E5\u5FD7\u300D\u52A0\u8F7D\uFF09\u3002" }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: MinisSettings_default.eventList, children: logs.slice(-30).map((l, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { children: [
+                fmtTime(numberOf(l.timeMs)),
+                " \xB7 ",
+                textOf(l.level),
+                " \xB7 ",
+                textOf(l.text)
+              ] }, i)) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("details", { open: showAdvanced, className: MinisSettings_default.collapse, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("summary", { onClick: () => setShowAdvanced((v) => !v), children: "\u9AD8\u7EA7\u8BBE\u7F6E" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: MinisSettings_default.detailRows, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u914D\u7F6E\u534F\u8BAE" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.configuredProtocol ?? "auto" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "\u5B9E\u9645\u534F\u8BAE" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: tunnel.connectedProtocol ?? "\u2014" })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: MinisSettings_default.actions, children: ["auto", "http2", "quic"].map((p) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                Button,
+                {
+                  disabled: busy || isTransition,
+                  onClick: () => run({ kind: "tunnel-protocol", payload: { protocol: p } }),
+                  children: p
+                },
+                p
+              )) }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: MinisSettings_default.muted, children: "\u9ED8\u8BA4\u300Cauto\u300D\u5728\u79FB\u52A8\u7F51\u7EDC\u56FA\u5B9A HTTP/2\uFF08\u8FD0\u8425\u5546 NAT \u4E0B QUIC/UDP \u4E0D\u7A33\u5B9A\uFF09\uFF1B\u4EC5\u6D4B\u8BD5\u786E\u8BC1\u540E\u624B\u52A8\u9009\u62E9 quic\u3002" })
+            ] }),
             /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(Form, { onSubmit: (payload) => run({ kind: "web-tunnel", payload: omitBlank(payload, ["cloudflareTunnelToken"]) }), children: [
               /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Field, { label: "\u516C\u5F00\u57DF\u540D", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { className: MinisSettings_default.input, name: "cloudflareHostname", defaultValue: textOf(settings.cloudflareHostname) }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Field, { label: "\u65B0 Tunnel Token\uFF08\u7559\u7A7A\u4FDD\u7559\uFF09", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { className: MinisSettings_default.input, type: "password", name: "cloudflareTunnelToken", autoComplete: "new-password" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Field, { label: hasToken ? "Tunnel Token\uFF08\u5DF2\u914D\u7F6E\uFF0C\u8F93\u5165\u65B0\u503C\u53EF\u66FF\u6362\uFF09" : "Tunnel Token", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { className: MinisSettings_default.input, type: "password", name: "cloudflareTunnelToken", autoComplete: "new-password", placeholder: hasToken ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "" }) }),
               /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: MinisSettings_default.check, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", name: "cloudflareTunnelEnabled", defaultChecked: booleanOf(settings.cloudflareTunnelEnabled) }),
                 " \u542F\u7528\u96A7\u9053"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { type: "submit", primary: true, disabled: busy, children: "\u4FDD\u5B58\u96A7\u9053\u8BBE\u7F6E" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { children: [
-              textOf(tunnel.phase),
-              " \xB7 ",
-              textOf(tunnel.detail)
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { type: "submit", primary: true, disabled: busy, children: "\u4FDD\u5B58\u914D\u7F6E" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(Button, { disabled: busy, onClick: () => run({ kind: "web-tunnel-install" }), children: "\u5B89\u88C5/\u66F4\u65B0 cloudflared" })
             ] })
           ] })
         ] }),
@@ -1592,13 +1872,13 @@ window.__ModuleLoader__.load({
     }
     
     // src/client/settings/pages/DevicePage.tsx
-    var import_react = require("react");
+    var import_react2 = require("react");
     var import_jsx_runtime11 = require("react/jsx-runtime");
     function DevicePage({ data, busy, run }) {
       const shot = objectOf(data.shot);
       const hasShot = textOf(shot.base64) !== "";
       const tapMode = booleanOf(data.tapMode);
-      const [display, setDisplay] = (0, import_react.useState)("\u2014");
+      const [display, setDisplay] = (0, import_react2.useState)("\u2014");
       const point = (event) => {
         const image = event.currentTarget;
         if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return void 0;
@@ -1823,7 +2103,7 @@ window.__ModuleLoader__.load({
     }
     function MinisSettings(props) {
       const state = props.useSnapshot((value) => value);
-      (0, import_react2.useEffect)(() => props.activate(), [props.activate]);
+      (0, import_react3.useEffect)(() => props.activate(), [props.activate]);
       const run = (command) => {
         void props.run(command);
       };

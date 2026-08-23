@@ -77,6 +77,15 @@ internal object HeadlessChatRunner {
         providerFor(context, sessionId)[ChatViewModel::class.java]
 
     /**
+     * Public accessor used by [com.openminis.app.remote.AgentCommandRegistry]
+     * so `/clear`、`/memory`、`/thinking` (Web slash endpoint) run through the
+     * SAME ChatViewModel instance the App UI binds to — the Web is not a
+     * second runtime and must not fork a second VM for the same session.
+     */
+    fun viewModelForCommand(context: Context, sessionId: String): ChatViewModel =
+        viewModel(context, sessionId)
+
+    /**
      * Ensure a session exists in the DB before binding a ViewModel. Mirrors
      * the in-app flow that creates a draft session lazily; for RPC-driven
      * automation we materialize it eagerly so subsequent reads can resolve

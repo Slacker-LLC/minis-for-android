@@ -552,6 +552,93 @@ class RemoteAccessServer(
                 put("publicHostname", RemoteAccessPrefs.cloudflareHostname(appContext))
                 put("tunnel", tunnelStatusJson())
             })
+            // Tunnel control/observability: single Android runtime, Web remote
+            // only forwards operations (never a second cloudflared). All gated
+            // by SERVICE_MANAGE through the route capability table.
+            "/api/tunnel/status" -> {
+                requireMethod(req, "GET")
+                respondJson(out, 200, JSONObject().apply {
+                    put("tunnel", tunnelStatusJson())
+                    put("events", JSONArray(CloudflareTunnelManager.recentEvents(40)))
+                })
+            }
+            "/api/tunnel/logs" -> {
+                requireMethod(req, "GET")
+                val limit = req.query["limit"]?.toIntOrNull()?.coerceIn(1, 200) ?: 80
+                respondJson(out, 200, JSONObject().apply {
+                    put("logs", JSONArray(CloudflareTunnelManager.recentLogs(limit).map { line ->
+                        JSONObject().apply {
+                            put("timeMs", line.timeMs)
+                            put("level", line.level)
+                            put("kind", line.kind)
+                            put("text", line.text)
+                        }
+                    }))
+                })
+            }
+            "/api/tunnel/start" -> {
+                requireMethod(req, "POST")
+                if (!RemoteAccessPrefs.hasCloudflareTunnelToken(appContext)) {
+                    respondJson(out, 400, JSONObject().put("error", "Cloudflare Tunnel Token is not configured"))
+                    return@runBlocking
+                }
+                val result = CloudflareTunnelManager.start(appContext)
+                if (result.isFailure) {
+                    respondJson(out, 500, JSONObject().put("error", result.exceptionOrNull()?.message ?: "tunnel start failed"))
+                } else {
+                    respondJson(out, 200, JSONObject().put("ok", true).put("tunnel", tunnelStatusJson()))
+                }
+            }
+            "/api/tunnel/stop" -> {
+                requireMethod(req, "POST")
+                CloudflareTunnelManager.stop()
+                respondJson(out, 200, JSONObject().put("ok", true).put("tunnel", tunnelStatusJson()))
+            }
+            "/api/tunnel/restart" -> {
+                requireMethod(req, "POST")
+                CloudflareTunnelManager.stop()
+                if (RemoteAccessPrefs.cloudflareTunnelEnabled(appContext) && RemoteAccessPrefs.hasCloudflareTunnelToken(appContext)) {
+                    val result = CloudflareTunnelManager.start(appContext)
+                    if (result.isFailure) {
+                        respondJson(out, 500, JSONObject().put("error", result.exceptionOrNull()?.message ?: "tunnel restart failed"))
+                        return@runBlocking
+                    }
+                }
+                respondJson(out, 200, JSONObject().put("ok", true).put("tunnel", tunnelStatusJson()))
+            }
+            "/api/tunnel/protocol" -> {
+                requireMethod(req, "POST")
+                val mode = runCatching { JSONObject(req.body).optString("protocol", "") }.getOrDefault("")
+                if (mode !in listOf("auto", "http2", "quic")) {
+                    respondJson(out, 400, JSONObject().put("error", "protocol must be auto|http2|quic"))
+                    return@runBlocking
+                }
+                RemoteAccessPrefs.setCloudflareTunnelProtocol(appContext, mode)
+                // Transactional: apply next time the tunnel (re)starts; never
+                // tear down a live connection on a preference write alone.
+                if (CloudflareTunnelManager.health.value.running) {
+                    CloudflareTunnelManager.stop()
+                    CloudflareTunnelManager.start(appContext)
+                }
+                respondJson(out, 200, JSONObject().put("ok", true).put("tunnel", tunnelStatusJson()))
+            }
+            "/api/tunnel/diagnose" -> {
+                requireMethod(req, "POST")
+                respondJson(out, 200, JSONObject().apply {
+                    put("checks", CloudflareTunnelManager.diagnose(appContext))
+                    put("tunnel", tunnelStatusJson())
+                })
+            }
+            "/api/tunnel/install" -> {
+                requireMethod(req, "POST")
+                val result = CloudflareTunnelManager.installOrUpdate(appContext)
+                if (result.isSuccess) {
+                    respondJson(out, 200, JSONObject().put("ok", true).put("version", result.getOrNull()))
+                } else {
+                    respondJson(out, 500, JSONObject().put("ok", false)
+                        .put("error", result.exceptionOrNull()?.message ?: "cloudflared install failed"))
+                }
+            }
             "/api/settings" -> routeSettings(req, out)
             "/api/settings/restart" -> {
                 requireMethod(req, "POST")
@@ -1008,13 +1095,31 @@ class RemoteAccessServer(
     }
 
     private fun tunnelStatusJson(): JSONObject {
-        val status = CloudflareTunnelManager.status.value
+        val h = CloudflareTunnelManager.health.value
+        val s = CloudflareTunnelManager.status.value
         return JSONObject().apply {
-            put("installed", status.installed)
-            put("running", status.running)
-            put("phase", status.phase)
-            put("detail", status.detail)
-            put("version", status.version)
+            put("installed", s.installed)
+            put("running", s.running)
+            put("phase", h.phase)
+            put("detail", h.detail)
+            put("version", h.version)
+            // Full shared snapshot — both UIs render the SAME object; neither
+            // computes its own notion of “tunnel healthy”.
+            put("connectedProtocol", h.protocol)
+            put("configuredProtocol", h.configuredProtocol)
+            put("edgeConnected", h.edgeConnected)
+            put("edgeExpected", h.edgeExpected)
+            put("edgeLocations", JSONArray(h.edgeLocations))
+            put("originHealth", h.originHealth)
+            put("publicHealth", h.publicHealth)
+            put("uptimeMs", h.uptimeMs)
+            put("startedAtMs", h.startedAtMs)
+            put("lastConnectedAtMs", h.lastConnectedAtMs)
+            put("lastDisconnectedAtMs", h.lastDisconnectedAtMs)
+            put("reconnectCount", h.reconnectCount)
+            put("lastError", h.lastError)
+            put("hostname", RemoteAccessPrefs.cloudflareHostname(appContext))
+            put("origin", "127.0.0.1:${RemoteAccessPrefs.port(appContext)}")
         }
     }
 
@@ -1304,6 +1409,15 @@ class RemoteAccessServer(
                                 appContext,
                             )
                             peer.sendText(dshServerRequest("events.mux", frame.optString("type"), frame).toString())
+                            // Plan-mode is Android-authoritative; push the
+                            // finished projection value as a session/projection
+                            // frame so the browser plan chip updates without
+                            // waiting for the next session.list refresh.
+                            DshApiAdapter.projectionFramesForEvent(
+                                event.sessionId, event.toEventJson(), appContext,
+                            ).forEach { proj ->
+                                peer.sendText(dshServerRequest("events.mux", proj.optString("type"), proj).toString())
+                            }
                         }
                     }
                     try {

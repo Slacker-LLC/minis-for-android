@@ -101,6 +101,11 @@ class RemoteAccessService : Service() {
 
         startForeground(NOTIFICATION_ID, notification())
 
+        // Proactive tunnel network-change handling (no polling): the callback
+        // logs Wi-Fi ↔ cellular transitions and the supervisor revives a dead
+        // cloudflared; a live one is left to its own reconnect.
+        CloudflareTunnelManager.registerNetworkCallback(this)
+
         server?.stop()
         val candidate = RemoteAccessServer(
             context = this,

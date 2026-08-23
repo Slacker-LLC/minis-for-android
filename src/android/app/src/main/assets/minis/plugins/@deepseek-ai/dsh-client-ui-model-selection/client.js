@@ -751,9 +751,15 @@ window.__ModuleLoader__.load({
 				const command = scope.get("commandUi");
 				const models = scope.modelDirectories;
 				const sessions = scope.sessions;
-				scope.effect(() => command.register({
+				// OpenMinis: the Android Host already serves `/model` through
+				// commands/list (AgentCommandRegistry). Registering a second
+				// contribution would collide and break the whole `/` menu
+				// (ui-commands throws on a duplicate name). Decoration hangs
+				// the popup on the HOST command for BARE invocation only:
+				// `/model` opens this picker, `/model <arg>` still executes
+				// through commands/execute on the host.
+				scope.effect(() => command.decorate({
 					name: "model",
-					description: t("command.description"),
 					available: (session) => sessions.subagentAddress(session.sessionId) === void 0,
 					ui: {
 						kind: "popupSelect",
@@ -769,7 +775,7 @@ window.__ModuleLoader__.load({
 							await directory.select(selection);
 						}
 					}
-				}), "ui-model-selection: /model contribution");
+				}), "ui-model-selection: /model decoration");
 			});
 			ctx.inject(["slots", "modelDirectories"], (scope) => {
 				const models = scope.modelDirectories;

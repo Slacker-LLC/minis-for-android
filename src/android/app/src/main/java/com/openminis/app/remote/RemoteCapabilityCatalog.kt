@@ -266,6 +266,9 @@ object RemoteCapabilityCatalog {
         "/api/settings" -> if (method == "GET") null else SERVICE_MANAGE
         "/api/auth/status", "/api/auth/login", "/api/auth/logout" -> null
         "/api/settings/restart" -> SERVICE_MANAGE
+        "/api/tunnel/status", "/api/tunnel/logs", "/api/tunnel/start",
+        "/api/tunnel/stop", "/api/tunnel/restart", "/api/tunnel/protocol",
+        "/api/tunnel/diagnose", "/api/tunnel/install" -> SERVICE_MANAGE
         "/api/sessions", "/api/messages", "/api/models", "/api/usage", "/api/respond" -> CHAT
         "/api/session/status", "/api/session/model", "/api/session/thinking",
         "/api/session/delete", "/api/session/title", "/api/session/new" -> CHAT
@@ -312,6 +315,12 @@ object RemoteCapabilityCatalog {
         "commands/list", "commands/execute" -> CHAT
         "messageFeedback/list", "messageFeedback/put", "messageFeedback/delete" -> CHAT
         "goals/create", "goals/edit", "goals/pause", "goals/resume", "goals/complete", "goals/clear" -> AGENT_MANAGE
+
+        // `@` resource catalog backing the Web mention picker. It walks the
+        // workspace (read-only listing) and the session list, so the correct
+        // capability is FILES_READ — NOT FILES_WRITE (listing must never
+        // require or imply write permission on the Web surface).
+        "resources/list" -> FILES_READ
 
         "settings.describe" -> PREFERENCES
         "settings.openDocument" -> PREFERENCES

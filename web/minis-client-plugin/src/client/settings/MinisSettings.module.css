@@ -119,6 +119,35 @@
 .deviceShot { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; margin: 0 auto; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; background: var(--dsw-alias-bg-base); cursor: crosshair; touch-action: manipulation; }
 .center { text-align: center; }
 
+/* Cloudflare Tunnel card (Web 远程) — same tokens as the rest of the settings UI. */
+.cardTitleRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.statusBadge { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--dsw-alias-border-l2); }
+.status-neutral { color: var(--dsw-alias-label-tertiary); background: var(--dsw-alias-interactive-bg-hover); }
+.status-normal { color: var(--dsw-alias-state-success-label, var(--dsw-alias-label-secondary)); background: var(--dsw-alias-state-success-bg, var(--dsw-alias-interactive-bg-hover)); }
+.status-warning { color: var(--dsw-alias-state-warn-label); background: var(--dsw-alias-state-warn-bg, var(--dsw-alias-interactive-bg-hover)); }
+.status-error { color: var(--dsw-alias-state-error-label, var(--dsw-alias-state-error-primary)); background: var(--dsw-alias-state-error-bg, var(--dsw-alias-interactive-bg-hover-danger)); }
+.statGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin: 10px 0; }
+.statItem { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px; padding: 8px 10px; }
+.statItem span { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
+.statItem strong { font-size: 13px; color: var(--dsw-alias-label-primary); overflow-wrap: anywhere; }
+.collapse { margin-top: 9px; border-top: 1px solid var(--dsw-alias-border-l2); padding-top: 8px; }
+.collapse > summary { cursor: pointer; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.detailRows { display: grid; gap: 5px; margin: 8px 0; font-size: 13px; }
+.detailRows > div { display: flex; gap: 10px; justify-content: space-between; }
+.detailRows span { color: var(--dsw-alias-label-tertiary); }
+.detailRows strong { overflow-wrap: anywhere; text-align: right; }
+.eventList { margin: 8px 0; padding-left: 18px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.eventList li { list-style: disc; margin: 3px 0; overflow-wrap: anywhere; }
+.diagList { margin: 8px 0; padding-left: 0; font-size: 13px; }
+.diagList li { display: flex; gap: 8px; align-items: baseline; margin: 5px 0; }
+.diagList .muted { margin-left: auto; text-align: right; overflow-wrap: anywhere; }
+.diagOk { color: var(--dsw-alias-state-success-label, var(--dsw-alias-label-primary)); }
+.diagFail { color: var(--dsw-alias-state-error-label, var(--dsw-alias-state-error-primary)); }
+
+@media (max-width: 760px) {
+  .statGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 760px) {
   .header { align-items: flex-start; }
   .header p, .repo, .navigation { display: none; }
