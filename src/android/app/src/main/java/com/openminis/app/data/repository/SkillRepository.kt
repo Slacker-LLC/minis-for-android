@@ -1227,7 +1227,7 @@ class SkillRepository(private val context: Context) {
             // before the installer re-materializes the file.
             //
             // Only one location to check, unlike iOS's Library+rootfs pair:
-            // PRootKernel.registerGlobalBindMounts binds /var/minis/skills
+            // MinisKernel.registerGlobalBindMounts binds /var/minis/skills
             // straight to this same filesDir/minis-global/skills.
             if (importSource != ImportSource.BUNDLED &&
                 !File(skillsDir, "$id/SKILL.md").exists()

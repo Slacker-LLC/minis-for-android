@@ -2286,7 +2286,7 @@ fun ChatScreen(
                 ?: 0
             val items = refs.map { ref ->
                 // Resolve minis://... / file:// / /abs → host File so Coil
-                // doesn't have to re-walk PRootKernel for every page swipe.
+                // doesn't have to re-walk MinisKernel for every page swipe.
                 // Falls back to the raw URL string when resolution misses —
                 // AsyncImage will route it through MinisImageFetcher anyway.
                 val resolved = resolveMdMediaFile(context, ref.source, sessionId)

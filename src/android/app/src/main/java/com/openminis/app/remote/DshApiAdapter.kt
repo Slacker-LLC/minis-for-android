@@ -8,7 +8,7 @@ import com.openminis.app.debug.ChatDebugMethods
 import com.openminis.app.debug.ChatMutationMethods
 import com.openminis.app.debug.DebugRPCHandler
 import com.openminis.app.debug.HeadlessChatRunner
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import com.openminis.app.tools.MessageFeedbackStore
 import com.openminis.app.tools.SessionPermissionStore
 import com.openminis.app.ui.chat.SessionEventHub
@@ -1685,11 +1685,11 @@ object DshApiAdapter {
 
     /** Resolve through the same PRoot mapping while enforcing the real host root. */
     private fun resolveSessionPath(context: Context, sessionId: String, linuxPath: String): File {
-        val resolved = PRootKernel.resolveSessionHostPath(sessionId, linuxPath, context)
+        val resolved = MinisKernel.resolveSessionHostPath(sessionId, linuxPath, context)
             ?: throw IllegalArgumentException("cannot resolve path")
         val expectedRoot = if (linuxPath.startsWith("/var/minis/")) {
             val subdir = linuxPath.removePrefix("/var/minis/").substringBefore('/')
-            PRootKernel.resolveSessionHostPath(sessionId, "/var/minis/$subdir", context)
+            MinisKernel.resolveSessionHostPath(sessionId, "/var/minis/$subdir", context)
                 ?: throw IllegalArgumentException("cannot resolve path root")
         } else {
             com.openminis.app.sandbox.RootfsManager.getInstance(context).rootfsDir

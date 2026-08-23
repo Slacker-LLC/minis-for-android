@@ -268,10 +268,14 @@ fun RemoteAccessSettingsScreen(
             SettingsRow(
                 title = "Cloudflare Tunnel 连接状态",
                 subtitle = buildString {
-                    append(if (tunnelStatus.installed) tunnelStatus.phase else "未配置")
+                    append(if (tunnelStatus.installed) CloudflareTunnelManager.phaseLabel(tunnelStatus.phase) else "未配置")
                     val h = CloudflareTunnelManager.health.value
                     if (h.edgeExpected > 0) append(" · ${h.edgeConnected}/${h.edgeExpected}")
-                    if (h.protocol.isNotBlank()) append(" · ${h.protocol}")
+                    if (h.protocol.isNotBlank()) append(" · " + when (h.protocol.lowercase()) {
+                        "http2" -> "HTTP/2"
+                        "quic" -> "QUIC"
+                        else -> h.protocol
+                    })
                     hostname.takeIf { it.isNotBlank() }?.let { append(" · $it") }
                 },
                 icon = Icons.Outlined.Info,
@@ -327,7 +331,7 @@ fun RemoteAccessSettingsScreen(
                 }
                 Text(
                     text = buildString {
-                        append("状态：").append(tunnelStatus.phase)
+                        append("状态：").append(CloudflareTunnelManager.phaseLabel(tunnelStatus.phase))
                         if (tunnelStatus.version.isNotBlank()) append(" · ").append(tunnelStatus.version)
                     },
                     style = MaterialTheme.typography.bodySmall,

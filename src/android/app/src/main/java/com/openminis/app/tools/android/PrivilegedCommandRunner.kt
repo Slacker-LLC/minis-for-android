@@ -2,8 +2,6 @@ package com.openminis.app.tools.android
 
 import android.content.Context
 import android.os.SystemClock
-import com.openminis.app.offload.OffloadPermissionManager
-import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.tools.ApprovalSeam
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -224,29 +222,7 @@ object PrivilegedCommandRunner {
         if (RootCommandRunner.cachedProbe()?.authorized == true) {
             return RootCommandRunner.run(argv, timeoutMs)
         }
-        if (!rootOnly && ShizukuManager.isReady()) {
-            val allowed = OffloadPermissionManager.checkPermission(
-                "shizuku_cli",
-                operation,
-                sessionId.ifBlank { OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID },
-            )
-            if (!allowed) {
-                return AndroidCommandResult(
-                    PrivilegedBackend.NONE, 126, "", "",
-                    unavailableReason = "android-shizuku-cli permission is not allowed",
-                )
-            }
-            return withContext(Dispatchers.IO) {
-                val result = ShizukuManager.runProcess(argv.toTypedArray(), timeoutMs = timeoutMs)
-                AndroidCommandResult(
-                    backend = PrivilegedBackend.SHIZUKU,
-                    exitCode = result.exitCode,
-                    stdout = result.stdout,
-                    stderr = result.stderr,
-                    timedOut = result.exitCode == 124,
-                )
-            }
-        }
+        // Shizuku backend removed (P3 Root-only): never fall back to Shizuku.
         return AndroidCommandResult(
             PrivilegedBackend.NONE,
             126,
@@ -255,7 +231,7 @@ object PrivilegedCommandRunner {
             unavailableReason = if (rootOnly) {
                 "authorized root with the required capability is unavailable"
             } else {
-                "neither authorized root nor an authorized Shizuku shell is available"
+                "authorized root is unavailable"
             },
         )
     }

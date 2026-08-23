@@ -227,10 +227,10 @@ fun AppNavigation(
     val context = LocalContext.current
 
     // T219-5: use the application-scoped singleton from MinisApp so UI
-    // add/remove shares state with PRootKernel and the lifecycle re-probe
+    // add/remove shares state with MinisKernel and the lifecycle re-probe
     // path. Pre-T219-5 this `remember { MountedFoldersStore(...) }` created
     // a SECOND independent instance — UI list updated but PRoot never
-    // saw the change because PRootKernel.mountedFoldersStore pointed at
+    // saw the change because MinisKernel.mountedFoldersStore pointed at
     // the application-scoped singleton in MinisApp.
     val mountedFoldersStore = remember {
         (context.applicationContext as com.openminis.app.MinisApp).mountedFoldersStore
@@ -954,7 +954,7 @@ fun AppNavigation(
                     rootPath = rootfs.rootfsDir,
                     initialPath = varMinis.takeIf { it.exists() },
                     rootLabel = "/",
-                    // T121: route directory listings through PRootKernel bind
+                    // T121: route directory listings through MinisKernel bind
                     // mounts so /var/minis/{skills,memory,shared} resolve to
                     // their backing host dirs (filesDir/minis-global/<subdir>).
                     // Without this the browser walks the rootfs tarball
@@ -1208,6 +1208,8 @@ fun AppNavigation(
         composable(Routes.REMOTE_ACCESS_TUNNEL) {
             CloudflareTunnelSettingsScreen(
                 onBack = { navController.safePopBackStack() },
+                onOpenLogs = { navController.safeNavigate(Routes.LOGS) },
+                onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
             )
         }
 

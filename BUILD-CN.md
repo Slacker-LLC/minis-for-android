@@ -23,11 +23,11 @@ ASCII 路径。
 ## 1. 克隆源码
 
 ```bash
-git clone --recurse-submodules https://github.com/limuzi013/minis-for-android.git
+git clone https://github.com/limuzi013/minis-for-android.git
 cd OpenMinis-Pet
 ```
 
-`deps/proot` 是固定 commit 的 submodule;源码压缩包不含其内容,必须递归克隆或手动初始化。
+原生依赖 `src/native/minisd`(Rust Root Broker)与 App 同仓,无 submodule。
 
 ## 2. 配置 SDK 与定制
 
@@ -35,6 +35,7 @@ cd OpenMinis-Pet
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"  # 按本机版本调整
+export PATH="$HOME/.cargo/bin:$PATH"                     # Rust 工具链(交叉编译用)
 
 cp src/android/app/provider-customization.properties.example \
    src/android/app/provider-customization.properties
@@ -45,14 +46,21 @@ cp src/android/app/provider-customization.properties.example \
 ## 3. 构建沙箱资源
 
 ```bash
-./deps/build_proot.sh
-./scripts/prepare_android_sandbox.sh
+# minisd Root Broker(需 rustup target add aarch64-unknown-linux-musl)
+cargo build --release --target aarch64-unknown-linux-musl \
+    --manifest-path src/native/minisd/Cargo.toml
+
+# Ubuntu 24.04 arm64 rootfs 打包(下载 + SHA-256 校验 + tar 打包)
+./scripts/build-ubuntu-rootfs.sh
 ```
 
-- 第一条从固定的 `OpenMinis/proot` 源码构建 PRoot,产出 `proot-aarch64` 与 `libproot.so`;
-  两个 Android ELF loader 是仓库中明确保留并校验 SHA-256 的 vendored Termux 构建;
-- 第二条下载固定的 Alpine 3.21.3 arm64 minirootfs、校验 SHA-256,并检查 PRoot 产物齐全;
-- 生成的 PRoot 与 Alpine 产物不提交 Git,干净 checkout 后必须重新生成。
+- 第一条交叉编译 minisd(静态 musl,无 Android 运行时依赖),产出到
+  `src/native/minisd/target/aarch64-unknown-linux-musl/release/minisd`;
+- 第二条下载固定 Ubuntu 24.04 arm64 base、校验 SHA-256、预装 python3/git
+  并打包为 rootfs tar;
+- 生成的 minisd 与 Ubuntu rootfs 产物不提交 Git,干净 checkout 后必须重新生成。
+- PRoot/Alpine 依赖(P2 已拆除)不再需要:`deps/build_proot.sh` 与
+  `scripts/prepare_android_sandbox.sh` 已随 P2 移除。
 
 ## 4. 构建 Minis Web Client Plugin
 
@@ -104,9 +112,10 @@ cd src/android
 
 ## 常见问题
 
-### `deps/proot/src` 不存在
+### cargo 交叉编译失败
 
-执行 `git submodule update --init --recursive`。
+先 `rustup target add aarch64-unknown-linux-musl`,并确认 `$HOME/.cargo/bin` 在 PATH。
+minisd 静态链接 musl,不需要 Android NDK。
 
 ### 找不到 Android NDK
 
@@ -114,17 +123,14 @@ cd src/android
 
 ### App 能启动但沙箱命令失败
 
-重建并核验沙箱产物:
+检查 minisd 是否已安装到 `/data/adb/minis/bin/minisd`(root 设备)与 Ubuntu rootfs
+是否在 `/data/adb/minis/rootfs`。App 在 `UbuntuRuntime.ensureReady()` 时会自动经 su
+拉起 minisd watchdog,无需手动常驻。执行一条 shell 命令并断言退出码为 0:
 
 ```bash
-./deps/build_proot.sh
-./scripts/prepare_android_sandbox.sh
-unzip -l src/android/app/build/outputs/apk/debug/app-debug.apk \
-  | grep -E 'libproot|alpine-minirootfs'
+adb shell su -c "/data/adb/minis/bin/minisd --call --socket /data/adb/minis/run/minisd.sock"
+# 输入: {"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
 ```
-
-APK 需要 `libproot.so`、64 位 PRoot loader 与 Alpine rootfs。仅启动 App 不是有效的沙箱测试;
-执行一条 shell 命令并断言退出码为 0。
 
 ### 更改 versionName/versionCode
 

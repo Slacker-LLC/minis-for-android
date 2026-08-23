@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import com.openminis.app.tools.internal.FileMutationQueue
 import com.openminis.app.tools.internal.FileRevision
 import org.json.JSONObject
@@ -59,7 +59,7 @@ object FileWriteTool {
             // friendly hint pointing the user at Settings. Mirrors iOS
             // MountedFolderCoordinator.isLinuxPathUnderReadOnlyMount used by
             // AIChatViewModel.fileWrite (AIChatViewModel.swift:8333-8341).
-            if (PRootKernel.isLinuxPathUnderReadOnlyMount(path)) {
+            if (MinisKernel.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
                         "Toggle writability in Settings → Mount External Folders if this is a mistake.",
@@ -72,7 +72,7 @@ object FileWriteTool {
             // /var/minis/browser/... land in this session's host dir
             // rather than the global bind-mount map (which is overwritten
             // every time another session boots its shell, last-writer-wins).
-            val file = PRootKernel.resolveSessionHostPath(sessionId, path, context)
+            val file = com.openminis.app.sandbox.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
                 ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
 
             // Validate UTF-8

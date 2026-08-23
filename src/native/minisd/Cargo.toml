@@ -1,0 +1,29 @@
+[package]
+name = "minisd"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+description = "Minis for Android Root Broker"
+publish = false
+
+[lib]
+name = "minisd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "minisd"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.180"
+tokio = { version = "1.48.0", default-features = false, features = ["rt", "macros", "net", "time", "sync", "io-util", "signal"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -9,7 +9,7 @@ import android.os.StatFs
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -160,8 +160,8 @@ object AndroidCapabilityResolver {
         return JSONObject().apply {
             put("defaultEnvironment", "proot")
             put("proot", CapabilityFact(
-                if (PRootKernel.isBooted || rootfs.isDirectory) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE,
-                if (PRootKernel.isBooted) "PRoot is booted" else "Alpine rootfs ${if (rootfs.isDirectory) "is installed" else "is missing"}",
+                if (MinisKernel.isBooted || rootfs.isDirectory) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE,
+                if (MinisKernel.isBooted) "PRoot is booted" else "Alpine rootfs ${if (rootfs.isDirectory) "is installed" else "is missing"}",
                 "proot",
             ).toJson())
             put("java", CapabilityFact(if (java) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE, "Java executable inside the Alpine rootfs").toJson())

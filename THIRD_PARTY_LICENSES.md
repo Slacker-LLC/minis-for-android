@@ -10,13 +10,25 @@ iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMi
 
 ## Native C/C++ dependencies (`deps/`)
 
+> P2 重构后 PRoot/Alpine 依赖已移除;下表中 proot/talloc/Alpine 条目为历史记录,
+> 当前不再构建或随 APK 分发。当前原生依赖为 Rust 的 minisd(见下)。
+
 | Component | Version / Source | License | Notes |
 |---|---|---|---|
-| [proot](https://github.com/OpenMinis/proot) (fork) | pinned git submodule `deps/proot` | **GPL-2.0** | Android sandbox runtime; fork-built `libproot.so` / `proot-aarch64` are generated locally |
-| Termux PRoot ELF loaders | proot `5.1.107-70`, tracked under `jniLibs/arm64-v8a/` | **GPL-2.0** | Vendored 64/32-bit Android loaders; SHA-256 pinned by `deps/build_proot.sh` because the exact package was retired |
-| [talloc](https://talloc.samba.org) (Samba) | 2.4.2, downloaded by `deps/build_proot.sh` | **LGPL-3.0-or-later** | Statically linked allocator required by PRoot; generated source/build directory is not tracked |
+| ~~[proot](https://github.com/OpenMinis/proot) (fork)~~ | pinned git submodule `deps/proot` | **GPL-2.0** | P2 已移除(历史) |
+| ~~Termux PRoot ELF loaders~~ | proot `5.1.107-70` | **GPL-2.0** | P2 已移除(历史) |
+| ~~[talloc](https://talloc.samba.org) (Samba)~~ | 2.4.2 | **LGPL-3.0-or-later** | P2 已移除(历史) |
 | [cppjieba](https://github.com/yanyiwu/cppjieba) | vendored (`jieba_jni`) | **MIT** | Chinese word segmentation (header-only + dictionaries) |
-| Alpine Linux minirootfs | 3.21.3, downloaded and SHA-256 checked by `scripts/prepare_android_sandbox.sh` | Aggregate of package licenses (musl **MIT**, BusyBox **GPL-2.0**, etc.) | Generated build asset; bundled into the APK as the current rootfs |
+| ~~Alpine Linux minirootfs~~ | 3.21.3 | Aggregate | P2 已移除(历史) |
+
+## Rust native dependencies (`src/native/minisd/`)
+
+| Component | Version / Source | License | Notes |
+|---|---|---|---|
+| minisd(本项目源码) | 同仓 `src/native/minisd/` | **GPL-3.0**(随项目) | Root Broker + Ubuntu chroot 运行时;静态 musl 交叉编译 |
+| [serde](https://github.com/serde-rs/serde) / serde_json | 1.x(见 Cargo.lock) | MIT / Apache-2.0 | JSON 协议序列化 |
+| [libc](https://github.com/rust-lang/libc) | 0.2(见 Cargo.lock) | MIT / Apache-2.0 | 裸 syscall 绑定(unshare/mount/getsockopt 等) |
+| Ubuntu 24.04 base rootfs | `24.04.3`(noble),打包脚本 SHA-256 校验 | Aggregate of package licenses | 生成构建产物,打包进 APK assets
 
 ## Web Remote 前端（`assets/minis/` 与兼容资源）
 
@@ -45,6 +57,12 @@ iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMi
 | [RealTimeCutVADLibraryForAndroid](https://github.com/helloooideeeeea/RealTimeCutVADLibraryForAndroid) | 1.0.5 | **MIT** |
 
 Test-only dependencies: JUnit 4.13.2 (**EPL-1.0**), MockWebServer 4.12.0 (**Apache-2.0**), kotlinx-coroutines-test 1.9.0 (**Apache-2.0**), org.json 20231013 (**Public Domain / JSON License**).
+
+## Tunnel / remote-access
+
+| Component | Version / Source | License | Notes |
+|---|---|---|---|
+| [cloudflared](https://github.com/cloudflare/cloudflared) | 2026.8.2, arm64 下载后 SHA-256 校验(见 `CloudflareTunnelManager.kt`) | **Apache-2.0** | Cloudflare Tunnel 客户端;运行时下载到 `/data/adb/minis/bin/cloudflared`,不随 APK 分发 |
 
 ## Bundled web/UI assets
 

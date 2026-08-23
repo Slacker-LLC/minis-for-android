@@ -6,13 +6,16 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 Minis 是一个 **Android 原生 Agent 运行时**:手机上运行完整的 LLM Agent(工具调用、文件编辑、
-持续 shell、网页浏览、目标管理),内置 **Alpine Linux + PRoot** 沙箱作为默认执行环境,
-并提供与 Android 共用同一数据源的 **Minis Web** 远程工作台。
+持续 shell、网页浏览、目标管理),内置 **Ubuntu 24.04 chroot**(由 minisd Root Broker 以
+root 管理、按 App UID 降权运行)作为默认执行环境,并提供与 Android 共用同一数据源的
+**Minis Web** 远程工作台。
 
 ```text
 Android 原生 App（唯一运行时与数据源）
 ├─ Agent Loop / Room / Repository / 会话状态
-├─ Alpine rootfs + PRoot（复用 Android 手机内核）
+├─ Ubuntu 24.04 rootfs + 真 chroot（minisd：unshare+mount+chroot，复用 Android 手机内核）
+├─ minisd Root Broker（unix socket + SO_PEERCRED 鉴权 + policy 门控）
+├─ MCP Server（127.0.0.1:18789，Bearer 认证，确认队列 + 手机通知）
 ├─ 桌面宠物与默认数字助手
 ├─ 可选 Shizuku / Sui 权限桥
 └─ RemoteAccessServer
@@ -48,7 +51,7 @@ Android 原生 App（唯一运行时与数据源）
 ### Agent 与沙箱
 
 - 多 Provider、模型组、OAuth/API Key、图片输入、会话历史和工具调用;
-- 每个会话复用持久 PRoot Shell;工作区、附件、产出和共享目录分层挂载;
+- 每个会话复用持久 Ubuntu chroot Shell(经 minisd);工作区、附件、产出和共享目录分层挂载;
 - 文件编辑支持并发串行化、revision 校验、重叠编辑拒绝及大输出落盘;
 - Goal、Todo、Plan、产出文件、反馈、提问卡片和子代理工具使用原生状态源;
 - Skills、MCP、记忆/SOUL、环境变量、外部 SAF 挂载和定时任务管理;
@@ -83,8 +86,8 @@ Android 原生 App（唯一运行时与数据源）
 
 - 通用 ZIP 桌面宠物包、悬浮窗、状态动画、模型直聊与语音配置复用;
 - Android `ROLE_ASSISTANT`、VoiceInteraction Session/Recognition 服务及系统助手入口;
-- Shizuku、AXManager 或 Sui 是**可选**的 Android shell/Binder 能力桥,普通聊天和 PRoot
-  沙箱不依赖它们。
+- Shizuku、AXManager 或 Sui 是**可选**的 Android shell/Binder 能力桥,普通聊天和 Ubuntu
+  chroot 沙箱不依赖它们。
 
 ## 安全边界
 
@@ -106,28 +109,28 @@ Web Remote 可能通过 Tunnel 暴露到公网,因此默认坚持最小权限:
 
 详细协议见 [Web Remote RPC](docs/WEB-REMOTE-RPC.md) 与 [安全设计](docs/SECURITY.md)。
 
-## 执行环境:PRoot、Root 与 Shizuku
+## 执行环境:Ubuntu chroot、Root 与 Shizuku
 
-源码中的 `PRootKernel` 名称是历史命名,它**不是 App 自带的 Linux 内核**。现状是:
+当前默认执行环境已从 Alpine+PRoot 重构为 **Ubuntu 24.04 + 真 chroot**(P2):
 
 ```text
-Android 手机内核 → OpenMinis App UID → PRoot → Alpine rootfs
+Android 手机内核 → OpenMinis App UID → minisd(root broker) → unshare+mount+chroot → Ubuntu 24.04
 ```
 
 | 方案 | 当前状态 | 是否需要 Root | 是否有独立内核 |
 |---|---|---:|---:|
-| Alpine + PRoot | 已实现(默认) | 否 | 否 |
-| Ubuntu rootfs + PRoot | 未实现,可增加为可选 profile | 否 | 否 |
+| **Ubuntu 24.04 + minisd chroot** | **已实现(默认)** | 是(KernelSU/Magisk) | 否 |
+| Alpine + PRoot | 已移除(P2 拆除) | 否 | 否 |
 | Root `su` 直接执行 | 已实现(主动探测后端) | 是 | 否 |
-| Native chroot/mount namespace | 实验性 `probe_native_chroot` | 是 | 否 |
 | QEMU/KVM + Ubuntu kernel/rootfs | 未实现,需单独评估 | KVM 通常需要 | 是 |
 
 - Root 设备通过 `su` 工作,不依赖 Shizuku,兼容 Magisk / KernelSU / APatch;
   Root provider 名称只作为诊断信息,能力判断以真实探测为准;
 - 被动能力查询(如 `android_capabilities get`)不会触发 Root 授权弹窗;只有显式
   `active_root_probe` 才请求授权并返回 uid/gid/groups/CapEff/SELinux;
-- native chroot/mount 仅实验性;通过完整 parity tests 前不会替换 PRoot;
-  不修改全局 SELinux 策略,chroot 不是容器,构建脚本原则上默认非 root 执行。
+- guest 进程以 App UID 降权(uid=policy.caller.appUid)运行,SELinux 全程 Enforcing;
+  不修改全局 SELinux 策略,chroot 不是容器;guest 出网经 minisd 根代理
+  `127.0.0.1:18787`(拒内网/回环目标)。
 
 完整边界见 [执行环境](docs/EXECUTION-ENVIRONMENT.md)。
 
@@ -163,8 +166,11 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
 
-./deps/build_proot.sh
-./scripts/prepare_android_sandbox.sh
+# minisd Root Broker（Rust → aarch64-linux-musl）
+# 源码：src/native/minisd（与 App 同仓，无需 submodule）
+cargo build --release --target aarch64-unknown-linux-musl --manifest-path src/native/minisd/Cargo.toml
+# Ubuntu 24.04 arm64 rootfs 打包（产出 assets 内 rootfs tar + SHA-256）
+./scripts/build-ubuntu-rootfs.sh
 
 cd src/android
 ./gradlew :app:assembleDebug --no-daemon
@@ -173,6 +179,9 @@ cd src/android
 APK 输出:`src/android/app/build/outputs/apk/debug/app-debug.apk`。
 Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install && npm run build`
 (生成 browser bundle 并与 Android assets 同步)。
+
+> 构建产物约定：`minisd` 二进制与 Ubuntu rootfs tar 不提交 Git，干净 checkout 后必须
+> 用上述命令重新生成（详见 `BUILD-CN.md`）。
 
 ## 仓库结构
 
@@ -183,7 +192,7 @@ Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install 
 | `web/minis-client-plugin/` | Minis Client Plugin 源码、测试与可重复构建脚本 |
 | `src/android/app/src/main/java/com/openminis/app/tools/android/` | Android Debug 工具链 |
 | `src/shared/` | Android 构建复用的共享规则/资源 |
-| `deps/` | PRoot submodule 与原生依赖构建脚本 |
+| `deps/` | 已移除的 PRoot/Alpine 依赖构建脚本(历史归档)；当前原生依赖为 `src/native/minisd`(Rust,同仓) |
 | `releases/` | 明确发布且与源码对应的 APK |
 | [`docs/README.md`](docs/README.md) | 文档索引 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 版本变更记录(自 1.01-beta 起) |

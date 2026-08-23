@@ -1,0 +1,191 @@
+use crate::policy::PolicyFile;
+use crate::rate::RateLimiter;
+use crate::session::SessionTable;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+#[derive(Debug, Clone)]
+pub struct PendingConfirm {
+    pub method: String,
+    pub expires: Instant,
+}
+
+#[derive(Debug, Default)]
+pub struct UbuntuState {
+    pub running: bool,
+    pub pid: Option<i32>,
+    pub rootfs: String,
+    pub version: Option<String>,
+    pub provisioned: bool,
+    pub last_error: Option<String>,
+}
+
+impl UbuntuState {
+    pub fn rootfs_or_default(&self) -> String {
+        if self.rootfs.is_empty() {
+            crate::layout::HOST_ROOTFS.to_string()
+        } else {
+            self.rootfs.clone()
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SupervisorState {
+    pub cloudflared_running: bool,
+    pub cloudflared_pid: Option<i32>,
+    pub cloudflared: Option<crate::supervisor::CloudflaredSupervisor>,
+}
+
+impl SupervisorState {
+    /// Live view: the watch thread is authoritative while a supervisor exists;
+    /// the plain fields only cover mock mode / no supervisor.
+    pub fn cloudflared_status(&self) -> (bool, Option<i32>) {
+        match &self.cloudflared {
+            Some(s) => s.status(),
+            None => (self.cloudflared_running, self.cloudflared_pid),
+        }
+    }
+}
+
+pub struct AppState {
+    pub mock: bool,
+    pub skip_peer: bool,
+    pub policy: PolicyFile,
+    pub last_good_policy: PolicyFile,
+    pub rates: RateLimiter,
+    pub sessions: SessionTable,
+    pub ubuntu: UbuntuState,
+    pub supervisor: SupervisorState,
+    pub workspace_quota_bytes: u64,
+    pub confirms: HashMap<String, PendingConfirm>,
+    pub used_confirms: HashMap<String, ()>,
+    clock: Instant,
+}
+
+impl AppState {
+    pub fn new(mock: bool, policy: PolicyFile) -> Self {
+        if mock {
+            let mut sessions = SessionTable::default();
+            sessions.enable_subreaper();
+            return Self {
+                mock,
+                skip_peer: false,
+                last_good_policy: policy.clone(),
+                policy,
+                rates: RateLimiter::new(),
+                sessions,
+                ubuntu: UbuntuState::default(),
+                supervisor: SupervisorState::default(),
+                workspace_quota_bytes: 4 * 1024 * 1024 * 1024,
+                confirms: HashMap::new(),
+                used_confirms: HashMap::new(),
+                clock: Instant::now(),
+            };
+        }
+        let mut sessions = SessionTable::default();
+        sessions.enable_subreaper();
+        Self {
+            mock,
+            skip_peer: false,
+            last_good_policy: policy.clone(),
+            policy,
+            rates: RateLimiter::new(),
+            sessions,
+            ubuntu: UbuntuState::default(),
+            supervisor: SupervisorState::default(),
+            workspace_quota_bytes: 4 * 1024 * 1024 * 1024,
+            confirms: HashMap::new(),
+            used_confirms: HashMap::new(),
+            clock: Instant::now(),
+        }
+    }
+
+    pub fn now(&self) -> Instant {
+        // B5 fix: production uses the real monotonic clock; only mock mode
+        // (tests) uses the manual clock so advance() can simulate expiry.
+        if self.mock {
+            self.clock
+        } else {
+            Instant::now()
+        }
+    }
+
+    pub fn advance(&mut self, d: Duration) {
+        self.clock += d;
+    }
+
+    pub fn try_reload_policy(&mut self, json: &str) -> Result<(), String> {
+        match PolicyFile::parse(json) {
+            Ok(next) => {
+                self.last_good_policy = self.policy.clone();
+                self.policy = next;
+                Ok(())
+            }
+            Err(e) => {
+                self.policy = self.last_good_policy.clone();
+                Err(e)
+            }
+        }
+    }
+
+    pub fn issue_confirm(&mut self, method: &str) -> String {
+        let id = format!("c-{}", self.confirms.len() + self.used_confirms.len() + 1);
+        self.confirms.insert(
+            id.clone(),
+            PendingConfirm {
+                method: method.to_string(),
+                expires: self.now() + Duration::from_secs(120),
+            },
+        );
+        id
+    }
+
+    pub fn consume_confirm(&mut self, id: &str, method: &str) -> Result<(), crate::protocol::ErrorCode> {
+        if self.used_confirms.contains_key(id) {
+            return Err(crate::protocol::ErrorCode::PolicyDenied);
+        }
+        let Some(p) = self.confirms.get(id) else {
+            return Err(crate::protocol::ErrorCode::PolicyDenied);
+        };
+        if p.method != method {
+            return Err(crate::protocol::ErrorCode::PolicyDenied); // entry kept
+        }
+        if p.expires <= self.now() {
+            self.confirms.remove(id);
+            return Err(crate::protocol::ErrorCode::PolicyDenied); // expired: removed
+        }
+        self.confirms.remove(id);
+        self.used_confirms.insert(id.to_string(), ());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::ErrorCode;
+
+    #[test]
+    fn t_u16_wrong_method_keeps_entry() {
+        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+        let id = state.issue_confirm("root.exec");
+        // wrong method: rejected, entry must survive
+        assert_eq!(state.consume_confirm(&id, "other.method"), Err(ErrorCode::PolicyDenied));
+        assert!(state.confirms.contains_key(&id));
+        // right method: succeeds
+        assert_eq!(state.consume_confirm(&id, "root.exec"), Ok(()));
+        assert!(!state.confirms.contains_key(&id));
+        assert!(state.used_confirms.contains_key(&id));
+    }
+
+    #[test]
+    fn t_u16_expired_removed() {
+        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+        let id = state.issue_confirm("root.exec");
+        state.advance(Duration::from_secs(121));
+        assert_eq!(state.consume_confirm(&id, "root.exec"), Err(ErrorCode::PolicyDenied));
+        assert!(!state.confirms.contains_key(&id));
+        assert!(!state.used_confirms.contains_key(&id));
+    }
+}

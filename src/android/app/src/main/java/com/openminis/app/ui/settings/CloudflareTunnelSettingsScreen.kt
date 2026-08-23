@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SettingsEthernet
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -31,26 +32,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.remote.CloudflareTunnelManager
 import com.openminis.app.remote.RemoteAccessPrefs
 import com.openminis.app.remote.RemoteAccessService
 import kotlinx.coroutines.launch
-
-private fun phaseLabel(phase: String?): String = when (phase) {
-    "unconfigured" -> "未配置"
-    "stopped" -> "已停止"
-    "starting" -> "启动中"
-    "connecting" -> "连接中"
-    "healthy" -> "正常"
-    "degraded" -> "连接降级"
-    "reconnecting" -> "重连中"
-    "auth-failed" -> "认证失败"
-    "origin-down" -> "本地服务异常"
-    "edge-down" -> "连接异常"
-    "process-exited" -> "进程异常退出"
-    "error" -> "错误"
-    else -> phase ?: "未知"
-}
 
 private fun phaseTone(phase: String?): String = when (phase) {
     "healthy" -> "正常"
@@ -84,7 +70,11 @@ private fun fmtClock(ms: Long): String {
  * [CloudflareTunnelManager]；本页不保存任何第二份配置。
  */
 @Composable
-fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
+fun CloudflareTunnelSettingsScreen(
+    onBack: () -> Unit,
+    onOpenLogs: (() -> Unit)? = null,
+    onOpenBackground: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val health by CloudflareTunnelManager.health.collectAsState()
@@ -94,7 +84,7 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
     var token by remember { mutableStateOf("") }
     var tokenConfigured by remember { mutableStateOf(RemoteAccessPrefs.hasCloudflareTunnelToken(context)) }
     var protocolMode by remember { mutableStateOf(RemoteAccessPrefs.cloudflareTunnelProtocol(context)) }
-    var diagnostics by remember { mutableStateOf<List<Pair<String, Boolean>>?>(null) }
+    var diagnostics by remember { mutableStateOf<List<Triple<String, Boolean, String>>?>(null) }
     var diagnosing by remember { mutableStateOf(false) }
     var tunnelEnabled by remember { mutableStateOf(RemoteAccessPrefs.cloudflareTunnelEnabled(context)) }
 
@@ -110,7 +100,7 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
                 val checks = CloudflareTunnelManager.diagnose(context)
                 diagnostics = (0 until checks.length()).map { i ->
                     val row = checks.getJSONObject(i)
-                    row.optString("name") to row.optBoolean("ok")
+                    Triple(row.optString("name"), row.optBoolean("ok"), row.optString("detail"))
                 }
             } finally {
                 diagnosing = false
@@ -150,7 +140,7 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
                 icon = Icons.Outlined.Cloud,
                 trailing = {
                     Text(
-                        health.phase,
+                        CloudflareTunnelManager.phaseLabel(health.phase),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -171,6 +161,18 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
                     subtitle = health.lastError,
                     icon = Icons.Outlined.Info,
                     showDivider = true,
+                )
+            }
+        }
+
+        // 后台运行警告（规格 91：锁屏后系统可能冻 Web Remote / Tunnel）
+        if (!PowerOptimizationManager.isIgnoringBatteryOptimizations(context)) {
+            SettingsSection(header = "后台运行可能受限") {
+                SettingsRow(
+                    title = "系统当前可能在锁屏后停止 Web Remote 或 Cloudflare Tunnel",
+                    subtitle = "检查后台运行设置",
+                    icon = Icons.Outlined.Warning,
+                    onClick = { onOpenBackground?.invoke() },
                 )
             }
         }
@@ -271,8 +273,8 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
         ) {
             SettingsRow(title = "Edge 连接", subtitle = "${health.edgeConnected} / ${health.edgeExpected}", showDivider = true)
             SettingsRow(title = "传输协议", subtitle = health.protocol, showDivider = true)
-            SettingsRow(title = "本地服务", subtitle = "${health.originHealth} · $originLabel", showDivider = true)
-            SettingsRow(title = "公网入口", subtitle = "${health.publicHealth} · $hostnameLabel", showDivider = true)
+            SettingsRow(title = "本地服务", subtitle = "${CloudflareTunnelManager.healthLabel(health.originHealth)} · $originLabel", showDivider = true)
+            SettingsRow(title = "公网入口", subtitle = "${CloudflareTunnelManager.healthLabel(health.publicHealth)} · $hostnameLabel", showDivider = true)
             SettingsRow(title = "启动时间", subtitle = fmtClock(health.startedAtMs), showDivider = true)
             SettingsRow(
                 title = "累计重连",
@@ -294,13 +296,21 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
             )
             if (diagnostics != null) {
                 SettingsCardBlock {
-                    for ((name, ok) in diagnostics!!) {
+                    for ((name, ok, detail) in diagnostics!!) {
                         Text(
                             text = "${if (ok) "✓" else "×"} $name",
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(vertical = 3.dp),
+                            modifier = Modifier.padding(top = 3.dp),
                         )
+                        if (!ok && detail.isNotBlank()) {
+                            Text(
+                                text = detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 14.dp, top = 2.dp, bottom = 3.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -326,7 +336,9 @@ fun CloudflareTunnelSettingsScreen(onBack: () -> Unit) {
                 title = "查看日志",
                 subtitle = "脱敏后的 cloudflared 输出",
                 icon = Icons.Outlined.Refresh,
-                onClick = { toast("日志入口：设置 → 日志管理（内容已脱敏）") },
+                onClick = {
+                    if (onOpenLogs != null) onOpenLogs() else toast("日志入口：设置 → 日志管理（内容已脱敏）")
+                },
             )
         }
 

@@ -11,7 +11,7 @@ import com.openminis.app.data.MountedFoldersStore
  * (not the app) handles cross-process consistency.
  *
  * Consumers (per T219 spec):
- *  - T219-3 PRootKernel: [bindMountSpecs] to seed `proot -b` flags.
+ *  - T219-3 MinisKernel: [bindMountSpecs] to seed `proot -b` flags.
  *  - T219-3 FileWriteTool / FileEditTool: [requireWritable] /
  *    [isLinuxPathUnderReadOnlyMount] to short-circuit writes against
  *    locked mounts before touching disk.

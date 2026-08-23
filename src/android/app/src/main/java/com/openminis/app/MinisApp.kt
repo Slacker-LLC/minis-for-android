@@ -34,8 +34,9 @@ import com.openminis.app.provider.ModelsDevApi
 import com.openminis.app.sandbox.ExecutionCoordinator
 import com.openminis.app.sandbox.MountedFolderCoordinator
 import com.openminis.app.sandbox.NativeOffloadServer
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
 import com.openminis.app.sandbox.offload.AccessibilityOffloadHandler
 import com.openminis.app.sandbox.offload.AlarmOffloadHandler
 import com.openminis.app.sandbox.offload.BrowserUseOffloadHandler
@@ -447,6 +448,132 @@ class MinisApp : Application(), ImageLoaderFactory {
         RootfsManager.getInstance(this)
         ExecutionCoordinator.init(this)
         ExecutionCoordinator.envVarRepository = envVarRepository
+        // P2: Ubuntu Runtime handle. Lazy — no su / no ubuntu.start here.
+        // PRoot remains the default shell until P2 exit deletes it.
+        UbuntuRuntime.init(this)
+        // P3: register Tool Runtime handlers (linux.* + old aliases).
+        // root.shell: Android Root domain shell, LOCAL_ONLY by policy.
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.RootShellHandler(),
+            aliasNames = listOf("shell_root"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxFileReadHandler(),
+            aliasNames = listOf("file_read"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxFileWriteHandler(),
+            aliasNames = listOf("file_write"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxFileEditHandler(),
+            aliasNames = listOf("file_edit"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxShellHandler(),
+            aliasNames = listOf("shell_execute"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxPythonRunHandler(),
+        )
+        // android.* remainder (logs/diagnose/deploy) via generic handler
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.LOGS,
+                "android.logs",
+            ),
+            aliasNames = listOf("android_logs"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.DIAGNOSE,
+                "android.diagnose",
+            ),
+            aliasNames = listOf("android_diagnose"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.DEPLOY,
+                "android.deploy",
+            ),
+            aliasNames = listOf("android_deploy"),
+        )
+        // android.* (read-first): capabilities + app + ui(screenshot/observe)
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.CAPABILITIES,
+                "android.capabilities",
+            ),
+            aliasNames = listOf("android_capabilities"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.APP,
+                "android.app",
+            ),
+            aliasNames = listOf("android_app"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AndroidToolHandler(
+                com.openminis.app.tools.android.AndroidAgentTools.UI,
+                "android.ui",
+            ),
+            aliasNames = listOf("android_ui"),
+        )
+        // P3 read-first wave 2: image read, agent goal/todo/subagent/ask, jobs
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxReadImageHandler(),
+            aliasNames = listOf("read_image"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AgentGoalHandler(),
+            aliasNames = listOf("get_goal", "create_goal", "update_goal"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AgentTodoHandler(),
+            aliasNames = listOf("todo_write"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AgentSubagentHandler(),
+            aliasNames = listOf("subagent"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AgentAskHandler(),
+            aliasNames = listOf("ask_user_question"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.SystemJobsHandler(),
+            aliasNames = listOf("job_list", "job_kill", "job_output"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.AgentRalphHandler(),
+            aliasNames = listOf("ralph"),
+        )
+
+        // P4 / 06 §1: register providers claiming tool-name prefixes.
+        // LinuxProvider gates linux.* on the Ubuntu runtime being available;
+        // the rest are pass-through PrefixProviders (semantics land in P5+).
+        com.openminis.app.tools.runtime.ProviderRouter.reset()
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.LinuxProvider(
+                available = { UbuntuRuntime.snapshot.value.available },
+            ),
+        )
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.PrefixProvider("android", listOf("android.")),
+        )
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.PrefixProvider("root", listOf("root.")),
+        )
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.PrefixProvider("core", listOf("system.", "agent.")),
+        )
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.PrefixProvider("mcp", listOf("mcp.")),
+        )
+        com.openminis.app.tools.runtime.ProviderRouter.register(
+            com.openminis.app.tools.runtime.PrefixProvider("skill", listOf("skill.")),
+        )
 
         // Privacy Mode store + redactor wiring. Mirrors iOS
         // EnvVarPrivacyStore.init / EnvVarRedactor static handoff.
@@ -462,7 +589,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Register global /var/minis/{memory,skills,shared} bind mounts up-front
         // so direct file I/O tools (file_read) resolve these paths even before
         // PRoot has booted or any shell has started.
-        PRootKernel.registerGlobalBindMounts(this)
+        MinisKernel.registerGlobalBindMounts(this)
 
         // T219-1: load user-mounted external folders and seed PRoot's
         // bindMounts before the first proot invocation, so the very first
@@ -471,7 +598,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // (cloud providers, unmounted SD card) are silently skipped by
         // bindMountSpecs.
         mountedFoldersStore = MountedFoldersStore(this)
-        // T219-5: hand the singleton to PRootKernel so applyMountedFoldersSnapshot
+        // T219-5: hand the singleton to MinisKernel so applyMountedFoldersSnapshot
         // can read the live state, and wire an onChange callback so any UI CRUD
         // (add/remove/rename/toggle) re-applies the snapshot.
         // T277: PersistentShell reuses one PRoot process per chat session for the
@@ -480,19 +607,19 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Kill any live shells so the next execute() rebuilds them with the
         // updated bind set. Mount CRUD is a Settings-screen action; the user
         // is not in chat mid-command, so this restart is safe and user-invisible.
-        PRootKernel.mountedFoldersStore = mountedFoldersStore
+        MinisKernel.mountedFoldersStore = mountedFoldersStore
         mountedFoldersStore.onChange = {
-            PRootKernel.applyMountedFoldersSnapshot(this)
+            MinisKernel.applyMountedFoldersSnapshot(this)
             ExecutionCoordinator.stopCurrentCommand()
         }
         // T219-6: route launch-time seeding through applyMountedFoldersSnapshot
         // so it (a) reads the live store consistently and (b) materializes the
         // /var/minis/mounts/<name> placeholder dirs that PRoot's `-b` needs.
-        // Note: this runs before PRootKernel.boot, so rootfs may not yet exist —
+        // Note: this runs before MinisKernel.boot, so rootfs may not yet exist —
         // applyMountedFoldersSnapshot tolerates that case (mkdirs fails silently
-        // and PRootKernel.boot calls applyMountedFoldersSnapshot again at the
+        // and MinisKernel.boot calls applyMountedFoldersSnapshot again at the
         // end of boot to materialize the targets once rootfs is on disk).
-        PRootKernel.applyMountedFoldersSnapshot(this)
+        MinisKernel.applyMountedFoldersSnapshot(this)
 
         // Register native_offload handlers and start the server eagerly —
         // the server only needs the rootfs tmp directory, which can be
@@ -523,7 +650,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         )
         NativeOffloadServer.register("minis-browser-use", BrowserUseOffloadHandler(this))
         // T188: minis-sessions-cli — agent-side query of chat history.
-        // Registers next to the other minis-* tools so PRootKernel.
+        // Registers next to the other minis-* tools so MinisKernel.
         // installHandlerStubs() picks it up on the next rootfs boot
         // (writes a 17-byte exit-0 stub at /usr/local/bin/minis-sessions-cli
         // so PATH lookup succeeds; PRoot intercepts the execve before
@@ -547,7 +674,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // T-android-minis-debug-cli: shell-side CLI wrapper around the in-app
         // DebugServer (127.0.0.1:5321) JSON-RPC. DEBUG-only — Release builds
         // ship neither the DebugServer nor this handler, so the
-        // `/usr/local/bin/minis-debug` stub is also absent (PRootKernel.
+        // `/usr/local/bin/minis-debug` stub is also absent (MinisKernel.
         // installHandlerStubs enumerates currently-registered handlers).
         if (BuildConfig.DEBUG) {
             NativeOffloadServer.register(
@@ -556,15 +683,21 @@ class MinisApp : Application(), ImageLoaderFactory {
             )
         }
 
-        NativeOffloadServer.start(RootfsManager.getInstance(this).rootfsDir)
+        NativeOffloadServer.start(java.io.File(filesDir, "minis-offload"))
 
         // Initialize session activity tracker for foreground service management
         SessionActivityTracker.init(this)
         // OpenMinis Pet fork: restore the optional overlay after process recreation.
         PetBridge.startIfEnabled(this)
+        // P6: Web Remote 下线 — auto-start 停用（startIfEnabled 已改为 no-op）。
         // Same rationale for Web Remote: without this the tunnel stays down
         // after a reboot until someone opens Settings and toggles it by hand.
-        com.openminis.app.remote.RemoteAccessService.startIfEnabled(this)
+        // com.openminis.app.remote.RemoteAccessService.startIfEnabled(this)
+
+        // [T-android-mcp-server] MCP server lifecycle gate. init() only reads
+        // the token-configured flag and honors the mcp_server_enabled boot
+        // pref (default false) — never auto-starts otherwise.
+        com.openminis.app.mcp.server.MCPServerManager.init(this)
 
         // [T-android-session-paused-badge] Per-session badge-state queue
         // displayed in the session-list cell corner. Init early so the
@@ -703,7 +836,7 @@ class MinisApp : Application(), ImageLoaderFactory {
 
         // Propagate system timezone and HTTP-proxy changes into the sandbox.
         // iOS recomputes TZ for every command (ISHShellExecutor.m:335-353);
-        // here we update PRootKernel.customEnvironment and push `export …`
+        // here we update MinisKernel.customEnvironment and push `export …`
         // into every live shell so interactive sessions pick up the change
         // without a restart.
         val sandboxSystemReceiver = object : BroadcastReceiver() {

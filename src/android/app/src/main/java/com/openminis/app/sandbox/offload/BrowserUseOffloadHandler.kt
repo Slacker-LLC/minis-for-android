@@ -8,7 +8,7 @@ import com.openminis.app.browser.BrowserActionResult
 import com.openminis.app.sandbox.NativeOffloadHandler
 import com.openminis.app.sandbox.NativeOffloadRequest
 import com.openminis.app.sandbox.NativeOffloadResult
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -171,7 +171,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // dropping the array (which used to reach set_cookies as empty).
         val cookiesFile = args.get("cookies-file", "cookies_file")
         val cookiesRaw: String? = if (cookiesFile != null) {
-            val host = PRootKernel.resolveHostPath(cookiesFile)
+            val host = MinisKernel.resolveHostPath(cookiesFile)
                 ?: throw IllegalArgumentException("--cookies-file: cannot resolve path '$cookiesFile'")
             runCatching { host.readText() }.getOrNull()
                 ?: throw IllegalArgumentException("--cookies-file: could not read '$cookiesFile'")
@@ -245,7 +245,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // Persist screenshot bytes under /var/minis/browser/ so shells can
         // reference the JPEG via image_path + minis_url instead of piping
         // base64 through stdout.
-        val browserHostDir: File? = PRootKernel.resolveHostPath(VAR_MINIS_BROWSER)?.also {
+        val browserHostDir: File? = MinisKernel.resolveHostPath(VAR_MINIS_BROWSER)?.also {
             try { it.mkdirs() } catch (_: Throwable) { /* non-fatal — write will fail below */ }
         }
 

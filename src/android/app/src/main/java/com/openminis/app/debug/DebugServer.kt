@@ -12,12 +12,14 @@ import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 
 /**
  * Debug-only JSON-RPC 2.0 server on port 5321.
- * Listens on all interfaces (0.0.0.0) so it's reachable from the local network for debugging.
+ * Listens on 127.0.0.1 only — reachable via `adb forward` or on-device,
+ * never from the local network.
  * Mirrors the iOS DebugServer for parity with the debug-server CLI skill.
  *
  * IMPORTANT: Only start this in debug builds. Never start in release.
@@ -102,10 +104,10 @@ class DebugServer(
 
         acceptJob = scope.launch {
             try {
-                // Listen on all interfaces (0.0.0.0) for network access
-                val ss = ServerSocket(port, 10)
+                // Loopback only (127.0.0.1) — reachable via adb forward / on-device
+                val ss = ServerSocket(port, 10, InetAddress.getByName("127.0.0.1"))
                 serverSocket = ss
-                Log.i(TAG, "Debug server listening on port $port (all interfaces)")
+                Log.i(TAG, "Debug server listening on 127.0.0.1:$port (loopback only)")
                 Log.i(TAG, "All clients must send X-Minis-Token (see files/debug_server_token)")
 
                 while (!stopped) {

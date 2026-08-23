@@ -6,9 +6,12 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +22,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.DatagramPacket
+import java.security.MessageDigest
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -45,8 +49,14 @@ import javax.net.ssl.SSLSocketFactory
  */
 object CloudflareTunnelManager {
     private const val TAG = "CloudflareTunnel"
+    // Pinned so installs are reproducible (the /latest redirect moves).
+    private const val CLOUDFLARED_VERSION = "2026.8.2"
     private const val DOWNLOAD_URL =
-        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+        "https://github.com/cloudflare/cloudflared/releases/download/$CLOUDFLARED_VERSION/cloudflared-linux-arm64"
+    // SHA-256 of the pinned binary, computed with:
+    //   curl -sL -o cloudflared-linux-arm64 $DOWNLOAD_URL && sha256sum cloudflared-linux-arm64
+    private const val CLOUDFLARED_SHA256 =
+        "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790"
     private const val MAX_BINARY_BYTES = 80L * 1024L * 1024L
     private const val METRICS_PORT = 8288
     private const val LOG_BUFFER = 400
@@ -68,6 +78,32 @@ object CloudflareTunnelManager {
         const val EDGE_DOWN = "edge-down"
         const val PROCESS_EXITED = "process-exited"
         const val ERROR = "error"
+    }
+
+    /** Chinese display label shared by both UI surfaces (spec 94: 两端文案统一). */
+    fun phaseLabel(phase: String): String = when (phase) {
+        Phase.UNCONFIGURED -> "未配置"
+        Phase.STOPPED -> "已停止"
+        Phase.STARTING -> "启动中"
+        Phase.CONNECTING -> "连接中"
+        Phase.HEALTHY -> "正常"
+        Phase.DEGRADED -> "连接降级"
+        Phase.RECONNECTING -> "重连中"
+        Phase.AUTH_FAILED -> "认证失败"
+        Phase.ORIGIN_DOWN -> "本地服务异常"
+        Phase.EDGE_DOWN -> "Tunnel 连接异常"
+        Phase.PROCESS_EXITED -> "cloudflared 异常退出"
+        Phase.ERROR -> "错误"
+        "idle" -> "空闲"
+        else -> phase
+    }
+
+    /** Chinese label for originHealth/publicHealth values. */
+    fun healthLabel(value: String): String = when (value) {
+        "healthy" -> "正常"
+        "down" -> "不可用"
+        "degraded" -> "降级"
+        else -> "未知"
     }
 
     /** Full runtime-visible snapshot (same object for App UI, Web RPC, diagnostics). */
@@ -113,6 +149,9 @@ object CloudflareTunnelManager {
     )
 
     @Volatile private var process: Process? = null
+    /** P5/D9: tunnel handed to minisd supervisor (RPC) instead of in-app spawn. */
+    @Volatile private var minisdManaged = false
+    @Volatile private var minisdRunning = false
     private val lock = Any()
     private var startedAtMs = 0L
     private var lastConnectedAtMs = 0L
@@ -171,7 +210,7 @@ object CloudflareTunnelManager {
     suspend fun installOrUpdate(context: Context): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             publish(Phase.STARTING, "Downloading cloudflared…")
-            PRootKernel.boot(context.applicationContext)
+            MinisKernel.boot(context.applicationContext)
             val target = binaryFile(context)
             target.parentFile?.mkdirs()
             val tmp = File(target.parentFile, "${target.name}.download")
@@ -198,6 +237,26 @@ object CloudflareTunnelManager {
                 }
             }
             if (tmp.length() < 1_000_000L) error("cloudflared binary download is incomplete")
+            if (sha256(tmp) != CLOUDFLARED_SHA256) {
+                tmp.delete()
+                error("cloudflared sha256 mismatch (expected $CLOUDFLARED_VERSION)")
+            }
+            // P5/D9: best-effort copy to the minisd-managed location (root-only
+            // path). Failure keeps the app-private copy as the fallback binary.
+            val suWriteOk = runCatching {
+                val su = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su")
+                    .firstOrNull { File(it).canExecute() } ?: error("no su")
+                val cmd = "mkdir -p /data/adb/minis/bin && cat > /data/adb/minis/bin/cloudflared && " +
+                    "chmod 755 /data/adb/minis/bin/cloudflared"
+                val proc = ProcessBuilder(su, "-c", cmd).start()
+                proc.outputStream.use { o -> tmp.inputStream().use { it.copyTo(o) } }
+                proc.outputStream.close()
+                proc.waitFor(120, TimeUnit.SECONDS) && proc.exitValue() == 0
+            }.getOrDefault(false)
+            if (!suWriteOk) {
+                Log.w(TAG, "root write to /data/adb/minis/bin/cloudflared failed; keeping app-private copy for fallback spawn")
+                recordEvent("写入 /data/adb/minis/bin/cloudflared 失败，保留 App 内回退路径")
+            }
             if (!tmp.renameTo(target)) {
                 tmp.copyTo(target, overwrite = true)
                 tmp.delete()
@@ -232,10 +291,42 @@ object CloudflareTunnelManager {
                 ?: error("Cloudflare Tunnel Token is not configured")
             if (!RemoteAccessPrefs.cloudflareTunnelEnabled(app)) return@runCatching
 
-            PRootKernel.boot(app)
+            MinisKernel.boot(app)
             if (!binaryFile(app).isFile) {
                 installOrUpdate(app).getOrThrow()
             }
+
+            // P5/D9: hand supervision to minisd when reachable. In-app spawn
+            // below stays as the fallback (minisd down / RPC rejected).
+            val minisdResp = runCatching {
+                UbuntuRuntime.client.cloudflaredStart(
+                    path = "/data/adb/minis/bin/cloudflared",
+                    args = listOf(
+                        "tunnel", "--no-autoupdate",
+                        "--protocol", resolvedProtocol(app),
+                        "--metrics", "127.0.0.1:$METRICS_PORT",
+                        "run",
+                    ),
+                    env = mapOf("TUNNEL_TOKEN" to token),
+                )
+            }.getOrNull()
+            if (minisdResp != null && minisdResp.ok) {
+                synchronized(lock) {
+                    startedAtMs = System.currentTimeMillis()
+                    lastConnectedAtMs = 0L
+                    lastDisconnectedAtMs = 0L
+                    reconnectCount = 0
+                    supervisorGeneration++
+                    minisdManaged = true
+                    minisdRunning = true
+                    publish(Phase.STARTING, "启动 cloudflared…")
+                }
+                Log.i(TAG, "cloudflared handed to minisd supervisor")
+                return@runCatching
+            }
+            Log.w(TAG, "minisd cloudflaredStart unavailable (${minisdResp?.code} ${minisdResp?.error?.detail?.take(200)}); falling back to in-app spawn")
+            recordEvent("minisd 接管不可用，已回退 App 内启动 cloudflared")
+            minisdManaged = false
 
             synchronized(lock) {
                 if (process?.isAlive == true) return@runCatching
@@ -281,6 +372,20 @@ object CloudflareTunnelManager {
                         Thread.sleep(250)
                         if (p.isAlive) p.destroyForcibly()
                     }
+                }
+            }
+        }
+        // P5/D9: stop the minisd-supervised tunnel asynchronously (stop() is
+        // called from UI threads, not suspend).
+        val wasMinisd = minisdManaged
+        minisdManaged = false
+        minisdRunning = false
+        if (wasMinisd) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val r = runCatching { UbuntuRuntime.client.cloudflaredStop() }.getOrNull()
+                if (r == null || !r.ok) {
+                    Log.w(TAG, "minisd cloudflaredStop failed (${r?.code} ${r?.error?.detail}); tunnel may be restarted by minisd supervisor")
+                    recordEvent("停止 minisd 侧 cloudflared 失败，隧道可能被 minisd 重新拉起")
                 }
             }
         }
@@ -334,37 +439,54 @@ object CloudflareTunnelManager {
 
         // 2. token configured (presence only)
         val tokenOK = RemoteAccessPrefs.hasCloudflareTunnelToken(app)
-        add("tunnel-token", tokenOK, if (tokenOK) "已配置" else "未配置 Tunnel Token")
+        add("Tunnel Token", tokenOK, if (tokenOK) "已配置" else "未配置 Tunnel Token")
 
-        // 3. origin (RemoteAccessServer on loopback)
+        // 3. origin（本地服务在 loopback 的源端口）
         val originPort = RemoteAccessPrefs.port(app)
         val originReachable = probeTcp(originHost(app), originPort, 1500)
-        add("origin", originReachable, if (originReachable) "127.0.0.1:$originPort 可访问" else "127.0.0.1:$originPort 不可访问（RemoteAccessServer 未运行？）")
+        add("本地 Origin", originReachable, if (originReachable) "127.0.0.1:$originPort 可访问" else "127.0.0.1:$originPort 不可访问（本地服务未运行？）")
 
-        // 4. DNS (cloudflared edge discovery host + api host)
+        // 4. DNS（cloudflared edge discovery host + api host）
         val dnsOk = runCatching { InetAddress.getByName("region1.v2.argotunnel.com") }.isSuccess
-        add("dns", dnsOk, if (dnsOk) "region1.v2.argotunnel.com 解析正常" else "region1.v2.argotunnel.com 解析失败")
+        add("DNS", dnsOk, if (dnsOk) "region1.v2.argotunnel.com 解析正常" else "region1.v2.argotunnel.com 解析失败")
 
         // 5. TCP/7844
         val tcp7844 = probeTcpCloudflare(7844, 2500)
-        add("tcp-7844", tcp7844, if (tcp7844) "TCP 7844 可达" else "TCP 7844 不可达（HTTP/2 路径可能仍可用）")
+        add("TCP 7844", tcp7844, if (tcp7844) "TCP 7844 可达" else "TCP 7844 不可达（HTTP/2 路径可能仍可用）")
 
         // 6. UDP/7844
         val udp7844 = probeUdpCloudflare(7844)
-        add("udp-7844", udp7844, if (udp7844) "UDP 7844 可达" else "UDP 7844 不可达或返回不可用（当前协议为 HTTP/2，不受影响）")
+        add("UDP 7844", udp7844, if (udp7844) "UDP 7844 可达" else "UDP 7844 不可达或返回不可用（当前协议为 HTTP/2，不受影响）")
 
-        // 7. management API 443
+        // 7. Cloudflare Edge：真实连接计数（log drain 写回，非模拟）
+        val h0 = _health.value
+        val edgeOk = h0.edgeConnected > 0 && (h0.edgeExpected <= 0 || h0.edgeConnected >= h0.edgeExpected)
+        add("Cloudflare Edge", edgeOk, when {
+            h0.edgeExpected > 0 -> "Edge 已连接 ${h0.edgeConnected}/${h0.edgeExpected}"
+            h0.edgeConnected > 0 -> "Edge 已连接 ${h0.edgeConnected} 条"
+            else -> "Edge 尚未建立连接"
+        })
+
+        // 8. 公开域名：Edge + Origin 双层推导（spec 95 链）
+        val publicOk = h0.publicHealth == "healthy"
+        add("公开域名", publicOk, when (h0.publicHealth) {
+            "healthy" -> "公网入口正常（Edge 与本地服务均健康）"
+            "down" -> "公网入口不可达（Edge 或本地服务异常）"
+            else -> "公网入口状态未知（Tunnel 未就绪）"
+        })
+
+        // 9. management API 443
         val api443 = probeTcp("api.cloudflare.com", 443, 2500)
-        add("api-443", api443, if (api443) "api.cloudflare.com:443 可达" else "api.cloudflare.com:443 不可达")
+        add("管理 API 443", api443, if (api443) "api.cloudflare.com:443 可达" else "api.cloudflare.com:443 不可达")
 
-        // 8. current runtime health
+        // 10. current runtime health
         val h = _health.value
-        add("runtime", when (h.phase) {
+        add("Runtime", when (h.phase) {
             Phase.HEALTHY -> true
             Phase.DEGRADED, Phase.RECONNECTING -> true
             Phase.ORIGIN_DOWN, Phase.EDGE_DOWN -> true
             else -> h.running
-        }, "phase=${h.phase} · edge=${h.edgeConnected}/${h.edgeExpected} · protocol=${h.protocol}")
+        }, "phase=${CloudflareTunnelManager.phaseLabel(h.phase)} · edge=${h.edgeConnected}/${h.edgeExpected} · protocol=${h.protocol}")
 
         out
     }
@@ -530,7 +652,7 @@ object CloudflareTunnelManager {
         val snapshot = h.copy(
             phase = phase,
             detail = detail.take(220),
-            running = process?.isAlive == true,
+            running = process?.isAlive == true || minisdRunning,
             protocol = latestProtocol,
             edgeConnected = edgeConnected,
             edgeExpected = edgeExpected,
@@ -561,22 +683,52 @@ object CloudflareTunnelManager {
     }
 
     /** Refresh process-derived fields only (no event emission). */
-    private fun refreshHealthLocked(context: Context): HealthSnapshot {
+    private suspend fun refreshHealthLocked(context: Context): HealthSnapshot {
         val file = binaryFile(context)
         val p = synchronized(lock) { process }
-        val alive = p?.isAlive == true
+        val appAlive = p?.isAlive == true
+        // P5/D9: minisd-supervised tunnel reports through supervisor.status.
+        var mRunning = false
+        if (minisdManaged) {
+            val st = runCatching { UbuntuRuntime.client.cloudflaredStatus() }.getOrNull()
+            mRunning = st != null && st.ok && st.result?.optBoolean("cloudflared") == true
+            if (st != null && !st.ok) {
+                Log.w(TAG, "minisd cloudflaredStatus unavailable (${st.code} ${st.error?.detail})")
+            }
+        }
+        minisdRunning = mRunning
+        val alive = appAlive || mRunning
         val current = _health.value
+        val phase = if (!alive && current.phase != Phase.STOPPED && current.phase != Phase.UNCONFIGURED && current.phase.isNotEmpty()) {
+            if (RemoteAccessPrefs.cloudflareTunnelEnabled(context)) Phase.PROCESS_EXITED else Phase.STOPPED
+        } else current.phase
+        // Live origin probe: tells the UIs whether the failure is the local
+        // service (origin down) or the tunnel side (edge/auth/process).
+        val origin = if (alive) probeOriginHealth(context) else "unknown"
         val snapshot = current.copy(
             installed = file.isFile && file.length() > 1_000_000L,
             running = alive,
-            phase = if (!alive && current.phase != Phase.STOPPED && current.phase != Phase.UNCONFIGURED && current.phase.isNotEmpty()) {
-                if (RemoteAccessPrefs.cloudflareTunnelEnabled(context)) Phase.PROCESS_EXITED else Phase.STOPPED
-            } else current.phase,
+            phase = phase,
             protocol = latestProtocol,
+            originHealth = origin,
+            publicHealth = derivePublicHealth(phase, origin),
             uptimeMs = if (startedAtMs > 0) System.currentTimeMillis() - startedAtMs else 0,
             metrics = fetchMetricsLocked(),
         )
         return snapshot
+    }
+
+    /** TCP probe of the loopback origin (RemoteAccessPrefs port), 1500ms budget. */
+    private fun probeOriginHealth(context: Context): String {
+        val port = RemoteAccessPrefs.port(context)
+        return if (probeTcp(originHost(context), port, 1500)) "healthy" else "down"
+    }
+
+    /** Public side is reachable only when edge and origin are both up (spec 95 chain). */
+    private fun derivePublicHealth(phase: String, originHealth: String): String = when {
+        phase == Phase.HEALTHY && originHealth == "healthy" -> "healthy"
+        originHealth == "down" || phase == Phase.EDGE_DOWN || phase == Phase.AUTH_FAILED || phase == Phase.PROCESS_EXITED -> "down"
+        else -> "unknown"
     }
 
     private fun logLine(level: String, text: String, kind: String) {
@@ -766,19 +918,28 @@ object CloudflareTunnelManager {
 
     internal fun binaryFile(context: Context): File {
         managerContext = context.applicationContext
-        return File(RootfsManager.getInstance(context.applicationContext).rootfsDir, "opt/bin/cloudflared")
+        return File(context.applicationContext.filesDir, "minis/bin/cloudflared")
     }
 
     private fun prootProcessBuilder(context: Context, command: String): ProcessBuilder {
-        val pb = ProcessBuilder(PRootKernel.buildProotCommand(command))
+        val rest = command.removePrefix("/opt/bin/cloudflared").trim()
+        val args = if (rest.isEmpty()) emptyList() else rest.split(Regex("\\s+"))
+        val pb = ProcessBuilder(listOf(binaryFile(context).absolutePath) + args)
         pb.redirectErrorStream(true)
-        val env = pb.environment()
-        env["PROOT_TMP_DIR"] = PRootKernel.getProotTmpDir(context).absolutePath
-        if (PRootKernel.nativeLibDir.isNotEmpty()) env["LD_LIBRARY_PATH"] = PRootKernel.nativeLibDir
-        if (PRootKernel.prootLoaderPath.isNotEmpty()) env["PROOT_LOADER"] = PRootKernel.prootLoaderPath
-        if (PRootKernel.prootLoader32Path.isNotEmpty()) env["PROOT_LOADER_32"] = PRootKernel.prootLoader32Path
-        for ((key, value) in PRootKernel.customEnvironment) env[key] = value
         return pb
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private fun runOneShot(

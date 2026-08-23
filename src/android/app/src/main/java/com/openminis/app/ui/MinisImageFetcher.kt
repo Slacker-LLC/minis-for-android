@@ -8,7 +8,7 @@ import coil.fetch.Fetcher
 import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import okio.buffer
 import okio.source
 import java.io.File
@@ -33,7 +33,7 @@ class MinisImageFetcher(
         val stripped = uri.removePrefix("minis://").substringBefore('?')
         val decoded = java.net.URLDecoder.decode(stripped, "UTF-8")
         val linuxPath = "/var/minis/$decoded"
-        val hostFile = PRootKernel.resolveHostPath(linuxPath)
+        val hostFile = MinisKernel.resolveHostPath(linuxPath)
             ?: throw IllegalArgumentException("Cannot resolve path: $linuxPath")
 
         if (!hostFile.exists()) {
@@ -127,7 +127,7 @@ class MinisImageFetcher(
             }
             val linuxPath = "/var/minis/$decoded"
             val mtime = try {
-                PRootKernel.resolveHostPath(linuxPath)?.lastModified() ?: 0L
+                MinisKernel.resolveHostPath(linuxPath)?.lastModified() ?: 0L
             } catch (_: Throwable) {
                 0L
             }

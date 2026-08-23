@@ -12,7 +12,7 @@ import android.view.MotionEvent
 import com.openminis.app.BuildConfig
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.sandbox.ExecutionCoordinator
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -91,6 +91,10 @@ class DebugRPCHandler(private val context: Context) {
             "debug.agentTrace" -> handleAgentTrace(params)
             "debug.fetch" -> handleFetch(params)
             "debug.shellExecute" -> handleShellExecute(params)
+            "debug.mcp.status" -> handleMcpStatus()
+            "debug.mcp.start" -> handleMcpStart()
+            "debug.mcp.stop" -> handleMcpStop()
+            "debug.mcp.settoken" -> handleMcpSetToken(params)
             "debug.update.check" -> handleUpdateCheck()
             "debug.update.download" -> handleUpdateDownload(params)
             "debug.update.install" -> handleUpdateInstall(params)
@@ -308,7 +312,10 @@ class DebugRPCHandler(private val context: Context) {
             put("sdkVersion", Build.VERSION.SDK_INT)
             put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
             put("androidVersion", Build.VERSION.RELEASE)
-            put("prootBooted", PRootKernel.isBooted)
+            val ubuntuRunning = com.openminis.app.sandbox.ubuntu.UbuntuRuntime.snapshot.value.running
+            // P2: PRoot gone; prootBooted kept as an alias for old tooling.
+            put("prootBooted", ubuntuRunning)
+            put("ubuntu", ubuntuRunning)
             put("filesDir", filesDir.absolutePath)
             put("logFiles", AppLogger.listLogFiles().size)
             put("totalLogSize", AppLogger.totalSize())
@@ -406,7 +413,7 @@ class DebugRPCHandler(private val context: Context) {
         val recursive = params.optBoolean("recursive", false)
         val maxDepth = params.optInt("maxDepth", 3)
 
-        val hostFile = PRootKernel.resolveHostPath(path)
+        val hostFile = MinisKernel.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
 
         if (!hostFile.isDirectory) throw RPCException(-32602, "Not a directory: $path")
@@ -484,7 +491,7 @@ class DebugRPCHandler(private val context: Context) {
         if (path.isEmpty()) throw RPCException(-32602, "Invalid params: 'path' is required")
         if (path.contains("..")) throw RPCException(-32602, "Invalid path: '..' not allowed")
 
-        val hostFile = PRootKernel.resolveHostPath(path)
+        val hostFile = MinisKernel.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
 
         if (!hostFile.exists()) throw RPCException(-32602, "File not found: $path")
@@ -988,6 +995,40 @@ class DebugRPCHandler(private val context: Context) {
             .put("session", session)
     }
 
+    // ── MCP Server (P4 smoke control) ──────────────────────────────────────
+
+    private fun handleMcpStatus(): JSONObject {
+        val s = com.openminis.app.mcp.server.MCPServerManager.status()
+        return JSONObject()
+            .put("running", s.running)
+            .put("configured", s.configured)
+            .put("port", s.port)
+    }
+
+    private fun handleMcpStart(): JSONObject {
+        val ok = com.openminis.app.mcp.server.MCPServerManager.start()
+        return JSONObject().put("started", ok)
+    }
+
+    private fun handleMcpStop(): JSONObject {
+        com.openminis.app.mcp.server.MCPServerManager.stop()
+        return JSONObject().put("stopped", true)
+    }
+
+    private fun handleMcpSetToken(params: JSONObject): JSONObject {
+        val id = params.optString("id", "default")
+        val token = params.optString("token")
+        if (token.isBlank()) throw RPCException(-32602, "token required")
+        val scope = params.optJSONArray("scope")?.let { arr ->
+            (0 until arr.length()).map { arr.getString(it) }.toSet()
+        } ?: emptySet()
+        com.openminis.app.mcp.server.TokenStore.save(
+            listOf(com.openminis.app.mcp.server.TokenStore.Token(id = id, token = token, scope = scope)),
+        )
+        com.openminis.app.mcp.server.MCPServerManager.init(context)
+        return JSONObject().put("saved", true).put("configured", com.openminis.app.mcp.server.TokenStore.isConfigured)
+    }
+
     // ── Update checker (T33) — exposed only via DebugRPC so the e2e flow can
     // be exercised before the production UI entry point lands.
     private suspend fun handleUpdateCheck(): JSONObject {
@@ -1108,7 +1149,7 @@ class DebugRPCHandler(private val context: Context) {
 
     /**
      * Write a file into the proot-mounted Linux namespace. Resolves the
-     * Linux path through PRootKernel.resolveHostPath, creates parent dirs,
+     * Linux path through MinisKernel.resolveHostPath, creates parent dirs,
      * writes the bytes, and best-effort applies the requested mode bits.
      * No fakefs registration is needed — proot reads the host directly,
      * so the guest sees the file the moment it lands on disk.
@@ -1128,7 +1169,7 @@ class DebugRPCHandler(private val context: Context) {
         // (it lazy-initializes its RootfsManager). Test harnesses commonly
         // want to stage files BEFORE booting, so route through the rootfs
         // dir directly when the kernel isn't ready yet.
-        val hostFile = PRootKernel.resolveHostPath(path) ?: run {
+        val hostFile = MinisKernel.resolveHostPath(path) ?: run {
             val rootfsDir = com.openminis.app.sandbox.RootfsManager.getInstance(context).rootfsDir
             File(rootfsDir, path.removePrefix("/"))
         }
@@ -1273,12 +1314,12 @@ class DebugRPCHandler(private val context: Context) {
 
         // Optional `input` blob: write to host /tmp and inject `--input <linuxPath>`
         // so the handler reads it via readLinuxPath() exactly like a real shell
-        // invocation would. We resolve the host path via PRootKernel to honour
+        // invocation would. We resolve the host path via MinisKernel to honour
         // the same rootfs layout the offload server uses.
         val finalArgv: List<String> = if (params.has("input")) {
             val inputBlob = params.optString("input", "")
             val linuxPath = "/tmp/.debug-modeluse-input-${System.currentTimeMillis()}.json"
-            val hostFile = com.openminis.app.sandbox.PRootKernel.resolveHostPath(linuxPath)
+            val hostFile = com.openminis.app.sandbox.MinisKernel.resolveHostPath(linuxPath)
                 ?: throw RPCException(-32603, "cannot resolve $linuxPath under rootfs")
             hostFile.parentFile?.mkdirs()
             hostFile.writeText(inputBlob)

@@ -68,11 +68,11 @@ object AgentTools {
     }
 
     // Aligned with iOS AIChatViewModel.swift:4982-4993
-    private fun shellExecuteDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "shell_execute",
-        description = "Execute a command in an isolated Linux process (Alpine Linux via PRoot). " +
-            "The command runs via /bin/sh -c with stdout and stderr merged. " +
-            "Each invocation spawns a fresh process — there is no shared terminal session. " +
+    fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
+        name = name,
+        description = "Execute a command in the on-device Ubuntu 24.04 environment (uid 10000). " +
+            "The command runs via /bin/bash -lc with stdout and stderr merged. " +
+            "Workspace is /workspace (host /data/adb/minis/workspace). " +
             "Default timeout is 15 minutes.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),

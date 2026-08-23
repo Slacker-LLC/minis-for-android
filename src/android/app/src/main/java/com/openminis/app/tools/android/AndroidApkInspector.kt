@@ -5,7 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.openminis.app.BuildConfig
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -137,8 +137,8 @@ object AndroidApkInspector {
     fun resolvePath(context: Context, sessionId: String, path: String): File? {
         if (!path.startsWith('/')) return null
         val candidate = when {
-            path.startsWith("/var/minis/") -> PRootKernel.resolveSessionHostPath(sessionId, path, context)
-            else -> PRootKernel.resolveHostPath(path)?.takeIf(File::exists) ?: File(path)
+            path.startsWith("/var/minis/") -> MinisKernel.resolveSessionHostPath(sessionId, path, context)
+            else -> MinisKernel.resolveHostPath(path)?.takeIf(File::exists) ?: File(path)
         } ?: return null
         return runCatching { candidate.canonicalFile }.getOrNull()
     }

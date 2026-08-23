@@ -49,17 +49,10 @@ class RemoteAccessService : Service() {
         @Volatile private var startInFlight = false
 
         fun startIfEnabled(context: Context) {
-            if (!RemoteAccessPrefs.isEnabled(context)) return
-            // Never expose remote control without a password, even on restore.
-            if (!RemoteAccessPrefs.hasPassword(context)) return
-            if (startInFlight) return
-            startInFlight = true
-            try {
-                runCatching { start(context) }
-                    .onFailure { Log.w("RemoteAccessService", "restore failed: ${it.message}") }
-            } finally {
-                startInFlight = false
-            }
+            // P6: Web Remote auto-start disabled — keep the signature so
+            // callers (MinisApp.onCreate, AlarmReceiver) don't break.
+            Log.i("RemoteAccessService", "Web Remote disabled (P6)")
+            return
         }
 
         /** Apply a bind-address/port/security change without changing the enabled preference. */
@@ -69,7 +62,7 @@ class RemoteAccessService : Service() {
         }
     }
 
-    private var server: RemoteAccessServer? = null
+    // P6: Web Remote server removed. Tunnel supervision stays (P5).
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var tunnelJob: Job? = null
 
@@ -106,22 +99,6 @@ class RemoteAccessService : Service() {
         // cloudflared; a live one is left to its own reconnect.
         CloudflareTunnelManager.registerNetworkCallback(this)
 
-        server?.stop()
-        val candidate = RemoteAccessServer(
-            context = this,
-            port = RemoteAccessPrefs.port(this),
-            token = RemoteAccessPrefs.token(this),
-            bindHost = RemoteAccessPrefs.bindHost(this),
-        )
-        if (!candidate.start()) {
-            server = null
-            CloudflareTunnelManager.stop()
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        server = candidate
-
         tunnelJob?.cancel()
         if (RemoteAccessPrefs.cloudflareTunnelEnabled(this)) {
             tunnelJob = serviceScope.launch {
@@ -137,8 +114,6 @@ class RemoteAccessService : Service() {
         tunnelJob?.cancel()
         tunnelJob = null
         CloudflareTunnelManager.stop()
-        server?.stop()
-        server = null
         serviceScope.cancel()
         super.onDestroy()
     }

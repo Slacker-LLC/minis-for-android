@@ -1,0 +1,209 @@
+pub use crate::path_guard::{GUEST_WORKSPACE, HOST_WORKSPACE};
+
+pub const HOST_MINIS: &str = "/data/adb/minis";
+pub const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
+pub const HOST_MEMORY: &str = "/data/adb/minis/memory";
+pub const HOST_SKILLS: &str = "/data/adb/minis/skills";
+pub const HOST_SHARED: &str = "/data/adb/minis/shared";
+pub const HOST_RUN: &str = "/data/adb/minis/run";
+pub const HOST_LOG: &str = "/data/adb/minis/log";
+
+pub const GUEST_UID: u32 = 10_000;
+pub const GUEST_GID: u32 = 10_000;
+pub const GUEST_USER: &str = "minis";
+pub const GUEST_HOME: &str = "/workspace";
+pub const GUEST_MEMORY: &str = "/memory";
+pub const GUEST_SKILLS: &str = "/skills";
+pub const GUEST_SHARED: &str = "/shared";
+
+pub const WORKSPACE_SUBDIRS: &[&str] = &[
+    "attachments",
+    "offloads",
+    "browser",
+    "sessions",
+    "shared",
+];
+
+/// P2 migration-window guest symlinks. Deleted at P2 exit.
+pub const VAR_MINIS_LINKS: &[(&str, &str)] = &[
+    ("var/minis/workspace", "/workspace"),
+    ("var/minis/attachments", "/workspace/attachments"),
+    ("var/minis/offloads", "/workspace/offloads"),
+    ("var/minis/browser", "/workspace/browser"),
+    ("var/minis/memory", "/memory"),
+    ("var/minis/skills", "/skills"),
+    ("var/minis/shared", "/shared"),
+];
+
+pub const ROOTFS_MARKER: &str = "etc/minis/rootfs.json";
+pub const PROVISION_MARKER: &str = "etc/minis/provisioned";
+pub const UBUNTU_PID_FILE: &str = "/data/adb/minis/run/ubuntu.pid";
+pub const UBUNTU_ROOTFS_FILE: &str = "/data/adb/minis/run/ubuntu.rootfs";
+pub const UBUNTU_PROXY_PID_FILE: &str = "/data/adb/minis/run/ubuntu-proxy.pid";
+
+pub fn workspace_readme() -> &'static str {
+    "\
+Minis workspace (Q16)
+=====================
+Host:  /data/adb/minis/workspace
+Guest: /workspace
+
+Default: every session shares this root.
+Optional isolation: /workspace/sessions/<sessionId>/
+
+Subdirs: attachments/ offloads/ browser/ sessions/ shared/
+Cross-session (not in this tree): /memory /skills /shared
+"
+}
+
+pub fn ensure_host_layout() -> Result<(), String> {
+    for dir in [
+        HOST_MINIS,
+        HOST_ROOTFS,
+        HOST_WORKSPACE,
+        HOST_MEMORY,
+        HOST_SKILLS,
+        HOST_SHARED,
+        HOST_RUN,
+        HOST_LOG,
+    ] {
+        std::fs::create_dir_all(dir).map_err(|e| format!("mkdir {dir}: {e}"))?;
+    }
+    for sub in WORKSPACE_SUBDIRS {
+        let p = format!("{HOST_WORKSPACE}/{sub}");
+        std::fs::create_dir_all(&p).map_err(|e| format!("mkdir {p}: {e}"))?;
+    }
+    let readme = format!("{HOST_WORKSPACE}/README");
+    if !std::path::Path::new(&readme).exists() {
+        std::fs::write(&readme, workspace_readme()).map_err(|e| format!("write README: {e}"))?;
+    }
+    Ok(())
+}
+
+pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
+    let root = std::path::Path::new(rootfs);
+    if !root.is_dir() {
+        return Err(format!("rootfs missing: {rootfs}"));
+    }
+    for rel in [
+        "proc",
+        "sys",
+        "dev",
+        "dev/pts",
+        "dev/shm",
+        "tmp",
+        "run",
+        "workspace",
+        "memory",
+        "skills",
+        "shared",
+        "mnt",
+        "var/minis",
+        "etc/minis",
+        "home",
+        "root",
+    ] {
+        std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
+    }
+    for (rel, target) in VAR_MINIS_LINKS {
+        let link = root.join(rel);
+        if link.exists() || link.symlink_metadata().is_ok() {
+            continue;
+        }
+        if let Some(parent) = link.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            symlink(target, &link).map_err(|e| format!("symlink {rel}: {e}"))?;
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (rel, target);
+        }
+    }
+    Ok(())
+}
+
+pub fn rootfs_looks_valid(rootfs: &str) -> bool {
+    let root = std::path::Path::new(rootfs);
+    root.join("etc/os-release").is_file()
+        && (root.join("bin/bash").exists()
+            || root.join("usr/bin/bash").exists()
+            || root.join("bin/sh").exists())
+}
+
+pub fn read_os_release(rootfs: &str) -> Option<String> {
+    let text = std::fs::read_to_string(std::path::Path::new(rootfs).join("etc/os-release")).ok()?;
+    let version = text
+        .lines()
+        .find_map(|l| l.strip_prefix("VERSION_ID="))
+        .map(|s| s.trim_matches('"').to_string())?;
+    Some(version)
+}
+
+pub fn is_provisioned(rootfs: &str) -> bool {
+    std::path::Path::new(rootfs).join(PROVISION_MARKER).is_file()
+        || std::path::Path::new(rootfs).join("usr/bin/python3").exists()
+}
+
+pub fn ensure_guest_user(rootfs: &str) -> Result<(), String> {
+    ensure_guest_user_ids(rootfs, GUEST_UID, GUEST_GID)
+}
+
+pub fn ensure_guest_user_ids(rootfs: &str, uid: u32, gid: u32) -> Result<(), String> {
+    let root = std::path::Path::new(rootfs);
+    let passwd = format!("minis:x:{uid}:{gid}:Minis:/workspace:/bin/bash\n");
+    let group = format!("minis:x:{gid}:\n");
+    append_unique(root.join("etc/passwd"), &format!(":{uid}:{gid}:"), &passwd)?;
+    append_unique(root.join("etc/group"), &format!(":{gid}:"), &group)?;
+    Ok(())
+}
+
+fn append_unique(path: impl AsRef<std::path::Path>, marker: &str, line: &str) -> Result<(), String> {
+    let path = path.as_ref();
+    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    if existing.contains(marker) {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
+    }
+    let mut body = existing;
+    if !body.is_empty() && !body.ends_with('\n') {
+        body.push('\n');
+    }
+    body.push_str(line);
+    std::fs::write(path, body).map_err(|e| format!("write {}: {e}", path.display()))
+}
+
+pub fn host_paths() -> serde_json::Value {
+    serde_json::json!({
+        "host_minis": HOST_MINIS,
+        "rootfs": HOST_ROOTFS,
+        "workspace": HOST_WORKSPACE,
+        "memory": HOST_MEMORY,
+        "skills": HOST_SKILLS,
+        "shared": HOST_SHARED,
+        "guest_workspace": GUEST_WORKSPACE,
+        "guest_uid": GUEST_UID,
+        "guest_gid": GUEST_GID
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn readme_mentions_q16() {
+        assert!(workspace_readme().contains("/workspace"));
+        assert!(workspace_readme().contains("sessions/"));
+    }
+
+    #[test]
+    fn invalid_rootfs_rejected() {
+        assert!(!rootfs_looks_valid("/no/such/rootfs"));
+    }
+}

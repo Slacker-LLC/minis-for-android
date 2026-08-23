@@ -19,7 +19,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.sandbox.NativeOffloadHandler
 import com.openminis.app.sandbox.NativeOffloadRequest
 import com.openminis.app.sandbox.NativeOffloadResult
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit
  *     for back-compat with prompts that learned the old form.
  *   - `--source <mic|path>` mirrors apple-speech: defaults to system mic,
  *     also accepts a Linux file path under /var/minis/... resolved via
- *     [PRootKernel.resolveHostPath]. **Audio-file transcription is not
+ *     [MinisKernel.resolveHostPath]. **Audio-file transcription is not
  *     yet wired through the recognizer** — Android's [SpeechRecognizer]
  *     only exposes microphone input on most vendor implementations
  *     (the API 31 `EXTRA_AUDIO_SOURCE` extension is not honoured by
@@ -224,7 +224,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
 
     /**
      * Resolve a `/var/minis/...`-style Linux path to a host File via
-     * [PRootKernel]'s global bind-mount table. Per-session paths
+     * [MinisKernel]'s global bind-mount table. Per-session paths
      * (attachments / offloads / workspace / browser) work as long as the
      * owning session is the most-recent shell to boot — last-writer-wins
      * per the kernel's documentation.
@@ -234,7 +234,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         if (trimmed.isEmpty()) return null
         return try {
             if (trimmed.startsWith("/")) {
-                PRootKernel.resolveHostPath(trimmed) ?: File(trimmed)
+                MinisKernel.resolveHostPath(trimmed) ?: File(trimmed)
             } else {
                 File(trimmed)
             }

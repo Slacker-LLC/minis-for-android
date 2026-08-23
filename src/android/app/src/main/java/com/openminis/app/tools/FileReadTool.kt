@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import org.json.JSONObject
 import java.io.File
 
@@ -52,7 +52,7 @@ object FileReadTool {
             }
 
             // T123: per-session resolver — see FileWriteTool for rationale.
-            val file = PRootKernel.resolveSessionHostPath(sessionId, path, context)
+            val file = com.openminis.app.sandbox.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
                 ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
 
             if (!file.exists()) {

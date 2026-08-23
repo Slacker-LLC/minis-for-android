@@ -51,7 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
-import com.openminis.app.sandbox.PRootKernel
+import com.openminis.app.sandbox.MinisKernel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -686,7 +686,7 @@ private fun resolveMediaFile(url: String): File? {
     val hostFile: File? = when {
         stripped.startsWith("minis://") -> {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-            PRootKernel.resolveHostPath("/var/minis/$decoded")
+            MinisKernel.resolveHostPath("/var/minis/$decoded")
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
         stripped.startsWith("/") -> File(stripped)

@@ -475,6 +475,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- [T-android-mcp-server] Confirm-queue notification actions (批准/拒绝).
+             Explicit PendingIntent broadcasts only (exported=false); answers the
+             shared ConfirmQueue and cancels the notification. -->
+        <receiver
+            android:name=".notification.McpConfirmReceiver"
+            android:exported="false" />
+
         <!-- Scheduled notification receiver — fires `android-notification schedule`
              alarms so the deferred notification posts at the requested time. -->
         <receiver
@@ -549,6 +556,15 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/minis_accessibility_service" />
+        </service>
+
+        <service
+            android:name=".mcp.server.MCPKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MCP Server keep-alive across lock screen" />
         </service>
 
         <!-- OpenMinis Pet fork: universal pet package control surface. -->
