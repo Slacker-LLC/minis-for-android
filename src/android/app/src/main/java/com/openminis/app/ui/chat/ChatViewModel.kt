@@ -3578,8 +3578,9 @@ class ChatViewModel(
      * Session ID that disk/shell-bound resources must use. Until the user sends
      * the first message, `realSessionId` is empty and we fall back to the draft
      * key. After `ensureSession()` runs, this returns the persisted id so
-     * `/var/minis/{attachments,workspace,...}` mounts, browser artifacts, and
-     * the PersistentShell all land in a single directory that survives re-entry.
+     * `/var/minis/{attachments,workspace,...}` mounts (P2: Ubuntu 侧经
+     * minisd bind 的 filesDir/minis 目录) and browser artifacts land in a
+     * single directory that survives re-entry.
      */
     internal val activeSessionId: String
         get() = realSessionId.ifEmpty { sessionId }

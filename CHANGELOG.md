@@ -2,6 +2,38 @@
 
 版本变更从 `1.01-beta` 开始记录。早期开发史不在此处,以 Git 历史为准。
 
+## [Unreleased] — Root-only 重构（P1-P5）
+
+整体替换 Alpine+PRoot 为 Root-only 新架构（架构审核请求文档全量落地）。
+
+### 核心
+
+- **minisd**（Rust, `src/native/minisd`）：Root Broker——unix socket + SO_PEERCRED +
+  policy 门控 + watchdog/flock + capset 清零 + 超时 SIGKILL + kill(-pgid) 进程树 +
+  /sys 只读失败中止 + 真实时钟 + path guard + cloudflared supervisor；
+- **Ubuntu 24.04 arm64 chroot**：unshare+mount+chroot；guest uid=App uid(10381)、
+  capabilities 清空；workspace=App filesDir/minis（Q16 修订）；出网经 minisd 根代理
+  `127.0.0.1:18787`（Q6 修订，B8 硬化：拒内网/回环+头/并发上限）；App 自动拉起
+  （ensureMinisdUp，subshell 分离 PPID=1）
+- **Tool Runtime**：ToolRegistry/ToolExecutor + 四级权限（LOCAL_ONLY/MCP_ALLOWED/
+  MCP_CONFIRM/MCP_DENIED）+ ProviderRouter/LinuxProvider + `root.shell` handler +
+  危险命令拦截接入 shell 路径
+- **MCP Server**：127.0.0.1:18789 `POST /mcp`；Bearer 多 token+scope；tools/list 按
+  caller 过滤；confirm 队列（120s TTL 一次性）+ 手机通知；MCPKeepAliveService 前台保活
+
+### 拆除
+
+- PRoot/Alpine 全套（deps/proot、libproot loader、PRootKernel/PersistentShell/
+  ShellExecutor、prepare_alpine_rootfs.sh 等）；
+- RemoteAccessServer（Web Remote 停用，RemoteAccessService no-op）；
+- Shizuku 后端（PrivilegedCommandRunner 永不选 SHIZUKU）。
+
+### 质量
+
+- App 全量 947 测试 / 14 OpenAI 环境基线零回归；minisd 47 cargo 测试绿；
+- 真机验证：SELinux Enforcing 零 denial；exec ~147ms；Ubuntu 冷启动 267ms；
+  confirm 通知真机弹出；锁屏冻结已知坑（前台服务保活对策）。
+
 ## [1.01-beta.2] — 2026-08-23
 
 修复 Web 图片气泡把图片块显示成「附加内容块」的嵌套数组 bug。

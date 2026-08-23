@@ -601,12 +601,8 @@ class MinisApp : Application(), ImageLoaderFactory {
         // T219-5: hand the singleton to MinisKernel so applyMountedFoldersSnapshot
         // can read the live state, and wire an onChange callback so any UI CRUD
         // (add/remove/rename/toggle) re-applies the snapshot.
-        // T277: PersistentShell reuses one PRoot process per chat session for the
-        // session's lifetime, so an applyMountedFoldersSnapshot call alone never
-        // reaches the live shell — proot's `-b` argv is frozen at spawn time.
-        // Kill any live shells so the next execute() rebuilds them with the
-        // updated bind set. Mount CRUD is a Settings-screen action; the user
-        // is not in chat mid-command, so this restart is safe and user-invisible.
+        // P2: Ubuntu 会话经 minisd 每次 exec 重新解析 SAF 挂载（无长驻 shell
+        // 持有旧 bind 集），applyMountedFoldersSnapshot 后无需杀会话。
         MinisKernel.mountedFoldersStore = mountedFoldersStore
         mountedFoldersStore.onChange = {
             MinisKernel.applyMountedFoldersSnapshot(this)

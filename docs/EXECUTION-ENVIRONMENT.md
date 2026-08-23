@@ -1,4 +1,18 @@
-# 执行环境:PRoot、Root、Shizuku 与 chroot
+# 执行环境（2026-08 P2 重构后）
+
+> **PRoot/Alpine 已拆除**。本文档为历史记录，当前执行链：
+>
+> ```text
+> Android 内核 → minisd（root, ksu 域） → unshare+mount+chroot → Ubuntu 24.04（uid=App uid）
+> ```
+>
+> 出网经 minisd 根代理 127.0.0.1:18787；workspace=App filesDir/minis；
+> Shizuku 后端已停用。详见 [`../README.md`](../README.md) 与
+> `../Minis for Android/` 规划文档集（00-10）。
+
+---
+
+# 执行环境:PRoot、Root、Shizuku 与 chroot（历史）
 
 本文描述 App 内沙箱与特权执行的真实现状。**不讨论**替换手机启动内核。
 

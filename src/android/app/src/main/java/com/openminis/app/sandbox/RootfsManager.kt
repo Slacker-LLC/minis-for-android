@@ -34,8 +34,9 @@ sealed class RootfsInstallState {
  */
 class RootfsManager private constructor(private val context: Context) {
 
-    val rootfsDir: File = File(context.filesDir, "alpine-rootfs")
-    val prootBinary: File = File(context.applicationInfo.nativeLibraryDir, "libproot.so")
+    // Ubuntu rootfs is managed by minisd (host path /data/adb/minis/rootfs);
+    // kept as a stub for UI compatibility — install state is always Installed.
+    val rootfsDir: File = File(context.filesDir, "minis-rootfs")
 
     val isInstalled: Boolean
         get() = true

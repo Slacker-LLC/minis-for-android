@@ -20,7 +20,7 @@
 | [`MINIS-WEB-ARCHITECTURE.md`](MINIS-WEB-ARCHITECTURE.md) | Minis Web、Harness 边界和 Android 数据映射 |
 | [`WEB-REMOTE-RPC.md`](WEB-REMOTE-RPC.md) | Web Remote HTTP/RPC/WebSocket 契约与安全边界 |
 | [`SECURITY.md`](SECURITY.md) | 安全设计:凭据、Web 授权、审批、路径与日志边界 |
-| [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | PRoot 沙箱、Root `su`、Shizuku 与 native chroot 现状与边界 |
+| [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行环境：Ubuntu 24.04 chroot（minisd）+ Root su 现状与边界（P2 已替换 PRoot/Alpine） |
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 当前已交付、验证和未交付项 |
 | [`specs/minis-url-scheme.md`](specs/minis-url-scheme.md) | `minis://` URL 方案说明 |
 | [`specs/debug-server-api.md`](specs/debug-server-api.md) | DebugServer API 参考;以 `rpc.discover` 与源码为最终依据 |

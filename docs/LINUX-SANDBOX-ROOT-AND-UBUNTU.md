@@ -1,6 +1,12 @@
 # OpenMinis 的 Linux 沙箱、Ubuntu、Root 与 Shizuku
 
-状态：架构说明；更新于 2026-08-22。本文讨论 **App 内沙箱**，不讨论替换手机启动内核。
+> **2026-08-23 起本文为历史记录**（P2 重构后 PRoot/Alpine 已拆除）。
+> 当前实现：minisd root broker → unshare+mount+chroot → Ubuntu 24.04。
+> 详见 [`../README.md`](../README.md) 与规划文档集。
+
+---
+
+状态：架构说明（历史）；更新于 2026-08-22。本文讨论 **App 内沙箱**，不讨论替换手机启动内核。
 
 ## 当前实现
 
