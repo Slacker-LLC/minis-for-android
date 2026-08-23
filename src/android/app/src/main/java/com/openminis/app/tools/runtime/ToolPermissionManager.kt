@@ -116,13 +116,18 @@ object ToolPermissionManager {
     /**
      * `*` suffix matching for grouped tools: `android.diagnose.*` matches
      * `android.diagnose.process`; `mcp.*` / `skill.*` match their prefix.
-     * Explicit keys always win.
+     * Explicit keys always win. Multi-level fallback: `mcp.files.read_file`
+     * walks up (`mcp.files.*` → `mcp.*`) so nested remote-MCP tool names are
+     * still governed instead of dying on "unknown".
      */
     private fun wildcardPolicy(tool: String): ToolPolicy? {
-        val dot = tool.lastIndexOf('.')
-        if (dot <= 0) return null
-        val group = tool.substring(0, dot + 1)
-        return table["${group}*"]
+        var idx = tool.lastIndexOf('.')
+        while (idx > 0) {
+            val group = tool.substring(0, idx + 1)
+            table["${group}*"]?.let { return it }
+            idx = tool.lastIndexOf('.', idx - 1)
+        }
+        return null
     }
 
     /**

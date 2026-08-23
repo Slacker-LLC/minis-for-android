@@ -28,6 +28,14 @@ object ToolRegistry {
         for (a in aliasNames) aliases[a] = handler.definition.name
     }
 
+    /** Removes a tool and any alias pointing at it (MCPProvider hot-reload). */
+    fun unregister(name: String) {
+        val canonical = canonicalName(name) ?: return
+        handlers.remove(canonical)
+        val dead = aliases.filterValues { it == canonical }.keys
+        dead.forEach { aliases.remove(it) }
+    }
+
     fun canonicalName(name: String): String? =
         if (handlers.containsKey(name)) name else aliases[name]
 
