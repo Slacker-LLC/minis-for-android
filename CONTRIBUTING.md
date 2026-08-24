@@ -42,12 +42,14 @@ token、私密文件内容或无关手机数据。请针对应用本身重现,�
 - 有副作用操作(install/uninstall/clear/root/mount/chroot)必须接入一次性审批,
   并复用检查点/ToolResult 治理;
 - 不伪造测试结果;无法设备验证的能力在文档中明确标注;
-- **不绑定任何厂商生态**:能力只来自通用 Android API + 通用 su(root,KernelSU/Magisk/
-  APatch 均可,provider 名称仅诊断)。禁止反射厂商隐藏 API、禁止硬依赖 `com.miui.*`/
-  `com.huawei.*` 等非公开组件执行功能;厂商识别(Build.MANUFACTURER)只允许用于
-  错误提示文案或“引导跳转设置页”,且必须逐项 try/catch + 失败回退通用设置页;
-  小米/华为等特有功能不做成工具;若必须实现,只能走通用能力路径并以“不支持”
-  结构化返回,不得使任意安卓设备崩溃。
+- **不绑定任何厂商生态(但允许条件式厂商适配)**:基础能力只来自通用 Android API +
+  通用 su(root,KernelSU/Magisk/APatch 均可,provider 名称仅诊断)。厂商专属能力
+  **允许实现**,但必须遵守:① 执行前检测设备(Build.MANUFACTURER/BRAND/系统特性/
+  类存在性),仅匹配设备开放;② 非匹配设备不得调用任何厂商 API,接口返回结构化
+  `unsupported/not_xiaomi_device`(或从工具清单动态过滤),绝不允许崩溃;③ 对厂商
+  隐藏 API 的反射必须 try/catch + 版本防护,失败降级为「不可用」而非异常;④ 厂商
+  能力只能是可选增强,缺失时其余功能不受影响;⑤ 厂商识别仅用于提示文案/设置页
+  引导时同样必须逐项 try/catch + 回退通用设置页。
 
 ## 验证检查
 
