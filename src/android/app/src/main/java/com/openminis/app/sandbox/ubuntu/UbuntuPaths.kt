@@ -84,6 +84,9 @@ object UbuntuPaths {
                 return childOf(hostBase, linuxPath.removePrefix(mount).removePrefix("/"))
             }
         }
+        // Relative path falls back to the workspace (schema contracts of the
+        // linux.file.* tools say "relative to workspace").
+        if (!linuxPath.startsWith("/")) return resolveGuest("/workspace/$linuxPath")
         return null
     }
 
