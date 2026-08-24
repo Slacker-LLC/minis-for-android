@@ -41,7 +41,13 @@ token、私密文件内容或无关手机数据。请针对应用本身重现,�
   `web/minis-client-plugin` 的 `npm run build` 生成;
 - 有副作用操作(install/uninstall/clear/root/mount/chroot)必须接入一次性审批,
   并复用检查点/ToolResult 治理;
-- 不伪造测试结果;无法设备验证的能力在文档中明确标注。
+- 不伪造测试结果;无法设备验证的能力在文档中明确标注;
+- **不绑定任何厂商生态**:能力只来自通用 Android API + 通用 su(root,KernelSU/Magisk/
+  APatch 均可,provider 名称仅诊断)。禁止反射厂商隐藏 API、禁止硬依赖 `com.miui.*`/
+  `com.huawei.*` 等非公开组件执行功能;厂商识别(Build.MANUFACTURER)只允许用于
+  错误提示文案或“引导跳转设置页”,且必须逐项 try/catch + 失败回退通用设置页;
+  小米/华为等特有功能不做成工具;若必须实现,只能走通用能力路径并以“不支持”
+  结构化返回,不得使任意安卓设备崩溃。
 
 ## 验证检查
 
