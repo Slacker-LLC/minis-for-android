@@ -65,7 +65,11 @@ import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.SystemVoiceIds
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.speech.VoiceOutputState
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 
 /**
  * [T-android-unified-model-picker] Android counterpart of iOS
@@ -156,6 +160,7 @@ fun UnifiedModelPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
         // Slim drag handle, same as the main picker / StandardChatSheet — the
         // Material default puts ~44dp of whitespace above the title.
         dragHandle = {
@@ -177,6 +182,7 @@ fun UnifiedModelPickerSheet(
             }
         },
     ) {
+        GlassSheetWindowBlur()
         // 0.9f fixed height + nav-bar inset, exactly like the main picker —
         // a content-wrapping column here let the voice pickers (whose provider
         // sections seed expanded) grow to cover the full screen.
@@ -184,6 +190,7 @@ fun UnifiedModelPickerSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
+                .glassSheetSurface()
                 .navigationBarsPadding(),
         ) {
             // Title bar — CENTERED title + trailing Done, byte-for-byte the

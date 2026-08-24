@@ -11,10 +11,10 @@ import com.openminis.app.tools.ToolExecutionResult
  * singleton (UbuntuRuntime / MinisdClient): availability is constructor-
  * injected ([available]), so the provider stays pure JVM-testable logic.
  *
- * When the runtime is unavailable, execution short-circuits to a fixed
- * structured error (`ubuntu_runtime_unavailable`) instead of reaching the
- * handler — the agent sees a recoverable failure, not a crashed loop.
- * When available, execution passes straight through to [next].
+ * When the runtime is unavailable, shell/Python tools short-circuit to a
+ * fixed structured error (`ubuntu_runtime_unavailable`). Workspace file tools
+ * are different: they use App-owned host storage directly and remain usable
+ * even before Ubuntu starts. When available, all tools pass through to [next].
  */
 class LinuxProvider(
     private val available: () -> Boolean,
@@ -31,6 +31,6 @@ class LinuxProvider(
         toolId: String,
         next: suspend () -> ToolExecutionResult,
     ): ToolExecutionResult =
-        if (available()) next()
+        if (toolName.startsWith("linux.file.") || available()) next()
         else ToolExecutionResult(output = "Error: ubuntu_runtime_unavailable: $toolName", success = false)
 }

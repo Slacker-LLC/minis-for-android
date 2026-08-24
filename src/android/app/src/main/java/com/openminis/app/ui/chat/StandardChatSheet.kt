@@ -24,13 +24,18 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 
 /**
  * Standardized half-screen modal sheet used by every popup launched from the
@@ -64,13 +69,17 @@ fun StandardChatSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = ChatColors.background,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.background,
         dragHandle = { CompactDragHandle() },
     ) {
+        // Glass style: the sheet lives in its own dialog window, so instead of
+        // backdrop sampling we use the platform window blur + translucent scrim.
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(sheetHeight),
+                .height(sheetHeight)
+                .glassSheetSurface(),
         ) {
             StandardChatSheetHeader(
                 title = title,

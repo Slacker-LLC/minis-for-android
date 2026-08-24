@@ -58,21 +58,6 @@ checkout. (PRoot/Alpine was removed in the P2 rebuild.)
 
 ## Build the Minis Web client plugin
 
-The Minis Console is a formal DeepSeek Harness client plugin; its source lives in
-`web/minis-client-plugin/` and its generated `client.js` ships in the APK assets.
-
-```sh
-cd web/minis-client-plugin
-npm install
-npm run check    # tsc --noEmit
-npm test         # vitest
-npm run build    # writes plugins/@openminis/minis-client-settings/client.js
-                 # and updates assets/minis/index.html boot graph
-```
-
-`npm run build` is the only supported way to update the browser bundle or the boot graph; never edit the
-generated `client.js` or the `__MINIS_BOOT__` JSON by hand.
-
 ## Build the APK
 
 ```sh
@@ -94,15 +79,11 @@ Install on a connected arm64 device with either:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Tests
-
-Focused public-repository regression baseline:
+Tests (focused regression baseline):
 
 ```sh
 cd src/android
-./gradlew :app:testDebugUnitTest \
-  --tests com.openminis.app.remote.DshApiAdapterTest \
-  --tests com.openminis.app.data.UpdateCheckerVersionTest
+./gradlew :app:testDebugUnitTest
 
 ./gradlew :app:assembleDebugAndroidTest
 ```
@@ -142,5 +123,4 @@ a release variant that does not start DebugServer, a complete security/test pass
 tag, and published artifact hashes.
 
 See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for minisd, the Ubuntu rootfs,
-cloudflared, Harness, and Android
-dependency licensing notes.
+and Android dependency licensing notes.

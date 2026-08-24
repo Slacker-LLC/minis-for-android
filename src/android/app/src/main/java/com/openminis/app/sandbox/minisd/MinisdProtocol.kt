@@ -133,6 +133,16 @@ object MinisdProtocol {
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
 
+    fun rootExec(tool: String, args: List<String> = emptyList(), timeoutMs: Long = 30_000, id: Long = 1): MinisdRequest =
+        MinisdRequest(
+            id = id,
+            method = "root.exec",
+            params = JSONObject()
+                .put("tool", tool)
+                .put("args", JSONArray(args))
+                .put("timeout_ms", timeoutMs),
+        )
+
     fun ubuntuAdminExec(argv: List<String>, timeoutMs: Long = 120_000, confirmId: String? = null, id: Long = 1): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }

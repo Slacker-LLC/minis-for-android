@@ -7,25 +7,21 @@
 
 Minis 是一个 **Android 原生 Agent 运行时**:手机上运行完整的 LLM Agent(工具调用、文件编辑、
 持续 shell、网页浏览、目标管理),内置 **Ubuntu 24.04 chroot**(由 minisd Root Broker 以
-root 管理、按 App UID 降权运行)作为默认执行环境,并提供与 Android 共用同一数据源的
-**Minis Web** 远程工作台。
+root 管理、按 App UID 降权运行)作为默认执行环境,并提供 MCP Server 作为本地/远程工具面。
 
 ```text
-Android 原生 App（唯一运行时与数据源）
+Android 原生 App(唯一运行时与数据源)
 ├─ Agent Loop / Room / Repository / 会话状态
-├─ Ubuntu 24.04 rootfs + 真 chroot（minisd：unshare+mount+chroot，复用 Android 手机内核）
-├─ minisd Root Broker（unix socket + SO_PEERCRED 鉴权 + policy 门控）
-├─ MCP Server（127.0.0.1:18789，Bearer 认证，确认队列 + 手机通知）
+├─ Ubuntu 24.04 rootfs + 真 chroot(minisd:unshare+mount+chroot,复用 Android 手机内核)
+├─ minisd Root Broker(unix socket + SO_PEERCRED 鉴权 + policy 门控)
+├─ MCP Server(127.0.0.1:18789,Bearer 认证,确认队列 + 手机通知)
+├─ MCPProvider(外部 MCP Server 客户端,mcp.<server>.<tool>)
 ├─ 桌面宠物与默认数字助手
-├─ 可选 Shizuku / Sui 权限桥
-└─ RemoteAccessServer
-   ├─ 登录、Host 校验、逐能力 RPC 授权
-   ├─ DshApiAdapter / SessionEventHub
-   └─ assets/minis/（Minis Web,含正式 Client Plugin 控制台）
+└─ 可选 Shizuku / Sui 权限桥
 ```
 
-浏览器不是第二套 Agent:网页中的会话、模型、Workspace、Goal、Skills、MCP、记忆、定时任务和设置
-最终都映射到 Android 现有的 ViewModel、数据库或 Repository。
+MCP 不是第二套 Agent:MCP Server 暴露的每个工具都映射到 Android 现有 ViewModel、
+数据库、Repository 或 Tool Runtime,并由 ToolPermissionManager 按工具 × caller 授权。
 
 ## 当前版本
 
@@ -58,18 +54,17 @@ Android 原生 App（唯一运行时与数据源）
 - 工具超时、执行意图检查点、后台作业、Token 计量、上下文压力、结果修剪/落盘、
   一次性审批和危险命令策略。
 
-### Minis Web
+### MCP Server
 
-- 统一的登录页、会话列表、消息/推理/工具事件和响应式设置界面;
-- 「Minis 控制台」是正式 DeepSeek Harness Client Plugin(`web/minis-client-plugin/` →
-  `assets/minis/plugins/@openminis/minis-client-settings/client.js`):走官方
-  `settings.section` slot、`createSnapshotStore` 与 locale 基础设施,纯 React 投影
-  Android 权威状态,不依赖 DOM 覆盖层;
-- Provider、模型、Skills、MCP、记忆/SOUL、环境、挂载、定时任务和 Agent 设置;
-- Skills/MCP 可粘贴配置或从公开 HTTPS URL 导入;导入器限制 HTTPS/443、重定向、大小,
+- MCP Server(`127.0.0.1:18789`)Bearer token 认证,`tools/list` 只列出该 token
+  可见的工具;写敏感工具(日历、联系人、位置、剪贴板、Intent、文件写等)要求手机通知
+  确认,120s 自动拒绝;
+- MCPProvider 可连接外部 HTTP/stdio MCP Server,工具统一注册为 `mcp.<server>.<tool>`
+  且 LOCAL_ONLY,支持 hot-reload;
+- Skills/MCP 配置可从公开 HTTPS URL 导入;导入器限制 HTTPS/443、重定向、大小,
   并拒绝 localhost、私网、链路本地和 CGNAT;
-- Session/Workspace 可见页定期与 Android 权威基线对账,设置写入带 revision 冲突检测;
-- 本地监听、显式 LAN 模式和 Cloudflare named tunnel;移动网络 tunnel 固定 HTTP/2。
+- 远程面只经 MCP Server;旧 Web Remote(HTTP 服务、Cloudflare Tunnel、capability
+  catalog 与静态前端)已删除。
 
 ### Android Debug 工具链
 
@@ -91,23 +86,16 @@ Android 原生 App（唯一运行时与数据源）
 
 ## 安全边界
 
-Web Remote 可能通过 Tunnel 暴露到公网,因此默认坚持最小权限:
+远程面只有 MCP Server 与本地 DebugServer,默认坚持最小权限:
 
-- 未设置登录密码时拒绝启动;登录使用 PBKDF2-HMAC-SHA256 和 HttpOnly Session Cookie;
-- 默认只监听 `127.0.0.1`,LAN 访问必须显式开启;LAN 模式是明文 HTTP,不应在不可信网络使用;
-- RPC 使用「方法 → 能力」显式映射表(`RemoteCapabilityCatalog`),未登记/未来新增的方法默认拒绝;
-  日志与崩溃正文受 `diagnostics.content`(默认关闭)保护;
+- MCP Server 只监听回环 `127.0.0.1:18789`,Bearer token 按需生成,未知 token 默认拒绝;
+- `ToolPermissionManager` 使用「工具 × caller」显式映射表,未登记工具默认拒绝;
+  敏感能力对 MCP 默认 MCP_CONFIRM(手机通知批准),`root.shell` 为 LOCAL_ONLY;
 - Provider Key、环境变量值以及 MCP Header/环境值不通过读取接口返回;
-- 设备控制(截图/点击/滚动/输入)、界面检查、凭据导出、任意路径文件访问与管理员操作默认关闭,
-  需在手机或网页「权限」页逐项开启;
-- 工作区文件读写默认开启且始终限定在 `/var/minis/workspace`;工作区以外路径需要默认关闭的
-  `sandbox.fs`;
-- `permission.manage` 在 Web 端关闭后,网页无法再修改任何能力开关,只能回手机恢复;
-- 新增外部目录必须由用户在 Android SAF 系统选择器中授权,网页只能管理已有挂载;
+- 文件工具统一经 `UbuntuPaths` canonical 边界,写操作限定 workspace 并尊重只读挂载;
 - 安装/卸载/清空日志/Root 授权等有副作用操作经过一次性审批(ApprovalSeam);
-- Web 不暴露裸 shell/root/tap/install 等设备直控接口。
-
-详细协议见 [Web Remote RPC](docs/WEB-REMOTE-RPC.md) 与 [安全设计](docs/SECURITY.md)。
+- 公网暴露(如 Cloudflare Tunnel)只能由用户自行配置在 MCP Server 之前,本项目不再内置
+  Web 服务端。
 
 ## 执行环境:Ubuntu chroot、Root 与 Shizuku
 
@@ -146,7 +134,7 @@ adb install -r OpenMinis-Pet-1.01-beta-arm64-debug.apk
 
 1. 在 Provider 设置中添加 API Key 或完成对应 OAuth;
 2. 如需桌面宠物,在 Android 系统界面授予悬浮窗权限;
-3. 如需 Web Remote,先设置强密码,再选择仅本机、LAN 或 Cloudflare Tunnel;
+3. 如需 Root 能力,安装并授权 KernelSU/Magisk,minisd 会以结构化 allowlist 方式使用;
 4. HyperOS 用户在系统设置中允许后台运行并开启自启动,否则退到后台后可能冻结;
 5. 系统角色、电池豁免、自启动和 SAF 目录都必须由用户在手机系统界面授权。
 
@@ -177,8 +165,6 @@ cd src/android
 ```
 
 APK 输出:`src/android/app/build/outputs/apk/debug/app-debug.apk`。
-Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install && npm run build`
-(生成 browser bundle 并与 Android assets 同步)。
 
 > 构建产物约定：`minisd` 二进制与 Ubuntu rootfs tar 不提交 Git，干净 checkout 后必须
 > 用上述命令重新生成（详见 `BUILD-CN.md`）。
@@ -187,12 +173,11 @@ Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install 
 
 | 路径 | 内容 |
 |---|---|
-| `src/android/` | Android App、Compose UI、Room、Provider 与 Remote 后端 |
-| `src/android/app/src/main/assets/minis/` | 默认 Minis Web bundle、登录页与官方插件产物 |
-| `web/minis-client-plugin/` | Minis Client Plugin 源码、测试与可重复构建脚本 |
+| `src/android/` | Android App、Compose UI、Room、Provider、MCP 与 Tool Runtime |
 | `src/android/app/src/main/java/com/openminis/app/tools/android/` | Android Debug 工具链 |
+| `src/android/app/src/main/java/com/openminis/app/mcp/` | MCP Server 与 MCPProvider |
 | `src/shared/` | Android 构建复用的共享规则/资源 |
-| `deps/` | 已移除的 PRoot/Alpine 依赖构建脚本(历史归档)；当前原生依赖为 `src/native/minisd`(Rust,同仓) |
+| `deps/` | 已移除的 PRoot/Alpine 依赖构建脚本(历史归档);当前原生依赖为 `src/native/minisd`(Rust,同仓) |
 | `releases/` | 明确发布且与源码对应的 APK |
 | [`docs/README.md`](docs/README.md) | 文档索引 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 版本变更记录(自 1.01-beta 起) |
@@ -203,8 +188,6 @@ Minis Web Client Plugin 单独构建:`cd web/minis-client-plugin && npm install 
 本项目作为独立项目发布,首版为 `v1.01-beta`。其代码谱系包含:
 
 - [OpenMinis](https://github.com/OpenMinis/OpenMinis)(GPL-3.0,派生基础);
-- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) `0.1.0-rc.8`
-  (MIT,Minis Web 的 source-adapted 前端与 wire schema);
 - PRoot、Alpine、Termux 与各 Android 依赖(见
   [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 与
   [README-upstream.md](README-upstream.md))。

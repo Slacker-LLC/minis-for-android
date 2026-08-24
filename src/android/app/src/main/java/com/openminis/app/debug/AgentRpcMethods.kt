@@ -25,8 +25,7 @@ internal object AgentRpcMethods {
 
     /**
      * Per-session Agent execution permission (DSH /permission state). This is
-     * the Agent-runtime layer — deliberately distinct from RemotePermissionPolicy
-     * which gates what a *browser* may invoke.
+     * the Agent-runtime layer — distinct from the browser/MCP surface.
      */
     fun sessionPermissionGet(context: Context, params: JSONObject): JSONObject {
         val sessionId = params.optString("sessionId", "").ifEmpty {

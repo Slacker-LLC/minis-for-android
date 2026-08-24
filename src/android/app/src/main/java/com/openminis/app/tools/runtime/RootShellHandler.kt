@@ -1,41 +1,31 @@
 package com.openminis.app.tools.runtime
 
 import android.content.Context
-import android.util.Log
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.tools.DangerousCommandPolicy
+import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.ToolExecutionResult
-import com.openminis.app.tools.android.RootCommandRunner
 import org.json.JSONObject
 
 /**
- * `root.shell` — the second shell (architecture doc §9): runs a command in the
- * Android Root domain via KernelSU, NOT in Ubuntu. LOCAL_ONLY by policy
- * (ToolPermissionManager) so remote MCP clients can never reach it; the local
- * Agent gets it through the same ToolRuntime gate as every other tool.
+ * Compatibility name for structured Android-root execution.
  *
- * Dangerous-command policy applies here too — root is a superset of the Ubuntu
- * shell, so the same destructive patterns (rm -rf /, mkfs, dd of=/dev, …) are
- * refused before execution.
+ * This deliberately has no `command` / shell-string parameter. Every call
+ * travels through minisd `root.exec`, whose policy owns the executable
+ * allowlist and argument deny rules; `root.shellRaw` remains denied.
  */
 class RootShellHandler : ToolHandler {
 
-    companion object {
-        private const val TAG = "RootShellHandler"
-    }
-
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "root.shell",
-        description = "Run a shell command in the Android Root domain (KernelSU). " +
-            "Use for Android system commands (cmd, pm, am, settings, dumpsys, getprop, mount…). " +
-            "This is NOT the Ubuntu shell — use linux.shell for Python/git/apt work. " +
-            "Destructive commands are refused by policy.",
+        description = "Run one allowlisted Android root tool through minisd root.exec. " +
+            "Use structured args only; arbitrary shell commands are not supported.",
         parameters = mapOf(
-            "command" to AgentToolParam("string", "Shell command to run as root (Android domain)"),
+            "tool" to AgentToolParam("string", "Allowlisted executable", listOf("pm", "am", "settings", "dumpsys", "getprop", "mount")),
+            "args" to AgentToolParam("array", "Arguments passed without shell parsing", items = AgentToolParam("string", "One argument")),
             "timeout_ms" to AgentToolParam("integer", "Timeout in ms (default 30000, max 120000)"),
         ),
-        required = listOf("command"),
+        required = listOf("tool"),
     )
 
     override suspend fun execute(
@@ -44,37 +34,36 @@ class RootShellHandler : ToolHandler {
         context: Context,
         toolId: String,
     ): ToolExecutionResult {
-        val args = runCatching { JSONObject(argsJson) }.getOrNull()
-            ?: return ToolExecutionResult("Invalid root.shell arguments", false)
-        val command = args.optString("command").trim()
-        if (command.isEmpty()) {
-            return ToolExecutionResult("Empty command", false)
-        }
-        val danger = DangerousCommandPolicy.dangerousReason(command)
-        if (danger != null) {
-            Log.w(TAG, "[$sessionId] blocked dangerous root command: $danger")
-            return ToolExecutionResult("blocked: $danger", false)
-        }
-        val timeout = args.optLong("timeout_ms", 30_000).coerceIn(1_000, 120_000)
-        val result = RootCommandRunner.run(listOf("sh", "-c", command), timeout)
-        val output = buildString {
-            if (result.stdout.isNotEmpty()) append(result.stdout)
-            if (result.stderr.isNotEmpty()) {
-                if (isNotEmpty()) append('\n')
-                append(result.stderr)
-            }
-            if (result.unavailableReason != null) {
-                if (isNotEmpty()) append('\n')
-                append("unavailable: ").append(result.unavailableReason)
-            }
-            if (result.timedOut) {
-                if (isNotEmpty()) append('\n')
-                append("(timed out)")
+        val json = runCatching { JSONObject(argsJson) }.getOrNull()
+            ?: return ToolExecutionResult("Error: invalid root.shell arguments", false)
+        val tool = json.optString("tool").trim()
+        if (tool.isEmpty()) return ToolExecutionResult("Error: tool is required", false)
+        val args = json.optJSONArray("args")
+        val argv = mutableListOf<String>()
+        if (args != null) {
+            for (index in 0 until args.length()) {
+                val value = args.opt(index)
+                if (value !is String || value.contains('\u0000')) {
+                    return ToolExecutionResult("Error: args[$index] must be a non-null string", false)
+                }
+                argv += value
             }
         }
-        return ToolExecutionResult(
-            if (output.isEmpty()) "(exit code: ${result.exitCode})" else output,
-            result.success && !result.timedOut,
-        )
+        val timeout = json.optLong("timeout_ms", 30_000).coerceIn(1_000, 120_000)
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        val response = UbuntuRuntime.client.rootExec(tool, argv, timeout)
+        if (!response.ok) {
+            val error = response.error
+            return ToolExecutionResult(
+                "Error: ${error?.code ?: "RUNTIME_UNAVAILABLE"}: ${error?.detail ?: "minisd root.exec failed"}",
+                false,
+            )
+        }
+        val result = response.result ?: return ToolExecutionResult("Error: malformed minisd root.exec result", false)
+        val stdout = result.optString("stdout")
+        val stderr = result.optString("stderr")
+        val exitCode = result.optInt("exit_code", 1)
+        val output = listOf(stdout, stderr).filter { it.isNotBlank() }.joinToString("\n")
+        return ToolExecutionResult(if (output.isBlank()) "(exit code: $exitCode)" else output, exitCode == 0)
     }
 }

@@ -35,7 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.speech.SpeechRecognitionManager
+import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import java.util.Locale
 
 /**
@@ -67,9 +72,10 @@ fun SpeechLanguagePickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = ChatColors.background,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.background,
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        GlassSheetWindowBlur()
+        Column(modifier = Modifier.fillMaxWidth().glassSheetSurface()) {
             Text(
                 text = stringResource(R.string.speech_lang_picker_title),
                 fontSize = 16.sp,

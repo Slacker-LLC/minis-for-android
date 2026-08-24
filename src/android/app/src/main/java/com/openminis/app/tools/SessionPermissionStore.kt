@@ -5,9 +5,8 @@ import android.content.Context
 /**
  * Per-session agent execution permission preset (DSH `/permission`).
  *
- * This is deliberately separate from [com.openminis.app.remote.RemotePermissionPolicy],
- * which gates the *Web Remote surface* (which HTTP/RPC capability a browser may
- * invoke). This store gates what the *Agent runtime* may do inside one chat
+ * This is deliberately separate from the MCP confirmation/surface gates:
+ * it gates what the *Agent runtime* may do inside one chat
  * session and is consumed directly by the tool execution gate
  * (see [FileWriteTool]/[FileEditTool]).
  *

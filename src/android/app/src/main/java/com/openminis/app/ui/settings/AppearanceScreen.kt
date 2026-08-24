@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardReturn
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.outlined.Launch
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.ScreenLockPortrait
+import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Icon
@@ -76,6 +78,7 @@ import kotlin.math.roundToInt
 // -- Preference Keys --
 const val PREF_APPEARANCE = "appearance_prefs"
 const val KEY_THEME_MODE = "theme_mode"            // 0=System, 1=Light, 2=Dark
+const val KEY_UI_STYLE = "ui_style"                // 0=Classic, 1=Glass (Liquid Glass)
 const val KEY_LAUNCH_SESSION = "launch_session"    // 0=Auto, 1=LastSession, 2=NewChat, 3=Home
 // iOS-aligned key names — match `@AppStorage("returnKeyBehavior")` and
 // `@AppStorage("keepScreenAwakeDuringTasks")` in ContentView.swift so
@@ -182,6 +185,7 @@ fun AppearanceScreen(
     val prefs = remember { getAppearancePrefs(context) }
 
     var themeMode by remember { mutableIntStateOf(prefs.getInt(KEY_THEME_MODE, 0)) }
+    var uiStyle by remember { mutableIntStateOf(prefs.getInt(KEY_UI_STYLE, 0)) }
     var launchSession by remember { mutableIntStateOf(prefs.getInt(KEY_LAUNCH_SESSION, 0)) }
     var returnKeyBehavior by remember { mutableIntStateOf(prefs.getInt(KEY_RETURN_KEY_BEHAVIOR, 0)) }
     var keepScreenAwake by remember { mutableStateOf(prefs.getBoolean(KEY_KEEP_SCREEN_AWAKE, false)) }
@@ -238,6 +242,40 @@ fun AppearanceScreen(
                         )
                     },
                     showDivider = idx < themeRows.size - 1,
+                )
+            }
+        }
+
+        // -- UI Style --
+        // Two parallel UIs: Classic (Material surface look) and Glass
+        // (liquid-glass surfaces over the page content). Switching applies
+        // instantly via LocalUiStyle — no restart.
+        SettingsSection(
+            header = "界面风格",
+            footer = "Android 12–15 启用原生模糊（Android 13–15 含折射）；" +
+                "Android 16 使用兼容磨砂效果，低版本自动降级。",
+        ) {
+            data class UiStyleRow(val label: String, val icon: ImageVector, val tint: Color)
+            val styleRows = listOf(
+                UiStyleRow("经典", Icons.Outlined.Style, tilePurple),
+                UiStyleRow("玻璃拟态", Icons.Outlined.BlurOn, tileBlue),
+            )
+            styleRows.forEachIndexed { idx, row ->
+                SettingsChoiceRow(
+                    title = row.label,
+                    selected = uiStyle == idx,
+                    onSelect = {
+                        uiStyle = idx
+                        prefs.edit().putInt(KEY_UI_STYLE, idx).apply()
+                    },
+                    leading = {
+                        androidx.compose.material3.Icon(
+                            row.icon,
+                            contentDescription = null,
+                            tint = row.tint,
+                        )
+                    },
+                    showDivider = idx < styleRows.size - 1,
                 )
             }
         }

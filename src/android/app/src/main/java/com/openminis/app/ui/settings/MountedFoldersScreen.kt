@@ -59,6 +59,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -608,10 +612,13 @@ private fun AddMountSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
     ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .glassSheetSurface()
                 .padding(horizontal = 20.dp, vertical = 8.dp),
         ) {
             Text(

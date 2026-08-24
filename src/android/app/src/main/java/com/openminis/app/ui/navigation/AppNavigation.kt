@@ -52,8 +52,6 @@ import com.openminis.app.ui.sandbox.RootfsManagementScreen
 import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
 import com.openminis.app.ui.settings.SettingsScreen
-import com.openminis.app.ui.settings.RemoteAccessSettingsScreen
-import com.openminis.app.ui.settings.CloudflareTunnelSettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
 import com.openminis.app.ui.settings.SessionStorageDetailScreen
 import com.openminis.app.ui.settings.SkillDetailScreen
@@ -165,8 +163,6 @@ object Routes {
     const val LOG_DETAIL = "log_detail/{fileName}"
     const val APPEARANCE = "appearance"
     const val BACKGROUND = "background"
-    const val REMOTE_ACCESS = "remote_access"
-    const val REMOTE_ACCESS_TUNNEL = "remote_access_tunnel"
     const val ABOUT = "about"
     const val ONBOARDING_MODELS = "onboarding_models"
     /** T219-2: Mount external folders settings + detail. */
@@ -589,7 +585,6 @@ fun AppNavigation(
                 onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                 onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                 onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
-                onRemoteAccessClick = { navController.safeNavigate(Routes.REMOTE_ACCESS) },
                 onLogsClick = { navController.safeNavigate(Routes.LOGS) },
                 onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
                 onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
@@ -1193,23 +1188,6 @@ fun AppNavigation(
         composable(Routes.BACKGROUND) {
             BackgroundSettingsScreen(
                 onBack = { navController.safePopBackStack() },
-            )
-        }
-
-        composable(Routes.REMOTE_ACCESS) {
-            RemoteAccessSettingsScreen(
-                onBack = { navController.safePopBackStack() },
-                onCloudflareTunnelClick = {
-                    navController.safeNavigate(Routes.REMOTE_ACCESS_TUNNEL)
-                },
-            )
-        }
-
-        composable(Routes.REMOTE_ACCESS_TUNNEL) {
-            CloudflareTunnelSettingsScreen(
-                onBack = { navController.safePopBackStack() },
-                onOpenLogs = { navController.safeNavigate(Routes.LOGS) },
-                onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
             )
         }
 

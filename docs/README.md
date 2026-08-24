@@ -17,9 +17,7 @@
 
 | 文档 | 内容 |
 |---|---|
-| [`MINIS-WEB-ARCHITECTURE.md`](MINIS-WEB-ARCHITECTURE.md) | Minis Web、Harness 边界和 Android 数据映射 |
-| [`WEB-REMOTE-RPC.md`](WEB-REMOTE-RPC.md) | Web Remote HTTP/RPC/WebSocket 契约与安全边界 |
-| [`SECURITY.md`](SECURITY.md) | 安全设计:凭据、Web 授权、审批、路径与日志边界 |
+| [`SECURITY.md`](SECURITY.md) | 安全设计:凭据、MCP 授权、审批、路径与日志边界 |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行环境：Ubuntu 24.04 chroot（minisd）+ Root su 现状与边界（P2 已替换 PRoot/Alpine） |
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 当前已交付、验证和未交付项 |
 | [`specs/minis-url-scheme.md`](specs/minis-url-scheme.md) | `minis://` URL 方案说明 |
@@ -36,8 +34,8 @@
 ## 真实性规则
 
 - 当前行为优先级:运行源码与测试 → 当前契约文档 → README/发布说明;
-- `assets/minis/` 是默认 Web UI;`assets/remote/` 是兼容资源;
-- PRoot/容器没有独立 kernel;当前仅实现 Alpine rootfs;
+- 远程面只有 MCP Server(`127.0.0.1:18789`)与本地 DebugServer;Web Remote 已删除;
+- PRoot/容器没有独立 kernel;当前仅实现 Ubuntu chroot;
 - Root/Shizuku/Accessibility 是三条独立能力,不构成权限等级链;
 - Strict schema 的空兼容响应不代表完整 Subagent、Job 或 Queue 功能已经交付;
 - Debug APK、生产 release 与真机系统授权必须分开描述。

@@ -1,6 +1,9 @@
 package com.openminis.app.sandbox.offload
 
 import android.Manifest
+import android.content.ContentProviderOperation
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
@@ -15,13 +18,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Host-side implementation of `android-contacts` — reads + writes the device
+ * Host-side implementation of `android-contacts` — reads and manages device
  * contacts via the ContactsContract ContentProvider.
  *
  * Usage:
  *   android-contacts list [--max N]
  *   android-contacts search <query> [--max N]
  *   android-contacts get <id>
+ *   android-contacts create --name N [--phone P] [--email E]
+ *   android-contacts update --id ID [--name N] [--phone P] [--email E]
  *   android-contacts delete <id>
  *   android-contacts --help
  */
@@ -41,9 +46,9 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
         // T330: tri-state agent gate before any work or system permission ask.
         OffloadGate.enforce("contacts", "android-contacts", parsedArgs, request)?.let { return it }
 
-        // delete needs WRITE_CONTACTS in addition to READ; the read-only path
-        // is fine with READ_CONTACTS alone.
-        val needsWrite = rawArgs[0] == "delete"
+        // Mutations need WRITE_CONTACTS in addition to READ; the read-only
+        // path is fine with READ_CONTACTS alone.
+        val needsWrite = rawArgs[0] in setOf("create", "update", "delete")
         ensurePermission(needsWrite = needsWrite, args = parsedArgs)?.let { return it }
 
         return try {
@@ -51,6 +56,8 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 "list" -> doList(rawArgs.drop(1), parsedArgs)
                 "search" -> doSearch(rawArgs.drop(1), parsedArgs)
                 "get" -> doGet(rawArgs.drop(1), parsedArgs)
+                "create" -> doCreate(parsedArgs)
+                "update" -> doUpdate(parsedArgs)
                 "delete" -> doDelete(rawArgs.drop(1), parsedArgs)
                 else -> NativeOffloadResult(2, "android-contacts: unknown subcommand '$sub'\n$HELP_TEXT")
             }
@@ -171,32 +178,32 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
     private fun doSearch(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {
         val query = args.firstOrNull { !it.startsWith("-") }
             ?: return NativeOffloadResult(2, "android-contacts search: missing <query>\n")
-        val max = parseMax(args, default = 20)
+        val max = parseMax(args, default = 20).coerceIn(1, 100)
+        val ids = linkedSetOf<Long>()
 
-        val projection = arrayOf(
-            ContactsContract.Contacts._ID,
-            ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
-            ContactsContract.Contacts.HAS_PHONE_NUMBER,
-        )
-        val selection = "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?"
-        val selectionArgs = arrayOf("%$query%")
-        val sort = "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC"
-        val cursor = context.contentResolver.query(
-            ContactsContract.Contacts.CONTENT_URI, projection, selection, selectionArgs, sort,
-        ) ?: return NativeOffloadResult(1, OffloadOutput.formatBody("android-contacts: failed to query contacts", parsedArgs) + "\n")
+        context.contentResolver.query(
+            ContactsContract.Contacts.CONTENT_URI,
+            arrayOf(ContactsContract.Contacts._ID),
+            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} LIKE ?",
+            arrayOf("%$query%"),
+            "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} ASC",
+        )?.use { cursor ->
+            while (cursor.moveToNext()) ids += cursor.getLong(0)
+        }
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID),
+            "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?",
+            arrayOf("%$query%"),
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) ids += cursor.getLong(0)
+        }
 
-        val arr = JSONArray()
-        cursor.use {
-            var n = 0
-            while (it.moveToNext() && n < max) {
-                arr.put(readContactRow(it))
-                n++
-            }
-        }
-        if (arr.length() == 0) {
-            return NativeOffloadResult(0, OffloadOutput.formatBody("No contacts found matching '$query'.", parsedArgs) + "\n")
-        }
-        return NativeOffloadResult(0, OffloadOutput.formatBody(arr.toString(2), parsedArgs) + "\n")
+        val contacts = JSONArray()
+        ids.take(max).forEach { id -> contactById(id)?.let(contacts::put) }
+        val body = JSONObject().put("contacts", contacts).put("count", contacts.length())
+        return NativeOffloadResult(0, OffloadOutput.formatBody(body.toString(2), parsedArgs) + "\n")
     }
 
     private fun doGet(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {
@@ -223,6 +230,136 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
             val obj = readContactRow(it)
             return NativeOffloadResult(0, OffloadOutput.formatBody(obj.toString(2), parsedArgs) + "\n")
         }
+    }
+
+    private fun doCreate(args: OffloadArgs): NativeOffloadResult {
+        val name = args.get("name")?.trim().orEmpty()
+        if (name.isEmpty()) return NativeOffloadResult(2, "android-contacts create: --name is required\n")
+        val phone = args.get("phone")?.trim().orEmpty()
+        val email = args.get("email")?.trim().orEmpty()
+        return try {
+            val ops = arrayListOf<ContentProviderOperation>()
+            ops += ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null as String?)
+                .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null as String?)
+                .build()
+            ops += ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name)
+                .build()
+            if (phone.isNotEmpty()) {
+                ops += ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, phone)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE)
+                    .build()
+            }
+            if (email.isNotEmpty()) {
+                ops += ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
+                    .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                    .withValue(ContactsContract.CommonDataKinds.Email.ADDRESS, email)
+                    .build()
+            }
+            val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            val rawId = results.firstOrNull()?.uri?.let(ContentUris::parseId)
+                ?: return NativeOffloadResult(1, "android-contacts create: provider did not return an id\n")
+            val id = contactIdForRaw(rawId) ?: rawId
+            NativeOffloadResult(
+                0,
+                OffloadOutput.formatBody(
+                    JSONObject().put("contact_id", id).put("name", name).toString(2),
+                    args,
+                ) + "\n",
+            )
+        } catch (e: SecurityException) {
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n")
+        } catch (e: Throwable) {
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), args) + "\n")
+        }
+    }
+
+    private fun doUpdate(args: OffloadArgs): NativeOffloadResult {
+        val id = args.getLong("id")
+            ?: return NativeOffloadResult(2, "android-contacts update: --id is required\n")
+        val name = args.get("name")
+        val phone = args.get("phone")
+        val email = args.get("email")
+        if (name == null && phone == null && email == null) {
+            return NativeOffloadResult(2, "android-contacts update: supply --name, --phone, or --email\n")
+        }
+        val rawId = firstRawContactId(id)
+            ?: return NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "not_found").put("contact_id", id).toString(), args) + "\n")
+        return try {
+            name?.let {
+                upsertData(id, rawId, ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE,
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, it)
+            }
+            phone?.let {
+                upsertData(id, rawId, ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER, it)
+            }
+            email?.let {
+                upsertData(id, rawId, ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
+                    ContactsContract.CommonDataKinds.Email.ADDRESS, it)
+            }
+            NativeOffloadResult(0, OffloadOutput.formatBody(JSONObject().put("contact_id", id).put("updated", true).toString(2), args) + "\n")
+        } catch (e: SecurityException) {
+            NativeOffloadResult(77, OffloadOutput.formatBody(JSONObject().put("error", "permission_denied").put("message", e.message).toString(), args) + "\n")
+        } catch (e: Throwable) {
+            NativeOffloadResult(1, OffloadOutput.formatBody(JSONObject().put("error", "contacts_provider_error").put("message", e.message).toString(), args) + "\n")
+        }
+    }
+
+    private fun upsertData(contactId: Long, rawId: Long, mimeType: String, column: String, value: String) {
+        val existingId = context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(ContactsContract.Data._ID),
+            "${ContactsContract.Data.CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?",
+            arrayOf(contactId.toString(), mimeType),
+            "${ContactsContract.Data._ID} ASC",
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+        val values = ContentValues().apply {
+            put(ContactsContract.Data.MIMETYPE, mimeType)
+            put(column, value)
+        }
+        if (existingId == null) {
+            values.put(ContactsContract.Data.RAW_CONTACT_ID, rawId)
+            context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values)
+        } else {
+            context.contentResolver.update(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, existingId), values, null, null)
+        }
+    }
+
+    private fun firstRawContactId(contactId: Long): Long? = context.contentResolver.query(
+        ContactsContract.RawContacts.CONTENT_URI,
+        arrayOf(ContactsContract.RawContacts._ID),
+        "${ContactsContract.RawContacts.CONTACT_ID}=?",
+        arrayOf(contactId.toString()),
+        "${ContactsContract.RawContacts._ID} ASC",
+    )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+
+    private fun contactIdForRaw(rawId: Long): Long? = context.contentResolver.query(
+        ContentUris.withAppendedId(ContactsContract.RawContacts.CONTENT_URI, rawId),
+        arrayOf(ContactsContract.RawContacts.CONTACT_ID),
+        null, null, null,
+    )?.use { cursor -> if (cursor.moveToFirst()) cursor.getLong(0) else null }
+
+    private fun contactById(id: Long): JSONObject? {
+        val cursor = context.contentResolver.query(
+            ContactsContract.Contacts.CONTENT_URI,
+            arrayOf(
+                ContactsContract.Contacts._ID,
+                ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+                ContactsContract.Contacts.HAS_PHONE_NUMBER,
+            ),
+            "${ContactsContract.Contacts._ID} = ?",
+            arrayOf(id.toString()),
+            null,
+        ) ?: return null
+        cursor.use { return if (it.moveToFirst()) readContactRow(it) else null }
     }
 
     /**
@@ -317,14 +454,16 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
 
     companion object {
         private const val TAG = "ContactsOffload"
-        private const val HELP_TEXT = """android-contacts — read + delete device contacts (requires READ_CONTACTS, plus WRITE_CONTACTS for delete)
+        private const val HELP_TEXT = """android-contacts — manage device contacts (requires READ_CONTACTS; mutations also need WRITE_CONTACTS)
 
 Usage:
-  android-contacts list [--max N]         List contacts (default 50)
-  android-contacts search <query> [--max N]  Search by name (default 20)
-  android-contacts get <id>               Get a single contact by id
-  android-contacts delete <id>            Delete a contact by id (PERMANENT — cascades all raw rows)
-  android-contacts --help                 Show this help
+  android-contacts list [--max N]                         List contacts (default 50)
+  android-contacts search <query> [--max N]                Search by name or phone (default 20)
+  android-contacts get <id>                                Get a single contact by id
+  android-contacts create --name N [--phone P] [--email E] Create a contact
+  android-contacts update --id ID [--name N] [--phone P] [--email E]
+  android-contacts delete <id>                             Delete a contact (PERMANENT)
+  android-contacts --help                                  Show this help
 
 Output is JSON. Each contact has: id, name, phones[], emails[].
 """

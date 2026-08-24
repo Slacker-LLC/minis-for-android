@@ -185,6 +185,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.glass.glassSurface
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 
 // FAB color — use shared theme values
 
@@ -1353,6 +1358,7 @@ private fun DualFabRow(
     val topGroups = remember(modelGroups) { modelGroups.take(10) }
 
     val chatFab: @Composable () -> Unit = {
+        val isGlass = LocalUiStyle.current == UiStyle.GLASS
         Box(
             modifier = Modifier
                 .offset { IntOffset(chatDragX.roundToInt(), 0) }
@@ -1373,7 +1379,7 @@ private fun DualFabRow(
             FloatingActionButton(
                 onClick = onNewChat,
                 shape = CircleShape,
-                containerColor = minisFabColor(),
+                containerColor = if (isGlass) Color.Transparent else minisFabColor(),
                 modifier = Modifier
                     .size(56.dp)
                     .combinedClickable(
@@ -1382,8 +1388,20 @@ private fun DualFabRow(
                             if (topGroups.isNotEmpty()) showGroupMenu = true
                         },
                     )
-                    .shadow(8.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.2f)),
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                    .then(
+                        if (isGlass) Modifier.glassSurface(
+                            shape = CircleShape,
+                            // Upstream's tinted glass icon button uses a 75%
+                            // tint layer and no Material elevation.
+                            glassScrim = minisFabColor().copy(alpha = 0.75f),
+                            fallbackScrim = minisFabColor(),
+                        ) else Modifier.shadow(8.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.2f)),
+                    ),
+                elevation = if (isGlass) {
+                    FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
+                } else {
+                    FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                },
             ) {
                 Icon(Icons.Outlined.Forum, contentDescription = "New Chat", tint = Color.White, modifier = Modifier.size(24.dp))
             }
@@ -1406,6 +1424,7 @@ private fun DualFabRow(
     }
 
     val searchFab: @Composable () -> Unit = {
+        val isGlass = LocalUiStyle.current == UiStyle.GLASS
         if (hasSessions) {
             AnimatedVisibility(
                 visible = !isSearchActive,
@@ -1417,7 +1436,7 @@ private fun DualFabRow(
                     shape = CircleShape,
                     // iOS: UIColor.secondarySystemBackground = #F2F2F7 (light) / #1C1C1E (dark).
                     // ChatColors.secondaryBg already matches these values across themes.
-                    containerColor = ChatColors.secondaryBg,
+                    containerColor = if (isGlass) Color.Transparent else ChatColors.secondaryBg,
                     modifier = Modifier
                         .size(56.dp)
                         .offset { IntOffset(searchDragX.roundToInt(), 0) }
@@ -1434,8 +1453,18 @@ private fun DualFabRow(
                                 onHorizontalDrag = { _, dragAmount -> searchDragX += dragAmount },
                             )
                         }
-                        .shadow(6.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.15f)),
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                        .then(
+                            if (isGlass) Modifier.glassSurface(
+                                shape = CircleShape,
+                                glassScrim = if (isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.5f),
+                                fallbackScrim = ChatColors.secondaryBg,
+                            ) else Modifier.shadow(6.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.15f)),
+                        ),
+                    elevation = if (isGlass) {
+                        FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
+                    } else {
+                        FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+                    },
                 ) {
                     Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.sessionlist_search_action), tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                 }
@@ -2873,10 +2902,13 @@ internal fun SessionEditSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
     ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .glassSheetSurface()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
                 .navigationBarsPadding(),

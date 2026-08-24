@@ -27,6 +27,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -225,7 +230,12 @@ private fun MCPAddSheet(
     var selectedTab by remember { mutableIntStateOf(0) }
     val isEdit = editServer != null
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+    ) {
+        GlassSheetWindowBlur()
         // [T-android-mcp-sheet-ime-occlusion] GH#44: verticalScroll + imePadding
         // keep every field reachable while the keyboard is up — imePadding sits
         // after verticalScroll so the inset becomes scrollable bottom space the
@@ -233,6 +243,7 @@ private fun MCPAddSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .glassSheetSurface()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .padding(bottom = 32.dp)
@@ -825,10 +836,15 @@ private fun MCPEnvVarPickerSheet(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+    ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .glassSheetSurface()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

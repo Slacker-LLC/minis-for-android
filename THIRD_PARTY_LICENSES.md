@@ -30,16 +30,6 @@ iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMi
 | [libc](https://github.com/rust-lang/libc) | 0.2(见 Cargo.lock) | MIT / Apache-2.0 | 裸 syscall 绑定(unshare/mount/getsockopt 等) |
 | Ubuntu 24.04 base rootfs | `24.04.3`(noble),打包脚本 SHA-256 校验 | Aggregate of package licenses | 生成构建产物,打包进 APK assets
 
-## Web Remote 前端（`assets/minis/` 与兼容资源）
-
-| 组件 | 版本 | License | 用途 |
-|---|---|---|---|
-| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | 0.1.0-rc.8 | **MIT** | Minis Web 的 React/Cordis 静态 bundle 和 wire schema 来自官方 rc8 的 source-adapted 移植；内部包 ID 保留。许可证全文见 `assets/minis/licenses/DeepSeek-Harness-MIT.txt`。本项目与 DeepSeek 无产品关联。 |
-| [@deepseek-ai/dsh-client-ui-theme](https://www.npmjs.com/package/@deepseek-ai/dsh-client-ui-theme) | 0.0.1-rc.1 | **BSD-3-Clause** | bundle 使用的设计 token/主题。许可证全文见 `assets/minis/licenses/dsh-client-ui-theme-BSD-3-Clause.txt`。原作者名称不得用于为本项目背书。 |
-| [marked](https://github.com/markedjs/marked) | 15.0.12 | **MIT** | 旧 `assets/remote/` 兼容页面的 Markdown 解析；许可证见 `assets/remote/LICENSE-marked.md`。 |
-| [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.14 | **MPL-2.0 OR Apache-2.0** | 旧兼容页面的 HTML 净化；许可证见 `assets/remote/LICENSE-dompurify`。 |
-
-这些资源均从 APK assets 提供，不依赖 CDN。Minis 品牌修改不移除第三方版权、许可证、内部模块标识或必要来源说明。
 
 ## Android — Gradle dependencies
 
@@ -58,11 +48,6 @@ iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMi
 
 Test-only dependencies: JUnit 4.13.2 (**EPL-1.0**), MockWebServer 4.12.0 (**Apache-2.0**), kotlinx-coroutines-test 1.9.0 (**Apache-2.0**), org.json 20231013 (**Public Domain / JSON License**).
 
-## Tunnel / remote-access
-
-| Component | Version / Source | License | Notes |
-|---|---|---|---|
-| [cloudflared](https://github.com/cloudflare/cloudflared) | 2026.8.2, arm64 下载后 SHA-256 校验(见 `CloudflareTunnelManager.kt`) | **Apache-2.0** | Cloudflare Tunnel 客户端;运行时下载到 `/data/adb/minis/bin/cloudflared`,不随 APK 分发 |
 
 ## Bundled web/UI assets
 

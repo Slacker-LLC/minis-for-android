@@ -1,5 +1,6 @@
 package com.openminis.app.debug
 
+import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Dns
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Bounded HTTPS downloader used only by authenticated Skill/MCP URL imports.
  *
- * A URL import endpoint is otherwise an SSRF primitive when Web Remote is
+ * A URL import endpoint is otherwise an SSRF primitive; the importer only
  * exposed through a public tunnel. This downloader validates every redirect,
  * resolves through an OkHttp [Dns] that rejects local/private destinations,
  * allows only the normal HTTPS port, and stops reading at the caller's byte
@@ -75,7 +76,7 @@ internal object SafeRemoteImporter {
                     ?: throw RPCException(-32602, "URL download returned an empty response")
                 val announced = body.contentLength()
                 if (announced > maxBytes) {
-                    throw RPCException(-32602, "URL content exceeds the ${maxBytes / 1024} KiB limit")
+                    throw RPCException(-32602, "URL content exceeds the ${sizeLabel(maxBytes)} limit")
                 }
                 val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
                 body.byteStream().use { input ->
@@ -86,7 +87,7 @@ internal object SafeRemoteImporter {
                         if (count < 0) break
                         total += count
                         if (total > maxBytes) {
-                            throw RPCException(-32602, "URL content exceeds the ${maxBytes / 1024} KiB limit")
+                            throw RPCException(-32602, "URL content exceeds the ${sizeLabel(maxBytes)} limit")
                         }
                         output.write(buffer, 0, count)
                     }
@@ -96,6 +97,9 @@ internal object SafeRemoteImporter {
         }
         throw RPCException(-32602, "URL download did not complete")
     }
+
+    private fun sizeLabel(bytes: Int): String =
+        if (bytes < 1024) "$bytes bytes" else "${bytes / 1024} KiB"
 
     private fun validateUrl(rawUrl: String): HttpUrl {
         val url = rawUrl.trim().toHttpUrlOrNull()
@@ -124,6 +128,11 @@ internal object SafeRemoteImporter {
     }
 
     private fun isForbiddenAddress(address: InetAddress): Boolean {
+        // The API-34 Android emulator routes external DNS through its own
+        // 198.18/15 benchmark-range NAT proxy. It is not reachable on a real
+        // device, so permit it only for ranchu/goldfish AVDs; all production
+        // paths retain the public-address-only SSRF boundary.
+        if (isEmulatorNatProxy(address)) return false
         if (address.isAnyLocalAddress || address.isLoopbackAddress ||
             address.isLinkLocalAddress || address.isSiteLocalAddress ||
             address.isMulticastAddress
@@ -144,5 +153,14 @@ internal object SafeRemoteImporter {
             if ((bytes[0].toInt() and 0xfe) == 0xfc) return true
         }
         return false
+    }
+
+    private fun isEmulatorNatProxy(address: InetAddress): Boolean {
+        if (!Build.HARDWARE.contains("ranchu", ignoreCase = true) &&
+            !Build.HARDWARE.contains("goldfish", ignoreCase = true)
+        ) return false
+        val bytes = address.address
+        return bytes.size == 4 && (bytes[0].toInt() and 0xff) == 198 &&
+            (bytes[1].toInt() and 0xff) in 18..19
     }
 }

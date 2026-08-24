@@ -1403,47 +1403,6 @@ object DebugMethodRegistry {
             example = ex("sessionId" to "6D0F…"),
         ),
 
-        // ── Web-remote settings: permission presets ─────────────────────────
-        MethodSpec(
-            name = "settings.permissionPreset.get",
-            description = "Return the Web Remote permission preset (workspace-write | danger-full-access).",
-            params = emptyList(),
-            returns = "{preset, label, danger}",
-            example = ex(),
-        ),
-        MethodSpec(
-            name = "settings.permissionPreset.set",
-            description = "Change the Web Remote permission preset (coarse batch: workspace-write resets all capabilities to defaults, danger-full-access enables all).",
-            params = listOf(
-                ParamSpec("preset", "string", required = true, description = "'workspace-write' or 'danger-full-access'."),
-            ),
-            returns = "{ok:true, preset}",
-            example = ex("preset" to "workspace-write"),
-        ),
-        MethodSpec(
-            name = "settings.capabilities.get",
-            description = "Return the per-capability catalog (stable ids, Chinese labels/descriptions, risk, defaultEnabled, enabled) plus the legacy preset.",
-            params = emptyList(),
-            returns = "{capabilities:[{id,label,description,risk,riskLabel,defaultEnabled,enabled}], preset}",
-            example = ex(),
-        ),
-        MethodSpec(
-            name = "settings.capabilities.set",
-            description = "Flip exactly one capability. When the permission-management capability is off, ALL capability writes are refused — re-enabling it must happen on the phone.",
-            params = listOf(
-                ParamSpec("capability", "string", required = true, description = "Stable capability id from settings.capabilities.get."),
-                ParamSpec("enabled", "bool", required = true, description = "true to enable, false to disable."),
-            ),
-            returns = "{ok:true, capability, enabled}",
-            example = ex("capability" to "device.control", "enabled" to false),
-        ),
-        MethodSpec(
-            name = "settings.sandbox.get",
-            description = "Report the resolved sandbox policy — one owner, one mode, one workspace root — plus the per-capability snapshot.",
-            params = emptyList(),
-            returns = "{owner, mode, workspaceRoot, capabilities:[...]}",
-            example = ex(),
-        ),
     )
 
     private fun encode(method: MethodSpec): JSONObject {

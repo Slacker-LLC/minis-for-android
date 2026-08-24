@@ -6,19 +6,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * root.shell handler contract (T-K1/T-K3 style): the second shell exists,
- * is LOCAL_ONLY (never visible to MCP), and its definition carries the
- * command/timeout parameters.
+ * root.shell handler contract: local-only compatibility name for structured
+ * minisd root.exec, never an arbitrary shell-string interface.
  */
 class RootShellHandlerTest {
 
     @Test
-    fun `root shell is registered with exact name and alias`() {
+    fun `root shell is structured minisd root exec`() {
         val def = RootShellHandler().definition
         assertEquals("root.shell", def.name)
-        assertTrue(def.parameters.containsKey("command"))
-        assertEquals(listOf("command"), def.required)
-        assertTrue(def.description.contains("Root"))
+        assertTrue(def.parameters.containsKey("tool"))
+        assertTrue(def.parameters.containsKey("args"))
+        assertFalse(def.parameters.containsKey("command"))
+        assertEquals(listOf("tool"), def.required)
+        assertTrue(def.description.contains("minisd"))
     }
 
     @Test
@@ -26,6 +27,7 @@ class RootShellHandlerTest {
         val localLevel = ToolPermissionManager.levelFor("root.shell", "local_agent")
         val mcpLevel = ToolPermissionManager.levelFor("root.shell", "mcp:attacker")
         assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, localLevel)
+        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("root.shell"))
         assertFalse(ToolPermissionManager.isDirectlyAllowed("root.shell", "mcp:attacker"))
         // MCP cannot even list it
@@ -38,6 +40,9 @@ class RootShellHandlerTest {
         ToolRegistry.register(RootShellHandler(), aliasNames = listOf("shell_root"))
         assertTrue(ToolRegistry.contains("root.shell"))
         assertTrue(ToolRegistry.contains("shell_root"))
+        assertTrue(
+            com.openminis.app.tools.AgentTools.makeAgentTools().any { it.name == "root.shell" },
+        )
         // alias must never appear in MCP-visible list either
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("shell_root"))
     }

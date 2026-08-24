@@ -157,6 +157,7 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         // --limit is the apple-calendar name; --max kept as alias.
         val limit = args.getInt("limit") ?: args.getInt("max") ?: DEFAULT_LIMIT
         val calFilter = args.get("calendar")
+        val titleFilter = args.get("title-filter", "title_filter")
 
         val projection = arrayOf(
             CalendarContract.Events._ID,
@@ -190,11 +191,13 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
         cursor.use {
             while (it.moveToNext()) {
                 val calName = it.getString(8) ?: ""
+                val title = it.getString(1) ?: ""
                 if (calFilter != null && !calName.contains(calFilter, ignoreCase = true)) continue
+                if (titleFilter != null && !title.contains(titleFilter, ignoreCase = true)) continue
                 matches.put(
                     JSONObject()
                         .put("id", it.getLong(0))
-                        .put("title", it.getString(1) ?: "")
+                        .put("title", title)
                         .put("start", formatIso(it.getLong(2)))
                         .put("start_ms", it.getLong(2))
                         .put("end", formatIso(it.getLong(3)))

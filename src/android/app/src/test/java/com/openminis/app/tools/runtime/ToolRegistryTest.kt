@@ -106,4 +106,17 @@ class ToolRegistryTest {
         )
         assertTrue(ToolPermissionManager.needsConfirm("linux.shell", "mcp:tok1"))
     }
+
+    @Test
+    fun `local agent schema includes runtime handlers without legacy aliases`() {
+        ToolRegistry.register(FakeHandler("android.web.test"))
+        try {
+            assertTrue(
+                com.openminis.app.tools.AgentTools.makeAgentTools()
+                    .any { it.name == "android.web.test" },
+            )
+        } finally {
+            ToolRegistry.unregister("android.web.test")
+        }
+    }
 }

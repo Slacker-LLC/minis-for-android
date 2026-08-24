@@ -152,8 +152,10 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
         context.contentResolver.query(uri, projection, selection, selArgs, "${MediaStore.Images.Media.DATE_TAKEN} DESC")?.use { c ->
             var n = 0
             while (c.moveToNext() && n < max) {
+                val id = c.getLong(0)
                 val p = JSONObject()
-                    .put("id", c.getLong(0))
+                    .put("id", id)
+                    .put("content_uri", ContentUris.withAppendedId(uri, id).toString())
                     .put("name", c.getString(1) ?: "")
                     .put("media_type", kind)
                 val dt = c.getLong(2)

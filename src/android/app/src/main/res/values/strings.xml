@@ -1679,18 +1679,4 @@
     <string name="browser_downloads_open">Open</string>
     <string name="provider_no_key_required">No key required</string>
 
-    <!-- Web Remote -->
-    <string name="remote_access_title">Web Remote</string>
-    <string name="remote_access_settings_subtitle">Control this phone from a browser over LAN or Cloudflare Tunnel</string>
-    <string name="remote_access_enable">Enable Web Remote</string>
-    <string name="remote_access_enable_desc">Runs an authenticated HTTP server on this phone. Disabled by default.</string>
-    <string name="remote_access_address_label">Local address</string>
-    <string name="remote_access_https_note">For Internet access, put this port behind an HTTPS reverse proxy or tunnel. Do not expose raw HTTP directly to the public Internet.</string>
-    <string name="remote_access_port">Listening port</string>
-    <string name="remote_access_apply_port">Apply port</string>
-    <string name="remote_access_token">Access token</string>
-    <string name="remote_access_copy_token">Copy token</string>
-    <string name="remote_access_regenerate_token">Regenerate</string>
-    <string name="remote_access_security_title">Security</string>
-    <string name="remote_access_security_body">Browser access uses username/password and an HttpOnly session cookie. Provider API keys are never exposed; the bearer token is reserved for CLI/automation.</string>
 </resources>

@@ -15,12 +15,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.glass.minisGlassBlurAvailable
+import com.openminis.app.ui.glass.minisGlassScrim
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 
 /**
  * App-wide confirmation dialog. Tighter than the Material 3 default
@@ -54,10 +61,26 @@ fun MinisAlertDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
     ) {
+        // Glass style: dialogs are their own window — platform window blur +
+        // a near-opaque tinted scrim (dialogs need more opacity than sheets
+        // for readability over arbitrary content).
+        GlassSheetWindowBlur(radius = 40.dp)
+        val isGlass = LocalUiStyle.current == UiStyle.GLASS
+        val blurredGlass = isGlass && minisGlassBlurAvailable()
+        val dialogShape = RoundedCornerShape(16.dp)
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+            modifier = if (isGlass && !blurredGlass) {
+                Modifier.glassSheetSurface(dialogShape)
+            } else {
+                Modifier
+            },
+            shape = dialogShape,
+            color = when {
+                blurredGlass -> minisGlassScrim().copy(alpha = 0.85f)
+                isGlass -> Color.Transparent
+                else -> MaterialTheme.colorScheme.surface
+            },
+            tonalElevation = if (isGlass) 0.dp else 6.dp,
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(

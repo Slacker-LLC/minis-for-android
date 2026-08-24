@@ -1534,18 +1534,4 @@
     <string name="model_picker_quick_test">快速测试</string>
     <string name="provider_no_key_required">无需密钥</string>
 
-    <!-- Web Remote -->
-    <string name="remote_access_title">Web 远程控制</string>
-    <string name="remote_access_settings_subtitle">通过局域网或 Cloudflare Tunnel 在浏览器控制这台手机</string>
-    <string name="remote_access_enable">启用 Web 远程控制</string>
-    <string name="remote_access_enable_desc">在手机上运行带认证的 HTTP 服务。默认关闭。</string>
-    <string name="remote_access_address_label">局域网地址</string>
-    <string name="remote_access_https_note">公网访问时请使用 HTTPS 反向代理或隧道转发到此端口，不要把手机的明文 HTTP 端口直接暴露到公网。</string>
-    <string name="remote_access_port">监听端口</string>
-    <string name="remote_access_apply_port">应用端口</string>
-    <string name="remote_access_token">访问 Token</string>
-    <string name="remote_access_copy_token">复制 Token</string>
-    <string name="remote_access_regenerate_token">重新生成</string>
-    <string name="remote_access_security_title">安全说明</string>
-    <string name="remote_access_security_body">浏览器使用用户名和密码登录，随后只保存 HttpOnly 会话 Cookie；模型供应商 API Key 不会下发到网页。备用 Bearer Token 仅供 CLI/自动化使用。</string>
 </resources>

@@ -66,6 +66,16 @@ class MinisdClient(
         timeoutMs + 5_000,
     )
 
+    /** Structured Android-root execution; minisd validates its tool allowlist. */
+    suspend fun rootExec(
+        tool: String,
+        args: List<String> = emptyList(),
+        timeoutMs: Long = 30_000,
+    ): MinisdResponse = call(
+        MinisdProtocol.rootExec(tool, args, timeoutMs, nextId()),
+        timeoutMs + 5_000,
+    )
+
     /** P5/D9: cloudflared 监督权已移交 minisd（supervisor.restartCloudflared）。 */
     suspend fun cloudflaredStart(
         path: String,

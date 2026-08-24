@@ -45,11 +45,15 @@ import com.openminis.app.ui.settings.KEY_KEEP_SCREEN_AWAKE
 import com.openminis.app.ui.settings.KEY_LANGUAGE
 import com.openminis.app.ui.settings.KEY_LAUNCH_SESSION
 import com.openminis.app.ui.settings.KEY_THEME_MODE
+import com.openminis.app.ui.settings.KEY_UI_STYLE
 import com.openminis.app.ui.settings.PREF_APPEARANCE
 import com.openminis.app.ui.settings.getAppearancePrefs
 import com.openminis.app.ui.settings.fontScaleForLevel
 import com.openminis.app.ui.settings.keepScreenAwakeEnabled
+import com.openminis.app.ui.glass.GlassHost
 import com.openminis.app.ui.theme.MinisTheme
+import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.theme.minisPageBackground
 
 private const val KEY_CURRENT_CHAT_SESSION_ID = "minis.current_chat_session_id"
 
@@ -155,18 +159,9 @@ class MainActivity : ComponentActivity() {
         }, 1200L)
     }
 
-    /**
-     * Restore the optional background services once the app is actually in the
-     * foreground.
-     *
-     * MinisApp.onCreate() also tries this, but a cold start driven by the
-     * system leaves the process in a non-TOP state, and Android 12+ rejects a
-     * foreground-service start from there ("mAllowStartForeground false").
-     * By onResume the app is TOP, so the start is always permitted.
-     */
+    /** Restore the user-enabled desktop-pet overlay once the app is foregrounded. */
     override fun onResume() {
         super.onResume()
-        com.openminis.app.remote.RemoteAccessService.startIfEnabled(this)
         com.openminis.app.pet.PetBridge.startIfEnabled(this)
     }
 
@@ -483,11 +478,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Register the screenshot/tap target in EVERY build. The local debug
-        // server (5321) only exists on DEBUG builds, and in RELEASE the only
-        // reachable callers are the Web Remote's opt-in device capabilities
-        // (device.view / device.control, both default-off) — so there is no
-        // extra release surface beyond what the user explicitly enabled.
+        // Register the screenshot/tap target in every build. The local debug
+        // server (5321) only exists on DEBUG builds; normal device control is
+        // gated by the Android tool runtime and user confirmation.
         com.openminis.app.debug.DebugRPCHandler.currentActivity = java.lang.ref.WeakReference(this)
 
         // Non-null and fully initialized — proven by the guard above.
@@ -511,12 +504,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val prefs = remember { getAppearancePrefs(this) }
             var themeMode by remember { mutableIntStateOf(prefs.getInt(KEY_THEME_MODE, 0)) }
+            var uiStyle by remember { mutableIntStateOf(prefs.getInt(KEY_UI_STYLE, 0)) }
             var appBaseLevel by remember { mutableIntStateOf(prefs.getInt(KEY_FONT_APP_BASE, 0)) }
 
             DisposableEffect(prefs) {
                 val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
                     when (key) {
                         KEY_THEME_MODE -> themeMode = sp.getInt(KEY_THEME_MODE, 0)
+                        KEY_UI_STYLE -> uiStyle = sp.getInt(KEY_UI_STYLE, 0)
                         KEY_FONT_APP_BASE -> appBaseLevel = sp.getInt(KEY_FONT_APP_BASE, 0)
                         KEY_KEEP_SCREEN_AWAKE -> applyKeepScreenAwakeFlag(
                             SessionActivityTracker.activeSessions.value.isNotEmpty()
@@ -554,8 +549,13 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
             }
 
-            MinisTheme(darkTheme = darkTheme, fontScale = fontScale) {
-                val navController = rememberNavController().also { this.navController = it }
+            MinisTheme(
+                darkTheme = darkTheme,
+                fontScale = fontScale,
+                uiStyle = if (uiStyle == 1) UiStyle.GLASS else UiStyle.CLASSIC,
+            ) {
+                GlassHost(backgroundColor = minisPageBackground(darkTheme)) {
+                    val navController = rememberNavController().also { this.navController = it }
 
                 // T166: drive `SessionActivityTracker.setPresent` /
                 // `setAbsent` from the nav back-stack so the foreground
@@ -604,6 +604,7 @@ class MainActivity : ComponentActivity() {
                 // agent triggers a change. Mirrors iOS MinisApp.swift
                 // root-level `.sheet(item: gate.pending)`.
                 com.openminis.app.ui.settings.ConfigConfirmDialogHost()
+                }
             }
         }
     }
@@ -664,9 +665,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         currentChatSessionId?.let { SessionActivityTracker.setAbsent(it) }
         currentChatSessionId = null
-        // Release the screenshot/tap target on every build: the Web Remote's
-        // device.view / device.control capabilities are user-enabled gates,
-        // and a stale WeakReference would read a destroyed window.
+        // Release the screenshot/tap target so no caller can read a destroyed window.
         val handler = com.openminis.app.debug.DebugRPCHandler.currentActivity
         if (handler?.get() === this) com.openminis.app.debug.DebugRPCHandler.currentActivity = null
         super.onDestroy()

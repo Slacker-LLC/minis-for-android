@@ -50,7 +50,8 @@ android {
         )
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            // Development target: API 34 x86_64 emulator; keep arm64-v8a for device builds.
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
 
         externalNativeBuild {
@@ -181,6 +182,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Vendored com.kyant.backdrop uses @Language("AGSL") from JetBrains annotations
+    implementation("org.jetbrains:annotations:26.1.0")
 
     // Core
     implementation("androidx.core:core-ktx:1.15.0")

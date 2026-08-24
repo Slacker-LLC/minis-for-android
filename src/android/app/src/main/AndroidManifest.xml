@@ -8,6 +8,7 @@
          apps" for this package the first time they upgrade. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- T-android-fgs-timeout-crash: switched from dataSync to mediaPlayback.
@@ -46,6 +47,18 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Special access: user grants this in Settings; never auto-escalated. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- Android 13+: nearby Wi-Fi is a runtime permission. Fine location stays
+         declared because scan results can reveal physical location. -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- Android 12+: paired-device metadata and scans are runtime-gated. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -53,6 +66,9 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- T36: WRITE_CONTACTS — required by `android-contacts delete <id>`. -->
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- P10 Gate 3b: android.sms.read / android.call_log.read (runtime-gated). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
@@ -452,13 +468,6 @@
              permission comment above. -->
         <service
             android:name=".service.AgentForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
-
-        <!-- User-enabled Web Remote server. Reuses the same long-running FGS
-             type as AgentForegroundService; Minis is distributed by sideload. -->
-        <service
-            android:name=".remote.RemoteAccessService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 

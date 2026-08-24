@@ -9,6 +9,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -134,6 +135,19 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = NeutralDarkOutline,
 )
 
+// The page background painted into the GlassHost backdrop layer. Must stay
+// in sync with Theme.kt's NeutralGroupedBg / NeutralDarkGroupedBg (which are
+// private to Theme.kt).
+fun minisPageBackground(darkTheme: Boolean): Color =
+    if (darkTheme) Color(0xFF000000) else Color(0xFFF2F2F7)
+
+// Two parallel UI styles, switchable live in 设置 → 外观. Both share the same
+// palette and shapes; the difference lives in the surface treatment (glass
+// components sample the GlassHost backdrop instead of painting flat surfaces).
+enum class UiStyle { CLASSIC, GLASS }
+
+val LocalUiStyle = staticCompositionLocalOf { UiStyle.CLASSIC }
+
 // App-wide FAB accent color (warm beige, matching iOS New Chat button).
 // Reads from ChatPalette so it follows the in-app theme override (theme_mode pref),
 // not android.isSystemInDarkTheme(), which only tracks the system setting.
@@ -154,6 +168,7 @@ private val MinisShapes = Shapes(
 fun MinisTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     fontScale: Float = 1f,
+    uiStyle: UiStyle = UiStyle.CLASSIC,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -165,7 +180,11 @@ fun MinisTheme(
         shapes = MinisShapes,
         typography = typography,
     ) {
-        CompositionLocalProvider(LocalChatPalette provides chatPalette, content = content)
+        CompositionLocalProvider(
+            LocalChatPalette provides chatPalette,
+            LocalUiStyle provides uiStyle,
+            content = content,
+        )
     }
 }
 

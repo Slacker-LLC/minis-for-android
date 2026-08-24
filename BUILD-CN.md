@@ -62,24 +62,7 @@ cargo build --release --target aarch64-unknown-linux-musl \
 - PRoot/Alpine 依赖(P2 已拆除)不再需要:`deps/build_proot.sh` 与
   `scripts/prepare_android_sandbox.sh` 已随 P2 移除。
 
-## 4. 构建 Minis Web Client Plugin
-
-「Minis 控制台」是正式 DeepSeek Harness Client Plugin;源码在 `web/minis-client-plugin/`,
-生成的 `client.js` 随 APK assets 分发。
-
-```bash
-cd web/minis-client-plugin
-npm install
-npm run check    # tsc --noEmit
-npm test         # vitest
-npm run build    # 生成 plugins/@openminis/minis-client-settings/client.js
-                 # 并更新 assets/minis/index.html 的 boot graph
-```
-
-`npm run build` 是更新浏览器 bundle 与 boot graph 的唯一受支持方式;禁止手工修改生成的
-`client.js` 或 `__MINIS_BOOT__` JSON。
-
-## 5. 构建 APK
+## 4. 构建 APK
 
 ```bash
 cd src/android
@@ -88,7 +71,7 @@ cd src/android
 
 输出:`src/android/app/build/outputs/apk/debug/app-debug.apk`
 
-安装到已连接的 arm64 设备:
+安装到已连接的设备:
 
 ```bash
 ./gradlew :app:installDebug
@@ -96,13 +79,11 @@ cd src/android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 6. 测试
+## 5. 测试
 
 ```bash
 cd src/android
-./gradlew :app:testDebugUnitTest \
-  --tests com.openminis.app.remote.DshApiAdapterTest \
-  --tests com.openminis.app.data.UpdateCheckerVersionTest
+./gradlew :app:testDebugUnitTest
 
 ./gradlew :app:assembleDebugAndroidTest
 ```

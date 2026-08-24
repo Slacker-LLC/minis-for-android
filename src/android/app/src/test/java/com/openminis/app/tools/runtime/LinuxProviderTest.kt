@@ -41,6 +41,22 @@ class LinuxProviderTest {
     }
 
     @Test
+    fun `workspace file tools pass through when Ubuntu is unavailable`() = runBlocking {
+        val provider = LinuxProvider(available = { false })
+        val nextCalled = AtomicBoolean(false)
+        val result = provider.execute(
+            toolName = "linux.file.list",
+            argsJson = "{}",
+            sessionId = "sid",
+            context = TestContext.dummy(),
+            toolId = "t-file",
+            next = { nextCalled.set(true); anyResult },
+        )
+        assertTrue(nextCalled.get())
+        assertEquals(anyResult, result)
+    }
+
+    @Test
     fun `available passes through next result unchanged`() = runBlocking {
         val provider = LinuxProvider(available = { true })
         val nextCalled = AtomicBoolean(false)

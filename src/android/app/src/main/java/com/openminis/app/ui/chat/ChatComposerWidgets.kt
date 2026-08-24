@@ -271,7 +271,10 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.browser.BrowserSheet
+import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -835,8 +838,19 @@ internal fun FloatingToolStatusBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 .align(Alignment.BottomCenter)
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp), ambientColor = Color.Black.copy(alpha = 0.06f), spotColor = Color.Black.copy(alpha = 0.12f))
-                .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
+                .then(
+                    // Glass style: this bar genuinely floats over the message
+                    // list, so the backdrop sampling shows real blur. Classic
+                    // keeps the flat fill + soft shadow.
+                    if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
+                        shape = RoundedCornerShape(10.dp),
+                        glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.5f),
+                        fallbackScrim = ChatColors.inputBg,
+                        blurRadius = 14.dp,
+                        refraction = 12.dp,
+                    ) else Modifier.shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp), ambientColor = Color.Black.copy(alpha = 0.06f), spotColor = Color.Black.copy(alpha = 0.12f))
+                        .background(ChatColors.inputBg, RoundedCornerShape(10.dp)),
+                )
                 .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp))
                 .padding(start = barStartPadding, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

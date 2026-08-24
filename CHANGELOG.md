@@ -28,6 +28,16 @@
 - RemoteAccessServer（Web Remote 停用，RemoteAccessService no-op）；
 - Shizuku 后端（PrivilegedCommandRunner 永不选 SHIZUKU）。
 
+### 更新（2026-08-24）
+
+- **Web Remote 全面删除**：Settings 入口/路由、Cloudflare Tunnel 管理（Token/密码
+  prefs、cloudflared supervisor 调用、`RemoteAccessService` 前台服务与 manifest
+  声明）、`RemoteCapabilityCatalog`/`RemotePermissionPolicy`/`SettingsRpcMethods`、
+  `assets/remote/` 静态 bundle 与 `web/minis-client-plugin` 源码、相关文档与测试；
+- 远程面收敛为 MCP Server（`127.0.0.1:18789`）+ 本地 DebugServer（DEBUG, 5321）；
+- `ToolPermissionManager` LOCAL_ONLY 语义修正：本地 Agent 可用、MCP 不可见；
+  `root.shell` 进入本地 Agent schema。
+
 ### 质量
 
 - App 全量 947 测试 / 14 OpenAI 环境基线零回归；minisd 47 cargo 测试绿；

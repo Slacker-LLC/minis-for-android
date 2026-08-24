@@ -461,6 +461,49 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.runtime.RootShellHandler(),
             aliasNames = listOf("shell_root"),
         )
+        // P10: linux.file.* ops (host-side workspace, bind-visible to guest)
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileAppendHandler(), listOf("append_file"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileCopyHandler(), listOf("copy_file"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileMoveHandler(), listOf("move_file"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileDeleteHandler(), listOf("delete_file"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileListHandler(), listOf("list_files"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileSearchHandler(), listOf("search_files"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileGrepHandler(), listOf("file_grep"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileHeadTailHandler(), listOf("file_head_tail"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileInfoHandler(), listOf("file_info"))
+        // P10: android.* system tools (standard APIs, no root)
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWebSearchHandler(), listOf("web_search"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidUrlFetchHandler(), listOf("url_fetch"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCalendarReadHandler(), listOf("read_calendar"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCalendarCreateHandler(), listOf("create_calendar_event"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCalendarUpdateHandler(), listOf("update_calendar_event"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCalendarDeleteHandler(), listOf("delete_calendar_event"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidContactsSearchHandler(), listOf("search_contacts"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidContactsManageHandler(), listOf("manage_contacts"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidLocationHandler(), listOf("get_location"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidClipboardHandler(), listOf("clipboard"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTimeHandler(), listOf("get_current_time"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSendIntentHandler(), listOf("send_intent"))
+        // P10 Gate 3b: standard API Wi-Fi/Bluetooth read-only queries.
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWifiInfoHandler(), listOf("wifi_info"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWifiScanHandler(), listOf("list_wifi_networks"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothStatusHandler(), listOf("bluetooth_status"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothPairedHandler(), listOf("bluetooth_paired_devices"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothScanHandler(), listOf("bluetooth_scan"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTtsVoicesHandler(), listOf("list_tts_voices"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTtsVoiceHandler(), listOf("set_tts_voice"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTtsEnabledHandler(), listOf("set_tts_enabled"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidMediaImagesHandler(), listOf("list_media_images"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidAppUsageHandler(), listOf("app_usage"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidMediaInfoHandler(), listOf("get_media_info"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidMediaControlHandler(), listOf("control_media"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWeatherHandler(), listOf("get_weather"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidDialHandler(), listOf("dial_phone"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSettingsGetHandler(), listOf("system.get_setting"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSettingsSetHandler(), listOf("system.set_setting"))
+        // P10 Gate 3b: telephony read-only (SMS/Call Log).
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSmsReadHandler(), listOf("read_sms"))
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCallLogReadHandler(), listOf("read_call_log"))
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.LinuxFileReadHandler(),
             aliasNames = listOf("file_read"),
@@ -689,11 +732,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         SessionActivityTracker.init(this)
         // OpenMinis Pet fork: restore the optional overlay after process recreation.
         PetBridge.startIfEnabled(this)
-        // P6: Web Remote 下线 — auto-start 停用（startIfEnabled 已改为 no-op）。
-        // Same rationale for Web Remote: without this the tunnel stays down
-        // after a reboot until someone opens Settings and toggles it by hand.
-        // com.openminis.app.remote.RemoteAccessService.startIfEnabled(this)
-
         // [T-android-mcp-server] MCP server lifecycle gate. init() only reads
         // the token-configured flag and honors the mcp_server_enabled boot
         // pref (default false) — never auto-starts otherwise.

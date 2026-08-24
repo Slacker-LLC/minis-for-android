@@ -55,26 +55,33 @@ object UbuntuPaths {
         File(hostShared).mkdirs()
     }
 
+    /** Resolves a child only when its canonical target remains below [base]. */
+    private fun childOf(base: String, rest: String): File? = runCatching {
+        val root = File(base).canonicalFile
+        val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
+        if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null
+    }.getOrNull()
+
+    private fun unsafePath(path: String): Boolean =
+        path.isEmpty() || path.contains('\u0000') || path.split('/').any { it == ".." }
+
     fun resolveGuest(linuxPath: String): File? {
-        if (linuxPath.isEmpty() || linuxPath.contains('\u0000') || linuxPath.contains("..")) {
-            return null
-        }
+        if (unsafePath(linuxPath)) return null
         val match = aliases
             .filter { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
             .maxByOrNull { it.first.length }
             ?: return null
-        val rest = linuxPath.removePrefix(match.first).removePrefix("/")
-        return if (rest.isEmpty()) File(match.second()) else File(match.second(), rest)
+        return childOf(match.second(), linuxPath.removePrefix(match.first).removePrefix("/"))
     }
 
     fun resolveHostPath(linuxPath: String): File? {
+        if (unsafePath(linuxPath)) return null
         resolveGuest(linuxPath)?.let { return it }
         val sorted = bindMounts.keys.sortedByDescending { it.length }
         for (mount in sorted) {
             if (linuxPath == mount || linuxPath.startsWith("$mount/")) {
                 val hostBase = bindMounts[mount] ?: continue
-                val rest = linuxPath.removePrefix(mount).removePrefix("/")
-                return if (rest.isEmpty()) File(hostBase) else File(hostBase, rest)
+                return childOf(hostBase, linuxPath.removePrefix(mount).removePrefix("/"))
             }
         }
         return null

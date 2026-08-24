@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
  *     caller reads defaults. This is intentionally NOT a plain-text
  *     SharedPreferences: credential material is never written to disk
  *     unencrypted, and the security-sensitive feature that depends on
- *     the store (e.g. Web Remote login) simply reports "not configured"
+ *     the store simply reports "not configured"
  *     and refuses to start. All callers of safeCreate hold credentials
  *     (provider API keys, OAuth tokens, remote-control secrets), so a
  *     plaintext fallback would hand every one of them to anything that

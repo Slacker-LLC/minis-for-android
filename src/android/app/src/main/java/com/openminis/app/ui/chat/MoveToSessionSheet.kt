@@ -56,6 +56,10 @@ import android.content.Context
 import com.openminis.app.R
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.ChatRepository
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -91,8 +95,13 @@ fun MoveToSessionSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+    ) {
+        GlassSheetWindowBlur()
+        Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 16.dp)) {
             Text(
                 stringResource(R.string.move_to_sheet_title),
                 style = MaterialTheme.typography.titleMedium,

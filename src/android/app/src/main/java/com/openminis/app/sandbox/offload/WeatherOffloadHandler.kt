@@ -62,9 +62,13 @@ class WeatherOffloadHandler(private val context: Context) : NativeOffloadHandler
 
         val maxHours = (args.getInt("hours") ?: 24).coerceIn(1, 48)
         val maxDays = (args.getInt("days") ?: 7).coerceIn(1, 10)
+        val units = (args.get("units") ?: "metric").lowercase()
+        if (units !in setOf("metric", "imperial")) {
+            return NativeOffloadResult(2, "android-weather: --units must be metric|imperial\n")
+        }
 
         val json = try {
-            WeatherManager.fetchWeatherJson(lat, lon)
+            WeatherManager.fetchWeatherJson(lat, lon, units)
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "fetchWeatherJson uncaught: ${e.message}")
             null

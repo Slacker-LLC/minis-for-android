@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 
 /**
  * App-wide popup menu with a unified look: softer rounded corners, a lifted
@@ -110,6 +112,10 @@ fun MinisMenu(
     // immediately on expanded=false, so this is an enter-only animation — the
     // dismiss is instant, matching the prior alignEnd behaviour.
     if (!expanded) return
+    // Glass style: popups live in a separate window and can't sample the
+    // GlassHost backdrop, so instead of blur we slightly translucify the
+    // container — a hint of glass without the broken sampling.
+    val isGlass = LocalUiStyle.current == UiStyle.GLASS
     val density = LocalDensity.current
     val offsetXPx = with(density) { offset.x.roundToPx() }
     val offsetYPx = with(density) { offset.y.roundToPx() }
@@ -186,7 +192,7 @@ fun MinisMenu(
                         spotColor = Color.Black.copy(alpha = 0.35f),
                     ),
                 shape = shape,
-                color = containerColor,
+                color = if (isGlass) containerColor.copy(alpha = 0.92f) else containerColor,
                 tonalElevation = tonalElevation,
                 shadowElevation = 0.dp,
                 border = border,

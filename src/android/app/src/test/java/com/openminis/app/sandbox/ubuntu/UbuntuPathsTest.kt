@@ -3,6 +3,7 @@ package com.openminis.app.sandbox.ubuntu
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.nio.file.Files
 
 class UbuntuPathsTest {
     @Test
@@ -39,5 +40,20 @@ class UbuntuPathsTest {
         assertNull(UbuntuPaths.resolveGuest("/workspace/../policy"))
         assertNull(UbuntuPaths.resolveGuest("/etc/passwd"))
         assertNull(UbuntuPaths.resolveGuest("/data/adb/minis/policy/x"))
+    }
+
+    @Test
+    fun `bind mount symlink cannot escape its host root`() {
+        val root = Files.createTempDirectory("minis-path-root")
+        val outside = Files.createTempDirectory("minis-path-outside")
+        Files.createSymbolicLink(root.resolve("escape"), outside)
+        UbuntuPaths.bindMounts["/mnt/test"] = root.toString()
+        try {
+            assertNull(UbuntuPaths.resolveHostPath("/mnt/test/escape/secret.txt"))
+        } finally {
+            UbuntuPaths.bindMounts.remove("/mnt/test")
+            root.toFile().deleteRecursively()
+            outside.toFile().deleteRecursively()
+        }
     }
 }

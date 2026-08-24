@@ -270,7 +270,11 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.browser.BrowserSheet
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -295,13 +299,18 @@ internal fun ToolDetailSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = null,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
         contentWindowInsets = { WindowInsets(0) },
     ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
-                .background(ChatColors.secondaryBg),
+                .then(
+                    if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSheetSurface()
+                    else Modifier.background(ChatColors.secondaryBg),
+                ),
         ) {
             // ── Top Nav Bar (iOS: X button + "Minis Computer" + action button) ──
             Row(

@@ -272,7 +272,11 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.browser.BrowserSheet
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
 
 /**
@@ -386,6 +390,7 @@ internal fun ModelPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
         // Match the slim drag handle used by StandardChatSheet (6dp top / 4dp
         // bottom) so the title sits flush with the indicator instead of the
         // Material default's ~44dp whitespace gap above it.
@@ -408,10 +413,12 @@ internal fun ModelPickerSheet(
             }
         },
     ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.9f)
+                .glassSheetSurface()
                 // [T-android-model-picker-polish] navigationBarsPadding ALONE.
                 //
                 // This also carried a fixed `padding(bottom = 32.dp)`, so the

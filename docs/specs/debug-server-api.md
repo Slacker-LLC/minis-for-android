@@ -2,7 +2,7 @@
 
 > **混合平台参考。** 前半部分仍包含 iOS `localhost:8321` 与 UIKit 契约;Android
 > DebugServer 使用 token 认证。端口、方法和字段应以当前源码、运行时 `rpc.discover`
-> 及 [`../WEB-REMOTE-RPC.md`](../WEB-REMOTE-RPC.md) 的安全边界为准。
+> 为准。
 
 MinisApp includes a built-in JSON-RPC 2.0 debug server (DEBUG builds only) for runtime view inspection.
 
@@ -1770,31 +1770,7 @@ print('Saved screenshot.png')
 
 These families are registered by `DebugRPCHandler` on the Android build
 (`app/src/main/java/com/openminis/app/debug/`). They are reachable on the local
-debug server, and — with the exception of `soul.save` and `memory.files.write`
-being gated by the same whitelist rules below — through the Web Remote
-`/api/rpc` proxy.
-
-### Web Remote whitelist
-
-The Web Remote RPC proxy (`RemoteAccessServer.RPC_ALLOWED_PREFIXES`) only
-forwards these method prefixes:
-
-```text
-provider.    chat.        rpc.discover
-skills.      memory.      soul.
-mcp.         scheduled.
-debug.logs.  debug.crash. debug.appInfo
-```
-
-Everything else under `debug.*` — `debug.tap`, `debug.inputText`,
-`debug.screenshot`, `debug.writeFile`, and friends — is blocked on the Web
-surface because the page may be reachable through a public Cloudflare Tunnel.
-Use the local `127.0.0.1:5321` debug port for those methods.
-
-`soul.save` and `memory.files.write` modify files that the Agent reads on every
-run; they are intentionally included so remote users can manage their pet's
-memory, but they are subject to the same login/password requirement as every
-other Web Remote call.
+debug server only (Web Remote `/api/rpc` proxy was removed in 2026-08).
 
 ### Skills (`skills.*`)
 
@@ -2062,13 +2038,13 @@ the outcome.
 
 **Errors:** `-32602` when the task is not found.
 
-### Security notes for the Web surface
+### Security notes for the local RPC surface
 
 - Credential material (API keys, OAuth tokens) is **never** returned by any of
   these methods — the same write-only rule as the rest of the RPC surface.
 - `memory.files.write`, `soul.save`, and `scheduled.run` mutate state or launch
-  Agent work; they are only reachable after the Web Remote login (PBKDF2 +
-  HttpOnly session cookie).
+  Agent work; they are reachable only on the local debug server (DEBUG builds)
+  and are gated by the debug token.
 - Memory file names are validated against `/` and `..` before any read/write/
   delete to prevent path traversal.
 

@@ -46,7 +46,6 @@ import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
@@ -71,6 +70,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -131,8 +134,6 @@ fun SettingsScreen(
     // OEM autostart guidance). Default no-op so older callers/tests
     // don't need to be retrofitted.
     onBackgroundClick: () -> Unit = {},
-    // Production Web Remote control (disabled by default).
-    onRemoteAccessClick: () -> Unit = {},
     // Hook accepted for forward-compat with AppNavigation's About route. The
     // About row below still has a TODO onClick in HEAD; future settings-bucket
     // work will wire this through.
@@ -321,14 +322,6 @@ fun SettingsScreen(
                     subtitle = stringResource(R.string.settings_env_vars_subtitle),
                     onClick = onEnvVarsClick,
                 )
-                SettingsItem(
-                    icon = Icons.Outlined.Language,
-                    iconColor = Color(0xFF30B0C7),
-                    title = stringResource(R.string.remote_access_title),
-                    subtitle = stringResource(R.string.remote_access_settings_subtitle),
-                    onClick = onRemoteAccessClick,
-                    showDivider = false,
-                )
             }
 
             // -- Storage --
@@ -428,8 +421,12 @@ fun SettingsScreen(
     }
 
     if (showFeedbackSheet) {
-        ModalBottomSheet(onDismissRequest = { showFeedbackSheet = false }) {
-            Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        ModalBottomSheet(
+            onDismissRequest = { showFeedbackSheet = false },
+            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        ) {
+            GlassSheetWindowBlur()
+            Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 24.dp)) {
                 FeedbackSheetItem(
                     icon = Icons.Outlined.BugReport,
                     title = stringResource(R.string.settings_submit_github_issues),

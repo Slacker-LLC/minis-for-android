@@ -28,6 +28,10 @@ class MCPServerTest {
         TokenStore.setInMemoryForTest(
             listOf(TokenStore.Token(id = "t1", token = "secret-token")),
         )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.runtime.LinuxShellHandler(),
+            aliasNames = listOf("shell_execute"),
+        )
         server = MCPServer(null, port).also { it.start() }
         // wait for bind
         var attempts = 0
@@ -40,6 +44,7 @@ class MCPServerTest {
     @After
     fun tearDown() {
         server?.stop()
+        com.openminis.app.tools.runtime.ToolRegistry.unregister("linux.shell")
         TokenStore.setInMemoryForTest(emptyList())
     }
 
@@ -102,6 +107,14 @@ class MCPServerTest {
         assertFalse(text.contains("confirm_required"))
         assertFalse(text.contains("-32001"))
         assertTrue(text.contains("ubuntu_runtime_unavailable"))
+    }
+
+    @Test
+    fun `legacy alias uses canonical policy before MCP gate`() {
+        val body = """{"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"shell_execute","arguments":{"cmd":"echo hi"}}}"""
+        val text = post(body, token = "secret-token").body!!.string()
+        assertTrue(text.contains("ubuntu_runtime_unavailable"))
+        assertFalse(text.contains("permission_denied"))
     }
 
     @Test

@@ -282,7 +282,12 @@ import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.tools.AgentStateStore
 import com.openminis.app.ui.browser.BrowserSheet
+import com.openminis.app.ui.glass.GlassSheetWindowBlur
+import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalUiStyle
+import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
 
 // iOS ChatColors equivalent
@@ -4188,10 +4193,18 @@ fun ChatScreen(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 12.dp, bottom = upBaseBottom + 46.dp)
-                            .shadow(4.dp, CircleShape)
+                            .then(
+                                if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
+                                    shape = CircleShape,
+                                    glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.5f),
+                                    fallbackScrim = ChatColors.inputBg,
+                                    blurRadius = 16.dp,
+                                    refraction = 12.dp,
+                                ) else Modifier.shadow(4.dp, CircleShape),
+                            )
                             .size(36.dp),
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                            containerColor = ChatColors.inputBg,
+                            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.inputBg,
                             contentColor = ChatColors.primaryText,
                         ),
                     ) {
@@ -4240,10 +4253,18 @@ fun ChatScreen(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 12.dp, bottom = fabBottomPadding)
-                            .shadow(4.dp, CircleShape)
+                            .then(
+                                if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
+                                    shape = CircleShape,
+                                    glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.5f),
+                                    fallbackScrim = ChatColors.inputBg,
+                                    blurRadius = 16.dp,
+                                    refraction = 12.dp,
+                                ) else Modifier.shadow(4.dp, CircleShape),
+                            )
                             .size(36.dp),
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                            containerColor = ChatColors.inputBg,
+                            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.inputBg,
                             contentColor = ChatColors.primaryText,
                         ),
                     ) {
@@ -4776,30 +4797,41 @@ fun ChatScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .drawBehind {
-                            val radiusPx = 20.dp.toPx()
-                            val canvas = drawContext.canvas.nativeCanvas
-                            // Pass 1: symmetric ambient halo — small blur, low alpha.
-                            shadowPaint.setShadowLayer(
-                                6.dp.toPx(), 0f, 0f,
-                                android.graphics.Color.argb(22, 0, 0, 0),
-                            )
-                            canvas.drawRoundRect(
-                                0f, 0f, size.width, size.height,
-                                radiusPx, radiusPx,
-                                shadowPaint,
-                            )
-                            // Pass 2: soft downward shadow (spot light).
-                            shadowPaint.setShadowLayer(
-                                10.dp.toPx(), 0f, 3.dp.toPx(),
-                                android.graphics.Color.argb(24, 0, 0, 0),
-                            )
-                            canvas.drawRoundRect(
-                                0f, 0f, size.width, size.height,
-                                radiusPx, radiusPx,
-                                shadowPaint,
-                            )
-                        }
+                        .then(
+                            // Glass style: the card fill + symmetric shadow are
+                            // replaced by the liquid-glass surface (blur samples
+                            // the GlassHost backdrop; the library paints its own
+                            // subtle shadow + inner shadow). Classic style keeps
+                            // the hand-painted two-pass shadow untouched.
+                            if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
+                                shape = RoundedCornerShape(20.dp),
+                                glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.55f),
+                                fallbackScrim = ChatColors.inputBg,
+                            ) else Modifier.drawBehind {
+                                val radiusPx = 20.dp.toPx()
+                                val canvas = drawContext.canvas.nativeCanvas
+                                // Pass 1: symmetric ambient halo — small blur, low alpha.
+                                shadowPaint.setShadowLayer(
+                                    6.dp.toPx(), 0f, 0f,
+                                    android.graphics.Color.argb(22, 0, 0, 0),
+                                )
+                                canvas.drawRoundRect(
+                                    0f, 0f, size.width, size.height,
+                                    radiusPx, radiusPx,
+                                    shadowPaint,
+                                )
+                                // Pass 2: soft downward shadow (spot light).
+                                shadowPaint.setShadowLayer(
+                                    10.dp.toPx(), 0f, 3.dp.toPx(),
+                                    android.graphics.Color.argb(24, 0, 0, 0),
+                                )
+                                canvas.drawRoundRect(
+                                    0f, 0f, size.width, size.height,
+                                    radiusPx, radiusPx,
+                                    shadowPaint,
+                                )
+                            },
+                        )
                         .padding(top = if (attachments.isNotEmpty()) 8.dp else 4.dp),
                 ) {
                     // T185: Move-to capsule lives INSIDE the composer card,
@@ -6571,8 +6603,12 @@ private fun ThinkingLevelSheet(
         listOf(com.openminis.app.data.model.ThinkingLevel.OFF) +
             availableLevels.filter { it != com.openminis.app.data.model.ThinkingLevel.OFF }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+    ) {
+        GlassSheetWindowBlur()
+        Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 12.dp)) {
             Text(
                 text = stringResource(R.string.thinking_level_sheet_title),
                 fontSize = 16.sp,

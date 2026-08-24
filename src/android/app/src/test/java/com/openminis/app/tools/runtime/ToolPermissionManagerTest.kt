@@ -126,10 +126,10 @@ class ToolPermissionManagerTest {
     }
 
     @Test
-    fun `local caller bypasses mcp restrictions`() {
+    fun `local caller can use local only tools while mcp cannot`() {
         assertTrue(ToolPermissionManager.isAllowedFor("android.logs.clear", "local_agent"))
-        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent") || ToolPermissionManager.levelFor("root.shell", "local_agent") == ToolPermissionManager.Level.LOCAL_ONLY)
-        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
+        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
+        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "mcp:tok1"))
     }
 
     @Test
@@ -174,6 +174,17 @@ class ToolPermissionManagerTest {
         assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor("agent.ralph", "mcp:tok1"))
         assertFalse(ToolPermissionManager.isAllowedFor("agent.ralph", "mcp:tok1"))
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("agent.ralph"))
+    }
+
+    @Test
+    fun `new privacy tools require mcp confirmation`() {
+        for (tool in listOf(
+            "android.calendar.read", "android.contacts.search", "android.location.get",
+            "android.wifi.info", "android.wifi.scan", "android.bluetooth.status",
+            "android.app.usage", "android.media.images", "android.media.info",
+        )) {
+            assertEquals(ToolPermissionManager.Level.MCP_CONFIRM, ToolPermissionManager.levelFor(tool, "mcp:tok1"))
+        }
     }
 
     @Test

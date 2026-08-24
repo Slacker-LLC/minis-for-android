@@ -56,6 +56,19 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `root exec is structured and has no shell command`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.rootExec("getprop", listOf("ro.build.version.sdk"), 12_000, id = 8),
+        )
+        val obj = JSONObject(raw)
+        assertEquals("root.exec", obj.getString("method"))
+        val params = obj.getJSONObject("params")
+        assertEquals("getprop", params.getString("tool"))
+        assertEquals("ro.build.version.sdk", params.getJSONArray("args").getString(0))
+        assertFalse(params.has("command"))
+    }
+
+    @Test
     fun `admin exec carries confirm_id`() {
         val raw = MinisdProtocol.encodeRequest(
             MinisdProtocol.ubuntuAdminExec(listOf("/usr/bin/apt-get", "update"), confirmId = "c-1"),

@@ -65,6 +65,18 @@ object AgentTools {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
         }
+        // ToolRegistry owns runtime schemas. Legacy tools above already expose
+        // aliases such as shell_execute/file_read/android_logs; add only the
+        // remaining canonical handlers so new capabilities are visible to the
+        // local agent without maintaining a second definition registry.
+        val legacyCanonicals = mapNotNull {
+            com.openminis.app.tools.runtime.ToolRegistry.canonicalName(it.name)
+        }.toSet()
+        addAll(
+            com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
+                it.name !in legacyCanonicals
+            },
+        )
     }
 
     // Aligned with iOS AIChatViewModel.swift:4982-4993

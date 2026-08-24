@@ -54,14 +54,6 @@ class AlarmReceiver : BroadcastReceiver() {
             } catch (t: Throwable) {
                 AppLogger.warning(TAG, "scheduled-task rescheduleAll failed: ${t.message}")
             }
-            // Web Remote is the one feature whose whole point is being reachable
-            // while nobody is holding the phone, so it has to survive a reboot
-            // without someone opening the app first.
-            try {
-                com.openminis.app.remote.RemoteAccessService.startIfEnabled(context)
-            } catch (t: Throwable) {
-                AppLogger.warning(TAG, "web remote restore failed: ${t.message}")
-            }
             // The floating pet is a foreground overlay the user enabled; bring
             // it back on boot too (startIfEnabled is a no-op when disabled).
             // Wrapped: OEM ROMs may reject the background FGS start, and the

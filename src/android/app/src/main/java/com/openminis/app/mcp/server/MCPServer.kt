@@ -235,24 +235,27 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         if (name.isEmpty()) {
             return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_PARAMS, "Missing tool name")
         }
+        // Aliases are a compatibility input surface only; policy, scope,
+        // confirmation, and execution must all operate on one canonical name.
+        val canonicalName = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name) ?: name
 
         // D8 gate: level + token scope
         if (!com.openminis.app.tools.runtime.ToolPermissionManager.tokenCanCall(
-                name, caller, tokenRecord.scope,
+                canonicalName, caller, tokenRecord.scope,
                 com.openminis.app.tools.runtime.ToolPermissionManager.Level.MCP_CONFIRM,
             )
         ) {
             return MCPCodec.errorResponse(
                 req.id, MCPCodec.INVALID_REQUEST,
-                "permission_denied: $name",
+                "permission_denied: $canonicalName",
             )
         }
 
         // A5: liveness first — a dead Ubuntu runtime answers immediately
         // without burning a user confirmation (ACC-T-02 semantics).
-        if (name.startsWith("linux.") && !MCPServerManager.linuxToolsAvailable()) {
+        if (canonicalName.startsWith("linux.") && !canonicalName.startsWith("linux.file.") && !MCPServerManager.linuxToolsAvailable()) {
             val err = com.openminis.app.tools.ToolExecutionResult(
-                output = "Error: ubuntu_runtime_unavailable: $name",
+                output = "Error: ubuntu_runtime_unavailable: $canonicalName",
                 success = false,
             )
             return MCPCodec.response(req.id, MCPCodec.toolResult(err.output, isError = true))
@@ -262,17 +265,17 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         // On issue, post the phone notification with 批准/拒绝 actions so the
         // user can answer without foregrounding the app (McpConfirmNotifier).
         var confirmConsumed = false
-        if (com.openminis.app.tools.runtime.ToolPermissionManager.needsConfirm(name, caller)) {
+        if (com.openminis.app.tools.runtime.ToolPermissionManager.needsConfirm(canonicalName, caller)) {
             val confirmId = params.optString("confirm_id")
             if (confirmId.isEmpty()) {
-                val id = confirmQueue.issue(name, name)
+                val id = confirmQueue.issue(canonicalName, canonicalName)
                 if (id == null) {
                     return errorWithData(req.id, CODE_CONFIRM_QUEUE_FULL, "confirm_queue_full", JSONObject())
                 }
-                Log.i(TAG, "confirm required for $name (confirm_id=$id)")
+                Log.i(TAG, "confirm required for $canonicalName (confirm_id=$id)")
                 // context is null in unit-test paths: log only, no notification.
                 context?.let {
-                    McpConfirmNotifier.show(it, name, name, id, ConfirmQueue.DEFAULT_TTL_MILLIS)
+                    McpConfirmNotifier.show(it, canonicalName, canonicalName, id, ConfirmQueue.DEFAULT_TTL_MILLIS)
                 }
                 return errorWithData(
                     req.id, CODE_CONFIRM_REQUIRED, "confirm_required",
@@ -281,7 +284,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                         .put("expires_in_ms", ConfirmQueue.DEFAULT_TTL_MILLIS),
                 )
             }
-            val consume = confirmQueue.consume(confirmId, name)
+            val consume = confirmQueue.consume(confirmId, canonicalName)
             if (consume != ConfirmQueue.Result.OK) {
                 return errorWithData(
                     req.id, CODE_CONFIRM_REJECTED, "confirm_rejected",
@@ -296,7 +299,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         }
 
         val result = com.openminis.app.tools.runtime.ToolExecutor.execute(
-            name = name,
+            name = canonicalName,
             argsJson = arguments.toString(),
             sessionId = "mcp",
             context = context ?: return MCPCodec.response(

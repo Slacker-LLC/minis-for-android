@@ -9,8 +9,7 @@ package com.openminis.app.tools.runtime
  *   MCP_CONFIRM  remote needs human confirmation (120s auto-deny)
  *   MCP_DENIED   remote never sees/calls
  *
- * Unknown tool → deny (explicit mapping only, no prefix matching — same
- * principle as RemoteCapabilityCatalog).
+ * Unknown tool → deny (explicit mapping only, no prefix matching).
  *
  * Pure Kotlin, no Android imports, for JVM unit tests (T-K1/T-K2).
  */
@@ -50,8 +49,47 @@ object ToolPermissionManager {
         "linux.file.write" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "linux.file.edit" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "linux.file.image.read" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "linux.file.append" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "linux.file.copy" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "linux.file.move" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "linux.file.delete" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "linux.file.list" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "linux.file.search" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "linux.file.grep" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "linux.file.head_tail" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "linux.file.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "linux.python.run" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "linux.pip.install" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        // android.web.* / calendar / contacts / location / clipboard / time / intent (P10)
+        "android.web.search" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "android.web.fetch" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "android.calendar.read" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.calendar.create" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.calendar.update" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.calendar.delete" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.contacts.search" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.contacts.manage" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.location.get" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.clipboard" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.time" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "android.intent.send" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.wifi.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.wifi.scan" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.bluetooth.status" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.bluetooth.paired" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.bluetooth.scan" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.tts.voices" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "android.tts.voice" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.tts.enabled" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.media.images" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.media.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.media.control" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.weather" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.phone.dial" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.settings.get" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.settings.set" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.sms.read" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.call_log.read" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         // android.*
         "android.capabilities" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "android.app" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
@@ -61,7 +99,7 @@ object ToolPermissionManager {
         "android.app.launch" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.app.force_stop" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.app.restart" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
-        "android.app.usage" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
+        "android.app.usage" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.package.install" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
         "android.package.uninstall" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
         "android.screenshot" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
@@ -143,8 +181,11 @@ object ToolPermissionManager {
         }
     }
 
-    fun isAllowedFor(tool: String, caller: String): Boolean =
-        levelFor(tool, caller) == Level.MCP_ALLOWED || levelFor(tool, caller) == Level.MCP_CONFIRM
+    fun isAllowedFor(tool: String, caller: String): Boolean {
+        val level = levelFor(tool, caller)
+        return level == Level.MCP_ALLOWED || level == Level.MCP_CONFIRM ||
+            caller == CALLER_LOCAL && level == Level.LOCAL_ONLY
+    }
 
     /**
      * True only for MCP_ALLOWED (no human gate). MCP_CONFIRM is excluded:

@@ -222,12 +222,17 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
         enabled: List<String>,
         timeoutSec: Int,
     ): android.location.Location? {
-        // Prefer NETWORK > FUSED > GPS for speed (GPS may take 30s+ cold).
-        val ordered = listOf(
+        // Prefer NETWORK > FUSED > GPS for speed (GPS may take 30s+ cold),
+        // then try any enabled OEM/test provider instead of declaring a device
+        // stale merely because it uses a non-AOSP provider name.
+        val preferred = listOf(
             LocationManager.NETWORK_PROVIDER,
             "fused",
             LocationManager.GPS_PROVIDER,
-        ).filter { it in enabled }
+        )
+        val ordered = (preferred.filter { it in enabled } +
+            enabled.filter { it !in preferred && it != LocationManager.PASSIVE_PROVIDER })
+            .distinct()
         if (ordered.isEmpty()) return null
 
         val perProvTimeoutMs = (timeoutSec.coerceAtLeast(1) * 1000L / ordered.size)
