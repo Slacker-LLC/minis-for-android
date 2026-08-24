@@ -24,6 +24,7 @@ class RootShellMinisdInstrumentedTest {
         )
         assumeFalse("minisd is not deployed: ${result.output}", result.output.contains("RUNTIME_UNAVAILABLE"))
         assertTrue(result.output, result.success)
-        assertEquals("34", result.output.trim())
+        // Device-independent: the broker returns the REAL sdk of the host.
+        assertEquals("${android.os.Build.VERSION.SDK_INT}", result.output.trim())
     }
 }

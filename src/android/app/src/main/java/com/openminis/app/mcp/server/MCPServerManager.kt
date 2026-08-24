@@ -121,6 +121,12 @@ object MCPServerManager {
         Log.i(TAG, "MCP server stopped")
     }
 
+    /** DEBUG-only approve path used by [DebugRPCHandler] for E2E on devices
+     *  whose notification actions are collapsed by the OEM (e.g. HyperOS).
+     *  Returns the ConfirmQueue Result name, or null when no server is up. */
+    fun debugApproveConfirm(confirmId: String, method: String): String? =
+        server?.approveConfirm(confirmId, method)?.name
+
     /** Starts a fresh [MCPServer] on [PORT]; updates [server]/[running]. */
     private fun startServerInstance(): Boolean {
         val ctx = appContext

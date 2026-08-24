@@ -52,6 +52,9 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
     private val connectionJobs = ConcurrentHashMap.newKeySet<Job>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val confirmQueue = ConfirmQueue()
+
+    /** DEBUG-only: approve a pending confirm (see MCPServerManager.debugApproveConfirm). */
+    fun approveConfirm(confirmId: String, method: String) = confirmQueue.approve(confirmId, method)
     private val connectionSlots = Semaphore(MAX_CONNECTIONS)
 
     /**
@@ -252,13 +255,16 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         }
 
         // A5: liveness first — a dead Ubuntu runtime answers immediately
-        // without burning a user confirmation (ACC-T-02 semantics).
+        // without burning a user confirmation (ACC-T-02 semantics). One-shot
+        // revive: when minisd is already up this is a cheap status refresh.
         if (canonicalName.startsWith("linux.") && !canonicalName.startsWith("linux.file.") && !MCPServerManager.linuxToolsAvailable()) {
-            val err = com.openminis.app.tools.ToolExecutionResult(
-                output = "Error: ubuntu_runtime_unavailable: $canonicalName",
-                success = false,
-            )
-            return MCPCodec.response(req.id, MCPCodec.toolResult(err.output, isError = true))
+            if (!com.openminis.app.sandbox.ubuntu.UbuntuRuntime.ensureReady().running) {
+                val err = com.openminis.app.tools.ToolExecutionResult(
+                    output = "Error: ubuntu_runtime_unavailable: $canonicalName",
+                    success = false,
+                )
+                return MCPCodec.response(req.id, MCPCodec.toolResult(err.output, isError = true))
+            }
         }
 
         // MCP_CONFIRM gate: one-shot confirm issued/consumed before execution (07 §6).

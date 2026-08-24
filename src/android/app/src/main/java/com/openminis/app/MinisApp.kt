@@ -604,6 +604,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ProviderRouter.register(
             com.openminis.app.tools.runtime.LinuxProvider(
                 available = { UbuntuRuntime.snapshot.value.available },
+                revive = { UbuntuRuntime.ensureReady().running },
             ),
         )
         com.openminis.app.tools.runtime.ProviderRouter.register(

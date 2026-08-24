@@ -18,6 +18,9 @@ import com.openminis.app.tools.ToolExecutionResult
  */
 class LinuxProvider(
     private val available: () -> Boolean,
+    /** Optional on-demand recovery: called once when [available] is false
+     *  (e.g. UbuntuRuntime.ensureReady — cheap when minisd is already up). */
+    private val revive: (suspend () -> Boolean)? = null,
 ) : ToolProvider {
 
     override val id: String = "linux"
@@ -30,7 +33,9 @@ class LinuxProvider(
         context: Context,
         toolId: String,
         next: suspend () -> ToolExecutionResult,
-    ): ToolExecutionResult =
-        if (toolName.startsWith("linux.file.") || available()) next()
+    ): ToolExecutionResult {
+        val usable = available() || (revive?.invoke() ?: false)
+        return if (toolName.startsWith("linux.file.") || usable) next()
         else ToolExecutionResult(output = "Error: ubuntu_runtime_unavailable: $toolName", success = false)
+    }
 }

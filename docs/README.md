@@ -20,6 +20,7 @@
 | [`SECURITY.md`](SECURITY.md) | 安全设计:凭据、MCP 授权、审批、路径与日志边界 |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行环境：Ubuntu 24.04 chroot（minisd）+ Root su 现状与边界（P2 已替换 PRoot/Alpine） |
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 当前已交付、验证和未交付项 |
+| [`语音对话子项目说明.md`](语音对话子项目说明.md) | 主工程语音输入、ASR、模型请求、在线 TTS 和现有入口 |
 | [`specs/minis-url-scheme.md`](specs/minis-url-scheme.md) | `minis://` URL 方案说明 |
 | [`specs/debug-server-api.md`](specs/debug-server-api.md) | DebugServer API 参考;以 `rpc.discover` 与源码为最终依据 |
 

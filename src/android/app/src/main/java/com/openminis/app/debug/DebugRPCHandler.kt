@@ -95,6 +95,7 @@ class DebugRPCHandler(private val context: Context) {
             "debug.mcp.start" -> handleMcpStart()
             "debug.mcp.stop" -> handleMcpStop()
             "debug.mcp.settoken" -> handleMcpSetToken(params)
+            "debug.mcp.confirm.answer" -> handleMcpConfirmAnswer(params)
             "debug.update.check" -> handleUpdateCheck()
             "debug.update.download" -> handleUpdateDownload(params)
             "debug.update.install" -> handleUpdateInstall(params)
@@ -1020,6 +1021,20 @@ class DebugRPCHandler(private val context: Context) {
         )
         com.openminis.app.mcp.server.MCPServerManager.init(context)
         return JSONObject().put("saved", true).put("configured", com.openminis.app.mcp.server.TokenStore.isConfigured)
+    }
+
+    /** DEBUG-only: approve a pending MCP confirm without the phone notification
+     *  (OEMs like HyperOS collapse notification actions, blocking the E2E path). */
+    private fun handleMcpConfirmAnswer(params: JSONObject): JSONObject {
+        val id = params.optString("confirm_id").ifEmpty {
+            throw RPCException(-32602, "confirm_id required")
+        }
+        val method = params.optString("method").ifEmpty {
+            throw RPCException(-32602, "method required")
+        }
+        val result = com.openminis.app.mcp.server.MCPServerManager.debugApproveConfirm(id, method)
+        if (result == null) throw RPCException(-32001, "MCP server is not running")
+        return JSONObject().put("approved", true).put("result", result)
     }
 
     // ── Update checker (T33) — exposed only via DebugRPC so the e2e flow can
