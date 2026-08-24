@@ -218,6 +218,15 @@
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- [T-assist-voice-assist] HyperOS power-menu “语音助手” launches
+                 ACTION_VOICE_ASSIST (verified in MiuiSystemUI
+                 GlobalActionsDialogLite: startActivity(new
+                 Intent(ACTION_VOICE_ASSIST))). Registering the standard action
+                 lets the power menu open Minis directly — no OEM hack. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- T-android-dynamic-app-icon: launcher-icon aliases. Exactly
