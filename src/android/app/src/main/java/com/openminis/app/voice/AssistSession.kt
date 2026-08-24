@@ -2,14 +2,16 @@ package com.openminis.app.voice
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import com.openminis.app.MainActivity
 
 /**
- * Minimal assistant session: invoking the assistant opens the app's main
- * chat UI and immediately finishes the session. Keeps the surface small —
- * OpenMinis Pet is a text-first assistant, so long-press Home = open the app.
+ * Assistant session: invoking the assistant opens the app at a fresh voice
+ * chat and immediately finishes the session. Long-press assistant = "talk to
+ * Minis" — the deep link carries the voice action so the Composer opens its
+ * inline voice panel (START_VOICE) instead of showing the plain text input.
  */
 class AssistSession(
     private val appContext: Context,
@@ -21,6 +23,7 @@ class AssistSession(
          *  collapsed into one launch (long-press Home mashing). */
         private const val LAUNCH_DEBOUNCE_MS = 1_500L
         @Volatile private var lastLaunchAt = 0L
+        private const val VOICE_ACTION_URI = "minis://action/voice"
     }
 
     override fun onShow(args: Bundle?, showFlags: Int) {
@@ -33,7 +36,8 @@ class AssistSession(
         lastLaunchAt = now
         runCatching {
             val intent = Intent(appContext, MainActivity::class.java)
-                .setAction(Intent.ACTION_ASSIST)
+                .setAction(Intent.ACTION_VIEW)
+                .setData(Uri.parse(VOICE_ACTION_URI))
                 // MainActivity is singleTask. CLEAR_TOP makes every system
                 // assistant gesture bring the existing chat task forward
                 // rather than layering another task behind the session.
