@@ -1,6 +1,6 @@
 # Building Minis for Android
 
-This document tracks the current `master` branch. Published APKs currently target Android `arm64-v8a`. Chinese instructions are in [BUILD-CN.md](BUILD-CN.md).
+This document tracks the current `master` branch. The repository is source-only and does not publish or track prebuilt APKs. Local Android builds currently target `arm64-v8a`. Chinese instructions are in [BUILD-CN.md](BUILD-CN.md).
 
 ## Requirements
 
@@ -26,7 +26,7 @@ git clone https://github.com/Slacker-LLC/minis-for-android.git
 cd minis-for-android
 ```
 
-The current repository has no Git submodules that need initialization. The Rust Root Broker lives in-tree at `src/native/minisd/`.
+The repository has no Git submodules that need initialization. The Rust Root Broker lives in-tree at `src/native/minisd/`.
 
 ## 2. Configure Android and provider customization
 
@@ -40,7 +40,7 @@ cp src/android/app/provider-customization.properties.example \
    src/android/app/provider-customization.properties
 ```
 
-Public-source builds may use empty customization values. Integrations that require private OAuth customization are not production-ready when those values are absent.
+Public-source builds may use empty customization values. Integrations that require private OAuth customization are unavailable or non-production when those values are absent.
 
 ## 3. Build minisd
 
@@ -84,6 +84,8 @@ Output:
 ```text
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+APKs are local build artifacts. `*.apk` and `*.aab` are ignored by Git and must not be committed to the repository.
 
 Install on a connected device:
 
@@ -152,17 +154,16 @@ then:
 {"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
 ```
 
-## Production releases
+## Future production releases
 
-The current public APK is a debug-signed development build, and release hardening is still tracked in the repository Issues.
-
-A production release should require at least:
+There is currently no formal release distribution. If production releases are reintroduced, they should require at least:
 
 - a protected long-term release keystore;
 - no DebugServer or debug-only surfaces in the production artifact;
 - release lint and CI gates;
 - a complete test/security pass;
-- an immutable source tag and published artifact hashes.
+- explicit source-version identification and published artifact hashes;
+- binary distribution through Release/CI artifacts rather than Git commits.
 
 See also:
 
