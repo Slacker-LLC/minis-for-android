@@ -47,6 +47,19 @@ class ProviderTransportPolicyTest {
     }
 
     @Test
+    fun `public http is rejected even with matching approval`() {
+        expectViolation {
+            ProviderTransportPolicy.requireAllowedInstanceBase(
+                instance(
+                    customBase = "http://api.example.com:8080",
+                    approvedOrigin = "http://api.example.com:8080",
+                ),
+                "http://api.example.com:8080/v1",
+            )
+        }
+    }
+
+    @Test
     fun `http without explicit custom base is rejected`() {
         expectViolation {
             ProviderTransportPolicy.requireAllowedInstanceBase(
