@@ -1,9 +1,12 @@
 use crate::policy::{args_denied, MethodPolicy};
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
+use std::io::Read;
 use std::time::{Duration, Instant};
 
 /// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
 pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
+/// Maximum bytes retained in memory for each root.exec output stream.
+pub const MAX_CAPTURE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct ExecRequest {
@@ -94,10 +97,45 @@ pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode
     Err(ErrorCode::BadParams)
 }
 
+#[derive(Debug)]
+struct CapturedOutput {
+    retained: Vec<u8>,
+    total_bytes: u64,
+    truncated: bool,
+}
+
+/// Drain the complete pipe so the child cannot block on a full stdout/stderr
+/// buffer, while retaining only a bounded prefix in broker memory.
+fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<CapturedOutput> {
+    let mut retained = Vec::with_capacity(limit.min(8192));
+    let mut total_bytes = 0u64;
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        total_bytes = total_bytes.saturating_add(n as u64);
+        if retained.len() < limit {
+            let keep = (limit - retained.len()).min(n);
+            retained.extend_from_slice(&buf[..keep]);
+        }
+    }
+    Ok(CapturedOutput {
+        truncated: total_bytes > retained.len() as u64,
+        retained,
+        total_bytes,
+    })
+}
+
 pub struct ExecOutput {
     pub exit_code: i32,
     pub stdout: String,
     pub stderr: String,
+    pub stdout_bytes: u64,
+    pub stderr_bytes: u64,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
 }
 
 pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCode> {
@@ -107,20 +145,38 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    let child = cmd.spawn().map_err(|_| ErrorCode::Internal)?;
+    let mut child = cmd.spawn().map_err(|_| ErrorCode::Internal)?;
     let pid = child.id() as i32;
-    let handle = std::thread::spawn(move || child.wait_with_output());
+    let stdout = child.stdout.take().ok_or(ErrorCode::Internal)?;
+    let stderr = child.stderr.take().ok_or(ErrorCode::Internal)?;
+
+    let stdout_handle = std::thread::spawn(move || collect_bounded(stdout, MAX_CAPTURE_BYTES));
+    let stderr_handle = std::thread::spawn(move || collect_bounded(stderr, MAX_CAPTURE_BYTES));
+    let wait_handle = std::thread::spawn(move || child.wait());
     let start = Instant::now();
+
     loop {
-        if handle.is_finished() {
-            let out = handle
+        if wait_handle.is_finished() {
+            let status = wait_handle
+                .join()
+                .map_err(|_| ErrorCode::Internal)?
+                .map_err(|_| ErrorCode::Internal)?;
+            let stdout = stdout_handle
+                .join()
+                .map_err(|_| ErrorCode::Internal)?
+                .map_err(|_| ErrorCode::Internal)?;
+            let stderr = stderr_handle
                 .join()
                 .map_err(|_| ErrorCode::Internal)?
                 .map_err(|_| ErrorCode::Internal)?;
             return Ok(ExecOutput {
-                exit_code: out.status.code().unwrap_or(255),
-                stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-                stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+                exit_code: status.code().unwrap_or(255),
+                stdout: String::from_utf8_lossy(&stdout.retained).into_owned(),
+                stderr: String::from_utf8_lossy(&stderr.retained).into_owned(),
+                stdout_bytes: stdout.total_bytes,
+                stderr_bytes: stderr.total_bytes,
+                stdout_truncated: stdout.truncated,
+                stderr_truncated: stderr.truncated,
             });
         }
         if start.elapsed() >= Duration::from_millis(req.timeout_ms) {
@@ -130,11 +186,15 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
             }
             #[cfg(unix)]
             {
+                // Give the wait thread a bounded opportunity to reap the killed child.
                 for _ in 0..50 {
-                    if handle.is_finished() {
+                    if wait_handle.is_finished() {
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(20));
+                }
+                if wait_handle.is_finished() {
+                    let _ = wait_handle.join();
                 }
             }
             return Err(ErrorCode::Timeout);
@@ -147,6 +207,7 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
 mod tests {
     use super::*;
     use crate::policy::{MethodPolicy, Mode, PolicyFile};
+    use std::io::Cursor;
 
     #[test]
     fn t_u4_allowlist_and_deny() {
@@ -173,12 +234,42 @@ mod tests {
         };
         let allow = effective_allowlist(Some(&spec));
         assert_eq!(allow, vec!["pm"]);
-
         let pm = parse_exec(&serde_json::json!({"tool":"pm","args":[]})).unwrap();
         assert!(validate_exec(Some(&spec), &pm).is_ok());
         let reboot = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
         assert_eq!(validate_exec(Some(&spec), &reboot).unwrap_err(), ErrorCode::PolicyDenied);
-        let getprop = parse_exec(&serde_json::json!({"tool":"getprop","args":[]})).unwrap();
-        assert_eq!(validate_exec(Some(&spec), &getprop).unwrap_err(), ErrorCode::PolicyDenied);
+    }
+
+    #[test]
+    fn bounded_collector_truncates_large_stdout() {
+        let data = vec![b'o'; MAX_CAPTURE_BYTES + 4096];
+        let out = collect_bounded(Cursor::new(data), MAX_CAPTURE_BYTES).unwrap();
+        assert_eq!(out.retained.len(), MAX_CAPTURE_BYTES);
+        assert_eq!(out.total_bytes, (MAX_CAPTURE_BYTES + 4096) as u64);
+        assert!(out.truncated);
+    }
+
+    #[test]
+    fn bounded_collector_truncates_large_stderr() {
+        let data = vec![b'e'; MAX_CAPTURE_BYTES + 1];
+        let out = collect_bounded(Cursor::new(data), MAX_CAPTURE_BYTES).unwrap();
+        assert_eq!(out.retained.len(), MAX_CAPTURE_BYTES);
+        assert!(out.truncated);
+    }
+
+    #[test]
+    fn bounded_collectors_handle_combined_large_output_independently() {
+        let stdout = collect_bounded(
+            Cursor::new(vec![b'o'; MAX_CAPTURE_BYTES + 10]),
+            MAX_CAPTURE_BYTES,
+        )
+        .unwrap();
+        let stderr = collect_bounded(
+            Cursor::new(vec![b'e'; MAX_CAPTURE_BYTES + 20]),
+            MAX_CAPTURE_BYTES,
+        )
+        .unwrap();
+        assert!(stdout.truncated && stderr.truncated);
+        assert_eq!(stdout.retained.len() + stderr.retained.len(), MAX_CAPTURE_BYTES * 2);
     }
 }

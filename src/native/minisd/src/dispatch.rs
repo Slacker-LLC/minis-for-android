@@ -143,11 +143,16 @@ fn exec_root(state: &mut AppState, req: &Request) -> Response {
         return Response::err(req.id, code, "exec policy");
     }
     if state.mock {
+        let stdout = format!("{} {}", parsed.tool, parsed.args.join(" "));
         return Response::ok(
             req.id,
             json!({
                 "exit_code": 0,
-                "stdout": format!("{} {}", parsed.tool, parsed.args.join(" ")),
+                "stdout_bytes": stdout.len(),
+                "stderr_bytes": 0,
+                "stdout_truncated": false,
+                "stderr_truncated": false,
+                "stdout": stdout,
                 "stderr": ""
             }),
         );
@@ -158,7 +163,11 @@ fn exec_root(state: &mut AppState, req: &Request) -> Response {
             json!({
                 "exit_code": out.exit_code,
                 "stdout": out.stdout,
-                "stderr": out.stderr
+                "stderr": out.stderr,
+                "stdout_bytes": out.stdout_bytes,
+                "stderr_bytes": out.stderr_bytes,
+                "stdout_truncated": out.stdout_truncated,
+                "stderr_truncated": out.stderr_truncated
             }),
         ),
         Err(code) => Response::err(req.id, code, "exec failed"),
