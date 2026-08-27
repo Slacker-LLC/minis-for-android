@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Build Ubuntu 24.04 LTS arm64 base rootfs (Q4 基础档 skeleton).
+# Build Ubuntu 24.04 LTS arm64 base rootfs.
 # Produces dist/ubuntu-arm64-rootfs.tar.gz (+ .sha256, manifest).
-# Does NOT qemu-provision python/git; that is ubuntu.adminExec on device (Q3).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,6 +11,20 @@ BASE_NAME="ubuntu-base-${REL}-base-arm64.tar.gz"
 BASE_URL="${BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/${BASE_NAME}}"
 SUMS_URL="${SUMS_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS}"
 
+# Supply-chain ceiling: the default release is pinned in-repo. A non-default
+# release must provide EXPECTED_BASE_SHA256 explicitly rather than trusting a
+# mutable remote checksum file by itself.
+case "$REL" in
+  24.04.3) PINNED_BASE_SHA256="7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048" ;;
+  *) PINNED_BASE_SHA256="" ;;
+esac
+EXPECTED_BASE_SHA256="${EXPECTED_BASE_SHA256:-$PINNED_BASE_SHA256}"
+if [[ ! "$EXPECTED_BASE_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "error: no valid pinned EXPECTED_BASE_SHA256 for Ubuntu Base release $REL" >&2
+  exit 1
+fi
+EXPECTED_BASE_SHA256="${EXPECTED_BASE_SHA256,,}"
+
 mkdir -p "$DIST" "$WORK"
 cd "$WORK"
 
@@ -19,17 +32,45 @@ echo "==> download $BASE_NAME"
 if [[ ! -f "$BASE_NAME" ]]; then
   curl -fL --retry 3 -o "$BASE_NAME" "$BASE_URL"
 fi
-if [[ ! -f SHA256SUMS ]]; then
-  curl -fL --retry 3 -o SHA256SUMS "$SUMS_URL" || true
+
+echo "==> verify Ubuntu Base checksum"
+# Always refresh upstream metadata. Failure is fatal; cached/stale metadata is
+# not accepted as proof for a privileged rootfs build.
+curl -fL --retry 3 -o SHA256SUMS.tmp "$SUMS_URL"
+mv SHA256SUMS.tmp SHA256SUMS
+
+UPSTREAM_SHA256="$(awk -v name="$BASE_NAME" '
+  {
+    file=$2
+    sub(/^\*/, "", file)
+    if (file == name) { print tolower($1); found=1; exit }
+  }
+  END { if (!found) exit 1 }
+' SHA256SUMS)" || {
+  echo "error: $BASE_NAME is not listed in $SUMS_URL" >&2
+  exit 1
+}
+
+if [[ ! "$UPSTREAM_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "error: invalid SHA-256 entry for $BASE_NAME in upstream checksum file" >&2
+  exit 1
 fi
-if [[ -f SHA256SUMS ]]; then
-  if grep -E "[ *]$BASE_NAME\$" SHA256SUMS > check.sha256; then
-    sha256sum -c check.sha256
-  else
-    echo "warn: $BASE_NAME not listed in SHA256SUMS; skipping verify"
-    cat SHA256SUMS || true
-  fi
+if [[ "$UPSTREAM_SHA256" != "$EXPECTED_BASE_SHA256" ]]; then
+  echo "error: upstream SHA-256 differs from repository pin" >&2
+  echo "       expected $EXPECTED_BASE_SHA256" >&2
+  echo "       upstream $UPSTREAM_SHA256" >&2
+  exit 1
 fi
+
+ACTUAL_BASE_SHA256="$(sha256sum "$BASE_NAME" | awk '{print tolower($1)}')"
+if [[ "$ACTUAL_BASE_SHA256" != "$EXPECTED_BASE_SHA256" ]]; then
+  echo "error: Ubuntu Base archive SHA-256 mismatch" >&2
+  echo "       expected $EXPECTED_BASE_SHA256" >&2
+  echo "       actual   $ACTUAL_BASE_SHA256" >&2
+  exit 1
+fi
+printf '%s  %s\n' "$EXPECTED_BASE_SHA256" "$BASE_NAME" > verified-base.sha256
+sha256sum -c verified-base.sha256
 
 STAGE="$WORK/rootfs"
 rm -rf "$STAGE"
@@ -68,7 +109,6 @@ ln -sfn /memory "$STAGE/var/minis/memory"
 ln -sfn /skills "$STAGE/var/minis/skills"
 ln -sfn /shared "$STAGE/var/minis/shared"
 
-# resolv.conf must be a regular file (ubuntu-base often ships a systemd symlink)
 rm -f "$STAGE/etc/resolv.conf"
 printf '# generated placeholder; minisd overwrites on ubuntu.start\nnameserver 8.8.8.8\nnameserver 8.8.4.4\n' \
   > "$STAGE/etc/resolv.conf"
@@ -88,7 +128,6 @@ export GOMAXPROCS=2
 umask 022
 EOF
 
-# Prefer Ubuntu ports for arm64 if the stock sources point at archive.ubuntu.com.
 if [[ -f "$STAGE/etc/apt/sources.list" ]]; then
   sed -i 's|http://archive.ubuntu.com/ubuntu|http://ports.ubuntu.com/ubuntu-ports|g' "$STAGE/etc/apt/sources.list" || true
   sed -i 's|http://security.ubuntu.com/ubuntu|http://ports.ubuntu.com/ubuntu-ports|g' "$STAGE/etc/apt/sources.list" || true
@@ -107,7 +146,9 @@ cat > "$STAGE/etc/minis/rootfs.json" <<EOF
   "arch": "arm64",
   "profile": "base",
   "preinstalled": "base-only",
-  "note": "python3/git/curl installed on device via ubuntu.adminExec (Q4)"
+  "source_url": "${BASE_URL}",
+  "upstream_sha256": "${EXPECTED_BASE_SHA256}",
+  "note": "python3/git/curl installed on device via ubuntu.adminExec"
 }
 EOF
 
@@ -125,9 +166,13 @@ cat > "$DIST/ubuntu-arm64-rootfs.manifest.json" <<EOF
   "ubuntu": "$VERSION_ID",
   "release": "$REL",
   "arch": "arm64",
-  "profile": "base"
+  "profile": "base",
+  "source_url": "$BASE_URL",
+  "checksums_url": "$SUMS_URL",
+  "upstream_sha256": "$EXPECTED_BASE_SHA256"
 }
 EOF
 echo "==> $OUT"
 echo "    sha256 $SHA"
 echo "    bytes  $SIZE"
+echo "    upstream $EXPECTED_BASE_SHA256"
