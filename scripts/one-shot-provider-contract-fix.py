@@ -149,6 +149,22 @@ if s.count(stream_old) != 1:
     raise SystemExit("OpenAIProviderTest: sendMessage transport test shape changed")
 s = s.replace(stream_old, stream_new, 1)
 
+cached_old = '''        assertEquals(100, response.usage?.inputTokens)
+        assertEquals(10, response.usage?.outputTokens)
+        assertEquals(50, response.usage?.cacheReadInputTokens)
+        assertNull(response.usage?.cacheCreationInputTokens)
+'''
+cached_new = '''        // prompt_tokens includes cached input. Provider usage normalizes
+        // inputTokens to fresh-only so cached input is not counted twice.
+        assertEquals(50, response.usage?.inputTokens)
+        assertEquals(10, response.usage?.outputTokens)
+        assertEquals(50, response.usage?.cacheReadInputTokens)
+        assertNull(response.usage?.cacheCreationInputTokens)
+'''
+if s.count(cached_old) != 1:
+    raise SystemExit("OpenAIProviderTest: cached-token assertion shape changed")
+s = s.replace(cached_old, cached_new, 1)
+
 # The reasoning-effort capture helper is below the streaming/error sections;
 # convert its one old Chat Completions fixture too.
 capture_start = s.index("    private fun captureBody(")
