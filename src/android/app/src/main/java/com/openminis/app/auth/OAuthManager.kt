@@ -27,7 +27,8 @@ abstract class OAuthManager(
         private const val KEY_MANUAL_BEARER = "manual_bearer_token"
 
         /** Shared OkHttp client for all OAuth HTTP requests (respects system proxy). */
-        internal val httpClient = OkHttpClient.Builder()
+        internal val httpClient = com.openminis.app.provider.ProviderTransportPolicy
+            .protectedHttpsBuilder(OkHttpClient.Builder())
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .build()

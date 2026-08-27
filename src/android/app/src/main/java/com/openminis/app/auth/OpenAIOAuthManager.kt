@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.provider.ProviderTransportPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -295,7 +296,8 @@ class OpenAIOAuthManager(context: Context, instanceId: String) : OAuthManager(co
      * (network may have switched between cold-start and tap-Sign-in).
      */
     private val systemAwareHttpClient: okhttp3.OkHttpClient by lazy {
-        okhttp3.OkHttpClient.Builder()
+        ProviderTransportPolicy
+            .protectedHttpsBuilder(okhttp3.OkHttpClient.Builder())
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .proxySelector(ProxySelector.getDefault())

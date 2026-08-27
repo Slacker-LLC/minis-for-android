@@ -141,6 +141,9 @@ data class ProviderInstance(
     var isEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     var customBaseURL: String? = null,
+    // Canonical HTTP origin explicitly approved on this device. null means no
+    // cleartext approval. Export/import intentionally does not carry this trust.
+    var cleartextHttpApprovedOrigin: String? = null,
     var appendV1Suffix: Boolean = true,
     // [T-provider-custom-user-agent] Optional per-provider User-Agent
     // override. Some relay gateways only accept requests whose UA looks like

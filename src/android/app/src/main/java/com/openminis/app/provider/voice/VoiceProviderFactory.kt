@@ -3,6 +3,7 @@ package com.openminis.app.provider.voice
 import android.util.Log
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
+import com.openminis.app.provider.ProviderTransportPolicy
 
 /**
  * [T-android-provider-voice] Maps a configured ProviderInstance to a concrete
@@ -24,6 +25,11 @@ object VoiceProviderFactory {
     private const val TAG = "VoiceFactory"
 
     fun make(instance: ProviderInstance, apiKey: String?): VoiceProvider? {
+        // Voice is a separate network entry point from the chat provider. Apply
+        // the same instance-level transport gate here so stale/imported config
+        // cannot bypass OAuth/public-HTTP restrictions through ASR/TTS.
+        ProviderTransportPolicy.requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
+
         val custom = instance.customBaseURL
         val normalizedBase = (custom ?: "").lowercase()
 

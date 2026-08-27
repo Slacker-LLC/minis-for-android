@@ -80,7 +80,8 @@ object UpdateChecker {
         data class Error(val message: String) : DownloadResult()
     }
 
-    private val client = OkHttpClient.Builder()
+    private val client = com.openminis.app.provider.ProviderTransportPolicy
+        .protectedHttpsBuilder(OkHttpClient.Builder())
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
@@ -266,7 +267,14 @@ object UpdateChecker {
             val a = assets.optJSONObject(i) ?: continue
             val name = a.optString("name").lowercase()
             if (name.endsWith(".apk")) {
-                val u = a.optString("browser_download_url").ifEmpty { null }
+                val raw = a.optString("browser_download_url").ifEmpty { null }
+                val u = raw?.let { candidate ->
+                    runCatching {
+                        com.openminis.app.provider.ProviderTransportPolicy
+                            .requireHttps(candidate, "update APK URL")
+                            .toString()
+                    }.getOrNull()
+                }
                 if (u != null) return u to a.optLong("size", 0)
             }
         }

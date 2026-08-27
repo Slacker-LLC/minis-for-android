@@ -2,6 +2,7 @@ package com.openminis.app.provider.voice
 
 import android.util.Base64
 import android.util.Log
+import com.openminis.app.provider.ProviderTransportPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,13 +33,6 @@ open class VoiceProvider(
 ) {
     companion object {
         private const val TAG = "VoiceProvider"
-
-        /** TTS responses can be large and slow — generous timeouts (iOS: 120s). */
-        val httpClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(120, TimeUnit.SECONDS)
-            .build()
 
         /**
          * Reduce a language tag (e.g. "zh-CN", "zh-Hans-CN", "en") to its
@@ -73,6 +67,20 @@ open class VoiceProvider(
             header.putInt(dataSize)
             return header.array() + pcm
         }
+    }
+
+    /**
+     * Per-provider client so redirect policy can depend on the actual voice
+     * endpoint. HTTPS may follow HTTPS redirects; an explicitly allowed local
+     * HTTP endpoint never redirects. Generous voice timeouts match iOS.
+     */
+    protected val httpClient: OkHttpClient by lazy {
+        ProviderTransportPolicy
+            .configureClient(OkHttpClient.Builder(), effectiveBaseURL())
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .build()
     }
 
     // -- Entry points ---------------------------------------------------------

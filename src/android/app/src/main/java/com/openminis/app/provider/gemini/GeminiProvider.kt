@@ -46,6 +46,7 @@ class GeminiProvider(
         // [T-android-stale-conn-retry-hang] Shared pool — see NetworkMonitor.
         // Network-transition eviction must reach provider connections.
         .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)
+        .let { com.openminis.app.provider.ProviderTransportPolicy.configureClient(it, basePath) }
         .build()
 
     override suspend fun sendMessageClamped(

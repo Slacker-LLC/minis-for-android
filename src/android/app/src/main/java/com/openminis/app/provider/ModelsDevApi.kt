@@ -39,7 +39,8 @@ object ModelsDevApi {
     private val isRefreshing = AtomicBoolean(false)
     private var appContext: Context? = null
 
-    private val client = OkHttpClient.Builder()
+    private val client = ProviderTransportPolicy
+        .protectedHttpsBuilder(OkHttpClient.Builder())
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

@@ -4,17 +4,17 @@ import android.content.Context
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.normalizeModalities
 import com.openminis.app.provider.ModelsDevApi
-import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.ProviderModelsCache
+import com.openminis.app.provider.ProviderTransportPolicy
+import com.openminis.app.provider.applyUserAgentOverride
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
 object OpenRouterModelsApi {
-    private val client = OkHttpClient()
+    private val client = ProviderTransportPolicy.protectedHttpsClient()
     private val cache = ProviderModelsCache("openrouter")
 
     /**

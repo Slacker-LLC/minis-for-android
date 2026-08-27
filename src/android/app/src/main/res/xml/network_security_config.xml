@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- T354: allow cleartext HTTP globally so user-configured provider
-         endpoints (private/LAN LLM servers like http://192.168.x.x:port or
-         http://my-host:8080) work. Minis is a tool where the user supplies
-         the endpoint — they own the trust decision. -->
+    <!-- Android's network-security-config cannot enumerate user-entered
+         runtime LAN hosts, so platform cleartext capability stays enabled.
+         This is transport plumbing, NOT the trust policy: ProviderTransportPolicy
+         permits HTTP only for an explicitly configured API-key provider origin,
+         blocks OAuth/update cleartext, and prevents insecure redirects. -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />

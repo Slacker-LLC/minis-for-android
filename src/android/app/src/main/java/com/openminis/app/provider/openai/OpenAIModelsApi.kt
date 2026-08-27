@@ -16,7 +16,6 @@ import org.json.JSONObject
 
 object OpenAIModelsApi {
     private const val TAG = "OpenAIModelsApi"
-    private val client = OkHttpClient()
     private val cache = ProviderModelsCache("openai")
 
     /**
@@ -101,6 +100,7 @@ object OpenAIModelsApi {
         }
 
         val url = buildURL(baseURL)
+        val client = com.openminis.app.provider.ProviderTransportPolicy.clientForBase(url)
         val request = Request.Builder()
             .url(url)
             .header("Authorization", "Bearer $apiKey")

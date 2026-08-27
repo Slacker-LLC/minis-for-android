@@ -127,6 +127,21 @@ fun ProviderDetailScreen(
     var isEnabled by remember { mutableStateOf(instance.isEnabled) }
     var customBaseURL by remember { mutableStateOf(instance.customBaseURL ?: "") }
     var appendV1Suffix by remember { mutableStateOf(instance.appendV1Suffix) }
+    val persistedCleartextOrigin = instance.cleartextHttpApprovedOrigin
+    var approvedCleartextOrigin by remember(instance.customBaseURL, persistedCleartextOrigin) {
+        val currentOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(instance.customBaseURL)
+        mutableStateOf(persistedCleartextOrigin?.takeIf { it == currentOrigin })
+    }
+    val trimmedCustomBase = customBaseURL.trim()
+    val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)
+    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val isAllowedCleartextEndpoint = com.openminis.app.provider.ProviderTransportPolicy
+        .isAllowedCleartextEndpoint(trimmedCustomBase)
+    val isOAuthCredential = instance.credentialType ==
+        com.openminis.app.data.model.ProviderCredential.oauth
+    val cleartextApproved = !isCleartextHttp ||
+        (!isOAuthCredential && isAllowedCleartextEndpoint && approvedCleartextOrigin == cleartextOrigin)
     // [T-provider-custom-user-agent] Per-provider UA override input. Only the
     // OpenAI-/Anthropic-compat custom-base section surfaces it (see gate below).
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
@@ -247,11 +262,47 @@ fun ProviderDetailScreen(
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     SectionTextField(
                         value = customBaseURL,
-                        onValueChange = { customBaseURL = it },
+                        onValueChange = { value ->
+                            val newOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(value.trim())
+                            if (approvedCleartextOrigin != newOrigin) approvedCleartextOrigin = null
+                            customBaseURL = value
+                        },
                         singleLine = true,
                         placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),
                         fieldModifier = Modifier.bringIntoViewOnFocus(),
                     )
+                }
+                if (isCleartextHttp) {
+                    if (isOAuthCredential) {
+                        Text(
+                            "OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP cannot be saved.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else if (!isAllowedCleartextEndpoint) {
+                        Text(
+                            "Cleartext HTTP is allowed only for local/private provider endpoints. Use HTTPS for public hosts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        SettingsSwitchRow(
+                            title = "Allow insecure HTTP for this provider",
+                            checked = approvedCleartextOrigin == cleartextOrigin,
+                            onCheckedChange = { allow ->
+                                approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                            },
+                            showDivider = false,
+                        )
+                        Text(
+                            "HTTP is not encrypted. API keys and prompts can be read or changed on the network.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -324,6 +375,11 @@ fun ProviderDetailScreen(
                         providerRepository.updateInstance(
                             instance.copy(
                                 customBaseURL = customBaseURL.ifBlank { null },
+                                cleartextHttpApprovedOrigin = if (isCleartextHttp && cleartextApproved) {
+                                    cleartextOrigin
+                                } else {
+                                    null
+                                },
                                 appendV1Suffix = appendV1Suffix,
                                 // [T-provider-custom-user-agent] Blank → null →
                                 // default UA. Only the gated providers can edit
@@ -340,6 +396,7 @@ fun ProviderDetailScreen(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = cleartextApproved,
                 ) {
                     Text(stringResource(R.string.provider_detail_save_url_settings))
                 }

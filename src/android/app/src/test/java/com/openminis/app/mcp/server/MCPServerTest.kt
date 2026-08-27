@@ -19,7 +19,7 @@ import org.junit.Test
  */
 class MCPServerTest {
 
-    private val port = 18877
+    private var port = 0
     private var server: MCPServer? = null
     private val client = OkHttpClient()
 
@@ -32,13 +32,16 @@ class MCPServerTest {
             com.openminis.app.tools.runtime.LinuxShellHandler(),
             aliasNames = listOf("shell_execute"),
         )
+        // A fixed port is flaky across back-to-back JVM tests because a just-closed
+        // loopback socket can still make the next bind fail with EADDRINUSE. Reserve
+        // an ephemeral loopback port for this test case, then let MCPServer bind it.
+        port = java.net.ServerSocket(
+            0,
+            1,
+            java.net.InetAddress.getByName("127.0.0.1"),
+        ).use { it.localPort }
         server = MCPServer(null, port).also { it.start() }
-        // wait for bind
-        var attempts = 0
-        while (!server!!.isRunning && attempts < 50) {
-            Thread.sleep(100)
-            attempts++
-        }
+        assertTrue("MCPServer failed to bind test port $port", server!!.isRunning)
     }
 
     @After
