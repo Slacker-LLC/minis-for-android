@@ -52,11 +52,7 @@ fn dispatch_method(state: &mut AppState, req: &Request) -> Response {
         "system.hello" => Response::ok(req.id, json!({"hello": true, "v": 1})),
         "system.ping" => Response::ok(req.id, json!({"pong": true})),
         "root.probe" => {
-            let probe = if state.mock {
-                mock_probe()
-            } else {
-                live_probe()
-            };
+            let probe = if state.mock { mock_probe() } else { live_probe() };
             Response::ok(req.id, serde_json::to_value(probe).unwrap())
         }
         "root.exec" => exec_root(state, req),
@@ -95,7 +91,7 @@ fn dispatch_method(state: &mut AppState, req: &Request) -> Response {
             } else {
                 Response::err(req.id, ErrorCode::RuntimeUnavailable, "mount ns not started")
             }
-        },
+        }
         "workspace.info" => Response::ok(
             req.id,
             json!({
@@ -112,28 +108,14 @@ fn dispatch_method(state: &mut AppState, req: &Request) -> Response {
             state.workspace_quota_bytes = n;
             Response::ok(req.id, json!({"quota_bytes": n}))
         }
-        "policy.get" => {
-            let json = serde_json::to_value(&json!({
+        "policy.get" => Response::ok(
+            req.id,
+            json!({
                 "methods": state.policy.methods.keys().cloned().collect::<Vec<_>>(),
                 "requireToken": state.policy.caller.require_token,
                 "appUid": state.policy.caller.app_uid
-            }))
-            .unwrap();
-            Response::ok(req.id, json)
-        }
-        "policy.reload" => reload_policy(state, req),
-        "supervisor.status" => {
-            let (running, pid) = state.supervisor.cloudflared_status();
-            Response::ok(req.id, json!({"cloudflared": running, "pid": pid}))
-        }
-        "supervisor.restartCloudflared" => match crate::supervisor::start_cloudflared(state, &req.params) {
-            Ok(v) => Response::ok(req.id, v),
-            Err((code, detail)) => Response::err(req.id, code, detail),
-        },
-        "supervisor.stopCloudflared" => {
-            let v = crate::supervisor::stop_cloudflared(state);
-            Response::ok(req.id, v)
-        }
+            }),
+        ),
         "health.get" => Response::ok(
             req.id,
             json!({
@@ -142,7 +124,6 @@ fn dispatch_method(state: &mut AppState, req: &Request) -> Response {
                 "ubuntu": state.ubuntu.running,
                 "ubuntu_pid": state.ubuntu.pid,
                 "ubuntu_version": state.ubuntu.version,
-                "cloudflared": state.supervisor.cloudflared_status().0,
                 "sessions": state.sessions.len(),
                 "selinux_enforcing": true
             }),
@@ -185,16 +166,11 @@ fn exec_root(state: &mut AppState, req: &Request) -> Response {
 }
 
 fn kill_tree(state: &mut AppState, req: &Request) -> Response {
-    let session = req
-        .params
-        .get("session")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let session = req.params.get("session").and_then(|v| v.as_str()).unwrap_or("");
     if session.is_empty() {
         return Response::err(req.id, ErrorCode::BadParams, "session required");
     }
     if state.mock {
-        // mock: keep the recording killer path (contract tests rely on it)
         if state.sessions.get(session).is_none() {
             state.sessions.insert(Session {
                 id: session.to_string(),
@@ -202,33 +178,36 @@ fn kill_tree(state: &mut AppState, req: &Request) -> Response {
                 children: vec![1001],
             });
         }
-        let mut killer = RecordingKiller {
-            term_alive: false,
-            calls: vec![],
-        };
-        return match state
-            .sessions
-            .kill_tree(session, std::time::Duration::from_millis(10), &mut killer)
-        {
+        let mut killer = RecordingKiller { term_alive: false, calls: vec![] };
+        return match state.sessions.kill_tree(
+            session,
+            std::time::Duration::from_millis(10),
+            &mut killer,
+        ) {
             Ok(steps) => Response::ok(req.id, json!({"steps": steps.len(), "mock": true})),
             Err(code) => Response::err(req.id, code, "killTree failed"),
         };
     }
     #[cfg(unix)]
     {
-        // real path: the session table is filled by exec/spawn callers; a
-        // missing session is a real error, not a mock fixture.
         let Some(sess) = state.sessions.get(session).cloned() else {
             return Response::err(req.id, ErrorCode::BadParams, "unknown session");
         };
         let mut killer = crate::session::RealKiller;
-        match state
-            .sessions
-            .kill_tree(session, std::time::Duration::from_secs(2), &mut killer)
-        {
+        match state.sessions.kill_tree(
+            session,
+            std::time::Duration::from_secs(2),
+            &mut killer,
+        ) {
             Ok(steps) => {
                 let _ = sess;
-                Response::ok(req.id, json!({"steps": steps.len(), "pgid": steps.first().map(|s| match s { crate::session::KillStep::Term { pgid } | crate::session::KillStep::Kill { pgid } => *pgid })}))
+                Response::ok(req.id, json!({
+                    "steps": steps.len(),
+                    "pgid": steps.first().map(|s| match s {
+                        crate::session::KillStep::Term { pgid }
+                        | crate::session::KillStep::Kill { pgid } => *pgid,
+                    })
+                }))
             }
             Err(code) => Response::err(req.id, code, "killTree failed"),
         }
@@ -236,17 +215,6 @@ fn kill_tree(state: &mut AppState, req: &Request) -> Response {
     #[cfg(not(unix))]
     {
         Response::err(req.id, ErrorCode::RuntimeUnavailable, "killTree requires unix")
-    }
-}
-
-fn reload_policy(state: &mut AppState, req: &Request) -> Response {
-    let json = req.params.get("json").and_then(|v| v.as_str());
-    let Some(json) = json else {
-        return Response::err(req.id, ErrorCode::BadParams, "json required");
-    };
-    match state.try_reload_policy(json) {
-        Ok(()) => Response::ok(req.id, json!({"reloaded": true})),
-        Err(e) => Response::err(req.id, ErrorCode::BadParams, format!("policy rejected, previous kept: {e}")),
     }
 }
 
@@ -293,31 +261,11 @@ mod tests {
     }
 
     #[test]
-    fn t_u3_policy_order_deny_and_rollback() {
+    fn removed_policy_reload_is_rejected() {
         let mut state = AppState::new(true, PolicyFile::default_policy());
-        let denied = handle(&mut state, req("root.shellRaw", json!({"cmd":"id"})), None);
-        assert_eq!(denied.error.unwrap().code, "POLICY_DENIED");
-
-        let previous = state.policy.methods.len();
-        let bad = handle(
-            &mut state,
-            req("policy.reload", json!({"json": "{\"methods\":{\"nope\":{\"mode\":\"allow\"}}}"})),
-            None,
-        );
-        assert!(!bad.ok);
-        assert_eq!(state.policy.methods.len(), previous);
-
-        let good = PolicyFile::default_policy();
-        let raw = serde_json::to_string(&json!({
-            "methods": {
-                "system.ping": {"mode":"allow"},
-                "root.shellRaw": {"mode":"deny"}
-            },
-            "caller": {"appUid": 0, "requireToken": false}
-        }))
-        .unwrap();
-        assert!(state.try_reload_policy(&raw).is_ok());
-        assert!(good.method("system.ping").is_some());
+        let resp = handle(&mut state, req("policy.reload", json!({"json": "{}"})), None);
+        assert!(!resp.ok);
+        assert_eq!(resp.error.unwrap().code, "BAD_PARAMS");
     }
 
     #[test]
