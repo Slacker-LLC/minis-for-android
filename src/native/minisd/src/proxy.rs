@@ -259,7 +259,7 @@ fn pump(a: TcpStream, b: TcpStream) -> Result<(), String> {
     let a2 = a.try_clone().map_err(|e| e.to_string())?;
     let b2 = b.try_clone().map_err(|e| e.to_string())?;
     let h = thread::spawn(move || copy(a2, b2));
-    let _ = copy(b, a);
+    copy(b, a);
     let _ = h.join();
     Ok(())
 }

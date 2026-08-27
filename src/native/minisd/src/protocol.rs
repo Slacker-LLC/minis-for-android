@@ -172,6 +172,9 @@ pub fn encode_frame(payload: &[u8], max: usize) -> Result<Vec<u8>, ErrorCode> {
     Ok(out)
 }
 
+// Parse failures are returned as complete wire-level responses so callers can
+// write them directly without a second error-to-protocol conversion/allocation.
+#[allow(clippy::result_large_err)]
 pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
     if bytes.len() > MAX_REQUEST_BYTES {
         return Err(Response::err(0, ErrorCode::BadParams, "request too large"));

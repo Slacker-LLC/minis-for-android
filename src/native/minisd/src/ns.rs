@@ -156,7 +156,7 @@ pub fn chroot_to(path: &str) -> Result<(), String> {
     if unsafe { libc::chroot(c.as_ptr()) } != 0 {
         return Err(last_err(&format!("chroot {path}")));
     }
-    if unsafe { libc::chdir(b"/\0".as_ptr() as *const libc::c_char) } != 0 {
+    if unsafe { libc::chdir(c"/".as_ptr()) } != 0 {
         return Err(last_err("chdir /"));
     }
     Ok(())

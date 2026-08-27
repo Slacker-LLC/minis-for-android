@@ -12,6 +12,9 @@ use serde_json::json;
 /// confirmation consumption and rate limiting) without executing the method.
 /// Socket serving can therefore snapshot execution inputs under a short state
 /// lock and run long subprocess work after releasing that lock.
+// A denied request is already a complete wire-level JSON-RPC response; boxing it
+// would add a heap allocation to the normal authorization failure path.
+#[allow(clippy::result_large_err)]
 pub fn authorize_request(
     state: &mut AppState,
     req: &Request,

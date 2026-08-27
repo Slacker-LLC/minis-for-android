@@ -154,7 +154,7 @@ fn main() -> ExitCode {
     }
     #[cfg(unix)]
     {
-        return unix_server(state, args.socket, args.app_socket);
+        unix_server(state, args.socket, args.app_socket)
     }
     #[cfg(not(unix))]
     {
@@ -279,12 +279,13 @@ fn running_as_root() -> bool {
 /// Returns the held File on success; the flock is released automatically when
 /// the fd is closed (i.e. when minisd exits). None means another instance is
 /// running (EWOULDBLOCK/EAGAIN) or the lock could not be taken at all.
-fn acquire_pidfile_lock(socket: &PathBuf) -> Option<std::fs::File> {
+fn acquire_pidfile_lock(socket: &std::path::Path) -> Option<std::fs::File> {
     use std::io::Write;
     use std::os::fd::AsRawFd;
     let pid_path = socket.with_extension("pid");
     let mut f = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .open(&pid_path)
@@ -721,6 +722,10 @@ fn helper_keep(
 }
 
 #[cfg(unix)]
+// This is the direct CLI-to-syscall helper boundary; keeping the security-
+// relevant uid/gid/rootfs/cwd/env inputs explicit is clearer than hiding them
+// in a loosely reusable options bag.
+#[allow(clippy::too_many_arguments)]
 fn helper_exec(
     pid: i32,
     rootfs: &str,
