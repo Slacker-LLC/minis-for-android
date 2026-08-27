@@ -1,0 +1,171 @@
+name: Apply persisted HTTP origin approval
+
+on:
+  push:
+    branches: [fix/provider-transport-policy]
+    paths:
+      - .github/workflows/apply-http-origin-approval.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/provider-transport-policy
+      - name: Persist and enforce cleartext origin approval
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found != count:
+                  raise SystemExit(f"{path}: expected {count} matches, found {found}\n--- needle ---\n{old}")
+              p.write_text(text.replace(old, new, count))
+              print(f"patched {path}")
+
+          # 1) Model state: approval is local configuration, default-deny for old JSON/imports.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/data/model/ProviderConfig.kt",
+              "    var customBaseURL: String? = null,\n    var appendV1Suffix: Boolean = true,",
+              "    var customBaseURL: String? = null,\n    // Canonical HTTP origin explicitly approved on this device. null means no\n    // cleartext approval. Export/import intentionally does not carry this trust.\n    var cleartextHttpApprovedOrigin: String? = null,\n    var appendV1Suffix: Boolean = true,",
+          )
+
+          # 2) Reuse provider meta KV so this security bit needs no Room table migration.
+          mapping = "src/android/app/src/main/java/com/openminis/app/data/db/ProviderConfigMapping.kt"
+          replace(
+              mapping,
+              "    const val JSON_SYNC_HASH = \"json_sync_hash\"\n}",
+              "    const val JSON_SYNC_HASH = \"json_sync_hash\"\n    private const val CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX = \"cleartext_http_approved_origin:\"\n    fun cleartextHttpApprovedOrigin(instanceId: String): String =\n        CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX + instanceId\n}",
+          )
+          replace(
+              mapping,
+              "    val metaRows = mutableListOf<ProviderConfigMetaEntity>()",
+              "    val metaRows = mutableListOf<ProviderConfigMetaEntity>()\n    instances.forEach { inst ->\n        inst.cleartextHttpApprovedOrigin?.let { origin ->\n            metaRows.add(\n                ProviderConfigMetaEntity(\n                    ProviderConfigMetaKeys.cleartextHttpApprovedOrigin(inst.id),\n                    origin,\n                )\n            )\n        }\n    }",
+          )
+          replace(
+              mapping,
+              "fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig {\n    val instances = this.instances.map { row ->",
+              "fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig {\n    val metaMap = this.meta.associate { it.key to it.value }\n    val instances = this.instances.map { row ->",
+          )
+          replace(
+              mapping,
+              "            customBaseURL = row.customBaseURL,\n            appendV1Suffix = row.appendV1Suffix != 0,",
+              "            customBaseURL = row.customBaseURL,\n            cleartextHttpApprovedOrigin = metaMap[\n                ProviderConfigMetaKeys.cleartextHttpApprovedOrigin(row.id)\n            ],\n            appendV1Suffix = row.appendV1Suffix != 0,",
+          )
+          replace(
+              mapping,
+              "    val metaMap = this.meta.associate { it.key to it.value }\n    return ProviderConfig(",
+              "    return ProviderConfig(",
+          )
+
+          # 3) Runtime policy requires approval for the exact current origin.
+          policy = "src/android/app/src/main/java/com/openminis/app/provider/ProviderTransportPolicy.kt"
+          replace(
+              policy,
+              "    fun isCleartextHttp(rawUrl: String?): Boolean =\n        rawUrl?.trim()?.toHttpUrlOrNull()?.scheme == \"http\"\n",
+              "    fun isCleartextHttp(rawUrl: String?): Boolean =\n        rawUrl?.trim()?.toHttpUrlOrNull()?.scheme == \"http\"\n\n    /** Canonical scheme/host/port key used to bind cleartext approval to one origin. */\n    fun originKey(rawUrl: String?): String? {\n        val url = rawUrl?.trim()?.toHttpUrlOrNull() ?: return null\n        if (url.scheme != \"http\" && url.scheme != \"https\") return null\n        return HttpUrl.Builder()\n            .scheme(url.scheme)\n            .host(url.host)\n            .port(url.port)\n            .build()\n            .toString()\n            .removeSuffix(\"/\")\n    }\n",
+          )
+          replace(
+              policy,
+              "        if (!isLocalOrPrivateHost(configured.host)) {\n            throw Violation(\"Cleartext HTTP is allowed only for local/private provider hosts; use HTTPS for public hosts.\")\n        }\n        return resolved",
+              "        if (!isLocalOrPrivateHost(configured.host)) {\n            throw Violation(\"Cleartext HTTP is allowed only for local/private provider hosts; use HTTPS for public hosts.\")\n        }\n        val configuredOrigin = originKey(configured.toString())\n        if (instance.cleartextHttpApprovedOrigin != configuredOrigin) {\n            throw Violation(\"Cleartext HTTP requires explicit approval for this exact provider origin.\")\n        }\n        return resolved",
+          )
+
+          # 4) Add-provider UI binds acknowledgement to canonical origin and persists it.
+          add = "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt"
+          replace(
+              add,
+              "    var approvedCleartextBase by remember { mutableStateOf<String?>(null) }\n    val trimmedCustomBase = customBaseURL.trim()\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val cleartextApproved = !isCleartextHttp || approvedCleartextBase == trimmedCustomBase",
+              "    var approvedCleartextOrigin by remember { mutableStateOf<String?>(null) }\n    val trimmedCustomBase = customBaseURL.trim()\n    val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val cleartextApproved = !isCleartextHttp || approvedCleartextOrigin == cleartextOrigin",
+          )
+          replace(
+              add,
+              "                        if (approvedCleartextBase != value.trim()) approvedCleartextBase = null\n                        onCustomBaseURLChange(value)",
+              "                        val newOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(value.trim())\n                        if (approvedCleartextOrigin != newOrigin) approvedCleartextOrigin = null\n                        onCustomBaseURLChange(value)",
+          )
+          replace(
+              add,
+              "                    checked = approvedCleartextBase == trimmedCustomBase,\n                    onCheckedChange = { allow ->\n                        approvedCleartextBase = if (allow) trimmedCustomBase else null",
+              "                    checked = approvedCleartextOrigin == cleartextOrigin,\n                    onCheckedChange = { allow ->\n                        approvedCleartextOrigin = if (allow) cleartextOrigin else null",
+          )
+          replace(
+              add,
+              "                customBaseURL = trimmedBase.ifEmpty { null },\n                appendV1Suffix = appendV1Suffix,",
+              "                customBaseURL = trimmedBase.ifEmpty { null },\n                cleartextHttpApprovedOrigin = if (isCleartextHttp && cleartextApproved) {\n                    cleartextOrigin\n                } else {\n                    null\n                },\n                appendV1Suffix = appendV1Suffix,",
+              count=1,
+          )
+
+          # 5) Existing-provider editor trusts only the persisted exact-origin approval.
+          detail = "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt"
+          replace(
+              detail,
+              "    var approvedCleartextBase by remember(instance.customBaseURL) {\n        mutableStateOf(instance.customBaseURL?.trim()?.takeIf {\n            com.openminis.app.provider.ProviderTransportPolicy.isCleartextHttp(it)\n        })\n    }\n    val trimmedCustomBase = customBaseURL.trim()\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val isOAuthCredential = instance.credentialType ==\n        com.openminis.app.data.model.ProviderCredential.oauth\n    val cleartextApproved = !isCleartextHttp ||\n        (!isOAuthCredential && approvedCleartextBase == trimmedCustomBase)",
+              "    val persistedCleartextOrigin = instance.cleartextHttpApprovedOrigin\n    var approvedCleartextOrigin by remember(instance.customBaseURL, persistedCleartextOrigin) {\n        val currentOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(instance.customBaseURL)\n        mutableStateOf(persistedCleartextOrigin?.takeIf { it == currentOrigin })\n    }\n    val trimmedCustomBase = customBaseURL.trim()\n    val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val isOAuthCredential = instance.credentialType ==\n        com.openminis.app.data.model.ProviderCredential.oauth\n    val cleartextApproved = !isCleartextHttp ||\n        (!isOAuthCredential && approvedCleartextOrigin == cleartextOrigin)",
+          )
+          replace(
+              detail,
+              "                            if (approvedCleartextBase != value.trim()) approvedCleartextBase = null\n                            customBaseURL = value",
+              "                            val newOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(value.trim())\n                            if (approvedCleartextOrigin != newOrigin) approvedCleartextOrigin = null\n                            customBaseURL = value",
+          )
+          replace(
+              detail,
+              "                            checked = approvedCleartextBase == trimmedCustomBase,\n                            onCheckedChange = { allow ->\n                                approvedCleartextBase = if (allow) trimmedCustomBase else null",
+              "                            checked = approvedCleartextOrigin == cleartextOrigin,\n                            onCheckedChange = { allow ->\n                                approvedCleartextOrigin = if (allow) cleartextOrigin else null",
+          )
+          replace(
+              detail,
+              "                                customBaseURL = customBaseURL.ifBlank { null },\n                                appendV1Suffix = appendV1Suffix,",
+              "                                customBaseURL = customBaseURL.ifBlank { null },\n                                cleartextHttpApprovedOrigin = if (isCleartextHttp && cleartextApproved) {\n                                    cleartextOrigin\n                                } else {\n                                    null\n                                },\n                                appendV1Suffix = appendV1Suffix,",
+          )
+
+          # 6) Tests: no approval => reject; exact approval => allow; origin changes invalidate it.
+          test = "src/android/app/src/test/java/com/openminis/app/provider/ProviderTransportPolicyTest.kt"
+          replace(
+              test,
+              "    fun `explicit custom http api-key base is allowed`() {\n        val instance = instance(customBase = \"http://192.168.1.20:11434\")",
+              "    fun `explicit approved custom http api-key base is allowed`() {\n        val instance = instance(\n            customBase = \"http://192.168.1.20:11434\",\n            approvedOrigin = \"http://192.168.1.20:11434\",\n        )",
+          )
+          replace(
+              test,
+              "    @Test\n    fun `http without explicit custom base is rejected`() {",
+              "    @Test\n    fun `local http without persisted approval is rejected`() {\n        expectViolation {\n            ProviderTransportPolicy.requireAllowedInstanceBase(\n                instance(customBase = \"http://192.168.1.20:11434\"),\n                \"http://192.168.1.20:11434/v1\",\n            )\n        }\n    }\n\n    @Test\n    fun `http without explicit custom base is rejected`() {",
+          )
+          replace(
+              test,
+              "                instance(customBase = \"http://192.168.1.20:11434\"),\n                \"http://192.168.1.21:11434/v1\",",
+              "                instance(\n                    customBase = \"http://192.168.1.20:11434\",\n                    approvedOrigin = \"http://192.168.1.20:11434\",\n                ),\n                \"http://192.168.1.21:11434/v1\",",
+          )
+          replace(
+              test,
+              "        customBase: String?,\n        credential: ProviderCredential = ProviderCredential.apiKey,\n    ) = ProviderInstance(",
+              "        customBase: String?,\n        credential: ProviderCredential = ProviderCredential.apiKey,\n        approvedOrigin: String? = null,\n    ) = ProviderInstance(",
+          )
+          replace(
+              test,
+              "        credentialType = credential,\n        customBaseURL = customBase,\n    )",
+              "        credentialType = credential,\n        customBaseURL = customBase,\n        cleartextHttpApprovedOrigin = approvedOrigin,\n    )",
+          )
+
+          # The shareable export/import path intentionally does not add the trust field.
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android/app/src/main/java/com/openminis/app/data/model/ProviderConfig.kt \
+                  src/android/app/src/main/java/com/openminis/app/data/db/ProviderConfigMapping.kt \
+                  src/android/app/src/main/java/com/openminis/app/provider/ProviderTransportPolicy.kt \
+                  src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt \
+                  src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt \
+                  src/android/app/src/test/java/com/openminis/app/provider/ProviderTransportPolicyTest.kt
+          git commit -m "security: persist cleartext provider origin approval"
+          git push origin HEAD:fix/provider-transport-policy
