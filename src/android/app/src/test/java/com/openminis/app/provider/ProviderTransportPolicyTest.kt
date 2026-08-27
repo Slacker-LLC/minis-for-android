@@ -23,14 +23,27 @@ class ProviderTransportPolicyTest {
     }
 
     @Test
-    fun `explicit custom http api-key base is allowed`() {
-        val instance = instance(customBase = "http://192.168.1.20:11434")
+    fun `explicit approved custom http api-key base is allowed`() {
+        val instance = instance(
+            customBase = "http://192.168.1.20:11434",
+            approvedOrigin = "http://192.168.1.20:11434",
+        )
         val url = ProviderTransportPolicy.requireAllowedInstanceBase(
             instance,
             "http://192.168.1.20:11434/v1",
         )
         assertEquals("192.168.1.20", url?.host)
         assertEquals(11434, url?.port)
+    }
+
+    @Test
+    fun `local http without persisted approval is rejected`() {
+        expectViolation {
+            ProviderTransportPolicy.requireAllowedInstanceBase(
+                instance(customBase = "http://192.168.1.20:11434"),
+                "http://192.168.1.20:11434/v1",
+            )
+        }
     }
 
     @Test
@@ -60,7 +73,10 @@ class ProviderTransportPolicyTest {
     fun `cleartext approval cannot be reused for another origin`() {
         expectViolation {
             ProviderTransportPolicy.requireAllowedInstanceBase(
-                instance(customBase = "http://192.168.1.20:11434"),
+                instance(
+                    customBase = "http://192.168.1.20:11434",
+                    approvedOrigin = "http://192.168.1.20:11434",
+                ),
                 "http://192.168.1.21:11434/v1",
             )
         }
@@ -115,12 +131,14 @@ class ProviderTransportPolicyTest {
     private fun instance(
         customBase: String?,
         credential: ProviderCredential = ProviderCredential.apiKey,
+        approvedOrigin: String? = null,
     ) = ProviderInstance(
         id = "test",
         label = "test",
         providerType = ProviderType.openAI,
         credentialType = credential,
         customBaseURL = customBase,
+        cleartextHttpApprovedOrigin = approvedOrigin,
     )
 
     private inline fun expectViolation(block: () -> Unit) {

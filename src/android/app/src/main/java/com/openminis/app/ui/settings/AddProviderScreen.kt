@@ -476,11 +476,12 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
     // OpenAI API Format: false = Chat Completions, true = Responses API
     var useResponsesAPI by remember { mutableStateOf(false) }
-    var approvedCleartextBase by remember { mutableStateOf<String?>(null) }
+    var approvedCleartextOrigin by remember { mutableStateOf<String?>(null) }
     val trimmedCustomBase = customBaseURL.trim()
+    val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)
     val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
         .isCleartextHttp(trimmedCustomBase)
-    val cleartextApproved = !isCleartextHttp || approvedCleartextBase == trimmedCustomBase
+    val cleartextApproved = !isCleartextHttp || approvedCleartextOrigin == cleartextOrigin
 
     // ── Credential ──────────────────────────────────────────────────────
     val keyPlaceholder = when (providerType) {
@@ -550,7 +551,8 @@ private fun ColumnScope.ApiKeyConfigSection(
                 SectionTextField(
                     value = customBaseURL,
                     onValueChange = { value ->
-                        if (approvedCleartextBase != value.trim()) approvedCleartextBase = null
+                        val newOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(value.trim())
+                        if (approvedCleartextOrigin != newOrigin) approvedCleartextOrigin = null
                         onCustomBaseURLChange(value)
                     },
                     placeholder = defaultUrl,
@@ -560,9 +562,9 @@ private fun ColumnScope.ApiKeyConfigSection(
             if (isCleartextHttp) {
                 SettingsSwitchRow(
                     title = "Allow insecure HTTP for this provider",
-                    checked = approvedCleartextBase == trimmedCustomBase,
+                    checked = approvedCleartextOrigin == cleartextOrigin,
                     onCheckedChange = { allow ->
-                        approvedCleartextBase = if (allow) trimmedCustomBase else null
+                        approvedCleartextOrigin = if (allow) cleartextOrigin else null
                     },
                     showDivider = false,
                 )
@@ -623,6 +625,11 @@ private fun ColumnScope.ApiKeyConfigSection(
                 providerType = providerType,
                 credentialType = ProviderCredential.apiKey,
                 customBaseURL = trimmedBase.ifEmpty { null },
+                cleartextHttpApprovedOrigin = if (isCleartextHttp && cleartextApproved) {
+                    cleartextOrigin
+                } else {
+                    null
+                },
                 appendV1Suffix = appendV1Suffix,
                 // Only OpenAI-family providers expose the Responses API toggle.
                 useResponsesAPI = providerType == ProviderType.openAI && useResponsesAPI,

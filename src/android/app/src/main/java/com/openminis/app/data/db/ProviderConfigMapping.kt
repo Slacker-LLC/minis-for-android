@@ -47,6 +47,9 @@ object ProviderConfigMetaKeys {
     // [T-android-vision-group / GH#182] Vision Group pointer (per-device meta KV).
     const val VISION_GROUP_ID = "vision_group_id"
     const val JSON_SYNC_HASH = "json_sync_hash"
+    private const val CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX = "cleartext_http_approved_origin:"
+    fun cleartextHttpApprovedOrigin(instanceId: String): String =
+        CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX + instanceId
 }
 
 /**
@@ -166,6 +169,16 @@ fun ProviderConfig.toSnapshot(
     }
 
     val metaRows = mutableListOf<ProviderConfigMetaEntity>()
+    instances.forEach { inst ->
+        inst.cleartextHttpApprovedOrigin?.let { origin ->
+            metaRows.add(
+                ProviderConfigMetaEntity(
+                    ProviderConfigMetaKeys.cleartextHttpApprovedOrigin(inst.id),
+                    origin,
+                )
+            )
+        }
+    }
     defaultPrimaryGroupId?.let {
         metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.DEFAULT_PRIMARY_GROUP_ID, it))
     }
@@ -194,6 +207,7 @@ fun ProviderConfig.toSnapshot(
  * group/agentLoop refs in the mirror JSON also point at the composite shape.
  */
 fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig {
+    val metaMap = this.meta.associate { it.key to it.value }
     val instances = this.instances.map { row ->
         ProviderInstance(
             id = row.id,
@@ -203,6 +217,9 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
             isEnabled = row.isEnabled != 0,
             createdAt = row.createdAt,
             customBaseURL = row.customBaseURL,
+            cleartextHttpApprovedOrigin = metaMap[
+                ProviderConfigMetaKeys.cleartextHttpApprovedOrigin(row.id)
+            ],
             appendV1Suffix = row.appendV1Suffix != 0,
             customUserAgent = row.customUserAgent,
             useResponsesAPI = row.useResponsesAPI != 0,
@@ -265,7 +282,6 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
         .map { it.targetId }
         .toMutableList()
 
-    val metaMap = this.meta.associate { it.key to it.value }
     return ProviderConfig(
         instances = instances,
         modelEntries = entries,

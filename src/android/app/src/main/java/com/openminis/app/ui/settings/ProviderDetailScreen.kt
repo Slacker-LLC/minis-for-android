@@ -127,18 +127,19 @@ fun ProviderDetailScreen(
     var isEnabled by remember { mutableStateOf(instance.isEnabled) }
     var customBaseURL by remember { mutableStateOf(instance.customBaseURL ?: "") }
     var appendV1Suffix by remember { mutableStateOf(instance.appendV1Suffix) }
-    var approvedCleartextBase by remember(instance.customBaseURL) {
-        mutableStateOf(instance.customBaseURL?.trim()?.takeIf {
-            com.openminis.app.provider.ProviderTransportPolicy.isCleartextHttp(it)
-        })
+    val persistedCleartextOrigin = instance.cleartextHttpApprovedOrigin
+    var approvedCleartextOrigin by remember(instance.customBaseURL, persistedCleartextOrigin) {
+        val currentOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(instance.customBaseURL)
+        mutableStateOf(persistedCleartextOrigin?.takeIf { it == currentOrigin })
     }
     val trimmedCustomBase = customBaseURL.trim()
+    val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)
     val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
         .isCleartextHttp(trimmedCustomBase)
     val isOAuthCredential = instance.credentialType ==
         com.openminis.app.data.model.ProviderCredential.oauth
     val cleartextApproved = !isCleartextHttp ||
-        (!isOAuthCredential && approvedCleartextBase == trimmedCustomBase)
+        (!isOAuthCredential && approvedCleartextOrigin == cleartextOrigin)
     // [T-provider-custom-user-agent] Per-provider UA override input. Only the
     // OpenAI-/Anthropic-compat custom-base section surfaces it (see gate below).
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
@@ -260,7 +261,8 @@ fun ProviderDetailScreen(
                     SectionTextField(
                         value = customBaseURL,
                         onValueChange = { value ->
-                            if (approvedCleartextBase != value.trim()) approvedCleartextBase = null
+                            val newOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(value.trim())
+                            if (approvedCleartextOrigin != newOrigin) approvedCleartextOrigin = null
                             customBaseURL = value
                         },
                         singleLine = true,
@@ -279,9 +281,9 @@ fun ProviderDetailScreen(
                     } else {
                         SettingsSwitchRow(
                             title = "Allow insecure HTTP for this provider",
-                            checked = approvedCleartextBase == trimmedCustomBase,
+                            checked = approvedCleartextOrigin == cleartextOrigin,
                             onCheckedChange = { allow ->
-                                approvedCleartextBase = if (allow) trimmedCustomBase else null
+                                approvedCleartextOrigin = if (allow) cleartextOrigin else null
                             },
                             showDivider = false,
                         )
@@ -364,6 +366,11 @@ fun ProviderDetailScreen(
                         providerRepository.updateInstance(
                             instance.copy(
                                 customBaseURL = customBaseURL.ifBlank { null },
+                                cleartextHttpApprovedOrigin = if (isCleartextHttp && cleartextApproved) {
+                                    cleartextOrigin
+                                } else {
+                                    null
+                                },
                                 appendV1Suffix = appendV1Suffix,
                                 // [T-provider-custom-user-agent] Blank → null →
                                 // default UA. Only the gated providers can edit

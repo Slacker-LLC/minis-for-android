@@ -32,6 +32,19 @@ object ProviderTransportPolicy {
     fun isCleartextHttp(rawUrl: String?): Boolean =
         rawUrl?.trim()?.toHttpUrlOrNull()?.scheme == "http"
 
+    /** Canonical scheme/host/port key used to bind cleartext approval to one origin. */
+    fun originKey(rawUrl: String?): String? {
+        val url = rawUrl?.trim()?.toHttpUrlOrNull() ?: return null
+        if (url.scheme != "http" && url.scheme != "https") return null
+        return HttpUrl.Builder()
+            .scheme(url.scheme)
+            .host(url.host)
+            .port(url.port)
+            .build()
+            .toString()
+            .removeSuffix("/")
+    }
+
     /**
      * True when [rawUrl] is an HTTP URL whose host is plausibly local/private.
      * No DNS lookup is performed for hostnames: single-label names, .local and
@@ -73,6 +86,10 @@ object ProviderTransportPolicy {
         }
         if (!isLocalOrPrivateHost(configured.host)) {
             throw Violation("Cleartext HTTP is allowed only for local/private provider hosts; use HTTPS for public hosts.")
+        }
+        val configuredOrigin = originKey(configured.toString())
+        if (instance.cleartextHttpApprovedOrigin != configuredOrigin) {
+            throw Violation("Cleartext HTTP requires explicit approval for this exact provider origin.")
         }
         return resolved
     }
