@@ -22,10 +22,7 @@
     "mount.prepare": { "mode": "allow" },
     "workspace.info": { "mode": "allow" },
     "workspace.setQuota": { "mode": "allow" },
-    "policy.reload": { "mode": "allow" },
     "policy.get": { "mode": "allow" },
-    "supervisor.status": { "mode": "allow" },
-    "supervisor.restartCloudflared": { "mode": "allow" },
     "health.get": { "mode": "allow" }
   },
   "caller": {
