@@ -1,7 +1,6 @@
 # Building Minis for Android
 
-This document describes the current `master` branch. The project is Android-only and builds
-`arm64-v8a`. Chinese instructions are in [BUILD-CN.md](BUILD-CN.md).
+This document tracks the current `master` branch. Published APKs currently target Android `arm64-v8a`. Chinese instructions are in [BUILD-CN.md](BUILD-CN.md).
 
 ## Requirements
 
@@ -9,56 +8,71 @@ This document describes the current `master` branch. The project is Android-only
 |---|---|
 | Host | Linux or WSL2 recommended |
 | JDK | 17 |
-| Android SDK | compileSdk 36, targetSdk 35, minSdk 26 |
-| Android NDK | r28+ (`28.0.13004108` used by the release build) |
+| Gradle | Wrapper 8.11.1 |
+| Android Gradle Plugin | 8.7.3 |
+| Kotlin | 2.1.0 |
+| Android SDK | compileSdk 36 / targetSdk 35 / minSdk 26 |
+| Android NDK | r28+ (`28.0.13004108` is the current example) |
 | CMake | 3.22.1 |
-| Node.js | 22+ (only for the Minis Web client plugin build) |
-| Shell tools | bash, curl, tar, make, awk, sed, sha256sum |
+| Rust | stable + `aarch64-unknown-linux-musl` target |
+| Shell tools | bash, curl, tar, awk, sed, sha256sum |
 
-Gradle 8.11.1, AGP 8.7.3, and Kotlin 2.1.0 are selected by the repository. Do not install a separate
-Gradle distribution.
+Use the repository Gradle wrapper. A separate Gradle installation is not required.
 
-## Clone
+## 1. Clone
 
 ```sh
 git clone https://github.com/Slacker-LLC/minis-for-android.git
-cd OpenMinis-Pet
+cd minis-for-android
 ```
 
-No submodules: the minisd Rust broker lives in-tree at `src/native/minisd`.
+The current repository has no Git submodules that need initialization. The Rust Root Broker lives in-tree at `src/native/minisd/`.
 
-## SDK and build customization
+## 2. Configure Android and provider customization
 
 ```sh
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"  # adjust locally
-export PATH="$HOME/.cargo/bin:$PATH"  # Rust toolchain for minisd
+export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
    src/android/app/provider-customization.properties
 ```
 
-Empty customization values are valid for API-key based providers. Features that require an omitted
-OAuth customization value fail explicitly at runtime; no private defaults are stored in this repository.
+Public-source builds may use empty customization values. Integrations that require private OAuth customization are not production-ready when those values are absent.
 
-## Build the sandbox assets
+## 3. Build minisd
 
 ```sh
-# minisd Root Broker (needs: rustup target add aarch64-unknown-linux-musl)
-cargo build --release --target aarch64-unknown-linux-musl \
-    --manifest-path src/native/minisd/Cargo.toml
+rustup target add aarch64-unknown-linux-musl
 
-# Ubuntu 24.04 arm64 rootfs (download + SHA-256 verify + tar)
+cargo build --release \
+  --target aarch64-unknown-linux-musl \
+  --manifest-path src/native/minisd/Cargo.toml
+```
+
+Output:
+
+```text
+src/native/minisd/target/aarch64-unknown-linux-musl/release/minisd
+```
+
+`minisd` is linked against musl for this target. The Android NDK is not used for this Rust cross-build step.
+
+## 4. Build the Ubuntu rootfs
+
+```sh
 ./scripts/build-ubuntu-rootfs.sh
 ```
 
-Generated minisd / Ubuntu rootfs artifacts are ignored by Git and must be recreated on a clean
-checkout. (PRoot/Alpine was removed in the P2 rebuild.)
+The script downloads Ubuntu 24.04 arm64 Ubuntu Base, overlays the Minis directory layout, and packages the rootfs.
 
-## Build the Minis Web client plugin
+The current rootfs is **base-only**. Tools such as `python3`, `git`, and `curl` are installed later by the on-device provisioning path; they are not preinstalled into the tarball by this script.
 
-## Build the APK
+The old Alpine + PRoot runtime has been removed. No PRoot submodule or PRoot sandbox preparation step is required.
+
+## 5. Build the APK
 
 ```sh
 cd src/android
@@ -71,7 +85,7 @@ Output:
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Install on a connected arm64 device with either:
+Install on a connected device:
 
 ```sh
 ./gradlew :app:installDebug
@@ -79,48 +93,80 @@ Install on a connected arm64 device with either:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Tests (focused regression baseline):
+## 6. Tests
 
 ```sh
 cd src/android
 ./gradlew :app:testDebugUnitTest
-
 ./gradlew :app:assembleDebugAndroidTest
 ```
 
-Use `./gradlew :app:connectedDebugAndroidTest` only with an explicitly authorized device. Thirty-eight
-Provider tests require OAuth customization or network fixtures that are intentionally absent from the
-public repository; do not remove them merely to produce a green unconfigured run.
+Run connected tests only on an explicitly authorized device:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest
+```
+
+Some Provider tests depend on OAuth customization or network fixtures that are intentionally absent from the public repository. Do not delete those tests merely to make an unconfigured environment green.
 
 ## Troubleshooting
 
-### cargo cross-compilation fails
+### Rust cross-compilation fails
 
-Run `rustup target add aarch64-unknown-linux-musl` and ensure `$HOME/.cargo/bin` is on PATH.
-minisd links musl statically — the Android NDK is not needed for it.
+Run:
 
-### Android NDK not found
+```sh
+rustup target add aarch64-unknown-linux-musl
+```
 
-Set `ANDROID_NDK_HOME` to an installed r28+ directory containing `toolchains/llvm/prebuilt`.
+and ensure `$HOME/.cargo/bin` is on `PATH`.
 
-### The app starts but sandbox commands fail
+### Android NDK is not found
 
-Check that minisd is installed at `/data/adb/minis/bin/minisd` (rooted device) and the Ubuntu
-rootfs is at `/data/adb/minis/rootfs`. The App auto-spawns the minisd watchdog on
-`UbuntuRuntime.ensureReady()`, so no manual daemon is needed. Execute a shell command and
-assert exit code 0:
+Point `ANDROID_NDK_HOME` to an installed r28+ directory containing:
+
+```text
+toolchains/llvm/prebuilt
+```
+
+### The app starts but Ubuntu shell commands fail
+
+On a rooted device, verify:
+
+```text
+/data/adb/minis/bin/minisd
+/data/adb/minis/rootfs
+```
+
+The app starts the minisd watchdog from the Ubuntu runtime readiness path.
+
+A direct status probe can be sent with:
 
 ```sh
 adb shell su -c "/data/adb/minis/bin/minisd --call --socket /data/adb/minis/run/minisd.sock"
-# feed: {"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
 ```
 
-## Signing and production releases
+then:
 
-The current `release` build type still uses debug signing, and debug APKs start DebugServer. This is
-acceptable only for development/self-test. A production release requires a protected release keystore,
-a release variant that does not start DebugServer, a complete security/test pass, an immutable source
-tag, and published artifact hashes.
+```json
+{"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
+```
 
-See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for minisd, the Ubuntu rootfs,
-and Android dependency licensing notes.
+## Production releases
+
+The current public APK is a debug-signed development build, and release hardening is still tracked in the repository Issues.
+
+A production release should require at least:
+
+- a protected long-term release keystore;
+- no DebugServer or debug-only surfaces in the production artifact;
+- release lint and CI gates;
+- a complete test/security pass;
+- an immutable source tag and published artifact hashes.
+
+See also:
+
+- [README.md](README.md)
+- [BUILD-CN.md](BUILD-CN.md)
+- [docs/SECURITY.md](docs/SECURITY.md)
+- [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
