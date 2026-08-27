@@ -1,0 +1,161 @@
+name: Apply cleartext UI local-only fix
+
+on:
+  push:
+    branches: [fix/provider-transport-policy]
+    paths:
+      - .github/workflows/apply-cleartext-ui-local-only.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/provider-transport-policy
+      - name: Restrict cleartext approval UI to local/private endpoints
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found != count:
+                  raise SystemExit(f"{path}: expected {count} matches, found {found}\n--- needle ---\n{old}")
+              p.write_text(text.replace(old, new, count))
+              print(f"patched {path}")
+
+          add = "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt"
+          replace(
+              add,
+              '''    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val cleartextApproved = !isCleartextHttp || approvedCleartextOrigin == cleartextOrigin''',
+              '''    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val isAllowedCleartextEndpoint = com.openminis.app.provider.ProviderTransportPolicy
+        .isAllowedCleartextEndpoint(trimmedCustomBase)
+    val cleartextApproved = !isCleartextHttp ||
+        (isAllowedCleartextEndpoint && approvedCleartextOrigin == cleartextOrigin)''',
+          )
+          replace(
+              add,
+              '''            if (isCleartextHttp) {
+                SettingsSwitchRow(
+                    title = "Allow insecure HTTP for this provider",
+                    checked = approvedCleartextOrigin == cleartextOrigin,
+                    onCheckedChange = { allow ->
+                        approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                    },
+                    showDivider = false,
+                )
+                Text(
+                    text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }''',
+              '''            if (isCleartextHttp) {
+                if (isAllowedCleartextEndpoint) {
+                    SettingsSwitchRow(
+                        title = "Allow insecure HTTP for this provider",
+                        checked = approvedCleartextOrigin == cleartextOrigin,
+                        onCheckedChange = { allow ->
+                            approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                        },
+                        showDivider = false,
+                    )
+                    Text(
+                        text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                } else {
+                    Text(
+                        text = "Cleartext HTTP is allowed only for local/private provider endpoints. Use HTTPS for public hosts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }''',
+          )
+
+          detail = "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt"
+          replace(
+              detail,
+              '''    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val isOAuthCredential = instance.credentialType ==
+        com.openminis.app.data.model.ProviderCredential.oauth
+    val cleartextApproved = !isCleartextHttp ||
+        (!isOAuthCredential && approvedCleartextOrigin == cleartextOrigin)''',
+              '''    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val isAllowedCleartextEndpoint = com.openminis.app.provider.ProviderTransportPolicy
+        .isAllowedCleartextEndpoint(trimmedCustomBase)
+    val isOAuthCredential = instance.credentialType ==
+        com.openminis.app.data.model.ProviderCredential.oauth
+    val cleartextApproved = !isCleartextHttp ||
+        (!isOAuthCredential && isAllowedCleartextEndpoint && approvedCleartextOrigin == cleartextOrigin)''',
+          )
+          replace(
+              detail,
+              '''                    } else {
+                        SettingsSwitchRow(
+                            title = "Allow insecure HTTP for this provider",
+                            checked = approvedCleartextOrigin == cleartextOrigin,
+                            onCheckedChange = { allow ->
+                                approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                            },
+                            showDivider = false,
+                        )
+                        Text(
+                            "HTTP is not encrypted. API keys and prompts can be read or changed on the network.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }''',
+              '''                    } else if (!isAllowedCleartextEndpoint) {
+                        Text(
+                            "Cleartext HTTP is allowed only for local/private provider endpoints. Use HTTPS for public hosts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        SettingsSwitchRow(
+                            title = "Allow insecure HTTP for this provider",
+                            checked = approvedCleartextOrigin == cleartextOrigin,
+                            onCheckedChange = { allow ->
+                                approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                            },
+                            showDivider = false,
+                        )
+                        Text(
+                            "HTTP is not encrypted. API keys and prompts can be read or changed on the network.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }''',
+          )
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt \
+                  src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt
+          git commit -m "fix: restrict cleartext approval UI to local endpoints"
+          git push origin HEAD:fix/provider-transport-policy
