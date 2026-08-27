@@ -236,7 +236,10 @@ mod tests {
 
         let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
         let group = std::fs::read_to_string(etc.join("group")).unwrap();
-        assert_eq!(passwd.lines().filter(|l| l.starts_with("minis:")).count(), 1);
+        assert_eq!(
+            passwd.lines().filter(|l| l.starts_with("minis:")).count(),
+            1
+        );
         assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert!(passwd.contains("minis:x:12345:12345:"));
         assert!(group.contains("minis:x:12345:"));
