@@ -82,7 +82,15 @@ class MinisdClient(
             val payload = MinisdProtocol.encodeRequest(request)
             appSocketPath?.let { path ->
                 if (File(path).exists()) {
-                    callLocal(path, payload, timeoutMs)?.let { return@withContext it }
+                    callLocal(path, payload, timeoutMs)?.let { local ->
+                        if (local.code != "NOT_AUTHORIZED") {
+                            return@withContext local
+                        }
+                        // A stale watchdog may still be enforcing a policy for
+                        // an old installation UID. Root fallback is required to
+                        // inspect that broker and repair the policy/watchdog.
+                        Log.w(TAG, "local minisd rejected app identity; retrying through su")
+                    }
                 }
             }
             val su = resolveSu()
