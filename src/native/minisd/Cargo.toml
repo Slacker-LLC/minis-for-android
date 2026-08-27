@@ -20,7 +20,7 @@ serde_json = "1.0.145"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.180"
-tokio = { version = "1.48.0", default-features = false, features = ["rt", "macros", "net", "time", "sync", "io-util", "signal"] }
+tokio = { version = "1.48.0", default-features = false, features = ["rt", "rt-multi-thread", "macros", "net", "time", "sync", "io-util", "signal"] }
 
 [profile.release]
 lto = true

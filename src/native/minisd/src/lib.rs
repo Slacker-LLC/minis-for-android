@@ -2,6 +2,7 @@ pub mod auth;
 pub mod dispatch;
 pub mod env;
 pub mod exec;
+pub mod ipc_exec;
 pub mod layout;
 pub mod ns;
 pub mod path_guard;
@@ -16,7 +17,7 @@ pub mod ubuntu;
 
 pub use dispatch::handle;
 pub use policy::PolicyFile;
-pub use protocol::{parse_request, encode_response, Request, Response};
+pub use protocol::{encode_response, parse_request, Request, Response};
 pub use state::AppState;
 
 /// Test-only convenience entry: always passes peer=None, so outside mock

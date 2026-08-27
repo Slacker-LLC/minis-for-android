@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_V: u32 = 1;
 pub const SUPPORTED_VERSIONS: &[u32] = &[1];
+pub const FRAME_HEADER_BYTES: usize = 4;
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
+pub const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 pub const MAX_ARG_BYTES: usize = 4096;
 pub const MAX_ARGS: usize = 32;
 pub const REQUEST_TIMEOUT_MS: u64 = 30_000;
@@ -139,6 +141,32 @@ impl Response {
     }
 }
 
+pub fn frame_header(len: usize, max: usize) -> Result<[u8; FRAME_HEADER_BYTES], ErrorCode> {
+    if len == 0 || len > max || len > u32::MAX as usize {
+        return Err(ErrorCode::BadParams);
+    }
+    Ok((len as u32).to_be_bytes())
+}
+
+pub fn decode_frame_len(
+    header: [u8; FRAME_HEADER_BYTES],
+    max: usize,
+) -> Result<usize, ErrorCode> {
+    let len = u32::from_be_bytes(header) as usize;
+    if len == 0 || len > max {
+        return Err(ErrorCode::BadParams);
+    }
+    Ok(len)
+}
+
+pub fn encode_frame(payload: &[u8], max: usize) -> Result<Vec<u8>, ErrorCode> {
+    let header = frame_header(payload.len(), max)?;
+    let mut out = Vec::with_capacity(FRAME_HEADER_BYTES + payload.len());
+    out.extend_from_slice(&header);
+    out.extend_from_slice(payload);
+    Ok(out)
+}
+
 pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
     if bytes.len() > MAX_REQUEST_BYTES {
         return Err(Response::err(0, ErrorCode::BadParams, "request too large"));
@@ -200,6 +228,25 @@ mod tests {
         let back: Response = serde_json::from_str(&encoded).unwrap();
         assert!(back.ok);
         assert_eq!(back.result.unwrap()["exit_code"], 0);
+    }
+
+    #[test]
+    fn frame_roundtrip_and_bounds() {
+        let payload = br#"{"v":1}"#;
+        let frame = encode_frame(payload, MAX_REQUEST_BYTES).unwrap();
+        let header: [u8; FRAME_HEADER_BYTES] = frame[..FRAME_HEADER_BYTES].try_into().unwrap();
+        let len = decode_frame_len(header, MAX_REQUEST_BYTES).unwrap();
+        assert_eq!(len, payload.len());
+        assert_eq!(&frame[FRAME_HEADER_BYTES..], payload);
+        assert_eq!(frame_header(0, MAX_REQUEST_BYTES), Err(ErrorCode::BadParams));
+        assert_eq!(
+            frame_header(MAX_REQUEST_BYTES + 1, MAX_REQUEST_BYTES),
+            Err(ErrorCode::BadParams)
+        );
+        assert_eq!(
+            decode_frame_len(((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes(), MAX_REQUEST_BYTES),
+            Err(ErrorCode::BadParams)
+        );
     }
 
     #[test]

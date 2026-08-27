@@ -1,5 +1,8 @@
 use minisd::policy::PolicyFile;
-use minisd::protocol::{encode_response, MAX_REQUEST_BYTES};
+use minisd::protocol::{
+    decode_frame_len, encode_response, frame_header, ErrorCode, Request, Response,
+    FRAME_HEADER_BYTES, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES,
+};
 use minisd::state::AppState;
 use minisd::{handle, parse_request};
 use std::fs;
@@ -158,7 +161,12 @@ fn main() -> ExitCode {
     }
 }
 
-fn watchdog_loop(mock: bool, socket: PathBuf, app_socket: Option<PathBuf>, policy: Option<PathBuf>) -> ExitCode {
+fn watchdog_loop(
+    mock: bool,
+    socket: PathBuf,
+    app_socket: Option<PathBuf>,
+    policy: Option<PathBuf>,
+) -> ExitCode {
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
@@ -187,6 +195,26 @@ fn watchdog_loop(mock: bool, socket: PathBuf, app_socket: Option<PathBuf>, polic
 }
 
 #[cfg(unix)]
+fn write_frame_sync<W: Write>(writer: &mut W, payload: &[u8], max: usize) -> Result<(), String> {
+    let header = frame_header(payload.len(), max).map_err(|_| "invalid frame size".to_string())?;
+    writer
+        .write_all(&header)
+        .and_then(|_| writer.write_all(payload))
+        .and_then(|_| writer.flush())
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+fn read_frame_sync<R: Read>(reader: &mut R, max: usize) -> Result<Vec<u8>, String> {
+    let mut header = [0u8; FRAME_HEADER_BYTES];
+    reader.read_exact(&mut header).map_err(|e| e.to_string())?;
+    let len = decode_frame_len(header, max).map_err(|_| "invalid frame size".to_string())?;
+    let mut payload = vec![0u8; len];
+    reader.read_exact(&mut payload).map_err(|e| e.to_string())?;
+    Ok(payload)
+}
+
+#[cfg(unix)]
 fn unix_call(socket: &PathBuf) -> ExitCode {
     use std::os::unix::net::UnixStream;
     let mut buf = Vec::new();
@@ -194,7 +222,7 @@ fn unix_call(socket: &PathBuf) -> ExitCode {
         eprintln!("stdin: {e}");
         return ExitCode::from(1);
     }
-    if buf.len() > MAX_REQUEST_BYTES {
+    if buf.is_empty() || buf.len() > MAX_REQUEST_BYTES {
         return ExitCode::from(1);
     }
     let mut stream = match UnixStream::connect(socket) {
@@ -204,15 +232,23 @@ fn unix_call(socket: &PathBuf) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    if let Err(e) = stream.write_all(&buf) {
-        eprintln!("write: {e}");
+    if let Err(e) = write_frame_sync(&mut stream, &buf, MAX_REQUEST_BYTES) {
+        eprintln!("write frame: {e}");
         return ExitCode::from(1);
     }
-    let mut out = String::new();
-    if let Err(e) = stream.read_to_string(&mut out) {
-        eprintln!("read: {e}");
-        return ExitCode::from(1);
-    }
+    let out = match read_frame_sync(&mut stream, MAX_RESPONSE_BYTES) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("response utf8: {e}");
+                return ExitCode::from(1);
+            }
+        },
+        Err(e) => {
+            eprintln!("read frame: {e}");
+            return ExitCode::from(1);
+        }
+    };
     print!("{out}");
     let success = serde_json::from_str::<serde_json::Value>(&out)
         .ok()
@@ -253,7 +289,6 @@ fn acquire_pidfile_lock(socket: &PathBuf) -> Option<std::fs::File> {
         .ok()?;
     let fd = f.as_raw_fd();
     if unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        // EWOULDBLOCK/EAGAIN: another minisd holds the lock.
         return None;
     }
     let _ = f.set_len(0);
@@ -268,19 +303,12 @@ fn acquire_pidfile_lock(socket: &PathBuf) -> Option<std::fs::File> {
 
 #[cfg(unix)]
 fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) -> ExitCode {
-    use minisd::auth::read_peer;
-    use std::os::unix::io::AsRawFd;
-    use std::sync::Arc;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     if let Some(parent) = socket.parent() {
         let _ = fs::create_dir_all(parent);
     }
     enable_subreaper();
-    // Hold the pidfile flock until process exit (fd closed on termination
-    // releases it), so watchdog and a manual start cannot run two brokers
-    // on the same socket.
     let lock = match acquire_pidfile_lock(&socket) {
         Some(f) => f,
         None => {
@@ -290,7 +318,8 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
     };
     let _ = lock;
     let _ = fs::remove_file(&socket);
-    let rt = match tokio::runtime::Builder::new_current_thread()
+    let rt = match tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
         .enable_all()
         .build()
     {
@@ -336,7 +365,10 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
                 Ok(s) => s,
                 Err(_) => continue,
             };
-            serve_client(stream, &state).await;
+            let state = Arc::clone(&state);
+            tokio::spawn(async move {
+                serve_client(stream, state).await;
+            });
         }
     })
 }
@@ -348,41 +380,150 @@ fn bind_sock(path: &PathBuf, mode: u32) -> Result<tokio::net::UnixListener, Stri
         let _ = fs::create_dir_all(parent);
     }
     let _ = fs::remove_file(path);
-    let listener = tokio::net::UnixListener::bind(path).map_err(|e| format!("bind {}: {e}", path.display()))?;
+    let listener = tokio::net::UnixListener::bind(path)
+        .map_err(|e| format!("bind {}: {e}", path.display()))?;
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
     Ok(listener)
 }
 
 #[cfg(unix)]
-async fn serve_client(mut stream: tokio::net::UnixStream, state: &std::sync::Arc<tokio::sync::Mutex<AppState>>) {
+async fn read_frame_async<R>(reader: &mut R, max: usize) -> Result<Vec<u8>, String>
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    use tokio::io::AsyncReadExt;
+    let mut header = [0u8; FRAME_HEADER_BYTES];
+    reader
+        .read_exact(&mut header)
+        .await
+        .map_err(|e| e.to_string())?;
+    let len = decode_frame_len(header, max).map_err(|_| "invalid frame size".to_string())?;
+    let mut payload = vec![0u8; len];
+    reader
+        .read_exact(&mut payload)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(payload)
+}
+
+#[cfg(unix)]
+async fn write_frame_async<W>(writer: &mut W, payload: &[u8], max: usize) -> Result<(), String>
+where
+    W: tokio::io::AsyncWrite + Unpin,
+{
+    use tokio::io::AsyncWriteExt;
+    let header = frame_header(payload.len(), max).map_err(|_| "invalid frame size".to_string())?;
+    writer
+        .write_all(&header)
+        .await
+        .map_err(|e| e.to_string())?;
+    writer
+        .write_all(payload)
+        .await
+        .map_err(|e| e.to_string())?;
+    writer.flush().await.map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+fn poisoned_lock<T>(
+    state: &std::sync::Arc<std::sync::Mutex<T>>,
+) -> std::sync::MutexGuard<'_, T> {
+    state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[cfg(unix)]
+async fn dispatch_socket_request(
+    state: std::sync::Arc<std::sync::Mutex<AppState>>,
+    req: Request,
+    peer: Option<minisd::auth::PeerCred>,
+) -> Response {
+    let id = req.id;
+    match req.method.as_str() {
+        "root.exec" => {
+            let (mock, spec) = {
+                let mut st = poisoned_lock(&state);
+                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                    return resp;
+                }
+                (st.mock, st.policy.method("root.exec").cloned())
+            };
+            match tokio::task::spawn_blocking(move || {
+                minisd::dispatch::execute_root_authorized(mock, spec, &req)
+            })
+            .await
+            {
+                Ok(resp) => resp,
+                Err(_) => Response::err(id, ErrorCode::Internal, "root.exec worker failed"),
+            }
+        }
+        "ubuntu.exec" | "ubuntu.adminExec" => {
+            let admin = req.method == "ubuntu.adminExec";
+            let snapshot = {
+                let mut st = poisoned_lock(&state);
+                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                    return resp;
+                }
+                if st.mock {
+                    return minisd::dispatch::dispatch_authorized(&mut st, &req);
+                }
+                match minisd::ipc_exec::snapshot_ubuntu_exec(&mut st) {
+                    Ok(snapshot) => snapshot,
+                    Err((code, detail)) => return Response::err(id, code, detail),
+                }
+            };
+            let params = req.params.clone();
+            match tokio::task::spawn_blocking(move || {
+                minisd::ipc_exec::execute_ubuntu_snapshot(snapshot, params, admin)
+            })
+            .await
+            {
+                Ok(Ok(value)) => Response::ok(id, value),
+                Ok(Err((code, detail))) => Response::err(id, code, detail),
+                Err(_) => Response::err(id, ErrorCode::Internal, "ubuntu.exec worker failed"),
+            }
+        }
+        _ => match tokio::task::spawn_blocking(move || {
+            let mut st = poisoned_lock(&state);
+            handle(&mut st, req, peer)
+        })
+        .await
+        {
+            Ok(resp) => resp,
+            Err(_) => Response::err(id, ErrorCode::Internal, "request worker failed"),
+        },
+    }
+}
+
+#[cfg(unix)]
+async fn serve_client(
+    mut stream: tokio::net::UnixStream,
+    state: std::sync::Arc<std::sync::Mutex<AppState>>,
+) {
     use minisd::auth::read_peer;
     use std::os::unix::io::AsRawFd;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let fd = stream.as_raw_fd();
-    let peer = read_peer(fd);
-    let mut buf = vec![0u8; MAX_REQUEST_BYTES + 1];
-    let read = tokio::time::timeout(
+
+    let peer = read_peer(stream.as_raw_fd());
+    let payload = match tokio::time::timeout(
         std::time::Duration::from_millis(minisd::protocol::REQUEST_TIMEOUT_MS),
-        stream.read(&mut buf),
+        read_frame_async(&mut stream, MAX_REQUEST_BYTES),
     )
-    .await;
-    let n = match read {
-        Ok(Ok(n)) => n,
+    .await
+    {
+        Ok(Ok(payload)) => payload,
         _ => return,
     };
-    if n == 0 || n > MAX_REQUEST_BYTES {
-        return;
-    }
-    let resp = {
-        let mut st = state.lock().await;
-        match parse_request(&buf[..n]) {
-            Ok(req) => handle(&mut st, req, peer),
-            Err(resp) => resp,
+    let req = match parse_request(&payload) {
+        Ok(req) => req,
+        Err(resp) => {
+            if let Ok(encoded) = encode_response(&resp) {
+                let _ = write_frame_async(&mut stream, encoded.as_bytes(), MAX_RESPONSE_BYTES).await;
+            }
+            return;
         }
     };
-    if let Ok(s) = encode_response(&resp) {
-        let _ = stream.write_all(s.as_bytes()).await;
-        let _ = stream.write_all(b"\n").await;
+    let resp = dispatch_socket_request(state, req, peer).await;
+    if let Ok(encoded) = encode_response(&resp) {
+        let _ = write_frame_async(&mut stream, encoded.as_bytes(), MAX_RESPONSE_BYTES).await;
     }
 }
 
@@ -437,23 +578,38 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 i += 1;
             }
             "--listen" => {
-                listen = args.get(i + 1).ok_or((8u8, "--listen needs value".into()))?.clone();
+                listen = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--listen needs value".into()))?
+                    .clone();
                 i += 2;
             }
             "--workspace" => {
-                workspace = args.get(i + 1).ok_or((8u8, "--workspace needs value".into()))?.clone();
+                workspace = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--workspace needs value".into()))?
+                    .clone();
                 i += 2;
             }
             "--memory" => {
-                memory = args.get(i + 1).ok_or((8u8, "--memory needs value".into()))?.clone();
+                memory = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--memory needs value".into()))?
+                    .clone();
                 i += 2;
             }
             "--skills" => {
-                skills = args.get(i + 1).ok_or((8u8, "--skills needs value".into()))?.clone();
+                skills = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--skills needs value".into()))?
+                    .clone();
                 i += 2;
             }
             "--shared" => {
-                shared = args.get(i + 1).ok_or((8u8, "--shared needs value".into()))?.clone();
+                shared = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--shared needs value".into()))?
+                    .clone();
                 i += 2;
             }
             "--rootfs" => {
@@ -506,8 +662,12 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 i += 2;
             }
             "--env" => {
-                let kv = args.get(i + 1).ok_or((8u8, "--env needs KEY=VAL".into()))?;
-                let (k, v) = kv.split_once('=').ok_or((8u8, "--env needs KEY=VAL".into()))?;
+                let kv = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--env needs KEY=VAL".into()))?;
+                let (k, v) = kv
+                    .split_once('=')
+                    .ok_or((8u8, "--env needs KEY=VAL".into()))?;
                 extra_env.insert(k.to_string(), v.to_string());
                 i += 2;
             }
@@ -520,14 +680,30 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     }
     match kind {
         "keep" => helper_keep(&rootfs, &workspace, &memory, &skills, &shared),
-        "exec" => helper_exec(pid, &rootfs, uid, gid, &cwd, &tz, &proxy, &extra_env, &guest_argv),
+        "exec" => helper_exec(
+            pid,
+            &rootfs,
+            uid,
+            gid,
+            &cwd,
+            &tz,
+            &proxy,
+            &extra_env,
+            &guest_argv,
+        ),
         "netproxy" => minisd::proxy::run_forever(&listen).map_err(|e| (1u8, e)),
         _ => Err((8, "helper kind must be keep|exec|netproxy".into())),
     }
 }
 
 #[cfg(unix)]
-fn helper_keep(rootfs: &str, workspace: &str, memory: &str, skills: &str, shared: &str) -> Result<(), (u8, String)> {
+fn helper_keep(
+    rootfs: &str,
+    workspace: &str,
+    memory: &str,
+    skills: &str,
+    shared: &str,
+) -> Result<(), (u8, String)> {
     use minisd::ns;
     unsafe {
         libc::setpgid(0, 0);
@@ -535,7 +711,8 @@ fn helper_keep(rootfs: &str, workspace: &str, memory: &str, skills: &str, shared
     ns::set_process_name("minisd-keep");
     ns::unshare_mount().map_err(|e| (1u8, e))?;
     ns::make_rprivate_root().map_err(|e| (2u8, e))?;
-    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared).map_err(|e| (3u8, e))?;
+    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared)
+        .map_err(|e| (3u8, e))?;
     println!("READY {}", std::process::id());
     let _ = std::io::Write::flush(&mut std::io::stdout());
     unsafe {
@@ -576,7 +753,6 @@ fn helper_exec(
         let _ = std::env::set_current_dir("/");
     }
     if uid == 0 {
-        // admin path: entering keeper ns must not keep privileges (05 §4)
         ns::lockdown_no_privs().map_err(|e| (6u8, e))?;
     } else {
         ns::drop_privs(uid, gid).map_err(|e| (6u8, e))?;
@@ -606,4 +782,51 @@ fn helper_exec(
         7,
         format!("execve {}: {}", argv[0], std::io::Error::last_os_error()),
     ))
+}
+
+#[cfg(all(test, unix))]
+mod ipc_tests {
+    use super::*;
+    use tokio::io::AsyncWriteExt;
+
+    #[test]
+    fn framed_reader_accepts_fragmented_stream_writes() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let (mut client, mut server) = tokio::io::duplex(256);
+            let payload = br#"{"v":1,"id":9,"method":"system.ping"}"#.to_vec();
+            let header = frame_header(payload.len(), MAX_REQUEST_BYTES).unwrap();
+            let expected = payload.clone();
+            let writer = tokio::spawn(async move {
+                client.write_all(&header[..2]).await.unwrap();
+                tokio::task::yield_now().await;
+                client.write_all(&header[2..]).await.unwrap();
+                client.write_all(&payload[..7]).await.unwrap();
+                tokio::task::yield_now().await;
+                client.write_all(&payload[7..]).await.unwrap();
+            });
+            let got = read_frame_async(&mut server, MAX_REQUEST_BYTES)
+                .await
+                .unwrap();
+            writer.await.unwrap();
+            assert_eq!(got, expected);
+        });
+    }
+
+    #[test]
+    fn framed_reader_rejects_oversize_before_payload_allocation() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let (mut client, mut server) = tokio::io::duplex(16);
+            let header = ((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes();
+            client.write_all(&header).await.unwrap();
+            assert!(read_frame_async(&mut server, MAX_REQUEST_BYTES).await.is_err());
+        });
+    }
 }
