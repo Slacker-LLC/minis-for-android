@@ -33,6 +33,8 @@ data class MinisdResponse(
 
 object MinisdProtocol {
     const val PROTOCOL_V = 1
+    const val MAX_REQUEST_BYTES = 64 * 1024
+    const val MAX_RESPONSE_BYTES = 1024 * 1024
     const val DEFAULT_SOCKET = "/data/adb/minis/run/minisd.sock"
     const val DEFAULT_BIN = "/data/adb/minis/bin/minisd"
     const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"
