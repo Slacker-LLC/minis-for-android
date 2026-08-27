@@ -5,9 +5,12 @@ import android.net.LocalSocketAddress
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * App-side client for the already-installed minisd.
@@ -92,16 +95,41 @@ class MinisdClient(
             } catch (t: Throwable) {
                 return@withContext unavailable("failed to start su: ${t.message}")
             }
+
+            val stdoutRef = AtomicReference("")
+            val stderrRef = AtomicReference("")
+            val stdoutThread = Thread({
+                runCatching { proc.inputStream.bufferedReader().use { it.readText() } }
+                    .onSuccess(stdoutRef::set)
+                    .onFailure { Log.d(TAG, "minisd helper stdout: ${it.message}") }
+            }, "minisd-stdout")
+            val stderrThread = Thread({
+                runCatching { proc.errorStream.bufferedReader().use { it.readText() } }
+                    .onSuccess(stderrRef::set)
+                    .onFailure { Log.d(TAG, "minisd helper stderr: ${it.message}") }
+            }, "minisd-stderr")
+            stdoutThread.isDaemon = true
+            stderrThread.isDaemon = true
+            stdoutThread.start()
+            stderrThread.start()
+
             try {
-                proc.outputStream.bufferedWriter().use { it.write(payload); it.flush() }
-                proc.outputStream.close()
+                proc.outputStream.bufferedWriter().use {
+                    it.write(payload)
+                    it.flush()
+                }
                 val finished = proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
                 if (!finished) {
                     proc.destroyForcibly()
+                    proc.waitFor(1_000, TimeUnit.MILLISECONDS)
+                    stdoutThread.join(1_000)
+                    stderrThread.join(1_000)
                     return@withContext unavailable("minisd --call timed out after ${timeoutMs}ms")
                 }
-                val stdout = proc.inputStream.bufferedReader().readText()
-                val stderr = proc.errorStream.bufferedReader().readText()
+                stdoutThread.join(1_000)
+                stderrThread.join(1_000)
+                val stdout = stdoutRef.get()
+                val stderr = stderrRef.get()
                 if (stdout.isBlank()) {
                     return@withContext unavailable(
                         "empty minisd response (exit=${proc.exitValue()} stderr=${stderr.take(300)})",
@@ -119,12 +147,27 @@ class MinisdClient(
     private fun callLocal(path: String, payload: String, timeoutMs: Long): MinisdResponse? {
         val sock = LocalSocket()
         return try {
+            val bytes = payload.toByteArray(Charsets.UTF_8)
+            if (bytes.isEmpty() || bytes.size > MinisdProtocol.MAX_REQUEST_BYTES) {
+                return null
+            }
             sock.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
             sock.soTimeout = timeoutMs.toInt().coerceAtMost(Int.MAX_VALUE)
-            sock.outputStream.write(payload.toByteArray())
-            sock.shutdownOutput()
-            val out = sock.inputStream.bufferedReader().readText()
-            if (out.isBlank()) null else MinisdProtocol.decodeResponse(out)
+
+            val output = DataOutputStream(sock.outputStream)
+            output.writeInt(bytes.size)
+            output.write(bytes)
+            output.flush()
+
+            val input = DataInputStream(sock.inputStream)
+            val responseSize = input.readInt()
+            if (responseSize !in 1..MinisdProtocol.MAX_RESPONSE_BYTES) {
+                Log.w(TAG, "invalid minisd frame size: $responseSize")
+                return null
+            }
+            val response = ByteArray(responseSize)
+            input.readFully(response)
+            MinisdProtocol.decodeResponse(response.toString(Charsets.UTF_8))
         } catch (t: Throwable) {
             Log.d(TAG, "local $path: ${t.message}")
             null
