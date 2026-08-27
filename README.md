@@ -1,8 +1,7 @@
 # Minis for Android
 
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](https://github.com/Slacker-LLC/minis-for-android/releases)
-[![Release](https://img.shields.io/badge/release-v1.01--beta.2-blue)](https://github.com/Slacker-LLC/minis-for-android/releases/tag/v1.01-beta.2)
-[![ABI](https://img.shields.io/badge/release%20ABI-arm64--v8a-orange)](#安装)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#从源码构建)
+[![ABI](https://img.shields.io/badge/ABI-arm64--v8a-orange)](#从源码构建)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 Minis for Android 是一个 Android 原生 AI Agent 运行时。Agent、会话、工具、数据库和 Android 能力都由 App 侧管理；Root 设备可使用 `minisd` 启动 Ubuntu 24.04 chroot 作为默认 Linux 执行环境，并通过 MCP 对外暴露受控工具能力。
@@ -17,25 +16,18 @@ Android App
    └─ Ubuntu 24.04 chroot
 ```
 
-> 当前主架构已经移除 Alpine + PRoot 和旧 Web Remote / Cloudflare Tunnel。历史资料只作为归档参考，不应作为当前实现说明。
+> 当前主架构已经移除 Alpine + PRoot 和旧 Web Remote / Cloudflare Tunnel。仓库目前只维护源码，不在 Git 中提交 APK，也不保留旧版本 Release / tag 作为当前产品入口。
 
-## 当前版本
+## 当前开发状态
 
-| 项目 | 值 |
-|---|---|
-| Release | [`v1.01-beta.2`](https://github.com/Slacker-LLC/minis-for-android/releases/tag/v1.01-beta.2) |
-| Android version | `1.01-beta.2` (`versionCode 39`) |
-| applicationId | `dev.openminispet.android` |
-| Published ABI | `arm64-v8a` |
-| APK | `OpenMinis-Pet-1.01-beta.2-arm64-debug.apk` |
-| SHA-256 | `4158bdd821d5a9b6b48c950dc9568842ec7c8f630d9c35467a54bacdef4e9490` |
+当前 `master` 是持续开发分支。版本号只用于 Android 构建兼容，不代表存在对应的 GitHub Release。
 
-当前发布 APK 使用 Android Debug 签名，只适合开发、自测和源码对应验证，不是生产发布包。生产发布仍需要独立 release keystore、release 构建门禁和安全验收。
+- applicationId: `dev.openminispet.android`
+- minSdk: 26
+- 当前主要 ABI: `arm64-v8a`
+- 发布状态: **源码开发阶段，无预编译 APK 发布**
 
-- [Release](https://github.com/Slacker-LLC/minis-for-android/releases/tag/v1.01-beta.2)
-- [对应源码](https://github.com/Slacker-LLC/minis-for-android/tree/v1.01-beta.2)
-- [发布说明](RELEASE-NOTES.md)
-- [变更记录](CHANGELOG.md)
+详细状态见 [docs/DEVELOPMENT-STATUS.md](docs/DEVELOPMENT-STATUS.md)，已知问题见 [Issues](https://github.com/Slacker-LLC/minis-for-android/issues)。
 
 ## 主要能力
 
@@ -44,7 +36,7 @@ Android App
 - 多 Provider、模型组、OAuth/API Key、图片输入、会话历史和工具调用；
 - Goal、Todo、Plan、Job、Subagent、提问/反馈、Token 计量、上下文压力和结果落盘；
 - 文件读写、编辑、浏览器、记忆、Android 系统工具和 Linux shell；
-- 工具超时、审批、执行检查点、危险命令策略和大输出处理。
+- 工具超时、审批、执行检查点、危险命令策略和大输出治理。
 
 ### Ubuntu chroot 与 Root Broker
 
@@ -87,23 +79,13 @@ Ubuntu 24.04 userspace
 
 ## 安全状态
 
-这是一个高权限 Agent 项目，尤其是 `minisd`、Root、MCP 和 Android 系统工具属于关键安全边界。
+这是一个高权限 Agent 项目，`minisd`、Root、MCP 和 Android 系统工具都属于关键安全边界。
 
-当前仓库已建立对应安全文档和问题跟踪，但仍存在待修复的安全/发布问题。不要把当前 Debug APK 当作生产安全版本。
+当前仍有 P0/P1 安全、可靠性和发布工程问题在收口，因此仓库不提供“可直接安装的正式版”承诺。
 
 - [安全设计](docs/SECURITY.md)
 - [当前开发状态](docs/DEVELOPMENT-STATUS.md)
 - [Open issues](https://github.com/Slacker-LLC/minis-for-android/issues)
-
-## 安装
-
-要求 Android 8.0（API 26）或更高版本。当前发布 APK 面向 arm64 设备。
-
-```bash
-adb install -r OpenMinis-Pet-1.01-beta.2-arm64-debug.apk
-```
-
-按需授予系统权限：悬浮窗、通知、电池优化豁免、系统助手、Accessibility、Shizuku 或 Root 等。HyperOS 等系统还可能需要单独允许后台运行和自启动。
 
 ## 从源码构建
 
@@ -132,10 +114,18 @@ cd src/android
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
-APK 输出：
+APK 只作为本地构建产物生成：
 
 ```text
 src/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+不要把 APK、AAB 或其他大体积构建产物提交到 Git。
+
+安装本地构建：
+
+```bash
+adb install -r src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 详细步骤：
@@ -149,12 +139,11 @@ src/android/app/build/outputs/apk/debug/app-debug.apk
 |---|---|
 | `src/android/` | Android App、Compose UI、Room、Provider、MCP、Tool Runtime |
 | `src/native/minisd/` | Rust Root Broker |
-| `src/shared/` | Android/iOS 历史共享规则中仍被当前构建使用的资源 |
+| `src/shared/` | 当前构建仍使用的共享规则/资源 |
 | `scripts/` | rootfs、构建和维护脚本 |
 | `docs/` | 当前架构、安全、状态、规格和归档文档 |
 | `assets/` | README/项目展示资源 |
-| `releases/` | 与源码版本对应的发布产物记录 |
-| `.github/` | Issue / PR 模板及后续 CI 配置 |
+| `.github/` | Issue / PR 模板与 CI 配置 |
 
 文档索引见 [docs/README.md](docs/README.md)。
 
@@ -164,15 +153,15 @@ src/android/app/build/outputs/apk/debug/app-debug.apk
 
 ```text
 运行源码与测试
-  > 当前架构/安全文档
-  > README / Release Notes
+  > 当前架构 / 安全文档
+  > README / CHANGELOG
   > archive / upstream 历史资料
 ```
 
-如果文档与当前 `master` 实现冲突，以源码和测试为准，并请提交 Issue。
+如果文档与当前 `master` 实现冲突，以源码和测试为准。
 
 ## 起源与许可证
 
 本项目代码谱系包含 [OpenMinis](https://github.com/OpenMinis/OpenMinis)（GPL-3.0）及其他开源组件。第三方来源和许可证见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 与 [README-upstream.md](README-upstream.md)。
 
-本项目整体按 [GPL-3.0](LICENSE) 分发。分发修改后的 APK 时应同时满足对应源码提供义务。
+本项目整体按 [GPL-3.0](LICENSE) 分发。分发自行构建或修改后的 APK 时应同时满足对应源码提供义务。
