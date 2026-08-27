@@ -21,6 +21,16 @@ jobs:
       - name: Test minisd
         run: cargo test --locked --manifest-path src/native/minisd/Cargo.toml
 
+  rootfs-verification:
+    name: Rootfs verification tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh
+      - name: Fail-closed checksum tests
+        run: bash scripts/test-build-ubuntu-rootfs-verification.sh
+
   android:
     name: Android compile
     runs-on: ubuntu-24.04
