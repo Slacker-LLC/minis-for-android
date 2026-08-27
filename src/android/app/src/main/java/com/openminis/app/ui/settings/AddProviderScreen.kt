@@ -481,7 +481,10 @@ private fun ColumnScope.ApiKeyConfigSection(
     val cleartextOrigin = com.openminis.app.provider.ProviderTransportPolicy.originKey(trimmedCustomBase)
     val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
         .isCleartextHttp(trimmedCustomBase)
-    val cleartextApproved = !isCleartextHttp || approvedCleartextOrigin == cleartextOrigin
+    val isAllowedCleartextEndpoint = com.openminis.app.provider.ProviderTransportPolicy
+        .isAllowedCleartextEndpoint(trimmedCustomBase)
+    val cleartextApproved = !isCleartextHttp ||
+        (isAllowedCleartextEndpoint && approvedCleartextOrigin == cleartextOrigin)
 
     // ── Credential ──────────────────────────────────────────────────────
     val keyPlaceholder = when (providerType) {
@@ -560,20 +563,29 @@ private fun ColumnScope.ApiKeyConfigSection(
                 )
             }
             if (isCleartextHttp) {
-                SettingsSwitchRow(
-                    title = "Allow insecure HTTP for this provider",
-                    checked = approvedCleartextOrigin == cleartextOrigin,
-                    onCheckedChange = { allow ->
-                        approvedCleartextOrigin = if (allow) cleartextOrigin else null
-                    },
-                    showDivider = false,
-                )
-                Text(
-                    text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+                if (isAllowedCleartextEndpoint) {
+                    SettingsSwitchRow(
+                        title = "Allow insecure HTTP for this provider",
+                        checked = approvedCleartextOrigin == cleartextOrigin,
+                        onCheckedChange = { allow ->
+                            approvedCleartextOrigin = if (allow) cleartextOrigin else null
+                        },
+                        showDivider = false,
+                    )
+                    Text(
+                        text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                } else {
+                    Text(
+                        text = "Cleartext HTTP is allowed only for local/private provider endpoints. Use HTTPS for public hosts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
             }
             // Auto Append "/v1" toggle (not for Gemini — Gemini uses full path)
             if (providerType != ProviderType.gemini) {
