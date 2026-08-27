@@ -1,0 +1,201 @@
+name: Apply provider transport wiring
+
+on:
+  push:
+    branches: [fix/provider-transport-policy]
+    paths:
+      - .github/workflows/apply-provider-transport.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/provider-transport-policy
+      - name: Apply transport policy wiring
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              found = text.count(old)
+              if found != count:
+                  raise SystemExit(f"{path}: expected {count} matches, found {found}\n--- needle ---\n{old}")
+              p.write_text(text.replace(old, new, count))
+              print(f"patched {path}")
+
+          # Runtime gate: every ProviderInstance is validated before construction.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/ProviderFactory.kt",
+              "        val basePath = instance.effectiveBaseURL\n        val provider: LLMProvider = when (instance.providerType) {",
+              "        val basePath = instance.effectiveBaseURL\n        ProviderTransportPolicy.requireAllowedInstanceBase(instance, basePath)\n        val provider: LLMProvider = when (instance.providerType) {",
+          )
+
+          # Model refresh is a second credential-bearing network entry point.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/data/repository/ProviderRepository.kt",
+              "    suspend fun refreshModels(instance: ProviderInstance) {\n        var apiKey = loadApiKey(instance.id)",
+              "    suspend fun refreshModels(instance: ProviderInstance) {\n        com.openminis.app.provider.ProviderTransportPolicy\n            .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)\n        var apiKey = loadApiKey(instance.id)",
+          )
+
+          # Provider clients: never auto-downgrade HTTPS; approved HTTP never redirects.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt",
+              "        .eventListenerFactory { OkHttpNetTraceListener() }\n        .build()",
+              "        .eventListenerFactory { OkHttpNetTraceListener() }\n        .let { com.openminis.app.provider.ProviderTransportPolicy.configureClient(it, basePath) }\n        .build()",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt",
+              "        .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)\n        .build()",
+              "        .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)\n        .let { com.openminis.app.provider.ProviderTransportPolicy.configureClient(it, basePath) }\n        .build()",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt",
+              "        .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)\n        .build()",
+              "        .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)\n        .let { com.openminis.app.provider.ProviderTransportPolicy.configureClient(it, basePath) }\n        .build()",
+          )
+
+          # Provider-returned image URLs are a separate cleartext/SSRF surface.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt",
+              "                        val dlReq = Request.Builder().url(urlStr).get().build()\n                        val dlResp = client.newCall(dlReq).execute()",
+              "                        val safeUrl = com.openminis.app.provider.ProviderTransportPolicy\n                            .requireAllowedSecondaryUrl(basePath, urlStr)\n                        val dlReq = Request.Builder().url(safeUrl).get().build()\n                        val dlResp = client.newCall(dlReq).execute()",
+          )
+
+          # Model-catalog clients carry credentials too, so they get the same redirect policy.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIModelsApi.kt",
+              "    private val client = OkHttpClient()\n    private val cache = ProviderModelsCache(\"openai\")",
+              "    private val cache = ProviderModelsCache(\"openai\")",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIModelsApi.kt",
+              "        val url = buildURL(baseURL)\n        val request = Request.Builder()",
+              "        val url = buildURL(baseURL)\n        val client = com.openminis.app.provider.ProviderTransportPolicy.clientForBase(url)\n        val request = Request.Builder()",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicModelsApi.kt",
+              "object AnthropicModelsApi {\n    private val client = OkHttpClient()",
+              "object AnthropicModelsApi {",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicModelsApi.kt",
+              "            val url = buildURL(candidate, forceV1Discovery = idx > 0)\n            val requestBuilder = Request.Builder()",
+              "            val url = buildURL(candidate, forceV1Discovery = idx > 0)\n            val client = com.openminis.app.provider.ProviderTransportPolicy.clientForBase(url)\n            val requestBuilder = Request.Builder()",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiModelsApi.kt",
+              "object GeminiModelsApi {\n    private val client = OkHttpClient()",
+              "object GeminiModelsApi {\n    private val client = com.openminis.app.provider.ProviderTransportPolicy.protectedHttpsClient()",
+          )
+
+          # OAuth exchanges and refreshes are HTTPS-only even though Android's platform
+          # cleartext switch remains enabled for user-chosen LAN providers.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/auth/OAuthManager.kt",
+              "        internal val httpClient = OkHttpClient.Builder()\n            .connectTimeout(15, TimeUnit.SECONDS)",
+              "        internal val httpClient = com.openminis.app.provider.ProviderTransportPolicy\n            .protectedHttpsBuilder(OkHttpClient.Builder())\n            .connectTimeout(15, TimeUnit.SECONDS)",
+          )
+
+          # Update metadata + APK downloads are HTTPS-only and cannot follow an
+          # HTTPS -> HTTP redirect. Returned asset URLs are filtered before display/use.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/data/UpdateChecker.kt",
+              "    private val client = OkHttpClient.Builder()\n        .connectTimeout(15, TimeUnit.SECONDS)",
+              "    private val client = com.openminis.app.provider.ProviderTransportPolicy\n        .protectedHttpsBuilder(OkHttpClient.Builder())\n        .connectTimeout(15, TimeUnit.SECONDS)",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/data/UpdateChecker.kt",
+              "                val u = a.optString(\"browser_download_url\").ifEmpty { null }\n                if (u != null) return u to a.optLong(\"size\", 0)",
+              "                val raw = a.optString(\"browser_download_url\").ifEmpty { null }\n                val u = raw?.let { candidate ->\n                    runCatching {\n                        com.openminis.app.provider.ProviderTransportPolicy\n                            .requireHttps(candidate, \"update APK URL\")\n                            .toString()\n                    }.getOrNull()\n                }\n                if (u != null) return u to a.optLong(\"size\", 0)",
+          )
+
+          # Add-provider UI: entering HTTP is a deliberate action and requires an
+          # explicit acknowledgement. OAuth/manual-bearer endpoints are blocked.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "    var useResponsesAPI by remember { mutableStateOf(false) }\n\n    // ── Credential",
+              "    var useResponsesAPI by remember { mutableStateOf(false) }\n    var approvedCleartextBase by remember { mutableStateOf<String?>(null) }\n    val trimmedCustomBase = customBaseURL.trim()\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val cleartextApproved = !isCleartextHttp || approvedCleartextBase == trimmedCustomBase\n\n    // ── Credential",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "                    value = customBaseURL,\n                    onValueChange = onCustomBaseURLChange,\n                    placeholder = defaultUrl,\n                    singleLine = true,",
+              "                    value = customBaseURL,\n                    onValueChange = { value ->\n                        if (approvedCleartextBase != value.trim()) approvedCleartextBase = null\n                        onCustomBaseURLChange(value)\n                    },\n                    placeholder = defaultUrl,\n                    singleLine = true,",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "            }\n            // Auto Append \"/v1\" toggle (not for Gemini — Gemini uses full path)",
+              "            }\n            if (isCleartextHttp) {\n                SettingsSwitchRow(\n                    title = \"Allow insecure HTTP for this provider\",\n                    checked = approvedCleartextBase == trimmedCustomBase,\n                    onCheckedChange = { allow ->\n                        approvedCleartextBase = if (allow) trimmedCustomBase else null\n                    },\n                    showDivider = false,\n                )\n                Text(\n                    text = \"HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.\",\n                    style = MaterialTheme.typography.bodySmall,\n                    color = MaterialTheme.colorScheme.error,\n                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),\n                )\n            }\n            // Auto Append \"/v1\" toggle (not for Gemini — Gemini uses full path)",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "        enabled = apiKey.isNotBlank() || (\n            customBaseURL.isNotBlank() &&\n                (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)\n        ),",
+              "        enabled = cleartextApproved && (\n            apiKey.isNotBlank() || (\n                customBaseURL.isNotBlank() &&\n                    (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)\n            )\n        ),",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "    var customBaseURL by remember { mutableStateOf(\"\") }\n    var appendV1Suffix by remember { mutableStateOf(providerType != ProviderType.gemini) }",
+              "    var customBaseURL by remember { mutableStateOf(\"\") }\n    var appendV1Suffix by remember { mutableStateOf(providerType != ProviderType.gemini) }\n    val manualHttpBlocked = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(customBaseURL)",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "                    value = customBaseURL,\n                    onValueChange = { customBaseURL = it },\n                    placeholder = defaultUrl,\n                    singleLine = true,\n                )\n                Spacer(Modifier.height(12.dp))",
+              "                    value = customBaseURL,\n                    onValueChange = { customBaseURL = it },\n                    placeholder = defaultUrl,\n                    singleLine = true,\n                )\n                if (manualHttpBlocked) {\n                    Spacer(Modifier.height(8.dp))\n                    Text(\n                        \"OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP is not allowed.\",\n                        style = MaterialTheme.typography.bodySmall,\n                        color = MaterialTheme.colorScheme.error,\n                    )\n                }\n                Spacer(Modifier.height(12.dp))",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/AddProviderScreen.kt",
+              "            enabled = manualToken.isNotBlank(),",
+              "            enabled = manualToken.isNotBlank() && !manualHttpBlocked,",
+          )
+
+          # Existing-provider editor: preserve an existing HTTP endpoint, but any
+          # changed/new HTTP origin requires a fresh acknowledgement. OAuth HTTP
+          # can never be saved.
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt",
+              "    var customBaseURL by remember { mutableStateOf(instance.customBaseURL ?: \"\") }\n    var appendV1Suffix by remember { mutableStateOf(instance.appendV1Suffix) }",
+              "    var customBaseURL by remember { mutableStateOf(instance.customBaseURL ?: \"\") }\n    var appendV1Suffix by remember { mutableStateOf(instance.appendV1Suffix) }\n    var approvedCleartextBase by remember(instance.customBaseURL) {\n        mutableStateOf(instance.customBaseURL?.trim()?.takeIf {\n            com.openminis.app.provider.ProviderTransportPolicy.isCleartextHttp(it)\n        })\n    }\n    val trimmedCustomBase = customBaseURL.trim()\n    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy\n        .isCleartextHttp(trimmedCustomBase)\n    val isOAuthCredential = instance.credentialType ==\n        com.openminis.app.data.model.ProviderCredential.oauth\n    val cleartextApproved = !isCleartextHttp ||\n        (!isOAuthCredential && approvedCleartextBase == trimmedCustomBase)",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt",
+              "                        value = customBaseURL,\n                        onValueChange = { customBaseURL = it },\n                        singleLine = true,\n                        placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),\n                        fieldModifier = Modifier.bringIntoViewOnFocus(),",
+              "                        value = customBaseURL,\n                        onValueChange = { value ->\n                            if (approvedCleartextBase != value.trim()) approvedCleartextBase = null\n                            customBaseURL = value\n                        },\n                        singleLine = true,\n                        placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),\n                        fieldModifier = Modifier.bringIntoViewOnFocus(),",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt",
+              "                    )\n                }\n                HorizontalDivider(\n                    modifier = Modifier.padding(horizontal = 16.dp),",
+              "                    )\n                }\n                if (isCleartextHttp) {\n                    if (isOAuthCredential) {\n                        Text(\n                            \"OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP cannot be saved.\",\n                            style = MaterialTheme.typography.bodySmall,\n                            color = MaterialTheme.colorScheme.error,\n                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),\n                        )\n                    } else {\n                        SettingsSwitchRow(\n                            title = \"Allow insecure HTTP for this provider\",\n                            checked = approvedCleartextBase == trimmedCustomBase,\n                            onCheckedChange = { allow ->\n                                approvedCleartextBase = if (allow) trimmedCustomBase else null\n                            },\n                            showDivider = false,\n                        )\n                        Text(\n                            \"HTTP is not encrypted. API keys and prompts can be read or changed on the network.\",\n                            style = MaterialTheme.typography.bodySmall,\n                            color = MaterialTheme.colorScheme.error,\n                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),\n                        )\n                    }\n                }\n                HorizontalDivider(\n                    modifier = Modifier.padding(horizontal = 16.dp),",
+          )
+          replace(
+              "src/android/app/src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt",
+              "                    },\n                    modifier = Modifier.fillMaxWidth(),\n                ) {\n                    Text(stringResource(R.string.provider_detail_save_url_settings))",
+              "                    },\n                    modifier = Modifier.fillMaxWidth(),\n                    enabled = cleartextApproved,\n                ) {\n                    Text(stringResource(R.string.provider_detail_save_url_settings))",
+          )
+
+          # Document why the Android platform-level cleartext switch remains broad:
+          # runtime hostnames cannot be enumerated in network-security-config.
+          replace(
+              "src/android/app/src/main/res/xml/network_security_config.xml",
+              "    <!-- T354: allow cleartext HTTP globally so user-configured provider\n         endpoints (private/LAN LLM servers like http://192.168.x.x:port or\n         http://my-host:8080) work. Minis is a tool where the user supplies\n         the endpoint — they own the trust decision. -->",
+              "    <!-- Android's network-security-config cannot enumerate user-entered\n         runtime LAN hosts, so platform cleartext capability stays enabled.\n         This is transport plumbing, NOT the trust policy: ProviderTransportPolicy\n         permits HTTP only for an explicitly configured API-key provider origin,\n         blocks OAuth/update cleartext, and prevents insecure redirects. -->",
+          )
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit wiring
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android
+          git commit -m "security: wire provider transport policy"
+          git push origin HEAD:fix/provider-transport-policy
