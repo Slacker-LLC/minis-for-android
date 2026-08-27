@@ -14,12 +14,20 @@ concurrency:
 
 jobs:
   minisd:
-    name: minisd tests
+    name: minisd quality
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Test minisd
+      - name: Install Rust quality components
+        run: rustup component add rustfmt clippy
+      - name: Format
+        run: cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
+      - name: Test
         run: cargo test --locked --manifest-path src/native/minisd/Cargo.toml
+      - name: Release build
+        run: cargo build --locked --release --manifest-path src/native/minisd/Cargo.toml
 
   rootfs-verification:
     name: Rootfs verification tests
@@ -27,22 +35,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
 
   android:
-    name: Android compile
+    name: Android build, test and release checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - name: Compile debug Kotlin
+      - name: Verify missing release credentials fail closed
         working-directory: src/android
         run: |
           chmod +x gradlew
-          ./gradlew :app:compileDebugKotlin --stacktrace
+          if env -u RELEASE_KEYSTORE -u RELEASE_STORE_PASSWORD -u RELEASE_KEY_ALIAS -u RELEASE_KEY_PASSWORD \
+            ./gradlew :app:requireReleaseSigning --stacktrace; then
+            echo "release signing gate unexpectedly succeeded without credentials" >&2
+            exit 1
+          fi
+      - name: Generate ephemeral CI release key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/ci-release.jks" \
+            -storepass ci-release-pass \
+            -keypass ci-release-pass \
+            -alias ci-release \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
+      - name: Android unit tests, lint and packaging
+        working-directory: src/android
+        env:
+          RELEASE_KEYSTORE: ${{ runner.temp }}/ci-release.jks
+          RELEASE_STORE_PASSWORD: ci-release-pass
+          RELEASE_KEY_ALIAS: ci-release
+          RELEASE_KEY_PASSWORD: ci-release-pass
+        run: |
+          ./gradlew \
+            :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:lintRelease \
+            :app:assembleDebug \
+            :app:compileReleaseKotlin \
+            :app:assembleRelease \
+            --stacktrace
+      - name: Verify release APK
+        run: bash scripts/verify-android-release.sh src/android/app/build/outputs/apk/release/app-release.apk
