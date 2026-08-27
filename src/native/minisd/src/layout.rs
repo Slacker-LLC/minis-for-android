@@ -155,29 +155,31 @@ pub fn ensure_guest_user_ids(rootfs: &str, uid: u32, gid: u32) -> Result<(), Str
     let root = std::path::Path::new(rootfs);
     let passwd = format!("minis:x:{uid}:{gid}:Minis:/workspace:/bin/bash\n");
     let group = format!("minis:x:{gid}:\n");
-    append_unique(root.join("etc/passwd"), &format!(":{uid}:{gid}:"), &passwd)?;
-    append_unique(root.join("etc/group"), &format!(":{gid}:"), &group)?;
+    upsert_named_line(root.join("etc/passwd"), "minis:", &passwd)?;
+    upsert_named_line(root.join("etc/group"), "minis:", &group)?;
     Ok(())
 }
 
-fn append_unique(
+fn upsert_named_line(
     path: impl AsRef<std::path::Path>,
-    marker: &str,
+    prefix: &str,
     line: &str,
 ) -> Result<(), String> {
     let path = path.as_ref();
-    let existing = std::fs::read_to_string(path).unwrap_or_default();
-    if existing.contains(marker) {
-        return Ok(());
-    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir {}: {e}", parent.display()))?;
     }
-    let mut body = existing;
-    if !body.is_empty() && !body.ends_with('\n') {
+    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let mut body = existing
+        .lines()
+        .filter(|existing_line| !existing_line.starts_with(prefix))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !body.is_empty() {
         body.push('\n');
     }
-    body.push_str(line);
+    body.push_str(line.trim_end_matches('\n'));
+    body.push('\n');
     std::fs::write(path, body).map_err(|e| format!("write {}: {e}", path.display()))
 }
 
@@ -208,5 +210,43 @@ mod tests {
     #[test]
     fn invalid_rootfs_rejected() {
         assert!(!rootfs_looks_valid("/no/such/rootfs"));
+    }
+
+    #[test]
+    fn guest_identity_replaces_stale_minis_entries() {
+        let unique = format!(
+            "minisd-layout-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(unique);
+        let etc = root.join("etc");
+        std::fs::create_dir_all(&etc).unwrap();
+        std::fs::write(
+            etc.join("passwd"),
+            "root:x:0:0:root:/root:/bin/sh\nminis:x:10000:10000:Minis:/workspace:/bin/bash\n",
+        )
+        .unwrap();
+        std::fs::write(etc.join("group"), "root:x:0:\nminis:x:10000:\n").unwrap();
+
+        ensure_guest_user_ids(root.to_str().unwrap(), 12345, 12345).unwrap();
+
+        let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
+        let group = std::fs::read_to_string(etc.join("group")).unwrap();
+        assert_eq!(passwd.lines().filter(|l| l.starts_with("minis:")).count(), 1);
+        assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
+        assert!(passwd.contains("minis:x:12345:12345:"));
+        assert!(group.contains("minis:x:12345:"));
+        assert!(passwd.contains("root:x:0:0:"));
+
+        ensure_guest_user_ids(root.to_str().unwrap(), 23456, 23456).unwrap();
+        let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
+        assert!(!passwd.contains("minis:x:12345:12345:"));
+        assert!(passwd.contains("minis:x:23456:23456:"));
+
+        let _ = std::fs::remove_dir_all(root);
     }
 }
