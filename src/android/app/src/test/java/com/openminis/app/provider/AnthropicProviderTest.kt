@@ -607,6 +607,7 @@ class AnthropicProviderTest {
             model = LLMModel.claudeSonnet5,
             basePath = server.url("/").toString().trimEnd('/'),
             isOAuth = true,
+            oauthIdentifierPromptOverride = "test-claude-code-prefix",
         )
         server.enqueue(MockResponse().setBody("""{"content":[],"usage":{"input_tokens":0,"output_tokens":0}}"""))
 
