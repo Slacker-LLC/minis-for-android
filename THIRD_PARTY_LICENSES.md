@@ -1,61 +1,66 @@
 # Third-Party Licenses
 
-OpenMinis bundles, links, or depends on the following third-party components. Versions reflect the current source tree; license types were verified against each project's repository (GitHub license metadata / LICENSE files).
+Minis for Android contains code derived from [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis) and uses additional third-party open-source components.
 
-## 本分支的许可证说明
+This file is a project-level inventory, not a substitute for the license files shipped by each dependency. Exact dependency versions remain authoritative in Gradle, Cargo, vendored source, and lock files.
 
-上游 OpenMinis 采用 GPL-3.0，其中一个原因是 iOS 侧的 iSH 为 GPL-3.0。**本分支移除了
-iOS 相关代码与 iSH，但这不改变许可证义务**：本仓库是 OpenMinis 的派生作品，因此整体
-继续按 **GPL-3.0** 分发。分发由本仓库构建的 APK 时，同样需要提供对应源码。
+## Project and upstream license
 
-## Native C/C++ dependencies (`deps/`)
+OpenMinis is distributed under GPL-3.0. Minis for Android is a derivative work and continues to be distributed under **GPL-3.0**. Removing upstream iOS code or replacing the upstream Android PRoot runtime does not remove the GPL obligations that apply to the derived application code.
 
-> P2 重构后 PRoot/Alpine 依赖已移除;下表中 proot/talloc/Alpine 条目为历史记录,
-> 当前不再构建或随 APK 分发。当前原生依赖为 Rust 的 minisd(见下)。
+When distributing a modified APK, provide the corresponding source and preserve applicable copyright/license notices.
 
-| Component | Version / Source | License | Notes |
+See also [UPSTREAM.md](UPSTREAM.md) and [LICENSE](LICENSE).
+
+## Active native/runtime components
+
+| Component | Source | License | Use |
 |---|---|---|---|
-| ~~[proot](https://github.com/OpenMinis/proot) (fork)~~ | pinned git submodule `deps/proot` | **GPL-2.0** | P2 已移除(历史) |
-| ~~Termux PRoot ELF loaders~~ | proot `5.1.107-70` | **GPL-2.0** | P2 已移除(历史) |
-| ~~[talloc](https://talloc.samba.org) (Samba)~~ | 2.4.2 | **LGPL-3.0-or-later** | P2 已移除(历史) |
-| [cppjieba](https://github.com/yanyiwu/cppjieba) | vendored (`jieba_jni`) | **MIT** | Chinese word segmentation (header-only + dictionaries) |
-| ~~Alpine Linux minirootfs~~ | 3.21.3 | Aggregate | P2 已移除(历史) |
+| `minisd` | this repository, `src/native/minisd/` | GPL-3.0 with project | Root broker / chroot setup |
+| serde / serde_json | Cargo.lock | MIT OR Apache-2.0 | JSON protocol |
+| libc (Rust crate) | Cargo.lock | MIT OR Apache-2.0 | low-level Linux/Unix calls |
+| Ubuntu 24.04 Base | Ubuntu project | aggregate package licenses | generated rootfs userspace |
+| cppjieba | vendored Android native source | MIT | word segmentation |
 
-## Rust native dependencies (`src/native/minisd/`)
+The Ubuntu rootfs is a generated build artifact. Its packages retain their own licenses and notices.
 
-| Component | Version / Source | License | Notes |
-|---|---|---|---|
-| minisd(本项目源码) | 同仓 `src/native/minisd/` | **GPL-3.0**(随项目) | Root Broker + Ubuntu chroot 运行时;静态 musl 交叉编译 |
-| [serde](https://github.com/serde-rs/serde) / serde_json | 1.x(见 Cargo.lock) | MIT / Apache-2.0 | JSON 协议序列化 |
-| [libc](https://github.com/rust-lang/libc) | 0.2(见 Cargo.lock) | MIT / Apache-2.0 | 裸 syscall 绑定(unshare/mount/getsockopt 等) |
-| Ubuntu 24.04 base rootfs | `24.04.3`(noble),打包脚本 SHA-256 校验 | Aggregate of package licenses | 生成构建产物,打包进 APK assets
+## Android dependencies
 
+| Library / family | License |
+|---|---|
+| AndroidX / Jetpack / Compose | Apache-2.0 |
+| OkHttp / MockWebServer | Apache-2.0 |
+| Kotlin coroutines / serialization | Apache-2.0 |
+| Coil | Apache-2.0 |
+| multiplatform-markdown-renderer | Apache-2.0 |
+| Reorderable | Apache-2.0 |
+| ACRA | Apache-2.0 |
+| Shizuku API/provider | MIT |
+| RealTimeCutVADLibraryForAndroid | MIT |
+| JUnit 4 | EPL-1.0 |
+| org.json test dependency | Public Domain / JSON License |
 
-## Android — Gradle dependencies
-
-| Library | Version | License |
-|---|---|---|
-| AndroidX / Jetpack (Compose BOM 2025.09.00, core-ktx, lifecycle, activity, navigation, Room, DataStore, security-crypto, browser, webkit, exifinterface) | see `app/build.gradle.kts` | **Apache-2.0** (Google / AOSP) |
-| OkHttp + okhttp-sse | 4.12.0 | **Apache-2.0** |
-| kotlinx-serialization-json | 1.7.3 | **Apache-2.0** |
-| kotlinx-coroutines-android | 1.9.0 | **Apache-2.0** |
-| Coil (coil-compose) | 2.7.0 | **Apache-2.0** |
-| multiplatform-markdown-renderer (+ m3) — mikepenz | 0.33.0 | **Apache-2.0** |
-| Reorderable (sh.calvin.reorderable) | 2.4.0 | **Apache-2.0** |
-| ACRA (acra-core) | 5.12.0 | **Apache-2.0** |
-| Shizuku API + provider (dev.rikka.shizuku) | 13.1.5 | **MIT** |
-| [RealTimeCutVADLibraryForAndroid](https://github.com/helloooideeeeea/RealTimeCutVADLibraryForAndroid) | 1.0.5 | **MIT** |
-
-Test-only dependencies: JUnit 4.13.2 (**EPL-1.0**), MockWebServer 4.12.0 (**Apache-2.0**), kotlinx-coroutines-test 1.9.0 (**Apache-2.0**), org.json 20231013 (**Public Domain / JSON License**).
-
+Use `src/android/app/build.gradle.kts` and Gradle dependency reports for the current version set.
 
 ## Bundled web/UI assets
 
 | Asset | Location | License |
 |---|---|---|
-| KaTeX | Android `app/src/main/assets/katex/` | **MIT** |
-| jieba dictionaries | Android `assets/jieba/` | **MIT** (cppjieba distribution) |
+| KaTeX | Android app assets | MIT |
+| cppjieba dictionaries | Android app assets | MIT / upstream distribution terms |
 
-## Removed / historical
+## Removed or historical components
 
-- **swift-markdown-ui** (MIT) — formerly vendored under `deps/swift-markdown-ui`; no longer referenced by the Xcode project or imported by any source file, and is not part of the open-source tree.
+The current Android execution architecture does not build or ship the historical Alpine + PRoot runtime. Older Git history and archived documents may still mention:
+
+- OpenMinis/Termux PRoot and ELF loaders (GPL-2.0);
+- talloc (LGPL-3.0-or-later);
+- Alpine Linux minirootfs;
+- iSH and iOS-only dependencies removed from this Android-focused tree;
+- historical Web Remote assets and associated web tooling.
+
+Those historical references must not be read as a statement that the components are part of the current Android artifact.
+
+## Verification
+
+Before publishing binaries, verify the final dependency graph and bundled assets against this inventory. If a dependency is added, removed, or relicensed, update this file in the same change.

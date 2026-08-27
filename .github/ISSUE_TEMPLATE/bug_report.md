@@ -1,40 +1,58 @@
 ---
-name: 🐛 Bug Report
-about: Report a bug or unexpected behavior in Minis
+name: 🐛 Bug report
+about: Report a reproducible problem in Minis for Android
 title: "[Bug] "
 labels: ["bug", "triage"]
 ---
 
-## 📝 Problem Summary / 问题描述
+## Problem
 
-<!-- A clear and concise description of the bug. 简要描述遇到的问题。-->
+<!-- Describe the failure clearly and concisely. -->
 
-## 📱 Basic Information / 基本信息
+## Environment
 
 | Field | Value |
-|-------|-------|
-| Platform / 平台 | Android |
-| OS Version / 系统版本 | <!-- e.g. Android 15 / 16 --> |
-| Minis Version / 应用版本 | <!-- e.g. 1.00-beta (36) --> |
-| Device Model / 设备型号 | <!-- e.g. Xiaomi 15 / Pixel 9 --> |
-| Rooted? / 是否 Root | <!-- No / Magisk / KernelSU / APatch (diagnostic only) --> |
+|---|---|
+| Android version | |
+| Minis `versionName` / `versionCode` | |
+| Device / ROM | |
+| Root status | None / Magisk / KernelSU / APatch / other |
+| SELinux mode (if relevant) | |
+| Provider / model (if relevant) | |
 
-## 🔁 Steps to Reproduce / 重现步骤
+## Steps to reproduce
 
-<!-- Optional. 可选。-->
+1.
+2.
+3.
 
-1. 
-2. 
-3. 
+## Expected behavior
 
-## ❌ Error Details / 错误信息
+<!-- What should have happened? -->
 
-<!-- Optional. Paste error messages or attach screenshots. 可选，粘贴错误信息或附上截图。-->
+## Actual behavior
+
+<!-- What happened instead? -->
+
+## Logs / diagnostics
+
+<!-- Paste only sanitized logs. Remove API keys, OAuth/MCP tokens, signing material, private file contents, phone numbers, contacts, and unrelated device data. -->
+
+```text
 
 ```
-paste error here
-```
 
-## ✅ Expected Behavior / 预期结果
+## Runtime area
 
-<!-- Optional. What did you expect to happen? 可选，你期望发生什么？-->
+- [ ] Android UI / chat
+- [ ] Provider / model
+- [ ] Android-native tool
+- [ ] MCP
+- [ ] Ubuntu / `minisd`
+- [ ] Voice / assistant / overlay
+- [ ] Build / CI / release
+- [ ] Other
+
+## Additional context
+
+<!-- For root/runtime issues, include the capability/SELinux result rather than assuming that root-provider name alone proves the capability. -->

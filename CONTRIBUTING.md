@@ -1,147 +1,151 @@
-# 参与贡献
+# Contributing
 
-欢迎为 Minis for Android 提交 Issue 与 Pull Request。
+Contributions to Minis for Android are welcome through GitHub Issues and Pull Requests.
 
-## 报告问题
+This repository is an independent Android project built on [OpenMinis](https://github.com/OpenMinis/OpenMinis). Before contributing, read [UPSTREAM.md](UPSTREAM.md) so upstream ports do not accidentally reintroduce architecture that this project intentionally replaced.
 
-Issue：<https://github.com/Slacker-LLC/minis-for-android/issues>
+## Reporting bugs
 
-请尽量包含：
+Include, when relevant:
 
-- 应用版本 / versionCode 与 Android 版本；
-- 设备型号、ROM，以及是否 Root（可注明 Magisk / KernelSU / APatch）；
-- 精确重现步骤、期望结果与实际结果；
-- 相关 Provider / 模型；
-- 已脱敏的应用日志或崩溃元数据。
+- Android version and app `versionName` / `versionCode`;
+- device model and ROM;
+- root status and root provider (Magisk / KernelSU / APatch) for diagnostics;
+- exact reproduction steps;
+- expected and actual behavior;
+- provider/model involved;
+- sanitized logs or crash metadata.
 
-禁止提交 API Key、OAuth token、MCP token、DebugServer token、私密文件内容或无关手机数据。
+Never post API keys, OAuth tokens, MCP tokens, DebugServer tokens, signing material, private files, or unrelated device data.
 
-## 提交 Pull Request
+## Pull requests
 
-提交前：
+Base new work on the current `master` branch unless the maintainers request otherwise.
 
-1. 基于当前 `master`；
-2. 保持 Android App 为 Agent、会话、工具和数据的唯一权威运行时，不新增第二套远程 Agent 数据源；
-3. 新工具必须经过现有 Tool Registry / ToolPermissionManager / runtime gate，不允许绕过统一权限入口；
-4. 敏感工具必须明确 caller scope，远程调用按需要使用确认或 LOCAL_ONLY；
-5. Root 能力必须经过 `minisd` 或现有受控 privileged backend，不新增裸 `su -c <模型输出>` 通道；
-6. 有副作用操作必须复用 Approval / ToolCheckpoint / Job / ToolResult 等现有治理机制；
-7. 更新与改动对应的测试和当前文档；
-8. 保留第三方许可证、来源和 GPL 义务。
+A change should preserve these project invariants:
 
-## 当前架构红线
+1. The Android app remains the single source of truth for agent state, sessions, providers, tools, and persistence.
+2. New tools go through the existing Tool Registry, permission manager, runtime gates, and result model.
+3. Sensitive operations define caller scope and use confirmation or local-only policy where appropriate.
+4. Root operations use `minisd` or an existing controlled privileged backend; do not add raw `su -c <model output>` paths.
+5. Side-effecting operations reuse approvals, checkpoints, jobs, and recovery semantics.
+6. Runtime capability is determined by real probes rather than by provider names or `uid=0` alone.
+7. Security-sensitive paths fail closed.
+8. Tests and English primary documentation are updated with behavior changes.
+9. GPL and third-party license obligations are preserved.
 
-### Android Runtime
+## Runtime architecture
 
-- Android App 是唯一的 Agent Runtime 和状态源；
-- 不重复实现第二套 Accessibility、Job、审批、检查点、Token 计量或 MCP 权限系统；
-- Root、Shizuku/AXManager/Sui、Accessibility 是独立能力，不构成简单的权限等级链；
-- 能力判断必须来自真实探测，不能只凭 provider 名称或 `uid=0` 推断全部能力。
+### Android runtime
 
-### Linux Runtime
+Do not create a second remote agent/database/runtime. MCP and system integrations must project into the existing Android runtime.
 
-当前 Linux 执行环境是：
+Do not duplicate Accessibility, jobs, approval, checkpoint, token accounting, provider state, or permission systems when a canonical implementation already exists.
+
+### Linux runtime
+
+The active rooted-device execution path is:
 
 ```text
-minisd Root Broker
+minisd root broker
   ↓
 unshare + mount + chroot
   ↓
 Ubuntu 24.04 userspace
 ```
 
-- Alpine + PRoot 已从当前架构删除，不要重新引入旧 PRoot 运行时作为并行实现；
-- `minisd` 是 Root TCB，任何新增 RPC 都必须最小权限、可审计、fail-closed；
-- runtime policy 不应成为绕过编译时权限上限的通用扩权入口；
-- 不允许为了可用性关闭全局 SELinux；
-- mount/chroot/root process 操作必须有明确边界和测试。
+Do not reintroduce Alpine + PRoot as a parallel default runtime.
 
-### MCP 与远程能力
+`minisd` is part of the trusted computing base. New privileged RPC methods must be narrow, structured, auditable, and bounded by a compile-time capability ceiling. Runtime policy may restrict capabilities but must never expand that ceiling.
 
-- 当前远程工具面是 MCP Server；旧 Web Remote / Cloudflare Tunnel 已删除；
-- 不重新添加第二套 Web-only Agent/runtime/database；
-- 不通过远程面暴露任意 Root shell、任意文件系统、凭据或无审批的高风险 Android 操作；
-- MCPProvider 接入外部 Server 时也必须进入现有工具注册和权限体系。
+Do not disable SELinux globally for compatibility.
 
-### 厂商适配
+### MCP
 
-基础能力应优先来自通用 Android API 与通用 Root / privileged backend。
+The remote tool surface is MCP. The removed Web Remote / Cloudflare Tunnel implementation must not return as a second control plane.
 
-厂商专属能力可以实现，但必须：
+External MCP servers still enter the canonical tool registry and permission system.
 
-1. 执行前检测设备、系统特性或目标 API 是否存在；
-2. 非匹配设备返回结构化 unsupported，而不是崩溃；
-3. 对隐藏 API/反射做版本保护和异常降级；
-4. 只能作为可选增强，缺失时不能破坏基础能力；
-5. 厂商设置页跳转失败时回退到通用 Android 设置页。
+### Android privileged backends
 
-## 安全要求
+Ordinary Android APIs, Accessibility, Shizuku-compatible bridges, and root are separate capabilities rather than a single privilege ladder.
 
-这是高权限 Agent 项目。涉及以下区域时按安全改动处理：
+Vendor-specific enhancements must:
 
-- `src/native/minisd/`；
-- Root / Shizuku / Accessibility；
-- MCP Server / MCPProvider；
-- Provider credential / OAuth；
-- 文件、mount、workspace 边界；
-- APK 安装、Intent、联系人、日历、短信、通话记录等敏感 Android 能力；
-- DebugServer 与 release 打包。
+- probe support before execution;
+- return structured unsupported/unavailable results on non-matching devices;
+- version-gate hidden APIs/reflection;
+- remain optional enhancements;
+- fall back to generic Android settings/actions when possible.
 
-安全相关改动应包含负向测试：不仅证明“允许的能运行”，还要证明“不允许的确实被拒绝”。
+## Security-sensitive areas
 
-## 验证检查
+Treat changes in these areas as security work:
 
-至少运行与你改动相关的最窄检查。
+- `src/native/minisd/`;
+- root / privileged backends / Accessibility;
+- MCP server and MCP provider;
+- provider credentials and OAuth;
+- file, path, mount, and workspace boundaries;
+- package installation and sensitive Android data/tools;
+- DebugServer and release packaging;
+- cleartext/network transport policy.
 
-Android：
+Security tests should cover negative cases, not only successful paths.
+
+## Validation
+
+Use the narrowest relevant checks locally, and rely on repository CI for the full gate.
+
+Android:
 
 ```bash
 cd src/android
-./gradlew :app:compileDebugKotlin --no-daemon
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest --no-daemon
+./gradlew :app:lintDebug --no-daemon
+./gradlew :app:assembleDebug --no-daemon
 ```
 
-Android instrumentation test：
+When release behavior changes:
 
 ```bash
-./gradlew :app:assembleDebugAndroidTest
+./gradlew :app:lintRelease --no-daemon
+./gradlew :app:compileReleaseKotlin --no-daemon
 ```
 
-只在明确授权的真机/模拟器上运行 connected tests。
-
-minisd：
+`minisd`:
 
 ```bash
-cd src/native/minisd
-cargo fmt --check
-cargo test
-cargo clippy -- -D warnings
+cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
+cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path src/native/minisd/Cargo.toml
 ```
 
-如果修改 rootfs 构建：
+Rootfs changes:
 
 ```bash
-./scripts/build-ubuntu-rootfs.sh
+bash scripts/test-build-ubuntu-rootfs-verification.sh
 ```
 
-并验证来源、hash、manifest 和失败路径。
+Connected Android tests must run only on an explicitly authorized emulator/device.
 
-## 文档
+## Documentation
 
-当前事实来源优先级：
+English is the primary documentation language. Translations may be added as secondary documents, but they must point back to the English source of truth.
+
+Authority order:
 
 ```text
-源码与测试
-  > 当前架构/安全文档
-  > README / Release Notes
-  > archive / upstream 历史资料
+source code and tests
+  > current architecture/security documents
+  > README and changelog
+  > archived material
 ```
 
-相关文档：
+See also:
 
 - [README.md](README.md)
-- [BUILD-CN.md](BUILD-CN.md)
+- [BUILDING.md](BUILDING.md)
 - [docs/README.md](docs/README.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)
