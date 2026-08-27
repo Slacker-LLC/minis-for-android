@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.provider.ProviderTransportPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -140,7 +141,8 @@ object OpenRouterOAuthManager {
             .replace("=", "")
     }
 
-    private val client = OkHttpClient.Builder()
+    private val client = ProviderTransportPolicy
+        .protectedHttpsBuilder(OkHttpClient.Builder())
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
