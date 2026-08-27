@@ -216,9 +216,15 @@ mod tests {
         let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["force-stop","a.b"]})).unwrap();
         assert!(validate_exec(spec, &ok).is_ok());
         let bad_tool = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
-        assert_eq!(validate_exec(spec, &bad_tool).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(spec, &bad_tool).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let denied = parse_exec(&serde_json::json!({"tool":"pm","args":["shell","su"]})).unwrap();
-        assert_eq!(validate_exec(spec, &denied).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(spec, &denied).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
@@ -237,7 +243,10 @@ mod tests {
         let pm = parse_exec(&serde_json::json!({"tool":"pm","args":[]})).unwrap();
         assert!(validate_exec(Some(&spec), &pm).is_ok());
         let reboot = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
-        assert_eq!(validate_exec(Some(&spec), &reboot).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(Some(&spec), &reboot).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
     }
 
     #[test]
@@ -270,6 +279,9 @@ mod tests {
         )
         .unwrap();
         assert!(stdout.truncated && stderr.truncated);
-        assert_eq!(stdout.retained.len() + stderr.retained.len(), MAX_CAPTURE_BYTES * 2);
+        assert_eq!(
+            stdout.retained.len() + stderr.retained.len(),
+            MAX_CAPTURE_BYTES * 2
+        );
     }
 }

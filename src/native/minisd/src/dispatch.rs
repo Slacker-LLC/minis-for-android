@@ -12,6 +12,9 @@ use serde_json::json;
 /// confirmation consumption and rate limiting) without executing the method.
 /// Socket serving can therefore snapshot execution inputs under a short state
 /// lock and run long subprocess work after releasing that lock.
+// A denied request is already a complete wire-level JSON-RPC response; boxing it
+// would add a heap allocation to the normal authorization failure path.
+#[allow(clippy::result_large_err)]
 pub fn authorize_request(
     state: &mut AppState,
     req: &Request,
@@ -32,7 +35,11 @@ pub fn authorize_request(
         ));
     }
     if !is_known_method(&req.method) {
-        return Err(Response::err(req.id, ErrorCode::BadParams, "unknown method"));
+        return Err(Response::err(
+            req.id,
+            ErrorCode::BadParams,
+            "unknown method",
+        ));
     }
     let decision = match decide_method(&state.policy, &req.method) {
         Ok(d) => d,
@@ -46,11 +53,7 @@ pub fn authorize_request(
             }
             Some(cid) => {
                 if let Err(code) = state.consume_confirm(cid, &req.method) {
-                    return Err(Response::err(
-                        req.id,
-                        code,
-                        "invalid or reused confirm_id",
-                    ));
+                    return Err(Response::err(req.id, code, "invalid or reused confirm_id"));
                 }
             }
         }
@@ -80,19 +83,19 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
         "system.hello" => Response::ok(req.id, json!({"hello": true, "v": 1})),
         "system.ping" => Response::ok(req.id, json!({"pong": true})),
         "root.probe" => {
-            let probe = if state.mock { mock_probe() } else { live_probe() };
+            let probe = if state.mock {
+                mock_probe()
+            } else {
+                live_probe()
+            };
             Response::ok(req.id, serde_json::to_value(probe).unwrap())
         }
-        "root.exec" => execute_root_authorized(
-            state.mock,
-            state.policy.method("root.exec").cloned(),
-            req,
-        ),
-        "root.shellRaw" => Response::err(
-            req.id,
-            ErrorCode::PolicyDenied,
-            "root.shellRaw is INTERNAL",
-        ),
+        "root.exec" => {
+            execute_root_authorized(state.mock, state.policy.method("root.exec").cloned(), req)
+        }
+        "root.shellRaw" => {
+            Response::err(req.id, ErrorCode::PolicyDenied, "root.shellRaw is INTERNAL")
+        }
         "ubuntu.status" => Response::ok(req.id, crate::ubuntu::status(state)),
         "ubuntu.start" => match crate::ubuntu::start(state, &req.params) {
             Ok(v) => Response::ok(req.id, v),
@@ -179,11 +182,7 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
 /// Execute an already-authorized root.exec using a policy snapshot. This helper
 /// intentionally owns the policy snapshot so callers can release AppState
 /// before entering a potentially long privileged subprocess.
-pub fn execute_root_authorized(
-    mock: bool,
-    spec: Option<MethodPolicy>,
-    req: &Request,
-) -> Response {
+pub fn execute_root_authorized(mock: bool, spec: Option<MethodPolicy>, req: &Request) -> Response {
     let parsed = match parse_exec(&req.params) {
         Ok(p) => p,
         Err(code) => return Response::err(req.id, code, "bad exec params"),
@@ -261,11 +260,10 @@ fn kill_tree(state: &mut AppState, req: &Request) -> Response {
             return Response::err(req.id, ErrorCode::BadParams, "unknown session");
         };
         let mut killer = crate::session::RealKiller;
-        match state.sessions.kill_tree(
-            session,
-            std::time::Duration::from_secs(2),
-            &mut killer,
-        ) {
+        match state
+            .sessions
+            .kill_tree(session, std::time::Duration::from_secs(2), &mut killer)
+        {
             Ok(steps) => {
                 let _ = sess;
                 Response::ok(
@@ -293,10 +291,7 @@ fn kill_tree(state: &mut AppState, req: &Request) -> Response {
 }
 
 pub fn require_workspace_path(params: &serde_json::Value) -> Result<String, ErrorCode> {
-    let path = params
-        .get("path")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let path = params.get("path").and_then(|v| v.as_str()).unwrap_or("");
     resolve_workspace(path)
 }
 

@@ -16,13 +16,8 @@ pub const GUEST_MEMORY: &str = "/memory";
 pub const GUEST_SKILLS: &str = "/skills";
 pub const GUEST_SHARED: &str = "/shared";
 
-pub const WORKSPACE_SUBDIRS: &[&str] = &[
-    "attachments",
-    "offloads",
-    "browser",
-    "sessions",
-    "shared",
-];
+pub const WORKSPACE_SUBDIRS: &[&str] =
+    &["attachments", "offloads", "browser", "sessions", "shared"];
 
 /// P2 migration-window guest symlinks. Deleted at P2 exit.
 pub const VAR_MINIS_LINKS: &[(&str, &str)] = &[
@@ -144,8 +139,12 @@ pub fn read_os_release(rootfs: &str) -> Option<String> {
 }
 
 pub fn is_provisioned(rootfs: &str) -> bool {
-    std::path::Path::new(rootfs).join(PROVISION_MARKER).is_file()
-        || std::path::Path::new(rootfs).join("usr/bin/python3").exists()
+    std::path::Path::new(rootfs)
+        .join(PROVISION_MARKER)
+        .is_file()
+        || std::path::Path::new(rootfs)
+            .join("usr/bin/python3")
+            .exists()
 }
 
 pub fn ensure_guest_user(rootfs: &str) -> Result<(), String> {
@@ -161,7 +160,11 @@ pub fn ensure_guest_user_ids(rootfs: &str, uid: u32, gid: u32) -> Result<(), Str
     Ok(())
 }
 
-fn append_unique(path: impl AsRef<std::path::Path>, marker: &str, line: &str) -> Result<(), String> {
+fn append_unique(
+    path: impl AsRef<std::path::Path>,
+    marker: &str,
+    line: &str,
+) -> Result<(), String> {
     let path = path.as_ref();
     let existing = std::fs::read_to_string(path).unwrap_or_default();
     if existing.contains(marker) {

@@ -8,7 +8,12 @@ pub struct PeerCred {
     pub pid: i32,
 }
 
-pub fn check_peer(policy: &PolicyFile, peer: Option<PeerCred>, mock: bool, skip_peer: bool) -> Result<(), ErrorCode> {
+pub fn check_peer(
+    policy: &PolicyFile,
+    peer: Option<PeerCred>,
+    mock: bool,
+    skip_peer: bool,
+) -> Result<(), ErrorCode> {
     if mock || skip_peer {
         return Ok(());
     }
@@ -33,7 +38,11 @@ fn ct_eq(a: &str, b: &str) -> bool {
     ab.iter().zip(bb).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-pub fn check_hello(policy: &PolicyFile, hello: Option<&ClientHello>, method: &str) -> Result<(), ErrorCode> {
+pub fn check_hello(
+    policy: &PolicyFile,
+    hello: Option<&ClientHello>,
+    method: &str,
+) -> Result<(), ErrorCode> {
     let Some(hello) = hello else {
         return Err(ErrorCode::NotAuthorized);
     };
@@ -90,7 +99,10 @@ mod tests {
         let mut policy = PolicyFile::default_policy();
         assert!(check_peer(&policy, None, true, false).is_ok());
         assert!(check_peer(&policy, None, false, true).is_ok());
-        assert_eq!(check_peer(&policy, None, false, false).unwrap_err(), ErrorCode::NotAuthorized);
+        assert_eq!(
+            check_peer(&policy, None, false, false).unwrap_err(),
+            ErrorCode::NotAuthorized
+        );
         assert!(check_peer(
             &policy,
             Some(PeerCred {

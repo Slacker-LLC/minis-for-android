@@ -43,6 +43,10 @@ impl SessionTable {
         self.sessions.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
     pub fn enable_subreaper(&mut self) {
         self.subreaper = true;
     }

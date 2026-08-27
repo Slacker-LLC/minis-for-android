@@ -73,7 +73,9 @@ pub fn parse_dumpsys_dns(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in text.lines() {
         let lower = line.to_ascii_lowercase();
-        if !(lower.contains("dnsaddresses") || lower.contains("dnsservers") || lower.contains("dns server"))
+        if !(lower.contains("dnsaddresses")
+            || lower.contains("dnsservers")
+            || lower.contains("dns server"))
         {
             continue;
         }
@@ -81,11 +83,13 @@ pub fn parse_dumpsys_dns(text: &str) -> Vec<String> {
             if token.is_empty() {
                 continue;
             }
-            if token.parse::<std::net::Ipv4Addr>().is_ok() || token.parse::<std::net::Ipv6Addr>().is_ok()
+            if (token.parse::<std::net::Ipv4Addr>().is_ok()
+                || token.parse::<std::net::Ipv6Addr>().is_ok())
+                && token != "127.0.0.1"
+                && token != "::1"
+                && !out.iter().any(|s| s == token)
             {
-                if token != "127.0.0.1" && token != "::1" && !out.iter().any(|s| s == token) {
-                    out.push(token.to_string());
-                }
+                out.push(token.to_string());
             }
         }
     }

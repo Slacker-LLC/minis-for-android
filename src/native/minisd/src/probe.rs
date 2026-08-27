@@ -40,7 +40,8 @@ pub fn live_probe() -> ProbeResult {
     let uid = unsafe { libc::geteuid() } as u32;
     let gid = unsafe { libc::getegid() } as u32;
     let mut groups = vec![0u32; 64];
-    let n = unsafe { libc::getgroups(groups.len() as i32, groups.as_mut_ptr() as *mut libc::gid_t) };
+    let n =
+        unsafe { libc::getgroups(groups.len() as i32, groups.as_mut_ptr() as *mut libc::gid_t) };
     if n > 0 {
         groups.truncate(n as usize);
     } else {

@@ -48,7 +48,10 @@ pub struct PolicyFile {
 pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
 
 fn is_builtin_root_exec_tool(tool: &str) -> bool {
-    matches!(tool, "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount")
+    matches!(
+        tool,
+        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount"
+    )
 }
 
 impl PolicyFile {
@@ -133,7 +136,9 @@ pub fn decide_method(policy: &PolicyFile, method: &str) -> Result<Decision, Erro
         return Err(ErrorCode::BadParams);
     }
     let spec = policy.method(method);
-    let mode = spec.map(|s| s.mode).unwrap_or_else(|| policy.implicit_mode(method));
+    let mode = spec
+        .map(|s| s.mode)
+        .unwrap_or_else(|| policy.implicit_mode(method));
     if mode == Mode::Deny {
         return Err(ErrorCode::PolicyDenied);
     }
@@ -157,7 +162,10 @@ mod tests {
     #[test]
     fn invalid_policy_rejected() {
         assert!(PolicyFile::parse(r#"{"methods":{"nope":{"mode":"allow"}}}"#).is_err());
-        assert!(PolicyFile::parse(r#"{"methods":{"system.ping":{"mode":"allow","ratePerMin":0}}}"#).is_err());
+        assert!(PolicyFile::parse(
+            r#"{"methods":{"system.ping":{"mode":"allow","ratePerMin":0}}}"#
+        )
+        .is_err());
         assert!(PolicyFile::parse("{").is_err());
     }
 

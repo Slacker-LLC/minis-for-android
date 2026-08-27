@@ -1,9 +1,8 @@
 use crate::layout::{
     ensure_host_layout, ensure_rootfs_layout, is_provisioned, read_os_release, rootfs_looks_valid,
-    GUEST_HOME, GUEST_UID, HOST_ROOTFS, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE,
-    UBUNTU_ROOTFS_FILE,
+    GUEST_HOME, GUEST_UID, HOST_ROOTFS, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
 };
-use crate::protocol::{ErrorCode, MAX_ARG_BYTES, MAX_ARGS};
+use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use crate::state::AppState;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -120,7 +119,10 @@ pub fn start(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode, 
     #[cfg(not(unix))]
     {
         let _ = params;
-        return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime requires unix".into()));
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime requires unix".into(),
+        ));
     }
     #[cfg(unix)]
     {
@@ -135,7 +137,10 @@ pub fn stop(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     }
     #[cfg(not(unix))]
     {
-        return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime requires unix".into()));
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime requires unix".into(),
+        ));
     }
     #[cfg(unix)]
     {
@@ -162,11 +167,18 @@ pub fn status(state: &mut AppState) -> Value {
     })
 }
 
-pub fn exec(state: &mut AppState, params: &Value, admin: bool) -> Result<Value, (ErrorCode, String)> {
+pub fn exec(
+    state: &mut AppState,
+    params: &Value,
+    admin: bool,
+) -> Result<Value, (ErrorCode, String)> {
     let parsed = parse_ubuntu_exec(params).map_err(|c| (c, "bad ubuntu exec params".into()))?;
     if state.mock {
         if !state.ubuntu.running {
-            return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime unavailable".into()));
+            return Err((
+                ErrorCode::RuntimeUnavailable,
+                "ubuntu runtime unavailable".into(),
+            ));
         }
         return Ok(json!({
             "exit_code": 0,
@@ -178,7 +190,10 @@ pub fn exec(state: &mut AppState, params: &Value, admin: bool) -> Result<Value, 
     #[cfg(not(unix))]
     {
         let _ = admin;
-        return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime requires unix".into()));
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime requires unix".into(),
+        ));
     }
     #[cfg(unix)]
     {
@@ -192,11 +207,16 @@ pub fn provision(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
             let _ = start(state, &json!({}));
         }
         state.ubuntu.provisioned = true;
-        return Ok(json!({"provisioned": true, "already": false, "mock": true, "packages": BASE_PACKAGES}));
+        return Ok(
+            json!({"provisioned": true, "already": false, "mock": true, "packages": BASE_PACKAGES}),
+        );
     }
     #[cfg(not(unix))]
     {
-        return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime requires unix".into()));
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime requires unix".into(),
+        ));
     }
     #[cfg(unix)]
     {
@@ -229,10 +249,26 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         .and_then(|v| v.as_str())
         .unwrap_or(HOST_ROOTFS)
         .to_string();
-    let workspace = params.get("workspace").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let memory = params.get("memory").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let skills = params.get("skills").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let shared = params.get("shared").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let workspace = params
+        .get("workspace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let memory = params
+        .get("memory")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let skills = params
+        .get("skills")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let shared = params
+        .get("shared")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     for (p, require_minis) in [
         (&rootfs, true),
         (&workspace, false),
@@ -267,12 +303,15 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     ensure_rootfs_layout(&rootfs).map_err(|e| (ErrorCode::Internal, e))?;
     let (guid, ggid) = guest_ids(state);
     crate::layout::ensure_guest_user(&rootfs).map_err(|e| (ErrorCode::Internal, e))?;
-    crate::layout::ensure_guest_user_ids(&rootfs, guid, ggid).map_err(|e| (ErrorCode::Internal, e))?;
+    crate::layout::ensure_guest_user_ids(&rootfs, guid, ggid)
+        .map_err(|e| (ErrorCode::Internal, e))?;
     let dns = crate::env::discover_dns();
-    let resolv = crate::env::write_resolv_conf(&rootfs, &dns).map_err(|e| (ErrorCode::Internal, e))?;
+    let resolv =
+        crate::env::write_resolv_conf(&rootfs, &dns).map_err(|e| (ErrorCode::Internal, e))?;
     chown_tree_best_effort(guid, ggid, &workspace, &memory, &skills, &shared);
 
-    let exe = std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
+    let exe =
+        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let mut child = std::process::Command::new(&exe)
         .args(["--helper", "keep", "--rootfs", &rootfs])
         .args(["--workspace", &workspace])
@@ -324,7 +363,10 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
             state.ubuntu.running = false;
             state.ubuntu.pid = None;
             state.ubuntu.last_error = Some(format!("{e} {err_out}"));
-            Err((ErrorCode::RuntimeUnavailable, format!("ubuntu keep failed: {e} {err_out}")))
+            Err((
+                ErrorCode::RuntimeUnavailable,
+                format!("ubuntu keep failed: {e} {err_out}"),
+            ))
         }
     }
 }
@@ -401,7 +443,12 @@ fn spawn_netproxy(exe: &std::path::Path) -> bool {
         }
     }
     match std::process::Command::new(exe)
-        .args(["--helper", "netproxy", "--listen", crate::proxy::PROXY_LISTEN])
+        .args([
+            "--helper",
+            "netproxy",
+            "--listen",
+            crate::proxy::PROXY_LISTEN,
+        ])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -474,13 +521,17 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     };
     let ins = exec_live(state, &install, true)?;
     if ins.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
-        return Err((ErrorCode::Internal, format!("apt-get install failed: {ins}")));
+        return Err((
+            ErrorCode::Internal,
+            format!("apt-get install failed: {ins}"),
+        ));
     }
     let marker = Path::new(&rootfs).join(crate::layout::PROVISION_MARKER);
     if let Some(parent) = marker.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    std::fs::write(&marker, "ok\n").map_err(|e| (ErrorCode::Internal, format!("write provisioned: {e}")))?;
+    std::fs::write(&marker, "ok\n")
+        .map_err(|e| (ErrorCode::Internal, format!("write provisioned: {e}")))?;
     state.ubuntu.provisioned = true;
     Ok(json!({
         "provisioned": true,
@@ -499,17 +550,28 @@ fn apt_env() -> BTreeMap<String, String> {
 }
 
 #[cfg(unix)]
-fn exec_live(state: &mut AppState, req: &UbuntuExec, admin: bool) -> Result<Value, (ErrorCode, String)> {
+fn exec_live(
+    state: &mut AppState,
+    req: &UbuntuExec,
+    admin: bool,
+) -> Result<Value, (ErrorCode, String)> {
     refresh_live(state);
     if !state.ubuntu.running {
-        return Err((ErrorCode::RuntimeUnavailable, "ubuntu runtime not started".into()));
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime not started".into(),
+        ));
     }
-    let pid = state.ubuntu.pid.ok_or((ErrorCode::RuntimeUnavailable, "no keeper pid".into()))?;
+    let pid = state
+        .ubuntu
+        .pid
+        .ok_or((ErrorCode::RuntimeUnavailable, "no keeper pid".into()))?;
     let rootfs = state.ubuntu.rootfs_or_default();
     let (guid, ggid) = guest_ids(state);
     let uid = if admin { 0 } else { guid };
     let gid = if admin { 0 } else { ggid };
-    let exe = std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
+    let exe =
+        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
     let proxy = if admin {
         crate::env::discover_proxy()
@@ -556,14 +618,19 @@ fn wait_output_timeout(
     mut cmd: std::process::Command,
     timeout: Duration,
 ) -> Result<(i32, String, String), (ErrorCode, String)> {
-    let child = cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn()
+    let child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .map_err(|e| (ErrorCode::Internal, format!("spawn exec helper: {e}")))?;
     let pid = child.id() as i32;
     let handle = std::thread::spawn(move || child.wait_with_output());
     let start = std::time::Instant::now();
     loop {
         if handle.is_finished() {
-            let out = handle.join().map_err(|_| (ErrorCode::Internal, "join exec helper".into()))?
+            let out = handle
+                .join()
+                .map_err(|_| (ErrorCode::Internal, "join exec helper".into()))?
                 .map_err(|e| (ErrorCode::Internal, format!("wait exec helper: {e}")))?;
             let code = out.status.code().unwrap_or(255);
             return Ok((
@@ -586,7 +653,10 @@ fn wait_output_timeout(
                 }
                 std::thread::sleep(Duration::from_millis(20));
             }
-            return Err((ErrorCode::Timeout, format!("ubuntu exec exceeded {}ms", timeout.as_millis())));
+            return Err((
+                ErrorCode::Timeout,
+                format!("ubuntu exec exceeded {}ms", timeout.as_millis()),
+            ));
         }
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -648,12 +718,35 @@ fn is_netproxy(pid: i32) -> bool {
 }
 
 #[cfg(unix)]
-fn chown_tree_best_effort(uid: u32, gid: u32, workspace: &str, memory: &str, skills: &str, shared: &str) {
+fn chown_tree_best_effort(
+    uid: u32,
+    gid: u32,
+    workspace: &str,
+    memory: &str,
+    skills: &str,
+    shared: &str,
+) {
     use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
-    let workspace = if workspace.is_empty() { HOST_WORKSPACE } else { workspace };
-    let memory = if memory.is_empty() { HOST_MEMORY } else { memory };
-    let skills = if skills.is_empty() { HOST_SKILLS } else { skills };
-    let shared = if shared.is_empty() { HOST_SHARED } else { shared };
+    let workspace = if workspace.is_empty() {
+        HOST_WORKSPACE
+    } else {
+        workspace
+    };
+    let memory = if memory.is_empty() {
+        HOST_MEMORY
+    } else {
+        memory
+    };
+    let skills = if skills.is_empty() {
+        HOST_SKILLS
+    } else {
+        skills
+    };
+    let shared = if shared.is_empty() {
+        HOST_SHARED
+    } else {
+        shared
+    };
     for path in [workspace, memory, skills, shared] {
         let c = match std::ffi::CString::new(path) {
             Ok(c) => c,
@@ -669,7 +762,11 @@ fn truncate(s: &str) -> String {
     if s.len() <= MAX_CAPTURE {
         s.to_string()
     } else {
-        format!("{}\n… truncated {} bytes", &s[..MAX_CAPTURE], s.len() - MAX_CAPTURE)
+        format!(
+            "{}\n… truncated {} bytes",
+            &s[..MAX_CAPTURE],
+            s.len() - MAX_CAPTURE
+        )
     }
 }
 

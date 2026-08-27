@@ -85,7 +85,11 @@ impl AppState {
         id
     }
 
-    pub fn consume_confirm(&mut self, id: &str, method: &str) -> Result<(), crate::protocol::ErrorCode> {
+    pub fn consume_confirm(
+        &mut self,
+        id: &str,
+        method: &str,
+    ) -> Result<(), crate::protocol::ErrorCode> {
         if self.used_confirms.contains_key(id) {
             return Err(crate::protocol::ErrorCode::PolicyDenied);
         }
@@ -114,7 +118,10 @@ mod tests {
     fn t_u16_wrong_method_keeps_entry() {
         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
         let id = state.issue_confirm("root.exec");
-        assert_eq!(state.consume_confirm(&id, "other.method"), Err(ErrorCode::PolicyDenied));
+        assert_eq!(
+            state.consume_confirm(&id, "other.method"),
+            Err(ErrorCode::PolicyDenied)
+        );
         assert!(state.confirms.contains_key(&id));
         assert_eq!(state.consume_confirm(&id, "root.exec"), Ok(()));
         assert!(!state.confirms.contains_key(&id));
@@ -126,7 +133,10 @@ mod tests {
         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
         let id = state.issue_confirm("root.exec");
         state.advance(Duration::from_secs(121));
-        assert_eq!(state.consume_confirm(&id, "root.exec"), Err(ErrorCode::PolicyDenied));
+        assert_eq!(
+            state.consume_confirm(&id, "root.exec"),
+            Err(ErrorCode::PolicyDenied)
+        );
         assert!(!state.confirms.contains_key(&id));
         assert!(!state.used_confirms.contains_key(&id));
     }

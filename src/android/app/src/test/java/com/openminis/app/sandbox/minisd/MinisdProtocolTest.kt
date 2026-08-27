@@ -50,7 +50,7 @@ class MinisdProtocolTest {
     @Test
     fun `provision method has no raw command`() {
         val raw = MinisdProtocol.encodeRequest(MinisdProtocol.ubuntuProvision(3))
-        val obj = org.json.JSONObject(raw)
+        val obj = JSONObject(raw)
         assertEquals("ubuntu.provision", obj.getString("method"))
         assertFalse(obj.getJSONObject("params").has("cmd"))
     }
@@ -79,26 +79,34 @@ class MinisdProtocolTest {
     }
 
     @Test
-    fun `supervisor restart cloudflared carries path ordered args and env`() {
+    fun `ubuntu start carries rootfs and optional mounts`() {
         val raw = MinisdProtocol.encodeRequest(
-            MinisdProtocol.supervisorRestartCloudflared(
-                path = "/data/adb/minis/bin/cloudflared",
-                args = listOf("tunnel", "--url", "http://127.0.0.1:8080"),
-                env = mapOf("TUNNEL_TOKEN" to "secret"),
+            MinisdProtocol.ubuntuStart(
                 id = 7,
+                rootfs = "/data/adb/minis/rootfs",
+                workspace = "/data/adb/minis/workspace",
+                memory = "/data/adb/minis/memory",
+                skills = "/data/adb/minis/skills",
+                shared = "/data/adb/minis/shared",
             ),
         )
         val obj = JSONObject(raw)
         assertEquals(7, obj.getLong("id"))
-        assertEquals("supervisor.restartCloudflared", obj.getString("method"))
+        assertEquals("ubuntu.start", obj.getString("method"))
         val params = obj.getJSONObject("params")
-        assertEquals("/data/adb/minis/bin/cloudflared", params.getString("path"))
-        val argv = params.getJSONArray("args")
-        assertEquals(3, argv.length())
-        assertEquals("tunnel", argv.getString(0))
-        assertEquals("--url", argv.getString(1))
-        assertEquals("http://127.0.0.1:8080", argv.getString(2))
-        assertEquals("secret", params.getJSONObject("env").getString("TUNNEL_TOKEN"))
+        assertEquals("/data/adb/minis/rootfs", params.getString("rootfs"))
+        assertEquals("/data/adb/minis/workspace", params.getString("workspace"))
+        assertEquals("/data/adb/minis/memory", params.getString("memory"))
+        assertEquals("/data/adb/minis/skills", params.getString("skills"))
+        assertEquals("/data/adb/minis/shared", params.getString("shared"))
+    }
+
+    @Test
+    fun `ubuntu stop uses current supervisor-free contract`() {
+        val stop = JSONObject(MinisdProtocol.encodeRequest(MinisdProtocol.ubuntuStop(5)))
+        assertEquals("ubuntu.stop", stop.getString("method"))
+        assertEquals(5, stop.getLong("id"))
+        assertFalse(stop.getJSONObject("params").has("cmd"))
     }
 
     @Test
@@ -107,26 +115,5 @@ class MinisdProtocolTest {
         val caps = JSONObject(raw).getJSONObject("client").getJSONArray("capabilities")
         assertEquals(1, caps.length())
         assertEquals("ubuntu.status", caps.getString(0))
-    }
-
-    @Test
-    fun `supervisor restart cloudflared with empty args has empty array`() {
-        val raw = MinisdProtocol.encodeRequest(
-            MinisdProtocol.supervisorRestartCloudflared(path = "/bin/true"),
-        )
-        val params = JSONObject(raw).getJSONObject("params")
-        assertEquals("/bin/true", params.getString("path"))
-        assertTrue(params.getJSONArray("args").length() == 0)
-    }
-
-    @Test
-    fun `supervisor status and stop methods`() {
-        val status = JSONObject(MinisdProtocol.encodeRequest(MinisdProtocol.supervisorStatus(4)))
-        assertEquals("supervisor.status", status.getString("method"))
-        assertEquals(4, status.getLong("id"))
-
-        val stop = JSONObject(MinisdProtocol.encodeRequest(MinisdProtocol.supervisorStopCloudflared(5)))
-        assertEquals("supervisor.stopCloudflared", stop.getString("method"))
-        assertEquals(5, stop.getLong("id"))
     }
 }

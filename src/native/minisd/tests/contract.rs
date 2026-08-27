@@ -1,5 +1,5 @@
 use minisd::policy::PolicyFile;
-use minisd::protocol::{parse_request, ClientHello, KNOWN_METHODS, Request};
+use minisd::protocol::{parse_request, ClientHello, Request, KNOWN_METHODS};
 use minisd::state::AppState;
 use minisd::{handle, handle_bytes};
 use serde_json::json;
@@ -91,5 +91,3 @@ fn unknown_method_and_unauth() {
     let denied = handle(&mut state, parsed, None);
     assert_eq!(denied.error.unwrap().code, "NOT_AUTHORIZED");
 }
-
-

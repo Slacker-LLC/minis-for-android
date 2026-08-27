@@ -36,7 +36,10 @@ pub fn parse_target(first_line: &str) -> Result<(String, u16, bool, String), Str
     if let Some(rest) = spec.strip_prefix("http://") {
         let (auth, path) = rest.split_once('/').unwrap_or((rest, ""));
         let (host, port) = split_host_port(auth, 80)?;
-        let origin = format!("{method} /{path} {}", parts.get(2).copied().unwrap_or("HTTP/1.1"));
+        let origin = format!(
+            "{method} /{path} {}",
+            parts.get(2).copied().unwrap_or("HTTP/1.1")
+        );
         return Ok((host, port, false, origin));
     }
     Err("only CONNECT or absolute-form HTTP".into())
@@ -110,8 +113,12 @@ fn handle_client(mut client: TcpStream) -> Result<(), String> {
 }
 
 fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
-    client.set_read_timeout(Some(std::time::Duration::from_secs(30))).ok();
-    client.set_write_timeout(Some(std::time::Duration::from_secs(120))).ok();
+    client
+        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+        .ok();
+    client
+        .set_write_timeout(Some(std::time::Duration::from_secs(120)))
+        .ok();
     let mut reader = BufReader::new(client.try_clone().map_err(|e| e.to_string())?);
     let mut total = 0usize;
     let mut read_line_capped = |reader: &mut BufReader<TcpStream>| -> Result<String, String> {
@@ -161,8 +168,7 @@ fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
     let mut upstream = TcpStream::connect(SocketAddr::from((ip, port)))
         .map_err(|e| format!("{host}({ip}):{port}: {e}"))?;
     if is_connect {
-        peer
-            .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+        peer.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
             .map_err(|e| e.to_string())?;
         if !buffered.is_empty() {
             upstream.write_all(&buffered).map_err(|e| e.to_string())?;
@@ -192,7 +198,9 @@ fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
 
 fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
     let mut q = Vec::new();
-    q.extend_from_slice(&[0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    q.extend_from_slice(&[
+        0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
     for label in host.split('.') {
         if label.is_empty() || label.len() > 63 {
             return Err("bad name".into());
@@ -251,7 +259,7 @@ fn pump(a: TcpStream, b: TcpStream) -> Result<(), String> {
     let a2 = a.try_clone().map_err(|e| e.to_string())?;
     let b2 = b.try_clone().map_err(|e| e.to_string())?;
     let h = thread::spawn(move || copy(a2, b2));
-    let _ = copy(b, a);
+    copy(b, a);
     let _ = h.join();
     Ok(())
 }
@@ -279,18 +287,19 @@ mod tests {
     fn parse_connect_and_http() {
         let (h, p, c, _) = parse_target("CONNECT example.com:443 HTTP/1.1").unwrap();
         assert_eq!((h, p, c), ("example.com".into(), 443, true));
-        let (h, p, c, origin) = parse_target("GET http://ports.ubuntu.com/ubuntu-ports/ HTTP/1.1").unwrap();
+        let (h, p, c, origin) =
+            parse_target("GET http://ports.ubuntu.com/ubuntu-ports/ HTTP/1.1").unwrap();
         assert_eq!((h, p, c), ("ports.ubuntu.com".into(), 80, false));
         assert!(origin.starts_with("GET /ubuntu-ports/ "));
     }
 
     #[test]
     fn forbidden_targets_are_rejected() {
-        assert!(is_forbidden_target(Ipv4Addr::new(127, 0, 0, 1)));      // loopback self-amplify
-        assert!(is_forbidden_target(Ipv4Addr::new(10, 0, 0, 5)));       // RFC1918 LAN
-        assert!(is_forbidden_target(Ipv4Addr::new(192, 168, 1, 1)));    // RFC1918
-        assert!(is_forbidden_target(Ipv4Addr::new(169, 254, 1, 1)));    // link-local
-        assert!(!is_forbidden_target(Ipv4Addr::new(8, 8, 8, 8)));       // public OK
+        assert!(is_forbidden_target(Ipv4Addr::new(127, 0, 0, 1))); // loopback self-amplify
+        assert!(is_forbidden_target(Ipv4Addr::new(10, 0, 0, 5))); // RFC1918 LAN
+        assert!(is_forbidden_target(Ipv4Addr::new(192, 168, 1, 1))); // RFC1918
+        assert!(is_forbidden_target(Ipv4Addr::new(169, 254, 1, 1))); // link-local
+        assert!(!is_forbidden_target(Ipv4Addr::new(8, 8, 8, 8))); // public OK
         assert!(!is_forbidden_target(Ipv4Addr::new(185, 199, 108, 153))); // public OK
     }
 

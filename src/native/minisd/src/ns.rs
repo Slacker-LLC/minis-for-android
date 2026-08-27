@@ -46,7 +46,13 @@ pub fn make_rprivate_root() -> Result<(), String> {
 }
 
 #[cfg(unix)]
-pub fn mount_fs(src: &str, target: &str, fstype: &str, flags: libc::c_ulong, data: Option<&str>) -> Result<(), String> {
+pub fn mount_fs(
+    src: &str,
+    target: &str,
+    fstype: &str,
+    flags: libc::c_ulong,
+    data: Option<&str>,
+) -> Result<(), String> {
     let c_src = cstr(src)?;
     let c_tgt = cstr(target)?;
     let c_type = cstr(fstype)?;
@@ -58,7 +64,15 @@ pub fn mount_fs(src: &str, target: &str, fstype: &str, flags: libc::c_ulong, dat
         .as_ref()
         .map(|s| s.as_ptr() as *const libc::c_void)
         .unwrap_or(std::ptr::null());
-    let rc = unsafe { libc::mount(c_src.as_ptr(), c_tgt.as_ptr(), c_type.as_ptr(), flags, data_ptr) };
+    let rc = unsafe {
+        libc::mount(
+            c_src.as_ptr(),
+            c_tgt.as_ptr(),
+            c_type.as_ptr(),
+            flags,
+            data_ptr,
+        )
+    };
     if rc == 0 {
         Ok(())
     } else {
@@ -142,7 +156,7 @@ pub fn chroot_to(path: &str) -> Result<(), String> {
     if unsafe { libc::chroot(c.as_ptr()) } != 0 {
         return Err(last_err(&format!("chroot {path}")));
     }
-    if unsafe { libc::chdir(b"/\0".as_ptr() as *const libc::c_char) } != 0 {
+    if unsafe { libc::chdir(c"/".as_ptr()) } != 0 {
         return Err(last_err("chdir /"));
     }
     Ok(())
@@ -194,12 +208,18 @@ pub fn lockdown_no_privs() -> Result<(), String> {
         pid: 0,
     };
     let data = [
-        CapData { effective: 0, permitted: 0, inheritable: 0 },
-        CapData { effective: 0, permitted: 0, inheritable: 0 },
+        CapData {
+            effective: 0,
+            permitted: 0,
+            inheritable: 0,
+        },
+        CapData {
+            effective: 0,
+            permitted: 0,
+            inheritable: 0,
+        },
     ];
-    let rc = unsafe {
-        libc::syscall(libc::SYS_capset, &header as *const CapHeader, data.as_ptr())
-    };
+    let rc = unsafe { libc::syscall(libc::SYS_capset, &header as *const CapHeader, data.as_ptr()) };
     if rc != 0 {
         return Err(last_err("capset"));
     }
@@ -275,20 +295,60 @@ pub fn setup_rootfs_mounts(
     shared: &str,
 ) -> Result<(), String> {
     use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
-    let workspace = if workspace.is_empty() { HOST_WORKSPACE } else { workspace };
-    let memory = if memory.is_empty() { HOST_MEMORY } else { memory };
-    let skills = if skills.is_empty() { HOST_SKILLS } else { skills };
-    let shared = if shared.is_empty() { HOST_SHARED } else { shared };
+    let workspace = if workspace.is_empty() {
+        HOST_WORKSPACE
+    } else {
+        workspace
+    };
+    let memory = if memory.is_empty() {
+        HOST_MEMORY
+    } else {
+        memory
+    };
+    let skills = if skills.is_empty() {
+        HOST_SKILLS
+    } else {
+        skills
+    };
+    let shared = if shared.is_empty() {
+        HOST_SHARED
+    } else {
+        shared
+    };
 
     let root = Path::new(rootfs);
-    for rel in ["proc", "sys", "dev", "dev/pts", "dev/shm", "tmp", "run", "workspace", "memory", "skills", "shared"] {
+    for rel in [
+        "proc",
+        "sys",
+        "dev",
+        "dev/pts",
+        "dev/shm",
+        "tmp",
+        "run",
+        "workspace",
+        "memory",
+        "skills",
+        "shared",
+    ] {
         std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
     }
 
     let proc = root.join("proc").to_string_lossy().into_owned();
-    match mount_fs("proc", &proc, "proc", libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV, Some("hidepid=2")) {
+    match mount_fs(
+        "proc",
+        &proc,
+        "proc",
+        libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
+        Some("hidepid=2"),
+    ) {
         Ok(()) => {}
-        Err(_) => mount_fs("proc", &proc, "proc", libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV, None)?,
+        Err(_) => mount_fs(
+            "proc",
+            &proc,
+            "proc",
+            libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
+            None,
+        )?,
     }
 
     let sys = root.join("sys").to_string_lossy().into_owned();
@@ -299,7 +359,13 @@ pub fn setup_rootfs_mounts(
     remount_ro(&sys)?;
 
     let dev = root.join("dev").to_string_lossy().into_owned();
-    mount_fs("tmpfs", &dev, "tmpfs", libc::MS_NOSUID, Some("mode=0755,size=64m"))?;
+    mount_fs(
+        "tmpfs",
+        &dev,
+        "tmpfs",
+        libc::MS_NOSUID,
+        Some("mode=0755,size=64m"),
+    )?;
     mknod_chr(&format!("{dev}/null"), 0o666, 1, 3)?;
     mknod_chr(&format!("{dev}/zero"), 0o666, 1, 5)?;
     mknod_chr(&format!("{dev}/full"), 0o666, 1, 7)?;
@@ -318,7 +384,13 @@ pub fn setup_rootfs_mounts(
     )
     .is_err()
     {
-        let _ = mount_fs("devpts", &pts, "devpts", libc::MS_NOSUID | libc::MS_NOEXEC, Some("ptmxmode=0666"));
+        let _ = mount_fs(
+            "devpts",
+            &pts,
+            "devpts",
+            libc::MS_NOSUID | libc::MS_NOEXEC,
+            Some("ptmxmode=0666"),
+        );
     }
     let _ = symlink_force("pts/ptmx", &format!("{dev}/ptmx"));
     let _ = symlink_force("/proc/self/fd", &format!("{dev}/fd"));
@@ -326,12 +398,30 @@ pub fn setup_rootfs_mounts(
     let _ = symlink_force("/proc/self/fd/1", &format!("{dev}/stdout"));
     let _ = symlink_force("/proc/self/fd/2", &format!("{dev}/stderr"));
     let shm = root.join("dev/shm").to_string_lossy().into_owned();
-    mount_fs("tmpfs", &shm, "tmpfs", libc::MS_NOSUID | libc::MS_NODEV, Some("mode=1777"))?;
+    mount_fs(
+        "tmpfs",
+        &shm,
+        "tmpfs",
+        libc::MS_NOSUID | libc::MS_NODEV,
+        Some("mode=1777"),
+    )?;
 
     let tmp = root.join("tmp").to_string_lossy().into_owned();
-    mount_fs("tmpfs", &tmp, "tmpfs", libc::MS_NOSUID | libc::MS_NODEV, Some("mode=1777"))?;
+    mount_fs(
+        "tmpfs",
+        &tmp,
+        "tmpfs",
+        libc::MS_NOSUID | libc::MS_NODEV,
+        Some("mode=1777"),
+    )?;
     let run = root.join("run").to_string_lossy().into_owned();
-    mount_fs("tmpfs", &run, "tmpfs", libc::MS_NOSUID | libc::MS_NODEV, Some("mode=0755"))?;
+    mount_fs(
+        "tmpfs",
+        &run,
+        "tmpfs",
+        libc::MS_NOSUID | libc::MS_NODEV,
+        Some("mode=0755"),
+    )?;
 
     let ws = root.join("workspace").to_string_lossy().into_owned();
     bind_mount(workspace, &ws, false)?;
