@@ -30,36 +30,17 @@ jobs:
                   raise SystemExit(f"{path}: expected 1 match, got {s.count(old)}")
               p.write_text(s.replace(old, new, 1))
 
-          once(
-              "src/native/minisd/src/dispatch.rs",
-              "pub fn authorize_request(\n",
-              "// A denied request is already a complete wire-level JSON-RPC response; boxing it\n// would add a heap allocation to the normal authorization failure path.\n#[allow(clippy::result_large_err)]\npub fn authorize_request(\n",
-          )
-          once(
-              "src/native/minisd/src/protocol.rs",
-              "pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {\n",
-              "// Parse failures are returned as complete wire-level responses so callers can\n// write them directly without a second error-to-protocol conversion/allocation.\n#[allow(clippy::result_large_err)]\npub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {\n",
-          )
-          once(
-              "src/native/minisd/src/env.rs",
-              "            if token.parse::<std::net::Ipv4Addr>().is_ok()\n                || token.parse::<std::net::Ipv6Addr>().is_ok()\n            {\n                if token != \"127.0.0.1\" && token != \"::1\" && !out.iter().any(|s| s == token) {\n                    out.push(token.to_string());\n                }\n            }\n",
-              "            if (token.parse::<std::net::Ipv4Addr>().is_ok()\n                || token.parse::<std::net::Ipv6Addr>().is_ok())\n                && token != \"127.0.0.1\"\n                && token != \"::1\"\n                && !out.iter().any(|s| s == token)\n            {\n                out.push(token.to_string());\n            }\n",
-          )
-          once(
-              "src/native/minisd/src/ns.rs",
-              "    if unsafe { libc::chdir(b\"/\\0\".as_ptr() as *const libc::c_char) } != 0 {\n",
-              "    if unsafe { libc::chdir(c\"/\".as_ptr()) } != 0 {\n",
-          )
-          once(
-              "src/native/minisd/src/proxy.rs",
-              "    let _ = copy(b, a);\n",
-              "    copy(b, a);\n",
-          )
-          once(
-              "src/native/minisd/src/session.rs",
-              "    pub fn len(&self) -> usize {\n        self.sessions.len()\n    }\n\n",
-              "    pub fn len(&self) -> usize {\n        self.sessions.len()\n    }\n\n    pub fn is_empty(&self) -> bool {\n        self.sessions.is_empty()\n    }\n\n",
-          )
+          once("src/native/minisd/src/dispatch.rs", "pub fn authorize_request(\n", "// A denied request is already a complete wire-level JSON-RPC response; boxing it\n// would add a heap allocation to the normal authorization failure path.\n#[allow(clippy::result_large_err)]\npub fn authorize_request(\n")
+          once("src/native/minisd/src/protocol.rs", "pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {\n", "// Parse failures are returned as complete wire-level responses so callers can\n// write them directly without a second error-to-protocol conversion/allocation.\n#[allow(clippy::result_large_err)]\npub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {\n")
+          once("src/native/minisd/src/env.rs", "            if token.parse::<std::net::Ipv4Addr>().is_ok()\n                || token.parse::<std::net::Ipv6Addr>().is_ok()\n            {\n                if token != \"127.0.0.1\" && token != \"::1\" && !out.iter().any(|s| s == token) {\n                    out.push(token.to_string());\n                }\n            }\n", "            if (token.parse::<std::net::Ipv4Addr>().is_ok()\n                || token.parse::<std::net::Ipv6Addr>().is_ok())\n                && token != \"127.0.0.1\"\n                && token != \"::1\"\n                && !out.iter().any(|s| s == token)\n            {\n                out.push(token.to_string());\n            }\n")
+          once("src/native/minisd/src/ns.rs", "    if unsafe { libc::chdir(b\"/\\0\".as_ptr() as *const libc::c_char) } != 0 {\n", "    if unsafe { libc::chdir(c\"/\".as_ptr()) } != 0 {\n")
+          once("src/native/minisd/src/proxy.rs", "    let _ = copy(b, a);\n", "    copy(b, a);\n")
+          once("src/native/minisd/src/session.rs", "    pub fn len(&self) -> usize {\n        self.sessions.len()\n    }\n\n", "    pub fn len(&self) -> usize {\n        self.sessions.len()\n    }\n\n    pub fn is_empty(&self) -> bool {\n        self.sessions.is_empty()\n    }\n\n")
+
+          once("src/native/minisd/src/main.rs", "        return unix_server(state, args.socket, args.app_socket);\n", "        unix_server(state, args.socket, args.app_socket)\n")
+          once("src/native/minisd/src/main.rs", "fn acquire_pidfile_lock(socket: &PathBuf) -> Option<std::fs::File> {\n", "fn acquire_pidfile_lock(socket: &std::path::Path) -> Option<std::fs::File> {\n")
+          once("src/native/minisd/src/main.rs", "        .create(true)\n        .read(true)\n", "        .create(true)\n        .truncate(false)\n        .read(true)\n")
+          once("src/native/minisd/src/main.rs", "#[cfg(unix)]\nfn helper_exec(\n", "#[cfg(unix)]\n// This is the direct CLI-to-syscall helper boundary; keeping the security-\n// relevant uid/gid/rootfs/cwd/env inputs explicit is clearer than hiding them\n// in a loosely reusable options bag.\n#[allow(clippy::too_many_arguments)]\nfn helper_exec(\n")
           PY
           cargo fmt --manifest-path src/native/minisd/Cargo.toml --all
           cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
