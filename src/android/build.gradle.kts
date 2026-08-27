@@ -1,4 +1,4 @@
-import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import org.gradle.api.GradleException
 
 plugins {
@@ -9,26 +9,25 @@ plugins {
     id("com.google.devtools.ksp") version "2.1.0-1.0.29" apply false
 }
 
-// Release hardening is applied after the app module has evaluated so it is
-// authoritative even if a downstream/public mirror still contains an older
-// release buildType default. Production packaging may never fall back to the
-// Android debug signing config.
 subprojects {
     pluginManager.withPlugin("com.android.application") {
-        afterEvaluate {
-            val android = extensions.getByType(ApplicationExtension::class.java)
-            val release = android.buildTypes.getByName("release")
+        val keystorePath = System.getenv("RELEASE_KEYSTORE")?.takeIf { it.isNotBlank() }
+        val storePassword = System.getenv("RELEASE_STORE_PASSWORD")?.takeIf { it.isNotBlank() }
+        val keyAlias = System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+        val keyPassword = System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+        val signingConfigured = listOf(
+            keystorePath,
+            storePassword,
+            keyAlias,
+            keyPassword,
+        ).all { it != null }
 
-            val keystorePath = System.getenv("RELEASE_KEYSTORE")?.takeIf { it.isNotBlank() }
-            val storePassword = System.getenv("RELEASE_STORE_PASSWORD")?.takeIf { it.isNotBlank() }
-            val keyAlias = System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
-            val keyPassword = System.getenv("RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
-            val signingConfigured = listOf(
-                keystorePath,
-                storePassword,
-                keyAlias,
-                keyPassword,
-            ).all { it != null }
+        // AGP 8.10 locks the application DSL before afterEvaluate. finalizeDsl
+        // is the supported last mutation point: module defaults have been read,
+        // but signing/lint/build-type objects are still mutable.
+        val androidComponents = extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
+        androidComponents.finalizeDsl { android ->
+            val release = android.buildTypes.getByName("release")
 
             if (signingConfigured) {
                 val signing = android.signingConfigs.findByName("productionRelease")
@@ -39,42 +38,39 @@ subprojects {
                 signing.keyPassword = keyPassword
                 release.signingConfig = signing
             } else {
-                // Explicitly clear any module-level debug signing fallback.
-                // Release compile/lint remains available to public CI, while
-                // packaging tasks below fail with a clear credential error.
+                // Never inherit the app module's historical debug-key fallback.
                 release.signingConfig = null
             }
 
-            // AGP 8.10 supports API 36 with the repository's Gradle 8.11.1.
-            // Keep only the known broken detector disabled in the app module;
-            // release lint itself must run.
+            // The app module historically disabled release lint. Restore it at
+            // the final supported DSL hook so lintRelease is a real gate.
             android.lint.checkReleaseBuilds = true
+        }
 
-            val requireReleaseSigning = tasks.register("requireReleaseSigning") {
-                group = "verification"
-                description = "Fails production release packaging unless explicit signing credentials are configured."
-                doLast {
-                    if (!signingConfigured) {
-                        throw GradleException(
-                            "Production release signing is not configured. Set RELEASE_KEYSTORE, " +
-                                "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD. " +
-                                "Debug signing is intentionally forbidden for release artifacts.",
-                        )
-                    }
-                    val store = file(keystorePath!!)
-                    if (!store.isFile) {
-                        throw GradleException("RELEASE_KEYSTORE does not exist or is not a file: $store")
-                    }
+        val requireReleaseSigning = tasks.register("requireReleaseSigning") {
+            group = "verification"
+            description = "Fails production release packaging unless explicit signing credentials are configured."
+            doLast {
+                if (!signingConfigured) {
+                    throw GradleException(
+                        "Production release signing is not configured. Set RELEASE_KEYSTORE, " +
+                            "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD. " +
+                            "Debug signing is intentionally forbidden for release artifacts.",
+                    )
+                }
+                val store = file(keystorePath!!)
+                if (!store.isFile) {
+                    throw GradleException("RELEASE_KEYSTORE does not exist or is not a file: $store")
                 }
             }
+        }
 
-            tasks.matching {
-                it.name == "assembleRelease" ||
-                    it.name == "bundleRelease" ||
-                    it.name == "packageRelease"
-            }.configureEach {
-                dependsOn(requireReleaseSigning)
-            }
+        tasks.matching {
+            it.name == "assembleRelease" ||
+                it.name == "bundleRelease" ||
+                it.name == "packageRelease"
+        }.configureEach {
+            dependsOn(requireReleaseSigning)
         }
     }
 }
