@@ -5,9 +5,10 @@ import com.openminis.app.data.model.ProviderInstance
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
+import java.io.IOException
 
 /**
- * Central transport boundary for provider traffic.
+ * Central transport boundary for provider and security-sensitive traffic.
  *
  * The Android manifest must keep platform cleartext enabled because a user may
  * intentionally point an API-key provider at a LAN endpoint such as
@@ -84,6 +85,34 @@ object ProviderTransportPolicy {
     /** Build a default OkHttp client carrying the provider redirect policy. */
     fun clientForBase(baseUrl: String): OkHttpClient =
         configureClient(OkHttpClient.Builder(), baseUrl).build()
+
+    /**
+     * Configure a client for flows that must never send cleartext: OAuth token
+     * exchange/refresh, update metadata/downloads, and other credential-bearing
+     * cloud calls. The interceptor blocks a direct http:// request; disabling
+     * SSL redirects blocks HTTPS -> HTTP follow-ups. HTTPS -> HTTPS redirects
+     * remain available for normal CDN/API routing.
+     */
+    fun protectedHttpsBuilder(
+        builder: OkHttpClient.Builder = OkHttpClient.Builder(),
+    ): OkHttpClient.Builder = builder
+        .followRedirects(true)
+        .followSslRedirects(false)
+        .addInterceptor { chain ->
+            if (!chain.request().url.isHttps) {
+                throw IOException("Cleartext HTTP is blocked for this security-sensitive network flow")
+            }
+            chain.proceed(chain.request())
+        }
+
+    fun protectedHttpsClient(): OkHttpClient = protectedHttpsBuilder().build()
+
+    /** Require an arbitrary security-sensitive URL to be HTTPS before use. */
+    fun requireHttps(rawUrl: String, label: String = "URL"): HttpUrl {
+        val url = parseHttpUrl(rawUrl, label)
+        if (!url.isHttps) throw Violation("$label must use HTTPS.")
+        return url
+    }
 
     /**
      * Validate a URL returned by a provider response (for example an image URL)
