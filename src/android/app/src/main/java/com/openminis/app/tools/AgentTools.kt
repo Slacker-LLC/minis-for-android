@@ -42,9 +42,9 @@ object AgentTools {
         add(FileEditTool.definition())
         if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) return@buildList
         // Android development/debug loop. These high-cohesion tools reuse the
-        // existing AccessibilityService, Shizuku, PRoot, approval, checkpoint,
-        // JobRegistry, and output-spill seams rather than creating parallel
-        // runtimes.
+        // existing AccessibilityService, Shizuku, Ubuntu runtime, approval,
+        // checkpoint, JobRegistry, and output-spill seams rather than creating
+        // parallel runtimes.
         addAll(com.openminis.app.tools.android.AndroidAgentTools.definitions())
         if (supportsImageInput || visionGroupConfigured) {
             add(ReadImageTool.definition())
@@ -84,7 +84,7 @@ object AgentTools {
         name = name,
         description = "Execute a command in the on-device Ubuntu 24.04 environment (uid 10000). " +
             "The command runs via /bin/bash -lc with stdout and stderr merged. " +
-            "Workspace is /workspace (host /data/adb/minis/workspace). " +
+            "Workspace is /workspace, backed by the app-private <filesDir>/minis/workspace directory. " +
             "Default timeout is 15 minutes.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
@@ -101,7 +101,7 @@ object AgentTools {
         name = "browser_use",
         description = "Control a web browser with up to 3 tabs. " +
             "Do NOT use this tool for minis:// action URLs (open_terminal, views, settings) — those are app deep links, use Markdown links in chat instead. " +
-            "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview session files (e.g. navigate to minis://workspace/index.html). " +
+            "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview app sandbox files (e.g. navigate to minis://workspace/index.html). " +
             "Sub-resources (JS, CSS, images, fonts) referenced via minis:// absolute paths or relative paths within HTML pages resolve correctly. " +
             "Use navigate to open URLs, screenshot to see the page (returns an image), " +
             "click/type to interact with elements, get_text/get_readable to extract content, " +
