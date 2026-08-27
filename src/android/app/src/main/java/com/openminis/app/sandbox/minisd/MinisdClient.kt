@@ -12,10 +12,8 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * App-side client for the already-installed minisd.
  *
- * P2 first hop uses `su -c 'minisd --call'` because `/data/adb/minis/run`
- * is 0700 root and untrusted_app cannot open that path (P1 evidence).
- * SO_PEERCRED still authenticates the helper as uid 0. A later hop will
- * add an app-private socket once sepolicy allows the App UID to connect.
+ * The current fallback hop uses `su -c 'minisd --call'` when the app-private
+ * socket is unavailable. Direct app-socket transport is preferred when present.
  *
  * Never starts `su` unless a caller explicitly invokes [call].
  */
@@ -75,19 +73,6 @@ class MinisdClient(
         MinisdProtocol.rootExec(tool, args, timeoutMs, nextId()),
         timeoutMs + 5_000,
     )
-
-    /** P5/D9: cloudflared 监督权已移交 minisd（supervisor.restartCloudflared）。 */
-    suspend fun cloudflaredStart(
-        path: String,
-        args: List<String> = emptyList(),
-        env: Map<String, String> = emptyMap(),
-    ): MinisdResponse = call(MinisdProtocol.supervisorRestartCloudflared(path, args, env, nextId()))
-
-    suspend fun cloudflaredStop(): MinisdResponse =
-        call(MinisdProtocol.supervisorStopCloudflared(nextId()))
-
-    suspend fun cloudflaredStatus(): MinisdResponse =
-        call(MinisdProtocol.supervisorStatus(nextId()))
 
     suspend fun call(request: MinisdRequest, timeoutMs: Long = 30_000): MinisdResponse =
         withContext(Dispatchers.IO) {
