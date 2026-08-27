@@ -43,7 +43,7 @@ jobs:
     name: Android build, test and release checks
     runs-on: ubuntu-24.04
     env:
-      RELEASE_KEYSTORE: ${{ runner.temp }}/ci-release.jks
+      RELEASE_KEYSTORE: /tmp/ci-release.jks
       RELEASE_STORE_PASSWORD: ci-release-pass
       RELEASE_KEY_ALIAS: ci-release
       RELEASE_KEY_PASSWORD: ci-release-pass
@@ -66,10 +66,10 @@ jobs:
       - name: Generate ephemeral CI release key
         run: |
           keytool -genkeypair -noprompt \
-            -keystore "$RUNNER_TEMP/ci-release.jks" \
-            -storepass ci-release-pass \
-            -keypass ci-release-pass \
-            -alias ci-release \
+            -keystore "$RELEASE_KEYSTORE" \
+            -storepass "$RELEASE_STORE_PASSWORD" \
+            -keypass "$RELEASE_KEY_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" \
             -keyalg RSA -keysize 2048 -validity 2 \
             -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
       - name: Android unit tests
