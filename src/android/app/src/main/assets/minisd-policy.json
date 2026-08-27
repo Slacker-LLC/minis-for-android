@@ -1,0 +1,32 @@
+{
+  "methods": {
+    "system.hello": { "mode": "allow" },
+    "system.ping": { "mode": "allow" },
+    "root.probe": { "mode": "allow" },
+    "root.exec": {
+      "mode": "allow",
+      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount"],
+      "argRules": {
+        "pm": { "regexDeny": ["shell.*su.*"] }
+      }
+    },
+    "root.shellRaw": { "mode": "deny" },
+    "ubuntu.start": { "mode": "allow" },
+    "ubuntu.stop": { "mode": "allow" },
+    "ubuntu.status": { "mode": "allow" },
+    "ubuntu.exec": { "mode": "allow" },
+    "ubuntu.adminExec": { "mode": "confirm", "ratePerMin": 3 },
+    "ubuntu.provision": { "mode": "allow" },
+    "proc.killTree": { "mode": "allow" },
+    "mount.list": { "mode": "allow" },
+    "mount.prepare": { "mode": "allow" },
+    "workspace.info": { "mode": "allow" },
+    "workspace.setQuota": { "mode": "allow" },
+    "policy.get": { "mode": "allow" },
+    "health.get": { "mode": "allow" }
+  },
+  "caller": {
+    "appUid": 0,
+    "requireToken": false
+  }
+}
