@@ -476,6 +476,11 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
     // OpenAI API Format: false = Chat Completions, true = Responses API
     var useResponsesAPI by remember { mutableStateOf(false) }
+    var approvedCleartextBase by remember { mutableStateOf<String?>(null) }
+    val trimmedCustomBase = customBaseURL.trim()
+    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val cleartextApproved = !isCleartextHttp || approvedCleartextBase == trimmedCustomBase
 
     // ── Credential ──────────────────────────────────────────────────────
     val keyPlaceholder = when (providerType) {
@@ -544,9 +549,28 @@ private fun ColumnScope.ApiKeyConfigSection(
                 RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
                 SectionTextField(
                     value = customBaseURL,
-                    onValueChange = onCustomBaseURLChange,
+                    onValueChange = { value ->
+                        if (approvedCleartextBase != value.trim()) approvedCleartextBase = null
+                        onCustomBaseURLChange(value)
+                    },
                     placeholder = defaultUrl,
                     singleLine = true,
+                )
+            }
+            if (isCleartextHttp) {
+                SettingsSwitchRow(
+                    title = "Allow insecure HTTP for this provider",
+                    checked = approvedCleartextBase == trimmedCustomBase,
+                    onCheckedChange = { allow ->
+                        approvedCleartextBase = if (allow) trimmedCustomBase else null
+                    },
+                    showDivider = false,
+                )
+                Text(
+                    text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             // Auto Append "/v1" toggle (not for Gemini — Gemini uses full path)
@@ -621,9 +645,11 @@ private fun ColumnScope.ApiKeyConfigSection(
         // (custom base URL filled in) — ollama / LM Studio / LiteLLM /
         // private relays need no key. Official endpoints and OAuth flows
         // keep requiring a credential. Mirrors iOS AddProviderView.
-        enabled = apiKey.isNotBlank() || (
-            customBaseURL.isNotBlank() &&
-                (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
+        enabled = cleartextApproved && (
+            apiKey.isNotBlank() || (
+                customBaseURL.isNotBlank() &&
+                    (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
+            )
         ),
     ) {
         Text(stringResource(R.string.provider_list_add_provider))
@@ -649,6 +675,8 @@ private fun ColumnScope.OAuthConfigSection(
     var manualToken by remember { mutableStateOf("") }
     var customBaseURL by remember { mutableStateOf("") }
     var appendV1Suffix by remember { mutableStateOf(providerType != ProviderType.gemini) }
+    val manualHttpBlocked = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(customBaseURL)
 
     val signInLabel = when (providerType) {
         ProviderType.anthropic -> "Sign in with Claude"
@@ -846,6 +874,14 @@ private fun ColumnScope.OAuthConfigSection(
                     placeholder = defaultUrl,
                     singleLine = true,
                 )
+                if (manualHttpBlocked) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP is not allowed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 RowLabel(text = stringResource(R.string.add_provider_bearer_token))
                 SectionTextField(
@@ -886,7 +922,7 @@ private fun ColumnScope.OAuthConfigSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            enabled = manualToken.isNotBlank(),
+            enabled = manualToken.isNotBlank() && !manualHttpBlocked,
         ) {
             Text(stringResource(R.string.provider_list_add_provider))
         }

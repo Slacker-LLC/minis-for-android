@@ -12,7 +12,7 @@ import okhttp3.Request
 import org.json.JSONObject
 
 object GeminiModelsApi {
-    private val client = OkHttpClient()
+    private val client = com.openminis.app.provider.ProviderTransportPolicy.protectedHttpsClient()
     private val cache = ProviderModelsCache("gemini")
 
     /**

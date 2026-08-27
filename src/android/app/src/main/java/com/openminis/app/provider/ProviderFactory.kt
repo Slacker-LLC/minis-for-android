@@ -31,6 +31,7 @@ object ProviderFactory {
         // completions endpoint suffix at OpenAIProvider.kt:710 then
         // produces a single-slash join.
         val basePath = instance.effectiveBaseURL
+        ProviderTransportPolicy.requireAllowedInstanceBase(instance, basePath)
         val provider: LLMProvider = when (instance.providerType) {
             ProviderType.anthropic -> {
                 val isOAuth = instance.credentialType == ProviderCredential.oauth

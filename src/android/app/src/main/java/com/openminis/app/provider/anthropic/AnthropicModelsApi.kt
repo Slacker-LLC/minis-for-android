@@ -13,7 +13,6 @@ import okhttp3.Response
 import org.json.JSONObject
 
 object AnthropicModelsApi {
-    private val client = OkHttpClient()
 
     /**
      * Fetch models from Anthropic API.
@@ -73,6 +72,7 @@ object AnthropicModelsApi {
             // paths used purely for host-root discovery (e.g. deepseek.com/anthropic ->
             // host root /v1/models); those keep the /v1 auto-append.
             val url = buildURL(candidate, forceV1Discovery = idx > 0)
+            val client = com.openminis.app.provider.ProviderTransportPolicy.clientForBase(url)
             val requestBuilder = Request.Builder()
                 .url(url)
                 .header("anthropic-version", "2023-06-01")

@@ -398,6 +398,7 @@ class OpenAIProvider private constructor(
         // a local proxy got reused on every retry (silent infinite hang).
         .connectionPool(com.openminis.app.network.NetworkMonitor.sharedLLMConnectionPool)
         .eventListenerFactory { OkHttpNetTraceListener() }
+        .let { com.openminis.app.provider.ProviderTransportPolicy.configureClient(it, basePath) }
         .build()
 
     /** Detect OpenRouter base URL. */
@@ -1759,7 +1760,9 @@ class OpenAIProvider private constructor(
                 val urlStr = item.safeOptString("url", "")
                 if (urlStr.isNotEmpty()) {
                     try {
-                        val dlReq = Request.Builder().url(urlStr).get().build()
+                        val safeUrl = com.openminis.app.provider.ProviderTransportPolicy
+                            .requireAllowedSecondaryUrl(basePath, urlStr)
+                        val dlReq = Request.Builder().url(safeUrl).get().build()
                         val dlResp = client.newCall(dlReq).execute()
                         val dlBytes = dlResp.body?.bytes()
                         val ctMime = dlResp.header("Content-Type")

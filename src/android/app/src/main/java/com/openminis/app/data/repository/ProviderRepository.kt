@@ -2088,6 +2088,8 @@ class ProviderRepository(private val context: Context) {
 
 
     suspend fun refreshModels(instance: ProviderInstance) {
+        com.openminis.app.provider.ProviderTransportPolicy
+            .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
         var apiKey = loadApiKey(instance.id)
 
         // For OAuth providers, try to refresh the token before using it (mirrors iOS validAccessToken)

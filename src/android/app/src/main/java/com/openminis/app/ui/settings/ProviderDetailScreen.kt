@@ -127,6 +127,18 @@ fun ProviderDetailScreen(
     var isEnabled by remember { mutableStateOf(instance.isEnabled) }
     var customBaseURL by remember { mutableStateOf(instance.customBaseURL ?: "") }
     var appendV1Suffix by remember { mutableStateOf(instance.appendV1Suffix) }
+    var approvedCleartextBase by remember(instance.customBaseURL) {
+        mutableStateOf(instance.customBaseURL?.trim()?.takeIf {
+            com.openminis.app.provider.ProviderTransportPolicy.isCleartextHttp(it)
+        })
+    }
+    val trimmedCustomBase = customBaseURL.trim()
+    val isCleartextHttp = com.openminis.app.provider.ProviderTransportPolicy
+        .isCleartextHttp(trimmedCustomBase)
+    val isOAuthCredential = instance.credentialType ==
+        com.openminis.app.data.model.ProviderCredential.oauth
+    val cleartextApproved = !isCleartextHttp ||
+        (!isOAuthCredential && approvedCleartextBase == trimmedCustomBase)
     // [T-provider-custom-user-agent] Per-provider UA override input. Only the
     // OpenAI-/Anthropic-compat custom-base section surfaces it (see gate below).
     var customUserAgent by remember { mutableStateOf(instance.customUserAgent ?: "") }
@@ -247,11 +259,39 @@ fun ProviderDetailScreen(
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     SectionTextField(
                         value = customBaseURL,
-                        onValueChange = { customBaseURL = it },
+                        onValueChange = { value ->
+                            if (approvedCleartextBase != value.trim()) approvedCleartextBase = null
+                            customBaseURL = value
+                        },
                         singleLine = true,
                         placeholder = stringResource(R.string.provider_detail_https_api_example_placeholder),
                         fieldModifier = Modifier.bringIntoViewOnFocus(),
                     )
+                }
+                if (isCleartextHttp) {
+                    if (isOAuthCredential) {
+                        Text(
+                            "OAuth/bearer-token endpoints require HTTPS. Cleartext HTTP cannot be saved.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        SettingsSwitchRow(
+                            title = "Allow insecure HTTP for this provider",
+                            checked = approvedCleartextBase == trimmedCustomBase,
+                            onCheckedChange = { allow ->
+                                approvedCleartextBase = if (allow) trimmedCustomBase else null
+                            },
+                            showDivider = false,
+                        )
+                        Text(
+                            "HTTP is not encrypted. API keys and prompts can be read or changed on the network.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -340,6 +380,7 @@ fun ProviderDetailScreen(
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = cleartextApproved,
                 ) {
                     Text(stringResource(R.string.provider_detail_save_url_settings))
                 }
