@@ -12,7 +12,6 @@ pub mod protocol;
 pub mod rate;
 pub mod session;
 pub mod state;
-pub mod supervisor;
 pub mod ubuntu;
 
 pub use dispatch::handle;
