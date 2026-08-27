@@ -47,6 +47,10 @@ pub struct PolicyFile {
 
 pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
 
+fn is_builtin_root_exec_tool(tool: &str) -> bool {
+    matches!(tool, "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount")
+}
+
 impl PolicyFile {
     pub fn parse(json: &str) -> Result<Self, String> {
         let policy: PolicyFile =
@@ -67,6 +71,17 @@ impl PolicyFile {
             if let Some(n) = spec.rate_per_min {
                 if n == 0 {
                     return Err(format!("{name}.ratePerMin must be >= 1"));
+                }
+            }
+            if name == "root.exec" {
+                if let Some(tools) = &spec.tool_allowlist {
+                    for tool in tools {
+                        if !is_builtin_root_exec_tool(tool) {
+                            return Err(format!(
+                                "root.exec.toolAllowlist may only narrow the built-in capability set: {tool}"
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -147,6 +162,18 @@ mod tests {
     }
 
     #[test]
+    fn root_exec_policy_cannot_expand_builtin_capabilities() {
+        assert!(PolicyFile::parse(
+            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm"]}}}"#
+        )
+        .is_ok());
+        assert!(PolicyFile::parse(
+            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm","reboot"]}}}"#
+        )
+        .is_err());
+    }
+
+    #[test]
     fn wildcard_shell_su() {
         assert!(wildcard_match("shell.*su.*", "shell su"));
         assert!(wildcard_match("shell.*su.*", "shell foo su bar"));
@@ -155,7 +182,6 @@ mod tests {
 
     #[test]
     fn wildcard_conservative_semantics() {
-        // fail-open guard: unanchored so "su.*" cannot be bypassed via "pm su"
         assert!(wildcard_match("su.*", "pm su"));
         assert!(wildcard_match("shell.*su.*", "shell su -c id"));
         assert!(!wildcard_match("shell.*su.*", "pm su"));
