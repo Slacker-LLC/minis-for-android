@@ -105,12 +105,12 @@ pub fn execute_ubuntu_snapshot(
     params: Value,
     admin: bool,
 ) -> Result<Value, (ErrorCode, String)> {
-    let req = parse_ubuntu_exec(&params)
-        .map_err(|code| (code, "bad ubuntu exec params".to_string()))?;
+    let req =
+        parse_ubuntu_exec(&params).map_err(|code| (code, "bad ubuntu exec params".to_string()))?;
     let uid = if admin { 0 } else { snapshot.guest_uid };
     let gid = if admin { 0 } else { snapshot.guest_gid };
-    let exe = std::env::current_exe()
-        .map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
+    let exe =
+        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
     let proxy = if admin {
         crate::env::discover_proxy()

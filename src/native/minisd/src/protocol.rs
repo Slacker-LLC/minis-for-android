@@ -125,7 +125,11 @@ impl Response {
     }
 
     pub fn unsupported(id: u64) -> Self {
-        let mut r = Self::err(id, ErrorCode::UnsupportedVersion, "unsupported protocol version");
+        let mut r = Self::err(
+            id,
+            ErrorCode::UnsupportedVersion,
+            "unsupported protocol version",
+        );
         if let Some(e) = r.error.as_mut() {
             e.supported = Some(SUPPORTED_VERSIONS.to_vec());
         }
@@ -133,7 +137,11 @@ impl Response {
     }
 
     pub fn confirm(id: u64, confirm_id: String) -> Self {
-        let mut r = Self::err(id, ErrorCode::ConfirmRequired, "human confirmation required");
+        let mut r = Self::err(
+            id,
+            ErrorCode::ConfirmRequired,
+            "human confirmation required",
+        );
         if let Some(e) = r.error.as_mut() {
             e.confirm_id = Some(confirm_id);
         }
@@ -148,10 +156,7 @@ pub fn frame_header(len: usize, max: usize) -> Result<[u8; FRAME_HEADER_BYTES], 
     Ok((len as u32).to_be_bytes())
 }
 
-pub fn decode_frame_len(
-    header: [u8; FRAME_HEADER_BYTES],
-    max: usize,
-) -> Result<usize, ErrorCode> {
+pub fn decode_frame_len(header: [u8; FRAME_HEADER_BYTES], max: usize) -> Result<usize, ErrorCode> {
     let len = u32::from_be_bytes(header) as usize;
     if len == 0 || len > max {
         return Err(ErrorCode::BadParams);
@@ -179,7 +184,11 @@ pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
         return Err(Response::unsupported(req.id));
     }
     if req.method.is_empty() {
-        return Err(Response::err(req.id, ErrorCode::BadParams, "missing method"));
+        return Err(Response::err(
+            req.id,
+            ErrorCode::BadParams,
+            "missing method",
+        ));
     }
     Ok(req)
 }
@@ -223,7 +232,10 @@ mod tests {
         let req = parse_request(raw.as_bytes()).unwrap();
         assert_eq!(req.method, "root.exec");
         assert_eq!(req.params["tool"], "pm");
-        let resp = Response::ok(1, serde_json::json!({"exit_code":0,"stdout":"ok","stderr":""}));
+        let resp = Response::ok(
+            1,
+            serde_json::json!({"exit_code":0,"stdout":"ok","stderr":""}),
+        );
         let encoded = encode_response(&resp).unwrap();
         let back: Response = serde_json::from_str(&encoded).unwrap();
         assert!(back.ok);
@@ -238,13 +250,19 @@ mod tests {
         let len = decode_frame_len(header, MAX_REQUEST_BYTES).unwrap();
         assert_eq!(len, payload.len());
         assert_eq!(&frame[FRAME_HEADER_BYTES..], payload);
-        assert_eq!(frame_header(0, MAX_REQUEST_BYTES), Err(ErrorCode::BadParams));
+        assert_eq!(
+            frame_header(0, MAX_REQUEST_BYTES),
+            Err(ErrorCode::BadParams)
+        );
         assert_eq!(
             frame_header(MAX_REQUEST_BYTES + 1, MAX_REQUEST_BYTES),
             Err(ErrorCode::BadParams)
         );
         assert_eq!(
-            decode_frame_len(((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes(), MAX_REQUEST_BYTES),
+            decode_frame_len(
+                ((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes(),
+                MAX_REQUEST_BYTES
+            ),
             Err(ErrorCode::BadParams)
         );
     }

@@ -28,13 +28,9 @@ pub fn resolve_workspace(user_path: &str) -> Result<String, ErrorCode> {
         return Err(ErrorCode::PolicyDenied);
     }
     let parts = normalize_unix(user_path)?;
-    let host = if user_path == GUEST_WORKSPACE
-        || user_path.starts_with("/workspace/")
-    {
+    let host = if user_path == GUEST_WORKSPACE || user_path.starts_with("/workspace/") {
         join_host(&parts[1..])
-    } else if user_path == HOST_WORKSPACE
-        || user_path.starts_with("/data/adb/minis/workspace/")
-    {
+    } else if user_path == HOST_WORKSPACE || user_path.starts_with("/data/adb/minis/workspace/") {
         if parts.len() < 4 {
             HOST_WORKSPACE.to_string()
         } else {
@@ -118,13 +114,22 @@ mod tests {
             resolve_workspace("sessions/1/out.txt").unwrap(),
             "/data/adb/minis/workspace/sessions/1/out.txt"
         );
-        assert_eq!(resolve_workspace("/workspace/../policy").unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            resolve_workspace("/workspace/../policy").unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         assert_eq!(
             resolve_workspace("/data/adb/minis/workspace/../policy/policy.json").unwrap_err(),
             ErrorCode::PolicyDenied
         );
-        assert_eq!(resolve_workspace("/etc/passwd").unwrap_err(), ErrorCode::PolicyDenied);
-        assert_eq!(resolve_workspace("/data/adb/minis/policy/x").unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            resolve_workspace("/etc/passwd").unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
+        assert_eq!(
+            resolve_workspace("/data/adb/minis/policy/x").unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         assert!(resolve_workspace("").is_err());
     }
 

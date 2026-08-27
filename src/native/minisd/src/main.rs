@@ -51,7 +51,9 @@ fn parse_args() -> Result<Args, String> {
                     "minisd [--mock] [--once] [--call] [--watchdog] [--socket PATH] [--app-socket PATH] [--policy PATH]"
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
-                eprintln!("minisd --helper exec --pid N --rootfs PATH --uid N --gid N --cwd PATH -- ARGV");
+                eprintln!(
+                    "minisd --helper exec --pid N --rootfs PATH --uid N --gid N --cwd PATH -- ARGV"
+                );
                 std::process::exit(0);
             }
             other => return Err(format!("unknown arg: {other}")),
@@ -413,22 +415,16 @@ where
 {
     use tokio::io::AsyncWriteExt;
     let header = frame_header(payload.len(), max).map_err(|_| "invalid frame size".to_string())?;
-    writer
-        .write_all(&header)
-        .await
-        .map_err(|e| e.to_string())?;
-    writer
-        .write_all(payload)
-        .await
-        .map_err(|e| e.to_string())?;
+    writer.write_all(&header).await.map_err(|e| e.to_string())?;
+    writer.write_all(payload).await.map_err(|e| e.to_string())?;
     writer.flush().await.map_err(|e| e.to_string())
 }
 
 #[cfg(unix)]
-fn poisoned_lock<T>(
-    state: &std::sync::Arc<std::sync::Mutex<T>>,
-) -> std::sync::MutexGuard<'_, T> {
-    state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+fn poisoned_lock<T>(state: &std::sync::Arc<std::sync::Mutex<T>>) -> std::sync::MutexGuard<'_, T> {
+    state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 #[cfg(unix)]
@@ -516,7 +512,8 @@ async fn serve_client(
         Ok(req) => req,
         Err(resp) => {
             if let Ok(encoded) = encode_response(&resp) {
-                let _ = write_frame_async(&mut stream, encoded.as_bytes(), MAX_RESPONSE_BYTES).await;
+                let _ =
+                    write_frame_async(&mut stream, encoded.as_bytes(), MAX_RESPONSE_BYTES).await;
             }
             return;
         }
@@ -568,7 +565,8 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut listen = minisd::proxy::PROXY_LISTEN.to_string();
     let mut tz = "LCL-8".to_string();
     let mut proxy = String::new();
-    let mut extra_env: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let mut extra_env: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
     let mut guest_argv: Vec<String> = Vec::new();
     let mut i = 0usize;
     while i < args.len() {
@@ -662,9 +660,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 i += 2;
             }
             "--env" => {
-                let kv = args
-                    .get(i + 1)
-                    .ok_or((8u8, "--env needs KEY=VAL".into()))?;
+                let kv = args.get(i + 1).ok_or((8u8, "--env needs KEY=VAL".into()))?;
                 let (k, v) = kv
                     .split_once('=')
                     .ok_or((8u8, "--env needs KEY=VAL".into()))?;
@@ -711,8 +707,7 @@ fn helper_keep(
     ns::set_process_name("minisd-keep");
     ns::unshare_mount().map_err(|e| (1u8, e))?;
     ns::make_rprivate_root().map_err(|e| (2u8, e))?;
-    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared)
-        .map_err(|e| (3u8, e))?;
+    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared).map_err(|e| (3u8, e))?;
     println!("READY {}", std::process::id());
     let _ = std::io::Write::flush(&mut std::io::stdout());
     unsafe {
@@ -826,7 +821,9 @@ mod ipc_tests {
             let (mut client, mut server) = tokio::io::duplex(16);
             let header = ((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes();
             client.write_all(&header).await.unwrap();
-            assert!(read_frame_async(&mut server, MAX_REQUEST_BYTES).await.is_err());
+            assert!(read_frame_async(&mut server, MAX_REQUEST_BYTES)
+                .await
+                .is_err());
         });
     }
 }

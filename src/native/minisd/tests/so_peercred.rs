@@ -15,10 +15,10 @@
 //! the live Android path.
 
 use minisd::auth::PeerCred;
+use minisd::handle;
 use minisd::policy::PolicyFile;
 use minisd::protocol::{ClientHello, Request};
 use minisd::state::AppState;
-use minisd::handle;
 
 fn client() -> ClientHello {
     ClientHello {
