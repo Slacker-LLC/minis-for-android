@@ -2,7 +2,7 @@
 
 本文描述 Minis for Android 当前的安全模型、目标边界和已知缺口。
 
-> 当前公开 APK 是 Debug 签名开发包，不是 production-ready 安全版本。高优先级安全问题以仓库 Issues 为准。
+> 仓库当前不提供预编译发行 APK。源码仍处于安全收口阶段，不能把本地 Debug/Release 构建视为 production-ready；高优先级问题以仓库 Issues 为准。
 
 ## 1. 凭据存储
 
@@ -17,7 +17,7 @@
 
 - 仅用于开发/自测；
 - 监听回环地址；
-- 生产构建必须确保 DebugServer 与 debug-only 资源不可进入发布 APK。
+- 未来生产构建必须确保 DebugServer 与 debug-only 资源不可进入发布 APK。
 
 ### MCP Server
 
@@ -120,16 +120,16 @@ Root、Shizuku/AXManager/Sui、Accessibility、普通 Android API 是不同能�
 - 当前全局 cleartext 配置的收口跟踪见 [#10](https://github.com/Slacker-LLC/minis-for-android/issues/10)；
 - 受保护流程不得被重定向降级为 HTTP。
 
-## 10. 发布安全
+## 10. 未来发布安全
 
-当前发布链还有明确待办：
+仓库当前是 source-only，没有正式发行版。若以后恢复 production release，至少先关闭这些发布链问题：
 
 - [#7](https://github.com/Slacker-LLC/minis-for-android/issues/7)：CI 门禁；
 - [#8](https://github.com/Slacker-LLC/minis-for-android/issues/8)：Release 禁止使用 debug keystore；
 - [#9](https://github.com/Slacker-LLC/minis-for-android/issues/9)：恢复 release lint；
 - [#12](https://github.com/Slacker-LLC/minis-for-android/issues/12)：私有 Provider 定制值缺失时显式禁用/失败。
 
-在上述问题关闭并完成独立验证前，不应把公开构建标记为 production-ready。
+二进制产物应通过受控的 Release/CI artifact 分发，不能再提交 APK/AAB 到 Git。
 
 ## 11. 已知平台边界
 
