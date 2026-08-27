@@ -1,18 +1,16 @@
 # 开发状态
 
-本文记录当前 `master` 的工程状态。发布使用者先阅读根目录 [README](../README.md)。
+本文记录当前 `master` 的工程状态。先阅读根目录 [README](../README.md)。
 
-## 仓库与发布
+## 仓库状态
 
 - Repository: `https://github.com/Slacker-LLC/minis-for-android`
 - Default branch: `master`
-- Latest tagged release: `v1.01-beta.2`
 - applicationId: `dev.openminispet.android`
-- Version: `1.01-beta.2` (`versionCode 39`)
-- Published APK: `OpenMinis-Pet-1.01-beta.2-arm64-debug.apk`
-- SHA-256: `4158bdd821d5a9b6b48c950dc9568842ec7c8f630d9c35467a54bacdef4e9490`
+- Android build metadata: `1.01-beta.2` (`versionCode 39`)
+- Distribution: **source-only；当前不维护 GitHub Release、Git tag 版本入口或仓库内 APK**
 
-当前公开 APK 是 Debug 签名开发包，不是生产 release。
+Android 的 `versionName/versionCode` 暂时仍作为构建/升级元数据存在，不表示仓库有同名公开发行版。
 
 ## 当前主架构
 
@@ -32,7 +30,7 @@ Android App
 - 旧 Web Remote HTTP Server；
 - 内置 Cloudflare Tunnel 前端/控制面。
 
-历史资料只保留在 archive/upstream 参考中，不应作为当前实现说明。
+历史资料只能作为 archive/upstream 参考，不应作为当前实现说明。
 
 ## 已实现
 
@@ -86,7 +84,7 @@ Android App
 - [#11 Correct foreground-service lifecycle/type](https://github.com/Slacker-LLC/minis-for-android/issues/11)
 - [#12 Explicit provider-customization capability state](https://github.com/Slacker-LLC/minis-for-android/issues/12)
 
-这些 Issue 是当前工程状态的一部分；在它们关闭前，不应把公开 Debug APK 描述成 production-ready。
+这些 Issue 是当前工程状态的一部分；在它们关闭前，不应建立 production-ready 分发入口。
 
 ## 已知设备/平台限制
 
@@ -97,7 +95,7 @@ Android App
 
 ## 当前验证原则
 
-仓库没有 CI 前，本地验证结果不等同于持续门禁。提交改动时至少执行与改动相关的最窄测试，并在 PR 中写清实际运行过的命令。
+在 CI 门禁建立前，本地验证结果不等同于持续门禁。提交改动时至少执行与改动相关的最窄测试，并在 PR 中写清实际运行过的命令。
 
 推荐基线：
 
@@ -137,8 +135,8 @@ cargo clippy -- -D warnings
 ```text
 源码与测试
   > 当前架构 / 安全文档
-  > README / Release Notes
+  > README / CHANGELOG
   > archive / upstream 历史资料
 ```
 
-发现冲突时，优先修当前文档，不要为了保留历史表述而让 README/CONTRIBUTING 与现状相互矛盾。
+发现冲突时，优先修当前文档，不要让旧发行资料或历史架构表述重新进入当前文档。
