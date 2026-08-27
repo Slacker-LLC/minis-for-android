@@ -8,13 +8,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Build-time customization values that must NOT ship in the public
-// open-source mirror. `provider-customization.properties` is tracked in the PRIVATE
-// MinisApp repo (with real values) and listed under `private:` in
-// PUBLISH_MANIFEST.yml so it is never synced; the public repo ships only
-// `provider-customization.properties.example` (empty values). A build without a
-// configured value compiles fine but fails at runtime the first time the
-// value is required (see ClaudeOAuthManager). See docs/PUBLISH_POLICY.md.
+// Optional provider customization is local build configuration. The repository
+// tracks only provider-customization.properties.example; the real
+// provider-customization.properties file is gitignored. Features that require
+// a missing private OAuth identifier must fail closed at their feature boundary,
+// while unrelated API-key paths must remain usable.
 val appCustomization = Properties().apply {
     val f = rootProject.file("app/provider-customization.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -24,12 +22,8 @@ fun customizationValue(key: String): String =
 
 android {
     namespace = "com.openminis.app"
-    // [T-android-dynamic-island] Bumped 35→36 so the Android 16 (Baklava)
-    // Live Updates APIs — Notification.ProgressStyle, FLAG_PROMOTED_ONGOING,
-    // NotificationManager.canPostPromotedNotifications(), setShortCriticalText —
-    // are available to compile against. targetSdk stays 35 to avoid pulling in
-    // Android 16 behavior changes; the Live Updates path is runtime-gated on
-    // Build.VERSION.SDK_INT >= 36 (see DynamicIslandSupport / AgentForegroundService).
+    // Compile against Android 16 APIs used by the Live Updates path. targetSdk
+    // remains 35; Android 16-only behavior is runtime-gated by SDK level.
     compileSdk = 36
 
     defaultConfig {
@@ -41,8 +35,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // System prompt prefix required by Anthropic for Claude Code OAuth
-        // credentials. Empty in the public mirror (see provider-customization.properties).
+        // Optional Anthropic OAuth identifier prompt. Empty when the local
+        // provider customization file does not configure it.
         buildConfigField(
             "String",
             "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT",
@@ -50,7 +44,8 @@ android {
         )
 
         ndk {
-            // Development target: API 34 x86_64 emulator; keep arm64-v8a for device builds.
+            // x86_64 supports emulator development; arm64-v8a is the primary
+            // physical-device ABI.
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
 
@@ -76,24 +71,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // !! SECURITY WARNING (fork audit 2026-08-21) !!
-            // Signing with the DEBUG keystore means anyone can re-sign a
-            // tampered "update" with the same key (the debug keystore's
-            // credentials are public knowledge), so an attacker could push a
-            // malicious higher-versionCode APK over this one on sideloaded
-            // devices. DO NOT distribute assembleRelease as-is. Use a real
-            // release keystore and point signingConfig at it:
-            //   signingConfig = signingConfigs.create("release") {
-            //       storeFile = file(System.getenv("RELEASE_KEYSTORE") ?: "")
-            //       storePassword = System.getenv("RELEASE_STORE_PASSWORD")
-            //       keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-            //       keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
-            //   }
-            // Also: the RELEASED artifact should be assembleRelease, NOT
-            // assembleDebug — debug builds start the DebugServer RPC surface
-            // (see MinisApp.onCreate / DebugServer), which is a serious
-            // remote-control exposure in a distributed APK.
-            signingConfig = signingConfigs.getByName("debug")
+            // Production signing is configured centrally in the root Android
+            // build.gradle.kts. Packaging a release without explicit RELEASE_*
+            // credentials fails closed and never falls back to the debug key.
         }
     }
 
@@ -112,7 +92,8 @@ android {
     }
 
     androidResources {
-        noCompress += listOf("tar.gz", "proot-aarch64")
+        // The Ubuntu rootfs is packaged as a compressed tar archive.
+        noCompress += "tar.gz"
     }
 
     testOptions {
@@ -120,27 +101,14 @@ android {
     }
 
     lint {
-        // Existing debt snapshot only. New findings must fail CI; this file may only shrink.
+        // Existing debt snapshot only. New findings must fail CI; this file may
+        // only shrink as historical findings are fixed.
         baseline = file("lint-baseline.xml")
-
-        // AGP 8.x ships a NonNullableMutableLiveData detector that throws
-        // IncompatibleClassChangeError on Kotlin source during
-        // lintVitalAnalyzeRelease, regardless of whether the project uses
-        // LiveData (this project does not). The crash happens in the
-        // detector's dispatch phase — before the configured `disable` list
-        // is consulted — so disabling the rule alone is not enough.
-        // checkReleaseBuilds=false skips lintVitalAnalyzeRelease entirely;
-        // debug-build lint coverage is unaffected. Re-enable once AGP ships
-        // a fixed detector (tracked at issuetracker.google.com/388538014).
-        checkReleaseBuilds = false
-        disable += "NonNullableMutableLiveData"
     }
 }
 
-// [T-bash-on-demand] Keep the shared bashism rule table / test vectors as a
-// SINGLE source of truth (src/shared/bashism) — copy into assets at build
-// time instead of committing duplicate JSON. iOS references the same files as
-// bundle resources. Runs before every asset merge so debug/release stay fresh.
+// Keep the shared bashism rule table and test vectors as a single source of
+// truth under src/shared/bashism, copied into Android assets at build time.
 val copyBashismRules by tasks.registering(Copy::class) {
     from(rootProject.file("../shared/bashism")) {
         include("bashism_rules.json", "bashism_test_vectors.json")
@@ -151,23 +119,15 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(copyBashismRules) }
 tasks.named("preBuild") { dependsOn(copyBashismRules) }
 
-// [T-android-debugserver-skill] Stage the debug-server skill + an Android
-// reference client into the DEBUG-ONLY asset source set, so the debug server
-// can serve them over GET /skill (mirrors the iOS "Generate Debug Skill" build
-// phase). Single source of truth stays .claude/skills/debug-server/.
-//
-// Wired to DEBUG asset merges only: src/debug/assets never reaches a release
-// APK, so the tooling docs can't ship to users. `assets` is also declared as an
-// output so Gradle re-runs this when the skill changes but skips it otherwise.
+// Stage optional debug-server skill assets only for debug builds. Local
+// development checkouts may provide the generator and .claude skill source;
+// source-only checkouts build normally when those optional files are absent.
 val stageDebugSkillAssets by tasks.registering(Exec::class) {
     val script = rootProject.file("../../scripts/gen_debug_skill_android.sh")
     val skillDir = rootProject.file("../../.claude/skills/debug-server")
     onlyIf { script.exists() }
-    // Declare the inputs only when they exist. `.optional()` covers an unset
-    // property, not a path that is absent: Gradle validates inputs before it
-    // consults onlyIf, so a missing skill dir fails the build outright. The
-    // public mirror has neither the script nor .claude/skills, and must still
-    // build.
+    // Gradle validates declared inputs before onlyIf, so declare them only when
+    // the optional local source actually exists.
     if (skillDir.isDirectory) inputs.dir(skillDir)
     if (script.isFile) inputs.file(script)
     outputs.dir(layout.projectDirectory.dir("src/debug/assets/debug-skill"))
@@ -193,8 +153,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    // ProcessLifecycleOwner — used by XAIOAuthManager to detect Custom
-    // Tab dismissal (T-xai-oauth-stop-resume port iOS d1dbdd5d).
+    // ProcessLifecycleOwner is used by XAIOAuthManager to detect Custom Tab dismissal.
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
@@ -213,15 +172,10 @@ dependencies {
     // Security (EncryptedSharedPreferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // OkHttp
-    // [T-android-vad] Silero v5 VAD (ONNX Runtime + WebRTC APM). The Android
-    // build of the exact library iOS uses via SPM, from the same author, so
-    // both platforms share one model and one set of thresholds. Carries
-    // native .so payloads for ONNX Runtime and the APM — see the abiFilters
-    // note in `ndk`; we ship arm64-v8a only.
+    // Silero v5 VAD (ONNX Runtime + WebRTC APM).
     implementation("com.github.helloooideeeeea:RealTimeCutVADLibraryForAndroid:1.0.5@aar")
 
-
+    // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
@@ -231,17 +185,15 @@ dependencies {
     // Coil (image loading)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Markdown rendering (mikepenz multiplatform-markdown-renderer)
+    // Markdown rendering
     implementation("com.mikepenz:multiplatform-markdown-renderer-android:0.33.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3-android:0.33.0")
 
     // Chrome Custom Tabs (in-app browser for OAuth)
     implementation("androidx.browser:browser:1.8.0")
 
-    // T-pwa-1: WebViewAssetLoader serves pinned PWA HTML under
-    // https://appassets.androidplatform.net/ inside PwaActivity, so
-    // sibling CSS/JS resolve against the file's parent dir without
-    // granting WebView raw file:// access.
+    // WebViewAssetLoader serves pinned PWA HTML under
+    // https://appassets.androidplatform.net/ without raw file:// access.
     implementation("androidx.webkit:webkit:1.12.1")
 
     // Drag-to-reorder for LazyColumn
@@ -250,27 +202,11 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // T283: ACRA — local crash report capture. acra-core only (no http
-    // sender, no network permission). CrashFileSender writes reports to
-    // filesDir/logs/ where LogManagementScreen surfaces them.
+    // ACRA local crash report capture. acra-core has no HTTP sender.
     implementation("ch.acra:acra-core:5.12.0")
 
-    // T322: Shizuku SDK — offloads privileged Android system APIs (PackageManager,
-    // PermissionManager, ActivityManager, AppOps, IInputManager, …) through a
-    // user-installed Shizuku app running as adb shell (uid=2000) or root. The CLI
-    // surface `android-shizuku-cli` is a NativeOffloadHandler that forwards argv into
-    // these hidden APIs via Shizuku's binder. `api` provides the manager binder
-    // proxy + permission flow, `provider` registers the in-process content
-    // provider that hosts the user-app side of the binder.
-    //
-    // [T-android-privileged-backend] AXManager (Axeron) needs NO extra
-    // dependency: its server is a drop-in Shizuku-protocol implementation that
-    // `sendBinder`s into the standard `<applicationId>.shizuku` ShizukuProvider
-    // (verified against the installed APK). AxeronBackend therefore rides the
-    // same `rikka.shizuku.Shizuku` client + provider declared above. The
-    // earlier Axeron-API SDK route was dropped — it duplicated the
-    // `moe.shizuku.*` classes (AGP checkDuplicateClasses failure) and pulled an
-    // incompatible androidx.core / minSdk for zero added capability.
+    // Shizuku-compatible privileged Android API bridge. AXManager/Sui-compatible
+    // implementations reuse the same Shizuku protocol surface.
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 

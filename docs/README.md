@@ -27,14 +27,6 @@ Chinese translations:
 | [`specs/minis-url-scheme.md`](specs/minis-url-scheme.md) | `minis://` URL scheme |
 | [`specs/debug-server-api.md`](specs/debug-server-api.md) | DebugServer API reference; runtime discovery/source remain authoritative |
 
-## Archived material
-
-`docs/archive/` contains historical design material that may describe removed implementations, experiments, other platforms, or one-off device evaluations.
-
-Archived documents are intentionally non-authoritative and may retain their original language.
-
-Do not use archived PRoot, Alpine, Web Remote, Cloudflare Tunnel, or iOS-specific design notes as the implementation contract for the current Android project.
-
 ## Documentation authority
 
 When sources disagree:
@@ -43,7 +35,6 @@ When sources disagree:
 source code and tests
   > current architecture/security documents
   > README and changelog
-  > archived material
 ```
 
-Current documentation should describe the project as **Minis for Android**, an independent Android project built on upstream OpenMinis. It should not describe this repository as an upstream release mirror or as the old PRoot/Web Remote experiment.
+Historical implementation notes remain available in Git history rather than in the current documentation tree. Current documents should describe the project as **Minis for Android**, an independent Android project built on upstream OpenMinis, not as an upstream release mirror or as an earlier PRoot/Web Remote experiment.
