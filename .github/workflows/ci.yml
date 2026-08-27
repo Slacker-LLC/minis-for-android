@@ -42,6 +42,11 @@ jobs:
   android:
     name: Android build, test and release checks
     runs-on: ubuntu-24.04
+    env:
+      RELEASE_KEYSTORE: ${{ runner.temp }}/ci-release.jks
+      RELEASE_STORE_PASSWORD: ci-release-pass
+      RELEASE_KEY_ALIAS: ci-release
+      RELEASE_KEY_PASSWORD: ci-release-pass
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -69,11 +74,6 @@ jobs:
             -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
       - name: Android unit tests
         working-directory: src/android
-        env: &release_signing
-          RELEASE_KEYSTORE: ${{ runner.temp }}/ci-release.jks
-          RELEASE_STORE_PASSWORD: ci-release-pass
-          RELEASE_KEY_ALIAS: ci-release
-          RELEASE_KEY_PASSWORD: ci-release-pass
         run: ./gradlew :app:testDebugUnitTest --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after tests
         if: always()
@@ -81,7 +81,6 @@ jobs:
         run: ./gradlew --stop || true
       - name: Debug lint
         working-directory: src/android
-        env: *release_signing
         run: ./gradlew :app:lintDebug --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after debug lint
         if: always()
@@ -89,7 +88,6 @@ jobs:
         run: ./gradlew --stop || true
       - name: Release lint
         working-directory: src/android
-        env: *release_signing
         run: ./gradlew :app:lintRelease --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after release lint
         if: always()
@@ -97,7 +95,6 @@ jobs:
         run: ./gradlew --stop || true
       - name: Assemble debug
         working-directory: src/android
-        env: *release_signing
         run: ./gradlew :app:assembleDebug --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after debug packaging
         if: always()
@@ -105,7 +102,6 @@ jobs:
         run: ./gradlew --stop || true
       - name: Compile release Kotlin
         working-directory: src/android
-        env: *release_signing
         run: ./gradlew :app:compileReleaseKotlin --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after release compile
         if: always()
@@ -113,7 +109,6 @@ jobs:
         run: ./gradlew --stop || true
       - name: Assemble release
         working-directory: src/android
-        env: *release_signing
         run: ./gradlew :app:assembleRelease --no-parallel --max-workers=2 --stacktrace
       - name: Verify release APK
         run: bash scripts/verify-android-release.sh src/android/app/build/outputs/apk/release/app-release.apk
