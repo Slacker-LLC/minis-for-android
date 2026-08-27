@@ -177,11 +177,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "mount.prepare",
     "workspace.info",
     "workspace.setQuota",
-    "policy.reload",
     "policy.get",
-    "supervisor.status",
-    "supervisor.restartCloudflared",
-    "supervisor.stopCloudflared",
     "health.get",
 ];
 
@@ -204,6 +200,14 @@ mod tests {
         let back: Response = serde_json::from_str(&encoded).unwrap();
         assert!(back.ok);
         assert_eq!(back.result.unwrap()["exit_code"], 0);
+    }
+
+    #[test]
+    fn removed_privileged_control_methods_are_not_known() {
+        assert!(!is_known_method("policy.reload"));
+        assert!(!is_known_method("supervisor.status"));
+        assert!(!is_known_method("supervisor.restartCloudflared"));
+        assert!(!is_known_method("supervisor.stopCloudflared"));
     }
 
     #[test]
