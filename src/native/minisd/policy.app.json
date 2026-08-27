@@ -26,7 +26,7 @@
     "health.get": { "mode": "allow" }
   },
   "caller": {
-    "appUid": 10381,
+    "appUid": 0,
     "requireToken": false
   }
 }
