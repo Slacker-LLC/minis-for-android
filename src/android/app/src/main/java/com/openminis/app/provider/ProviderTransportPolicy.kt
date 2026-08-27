@@ -6,6 +6,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import java.io.IOException
+import java.net.InetAddress
 
 /**
  * Central transport boundary for provider and security-sensitive traffic.
@@ -14,7 +15,7 @@ import java.io.IOException
  * intentionally point an API-key provider at a LAN endpoint such as
  * http://192.168.1.20:11434. That platform opt-in is therefore NOT the security
  * policy. This object is: HTTPS is the default, and HTTP is accepted only when
- * it is the instance's explicitly configured custom base URL in API-key mode.
+ * it is an explicitly configured API-key endpoint on a local/private network.
  * OAuth/account flows never get that exception.
  *
  * Redirect handling is deliberately conservative:
@@ -30,6 +31,17 @@ object ProviderTransportPolicy {
     /** True only for an explicit http:// URL. Invalid/blank strings are false. */
     fun isCleartextHttp(rawUrl: String?): Boolean =
         rawUrl?.trim()?.toHttpUrlOrNull()?.scheme == "http"
+
+    /**
+     * True when [rawUrl] is an HTTP URL whose host is plausibly local/private.
+     * No DNS lookup is performed for hostnames: single-label names, .local and
+     * .home.arpa are treated as local; numeric addresses are checked against
+     * loopback/private/link-local/CGNAT/IPv6-ULA ranges.
+     */
+    fun isAllowedCleartextEndpoint(rawUrl: String?): Boolean {
+        val url = rawUrl?.trim()?.toHttpUrlOrNull() ?: return false
+        return url.scheme == "http" && isLocalOrPrivateHost(url.host)
+    }
 
     /**
      * Validate the resolved provider base before a provider object is created.
@@ -59,6 +71,9 @@ object ProviderTransportPolicy {
         if (configured.scheme != "http" || !sameOrigin(configured, resolved)) {
             throw Violation("Cleartext HTTP is allowed only for the configured provider origin.")
         }
+        if (!isLocalOrPrivateHost(configured.host)) {
+            throw Violation("Cleartext HTTP is allowed only for local/private provider hosts; use HTTPS for public hosts.")
+        }
         return resolved
     }
 
@@ -66,8 +81,8 @@ object ProviderTransportPolicy {
      * Apply redirect policy to a provider OkHttp builder.
      *
      * HTTPS keeps normal same-scheme redirects while disabling scheme changes.
-     * HTTP disables redirects entirely so an approved local origin cannot bounce
-     * a credential to another host/path authority.
+     * HTTP is accepted only for a local/private base and disables redirects
+     * entirely so an approved origin cannot bounce a credential elsewhere.
      */
     fun configureClient(
         builder: OkHttpClient.Builder,
@@ -76,6 +91,9 @@ object ProviderTransportPolicy {
         val base = parseHttpUrl(baseUrl, "provider base URL")
         if (base.scheme != "https" && base.scheme != "http") {
             throw Violation("Unsupported provider URL scheme: ${base.scheme}")
+        }
+        if (base.scheme == "http" && !isLocalOrPrivateHost(base.host)) {
+            throw Violation("Cleartext HTTP is allowed only for local/private provider hosts.")
         }
         builder.followSslRedirects(false)
         builder.followRedirects(base.isHttps)
@@ -119,15 +137,20 @@ object ProviderTransportPolicy {
      * before issuing a second request to it.
      *
      * A secure provider may return another HTTPS URL. A cleartext provider may
-     * return HTTP only on its exact approved origin. This prevents an upstream
-     * response from turning an authenticated provider call into an arbitrary
+     * return HTTP only on its exact approved local/private origin. This prevents
+     * an upstream response from turning a provider call into an arbitrary
      * cleartext fetch elsewhere.
      */
     fun requireAllowedSecondaryUrl(baseUrl: String, targetUrl: String): HttpUrl {
         val base = parseHttpUrl(baseUrl, "provider base URL")
         val target = parseHttpUrl(targetUrl, "provider-returned URL")
         if (target.isHttps) return target
-        if (target.scheme == "http" && base.scheme == "http" && sameOrigin(base, target)) {
+        if (
+            target.scheme == "http" &&
+            base.scheme == "http" &&
+            isLocalOrPrivateHost(base.host) &&
+            sameOrigin(base, target)
+        ) {
             return target
         }
         throw Violation("Provider-returned cleartext URL is outside the approved provider origin.")
@@ -136,6 +159,55 @@ object ProviderTransportPolicy {
     /** Pure helper used by tests and diagnostics. */
     fun sameOrigin(a: HttpUrl, b: HttpUrl): Boolean =
         a.scheme == b.scheme && a.host == b.host && a.port == b.port
+
+    private fun isLocalOrPrivateHost(rawHost: String): Boolean {
+        val host = rawHost.lowercase().trimEnd('.')
+        if (host == "localhost" || host.endsWith(".localhost")) return true
+        if (!host.contains('.') && !host.contains(':')) return true
+        if (host.endsWith(".local") || host.endsWith(".home.arpa")) return true
+
+        parseIpv4(host)?.let { octets ->
+            val a = octets[0]
+            val b = octets[1]
+            return when {
+                a == 10 -> true
+                a == 127 -> true
+                a == 169 && b == 254 -> true
+                a == 172 && b in 16..31 -> true
+                a == 192 && b == 168 -> true
+                // RFC 6598 shared address space, commonly used by Tailscale/
+                // carrier/private overlays for on-device local services.
+                a == 100 && b in 64..127 -> true
+                else -> false
+            }
+        }
+
+        // A ':' means this is an IPv6 literal, not a DNS hostname, so parsing it
+        // cannot trigger a DNS lookup. Java classifies loopback/link/site-local;
+        // ULA fc00::/7 is checked explicitly because isSiteLocalAddress does not
+        // cover the modern ULA range.
+        if (host.contains(':')) {
+            val address = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return false
+            if (address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress) {
+                return true
+            }
+            val bytes = address.address
+            if (bytes.size == 16 && (bytes[0].toInt() and 0xFE) == 0xFC) return true
+        }
+        return false
+    }
+
+    private fun parseIpv4(host: String): IntArray? {
+        val parts = host.split('.')
+        if (parts.size != 4) return null
+        val out = IntArray(4)
+        for (i in 0..3) {
+            val value = parts[i].toIntOrNull() ?: return null
+            if (value !in 0..255) return null
+            out[i] = value
+        }
+        return out
+    }
 
     private fun parseHttpUrl(raw: String, label: String): HttpUrl =
         raw.trim().toHttpUrlOrNull()
