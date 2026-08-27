@@ -1,19 +1,18 @@
-# 全仓库统一 LF。
+# Keep repository text files on LF.
 #
-# 构建只在 Linux / WSL 上进行，而 gradlew、deps/*.sh、scripts/*.sh 一旦被检出成
-# CRLF，shebang 会带上 \r，Linux 直接报 "bad interpreter: /usr/bin/env bash^M"。
-# Windows 上开发时 Git 的 core.autocrlf=true 正是会这么干，所以在这里强制约定。
+# Linux/WSL builds rely on shell shebangs and Gradle scripts being checked out
+# without CRLF conversion. This also avoids environment-specific diff noise.
 * text=auto eol=lf
 
-# 必须 LF，否则无法执行
+# Executable scripts must remain LF.
 *.sh    text eol=lf
 gradlew text eol=lf
 
-# Windows 批处理反过来，必须 CRLF
+# Windows command files use CRLF.
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
-# 二进制：一律不做行尾转换
+# Binary files must not receive line-ending conversion.
 *.png  binary
 *.jpg  binary
 *.jpeg binary

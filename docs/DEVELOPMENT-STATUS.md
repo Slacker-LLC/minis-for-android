@@ -1,142 +1,115 @@
-# 开发状态
+# Development Status
 
-本文记录当前 `master` 的工程状态。先阅读根目录 [README](../README.md)。
+This document describes the current engineering state of Minis for Android. It is intentionally written at the architecture/capability level instead of duplicating volatile issue counts or release metadata.
 
-## 仓库状态
+## Project state
 
-- Repository: `https://github.com/Slacker-LLC/minis-for-android`
-- Default branch: `master`
+- Repository: `Slacker-LLC/minis-for-android`
+- Primary branch: `master`
+- Platform: Android
 - applicationId: `dev.openminispet.android`
-- Android build metadata: `1.01-beta.2` (`versionCode 39`)
-- Distribution: **source-only；当前不维护 GitHub Release、Git tag 版本入口或仓库内 APK**
+- Upstream base: [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis)
+- Public distribution: source-first; no production APK release is promised by the repository at this time
 
-Android 的 `versionName/versionCode` 暂时仍作为构建/升级元数据存在，不表示仓库有同名公开发行版。
+Build metadata such as `versionName` and `versionCode` lives in `src/android/app/build.gradle.kts` and is not a substitute for GitHub release metadata.
 
-## 当前主架构
+## Active architecture
 
 ```text
-Android App
-├─ Agent Runtime / Room / Repository
-├─ Tool Runtime / Android tools / Jobs / Goals / Subagents
-├─ MCP Server / MCPProvider
-├─ Voice / Assistant / Pet integrations
-└─ minisd Root Broker
+Android app
+├─ Agent runtime / sessions / persistence
+├─ Provider and model runtime
+├─ Tool runtime / permission gates
+├─ Android-native tools
+├─ jobs / goals / todos / subagents
+├─ MCP client + local MCP server
+├─ voice / assistant / overlay integrations
+└─ minisd root broker
    └─ Ubuntu 24.04 chroot
 ```
 
-已经退出当前主架构的历史路径：
+Historical Alpine + PRoot and Web Remote / Cloudflare Tunnel implementations are not part of the active runtime.
 
-- Alpine + PRoot；
-- 旧 Web Remote HTTP Server；
-- 内置 Cloudflare Tunnel 前端/控制面。
+## Implemented areas
 
-历史资料只能作为 archive/upstream 参考，不应作为当前实现说明。
+### Agent runtime
 
-## 已实现
-
-### Agent Runtime
-
-- 多 Provider、会话、图片输入、工具调用；
-- Goal / Todo / Plan / Job / Subagent；
-- 工具超时、审批、执行检查点、Token 计量、上下文压力和大结果落盘；
-- 文件、浏览器、记忆、Linux 和 Android 工具统一进入 Tool Runtime。
+- multi-provider/model support, OAuth/API-key flows, image input, streaming, and tool calls;
+- persistent sessions and repository-backed state;
+- goals, todos, jobs, subagents, structured questions, memory, and skills;
+- tool approval, checkpointing, timeout policy, dangerous-command controls, context pressure, and large-output spill/pruning.
 
 ### MCP
 
-- MCP Server 默认回环监听；
-- Bearer token 与工具级 caller 权限；
-- 敏感工具可进入手机端确认；
-- MCPProvider 连接外部 HTTP/stdio MCP Server，并将工具注册到现有 Runtime。
+- loopback MCP server with bearer authentication;
+- caller-aware tool visibility and permission gates;
+- confirmation flow for sensitive remote calls;
+- external MCP provider integration through the canonical tool registry.
 
-### Android
+### Android integration
 
-- Compose UI、Room、Provider 设置与会话状态；
-- Accessibility、截图、logcat、APK 部署和诊断工具；
-- 桌面宠物、系统助手/VoiceInteraction、语音相关模块；
-- Root、Shizuku/AXManager/Sui 等多后端能力探测与调用。
+- Compose UI and Room-backed state;
+- Accessibility, screenshots, logcat, package/deployment, media, settings, connectivity, and diagnostics tools;
+- desktop pet / overlay and default-assistant integration;
+- speech recognition, provider ASR/TTS, and system TTS;
+- ordinary Android API, Shizuku-compatible bridges, and root capabilities selected by actual availability.
 
-### Linux / Root
+### Linux/root runtime
 
-- `src/native/minisd/` Rust Root Broker；
-- Ubuntu 24.04 chroot；
-- App 侧 Ubuntu runtime 位于 `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/`；
-- rootfs 由 `scripts/build-ubuntu-rootfs.sh` 构建；
-- 当前 rootfs 是 Ubuntu Base skeleton，额外工具在设备端 provisioning。
+- Rust `minisd` root broker;
+- Ubuntu 24.04 chroot built from a pinned and verified rootfs source;
+- mount namespace and explicit host/guest path mapping;
+- guest execution under the app UID;
+- structured root operations rather than unrestricted remote root shell exposure.
 
-## 当前高优先级问题
+## CI and release engineering
 
-当前能力已经超过普通 App 的权限规模，工程重点应从继续扩功能转向安全和可靠性收口。
+Repository CI currently covers:
 
-### P0
+- Rust formatting, Clippy, tests, and release build;
+- rootfs checksum/failure-path tests;
+- Android unit tests;
+- Debug and Release lint;
+- Debug packaging;
+- Release Kotlin compilation and packaging;
+- fail-closed release signing;
+- release APK verification.
 
-- [#2 Prevent minisd runtime policy self-escalation](https://github.com/Slacker-LLC/minis-for-android/issues/2)
-- [#3 Remove arbitrary root process spawning via restartCloudflared](https://github.com/Slacker-LLC/minis-for-android/issues/3)
-- [#7 Add CI gates for Android, minisd and release checks](https://github.com/Slacker-LLC/minis-for-android/issues/7)
-- [#8 Stop signing release builds with the Android debug key](https://github.com/Slacker-LLC/minis-for-android/issues/8)
+The repository keeps an Android lint baseline for historical debt; new lint findings are expected to remain gated.
 
-### P1
+## Current risk areas
 
-- [#4 Framed/concurrent minisd IPC](https://github.com/Slacker-LLC/minis-for-android/issues/4)
-- [#5 Fail-closed Ubuntu rootfs verification](https://github.com/Slacker-LLC/minis-for-android/issues/5)
-- [#6 Bound root.exec output](https://github.com/Slacker-LLC/minis-for-android/issues/6)
-- [#9 Restore release lint](https://github.com/Slacker-LLC/minis-for-android/issues/9)
-- [#10 Contain cleartext HTTP](https://github.com/Slacker-LLC/minis-for-android/issues/10)
-- [#11 Correct foreground-service lifecycle/type](https://github.com/Slacker-LLC/minis-for-android/issues/11)
-- [#12 Explicit provider-customization capability state](https://github.com/Slacker-LLC/minis-for-android/issues/12)
+The project has a larger privilege surface than a conventional Android app. Active work should continue to prioritize:
 
-这些 Issue 是当前工程状态的一部分；在它们关闭前，不应建立 production-ready 分发入口。
+- provider/network transport boundaries;
+- Android foreground-service lifecycle correctness;
+- explicit capability state for integrations that require unavailable private build customization;
+- process-death recovery and non-duplication of side effects;
+- root/SELinux/device-specific compatibility testing;
+- reduction of historical lint debt.
 
-## 已知设备/平台限制
+Use the live [GitHub Issues](https://github.com/Slacker-LLC/minis-for-android/issues) list for current issue state rather than copying issue numbers into long-lived documentation.
 
-- HyperOS 等 OEM 在未授予后台运行/自启动时可能冻结后台网络和 Agent 任务；
-- 系统角色、Accessibility、悬浮窗、电池豁免、SAF、Shizuku 和 Root 均需要用户在系统侧明确授权；
-- Root 能力受 provider、SELinux、capability 和 ROM 行为影响，需要真机验证；
-- 长任务不能只依赖 Android 进程永不被杀，应继续使用持久状态和恢复机制。
+## Platform limitations
 
-## 当前验证原则
+- OEM background restrictions may freeze network/CPU when the app is not allowed to run in the background.
+- Assistant role, Accessibility, overlay, SAF, microphone, battery exemptions, Shizuku, and root each require their own user/system authorization.
+- Root availability does not imply unrestricted SELinux or Linux capability access.
+- Long-running work must tolerate Android process/service termination and recover from persisted state.
 
-在 CI 门禁建立前，本地验证结果不等同于持续门禁。提交改动时至少执行与改动相关的最窄测试，并在 PR 中写清实际运行过的命令。
+## Primary source locations
 
-推荐基线：
-
-```bash
-cd src/android
-./gradlew :app:compileDebugKotlin --no-daemon
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-```
-
-minisd：
-
-```bash
-cd src/native/minisd
-cargo fmt --check
-cargo test
-cargo clippy -- -D warnings
-```
-
-## 关键入口
-
-| 目的 | 路径 |
+| Area | Path |
 |---|---|
-| Android App | `src/android/` |
+| Android app | `src/android/` |
 | Android tools | `src/android/app/src/main/java/com/openminis/app/tools/android/` |
-| Tool Runtime | `src/android/app/src/main/java/com/openminis/app/tools/runtime/` |
+| Tool runtime | `src/android/app/src/main/java/com/openminis/app/tools/runtime/` |
 | MCP | `src/android/app/src/main/java/com/openminis/app/mcp/` |
 | Ubuntu runtime | `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/` |
-| Root Broker | `src/native/minisd/` |
+| Root broker | `src/native/minisd/` |
 | Rootfs build | `scripts/build-ubuntu-rootfs.sh` |
-| Build guide | [`../BUILD-CN.md`](../BUILD-CN.md) |
-| Security | [`SECURITY.md`](SECURITY.md) |
-| Docs index | [`README.md`](README.md) |
+| CI | `.github/workflows/ci.yml` |
 
-## 文档真实性规则
+## Documentation rule
 
-```text
-源码与测试
-  > 当前架构 / 安全文档
-  > README / CHANGELOG
-  > archive / upstream 历史资料
-```
-
-发现冲突时，优先修当前文档，不要让旧发行资料或历史架构表述重新进入当前文档。
+If this document conflicts with source code or tests, update this document. Do not preserve obsolete architecture descriptions for historical continuity in a current-status file.
