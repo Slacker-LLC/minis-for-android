@@ -1,6 +1,6 @@
 # Minis for Android 构建说明
 
-本文对应当前 `master`。发布 APK 目前面向 Android `arm64-v8a`。
+本文对应当前 `master`。仓库当前只维护源码，不提供预编译 APK 发行版；本地 Android 构建主要面向 `arm64-v8a`。
 
 ## 环境要求
 
@@ -85,6 +85,8 @@ cd src/android
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+APK 是本地构建产物，`.gitignore` 会忽略 `*.apk` / `*.aab`，不要把二进制构建产物提交到仓库。
+
 安装：
 
 ```bash
@@ -150,15 +152,16 @@ adb shell su -c "/data/adb/minis/bin/minisd --call --socket /data/adb/minis/run/
 {"v":1,"method":"ubuntu.status","client":{"id":"adb","capabilities":["ubuntu.status"]}}
 ```
 
-## 发布说明
+## 未来生产发布要求
 
-当前 `release` 构建类型仍存在发布安全待办，公开发布 APK 也是 Debug 签名开发包。生产发布至少需要：
+仓库目前没有正式发行版。若以后恢复 production release，至少需要：
 
 - 独立且长期保管的 release keystore；
-- 禁止 DebugServer/Debug-only 能力进入生产 APK；
+- 禁止 DebugServer / debug-only 能力进入生产 APK；
 - release lint、CI 和测试门禁；
-- 固定源码 tag 与产物 SHA-256；
-- 独立安全验收。
+- 明确的源码版本标识与产物 SHA-256；
+- 独立安全验收；
+- 二进制产物通过 Release/CI artifact 分发，而不是提交到 Git。
 
 相关问题见仓库 Issues。
 
