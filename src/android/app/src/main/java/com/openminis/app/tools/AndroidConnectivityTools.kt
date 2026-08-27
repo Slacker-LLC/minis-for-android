@@ -1,6 +1,7 @@
 package com.openminis.app.tools
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -65,6 +66,7 @@ object AndroidConnectivityOps {
         }
     }
 
+    @SuppressLint("MissingPermission")
     suspend fun wifiInfo(context: Context): ToolExecutionResult {
         requirePermissions(context, wifiPermissions())?.let { return it }
         return withContext(Dispatchers.IO) {
@@ -87,6 +89,7 @@ object AndroidConnectivityOps {
         }
     }
 
+    @SuppressLint("MissingPermission")
     suspend fun wifiScan(
         context: Context,
         groupBySsid: Boolean,
@@ -131,6 +134,7 @@ object AndroidConnectivityOps {
         }
     }
 
+    @SuppressLint("MissingPermission")
     suspend fun bluetoothStatus(context: Context): ToolExecutionResult {
         requirePermissions(context, bluetoothPermissions(scan = false))?.let { return it }
         return withContext(Dispatchers.IO) {
@@ -162,6 +166,7 @@ object AndroidConnectivityOps {
         }
     }
 
+    @SuppressLint("MissingPermission")
     suspend fun bluetoothPaired(context: Context): ToolExecutionResult {
         requirePermissions(context, bluetoothPermissions(scan = false))?.let { return it }
         return withContext(Dispatchers.IO) {
@@ -177,6 +182,7 @@ object AndroidConnectivityOps {
         }
     }
 
+    @SuppressLint("MissingPermission")
     suspend fun bluetoothScan(context: Context, durationSeconds: Int): ToolExecutionResult {
         requirePermissions(context, bluetoothPermissions(scan = true))?.let { return it }
         return withContext(Dispatchers.IO) {
