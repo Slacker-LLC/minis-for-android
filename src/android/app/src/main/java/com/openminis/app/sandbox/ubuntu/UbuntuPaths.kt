@@ -4,10 +4,14 @@ import android.content.Context
 import java.io.File
 
 /**
- * Q16 path contract: guest `/workspace` ↔ host App `filesDir/minis-workspace`
- * (host dirs live under the App data dir so the App's own File API can read
- * and write them — /data/adb is root-owned and not readable by the App).
- * minisd bind-mounts these dirs into the chroot at ubuntu.start.
+ * Guest `/workspace` is backed by the App-private
+ * `<filesDir>/minis/workspace` directory after [init]. The related memory,
+ * skills, and shared directories live under the same App-private `minis`
+ * directory so normal App file APIs can read and write them.
+ *
+ * `/data/adb/minis` is reserved for root-owned runtime state such as the Ubuntu
+ * rootfs and minisd. It is not the App workspace. minisd bind-mounts the
+ * App-private directories into the chroot when Ubuntu starts.
  */
 object UbuntuPaths {
     const val HOST_MINIS = "/data/adb/minis"
