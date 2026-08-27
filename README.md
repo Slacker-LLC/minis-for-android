@@ -160,6 +160,13 @@ adb install -r src/android/app/build/outputs/apk/debug/app-debug.apk
 
 如果文档与当前 `master` 实现冲突，以源码和测试为准。
 
+## 贡献者
+
+- ChatGPT (OpenAI)
+- Claude (Anthropic)
+
+完整贡献说明见 [CONTRIBUTORS.md](CONTRIBUTORS.md)。
+
 ## 起源与许可证
 
 本项目代码谱系包含 [OpenMinis](https://github.com/OpenMinis/OpenMinis)（GPL-3.0）及其他开源组件。第三方来源和许可证见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 与 [README-upstream.md](README-upstream.md)。
