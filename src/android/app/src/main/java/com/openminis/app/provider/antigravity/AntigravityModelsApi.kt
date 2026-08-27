@@ -4,10 +4,10 @@ import android.content.Context
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.provider.ModelsDevApi
 import com.openminis.app.provider.ProviderModelsCache
+import com.openminis.app.provider.ProviderTransportPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
@@ -32,7 +32,7 @@ import org.json.JSONObject
  */
 object AntigravityModelsApi {
     private const val USER_AGENT = "antigravity/1.107.0 android/aarch64"
-    private val client = OkHttpClient()
+    private val client = ProviderTransportPolicy.protectedHttpsClient()
     private val cache = ProviderModelsCache("antigravity")
 
     /**
