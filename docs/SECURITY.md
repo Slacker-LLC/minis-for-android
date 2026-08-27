@@ -1,68 +1,156 @@
 # 安全设计
 
-本文描述 Minis for Android 当前的安全模型与边界。
+本文描述 Minis for Android 当前的安全模型、目标边界和已知缺口。
 
-## 1. 凭据存储:fail-closed
+> 当前公开 APK 是 Debug 签名开发包，不是 production-ready 安全版本。高优先级安全问题以仓库 Issues 为准。
 
-- `EncryptedPrefsFactory` 在 Tink/EncryptedSharedPreferences 连续创建失败时**不得回退明文**;
-  失败路径不会删除全局唯一的 AndroidKeyStore 主密钥别名或共享 Tink keyset 文件;
-- Provider API Key、OAuth token、DebugServer token 全部经该工厂落盘;
-- `allowBackup=false`。
+## 1. 凭据存储
+
+- Provider API Key、OAuth token、DebugServer token 等敏感值应使用 Android 加密存储；
+- 加密存储初始化失败时应 fail-closed，不回退到明文；
+- `allowBackup=false`；
+- Provider/MCP/环境变量读取接口不应返回 secret 原文。
 
 ## 2. 本地服务边界
 
-- DebugServer(DEBUG 构建,`127.0.0.1:5321`)以动态 token 全连接认证,仅限开发自测,
-  release 构建不携带;
-- MCP Server(`127.0.0.1:18789`)Bearer token 认证,默认 fail-closed,写敏感工具必须
-  手机通知确认(120s 自动拒绝);
-- 两个本地服务都只监听回环地址,不经 LAN/公网暴露;
-- minisd root broker 只监听 App 私有 unix socket,SO_PEERCRED + policy 门控。
+### DebugServer
 
-## 3. 工具调用授权:显式映射
+- 仅用于开发/自测；
+- 监听回环地址；
+- 生产构建必须确保 DebugServer 与 debug-only 资源不可进入发布 APK。
 
-- `ToolPermissionManager` 是唯一映射表:每个工具 × caller(local_agent / mcp:<token id>)
-  有一个级别(LOCAL_ONLY / MCP_ALLOWED / MCP_CONFIRM / MCP_DENIED),未登记工具**默认拒绝**;
-- 未知 token 默认拒绝,scope 子集与级别上限在 token 上显式绑定;
-- 日历、联系人、位置、剪贴板、Intent、设置等敏感能力对 MCP 一律 MCP_CONFIRM(或
-  LOCAL_ONLY),不默认放行;
-- `root.shell` 为 LOCAL_ONLY,且只接受结构化 minisd `root.exec`,不暴露 raw shell。
+### MCP Server
 
-## 4. 文件与沙箱边界
+- 默认监听 `127.0.0.1:18789`；
+- Bearer token 认证；
+- 工具权限由 caller/token scope 和 ToolPermissionManager 控制；
+- 敏感工具可要求手机端确认；
+- 未经用户额外代理/隧道配置时，不应直接暴露到 LAN/公网。
 
-- `UbuntuPaths` canonical path containment:`..`/symlink 逃逸在任何文件工具执行前被拒绝;
-- 工作区读写默认限定 App workspace(`filesDir/minis/workspace`);外部 SAF 目录只能由
-  用户在 Android 系统选择器中授权,只读挂载在工具层写保护;
-- 大文件/递归限制(FileMutationQueue 串行化)防止资源耗尽;
-- Web URL 导入(`SafeRemoteImporter`)仅允许安全公共 HTTPS 目标,拒绝
-  localhost/私网/链路本地/CGNAT(ran chu 模拟器 198.18/15 NAT 特例除外,真机不放宽)。
+### minisd Root Broker
 
-## 5. Android 权限:普通 API > Shizuku > Root
+`minisd` 是整个 Root 路径的 TCB（可信计算基）。它的安全要求高于普通 App 内部模块。
 
-- 结构化 Android 工具优先走普通 API,失败才考虑 Shizuku;Root 优先经 minisd 结构化
-  `root.exec` allowlist;
-- Root 探测区分被动(检测 `su` 存在,不弹窗)与主动(需要用户批准,返回真实
-  uid/gid/groups/CapEff/SELinux context/mode);
-- `uid=0` 不等于全能力;集成断言 `CAP_SYS_CHROOT`/`CAP_SYS_ADMIN` 后再谈 chroot/mount;
-- **禁止** `setenforce 0`、修改全局 SELinux 策略、默认 bind 整个可写 `/sys`;
-- chroot 不是容器;guest 以 App UID 降权运行,SELinux 全程 Enforcing;
-- Root provider 名称(Magisk/KernelSU/APatch/Sui)只作为诊断元数据,不参与能力判断。
+目标模型：
 
-## 6. Agent 侧安全治理
+```text
+caller
+  ↓ identity / peer check
+minisd RPC
+  ↓ compile-time capability ceiling
+runtime policy (只能收紧)
+  ↓ structured privileged operation
+Android / mount / chroot
+```
 
-- **一次性审批**(`ApprovalSeam`):政策 `ask|never`,危险 shell 命令与所有有副作用的
-  Android 操作(install/uninstall/clear logs/root 授权/mount/chroot)在批准前不执行;
-  无人应答超时视为取消,不运行;
-- **危险命令策略**(`DangerousCommandPolicy`):明确破坏性的模式才拦截,避免误伤;
-- **执行意图检查点**(`ToolCheckpointStore`):工具体执行前记录 intent,执行后标记;
-  进程被杀后下轮注入 `TOOL_OUTCOME_UNKNOWN`,不盲目重试可能有副作用的操作;
-- **工具超时**:`AgentToolDefinition.timeoutMs` 产生结构化 `TOOL_TIMEOUT` 结果;
-- **结果治理**:`ToolResultPruner` 管理上下文修剪,`SpillPolicy` 把超大结果落盘为
-  `/var/minis/offloads` 指针;`TokenMeter`/`ContextPressure` 只作告警,不作门禁;
-- 环境变量值通过 `EnvVarRedactor` 在模型可见前脱敏。
+当前实现仍在安全收口中，已知关键问题包括：
 
-## 7. 已知边界
+- [#2](https://github.com/Slacker-LLC/minis-for-android/issues/2)：运行时 policy 目前存在自我扩权风险；
+- [#3](https://github.com/Slacker-LLC/minis-for-android/issues/3)：历史 `restartCloudflared` supervisor RPC 可形成过宽的 Root 进程启动面；
+- [#4](https://github.com/Slacker-LLC/minis-for-android/issues/4)：Unix stream framing、并发和全局锁需要重构；
+- [#6](https://github.com/Slacker-LLC/minis-for-android/issues/6)：`root.exec` 输出需要硬上限。
 
-- Debug APK 会启动 DebugServer(动态 token 认证),仅限开发自测;
-- HyperOS 后台冻结、SAF、角色、悬浮窗、电池豁免必须由用户在系统界面授权;
-- Root 场景(provider 授权弹窗、SELinux 拒绝、capability 缺位)需要真机验证;
-- 完整设备级边界以 `android_capabilities get` 的真实探测结果为准。
+因此当前文档不把 `SO_PEERCRED + policy` 描述成已经完全闭环的生产安全边界。
+
+## 3. 工具调用授权
+
+- 所有 Agent/MCP 工具应进入统一 Tool Registry / ToolPermissionManager / runtime gate；
+- 未登记工具默认拒绝；
+- caller 至少区分本地 Agent 与不同 MCP token/scope；
+- 敏感 Android 能力应使用 `MCP_CONFIRM` 或 `LOCAL_ONLY`；
+- Root 能力不得提供裸 raw shell 给远程 caller；
+- 权限检查不能只存在 UI 层，真正执行入口也必须再次验证。
+
+## 4. Root 权限原则
+
+- Root 工具优先使用结构化 RPC，而不是 `su -c <任意字符串>`；
+- 编译时必须存在不可被 runtime policy 扩大的最大权限集合；
+- runtime policy 只能缩小权限，不得新增超出编译时 ceiling 的 binary/method；
+- policy 管理能力应与普通 App 调用面隔离；
+- 不允许为了可用性执行 `setenforce 0` 或关闭全局 SELinux；
+- Root provider 名称（KernelSU/Magisk/APatch 等）只作诊断，不代替真实 capability 探测。
+
+## 5. Ubuntu chroot 边界
+
+- chroot 不是虚拟机或完整容器；
+- guest 复用 Android kernel；
+- mount / namespace / UID / SELinux 边界必须由 minisd 明确建立；
+- workspace、memory、skills、shared 等挂载必须使用固定 host/guest layout；
+- guest 不应获得不必要的 host 路径写权限；
+- rootfs 来源和 hash 必须可验证，见 [#5](https://github.com/Slacker-LLC/minis-for-android/issues/5)。
+
+## 6. 文件与路径边界
+
+- 文件工具在执行前做 canonical path containment；
+- workspace 写入和外部 SAF 授权必须分开处理；
+- `..`、symlink escape 和越界挂载必须 fail-closed；
+- 大文件和大工具输出应限制大小或 spill 到受控目录；
+- 外部 URL 导入需要限制 scheme、重定向、大小和 SSRF 目标。
+
+## 7. Android 权限
+
+Root、Shizuku/AXManager/Sui、Accessibility、普通 Android API 是不同能力，不应混成简单的“权限等级链”。
+
+原则：
+
+- 普通 Android API 能完成时优先普通 API；
+- privileged backend 只在对应操作确实需要时使用；
+- capability 必须真实探测；
+- `uid=0` 不等于拥有所有 SELinux/capability 能力；
+- 系统角色、Accessibility、悬浮窗、SAF、电池豁免等仍由用户在 Android 系统界面授权。
+
+## 8. Agent 侧安全治理
+
+高副作用操作应组合使用：
+
+- Approval / user confirmation；
+- ToolCheckpoint；
+- Tool timeout；
+- DangerousCommandPolicy；
+- Job / persisted state；
+- SpillPolicy / ToolResultPruner；
+- secret redaction。
+
+进程死亡恢复时，不能因为“没收到上一次工具结果”就盲目重试有副作用的操作。
+
+## 9. 网络安全
+
+- 云 Provider、OAuth、更新/下载信任元数据默认必须使用 HTTPS；
+- 用户配置的 LAN HTTP Provider 是特殊情况，不应把整个 App 的明文 HTTP 当成默认安全策略；
+- 当前全局 cleartext 配置的收口跟踪见 [#10](https://github.com/Slacker-LLC/minis-for-android/issues/10)；
+- 受保护流程不得被重定向降级为 HTTP。
+
+## 10. 发布安全
+
+当前发布链还有明确待办：
+
+- [#7](https://github.com/Slacker-LLC/minis-for-android/issues/7)：CI 门禁；
+- [#8](https://github.com/Slacker-LLC/minis-for-android/issues/8)：Release 禁止使用 debug keystore；
+- [#9](https://github.com/Slacker-LLC/minis-for-android/issues/9)：恢复 release lint；
+- [#12](https://github.com/Slacker-LLC/minis-for-android/issues/12)：私有 Provider 定制值缺失时显式禁用/失败。
+
+在上述问题关闭并完成独立验证前，不应把公开构建标记为 production-ready。
+
+## 11. 已知平台边界
+
+- HyperOS 等 OEM 可能冻结后台 Agent 网络/CPU；
+- Foreground Service 行为和 Android 版本策略会变化，见 [#11](https://github.com/Slacker-LLC/minis-for-android/issues/11)；
+- Root/SELinux/capability 行为必须真机验证；
+- Android 系统授权不能由 App 静默绕过。
+
+## 12. 安全改动的测试要求
+
+安全改动不能只测试 happy path。
+
+至少需要覆盖：
+
+```text
+允许的调用 → 成功
+越权调用 → 拒绝
+非法参数 → 拒绝
+边界尺寸 → 限制
+进程/IPC 异常 → fail-closed
+重启/恢复 → 不重复副作用
+```
+
+尤其是 `src/native/minisd/` 的改动，应把负向测试视为合并条件。
