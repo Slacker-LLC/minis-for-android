@@ -165,7 +165,7 @@ class DebugServer(
                 }
                 val method = parts[0]
                 // [T-android-debugserver-skill] Path (query stripped) so the
-                // unauthenticated GET skill routes can be dispatched.
+                // authenticated GET skill routes can be dispatched.
                 val path = parts.getOrNull(1)?.substringBefore('?') ?: "/"
 
                 // Handle CORS preflight
@@ -229,9 +229,10 @@ class DebugServer(
                 // Deliberately placed AFTER the auth gate above: unlike iOS
                 // (whose /skill is unauthenticated because every RPC is still
                 // sealed by the v1 envelope), Android's RPCs are plaintext, so
-                // the token remains the only barrier for LAN clients and must not
-                // be bypassed. Over `adb forward` (loopback) it's token-free,
-                // which is the path the tooling actually uses.
+                // the token remains the barrier for every client and must not
+                // be bypassed. `adb forward` only provides transport to the
+                // loopback listener; the client still sends the same per-install
+                // token as any other connection.
                 if (method == "GET") {
                     val wantsHuman = accept.contains("text/html") ||
                         accept.contains("text/markdown") ||
@@ -298,9 +299,10 @@ class DebugServer(
     }
 
     /// [T-android-debugserver-skill] Capability descriptor. Mirrors the iOS
-    /// shape so a shared client can detect the platform: `auth` reports the
-    /// Android scheme ("token-lan" — plaintext payloads, token only for
-    /// non-loopback) rather than iOS's "v1" envelope, and there is no pair_path.
+    /// shape so a shared client can detect the platform. `auth` keeps the
+    /// legacy "token-lan" capability id for shared-client compatibility;
+    /// `token_required` records the actual Android policy: every connection,
+    /// including loopback/adb-forwarded clients, must present the token.
     private fun schemaJSON(): String {
         val version = try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
@@ -311,7 +313,7 @@ class DebugServer(
         // break the schema document.
         val escaped = version.replace("\\", "\\\\").replace("\"", "\\\"")
         return """{"app":"MinisApp","platform":"android","version":"$escaped",""" +
-            """"rpc":"jsonrpc-2.0","auth":"token-lan","transport":"plaintext",""" +
+            """"rpc":"jsonrpc-2.0","auth":"token-lan","token_required":"all","transport":"plaintext",""" +
             """"rpc_path":"/","skill_path":"/skill"}"""
     }
 
