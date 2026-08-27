@@ -3,7 +3,7 @@ package com.openminis.app.sandbox.minisd
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Wire types for minisd JSON-RPC v1 (see Minis for Android/03). */
+/** Wire types for minisd JSON-RPC v1. */
 data class MinisdRequest(
     val id: Long,
     val method: String,
@@ -43,8 +43,6 @@ object MinisdProtocol {
     fun encodeRequest(req: MinisdRequest): String {
         val client = JSONObject().put("id", req.clientId)
         req.token?.let { client.put("token", it) }
-        // minisd B22 semantics: hello must declare the method it calls —
-        // empty capabilities are rejected server-side.
         client.put("capabilities", JSONArray().put(req.method))
         val body = JSONObject()
             .put("v", req.v)
@@ -133,17 +131,26 @@ object MinisdProtocol {
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
 
-    fun rootExec(tool: String, args: List<String> = emptyList(), timeoutMs: Long = 30_000, id: Long = 1): MinisdRequest =
-        MinisdRequest(
-            id = id,
-            method = "root.exec",
-            params = JSONObject()
-                .put("tool", tool)
-                .put("args", JSONArray(args))
-                .put("timeout_ms", timeoutMs),
-        )
+    fun rootExec(
+        tool: String,
+        args: List<String> = emptyList(),
+        timeoutMs: Long = 30_000,
+        id: Long = 1,
+    ): MinisdRequest = MinisdRequest(
+        id = id,
+        method = "root.exec",
+        params = JSONObject()
+            .put("tool", tool)
+            .put("args", JSONArray(args))
+            .put("timeout_ms", timeoutMs),
+    )
 
-    fun ubuntuAdminExec(argv: List<String>, timeoutMs: Long = 120_000, confirmId: String? = null, id: Long = 1): MinisdRequest {
+    fun ubuntuAdminExec(
+        argv: List<String>,
+        timeoutMs: Long = 120_000,
+        confirmId: String? = null,
+        id: Long = 1,
+    ): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }
         return MinisdRequest(
@@ -153,31 +160,4 @@ object MinisdProtocol {
             confirmId = confirmId,
         )
     }
-
-    fun supervisorStatus(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "supervisor.status")
-
-    fun supervisorRestartCloudflared(
-        path: String,
-        args: List<String> = emptyList(),
-        env: Map<String, String> = emptyMap(),
-        id: Long = 1,
-    ): MinisdRequest {
-        val arr = JSONArray()
-        args.forEach { arr.put(it) }
-        val params = JSONObject().put("path", path).put("args", arr)
-        if (env.isNotEmpty()) {
-            val obj = JSONObject()
-            env.forEach { (k, v) -> obj.put(k, v) }
-            params.put("env", obj)
-        }
-        return MinisdRequest(
-            id = id,
-            method = "supervisor.restartCloudflared",
-            params = params,
-        )
-    }
-
-    fun supervisorStopCloudflared(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "supervisor.stopCloudflared")
 }

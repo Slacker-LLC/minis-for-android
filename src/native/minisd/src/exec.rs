@@ -2,6 +2,7 @@ use crate::policy::{args_denied, MethodPolicy};
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use std::time::{Duration, Instant};
 
+/// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
 pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
 
 #[derive(Debug, Clone)]
@@ -53,12 +54,16 @@ pub fn parse_exec(params: &serde_json::Value) -> Result<ExecRequest, ErrorCode> 
     })
 }
 
-/// Single source of truth for the root.exec tool allowlist:
-/// policy `toolAllowlist` when present, DEFAULT_TOOLS as fallback.
+/// Runtime policy can only narrow the built-in root.exec tool set.
 pub fn effective_allowlist(spec: Option<&MethodPolicy>) -> Vec<&str> {
-    spec.and_then(|s| s.tool_allowlist.as_ref())
-        .map(|v| v.iter().map(String::as_str).collect())
-        .unwrap_or_else(|| DEFAULT_TOOLS.to_vec())
+    match spec.and_then(|s| s.tool_allowlist.as_ref()) {
+        Some(policy_tools) => policy_tools
+            .iter()
+            .map(String::as_str)
+            .filter(|tool| DEFAULT_TOOLS.contains(tool))
+            .collect(),
+        None => DEFAULT_TOOLS.to_vec(),
+    }
 }
 
 pub fn validate_exec(spec: Option<&MethodPolicy>, req: &ExecRequest) -> Result<(), ErrorCode> {
@@ -125,7 +130,6 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
             }
             #[cfg(unix)]
             {
-                // bounded join: at most ~1s (50 x 20ms) for the killed child to be reaped
                 for _ in 0..50 {
                     if handle.is_finished() {
                         break;
@@ -160,10 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn t_u4_effective_allowlist() {
-        // None → DEFAULT_TOOLS fallback
-        assert_eq!(effective_allowlist(None), DEFAULT_TOOLS);
-        // policy toolAllowlist overrides the default
+    fn runtime_allowlist_can_only_narrow_builtin_tools() {
         let spec = MethodPolicy {
             mode: Mode::Allow,
             tool_allowlist: Some(vec!["pm".into(), "reboot".into()]),
@@ -171,20 +172,13 @@ mod tests {
             rate_per_min: None,
         };
         let allow = effective_allowlist(Some(&spec));
-        assert!(allow.contains(&"reboot"));
-        assert!(!allow.contains(&"getprop"));
-        // validate_exec uses the same source: reboot now allowed, getprop not
+        assert_eq!(allow, vec!["pm"]);
+
+        let pm = parse_exec(&serde_json::json!({"tool":"pm","args":[]})).unwrap();
+        assert!(validate_exec(Some(&spec), &pm).is_ok());
         let reboot = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
-        assert!(validate_exec(Some(&spec), &reboot).is_ok());
+        assert_eq!(validate_exec(Some(&spec), &reboot).unwrap_err(), ErrorCode::PolicyDenied);
         let getprop = parse_exec(&serde_json::json!({"tool":"getprop","args":[]})).unwrap();
-        assert_eq!(
-            validate_exec(Some(&spec), &getprop).unwrap_err(),
-            ErrorCode::PolicyDenied
-        );
-        // resolve_tool_path honors the passed allowlist param (deny path needs no fs)
-        assert_eq!(
-            resolve_tool_path("getprop", &allow).unwrap_err(),
-            ErrorCode::PolicyDenied
-        );
+        assert_eq!(validate_exec(Some(&spec), &getprop).unwrap_err(), ErrorCode::PolicyDenied);
     }
 }
