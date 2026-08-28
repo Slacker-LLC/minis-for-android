@@ -447,13 +447,13 @@ object UbuntuRuntime {
             BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}
             SHA=${shellQuote(MINISD_SHA_PATH)}
             mkdir -p /data/adb/minis/bin /data/adb/minis/run
-            TMP="\$BIN.installing"
-            rm -f "\$TMP"
-            cat > "\$TMP"
-            chmod 0755 "\$TMP"
-            mv -f "\$TMP" "\$BIN"
-            printf '%s\n' ${shellQuote(expected.lowercase())} > "\$SHA.tmp"
-            mv -f "\$SHA.tmp" "\$SHA"
+            TMP="${'$'}BIN.installing"
+            rm -f "${'$'}TMP"
+            cat > "${'$'}TMP"
+            chmod 0755 "${'$'}TMP"
+            mv -f "${'$'}TMP" "${'$'}BIN"
+            printf '%s\n' ${shellQuote(expected.lowercase())} > "${'$'}SHA.tmp"
+            mv -f "${'$'}SHA.tmp" "${'$'}SHA"
             echo MINISD_INSTALLED
         """.trimIndent()
 
