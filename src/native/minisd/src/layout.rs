@@ -256,7 +256,11 @@ mod tests {
         let root = temp_root("partial");
         std::fs::create_dir_all(root.join("etc")).unwrap();
         std::fs::create_dir_all(root.join("bin")).unwrap();
-        std::fs::write(root.join("etc/os-release"), "ID=ubuntu\nVERSION_ID=\"24.04\"\n").unwrap();
+        std::fs::write(
+            root.join("etc/os-release"),
+            "ID=ubuntu\nVERSION_ID=\"24.04\"\n",
+        )
+        .unwrap();
         std::fs::write(root.join("bin/bash"), "").unwrap();
         assert!(!rootfs_looks_valid(root.to_str().unwrap()));
         let _ = std::fs::remove_dir_all(root);
@@ -267,7 +271,11 @@ mod tests {
         let root = temp_root("marker");
         std::fs::create_dir_all(root.join("etc/minis")).unwrap();
         std::fs::create_dir_all(root.join("bin")).unwrap();
-        std::fs::write(root.join("etc/os-release"), "ID=ubuntu\nVERSION_ID=\"24.04\"\n").unwrap();
+        std::fs::write(
+            root.join("etc/os-release"),
+            "ID=ubuntu\nVERSION_ID=\"24.04\"\n",
+        )
+        .unwrap();
         std::fs::write(root.join("bin/bash"), "").unwrap();
         std::fs::write(
             root.join(ROOTFS_MARKER),
@@ -307,7 +315,10 @@ mod tests {
         ensure_guest_user_ids(root.to_str().unwrap(), 12345, 12345).unwrap();
         let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
         let group = std::fs::read_to_string(etc.join("group")).unwrap();
-        assert_eq!(passwd.lines().filter(|l| l.starts_with("minis:")).count(), 1);
+        assert_eq!(
+            passwd.lines().filter(|l| l.starts_with("minis:")).count(),
+            1
+        );
         assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert!(passwd.contains("minis:x:12345:12345:"));
         assert!(group.contains("minis:x:12345:"));
