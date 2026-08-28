@@ -3,6 +3,7 @@ package com.openminis.app.ui.chat
 import android.util.Log
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
 
 /**
  * Process-level cache of ChatViewModels keyed by sessionId. Mirrors iOS
@@ -87,6 +88,12 @@ object ChatViewModelStore {
     @Synchronized
     fun setActiveSession(sessionId: String?) {
         activeSessionIdInternal = sessionId
+        if (sessionId != null) {
+            // Issue #43: opening a chat is a recovery boundary. Run the same
+            // full self-check as app startup in the background so a broken
+            // keeper/rootfs is repaired before the next agent tool call.
+            UbuntuRuntime.kickSelfCheck("chat_open")
+        }
     }
 
     @Synchronized
