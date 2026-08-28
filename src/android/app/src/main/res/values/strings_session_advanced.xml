@@ -16,6 +16,11 @@
     <string name="session_advanced_model_section">Model parameters</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_top_p">Top P</string>
+    <string name="session_advanced_top_p_hint">0.0–1.0</string>
+    <string name="session_advanced_top_k">Top K</string>
+    <string name="session_advanced_top_k_hint">Positive integer</string>
+    <string name="session_advanced_sampling_help">Top P is applied where supported. Top K is applied by Anthropic and Gemini; unsupported providers ignore it safely.</string>
     <string name="session_advanced_max_tokens">Max output tokens</string>
     <string name="session_advanced_max_tokens_hint">Positive integer</string>
     <string name="session_advanced_tools_section">Tools</string>
@@ -27,6 +32,8 @@
     <string name="session_advanced_missing_session">Could not prepare this session.</string>
     <string name="session_advanced_invalid_prompt">Enter session instructions or turn off Custom.</string>
     <string name="session_advanced_invalid_temperature">Temperature must be between 0.0 and 2.0.</string>
+    <string name="session_advanced_invalid_top_p">Top P must be between 0.0 and 1.0.</string>
+    <string name="session_advanced_invalid_top_k">Top K must be a positive integer.</string>
     <string name="session_advanced_invalid_max_tokens">Max output tokens must be a positive integer.</string>
     <string name="session_advanced_save_failed">Could not save session settings.</string>
     <string name="session_advanced_reset_failed">Could not reset session settings.</string>
