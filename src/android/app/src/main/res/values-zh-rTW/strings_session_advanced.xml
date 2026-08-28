@@ -20,7 +20,7 @@
     <string name="session_advanced_top_p_hint">0.0–1.0</string>
     <string name="session_advanced_top_k">Top K</string>
     <string name="session_advanced_top_k_hint">正整數</string>
-    <string name="session_advanced_sampling_help">Top P 會在支援的 Provider 上生效。Top K 目前由 Anthropic 與 Gemini 套用；不支援的 Provider 會安全忽略。</string>
+    <string name="session_advanced_sampling_help">取樣覆蓋嚴格依各 Provider 與具體模型的官方 API 能力套用；不支援或已棄用的參數不會送出，Gemini 3.x 保持模型預設值。</string>
     <string name="session_advanced_max_tokens">最大輸出 Token</string>
     <string name="session_advanced_max_tokens_hint">正整數</string>
     <string name="session_advanced_tools_section">工具</string>

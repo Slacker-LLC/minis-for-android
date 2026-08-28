@@ -13,6 +13,7 @@ import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.SamplingPolicy
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -352,11 +353,10 @@ class GeminiProvider(
 
         val config = JSONObject()
         config.put("maxOutputTokens", maxTokens)
-        if (temperature != null) {
-            config.put("temperature", temperature)
-        }
-        topP?.let { config.put("topP", it) }
-        topK?.let { config.put("topK", it) }
+        val sampling = SamplingPolicy.gemini(model, temperature, topP, topK)
+        sampling.temperature?.let { config.put("temperature", it) }
+        sampling.topP?.let { config.put("topP", it) }
+        sampling.topK?.let { config.put("topK", it) }
 
         // Thinking configuration (model-specific)
         buildThinkingConfig(thinkingLevel)?.let { thinkingConfig ->

@@ -20,7 +20,7 @@
     <string name="session_advanced_top_p_hint">0.0–1.0</string>
     <string name="session_advanced_top_k">Top K</string>
     <string name="session_advanced_top_k_hint">Положительное целое число</string>
-    <string name="session_advanced_sampling_help">Top P применяется там, где поддерживается. Top K применяется Anthropic и Gemini; неподдерживающие провайдеры безопасно его игнорируют.</string>
+    <string name="session_advanced_sampling_help">Переопределения сэмплирования применяются по официальному API конкретного провайдера и модели. Неподдерживаемые или устаревшие параметры не отправляются; Gemini 3.x использует значения модели по умолчанию.</string>
     <string name="session_advanced_max_tokens">Максимум выходных токенов</string>
     <string name="session_advanced_max_tokens_hint">Положительное целое число</string>
     <string name="session_advanced_tools_section">Инструменты</string>

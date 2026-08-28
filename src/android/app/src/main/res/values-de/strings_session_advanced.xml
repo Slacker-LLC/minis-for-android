@@ -20,7 +20,7 @@
     <string name="session_advanced_top_p_hint">0.0–1.0</string>
     <string name="session_advanced_top_k">Top K</string>
     <string name="session_advanced_top_k_hint">Positive Ganzzahl</string>
-    <string name="session_advanced_sampling_help">Top P wird von unterstützten Anbietern angewendet. Top K wird von Anthropic und Gemini angewendet; nicht unterstützte Anbieter ignorieren es sicher.</string>
+    <string name="session_advanced_sampling_help">Sampling-Overrides folgen der offiziellen API des jeweiligen Providers und Modells. Nicht unterstützte oder veraltete Parameter werden weggelassen; Gemini 3.x behält die Modellstandardwerte.</string>
     <string name="session_advanced_max_tokens">Maximale Ausgabetokens</string>
     <string name="session_advanced_max_tokens_hint">Positive Ganzzahl</string>
     <string name="session_advanced_tools_section">Werkzeuge</string>

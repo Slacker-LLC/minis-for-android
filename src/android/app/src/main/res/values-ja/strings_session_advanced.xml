@@ -20,7 +20,7 @@
     <string name="session_advanced_top_p_hint">0.0–1.0</string>
     <string name="session_advanced_top_k">Top K</string>
     <string name="session_advanced_top_k_hint">正の整数</string>
-    <string name="session_advanced_sampling_help">Top P は対応するプロバイダーで適用されます。Top K は Anthropic と Gemini で適用され、未対応のプロバイダーでは安全に無視されます。</string>
+    <string name="session_advanced_sampling_help">サンプリングの上書きは各 Provider／モデルの公式 API に従います。未対応または非推奨のパラメータは送信せず、Gemini 3.x はモデル既定値を維持します。</string>
     <string name="session_advanced_max_tokens">最大出力トークン</string>
     <string name="session_advanced_max_tokens_hint">正の整数</string>
     <string name="session_advanced_tools_section">ツール</string>

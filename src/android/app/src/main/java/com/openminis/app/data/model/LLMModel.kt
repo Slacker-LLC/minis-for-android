@@ -37,6 +37,15 @@ data class LLMModel(
     // Mirrors iOS ModelModality flags. When null, treat as text-in/text-out only.
     val inputModalities: List<String>? = null,
     val outputModalities: List<String>? = null,
+    // First-party Gemini Model resource sampling metadata. Nullable values keep
+    // non-Gemini providers and old cached model JSON backward-compatible. When
+    // samplingMetadataKnown=true, a null samplingDefaultTopK means Google's
+    // Model.topK was empty, which explicitly forbids sending topK.
+    val samplingDefaultTemperature: Double? = null,
+    val samplingMaxTemperature: Double? = null,
+    val samplingDefaultTopP: Double? = null,
+    val samplingDefaultTopK: Int? = null,
+    val samplingMetadataKnown: Boolean = false,
 ) {
     companion object {
         // Anthropic — mirrors iOS LLMTypes.swift allAnthropic.

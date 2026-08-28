@@ -13,6 +13,7 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.ImageBudget
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.SamplingPolicy
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
@@ -362,15 +363,16 @@ class AnthropicProvider(
         body.put("max_tokens", maxTokens)
         body.put("stream", stream)
 
-        if (temperature != null && !thinkingLevel.isEnabled && !modelRejectsTemperature(model.id)) {
-            body.put("temperature", temperature)
-        }
-        // GH#32: keep extended-thinking requests conservative; sampling
-        // overrides are emitted only when thinking is off.
-        if (!thinkingLevel.isEnabled) {
-            topP?.let { body.put("top_p", it) }
-            topK?.let { body.put("top_k", it) }
-        }
+        val sampling = SamplingPolicy.anthropic(
+            modelId = model.id,
+            thinkingEnabled = thinkingLevel.isEnabled,
+            temperature = temperature,
+            topP = topP,
+            topK = topK,
+        )
+        sampling.temperature?.let { body.put("temperature", it) }
+        sampling.topP?.let { body.put("top_p", it) }
+        sampling.topK?.let { body.put("top_k", it) }
 
         // Thinking / extended thinking. Two protocol shapes:
         //   - Claude 4.6+ (adaptive): thinking.type="adaptive" + output_config.effort.
