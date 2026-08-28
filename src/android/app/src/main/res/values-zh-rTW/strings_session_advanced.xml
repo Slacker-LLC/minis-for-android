@@ -12,7 +12,11 @@
     <string name="session_advanced_thinking_not_supported">目前模型不支援</string>
     <string name="session_advanced_instructions_section">工作階段靈魂</string>
     <string name="session_advanced_system_prompt">工作階段人格</string>
-    <string name="session_advanced_system_prompt_hint">只作用於此工作階段的人設、角色、語氣與行為；全域 SOUL.md 仍作為基礎層。</string>
+    <string name="session_advanced_system_prompt_hint">此工作階段獨立的人設、角色、語氣與行為。</string>
+    <string name="session_advanced_soul_help">預設使用全域 SOUL.md。只有在送出第一則訊息前設定「工作階段靈魂」，才會由目前工作階段完整覆蓋全域靈魂；聊天開始後此選擇永久鎖定。</string>
+    <string name="session_advanced_soul_locked_help">此工作階段已經開始，靈魂選擇已鎖定，之後不能修改；即使清除聊天記錄也不會重新解鎖。</string>
+    <string name="session_advanced_soul_locked_custom">自訂靈魂 · 已鎖定</string>
+    <string name="session_advanced_soul_locked_global">全域靈魂 · 已鎖定</string>
     <string name="session_advanced_model_section">模型參數</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
