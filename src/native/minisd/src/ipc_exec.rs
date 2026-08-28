@@ -112,11 +112,11 @@ pub fn execute_ubuntu_snapshot(
     let exe =
         std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
-    let proxy = if admin {
-        crate::env::discover_proxy()
-    } else {
-        crate::proxy::PROXY_URI.to_string()
-    };
+    // Match upstream Android semantics: the guest shares the phone's network
+    // namespace and only mirrors the Android system proxy when one is actually
+    // configured. Do not force ordinary guest traffic through minisd's root
+    // loopback proxy; direct sockets should use the app UID's host networking.
+    let proxy = crate::env::discover_proxy();
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
