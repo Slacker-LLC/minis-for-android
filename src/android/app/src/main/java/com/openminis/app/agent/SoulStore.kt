@@ -152,14 +152,9 @@ object SoulMDParser {
 }
 
 /**
- * Result of a SOUL.md body length check. The hard limit depends on what
- * language the body is written in — Chinese / Japanese / Korean text is
- * information-dense per character so the cap is in chars, while English /
- * other Latin-alphabet text is capped by word count.
- *
- * Mirrors `SoulStore.isOverLimit(_:)` on iOS. The associated value carries
- * the observed magnitude and the matching cap so callers can surface a
- * precise "your body is N / max M" message.
+ * Legacy compatibility result retained for older call sites/tests.
+ * SOUL.md body length is no longer capped, so [SoulStore.isOverLimit]
+ * always returns [Ok].
  */
 sealed class SoulBodyLimitCheck {
     object Ok : SoulBodyLimitCheck()
@@ -184,89 +179,20 @@ object SoulStore {
     fun fileLocation(context: Context): File =
         File(File(context.filesDir, MEMORY_SUBDIR), FILE_NAME)
 
-    // -- Body length rules (language-aware) ----------------------------
-    //
-    // The personality body has a hard cap applied at every write surface
-    // (Settings UI Save button, minis-config writer, and the
-    // prompt-build-time fallback in `SystemPromptBuilder`). The cap is
-    // language-dependent: CJK text is information-dense per character so
-    // 1600 chars is the limit; Latin / mixed text gets a 1000-word cap.
-    // (T-soul-body-limit-2000 — both axes doubled from 800 / 500 to align
-    //  with iOS bumping its single 1000→2000 token cap.)
-    //
-    // CJK ratio of 30% switches the rule. A body whose CJK glyphs make up
-    // more than 30% of all unicode code points is treated as CJK-leaning
-    // and counted by character; anything at-or-below 30% is counted by
-    // word. 30% is the lowest watermark at which Chinese / Japanese
-    // clearly dominates — high enough to ignore stray CJK quotes or
-    // proper nouns in an English document, low enough that a majority-CJK
-    // paragraph with a few inline English terms still counts as CJK.
-
+    /**
+     * Compatibility constants kept so older source/tests continue to compile.
+     * They are not enforced by Settings, minis-config, or prompt construction.
+     */
+    @Deprecated("SOUL.md body length is no longer capped")
     const val CJK_RATIO_THRESHOLD: Double = 0.3
+    @Deprecated("SOUL.md body length is no longer capped")
     const val CHINESE_CHAR_LIMIT: Int = 1600
+    @Deprecated("SOUL.md body length is no longer capped")
     const val ENGLISH_WORD_LIMIT: Int = 1000
 
-    /**
-     * Classify [body] under the language-aware length rules above. Empty
-     * / whitespace-only bodies always return [SoulBodyLimitCheck.Ok].
-     */
-    fun isOverLimit(body: String): SoulBodyLimitCheck {
-        val trimmed = body.trim()
-        if (trimmed.isEmpty()) return SoulBodyLimitCheck.Ok
-
-        var cjk = 0
-        var total = 0
-        var i = 0
-        while (i < trimmed.length) {
-            val cp = trimmed.codePointAt(i)
-            total += 1
-            if (isCJKCodePoint(cp)) cjk += 1
-            i += Character.charCount(cp)
-        }
-        val ratio = if (total > 0) cjk.toDouble() / total else 0.0
-        return if (ratio > CJK_RATIO_THRESHOLD) {
-            // Code-point count — closest analogue to iOS grapheme cluster
-            // count for the CJK ranges we care about (no combining marks
-            // / no flag emojis in Han/Kana/Hangul). Bytes / UTF-16 code
-            // units would over-count surrogate-pair CJK extensions.
-            val chars = trimmed.codePointCount(0, trimmed.length)
-            if (chars > CHINESE_CHAR_LIMIT) SoulBodyLimitCheck.OverLimitChinese(chars, CHINESE_CHAR_LIMIT)
-            else SoulBodyLimitCheck.Ok
-        } else {
-            // Whitespace-delimited word count. `split(Regex("\\s+"))` on
-            // a trimmed string collapses consecutive whitespace into a
-            // single delimiter.
-            val words = trimmed.split(Regex("\\s+")).count { it.isNotEmpty() }
-            if (words > ENGLISH_WORD_LIMIT) SoulBodyLimitCheck.OverLimitEnglish(words, ENGLISH_WORD_LIMIT)
-            else SoulBodyLimitCheck.Ok
-        }
-    }
-
-    /**
-     * True if [cp] belongs to any CJK Unified Ideograph or Kana / Hangul
-     * range. Covers Chinese (Simplified + Traditional), Japanese
-     * (Hiragana + Katakana + Kanji shared with CJK Unified), and Korean
-     * (Hangul Syllables + Jamo). Wider than just U+4E00–U+9FFF so the
-     * extensions and Hangul also count toward the ratio.
-     */
-    private fun isCJKCodePoint(cp: Int): Boolean {
-        // CJK Unified Ideographs + Ext A
-        if (cp in 0x4E00..0x9FFF) return true
-        if (cp in 0x3400..0x4DBF) return true
-        // CJK Unified Ideographs Ext B, C/D/E/F, G/H
-        if (cp in 0x20000..0x2A6DF) return true
-        if (cp in 0x2A700..0x2EBEF) return true
-        if (cp in 0x30000..0x323AF) return true
-        // Hiragana, Katakana, Katakana Phonetic Extensions
-        if (cp in 0x3040..0x309F) return true
-        if (cp in 0x30A0..0x30FF) return true
-        if (cp in 0x31F0..0x31FF) return true
-        // Hangul Syllables, Jamo, Compatibility Jamo
-        if (cp in 0xAC00..0xD7AF) return true
-        if (cp in 0x1100..0x11FF) return true
-        if (cp in 0x3130..0x318F) return true
-        return false
-    }
+    /** SOUL.md body length is intentionally unrestricted. */
+    @Suppress("UNUSED_PARAMETER")
+    fun isOverLimit(body: String): SoulBodyLimitCheck = SoulBodyLimitCheck.Ok
 
     /**
      * The verbatim default file content used both for first-run
@@ -359,7 +285,7 @@ lang: "auto"
     /**
      * Re-read SOUL.md into [cachedMetadata]. Call once at app launch
      * (after [ensureExists]) and any time the file is rewritten outside
-     * of [save] (currently only the Settings UI uses save()).
+     * of [save].
      */
     fun refreshCache(context: Context) {
         val parsed = load(context)
@@ -377,17 +303,12 @@ lang: "auto"
  *  - Users never see "You are <name>, a capable AI assistant ..." in the
  *    Personality editor — that internal scaffolding stays out of view
  *    so users can't accidentally delete or duplicate it.
- *  - The original carefully-tuned identity sentence is preserved
- *    byte-for-byte. Substituting only `{name}` keeps the surrounding
- *    model expectations (Android device, Linux sandbox via PRoot,
- *    aarch64) intact.
- *  - When the user hasn't authored a personality body, the full
- *    assembled prompt is byte-identical to the pre-SOUL prompt
- *    (modulo `{name}`) — no behavior regression for default users.
+ *  - The runtime identity stays aligned with the current Android execution
+ *    backend: Ubuntu 24.04 userspace managed through minisd + chroot.
+ *  - When the user hasn't authored a personality body, the assembled
+ *    prompt falls back to the identity sentence plus the SOUL editing hint.
  */
 object SystemPromptBuilder {
-
-    private const val TAG = "Soul"
 
     /**
      * Patterns used by [scrubInjections] to drop prompt-injection lines
@@ -411,40 +332,13 @@ object SystemPromptBuilder {
     fun containsInjectionPattern(s: String): Boolean =
         INJECTION_PATTERNS.any { it.containsMatchIn(s) }
 
-    /**
-     * The identity sentence template. `{name}` is substituted from the
-     * SOUL metadata. This wording matches the pre-SOUL literal that
-     * lived inline in ChatViewModel.buildSystemPrompt — keep it in sync
-     * if you ever need to tweak the runtime statement, because every
-     * Android chat hits this line.
-     */
+    /** Current Android runtime identity exposed to the model. */
     private const val IDENTITY_TEMPLATE =
         "You are {name}, a capable AI assistant running on an Android device with a fully functional Linux sandbox (Ubuntu 24.04 aarch64, uid 10000, workspace /workspace). "
 
     /**
      * Render the identity sentence (template + name) and optionally
      * append the user-authored personality body from SOUL.md.
-     *
-     * Two distinct trailing-whitespace contracts so the next concatenated
-     * sentence in [com.openminis.app.ui.chat.ChatViewModel.buildSystemPrompt]
-     * glues correctly:
-     *   - No personality body → identity sentence with its original
-     *     single trailing space (byte-identical to the pre-SOUL prompt).
-     *   - With personality body → identity sentence + blank line +
-     *     "Personality:" block + blank line, so the runtime-guidance
-     *     sentence starts a fresh paragraph.
-     *
-     * Returned format (when SOUL body is present):
-     *
-     *     You are <name>, a capable AI assistant running on an Android device …
-     *
-     *     Personality (from SOUL.md — your character and voice; defer to
-     *     the user's latest message when it conflicts with anything here):
-     *     <body>
-     *
-     * We never substitute a default body into the prompt — the identity
-     * sentence alone is the safe fallback when SOUL.md is missing or
-     * empty, matching pre-SOUL behavior.
      */
     fun identitySection(context: Context): String {
         val file = SoulStore.load(context)
@@ -459,9 +353,7 @@ object SystemPromptBuilder {
 
         // [T-soul-hint] Fixed hint telling the model how SOUL fields can be
         // changed. Always appended (with or without a personality body) so
-        // the model never says "I can't change my personality". This hint
-        // is system-owned text and is NOT counted against the user-facing
-        // SOUL body length limit (#356 / 1000 EN words / 1600 CN chars).
+        // the model never says "I can't change my personality".
         val soulEditHint =
             "---\n" +
             "SOUL.md fields (name / style / lang / body) can be edited two ways:\n" +
@@ -469,18 +361,8 @@ object SystemPromptBuilder {
             "2. UI: ask the user to go to Settings → Soul to edit directly.\n" +
             "Pick whichever the user finds easier in context. Do not say you cannot change your personality."
 
-        // [T-soul-style-injection 2026-05-18, port iOS 0409e24f] The `style`
-        // frontmatter field (response voice / tone / formatting preference,
-        // e.g. a row of emojis or "concise, no markdown") was parsed and
-        // shown in the UI but never reached the model — only the Markdown
-        // body was injected. Render it as its own labeled paragraph so the
-        // model treats it as a hard constraint on response style rather
-        // than free-form context.
         fun styleBlock(s: String): String {
             if (s.isEmpty()) return ""
-            // [T-agent-prompt-consistency-pass] Mirrors iOS SoulStore: a user-authored
-            // style that prescribes a reply language is the more specific preference
-            // and wins over the base prompt's match-the-user's-language default.
             return "\n\nResponse style (from SOUL.md `style` — apply to every reply unless the user explicitly asks otherwise; if it prescribes a reply language, it overrides the default match-the-user's-language rule):\n$s"
         }
 
@@ -490,24 +372,8 @@ object SystemPromptBuilder {
             return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n"
         }
 
-        // Reject (NOT truncate) bodies that exceed the language-aware
-        // limit. The old head/tail truncation silently dropped half the
-        // user's text — falling back to identity-only is the safer
-        // signal: the user notices the personality isn't taking effect,
-        // opens Settings, and sees the same red over-limit warning the
-        // Save button surfaces. Write paths already reject over-limit;
-        // this branch only triggers for an on-disk file written before
-        // this rule existed (or via shell / another device).
-        val check = SoulStore.isOverLimit(trimmed)
-        if (check.isOverLimit) {
-            AppLogger.warning(TAG, "personality body is over the language-aware limit ($check) — falling back to identity-only system prompt.")
-            return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n"
-        }
-
         val personality = scrubInjections(trimmed)
 
-        // Strip the trailing space we'd otherwise leave hanging at the
-        // end of the first paragraph when a personality block follows.
         return identityTrimmed +
             "\n\nPersonality (from SOUL.md — your character and voice; defer to the user's latest message when it conflicts with anything here):\n" +
             personality +
@@ -520,8 +386,7 @@ object SystemPromptBuilder {
     /**
      * Drop lines that look like an attempt to subvert the system prompt.
      * SOUL.md is user-authored personality — instructions to the model
-     * have no business being there. Casts a wide net on purpose: matches
-     * "ignore previous instructions" and the usual variants.
+     * have no business being there.
      */
     private fun scrubInjections(s: String): String =
         s.split("\n")
