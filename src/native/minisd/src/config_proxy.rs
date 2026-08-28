@@ -1,6 +1,6 @@
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
@@ -11,7 +11,8 @@ const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BRIDGE_BYTES: usize = 2 * 1024 * 1024;
 const MAGIC: &str = "MINISCFG1";
 
-static STARTED: OnceLock<Result<(), String>> = OnceLock::new();
+static STARTED: OnceLock<()> = OnceLock::new();
+static START_LOCK: Mutex<()> = Mutex::new(());
 
 /// Start the guest-facing minis-config proxy once per minisd process.
 ///
@@ -21,11 +22,38 @@ static STARTED: OnceLock<Result<(), String>> = OnceLock::new();
 /// methods. A per-process random token prevents unrelated localhost clients
 /// from using the proxy; the token is materialized only inside the Ubuntu
 /// rootfs alongside the CLI wrapper.
+///
+/// Failed initialization is never cached as success. A short bounded retry
+/// covers transient bind/rootfs filesystem races during broker startup; a later
+/// call may retry again if all attempts fail.
 pub fn ensure_started(app_uid: u32) {
-    if app_uid == 0 {
+    if app_uid == 0 || STARTED.get().is_some() {
         return;
     }
-    if let Err(error) = STARTED.get_or_init(|| start_proxy(app_uid)) {
+    let _guard = match START_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if STARTED.get().is_some() {
+        return;
+    }
+
+    let mut last_error = None;
+    for attempt in 0..3 {
+        match start_proxy(app_uid) {
+            Ok(()) => {
+                let _ = STARTED.set(());
+                return;
+            }
+            Err(error) => {
+                last_error = Some(error);
+                if attempt < 2 {
+                    std::thread::sleep(Duration::from_millis(150));
+                }
+            }
+        }
+    }
+    if let Some(error) = last_error {
         eprintln!("minis-config proxy init failed: {error}");
     }
 }
@@ -460,6 +488,8 @@ mod tests {
         assert!(script.contains("/etc/minis/minis-config-proxy"));
         assert!(script.contains("/dev/tcp/127.0.0.1/"));
         assert!(script.contains("--file"));
+        assert!(!script.contains("root.exec"));
+        assert!(!script.contains("ubuntu.adminExec"));
         assert_eq!(GUEST_CONFIG_BIN, "/opt/minis/bin/minis-config");
     }
 }
