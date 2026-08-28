@@ -47,9 +47,10 @@ impl AppState {
     pub fn new(mock: bool, policy: PolicyFile) -> Self {
         let mut sessions = SessionTable::default();
         sessions.enable_subreaper();
-        if !mock && policy.caller.app_uid != 0 {
-            // The guest-facing minis-config transport is intentionally started
-            // with the broker, not with the historical PRoot/sandbox path.
+        if should_start_config_proxy(mock, policy.caller.app_uid) {
+            // `main` constructs AppState before branching into watchdog mode.
+            // The guard above keeps the watchdog parent out: only the actual
+            // root socket-server child owns the guest-facing minis-config proxy.
             crate::config_proxy::ensure_started(policy.caller.app_uid);
         }
         Self {
@@ -114,6 +115,32 @@ impl AppState {
     }
 }
 
+fn should_start_config_proxy(mock: bool, app_uid: u32) -> bool {
+    if mock || app_uid == 0 {
+        return false;
+    }
+    let non_serving_mode = std::env::args_os().any(|arg| {
+        matches!(
+            arg.to_str(),
+            Some("--watchdog" | "--once" | "--call" | "--mock")
+        )
+    });
+    if non_serving_mode {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        // The production socket server is root-owned; refusing to initialize
+        // the proxy before that privilege check avoids writing runtime state
+        // from accidental non-root direct invocations.
+        unsafe { libc::geteuid() == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,5 +171,15 @@ mod tests {
         );
         assert!(!state.confirms.contains_key(&id));
         assert!(!state.used_confirms.contains_key(&id));
+    }
+
+    #[test]
+    fn mock_never_starts_config_proxy() {
+        assert!(!should_start_config_proxy(true, 12345));
+    }
+
+    #[test]
+    fn zero_uid_never_starts_config_proxy() {
+        assert!(!should_start_config_proxy(false, 0));
     }
 }
