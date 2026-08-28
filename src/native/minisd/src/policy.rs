@@ -76,6 +76,10 @@ impl PolicyFile {
         let app_uid = raw
             .parse::<u32>()
             .map_err(|_| format!("{APP_UID_ENV} must be a positive Android uid"))?;
+        self.apply_runtime_app_uid(app_uid)
+    }
+
+    fn apply_runtime_app_uid(&mut self, app_uid: u32) -> Result<(), String> {
         if app_uid == 0 {
             return Err(format!("{APP_UID_ENV} must be a positive Android uid"));
         }
@@ -174,6 +178,14 @@ mod tests {
         let p = PolicyFile::default_policy();
         assert_eq!(p.implicit_mode("root.shellRaw"), Mode::Deny);
         assert_eq!(p.method("root.exec").unwrap().mode, Mode::Allow);
+    }
+
+    #[test]
+    fn runtime_app_uid_override_replaces_template_uid() {
+        let mut p: PolicyFile = serde_json::from_str(r#"{"caller":{"appUid":10381}}"#).unwrap();
+        p.apply_runtime_app_uid(10394).unwrap();
+        assert_eq!(p.caller.app_uid, 10394);
+        assert!(p.apply_runtime_app_uid(0).is_err());
     }
 
     #[test]
