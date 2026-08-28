@@ -5,7 +5,24 @@ use serde_json::{json, Value};
 use std::io::Read;
 use std::time::{Duration, Instant};
 
+#[cfg(unix)]
+use std::ffi::CString;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
 const MAX_CAPTURE_BYTES: usize = 256 * 1024;
+
+// Reserved errno values used only by our pre_exec closure. Linux execve(2)
+// never returns these values, so Command::spawn can tell an infrastructure
+// failure before execve apart from failure to execute the guest binary itself.
+#[cfg(unix)]
+const PREEXEC_ERR_SETNS: i32 = 240;
+#[cfg(unix)]
+const PREEXEC_ERR_CHROOT: i32 = 241;
+#[cfg(unix)]
+const PREEXEC_ERR_PRIVS: i32 = 242;
+#[cfg(unix)]
+const ANDROID_AID_INET: libc::gid_t = 3003;
 
 #[derive(Debug, Clone)]
 pub struct UbuntuExecSnapshot {
@@ -16,7 +33,7 @@ pub struct UbuntuExecSnapshot {
 }
 
 /// Refresh Ubuntu state under the caller's short AppState lock and copy only
-/// immutable execution inputs. The actual helper process is launched later,
+/// immutable execution inputs. The actual guest process is launched later,
 /// after the global broker state lock has been released.
 pub fn snapshot_ubuntu_exec(
     state: &mut AppState,
@@ -98,8 +115,125 @@ fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<Capt
     })
 }
 
+#[cfg(unix)]
+fn staged_error(errno: i32) -> std::io::Error {
+    std::io::Error::from_raw_os_error(errno)
+}
+
+#[cfg(unix)]
+fn classify_spawn_error(error: std::io::Error, argv0: &str) -> (ErrorCode, String) {
+    match error.raw_os_error() {
+        Some(PREEXEC_ERR_SETNS) => (
+            ErrorCode::KeeperNamespaceLost,
+            "failed to enter keeper mount namespace before guest exec".into(),
+        ),
+        Some(PREEXEC_ERR_CHROOT) => (
+            ErrorCode::ChrootUnavailable,
+            "failed to enter Ubuntu rootfs before guest exec".into(),
+        ),
+        Some(PREEXEC_ERR_PRIVS) => (
+            ErrorCode::GuestPrivilegeSetupFailed,
+            "failed to establish guest uid/gid/capability boundary before exec".into(),
+        ),
+        // These are the normal execve/path failures. They happen after the
+        // namespace/chroot/privilege boundary succeeded, but before user code
+        // can run, so they are still safe pre-exec failures.
+        Some(libc::ENOENT | libc::EACCES | libc::ENOEXEC | libc::ENOTDIR | libc::ELOOP | libc::ETXTBSY) => (
+            ErrorCode::GuestExecveFailed,
+            format!("execve {argv0}: {error}"),
+        ),
+        _ => (ErrorCode::Internal, format!("spawn guest {argv0}: {error}")),
+    }
+}
+
+/// Enter the keeper mount namespace and guest root directly in Command's child
+/// immediately before execve. Only raw libc operations are used here because
+/// pre_exec runs after fork in a multi-threaded process.
+#[cfg(unix)]
+unsafe fn enter_guest_pre_exec(
+    keeper_ns: &CString,
+    rootfs: &CString,
+    cwd: &CString,
+    uid: u32,
+    gid: u32,
+) -> std::io::Result<()> {
+    // Best effort: later timeout cleanup also kills the process group.
+    libc::setpgid(0, 0);
+
+    let ns_fd = libc::open(keeper_ns.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC);
+    if ns_fd < 0 {
+        return Err(staged_error(PREEXEC_ERR_SETNS));
+    }
+    let setns_rc = libc::setns(ns_fd, libc::CLONE_NEWNS);
+    libc::close(ns_fd);
+    if setns_rc != 0 {
+        return Err(staged_error(PREEXEC_ERR_SETNS));
+    }
+
+    if libc::chroot(rootfs.as_ptr()) != 0 || libc::chdir(c"/".as_ptr()) != 0 {
+        return Err(staged_error(PREEXEC_ERR_CHROOT));
+    }
+    // Preserve the previous helper behavior: a vanished/invalid cwd falls back
+    // to guest root rather than turning an otherwise healthy runtime into a
+    // hard failure.
+    if libc::chdir(cwd.as_ptr()) != 0 {
+        let _ = libc::chdir(c"/".as_ptr());
+    }
+
+    if uid == 0 {
+        if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
+            return Err(staged_error(PREEXEC_ERR_PRIVS));
+        }
+        for cap in 0..=40 {
+            libc::prctl(libc::PR_CAPBSET_DROP, cap, 0, 0, 0);
+        }
+        #[repr(C)]
+        struct CapHeader {
+            version: u32,
+            pid: i32,
+        }
+        #[repr(C)]
+        struct CapData {
+            effective: u32,
+            permitted: u32,
+            inheritable: u32,
+        }
+        let header = CapHeader {
+            version: 0x2008_0522,
+            pid: 0,
+        };
+        let data = [
+            CapData {
+                effective: 0,
+                permitted: 0,
+                inheritable: 0,
+            },
+            CapData {
+                effective: 0,
+                permitted: 0,
+                inheritable: 0,
+            },
+        ];
+        if libc::syscall(libc::SYS_capset, &header as *const CapHeader, data.as_ptr()) != 0 {
+            return Err(staged_error(PREEXEC_ERR_PRIVS));
+        }
+    } else {
+        let groups = [ANDROID_AID_INET];
+        if libc::setgroups(groups.len(), groups.as_ptr()) != 0
+            || libc::setgid(gid) != 0
+            || libc::setuid(uid) != 0
+        {
+            return Err(staged_error(PREEXEC_ERR_PRIVS));
+        }
+        let _ = libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    }
+    Ok(())
+}
+
 /// Run ubuntu.exec / ubuntu.adminExec using a previously authorized and
-/// snapshotted keeper context. This function does not touch AppState.
+/// snapshotted keeper context. Infrastructure failures before execve are
+/// returned as structured RPC errors and can never collide with a user program's
+/// numeric exit status.
 pub fn execute_ubuntu_snapshot(
     snapshot: UbuntuExecSnapshot,
     params: Value,
@@ -109,66 +243,80 @@ pub fn execute_ubuntu_snapshot(
         parse_ubuntu_exec(&params).map_err(|code| (code, "bad ubuntu exec params".to_string()))?;
     let uid = if admin { 0 } else { snapshot.guest_uid };
     let gid = if admin { 0 } else { snapshot.guest_gid };
-    let exe =
-        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
-    // Match upstream Android semantics: the guest shares the phone's network
-    // namespace and only mirrors the Android system proxy when one is actually
-    // configured. Do not force ordinary guest traffic through minisd's root
-    // loopback proxy; direct sockets should use the app UID's host networking.
+    // The guest shares the phone network namespace and mirrors the Android
+    // system proxy only when one is configured.
     let proxy = crate::env::discover_proxy();
+    let home = if uid == 0 {
+        "/root"
+    } else {
+        crate::layout::GUEST_HOME
+    };
+    let env = crate::env::guest_env(&tz, &proxy, home, &req.env);
 
-    let mut cmd = std::process::Command::new(&exe);
-    cmd.args([
-        "--helper",
-        "exec",
-        "--pid",
-        &snapshot.pid.to_string(),
-        "--rootfs",
-        &snapshot.rootfs,
-        "--uid",
-        &uid.to_string(),
-        "--gid",
-        &gid.to_string(),
-        "--cwd",
-        &req.cwd,
-        "--tz",
-        &tz,
-        "--proxy",
-        &proxy,
-    ]);
-    for (k, v) in &req.env {
-        cmd.arg("--env").arg(format!("{k}={v}"));
+    #[cfg(not(unix))]
+    {
+        let _ = (snapshot, req, uid, gid, env);
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu execution requires unix".into(),
+        ));
     }
-    cmd.arg("--");
-    cmd.args(&req.argv);
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
 
+    #[cfg(unix)]
+    let mut cmd = {
+        let keeper_ns = CString::new(format!("/proc/{}/ns/mnt", snapshot.pid))
+            .map_err(|_| (ErrorCode::BadParams, "invalid keeper namespace path".into()))?;
+        let rootfs = CString::new(snapshot.rootfs.clone())
+            .map_err(|_| (ErrorCode::BadParams, "NUL in rootfs path".into()))?;
+        let cwd = CString::new(req.cwd.clone())
+            .map_err(|_| (ErrorCode::BadParams, "NUL in cwd".into()))?;
+
+        let mut command = std::process::Command::new(&req.argv[0]);
+        command.args(&req.argv[1..]);
+        command.env_clear();
+        command.envs(&env);
+        command.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        unsafe {
+            command.pre_exec(move || enter_guest_pre_exec(&keeper_ns, &rootfs, &cwd, uid, gid));
+        }
+        command
+    };
+
+    #[cfg(unix)]
     let mut child = cmd
         .spawn()
-        .map_err(|e| (ErrorCode::Internal, format!("spawn exec helper: {e}")))?;
+        .map_err(|e| classify_spawn_error(e, &req.argv[0]))?;
+    #[cfg(unix)]
     let pid = child.id() as i32;
+    #[cfg(unix)]
     let stdout = child
         .stdout
         .take()
         .ok_or((ErrorCode::Internal, "missing exec stdout".into()))?;
+    #[cfg(unix)]
     let stderr = child
         .stderr
         .take()
         .ok_or((ErrorCode::Internal, "missing exec stderr".into()))?;
+    #[cfg(unix)]
     let stdout_handle = std::thread::spawn(move || collect_bounded(stdout, MAX_CAPTURE_BYTES));
+    #[cfg(unix)]
     let stderr_handle = std::thread::spawn(move || collect_bounded(stderr, MAX_CAPTURE_BYTES));
+    #[cfg(unix)]
     let wait_handle = std::thread::spawn(move || child.wait());
+    #[cfg(unix)]
     let start = Instant::now();
 
+    #[cfg(unix)]
     loop {
         if wait_handle.is_finished() {
             let status = wait_handle
                 .join()
-                .map_err(|_| (ErrorCode::Internal, "join exec helper".into()))?
-                .map_err(|e| (ErrorCode::Internal, format!("wait exec helper: {e}")))?;
+                .map_err(|_| (ErrorCode::Internal, "join guest process".into()))?
+                .map_err(|e| (ErrorCode::Internal, format!("wait guest process: {e}")))?;
             let stdout = stdout_handle
                 .join()
                 .map_err(|_| (ErrorCode::Internal, "join stdout collector".into()))?
@@ -190,7 +338,6 @@ pub fn execute_ubuntu_snapshot(
             }));
         }
         if start.elapsed() >= Duration::from_millis(req.timeout_ms) {
-            #[cfg(unix)]
             unsafe {
                 libc::kill(pid, libc::SIGKILL);
                 libc::kill(-pid, libc::SIGKILL);
@@ -225,5 +372,26 @@ mod tests {
         assert_eq!(out.retained.len(), MAX_CAPTURE_BYTES);
         assert_eq!(out.total_bytes, (MAX_CAPTURE_BYTES + 8192) as u64);
         assert!(out.truncated);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reserved_preexec_errnos_map_to_structured_runtime_errors() {
+        assert_eq!(
+            classify_spawn_error(staged_error(PREEXEC_ERR_SETNS), "/bin/true").0,
+            ErrorCode::KeeperNamespaceLost
+        );
+        assert_eq!(
+            classify_spawn_error(staged_error(PREEXEC_ERR_CHROOT), "/bin/true").0,
+            ErrorCode::ChrootUnavailable
+        );
+        assert_eq!(
+            classify_spawn_error(staged_error(PREEXEC_ERR_PRIVS), "/bin/true").0,
+            ErrorCode::GuestPrivilegeSetupFailed
+        );
+        assert_eq!(
+            classify_spawn_error(std::io::Error::from_raw_os_error(libc::ENOENT), "/missing").0,
+            ErrorCode::GuestExecveFailed
+        );
     }
 }
