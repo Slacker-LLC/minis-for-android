@@ -226,28 +226,28 @@ class RootfsManager private constructor(private val context: Context) {
 
     private fun healthCommand(): String = """
         ROOT=${shellQuote(UbuntuPaths.HOST_ROOTFS)}
-        if [ ! -d "\$ROOT" ]; then echo ROOTFS_MISSING; exit 10; fi
-        if [ ! -f "\$ROOT/etc/os-release" ]; then echo ROOTFS_OS_RELEASE_MISSING; exit 11; fi
-        if ! grep -Eq '^ID=("?ubuntu"?)$' "\$ROOT/etc/os-release"; then echo ROOTFS_NOT_UBUNTU; exit 12; fi
-        if [ ! -f "\$ROOT/etc/minis/rootfs.json" ]; then echo ROOTFS_MARKER_MISSING; exit 13; fi
-        if ! grep -Fq '"distro": "ubuntu"' "\$ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_DISTRO_INVALID; exit 14; fi
-        if ! grep -Fq '"arch": "arm64"' "\$ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_ARCH_INVALID; exit 15; fi
-        if [ ! -x "\$ROOT/bin/bash" ] && [ ! -x "\$ROOT/usr/bin/bash" ] && [ ! -x "\$ROOT/bin/sh" ]; then echo ROOTFS_SHELL_MISSING; exit 16; fi
+        if [ ! -d "${'$'}ROOT" ]; then echo ROOTFS_MISSING; exit 10; fi
+        if [ ! -f "${'$'}ROOT/etc/os-release" ]; then echo ROOTFS_OS_RELEASE_MISSING; exit 11; fi
+        if ! grep -Eq '^ID=("?ubuntu"?)$' "${'$'}ROOT/etc/os-release"; then echo ROOTFS_NOT_UBUNTU; exit 12; fi
+        if [ ! -f "${'$'}ROOT/etc/minis/rootfs.json" ]; then echo ROOTFS_MARKER_MISSING; exit 13; fi
+        if ! grep -Fq '"distro": "ubuntu"' "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_DISTRO_INVALID; exit 14; fi
+        if ! grep -Fq '"arch": "arm64"' "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_ARCH_INVALID; exit 15; fi
+        if [ ! -x "${'$'}ROOT/bin/bash" ] && [ ! -x "${'$'}ROOT/usr/bin/bash" ] && [ ! -x "${'$'}ROOT/bin/sh" ]; then echo ROOTFS_SHELL_MISSING; exit 16; fi
         echo ROOTFS_OK
     """.trimIndent()
 
     private fun rollbackCommand(): String = """
         ROOT=${shellQuote(ROOT_BASE)}
-        TARGET="\$ROOT/rootfs"
-        BACKUP="\$ROOT/rootfs.backup"
-        if [ -d "\$BACKUP" ]; then
-          rm -rf "\$TARGET"
-          mv "\$BACKUP" "\$TARGET"
+        TARGET="${'$'}ROOT/rootfs"
+        BACKUP="${'$'}ROOT/rootfs.backup"
+        if [ -d "${'$'}BACKUP" ]; then
+          rm -rf "${'$'}TARGET"
+          mv "${'$'}BACKUP" "${'$'}TARGET"
         fi
     """.trimIndent()
 
     private fun cleanupBackupCommand(): String =
-        "rm -rf ${shellQuote("$ROOT_BASE/rootfs.backup")} ${shellQuote("$ROOT_BASE/rootfs.installing")}" 
+        "rm -rf ${shellQuote("$ROOT_BASE/rootfs.backup")} ${shellQuote("$ROOT_BASE/rootfs.installing")}"
 
     /**
      * Extract to a sibling staging directory and swap only after every required
@@ -256,26 +256,26 @@ class RootfsManager private constructor(private val context: Context) {
     private fun installerCommand(): String = """
         set -eu
         ROOT=${shellQuote(ROOT_BASE)}
-        TARGET="\$ROOT/rootfs"
-        BACKUP="\$ROOT/rootfs.backup"
-        STAGE="\$ROOT/rootfs.installing"
-        mkdir -p "\$ROOT"
-        if [ ! -d "\$TARGET" ] && [ -d "\$BACKUP" ]; then mv "\$BACKUP" "\$TARGET"; fi
-        rm -rf "\$STAGE"
-        mkdir -p "\$STAGE"
-        cleanup_stage() { rm -rf "\$STAGE"; }
+        TARGET="${'$'}ROOT/rootfs"
+        BACKUP="${'$'}ROOT/rootfs.backup"
+        STAGE="${'$'}ROOT/rootfs.installing"
+        mkdir -p "${'$'}ROOT"
+        if [ ! -d "${'$'}TARGET" ] && [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
+        rm -rf "${'$'}STAGE"
+        mkdir -p "${'$'}STAGE"
+        cleanup_stage() { rm -rf "${'$'}STAGE"; }
         trap cleanup_stage EXIT HUP INT TERM
-        tar -xzf - -C "\$STAGE"
-        test -f "\$STAGE/etc/os-release"
-        grep -Eq '^ID=("?ubuntu"?)$' "\$STAGE/etc/os-release"
-        test -f "\$STAGE/etc/minis/rootfs.json"
-        grep -Fq '"distro": "ubuntu"' "\$STAGE/etc/minis/rootfs.json"
-        grep -Fq '"arch": "arm64"' "\$STAGE/etc/minis/rootfs.json"
-        if [ ! -x "\$STAGE/bin/bash" ] && [ ! -x "\$STAGE/usr/bin/bash" ] && [ ! -x "\$STAGE/bin/sh" ]; then exit 72; fi
-        rm -rf "\$BACKUP"
-        if [ -e "\$TARGET" ]; then mv "\$TARGET" "\$BACKUP"; fi
-        if ! mv "\$STAGE" "\$TARGET"; then
-          if [ -d "\$BACKUP" ]; then mv "\$BACKUP" "\$TARGET"; fi
+        tar -xzf - -C "${'$'}STAGE"
+        test -f "${'$'}STAGE/etc/os-release"
+        grep -Eq '^ID=("?ubuntu"?)$' "${'$'}STAGE/etc/os-release"
+        test -f "${'$'}STAGE/etc/minis/rootfs.json"
+        grep -Fq '"distro": "ubuntu"' "${'$'}STAGE/etc/minis/rootfs.json"
+        grep -Fq '"arch": "arm64"' "${'$'}STAGE/etc/minis/rootfs.json"
+        if [ ! -x "${'$'}STAGE/bin/bash" ] && [ ! -x "${'$'}STAGE/usr/bin/bash" ] && [ ! -x "${'$'}STAGE/bin/sh" ]; then exit 72; fi
+        rm -rf "${'$'}BACKUP"
+        if [ -e "${'$'}TARGET" ]; then mv "${'$'}TARGET" "${'$'}BACKUP"; fi
+        if ! mv "${'$'}STAGE" "${'$'}TARGET"; then
+          if [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
           exit 73
         fi
         trap - EXIT HUP INT TERM
