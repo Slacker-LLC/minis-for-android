@@ -197,10 +197,12 @@ class RootfsManager private constructor(private val context: Context) {
     }
 
     suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
-        val result = runRootCommand("du -sk ${shellQuote(UbuntuPaths.HOST_ROOTFS)} 2>/dev/null", HEALTH_TIMEOUT_MS)
-            ?: return@withContext 0L
-        result.output.trim().substringBefore(Regex("\\s+"))
-            .toLongOrNull()?.times(1024L) ?: 0L
+        val result = runRootCommand(
+            "du -sk ${shellQuote(UbuntuPaths.HOST_ROOTFS)} 2>/dev/null",
+            HEALTH_TIMEOUT_MS,
+        ) ?: return@withContext 0L
+        result.output.trim().split(Regex("\\s+"), limit = 2)
+            .firstOrNull()?.toLongOrNull()?.times(1024L) ?: 0L
     }
 
     /** User data is outside the current rootfs; there is nothing to restore here. */
