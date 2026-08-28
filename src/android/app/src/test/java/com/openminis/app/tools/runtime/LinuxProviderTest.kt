@@ -1,5 +1,6 @@
 package com.openminis.app.tools.runtime
 
+import com.openminis.app.sandbox.ubuntu.UbuntuRuntimeDiagnostics
 import com.openminis.app.tools.ToolExecutionResult
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -38,6 +39,37 @@ class LinuxProviderTest {
         assertFalse(result.success)
         assertTrue(result.output.contains("ubuntu_runtime_unavailable"))
         assertTrue(result.output.contains("linux.shell"))
+    }
+
+    @Test
+    fun `failed recovery includes concrete runtime diagnostic`() = runBlocking {
+        UbuntuRuntimeDiagnostics.update("Root authorization denied or unavailable (exit=1): denied")
+        try {
+            val provider = LinuxProvider(
+                available = { false },
+                revive = { false },
+            )
+            val nextCalled = AtomicBoolean(false)
+
+            val result = provider.execute(
+                toolName = "linux.shell",
+                argsJson = "{}",
+                sessionId = "sid",
+                context = TestContext.dummy(),
+                toolId = "t-root",
+                next = {
+                    nextCalled.set(true)
+                    anyResult
+                },
+            )
+
+            assertFalse(nextCalled.get())
+            assertFalse(result.success)
+            assertTrue(result.output.contains("ubuntu_runtime_unavailable"))
+            assertTrue(result.output.contains("Root authorization denied or unavailable"))
+        } finally {
+            UbuntuRuntimeDiagnostics.update(null)
+        }
     }
 
     @Test

@@ -73,6 +73,7 @@ object UbuntuRuntime {
         val dir = java.io.File(ctx.filesDir, "minis")
         dir.mkdirs()
         client = MinisdClient(appSocketPath = java.io.File(dir, "minisd.sock").absolutePath)
+        UbuntuRuntimeDiagnostics.update(null)
         isInitialized = true
         redirectPaths = true
         Log.i(TAG, "initialized (lazy) appSocket=${dir}/minisd.sock")
@@ -102,6 +103,7 @@ object UbuntuRuntime {
                     lastError = spawn.error ?: "minisd watchdog could not be started",
                 )
                 _snapshot.value = failed
+                UbuntuRuntimeDiagnostics.update(failed.lastError)
                 redirectPaths = false
                 Log.w(TAG, "ensureReady failed: ${failed.lastError}")
                 return failed
@@ -319,6 +321,7 @@ object UbuntuRuntime {
             )
         }
         _snapshot.value = next
+        UbuntuRuntimeDiagnostics.update(next.lastError)
         return next
     }
 }
