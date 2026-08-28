@@ -16,7 +16,7 @@ class SessionOverridesTest {
     }
 
     @Test
-    fun `round trip preserves explicit sparse values`() {
+    fun `round trip preserves explicit sparse values and raw Soul text`() {
         val original = SessionOverrides(
             systemPrompt = "Prefer concise answers.",
             temperature = 0.25,
@@ -27,7 +27,30 @@ class SessionOverridesTest {
         val encoded = original.toJsonOrNull()
         val decoded = SessionOverrides.fromJson(encoded)
 
-        assertEquals(original, decoded)
+        assertEquals("Prefer concise answers.", decoded.editableSystemPrompt())
+        assertEquals(original.temperature, decoded.temperature)
+        assertEquals(original.maxTokens, decoded.maxTokens)
+        assertEquals(original.enabledTools, decoded.enabledTools)
+        assertEquals("Prefer concise answers.", JSONObject(decoded.toJsonOrNull()!!).getString("systemPrompt"))
+    }
+
+    @Test
+    fun `explicit session Soul becomes runtime replacement for global Soul`() {
+        val decoded = SessionOverrides.fromJson(
+            """{"systemPrompt":"You are the drawing assistant for this conversation."}""",
+        )
+
+        assertEquals(
+            "You are the drawing assistant for this conversation.",
+            decoded.editableSystemPrompt(),
+        )
+        assertTrue(decoded.systemPrompt!!.contains("REPLACES the global SOUL.md"))
+        assertTrue(decoded.systemPrompt!!.contains("<session-soul>"))
+        assertTrue(decoded.systemPrompt!!.contains("You are the drawing assistant for this conversation."))
+        assertEquals(
+            "You are the drawing assistant for this conversation.",
+            JSONObject(decoded.toJsonOrNull()!!).getString("systemPrompt"),
+        )
     }
 
     @Test
@@ -84,7 +107,7 @@ class SessionOverridesTest {
             }""".trimIndent(),
         )
 
-        assertEquals("Keep code runnable.", decoded.systemPrompt)
+        assertEquals("Keep code runnable.", decoded.editableSystemPrompt())
         assertNull(decoded.temperature)
         assertNull(decoded.maxTokens)
         assertEquals(setOf("file_read", "shell_execute"), decoded.enabledTools)
