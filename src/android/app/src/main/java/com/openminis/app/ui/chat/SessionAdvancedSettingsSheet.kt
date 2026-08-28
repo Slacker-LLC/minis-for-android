@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -169,178 +168,180 @@ fun SessionAdvancedSettingsSheet(
             return@StandardChatSheet
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                item {
-                    SettingsSection(
-                        header = stringResource(R.string.session_advanced_instructions_section),
-                        footer = stringResource(R.string.session_advanced_settings_inherit_help),
-                    ) {
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.session_advanced_system_prompt),
-                            subtitle = stringResource(R.string.session_advanced_custom),
-                            checked = customInstructions,
-                            onCheckedChange = { customInstructions = it; errorText = null },
-                            showDivider = customInstructions,
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
+                SettingsSection(
+                    header = stringResource(R.string.session_advanced_instructions_section),
+                    footer = stringResource(R.string.session_advanced_settings_inherit_help),
+                ) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_system_prompt),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customInstructions,
+                        onCheckedChange = { customInstructions = it; errorText = null },
+                        showDivider = customInstructions,
+                    )
+                    if (customInstructions) {
+                        OutlinedTextField(
+                            value = instructionsText,
+                            onValueChange = { instructionsText = it; errorText = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            placeholder = { Text(stringResource(R.string.session_advanced_system_prompt_hint)) },
+                            minLines = 4,
+                            maxLines = 10,
                         )
-                        if (customInstructions) {
-                            OutlinedTextField(
-                                value = instructionsText,
-                                onValueChange = { instructionsText = it; errorText = null },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                placeholder = { Text(stringResource(R.string.session_advanced_system_prompt_hint)) },
-                                minLines = 4,
-                                maxLines = 10,
-                            )
-                        }
                     }
                 }
-
-                item {
-                    SettingsSection(header = stringResource(R.string.session_advanced_model_section)) {
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.session_advanced_temperature),
-                            subtitle = stringResource(R.string.session_advanced_custom),
-                            checked = customTemperature,
-                            onCheckedChange = { customTemperature = it; errorText = null },
-                            showDivider = true,
-                        )
-                        if (customTemperature) {
-                            OutlinedTextField(
-                                value = temperatureText,
-                                onValueChange = { temperatureText = it; errorText = null },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                label = { Text(stringResource(R.string.session_advanced_temperature)) },
-                                placeholder = { Text(stringResource(R.string.session_advanced_temperature_hint)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            )
-                        }
-
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.session_advanced_max_tokens),
-                            subtitle = stringResource(R.string.session_advanced_custom),
-                            checked = customMaxTokens,
-                            onCheckedChange = { customMaxTokens = it; errorText = null },
-                            showDivider = customMaxTokens,
-                        )
-                        if (customMaxTokens) {
-                            OutlinedTextField(
-                                value = maxTokensText,
-                                onValueChange = { maxTokensText = it; errorText = null },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                label = { Text(stringResource(R.string.session_advanced_max_tokens)) },
-                                placeholder = { Text(stringResource(R.string.session_advanced_max_tokens_hint)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    SettingsSection(
-                        header = stringResource(R.string.session_advanced_tools_section),
-                        footer = stringResource(R.string.session_advanced_tools_help),
-                    ) {
-                        SettingsSwitchRow(
-                            title = stringResource(R.string.session_advanced_tools),
-                            subtitle = stringResource(R.string.session_advanced_custom),
-                            checked = customTools,
-                            onCheckedChange = { enabled ->
-                                customTools = enabled
-                                if (enabled) selectedToolIds = allToolIds
-                                errorText = null
-                            },
-                            showDivider = customTools && toolDefinitions.isNotEmpty(),
-                        )
-                        if (customTools) {
-                            toolDefinitions.forEachIndexed { index, tool ->
-                                SettingsSwitchRow(
-                                    title = tool.name,
-                                    checked = tool.name in selectedToolIds,
-                                    onCheckedChange = { enabled ->
-                                        selectedToolIds = if (enabled) {
-                                            selectedToolIds + tool.name
-                                        } else {
-                                            selectedToolIds - tool.name
-                                        }
-                                    },
-                                    showDivider = index < toolDefinitions.lastIndex,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item { Spacer(modifier = Modifier.padding(bottom = 8.dp)) }
             }
+
+            item {
+                SettingsSection(header = stringResource(R.string.session_advanced_model_section)) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_temperature),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customTemperature,
+                        onCheckedChange = { customTemperature = it; errorText = null },
+                        showDivider = true,
+                    )
+                    if (customTemperature) {
+                        OutlinedTextField(
+                            value = temperatureText,
+                            onValueChange = { temperatureText = it; errorText = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            label = { Text(stringResource(R.string.session_advanced_temperature)) },
+                            placeholder = { Text(stringResource(R.string.session_advanced_temperature_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                    }
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_max_tokens),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customMaxTokens,
+                        onCheckedChange = { customMaxTokens = it; errorText = null },
+                        showDivider = customMaxTokens,
+                    )
+                    if (customMaxTokens) {
+                        OutlinedTextField(
+                            value = maxTokensText,
+                            onValueChange = { maxTokensText = it; errorText = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            label = { Text(stringResource(R.string.session_advanced_max_tokens)) },
+                            placeholder = { Text(stringResource(R.string.session_advanced_max_tokens_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsSection(
+                    header = stringResource(R.string.session_advanced_tools_section),
+                    footer = stringResource(R.string.session_advanced_tools_help),
+                ) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_tools),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customTools,
+                        onCheckedChange = { enabled ->
+                            customTools = enabled
+                            if (enabled) selectedToolIds = allToolIds
+                            errorText = null
+                        },
+                        showDivider = customTools && toolDefinitions.isNotEmpty(),
+                    )
+                    if (customTools) {
+                        toolDefinitions.forEachIndexed { index, tool ->
+                            SettingsSwitchRow(
+                                title = tool.name,
+                                checked = tool.name in selectedToolIds,
+                                onCheckedChange = { enabled ->
+                                    selectedToolIds = if (enabled) {
+                                        selectedToolIds + tool.name
+                                    } else {
+                                        selectedToolIds - tool.name
+                                    }
+                                },
+                                showDivider = index < toolDefinitions.lastIndex,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.padding(bottom = 8.dp)) }
 
             errorText?.let { message ->
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                )
+                item {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    enabled = !isSaving,
-                    onClick = {
-                        isSaving = true
-                        errorText = null
-                        scope.launch {
-                            val result = runCatching {
-                                chatRepository.dao.updateSessionOverrides(sessionId, null)
-                            }
-                            isSaving = false
-                            if (result.isSuccess) {
-                                onDismiss()
-                            } else {
-                                errorText = resetFailedMessage
-                            }
-                        }
-                    },
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.session_advanced_reset_all))
-                }
+                    TextButton(
+                        enabled = !isSaving,
+                        onClick = {
+                            isSaving = true
+                            errorText = null
+                            scope.launch {
+                                val result = runCatching {
+                                    chatRepository.dao.updateSessionOverrides(sessionId, null)
+                                }
+                                isSaving = false
+                                if (result.isSuccess) {
+                                    onDismiss()
+                                } else {
+                                    errorText = resetFailedMessage
+                                }
+                            }
+                        },
+                    ) {
+                        Text(stringResource(R.string.session_advanced_reset_all))
+                    }
 
-                Button(
-                    enabled = !isSaving && errorText != missingSessionMessage,
-                    onClick = save@{
-                        val overrides = buildOverridesOrShowError() ?: return@save
-                        isSaving = true
-                        scope.launch {
-                            val result = runCatching {
-                                chatRepository.dao.updateSessionOverrides(
-                                    sessionId,
-                                    overrides.toJsonOrNull(),
-                                )
+                    Button(
+                        enabled = !isSaving && errorText != missingSessionMessage,
+                        onClick = save@{
+                            val overrides = buildOverridesOrShowError() ?: return@save
+                            isSaving = true
+                            scope.launch {
+                                val result = runCatching {
+                                    chatRepository.dao.updateSessionOverrides(
+                                        sessionId,
+                                        overrides.toJsonOrNull(),
+                                    )
+                                }
+                                isSaving = false
+                                if (result.isSuccess) {
+                                    onDismiss()
+                                } else {
+                                    errorText = saveFailedMessage
+                                }
                             }
-                            isSaving = false
-                            if (result.isSuccess) {
-                                onDismiss()
-                            } else {
-                                errorText = saveFailedMessage
-                            }
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.session_advanced_save))
+                        },
+                    ) {
+                        Text(stringResource(R.string.session_advanced_save))
+                    }
                 }
             }
         }
