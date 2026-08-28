@@ -31,6 +31,23 @@ if unzip -Z1 "$APK" | grep -Eq '(^|/)debug-skill(/|$)'; then
   exit 1
 fi
 
+# Issue #43: production builds must carry the complete offline recovery payload.
+# A build that omits any of these files cannot satisfy the runtime self-heal
+# contract and must fail before it can be distributed.
+APK_ENTRIES="$(unzip -Z1 "$APK")"
+for required in \
+  assets/runtime/minisd-aarch64 \
+  assets/runtime/minisd-aarch64.sha256 \
+  assets/runtime/ubuntu-arm64-rootfs.tar.gz \
+  assets/runtime/ubuntu-arm64-rootfs.tar.gz.sha256 \
+  assets/runtime/ubuntu-arm64-rootfs.manifest.json
+do
+  if ! grep -Fxq "$required" <<<"$APK_ENTRIES"; then
+    echo "release APK missing runtime recovery asset: $required" >&2
+    exit 1
+  fi
+done
+
 # R8 should eliminate the debug RPC server because every startup/reference is
 # guarded by BuildConfig.DEBUG=false in release. Scan every DEX for the source
 # descriptor/string as a regression backstop.
