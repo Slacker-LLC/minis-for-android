@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">Dieser Sitzung erlauben, dauerhaftes Gedächtnis einzubinden und zu verwenden.</string>
     <string name="session_advanced_thinking">Denkstufe</string>
     <string name="session_advanced_thinking_not_supported">Vom aktuellen Modell nicht unterstützt</string>
-    <string name="session_advanced_instructions_section">Anweisungen</string>
-    <string name="session_advanced_system_prompt">Sitzungsanweisungen</string>
-    <string name="session_advanced_system_prompt_hint">Zusätzliche Anweisungen für diese Sitzung</string>
+    <string name="session_advanced_instructions_section">Sitzungsseele</string>
+    <string name="session_advanced_system_prompt">Sitzungspersönlichkeit</string>
+    <string name="session_advanced_system_prompt_hint">Rolle, Persönlichkeit, Ton und Verhalten für diese Unterhaltung.</string>
+    <string name="session_advanced_soul_help">Standardmäßig wird die globale SOUL.md verwendet. Wenn Sie vor der ersten Nachricht eine Sitzungsseele festlegen, ersetzt sie die globale Seele für diese Unterhaltung. Die Auswahl wird beim Start des Chats gesperrt.</string>
+    <string name="session_advanced_soul_locked_help">Diese Unterhaltung hat bereits begonnen. Die gewählte Seele ist gesperrt und kann nicht mehr geändert werden, auch nicht nach dem Löschen des Chatverlaufs.</string>
+    <string name="session_advanced_soul_locked_custom">Benutzerdefinierte Seele · gesperrt</string>
+    <string name="session_advanced_soul_locked_global">Globale Seele · gesperrt</string>
     <string name="session_advanced_model_section">Modellparameter</string>
     <string name="session_advanced_temperature">Temperatur</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">Überschreibungen zurücksetzen</string>
     <string name="session_advanced_loading">Sitzungseinstellungen werden vorbereitet…</string>
     <string name="session_advanced_missing_session">Diese Sitzung konnte nicht vorbereitet werden.</string>
-    <string name="session_advanced_invalid_prompt">Geben Sie Sitzungsanweisungen ein oder deaktivieren Sie „Benutzerdefiniert“.</string>
+    <string name="session_advanced_invalid_prompt">Geben Sie eine Sitzungspersönlichkeit ein oder deaktivieren Sie „Benutzerdefiniert“.</string>
     <string name="session_advanced_invalid_temperature">Die Temperatur muss zwischen 0.0 und 2.0 liegen.</string>
     <string name="session_advanced_invalid_max_tokens">Die maximale Anzahl der Ausgabetokens muss eine positive Ganzzahl sein.</string>
     <string name="session_advanced_save_failed">Sitzungseinstellungen konnten nicht gespeichert werden.</string>
