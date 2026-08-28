@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.Charset
@@ -54,6 +55,14 @@ class RootfsManager private constructor(private val context: Context) {
         val output: String,
     )
 
+    private data class RootfsExpectation(
+        val release: String,
+        val arch: String,
+        val profile: String,
+        val upstreamSha256: String,
+        val archiveSha256: String,
+    )
+
     val rootfsDir: File = File(UbuntuPaths.HOST_ROOTFS)
 
     @Volatile
@@ -87,7 +96,15 @@ class RootfsManager private constructor(private val context: Context) {
             )
         }
 
-        val result = runRootCommand(healthCommand(), HEALTH_TIMEOUT_MS)
+        val expected = try {
+            loadBundledExpectation()
+        } catch (t: Throwable) {
+            return@withContext rememberHealth(
+                Health(false, "bundled rootfs manifest invalid: ${t.message}"),
+            )
+        }
+
+        val result = runRootCommand(healthCommand(expected), HEALTH_TIMEOUT_MS)
         val health = when {
             result == null -> Health(false, "root unavailable while checking Ubuntu rootfs")
             result.exitCode == 0 && result.output.contains("ROOTFS_OK") -> Health(true, "ok")
@@ -123,8 +140,17 @@ class RootfsManager private constructor(private val context: Context) {
             // states this recovery path exists to survive.
             runCatching { client.ubuntuStop() }
 
+            val expected = try {
+                loadBundledExpectation()
+            } catch (t: Throwable) {
+                val detail = "recovery manifest unavailable: ${t.message}"
+                _installState.value = RootfsInstallState.Failed(detail)
+                rememberHealth(Health(false, detail))
+                return@withContext false
+            }
+
             val archive = try {
-                materializeVerifiedRecoveryArchive()
+                materializeVerifiedRecoveryArchive(expected)
             } catch (t: Throwable) {
                 val detail = "recovery asset unavailable: ${t.message}"
                 _installState.value = RootfsInstallState.Failed(detail)
@@ -142,7 +168,7 @@ class RootfsManager private constructor(private val context: Context) {
             }
 
             _installState.value = RootfsInstallState.Extracting(0f)
-            val result = streamArchiveToAtomicInstaller(su, archive)
+            val result = streamArchiveToAtomicInstaller(su, archive, expected)
             if (result == null || result.exitCode != 0) {
                 val detail = result?.output?.take(1000)?.ifBlank { null }
                     ?: "atomic rootfs installer failed"
@@ -224,17 +250,50 @@ class RootfsManager private constructor(private val context: Context) {
 
     suspend fun applyDefaultMountOverlay() = withContext(Dispatchers.IO) { Unit }
 
-    private fun healthCommand(): String = """
-        ROOT=${shellQuote(UbuntuPaths.HOST_ROOTFS)}
-        if [ ! -d "${'$'}ROOT" ]; then echo ROOTFS_MISSING; exit 10; fi
-        if [ ! -f "${'$'}ROOT/etc/os-release" ]; then echo ROOTFS_OS_RELEASE_MISSING; exit 11; fi
-        if ! grep -Eq '^ID=("?ubuntu"?)$' "${'$'}ROOT/etc/os-release"; then echo ROOTFS_NOT_UBUNTU; exit 12; fi
-        if [ ! -f "${'$'}ROOT/etc/minis/rootfs.json" ]; then echo ROOTFS_MARKER_MISSING; exit 13; fi
-        if ! grep -Fq '"distro": "ubuntu"' "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_DISTRO_INVALID; exit 14; fi
-        if ! grep -Fq '"arch": "arm64"' "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_ARCH_INVALID; exit 15; fi
-        if [ ! -x "${'$'}ROOT/bin/bash" ] && [ ! -x "${'$'}ROOT/usr/bin/bash" ] && [ ! -x "${'$'}ROOT/bin/sh" ]; then echo ROOTFS_SHELL_MISSING; exit 16; fi
-        echo ROOTFS_OK
-    """.trimIndent()
+    private fun loadBundledExpectation(): RootfsExpectation {
+        val raw = context.assets.open(RECOVERY_MANIFEST_ASSET)
+            .bufferedReader()
+            .use { it.readText() }
+        val obj = JSONObject(raw)
+        fun required(name: String): String = obj.optString(name).trim().takeIf { it.isNotEmpty() }
+            ?: error("missing $name")
+        val release = required("release")
+        val arch = required("arch")
+        val profile = required("profile")
+        val upstream = required("upstream_sha256").lowercase()
+        val archive = required("sha256").lowercase()
+        require(arch == "arm64") { "unsupported recovery arch: $arch" }
+        require(upstream.matches(Regex("[0-9a-f]{64}"))) { "invalid upstream_sha256" }
+        require(archive.matches(Regex("[0-9a-f]{64}"))) { "invalid archive sha256" }
+        return RootfsExpectation(
+            release = release,
+            arch = arch,
+            profile = profile,
+            upstreamSha256 = upstream,
+            archiveSha256 = archive,
+        )
+    }
+
+    private fun healthCommand(expected: RootfsExpectation): String {
+        val releaseNeedle = shellQuote("\"release\": \"${expected.release}\"")
+        val archNeedle = shellQuote("\"arch\": \"${expected.arch}\"")
+        val profileNeedle = shellQuote("\"profile\": \"${expected.profile}\"")
+        val upstreamNeedle = shellQuote("\"upstream_sha256\": \"${expected.upstreamSha256}\"")
+        return """
+            ROOT=${shellQuote(UbuntuPaths.HOST_ROOTFS)}
+            if [ ! -d "${'$'}ROOT" ]; then echo ROOTFS_MISSING; exit 10; fi
+            if [ ! -f "${'$'}ROOT/etc/os-release" ]; then echo ROOTFS_OS_RELEASE_MISSING; exit 11; fi
+            if ! grep -Eq '^ID=("?ubuntu"?)$' "${'$'}ROOT/etc/os-release"; then echo ROOTFS_NOT_UBUNTU; exit 12; fi
+            if [ ! -f "${'$'}ROOT/etc/minis/rootfs.json" ]; then echo ROOTFS_MARKER_MISSING; exit 13; fi
+            if ! grep -Fq '"distro": "ubuntu"' "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_DISTRO_INVALID; exit 14; fi
+            if ! grep -Fq $archNeedle "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_MARKER_ARCH_INCOMPATIBLE; exit 15; fi
+            if ! grep -Fq $releaseNeedle "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_RELEASE_INCOMPATIBLE; exit 16; fi
+            if ! grep -Fq $profileNeedle "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_PROFILE_INCOMPATIBLE; exit 17; fi
+            if ! grep -Fq $upstreamNeedle "${'$'}ROOT/etc/minis/rootfs.json"; then echo ROOTFS_SOURCE_INCOMPATIBLE; exit 18; fi
+            if [ ! -x "${'$'}ROOT/bin/bash" ] && [ ! -x "${'$'}ROOT/usr/bin/bash" ] && [ ! -x "${'$'}ROOT/bin/sh" ]; then echo ROOTFS_SHELL_MISSING; exit 19; fi
+            echo ROOTFS_OK
+        """.trimIndent()
+    }
 
     private fun rollbackCommand(): String = """
         ROOT=${shellQuote(ROOT_BASE)}
@@ -253,38 +312,51 @@ class RootfsManager private constructor(private val context: Context) {
      * Extract to a sibling staging directory and swap only after every required
      * marker has been validated. stdin is the already SHA-verified APK asset.
      */
-    private fun installerCommand(): String = """
-        set -eu
-        ROOT=${shellQuote(ROOT_BASE)}
-        TARGET="${'$'}ROOT/rootfs"
-        BACKUP="${'$'}ROOT/rootfs.backup"
-        STAGE="${'$'}ROOT/rootfs.installing"
-        mkdir -p "${'$'}ROOT"
-        if [ ! -d "${'$'}TARGET" ] && [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
-        rm -rf "${'$'}STAGE"
-        mkdir -p "${'$'}STAGE"
-        cleanup_stage() { rm -rf "${'$'}STAGE"; }
-        trap cleanup_stage EXIT HUP INT TERM
-        tar -xzf - -C "${'$'}STAGE"
-        test -f "${'$'}STAGE/etc/os-release"
-        grep -Eq '^ID=("?ubuntu"?)$' "${'$'}STAGE/etc/os-release"
-        test -f "${'$'}STAGE/etc/minis/rootfs.json"
-        grep -Fq '"distro": "ubuntu"' "${'$'}STAGE/etc/minis/rootfs.json"
-        grep -Fq '"arch": "arm64"' "${'$'}STAGE/etc/minis/rootfs.json"
-        if [ ! -x "${'$'}STAGE/bin/bash" ] && [ ! -x "${'$'}STAGE/usr/bin/bash" ] && [ ! -x "${'$'}STAGE/bin/sh" ]; then exit 72; fi
-        rm -rf "${'$'}BACKUP"
-        if [ -e "${'$'}TARGET" ]; then mv "${'$'}TARGET" "${'$'}BACKUP"; fi
-        if ! mv "${'$'}STAGE" "${'$'}TARGET"; then
-          if [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
-          exit 73
-        fi
-        trap - EXIT HUP INT TERM
-        echo ROOTFS_REPAIRED
-    """.trimIndent()
+    private fun installerCommand(expected: RootfsExpectation): String {
+        val releaseNeedle = shellQuote("\"release\": \"${expected.release}\"")
+        val archNeedle = shellQuote("\"arch\": \"${expected.arch}\"")
+        val profileNeedle = shellQuote("\"profile\": \"${expected.profile}\"")
+        val upstreamNeedle = shellQuote("\"upstream_sha256\": \"${expected.upstreamSha256}\"")
+        return """
+            set -eu
+            ROOT=${shellQuote(ROOT_BASE)}
+            TARGET="${'$'}ROOT/rootfs"
+            BACKUP="${'$'}ROOT/rootfs.backup"
+            STAGE="${'$'}ROOT/rootfs.installing"
+            mkdir -p "${'$'}ROOT"
+            if [ ! -d "${'$'}TARGET" ] && [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
+            rm -rf "${'$'}STAGE"
+            mkdir -p "${'$'}STAGE"
+            cleanup_stage() { rm -rf "${'$'}STAGE"; }
+            trap cleanup_stage EXIT HUP INT TERM
+            tar -xzf - -C "${'$'}STAGE"
+            test -f "${'$'}STAGE/etc/os-release"
+            grep -Eq '^ID=("?ubuntu"?)$' "${'$'}STAGE/etc/os-release"
+            test -f "${'$'}STAGE/etc/minis/rootfs.json"
+            grep -Fq '"distro": "ubuntu"' "${'$'}STAGE/etc/minis/rootfs.json"
+            grep -Fq $archNeedle "${'$'}STAGE/etc/minis/rootfs.json"
+            grep -Fq $releaseNeedle "${'$'}STAGE/etc/minis/rootfs.json"
+            grep -Fq $profileNeedle "${'$'}STAGE/etc/minis/rootfs.json"
+            grep -Fq $upstreamNeedle "${'$'}STAGE/etc/minis/rootfs.json"
+            if [ ! -x "${'$'}STAGE/bin/bash" ] && [ ! -x "${'$'}STAGE/usr/bin/bash" ] && [ ! -x "${'$'}STAGE/bin/sh" ]; then exit 72; fi
+            rm -rf "${'$'}BACKUP"
+            if [ -e "${'$'}TARGET" ]; then mv "${'$'}TARGET" "${'$'}BACKUP"; fi
+            if ! mv "${'$'}STAGE" "${'$'}TARGET"; then
+              if [ -d "${'$'}BACKUP" ]; then mv "${'$'}BACKUP" "${'$'}TARGET"; fi
+              exit 73
+            fi
+            trap - EXIT HUP INT TERM
+            echo ROOTFS_REPAIRED
+        """.trimIndent()
+    }
 
-    private fun streamArchiveToAtomicInstaller(su: String, archive: File): RootCommandResult? {
+    private fun streamArchiveToAtomicInstaller(
+        su: String,
+        archive: File,
+        expected: RootfsExpectation,
+    ): RootCommandResult? {
         val process = try {
-            ProcessBuilder(su, "-c", installerCommand())
+            ProcessBuilder(su, "-c", installerCommand(expected))
                 .redirectErrorStream(true)
                 .start()
         } catch (t: Throwable) {
@@ -342,15 +414,18 @@ class RootfsManager private constructor(private val context: Context) {
     }
 
     /** Materialize APK asset locally and verify it before any root process sees it. */
-    private fun materializeVerifiedRecoveryArchive(): File {
-        val expected = context.assets.open(RECOVERY_SHA_ASSET).bufferedReader().use { reader ->
+    private fun materializeVerifiedRecoveryArchive(expected: RootfsExpectation): File {
+        val checksumFileSha = context.assets.open(RECOVERY_SHA_ASSET).bufferedReader().use { reader ->
             reader.readLine()?.trim()?.substringBefore(' ')
         }?.takeIf { it.matches(Regex("[0-9a-fA-F]{64}")) }
-            ?: error("invalid bundled rootfs SHA-256 manifest")
+            ?: error("invalid bundled rootfs SHA-256 file")
+        check(checksumFileSha.equals(expected.archiveSha256, ignoreCase = true)) {
+            "rootfs checksum metadata disagreement"
+        }
 
         val dir = File(context.filesDir, "minis/recovery").apply { mkdirs() }
         val target = File(dir, "ubuntu-arm64-rootfs.tar.gz")
-        if (target.isFile && sha256(target).equals(expected, ignoreCase = true)) {
+        if (target.isFile && sha256(target).equals(expected.archiveSha256, ignoreCase = true)) {
             return target
         }
 
@@ -360,8 +435,8 @@ class RootfsManager private constructor(private val context: Context) {
             tmp.outputStream().buffered().use { output -> input.copyTo(output) }
         }
         val actual = sha256(tmp)
-        check(actual.equals(expected, ignoreCase = true)) {
-            "bundled rootfs checksum mismatch: expected=$expected actual=$actual"
+        check(actual.equals(expected.archiveSha256, ignoreCase = true)) {
+            "bundled rootfs checksum mismatch: expected=${expected.archiveSha256} actual=$actual"
         }
         if (target.exists() && !target.delete()) error("cannot replace stale recovery archive")
         if (!tmp.renameTo(target)) {
@@ -541,6 +616,7 @@ class RootfsManager private constructor(private val context: Context) {
         private const val ROOT_BASE = "/data/adb/minis"
         private const val RECOVERY_ASSET = "runtime/ubuntu-arm64-rootfs.tar.gz"
         private const val RECOVERY_SHA_ASSET = "runtime/ubuntu-arm64-rootfs.tar.gz.sha256"
+        private const val RECOVERY_MANIFEST_ASSET = "runtime/ubuntu-arm64-rootfs.manifest.json"
         private const val HEALTH_CACHE_MS = 30_000L
         private const val HEALTH_TIMEOUT_MS = 10_000L
         private const val REPAIR_TIMEOUT_MS = 180_000L
