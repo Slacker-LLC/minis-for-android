@@ -18,7 +18,7 @@ class LinuxProviderTest {
     private val anyResult = ToolExecutionResult("ok", true)
 
     @Test
-    fun `unavailable short-circuits with ubuntu_runtime_unavailable and skips next`() = runBlocking {
+    fun `unavailable without recovery short-circuits with generic error`() = runBlocking {
         val provider = LinuxProvider(available = { false })
         val nextCalled = AtomicBoolean(false)
 
@@ -38,6 +38,35 @@ class LinuxProviderTest {
         assertFalse(result.success)
         assertTrue(result.output.contains("ubuntu_runtime_unavailable"))
         assertTrue(result.output.contains("linux.shell"))
+    }
+
+    @Test
+    fun `failed recovery delegates so downstream can expose bootstrap detail`() = runBlocking {
+        val provider = LinuxProvider(
+            available = { false },
+            revive = { false },
+        )
+        val nextCalled = AtomicBoolean(false)
+        val concrete = ToolExecutionResult(
+            "ubuntu unavailable: rootfs not installed at /data/adb/minis/rootfs",
+            false,
+        )
+
+        val result = provider.execute(
+            toolName = "linux.shell",
+            argsJson = "{}",
+            sessionId = "sid",
+            context = TestContext.dummy(),
+            toolId = "t-recovery",
+            next = {
+                nextCalled.set(true)
+                concrete
+            },
+        )
+
+        assertTrue(nextCalled.get())
+        assertEquals(concrete, result)
+        assertTrue(result.output.contains("rootfs not installed"))
     }
 
     @Test

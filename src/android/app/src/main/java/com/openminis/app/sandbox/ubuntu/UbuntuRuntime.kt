@@ -2,18 +2,20 @@ package com.openminis.app.sandbox.ubuntu
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.sandbox.minisd.MinisdBootstrap
 import com.openminis.app.sandbox.minisd.MinisdClient
 import com.openminis.app.sandbox.minisd.MinisdProtocol
 import com.openminis.app.sandbox.minisd.MinisdResponse
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 /**
  * App-side Ubuntu Runtime. [init] is lazy (no su). [ensureReady] starts
@@ -29,6 +31,7 @@ object UbuntuRuntime {
         val pid: Int? = null,
         val version: String? = null,
         val provisioned: Boolean = false,
+        val guestUid: Int? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -37,6 +40,11 @@ object UbuntuRuntime {
         val output: String,
         val exitCode: Int,
         val durationMs: Long,
+    )
+
+    private data class BrokerStartResult(
+        val ok: Boolean,
+        val error: String? = null,
     )
 
     @Volatile
@@ -68,7 +76,7 @@ object UbuntuRuntime {
         client = MinisdClient(appSocketPath = java.io.File(dir, "minisd.sock").absolutePath)
         isInitialized = true
         redirectPaths = true
-        Log.i(TAG, "initialized (lazy) appSocket=${dir}/minisd.sock")
+        Log.i(TAG, "initialized (lazy) appSocket=${dir}/minisd.sock uid=${ctx.applicationInfo.uid}")
     }
 
     suspend fun refresh(): Snapshot {
@@ -77,25 +85,55 @@ object UbuntuRuntime {
     }
 
     suspend fun ensureReady(): Snapshot = startLock.withLock {
+        val ctx = appContext
+            ?: return@withLock fail("UbuntuRuntime.init(context) has not been called")
+        val expectedUid = ctx.applicationInfo.uid
         var cur = refresh()
-        if (cur.running) {
-            redirectPaths = true
-            return cur
-        }
-        // minisd down (e.g. after reboot) → spawn the watchdog via root, then
-        // retry. B13's pidfile flock makes a duplicate spawn a harmless no-op.
-        val spawned = ensureMinisdUp()
-        if (spawned) {
-            for (i in 0 until 10) {
-                delay(300)
-                cur = refresh()
-                if (cur.running) break
+
+        // A previous installation may have left a watchdog whose policy still
+        // names a different Android UID. Minisd status exposes the guest UID;
+        // root fallback in MinisdClient lets us inspect and repair that stale
+        // broker even when its app-private socket rejects the current process.
+        if (cur.guestUid != null && cur.guestUid != expectedUid) {
+            Log.w(TAG, "stale minisd identity brokerUid=${cur.guestUid} appUid=$expectedUid")
+            val restarted = ensureMinisdUp(forceRestart = true)
+            if (!restarted.ok) {
+                return@withLock fail(
+                    "minisd identity restart failed: ${restarted.error ?: "unknown error"}",
+                )
             }
+            cur = awaitBroker(expectedUid)
+        } else if (cur.guestUid == null) {
+            val spawned = ensureMinisdUp(forceRestart = false)
+            if (!spawned.ok) {
+                return@withLock fail(spawned.error ?: cur.lastError ?: "failed to start minisd")
+            }
+            cur = awaitBroker(expectedUid)
         }
+
+        // One forced recovery covers a wedged/stale broker whose pidfile was
+        // present but whose status call did not expose the expected identity.
+        if (cur.guestUid != expectedUid) {
+            val restarted = ensureMinisdUp(forceRestart = true)
+            if (!restarted.ok) {
+                return@withLock fail(
+                    "minisd recovery failed: ${restarted.error ?: "unknown error"}",
+                )
+            }
+            cur = awaitBroker(expectedUid)
+        }
+        if (cur.guestUid != expectedUid) {
+            return@withLock fail(
+                "minisd app identity mismatch: expected uid=$expectedUid, " +
+                    "broker uid=${cur.guestUid ?: "unknown"}; update/restart the privileged runtime",
+            )
+        }
+
         if (cur.running) {
             redirectPaths = true
-            return cur
+            return@withLock cur
         }
+
         val started = apply(
             client.ubuntuStart(
                 workspace = UbuntuPaths.hostWorkspace,
@@ -106,48 +144,101 @@ object UbuntuRuntime {
         )
         redirectPaths = started.running
         if (started.running) {
-            Log.i(TAG, "ubuntu.start ok pid=${started.pid} version=${started.version}")
+            Log.i(
+                TAG,
+                "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid",
+            )
         } else {
             Log.w(TAG, "ubuntu.start failed: ${started.lastError}")
         }
         started
     }
 
-    /**
-     * Spawns minisd --watchdog via su when it is not running. Safe to call
-     * blindly: B13 pidfile flock makes a second instance exit immediately.
-     * The subshell `( … & )` detaches minisd from the su session so it
-     * survives su exit (adopted by init).
-     */
-    private suspend fun ensureMinisdUp(): Boolean = withContext(Dispatchers.IO) {
-        val su = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su")
-            .firstOrNull { java.io.File(it).canExecute() }
-        if (su == null) {
-            Log.w(TAG, "ensureMinisdUp: no su binary")
-            return@withContext false
+    private suspend fun awaitBroker(expectedUid: Int): Snapshot {
+        var cur = _snapshot.value
+        repeat(10) {
+            delay(300)
+            cur = refresh()
+            if (cur.guestUid == expectedUid) return cur
         }
-        val appSock = appContext
-            ?.let { java.io.File(it.filesDir, "minis/minisd.sock").absolutePath }
-        if (appSock == null) {
-            Log.w(TAG, "ensureMinisdUp: no app context")
-            return@withContext false
-        }
-        val cmd = "(/data/adb/minis/bin/minisd --watchdog --policy " +
-            "/data/adb/minis/policy/policy.json --app-socket $appSock >/dev/null 2>&1 &)"
-        try {
-            val proc = ProcessBuilder(su, "-c", cmd).redirectErrorStream(true).start()
-            val finished = proc.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
-            if (finished) {
-                Log.i(TAG, "ensureMinisdUp: su exited=${proc.exitValue()}")
-            } else {
-                Log.i(TAG, "ensureMinisdUp: su still running (spawned)")
-            }
-            true
-        } catch (t: Throwable) {
-            Log.w(TAG, "ensureMinisdUp failed: ${t.message}")
-            false
-        }
+        return cur
     }
+
+    /**
+     * Materializes a policy for the current installation UID and starts the
+     * watchdog via su. When [forceRestart] is true, a stale watchdog parent
+     * and its server child are terminated through the broker pidfile first.
+     */
+    private suspend fun ensureMinisdUp(forceRestart: Boolean): BrokerStartResult =
+        withContext(Dispatchers.IO) {
+            val ctx = appContext
+                ?: return@withContext BrokerStartResult(false, "no app context")
+            val su = listOf(
+                "/system/bin/su",
+                "/system/xbin/su",
+                "/sbin/su",
+                "/debug_ramdisk/su",
+            ).firstOrNull { java.io.File(it).canExecute() }
+                ?: return@withContext BrokerStartResult(false, "no executable su binary")
+
+            val appSock = java.io.File(ctx.filesDir, "minis/minisd.sock").absolutePath
+            val template = try {
+                ctx.assets.open(MinisdBootstrap.POLICY_ASSET)
+                    .bufferedReader()
+                    .use { it.readText() }
+            } catch (t: Throwable) {
+                return@withContext BrokerStartResult(
+                    false,
+                    "cannot read ${MinisdBootstrap.POLICY_ASSET}: ${t.message}",
+                )
+            }
+            val policy = try {
+                MinisdBootstrap.policyForUid(template, ctx.applicationInfo.uid)
+            } catch (t: Throwable) {
+                return@withContext BrokerStartResult(false, "invalid minisd policy template: ${t.message}")
+            }
+            val cmd = MinisdBootstrap.watchdogCommand(
+                appSocket = appSock,
+                policyJson = policy,
+                forceRestart = forceRestart,
+            )
+
+            val proc = try {
+                ProcessBuilder(su, "-c", cmd)
+                    .redirectErrorStream(true)
+                    .start()
+            } catch (t: Throwable) {
+                return@withContext BrokerStartResult(false, "failed to start su: ${t.message}")
+            }
+
+            try {
+                val finished = proc.waitFor(6, TimeUnit.SECONDS)
+                if (!finished) {
+                    proc.destroyForcibly()
+                    proc.waitFor(1, TimeUnit.SECONDS)
+                    return@withContext BrokerStartResult(
+                        false,
+                        "minisd bootstrap timed out while invoking su",
+                    )
+                }
+                val output = runCatching {
+                    proc.inputStream.bufferedReader().use { it.readText().trim() }
+                }.getOrDefault("")
+                if (proc.exitValue() != 0) {
+                    val detail = output.ifBlank { "su exited ${proc.exitValue()}" }
+                    Log.w(TAG, "ensureMinisdUp failed: $detail")
+                    return@withContext BrokerStartResult(false, detail)
+                }
+                Log.i(
+                    TAG,
+                    "ensureMinisdUp forceRestart=$forceRestart uid=${ctx.applicationInfo.uid} " +
+                        output.take(200),
+                )
+                BrokerStartResult(true)
+            } finally {
+                proc.destroy()
+            }
+        }
 
     suspend fun start(): Snapshot = ensureReady()
 
@@ -211,17 +302,35 @@ object UbuntuRuntime {
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
-        .put("guestUid", MinisdProtocol.GUEST_UID)
+        .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
+
+    private fun fail(detail: String): Snapshot {
+        val next = Snapshot(lastError = detail)
+        _snapshot.value = next
+        redirectPaths = false
+        Log.w(TAG, detail)
+        return next
+    }
 
     private fun apply(resp: MinisdResponse): Snapshot {
         val result = resp.result
         val next = if (resp.ok && result != null) {
             Snapshot(
-                running = result.optBoolean("running") || result.optBoolean("provisioned") && _snapshot.value.running,
+                running = result.optBoolean("running") ||
+                    result.optBoolean("provisioned") && _snapshot.value.running,
                 available = result.optBoolean("available", result.optBoolean("running")),
-                pid = if (result.has("pid") && !result.isNull("pid")) result.optInt("pid") else _snapshot.value.pid,
+                pid = if (result.has("pid") && !result.isNull("pid")) {
+                    result.optInt("pid")
+                } else {
+                    _snapshot.value.pid
+                },
                 version = result.optString("version").ifEmpty { _snapshot.value.version },
                 provisioned = result.optBoolean("provisioned") || _snapshot.value.provisioned,
+                guestUid = if (result.has("uid") && !result.isNull("uid")) {
+                    result.optInt("uid")
+                } else {
+                    _snapshot.value.guestUid
+                },
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )
