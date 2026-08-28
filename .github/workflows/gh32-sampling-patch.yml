@@ -20,7 +20,40 @@ jobs:
 
       - name: Apply provider-aware sampling patch
         run: |
-          python3 scripts/gh32_sampling_patch.py
+          set +e
+          output="$(python3 scripts/gh32_sampling_patch.py 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ] && ! grep -Fq 'agent sampling entry: expected exactly one match' <<<"$output"; then
+            exit "$status"
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt')
+          s = p.read_text()
+
+          old = '''currentProvider.streamMessage(
+                        messages = applyRequestImageBudget(effectiveAgentHistory()),'''
+          new = '''currentProvider.streamMessageWithSampling(
+                        messages = applyRequestImageBudget(effectiveAgentHistory()),'''
+          if s.count(old) != 1:
+              raise SystemExit(f'agent sampling entry v2: expected 1 match, found {s.count(old)}')
+          s = s.replace(old, new, 1)
+
+          old = '''temperature = sessionOverrides.temperature,
+                        tools = turnTools,'''
+          new = '''temperature = sessionOverrides.temperature,
+                        tools = turnTools,
+                        topP = sessionOverrides.topP,
+                        topK = sessionOverrides.topK,'''
+          if s.count(old) != 1:
+              raise SystemExit(f'agent sampling values v2: expected 1 match, found {s.count(old)}')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
           git diff --check
           git diff -- src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt
 
