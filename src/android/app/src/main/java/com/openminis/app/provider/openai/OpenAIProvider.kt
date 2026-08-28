@@ -592,6 +592,21 @@ class OpenAIProvider private constructor(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
     ).failOnSilentEmptyCompletion(name)
 
+    override fun streamMessageSamplingClamped(
+        messages: List<LLMMessage>,
+        systemPrompt: String?,
+        maxTokens: Int,
+        temperature: Double?,
+        imageParts: List<LLMMessage.ImagePart>,
+        tools: List<AgentToolDefinition>,
+        thinkingLevel: ThinkingLevel,
+        topP: Double?,
+        topK: Int?,
+    ): Flow<LLMStreamChunk> = rawStreamMessage(
+        messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
+        topP = topP,
+    ).failOnSilentEmptyCompletion(name)
+
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
         systemPrompt: String?,
@@ -600,6 +615,7 @@ class OpenAIProvider private constructor(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
+        topP: Double? = null,
     ): Flow<LLMStreamChunk> = callbackFlow {
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
@@ -626,7 +642,7 @@ class OpenAIProvider private constructor(
             )
             buildCodexImageBody(messages)
         } else if (usesChatCompletionsAPI) {
-            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, topP = topP, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         } else {
             buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
@@ -1793,6 +1809,7 @@ class OpenAIProvider private constructor(
         maxTokens: Int,
         stream: Boolean,
         temperature: Double?,
+        topP: Double? = null,
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition> = emptyList(),
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
@@ -1818,6 +1835,7 @@ class OpenAIProvider private constructor(
         if (temperature != null) {
             body.put("temperature", temperature)
         }
+        topP?.let { body.put("top_p", it) }
 
         if (stream && !isOpenRouter) {
             body.put("stream_options", JSONObject().put("include_usage", true))

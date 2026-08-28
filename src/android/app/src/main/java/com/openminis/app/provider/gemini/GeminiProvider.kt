@@ -96,6 +96,21 @@ class GeminiProvider(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
     ).failOnSilentEmptyCompletion(name)
 
+    override fun streamMessageSamplingClamped(
+        messages: List<LLMMessage>,
+        systemPrompt: String?,
+        maxTokens: Int,
+        temperature: Double?,
+        imageParts: List<LLMMessage.ImagePart>,
+        tools: List<AgentToolDefinition>,
+        thinkingLevel: ThinkingLevel,
+        topP: Double?,
+        topK: Int?,
+    ): Flow<LLMStreamChunk> = rawStreamMessage(
+        messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
+        topP = topP, topK = topK,
+    ).failOnSilentEmptyCompletion(name)
+
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
         systemPrompt: String?,
@@ -104,8 +119,10 @@ class GeminiProvider(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
+        topP: Double? = null,
+        topK: Int? = null,
     ): Flow<LLMStreamChunk> = callbackFlow {
-        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
+        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel, topP = topP, topK = topK)
         val url = "$basePath/models/${model.id}:streamGenerateContent?alt=sse&key=$apiKey"
         val request = Request.Builder()
             .url(url)
@@ -188,6 +205,8 @@ class GeminiProvider(
         // [T-android-thinking-level-arch] Already clamped to the model ceiling by
         // LLMProvider.streamMessage/sendMessage before reaching here.
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
+        topP: Double? = null,
+        topK: Int? = null,
     ): JSONObject {
         val body = JSONObject()
 
@@ -336,6 +355,8 @@ class GeminiProvider(
         if (temperature != null) {
             config.put("temperature", temperature)
         }
+        topP?.let { config.put("topP", it) }
+        topK?.let { config.put("topK", it) }
 
         // Thinking configuration (model-specific)
         buildThinkingConfig(thinkingLevel)?.let { thinkingConfig ->
