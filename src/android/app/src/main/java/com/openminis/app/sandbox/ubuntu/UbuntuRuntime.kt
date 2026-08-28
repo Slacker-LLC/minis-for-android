@@ -22,6 +22,8 @@ import org.json.JSONObject
  */
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
+    private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
+    private const val MINISD_SPAWN_TIMEOUT_MS = 5_000L
 
     data class Snapshot(
         val running: Boolean = false,
@@ -37,6 +39,11 @@ object UbuntuRuntime {
         val output: String,
         val exitCode: Int,
         val durationMs: Long,
+    )
+
+    private data class MinisdSpawnResult(
+        val started: Boolean,
+        val error: String? = null,
     )
 
     @Volatile
@@ -82,15 +89,24 @@ object UbuntuRuntime {
             redirectPaths = true
             return cur
         }
-        // minisd down (e.g. after reboot) → spawn the watchdog via root, then
-        // retry. B13's pidfile flock makes a duplicate spawn a harmless no-op.
-        val spawned = ensureMinisdUp()
-        if (spawned) {
-            for (i in 0 until 10) {
-                delay(300)
-                cur = refresh()
-                if (cur.running) break
-            }
+        // minisd down (e.g. after reboot) → actively establish root authorization,
+        // then spawn the watchdog. B13's pidfile flock makes a duplicate spawn harmless.
+        val spawn = ensureMinisdUp()
+        if (!spawn.started) {
+            val failed = Snapshot(
+                running = false,
+                available = false,
+                lastError = spawn.error ?: "minisd watchdog could not be started",
+            )
+            _snapshot.value = failed
+            redirectPaths = false
+            Log.w(TAG, "ensureReady failed: ${failed.lastError}")
+            return failed
+        }
+        for (i in 0 until 10) {
+            delay(300)
+            cur = refresh()
+            if (cur.running) break
         }
         if (cur.running) {
             redirectPaths = true
@@ -114,40 +130,102 @@ object UbuntuRuntime {
     }
 
     /**
-     * Spawns minisd --watchdog via su when it is not running. Safe to call
-     * blindly: B13 pidfile flock makes a second instance exit immediately.
-     * The subshell `( … & )` detaches minisd from the su session so it
-     * survives su exit (adopted by init).
+     * Establishes a real uid-0 `su` session first, so KernelSU can grant or
+     * reject the current install explicitly. The app UID is then injected as a
+     * trusted root-process environment override; the watchdog and every child
+     * inherit it, so policy reload/reparse cannot fall back to a device UID.
      */
-    private suspend fun ensureMinisdUp(): Boolean = withContext(Dispatchers.IO) {
-        val su = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su")
-            .firstOrNull { java.io.File(it).canExecute() }
-        if (su == null) {
-            Log.w(TAG, "ensureMinisdUp: no su binary")
-            return@withContext false
-        }
+    private suspend fun ensureMinisdUp(): MinisdSpawnResult = withContext(Dispatchers.IO) {
+        val su = resolveSu()
+            ?: return@withContext MinisdSpawnResult(
+                false,
+                "Root unavailable: no executable su found (KernelSU/Magisk not installed or not exposed to this app)",
+            )
         val appSock = appContext
             ?.let { java.io.File(it.filesDir, "minis/minisd.sock").absolutePath }
-        if (appSock == null) {
-            Log.w(TAG, "ensureMinisdUp: no app context")
-            return@withContext false
+            ?: return@withContext MinisdSpawnResult(false, "minisd startup failed: app context unavailable")
+
+        val rootProbe = try {
+            ProcessBuilder(su, "-c", "id -u").redirectErrorStream(true).start()
+        } catch (t: Throwable) {
+            return@withContext MinisdSpawnResult(false, "Root unavailable: failed to start su: ${t.message}")
         }
-        val cmd = "(/data/adb/minis/bin/minisd --watchdog --policy " +
-            "/data/adb/minis/policy/policy.json --app-socket $appSock >/dev/null 2>&1 &)"
+        val authorized = rootProbe.waitFor(ROOT_AUTH_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        if (!authorized) {
+            rootProbe.destroyForcibly()
+            rootProbe.waitFor(1_000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            return@withContext MinisdSpawnResult(
+                false,
+                "Root authorization timed out after ${ROOT_AUTH_TIMEOUT_MS}ms; approve this app in KernelSU and retry",
+            )
+        }
+        val rootOutput = runCatching { rootProbe.inputStream.bufferedReader().use { it.readText() } }
+            .getOrDefault("").trim()
+        if (rootProbe.exitValue() != 0) {
+            val detail = rootOutput.take(300).ifBlank { "su exited without diagnostic output" }
+            return@withContext MinisdSpawnResult(
+                false,
+                "Root authorization denied or unavailable (exit=${rootProbe.exitValue()}): $detail",
+            )
+        }
+        val effectiveUid = rootOutput.lineSequence().map(String::trim).lastOrNull { it.isNotEmpty() }
+        if (effectiveUid != "0") {
+            return@withContext MinisdSpawnResult(
+                false,
+                "Root authorization invalid: su returned uid=${effectiveUid ?: "unknown"}, expected 0",
+            )
+        }
+
+        val appUid = android.os.Process.myUid()
+        val cmd = "(MINIS_APP_UID=$appUid /data/adb/minis/bin/minisd --watchdog --policy " +
+            "/data/adb/minis/policy/policy.json --app-socket ${shellQuote(appSock)} >/dev/null 2>&1 &)"
         try {
             val proc = ProcessBuilder(su, "-c", cmd).redirectErrorStream(true).start()
-            val finished = proc.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
-            if (finished) {
-                Log.i(TAG, "ensureMinisdUp: su exited=${proc.exitValue()}")
-            } else {
-                Log.i(TAG, "ensureMinisdUp: su still running (spawned)")
+            val finished = proc.waitFor(MINISD_SPAWN_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                proc.waitFor(1_000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                return@withContext MinisdSpawnResult(
+                    false,
+                    "Root command timed out while starting minisd watchdog",
+                )
             }
-            true
+            val output = runCatching { proc.inputStream.bufferedReader().use { it.readText() } }
+                .getOrDefault("").trim()
+            if (proc.exitValue() != 0) {
+                val detail = output.take(300).ifBlank { "su exited without diagnostic output" }
+                return@withContext MinisdSpawnResult(
+                    false,
+                    "minisd watchdog start failed (exit=${proc.exitValue()}): $detail",
+                )
+            }
+            Log.i(TAG, "ensureMinisdUp: watchdog spawned appUid=$appUid")
+            MinisdSpawnResult(true)
         } catch (t: Throwable) {
             Log.w(TAG, "ensureMinisdUp failed: ${t.message}")
-            false
+            MinisdSpawnResult(false, "minisd watchdog start failed: ${t.message}")
         }
     }
+
+    private fun resolveSu(): String? {
+        val candidates = listOf(
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/sbin/su",
+            "/su/bin/su",
+            "/data/adb/ksu/bin/su",
+            "/debug_ramdisk/su",
+        )
+        candidates.firstOrNull { java.io.File(it).canExecute() }?.let { return it }
+        return System.getenv("PATH").orEmpty()
+            .split(java.io.File.pathSeparatorChar)
+            .asSequence()
+            .map { java.io.File(it, "su") }
+            .firstOrNull { it.canExecute() }
+            ?.absolutePath
+    }
+
+    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
     suspend fun start(): Snapshot = ensureReady()
 
