@@ -47,6 +47,11 @@ impl AppState {
     pub fn new(mock: bool, policy: PolicyFile) -> Self {
         let mut sessions = SessionTable::default();
         sessions.enable_subreaper();
+        if !mock && policy.caller.app_uid != 0 {
+            // The guest-facing minis-config transport is intentionally started
+            // with the broker, not with the historical PRoot/sandbox path.
+            crate::config_proxy::ensure_started(policy.caller.app_uid);
+        }
         Self {
             mock,
             skip_peer: false,
