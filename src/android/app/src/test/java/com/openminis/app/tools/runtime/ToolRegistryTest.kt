@@ -119,4 +119,24 @@ class ToolRegistryTest {
             ToolRegistry.unregister("android.web.test")
         }
     }
+
+    @Test
+    fun `dotted mcp name resolves through provider wire name`() {
+        ToolRegistry.register(FakeHandler("mcp.github.get_issue"))
+        try {
+            assertEquals(
+                "mcp_github_get_issue",
+                ToolRegistry.definition("mcp.github.get_issue")!!.apiName,
+            )
+            assertEquals(
+                "mcp.github.get_issue",
+                ToolRegistry.canonicalName("mcp_github_get_issue"),
+            )
+            assertNotNull(ToolRegistry.handler("mcp_github_get_issue"))
+            assertTrue(ToolRegistry.contains("mcp_github_get_issue"))
+        } finally {
+            ToolRegistry.unregister("mcp.github.get_issue")
+            assertFalse(ToolRegistry.contains("mcp_github_get_issue"))
+        }
+    }
 }

@@ -24,6 +24,22 @@ data class AgentToolDefinition(
      */
     val timeoutMs: Long? = null,
 ) {
+    /**
+     * Provider wire name. OpenAI-compatible endpoints (DeepSeek, Kimi, GLM…)
+     * validate `tools[].name` against `^[a-zA-Z0-9_-]{1,64}$`, so the local
+     * `mcp.<server>.<tool>` naming scheme (dots) is rejected with
+     * `400 Invalid 'tools[N].name'`. Local dispatch keeps the canonical dotted
+     * name; only the serialized wire form is sanitized.
+     */
+    val apiName: String
+        get() = name
+            .replace(Regex("[^a-zA-Z0-9_-]"), "_")
+            .take(64)
+            .ifEmpty { "tool" }
+
+    /** True when [candidate] is either the canonical local name or the wire name. */
+    fun matchesName(candidate: String): Boolean = name == candidate || apiName == candidate
+
     /** Anthropic format: {name, description, input_schema: {type:object, properties, required}} */
     fun toAnthropicJson(): JSONObject {
         val props = JSONObject()
@@ -36,7 +52,7 @@ data class AgentToolDefinition(
             if (required.isNotEmpty()) put("required", JSONArray(required))
         }
         return JSONObject().apply {
-            put("name", name)
+            put("name", apiName)
             put("description", description)
             put("input_schema", schema)
         }
@@ -55,7 +71,7 @@ data class AgentToolDefinition(
             if (propertyOrdering != null) put("propertyOrdering", JSONArray(propertyOrdering))
         }
         return JSONObject().apply {
-            put("name", name)
+            put("name", apiName)
             put("description", description)
             put("parameters", params)
         }
@@ -75,7 +91,7 @@ data class AgentToolDefinition(
         return JSONObject().apply {
             put("type", "function")
             put("function", JSONObject().apply {
-                put("name", name)
+                put("name", apiName)
                 put("description", description)
                 put("parameters", params)
             })

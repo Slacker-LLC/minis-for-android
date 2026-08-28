@@ -203,7 +203,7 @@ class ChatViewModel(
             // Unknown tool names go through to the existing `else` branch in
             // executeTool() which returns "Unknown tool: …". Preflight stays
             // silent so we don't double-fail.
-            val toolDef = tools.firstOrNull { it.name == name } ?: return null
+            val toolDef = tools.firstOrNull { it.matchesName(name) } ?: return null
             // Required fields that actually gate execution (everything except the
             // non-blocking ones like tool_title — see PREFLIGHT_NON_BLOCKING_FIELDS).
             val enforced = toolDef.required.filter { it !in PREFLIGHT_NON_BLOCKING_FIELDS }
@@ -8405,7 +8405,7 @@ class ChatViewModel(
         // and returns a structured TOOL_TIMEOUT result instead of hanging
         // the whole turn. Tools that manage their own budget (shell,
         // subagent, ask_user_question) declare null and skip the wrapper.
-        val timeoutMs = agentTools.firstOrNull { it.name == name }?.timeoutMs
+        val timeoutMs = agentTools.firstOrNull { it.matchesName(name) }?.timeoutMs
         val dispatched: ToolExecutionResult? = if (timeoutMs != null) {
             withTimeoutOrNull(timeoutMs) {
                 dispatchTool(name, argsJson, toolId, toolBlocks, assistantId, currentText)
