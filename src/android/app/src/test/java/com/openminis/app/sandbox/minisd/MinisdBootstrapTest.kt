@@ -36,7 +36,7 @@ class MinisdBootstrapTest {
     }
 
     @Test
-    fun `watchdog command validates runtime assets before spawn`() {
+    fun `watchdog command starts broker independently of rootfs`() {
         val command = MinisdBootstrap.watchdogCommand(
             appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
@@ -44,9 +44,10 @@ class MinisdBootstrapTest {
         )
 
         assertTrue(command.contains("minisd missing or not executable"))
-        assertTrue(command.contains("ubuntu rootfs missing"))
         assertTrue(command.contains("--watchdog --policy"))
         assertTrue(command.contains("--app-socket"))
+        assertFalse(command.contains("ubuntu rootfs missing"))
+        assertFalse(command.contains("ROOTFS="))
         assertFalse(command.contains("minisd.pid"))
     }
 
