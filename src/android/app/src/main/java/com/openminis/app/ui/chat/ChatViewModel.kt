@@ -1522,6 +1522,20 @@ class ChatViewModel(
         return ""
     }
 
+    /**
+     * Set memory for the active session from a settings surface. Unlike a raw
+     * DAO write this updates the live StateFlow first, so the next agent turn
+     * immediately rebuilds its memory-gated tool list and system prompt.
+     */
+    fun setMemoryEnabledForSession(enabled: Boolean) {
+        if (_memoryEnabled.value == enabled) return
+        _memoryEnabled.value = enabled
+        viewModelScope.launch {
+            val sid = ensureSession()
+            chatRepository.dao.updateMemoryEnabled(sid, if (enabled) 1 else 0)
+        }
+    }
+
     /** Toggle memory writes on/off, persist to DB, and append a system-info message. */
     private fun toggleMemoryEnabled() {
         val newValue = !_memoryEnabled.value
@@ -3589,6 +3603,14 @@ class ChatViewModel(
     /** Public accessor used by ChatScreen to resolve session-scoped minis:// links. */
     val currentSessionId: String
         get() = activeSessionId
+
+    /**
+     * Ensure a durable row exists before a UI edits per-session settings.
+     * Draft chats normally materialize on first send; opening Advanced settings
+     * is also a durable session action and must not write against the synthetic
+     * `__new__` route id.
+     */
+    suspend fun ensureSessionForSettings(): String = ensureSession()
 
     /** T-chat-title-pill-edit: load the persisted [ChatSessionEntity] for the
      *  current session so the shared edit-title sheet (reused from the session

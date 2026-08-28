@@ -6262,6 +6262,7 @@ fun ChatScreen(
         SessionAdvancedSettingsSheet(
             sessionId = sessionId,
             chatRepository = chatRepository,
+            viewModel = viewModel,
             onDismiss = { showSessionAdvancedSettings = false },
         )
     }
