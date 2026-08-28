@@ -84,7 +84,7 @@ object UbuntuRuntime {
     }
 
     suspend fun ensureReady(): Snapshot = startLock.withLock {
-        var cur = refresh()
+        var cur = client.ubuntuStatusLocal()?.let { apply(it) } ?: Snapshot()
         if (cur.running) {
             redirectPaths = true
             return cur
@@ -105,8 +105,9 @@ object UbuntuRuntime {
         }
         for (i in 0 until 10) {
             delay(300)
-            cur = refresh()
-            if (cur.running) break
+            val status = client.ubuntuStatusLocal() ?: continue
+            cur = apply(status)
+            if (status.ok) break
         }
         if (cur.running) {
             redirectPaths = true
@@ -168,7 +169,7 @@ object UbuntuRuntime {
                 "Root authorization denied or unavailable (exit=${rootProbe.exitValue()}): $detail",
             )
         }
-        val effectiveUid = rootOutput.lineSequence().map(String::trim).lastOrNull { it.isNotEmpty() }
+        val effectiveUid = rootOutput.lineSequence().map { it.trim() }.lastOrNull { it.isNotEmpty() }
         if (effectiveUid != "0") {
             return@withContext MinisdSpawnResult(
                 false,
