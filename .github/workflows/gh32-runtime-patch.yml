@@ -1,0 +1,92 @@
+name: GH32 runtime patch
+
+on:
+  push:
+    branches:
+      - feature/issue-32-session-overrides
+
+permissions:
+  contents: write
+
+jobs:
+  apply-runtime-patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/issue-32-session-overrides
+          fetch-depth: 0
+
+      - name: Apply exact ChatViewModel patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt')
+          text = path.read_text()
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'import com.openminis.app.data.model.ModelGroup\nimport com.openminis.app.data.model.ThinkingLevel\n',
+              'import com.openminis.app.data.model.ModelGroup\nimport com.openminis.app.data.model.SessionOverrides\nimport com.openminis.app.data.model.ThinkingLevel\n',
+              'SessionOverrides import',
+          )
+
+          replace_once(
+              '''    ) {\n        AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")\n        // [T-android-mem-probe-trust] Send-path context shape. The existing\n''',
+              '''    ) {\n        AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")\n\n        // GH#32: resolve the sparse session payload once per agent-loop run.\n        // Settings changed while a loop is already in flight intentionally take\n        // effect on the next run rather than changing semantics mid-turn.\n        val sessionOverrides = runCatching {\n            SessionOverrides.fromJson(\n                chatRepository.getSession(activeSessionId)?.sessionOverrides,\n            )\n        }.onFailure { error ->\n            AppLogger.warning(TAG, "session overrides unavailable for $activeSessionId: ${error.message}")\n        }.getOrDefault(SessionOverrides())\n\n        // Preserve the app's core runtime/tool/safety prompt and append the\n        // session-specific instruction as a clearly delimited final layer.\n        // Replacing the core prompt would make a custom persona accidentally\n        // remove tool/runtime instructions.\n        val effectiveSystemPrompt = sessionOverrides.systemPrompt?.let { sessionPrompt ->\n            buildString {\n                if (!systemPrompt.isNullOrBlank()) {\n                    append(systemPrompt)\n                    append("\\n\\n")\n                }\n                append("<session-specific-instructions>\\n")\n                append(sessionPrompt)\n                append("\\n</session-specific-instructions>")\n            }\n        } ?: systemPrompt\n\n        // [T-android-mem-probe-trust] Send-path context shape. The existing\n''',
+              'runAgentLoop override resolution',
+          )
+
+          replace_once(
+              '''            var lastUsage: LLMUsage? = null\n            val maxTokens = dynamicMaxTokens(provider, lastContextTokens)\n            val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args\n''',
+              '''            var lastUsage: LLMUsage? = null\n            // GH#32: null allow-list inherits every agent tool; an explicit\n            // empty list is chat-only. Keep this list stable for the whole\n            // provider retry/fallback cycle of this turn.\n            val turnTools = if (chatOnlyForNextTurn) {\n                emptyList()\n            } else {\n                sessionOverrides.filterTools(agentTools)\n            }\n            val turnToolNames = turnTools.mapTo(hashSetOf()) { it.name }\n            val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args\n''',
+              'turn tool allow-list',
+          )
+
+          replace_once(
+              '''                    val turnTools = if (chatOnlyForNextTurn) emptyList() else agentTools\n                    currentProvider.streamMessage(\n                        applyRequestImageBudget(effectiveAgentHistory()),\n                        systemPrompt, dynamicMaxTokens(currentProvider, lastContextTokens),\n                        tools = turnTools,\n                        thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,\n                    ).collect { chunk ->\n''',
+              '''                    currentProvider.streamMessage(\n                        messages = applyRequestImageBudget(effectiveAgentHistory()),\n                        systemPrompt = effectiveSystemPrompt,\n                        maxTokens = sessionOverrides.effectiveMaxTokens(\n                            dynamicMaxTokens(currentProvider, lastContextTokens),\n                        ),\n                        temperature = sessionOverrides.temperature,\n                        tools = turnTools,\n                        thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,\n                    ).collect { chunk ->\n''',
+              'stream request overrides',
+          )
+
+          replace_once(
+              '''            val resultParts = mutableListOf<AgentContentPart>()\n            for ((id, name, args) in toolCalls) {\n                // [T-android-overlay-tool-title] Pull tool_title uniformly\n''',
+              '''            val resultParts = mutableListOf<AgentContentPart>()\n            for ((id, name, args) in toolCalls) {\n                // GH#32: schema filtering is not a security boundary. A stale\n                // provider response, retry, or hallucinated tool call can still\n                // name a tool that was not offered this turn. Reject it before\n                // repair, permission/status updates, or execution. This also\n                // makes chatOnlyForNextTurn fail closed.\n                if (name !in turnToolNames) {\n                    val blockedMessage = "Error: Tool '$name' is disabled for this session."\n                    AppLogger.warning(\n                        "ToolPreflight",\n                        "BLOCKED session-disabled tool=$name id=$id session=$activeSessionId",\n                    )\n                    val blockIdx = allToolBlocks.indexOfFirst { it.id == id }\n                    if (blockIdx >= 0) {\n                        val elapsed = System.currentTimeMillis() - allToolBlocks[blockIdx].startTimeMs\n                        allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(\n                            toolStatus = ToolBlockStatus.FAILED,\n                            content = "Blocked by this session's tool allow-list",\n                            durationMs = elapsed,\n                        )\n                        sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])\n                    }\n                    toolLoopDetector.record(\n                        toolName = name,\n                        params = parseToolParams(args.toString()),\n                        result = null,\n                        errorMessage = blockedMessage,\n                        toolCallId = id,\n                    )\n                    resultParts.add(\n                        AgentContentPart.ToolResult(\n                            id = id,\n                            name = name,\n                            content = blockedMessage,\n                            isError = true,\n                        ),\n                    )\n                    withContext(Dispatchers.Main) {\n                        updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)\n                    }\n                    continue\n                }\n\n                // [T-android-overlay-tool-title] Pull tool_title uniformly\n''',
+              'defensive execution allow-list',
+          )
+
+          replace_once(
+              '                    name, args, toolInputChunkRings[id]?.lastOrNull(), agentTools,\n',
+              '                    name, args, toolInputChunkRings[id]?.lastOrNull(), turnTools,\n',
+              'tool repair schema',
+          )
+
+          replace_once(
+              '                val preflightError = preflightValidateToolCall(name, args, agentTools)\n',
+              '                val preflightError = preflightValidateToolCall(name, args, turnTools)\n',
+              'tool preflight schema',
+          )
+
+          path.write_text(text)
+          PY
+
+          git diff --check
+          git diff -- src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt
+
+      - name: Commit runtime patch and remove temporary workflow
+        run: |
+          rm .github/workflows/gh32-runtime-patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt .github/workflows/gh32-runtime-patch.yml
+          git diff --cached --check
+          git commit -m 'feat(session): apply overrides in agent loop'
+          git push origin HEAD:feature/issue-32-session-overrides
