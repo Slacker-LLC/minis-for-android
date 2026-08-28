@@ -32,30 +32,33 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p = Path('src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt')
-          s = p.read_text()
+          lines = p.read_text().splitlines()
 
-          old = '''currentProvider.streamMessage(
-                        messages = applyRequestImageBudget(effectiveAgentHistory()),'''
-          new = '''currentProvider.streamMessageWithSampling(
-                        messages = applyRequestImageBudget(effectiveAgentHistory()),'''
-          if s.count(old) != 1:
-              raise SystemExit(f'agent sampling entry v2: expected 1 match, found {s.count(old)}')
-          s = s.replace(old, new, 1)
+          call_hits = [i for i, line in enumerate(lines)
+                       if line.strip() == 'currentProvider.streamMessage('
+                       and i + 1 < len(lines)
+                       and 'messages = applyRequestImageBudget(effectiveAgentHistory())' in lines[i + 1]]
+          if len(call_hits) != 1:
+              raise SystemExit(f'agent sampling entry line match: expected 1, found {len(call_hits)}')
+          i = call_hits[0]
+          lines[i] = lines[i].replace('currentProvider.streamMessage(', 'currentProvider.streamMessageWithSampling(')
 
-          old = '''temperature = sessionOverrides.temperature,
-                        tools = turnTools,'''
-          new = '''temperature = sessionOverrides.temperature,
-                        tools = turnTools,
-                        topP = sessionOverrides.topP,
-                        topK = sessionOverrides.topK,'''
-          if s.count(old) != 1:
-              raise SystemExit(f'agent sampling values v2: expected 1 match, found {s.count(old)}')
-          s = s.replace(old, new, 1)
-          p.write_text(s)
+          value_hits = [i for i, line in enumerate(lines)
+                        if line.strip() == 'temperature = sessionOverrides.temperature,'
+                        and i + 1 < len(lines)
+                        and lines[i + 1].strip() == 'tools = turnTools,']
+          if len(value_hits) != 1:
+              raise SystemExit(f'agent sampling values line match: expected 1, found {len(value_hits)}')
+          i = value_hits[0]
+          indent = lines[i + 1][:len(lines[i + 1]) - len(lines[i + 1].lstrip())]
+          lines[i + 2:i + 2] = [
+              indent + 'topP = sessionOverrides.topP,',
+              indent + 'topK = sessionOverrides.topK,',
+          ]
+          p.write_text('\n'.join(lines) + '\n')
           PY
 
           git diff --check
-          git diff -- src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt
 
       - name: Commit sampling wiring and remove temporary files
         run: |
