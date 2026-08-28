@@ -32,6 +32,14 @@ class MinisdClient(
 
     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
 
+    /** Passive status check for startup recovery. Never invokes `su`. */
+    suspend fun ubuntuStatusLocal(timeoutMs: Long = 1_000): MinisdResponse? =
+        withContext(Dispatchers.IO) {
+            val path = appSocketPath ?: return@withContext null
+            if (!File(path).exists()) return@withContext null
+            callLocal(path, MinisdProtocol.encodeRequest(MinisdProtocol.ubuntuStatus(nextId())), timeoutMs)
+        }
+
     suspend fun ubuntuStart(
         rootfs: String = MinisdProtocol.DEFAULT_ROOTFS,
         workspace: String = "",
@@ -185,9 +193,17 @@ class MinisdClient(
             "/system/bin/su",
             "/system/xbin/su",
             "/sbin/su",
+            "/su/bin/su",
+            "/data/adb/ksu/bin/su",
             "/debug_ramdisk/su",
         )
-        return candidates.firstOrNull { File(it).canExecute() }
+        candidates.firstOrNull { File(it).canExecute() }?.let { return it }
+        return System.getenv("PATH").orEmpty()
+            .split(File.pathSeparatorChar)
+            .asSequence()
+            .map { File(it, "su") }
+            .firstOrNull { it.canExecute() }
+            ?.absolutePath
     }
 
     private fun unavailable(detail: String) = MinisdResponse(
