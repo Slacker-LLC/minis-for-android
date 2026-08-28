@@ -248,6 +248,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ArrowCircleDown
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material3.ButtonDefaults
@@ -722,6 +723,8 @@ fun ChatScreen(
     var showSkillsSheet by remember { mutableStateOf(false) }
     // [T-mcp-integration-android] MCPs-in-Session sheet visibility.
     var showMcpsSheet by remember { mutableStateOf(false) }
+    // GH#32/#35: session-local prompt/model/tool overrides.
+    var showSessionAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
     // ChatScreen so the trigger (capsule inside the composer) and the
@@ -2659,6 +2662,17 @@ fun ChatScreen(
                                     },
                                 )
                             }
+                            // GH#32/#35: first-class editor for session-local overrides.
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.session_advanced_settings_menu)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    showSessionAdvancedSettings = true
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Settings, contentDescription = null)
+                                },
+                            )
                             // Session Memory (iOS parity)
                             if (memoryRepository != null && menuMemoryEnabled) {
                                 DropdownMenuItem(
@@ -6240,6 +6254,15 @@ fun ChatScreen(
             skillRepository = skillRepository,
             sessionId = sessionId,
             onDismiss = { showSkillsSheet = false },
+        )
+    }
+
+    // GH#32/#35: session-local advanced settings sheet.
+    if (showSessionAdvancedSettings) {
+        SessionAdvancedSettingsSheet(
+            sessionId = sessionId,
+            chatRepository = chatRepository,
+            onDismiss = { showSessionAdvancedSettings = false },
         )
     }
 
