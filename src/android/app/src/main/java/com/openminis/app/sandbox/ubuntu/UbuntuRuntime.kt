@@ -46,6 +46,11 @@ object UbuntuRuntime {
         val version: String? = null,
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
+        val layoutKnown: Boolean = false,
+        val hostWorkspace: String? = null,
+        val hostMemory: String? = null,
+        val hostSkills: String? = null,
+        val hostShared: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -208,6 +213,25 @@ object UbuntuRuntime {
             )
         }
 
+        // A keeper recovered from a stale pidfile cannot prove which host paths
+        // were bound into /workspace, /memory, /skills and /shared. Likewise a
+        // keeper started by an older app may point at /data/adb/minis/* instead
+        // of this install's app-private filesDir. Never guess: stop it and build
+        // a fresh keeper with the current authoritative paths.
+        if (cur.running && !runtimeLayoutMatches(cur)) {
+            Log.w(
+                TAG,
+                "keeper layout stale/unknown; rebuilding " +
+                    "reported=${cur.hostWorkspace},${cur.hostMemory},${cur.hostSkills},${cur.hostShared}",
+            )
+            val stopped = apply(client.ubuntuStop())
+            if (stopped.running) {
+                return@withLock fail("failed to stop keeper with stale runtime layout")
+            }
+            clearProbeCache()
+            cur = stopped
+        }
+
         val rootfs = RootfsManager.getInstance(ctx)
         var rootfsRepaired = false
         val health = rootfs.checkHealth(force = forceCheck)
@@ -260,6 +284,10 @@ object UbuntuRuntime {
         if (!started.running) {
             return@withLock fail(started.lastError ?: "ubuntu.start failed after recovery")
         }
+        if (!runtimeLayoutMatches(started)) {
+            runCatching { client.ubuntuStop() }
+            return@withLock fail("fresh keeper did not confirm the requested runtime bind layout")
+        }
 
         var probe = probeGuest(started, force = true)
         if (!probe.ok && probe.rootfsSuspect && !rootfsRepaired) {
@@ -284,10 +312,13 @@ object UbuntuRuntime {
             if (started.running) probe = probeGuest(started, force = true)
         }
 
-        if (!started.running || !probe.ok) {
+        if (!started.running || !runtimeLayoutMatches(started) || !probe.ok) {
             return@withLock fail(
-                if (!started.running) started.lastError ?: "keeper rebuild failed"
-                else "runtime probe failed after bounded recovery: ${probe.detail}",
+                when {
+                    !started.running -> started.lastError ?: "keeper rebuild failed"
+                    !runtimeLayoutMatches(started) -> "keeper runtime bind layout mismatch after recovery"
+                    else -> "runtime probe failed after bounded recovery: ${probe.detail}"
+                },
             )
         }
 
@@ -295,8 +326,15 @@ object UbuntuRuntime {
         started
     }
 
+    private fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
+        snapshot.layoutKnown &&
+            snapshot.hostWorkspace == UbuntuPaths.hostWorkspace &&
+            snapshot.hostMemory == UbuntuPaths.hostMemory &&
+            snapshot.hostSkills == UbuntuPaths.hostSkills &&
+            snapshot.hostShared == UbuntuPaths.hostShared
+
     private suspend fun startKeeper(expectedUid: Int): Snapshot {
-        val started = apply(
+        val raw = apply(
             client.ubuntuStart(
                 workspace = UbuntuPaths.hostWorkspace,
                 memory = UbuntuPaths.hostMemory,
@@ -304,9 +342,14 @@ object UbuntuRuntime {
                 shared = UbuntuPaths.hostShared,
             ),
         )
-        redirectPaths = started.running
+        val started = if (raw.running) refresh() else raw
+        redirectPaths = started.running && runtimeLayoutMatches(started)
         if (started.running) {
-            Log.i(TAG, "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid")
+            Log.i(
+                TAG,
+                "ubuntu.start ok pid=${started.pid} version=${started.version} " +
+                    "uid=$expectedUid layoutKnown=${started.layoutKnown}",
+            )
         } else {
             Log.w(TAG, "ubuntu.start failed: ${started.lastError}")
         }
@@ -457,13 +500,18 @@ object UbuntuRuntime {
         }
 
         if (!force) {
-            val marker = runSuCommand(
-                su,
-                "if [ -x ${shellQuote(MinisdProtocol.DEFAULT_BIN)} ] && " +
-                    "[ -r ${shellQuote(MINISD_SHA_PATH)} ]; then cat ${shellQuote(MINISD_SHA_PATH)}; fi",
-                5_000L,
-            )
-            if (marker?.exitCode == 0 && marker.output.trim().equals(expected, ignoreCase = true)) {
+            val verifyScript = """
+                BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}
+                if [ -x "${'$'}BIN" ]; then
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    sha256sum "${'$'}BIN" | awk '{print ${'$'}1}'
+                  elif command -v toybox >/dev/null 2>&1; then
+                    toybox sha256sum "${'$'}BIN" | awk '{print ${'$'}1}'
+                  fi
+                fi
+            """.trimIndent()
+            val actual = runSuCommand(su, verifyScript, 5_000L)
+            if (actual?.exitCode == 0 && actual.output.trim().equals(expected, ignoreCase = true)) {
                 return BinarySyncResult(true, changed = false)
             }
         }
@@ -698,7 +746,7 @@ object UbuntuRuntime {
     }
 
     private fun isSafePreExecFailure(resp: MinisdResponse): Boolean =
-        !resp.ok && resp.error?.code in SAFE_PREEXEC_ERRORS
+        !resp.ok && resp.error?.code?.let { it in SAFE_PREEXEC_ERRORS } == true
 
     fun paths(): JSONObject = JSONObject()
         .put("hostWorkspace", UbuntuPaths.hostWorkspace)
@@ -738,6 +786,11 @@ object UbuntuRuntime {
                 } else {
                     _snapshot.value.guestUid
                 },
+                layoutKnown = result.optBoolean("layout_known", false),
+                hostWorkspace = result.optNullableString("workspace"),
+                hostMemory = result.optNullableString("memory"),
+                hostSkills = result.optNullableString("skills"),
+                hostShared = result.optNullableString("shared"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )
@@ -745,12 +798,15 @@ object UbuntuRuntime {
             Snapshot(
                 running = false,
                 available = false,
-                lastError = resp.error?.detail ?: "ubuntu rpc failed",
+                lastError = resp.error?.let { "${it.code}: ${it.detail}" } ?: "ubuntu rpc failed",
             )
         }
         _snapshot.value = next
         return next
     }
+
+    private fun JSONObject.optNullableString(key: String): String? =
+        if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
 
     private val SAFE_PREEXEC_ERRORS = setOf(
         "KEEPER_NAMESPACE_LOST",
