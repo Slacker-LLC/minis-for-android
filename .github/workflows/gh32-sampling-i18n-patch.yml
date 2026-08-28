@@ -1,0 +1,32 @@
+name: GH32 sampling i18n patch
+
+on:
+  push:
+    branches:
+      - feature/issue-32-session-overrides
+
+permissions:
+  contents: write
+
+jobs:
+  apply-sampling-i18n:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/issue-32-session-overrides
+          fetch-depth: 0
+      - name: Apply localization patch
+        run: |
+          python3 scripts/gh32_sampling_i18n_patch.py
+          git diff --check
+      - name: Commit localizations and remove temporary files
+        run: |
+          rm .github/workflows/gh32-sampling-i18n-patch.yml scripts/gh32_sampling_i18n_patch.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/android/app/src/main/res/values-fr/strings_session_advanced.xml src/android/app/src/main/res/values-ja/strings_session_advanced.xml src/android/app/src/main/res/values-ko/strings_session_advanced.xml src/android/app/src/main/res/values-ru/strings_session_advanced.xml src/android/app/src/main/res/values-zh-rTW/strings_session_advanced.xml .github/workflows/gh32-sampling-i18n-patch.yml scripts/gh32_sampling_i18n_patch.py
+          git diff --cached --check
+          git commit -m 'feat(i18n): localize session sampling controls'
+          git push origin HEAD:feature/issue-32-session-overrides
