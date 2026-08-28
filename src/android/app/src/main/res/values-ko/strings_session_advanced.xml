@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">고급 설정</string>
+    <string name="session_advanced_settings_menu">고급 설정</string>
+    <string name="session_advanced_settings_inherit_help">재정의는 이 세션에만 적용됩니다. “사용자 지정”을 끄면 현재 전역 또는 모델 기본값을 상속합니다.</string>
+    <string name="session_advanced_custom">사용자 지정</string>
+    <string name="session_advanced_runtime_section">세션 동작</string>
+    <string name="session_advanced_runtime_help">메모리와 사고 수준은 기존 세션별 제어를 재사용하므로 변경 사항이 즉시 적용되고 재정의 JSON에 중복 저장되지 않습니다.</string>
+    <string name="session_advanced_memory">메모리</string>
+    <string name="session_advanced_memory_help">이 세션에서 영구 메모리를 주입하고 사용할 수 있도록 허용합니다.</string>
+    <string name="session_advanced_thinking">사고 수준</string>
+    <string name="session_advanced_thinking_not_supported">현재 모델에서 지원되지 않음</string>
+    <string name="session_advanced_instructions_section">지침</string>
+    <string name="session_advanced_system_prompt">세션 지침</string>
+    <string name="session_advanced_system_prompt_hint">이 세션에 대한 추가 지침</string>
+    <string name="session_advanced_model_section">모델 매개변수</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">최대 출력 토큰</string>
+    <string name="session_advanced_max_tokens_hint">양의 정수</string>
+    <string name="session_advanced_tools_section">도구</string>
+    <string name="session_advanced_tools">사용자 지정 도구 허용 목록</string>
+    <string name="session_advanced_tools_help">이 세션에서 기본적으로 사용할 수 있는 도구를 제한합니다. 모델, 메모리, 프리셋 및 런타임 기능 검사에 따라 추가 도구가 제거될 수 있습니다.</string>
+    <string name="session_advanced_save">저장</string>
+    <string name="session_advanced_reset_all">재정의 초기화</string>
+    <string name="session_advanced_loading">세션 설정 준비 중…</string>
+    <string name="session_advanced_missing_session">이 세션을 준비할 수 없습니다.</string>
+    <string name="session_advanced_invalid_prompt">세션 지침을 입력하거나 “사용자 지정”을 끄세요.</string>
+    <string name="session_advanced_invalid_temperature">Temperature는 0.0에서 2.0 사이여야 합니다.</string>
+    <string name="session_advanced_invalid_max_tokens">최대 출력 토큰은 양의 정수여야 합니다.</string>
+    <string name="session_advanced_save_failed">세션 설정을 저장할 수 없습니다.</string>
+    <string name="session_advanced_reset_failed">세션 설정을 초기화할 수 없습니다.</string>
+</resources>
