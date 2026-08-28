@@ -20,6 +20,29 @@ val appCustomization = Properties().apply {
 fun customizationValue(key: String): String =
     (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
 
+// Issue #43: the APK carries a verified, known-good Ubuntu base archive so a
+// rooted device can repair a missing/corrupt runtime without requiring network
+// access at the moment of failure. The asset is generated from the same pinned
+// build script used by CI/release engineering; it is never checked into Git.
+val generatedRuntimeAssetsDir = layout.buildDirectory.dir("generated/runtime-assets")
+val prepareUbuntuRootfsAsset by tasks.registering(Exec::class) {
+    val script = rootProject.file("../../scripts/build-ubuntu-rootfs.sh")
+    val runtimeDir = generatedRuntimeAssetsDir.map { it.dir("runtime").asFile }
+    val workDir = layout.buildDirectory.dir("tmp/ubuntu-rootfs")
+
+    inputs.file(script)
+    outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.tar.gz") })
+    outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.tar.gz.sha256") })
+    outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.manifest.json") })
+
+    doFirst {
+        val out = runtimeDir.get().apply { mkdirs() }
+        environment("DIST", out.absolutePath)
+        environment("WORK", workDir.get().asFile.absolutePath)
+    }
+    commandLine("bash", script.absolutePath)
+}
+
 android {
     namespace = "com.openminis.app"
     // Compile against Android 16 APIs used by the Live Updates path. targetSdk
@@ -91,6 +114,10 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        getByName("main").assets.srcDir(generatedRuntimeAssetsDir)
+    }
+
     androidResources {
         // The Ubuntu rootfs is packaged as a compressed tar archive.
         noCompress += "tar.gz"
@@ -106,6 +133,12 @@ android {
         baseline = file("lint-baseline.xml")
     }
 }
+
+// Any variant that merges production assets must first materialize the bundled
+// recovery image. This keeps debug/release behavior identical and makes a
+// missing recovery archive a build failure rather than a device-time surprise.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(prepareUbuntuRootfsAsset) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.
@@ -200,7 +233,7 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:2.4.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx-coroutines-android:1.9.0")
 
     // ACRA local crash report capture. acra-core has no HTTP sender.
     implementation("ch.acra:acra-core:5.12.0")
@@ -220,6 +253,6 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    androidTestImplementation("org.jetbrains.kotlinx-coroutines-test:1.9.0")
     androidTestImplementation("junit:junit:4.13.2")
 }
