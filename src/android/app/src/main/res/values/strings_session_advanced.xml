@@ -12,7 +12,11 @@
     <string name="session_advanced_thinking_not_supported">Not supported by the current model</string>
     <string name="session_advanced_instructions_section">Session Soul</string>
     <string name="session_advanced_system_prompt">Session personality</string>
-    <string name="session_advanced_system_prompt_hint">Role, personality, tone, and behavior for this session. Global SOUL.md remains the base layer.</string>
+    <string name="session_advanced_system_prompt_hint">Role, personality, tone, and behavior for this conversation.</string>
+    <string name="session_advanced_soul_help">Global SOUL.md is used by default. If you set a Session Soul before the first message, it replaces the global Soul for this conversation. The choice locks when chat starts.</string>
+    <string name="session_advanced_soul_locked_help">This conversation has already started. Its Soul choice is locked and cannot be changed, even after clearing chat history.</string>
+    <string name="session_advanced_soul_locked_custom">Custom Soul · locked</string>
+    <string name="session_advanced_soul_locked_global">Global Soul · locked</string>
     <string name="session_advanced_model_section">Model parameters</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
