@@ -59,8 +59,8 @@ pub fn ensure_started(app_uid: u32) {
 }
 
 fn start_proxy(app_uid: u32) -> Result<(), String> {
-    let listener = TcpListener::bind(("127.0.0.1", 0))
-        .map_err(|e| format!("bind minis-config proxy: {e}"))?;
+    let listener =
+        TcpListener::bind(("127.0.0.1", 0)).map_err(|e| format!("bind minis-config proxy: {e}"))?;
     let port = listener
         .local_addr()
         .map_err(|e| format!("minis-config proxy local_addr: {e}"))?
@@ -90,7 +90,11 @@ fn accept_loop(listener: TcpListener, token: String, bridge_name: String) {
     }
 }
 
-fn handle_guest(mut stream: TcpStream, expected_token: &str, bridge_name: &str) -> Result<(), String> {
+fn handle_guest(
+    mut stream: TcpStream,
+    expected_token: &str,
+    bridge_name: &str,
+) -> Result<(), String> {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(15)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(15)));
     let reader_stream = stream
@@ -157,7 +161,10 @@ fn handle_guest(mut stream: TcpStream, expected_token: &str, bridge_name: &str) 
     write_cli_response(&mut stream, exit_code, &output)
 }
 
-fn rewrite_file_argument(mut args: Vec<String>, payload: Option<Vec<u8>>) -> Result<Vec<String>, String> {
+fn rewrite_file_argument(
+    mut args: Vec<String>,
+    payload: Option<Vec<u8>>,
+) -> Result<Vec<String>, String> {
     let Some(payload) = payload else {
         return Ok(args);
     };
@@ -197,7 +204,8 @@ fn forward_to_android(
             "cwd": if cwd.is_empty() { "/workspace" } else { cwd },
             "session": session,
         });
-        let body = serde_json::to_vec(&request).map_err(|e| format!("encode bridge request: {e}"))?;
+        let body =
+            serde_json::to_vec(&request).map_err(|e| format!("encode bridge request: {e}"))?;
         if body.is_empty() || body.len() > MAX_BRIDGE_BYTES {
             return Err("bridge request too large".into());
         }
@@ -306,8 +314,7 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
             std::fs::remove_file(&link)
                 .map_err(|e| format!("remove stale {}: {e}", link.display()))?;
         }
-        symlink(GUEST_CONFIG_BIN, &link)
-            .map_err(|e| format!("symlink {}: {e}", link.display()))?;
+        symlink(GUEST_CONFIG_BIN, &link).map_err(|e| format!("symlink {}: {e}", link.display()))?;
     }
     Ok(())
 }
@@ -451,7 +458,9 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 fn write_cli_response(stream: &mut TcpStream, exit_code: i32, output: &str) -> Result<(), String> {
     let mut writer = BufWriter::new(stream);
     writeln!(writer, "{}", exit_code.clamp(0, 255)).map_err(|e| e.to_string())?;
-    writer.write_all(output.as_bytes()).map_err(|e| e.to_string())?;
+    writer
+        .write_all(output.as_bytes())
+        .map_err(|e| e.to_string())?;
     writer.flush().map_err(|e| e.to_string())
 }
 
