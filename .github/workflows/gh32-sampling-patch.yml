@@ -1,11 +1,15 @@
 name: GH32 sampling patch
+
 on:
   push:
-    branches: [feature/issue-32-session-overrides]
+    branches:
+      - feature/issue-32-session-overrides
+
 permissions:
   contents: write
+
 jobs:
-  patch-sampling:
+  apply-sampling-patch:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
@@ -13,244 +17,19 @@ jobs:
         with:
           ref: feature/issue-32-session-overrides
           fetch-depth: 0
-      - name: Patch providers and agent loop
-        shell: bash
+
+      - name: Apply provider-aware sampling patch
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path, old, new):
-              p = Path(path)
-              s = p.read_text()
-              count = s.count(old)
-              if count != 1:
-                  raise SystemExit(f'{path}: expected exactly one anchor, found {count}: {old[:100]!r}')
-              p.write_text(s.replace(old, new, 1))
-
-          # Anthropic: native top_p + top_k, omitted while extended thinking is active.
-          p = 'src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt'
-          anchor = '''    override fun streamMessageClamped(
-              messages: List<LLMMessage>,
-              systemPrompt: String?,
-              maxTokens: Int,
-              temperature: Double?,
-              imageParts: List<LLMMessage.ImagePart>,
-              tools: List<AgentToolDefinition>,
-              thinkingLevel: ThinkingLevel,
-          ): Flow<LLMStreamChunk> = rawStreamMessage(
-              messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-          ).failOnSilentEmptyCompletion(name)
-'''
-          replace_once(p, anchor, anchor + '''
-              override fun streamMessageSamplingClamped(
-                  messages: List<LLMMessage>,
-                  systemPrompt: String?,
-                  maxTokens: Int,
-                  temperature: Double?,
-                  imageParts: List<LLMMessage.ImagePart>,
-                  tools: List<AgentToolDefinition>,
-                  thinkingLevel: ThinkingLevel,
-                  topP: Double?,
-                  topK: Int?,
-              ): Flow<LLMStreamChunk> = rawStreamMessage(
-                  messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-                  topP = topP, topK = topK,
-              ).failOnSilentEmptyCompletion(name)
-''')
-          replace_once(p,
-          '''        thinkingLevel: ThinkingLevel,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-                  val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
-''',
-          '''        thinkingLevel: ThinkingLevel,
-                  topP: Double? = null,
-                  topK: Int? = null,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-                  val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, topP = topP, topK = topK, thinkingLevel = thinkingLevel)
-''')
-          replace_once(p,
-          '''        tools: List<AgentToolDefinition> = emptyList(),
-                  // [T-android-thinking-level-arch] Already clamped to the model ceiling by
-''',
-          '''        tools: List<AgentToolDefinition> = emptyList(),
-                  topP: Double? = null,
-                  topK: Int? = null,
-                  // [T-android-thinking-level-arch] Already clamped to the model ceiling by
-''')
-          replace_once(p,
-          '''        if (temperature != null && !thinkingLevel.isEnabled && !modelRejectsTemperature(model.id)) {
-                  body.put("temperature", temperature)
-              }
-''',
-          '''        if (temperature != null && !thinkingLevel.isEnabled && !modelRejectsTemperature(model.id)) {
-                  body.put("temperature", temperature)
-              }
-              // GH#32: Anthropic accepts top_p/top_k, but keep the existing
-              // extended-thinking request shape conservative and omit sampling
-              // overrides while thinking is enabled.
-              if (!thinkingLevel.isEnabled) {
-                  topP?.let { body.put("top_p", it) }
-                  topK?.let { body.put("top_k", it) }
-              }
-''')
-
-          # Gemini: generationConfig natively supports topP + topK.
-          p = 'src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt'
-          anchor = '''    override fun streamMessageClamped(
-              messages: List<LLMMessage>,
-              systemPrompt: String?,
-              maxTokens: Int,
-              temperature: Double?,
-              imageParts: List<LLMMessage.ImagePart>,
-              tools: List<AgentToolDefinition>,
-              thinkingLevel: ThinkingLevel,
-          ): Flow<LLMStreamChunk> = rawStreamMessage(
-              messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-          ).failOnSilentEmptyCompletion(name)
-'''
-          replace_once(p, anchor, anchor + '''
-              override fun streamMessageSamplingClamped(
-                  messages: List<LLMMessage>,
-                  systemPrompt: String?,
-                  maxTokens: Int,
-                  temperature: Double?,
-                  imageParts: List<LLMMessage.ImagePart>,
-                  tools: List<AgentToolDefinition>,
-                  thinkingLevel: ThinkingLevel,
-                  topP: Double?,
-                  topK: Int?,
-              ): Flow<LLMStreamChunk> = rawStreamMessage(
-                  messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-                  topP = topP, topK = topK,
-              ).failOnSilentEmptyCompletion(name)
-''')
-          replace_once(p,
-          '''        thinkingLevel: ThinkingLevel,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-                  val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
-''',
-          '''        thinkingLevel: ThinkingLevel,
-                  topP: Double? = null,
-                  topK: Int? = null,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-                  val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel, topP = topP, topK = topK)
-''')
-          replace_once(p,
-          '''        thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
-              ): JSONObject {
-''',
-          '''        thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
-                  topP: Double? = null,
-                  topK: Int? = null,
-              ): JSONObject {
-''')
-          replace_once(p,
-          '''        if (temperature != null) {
-                  config.put("temperature", temperature)
-              }
-''',
-          '''        if (temperature != null) {
-                  config.put("temperature", temperature)
-              }
-              topP?.let { config.put("topP", it) }
-              topK?.let { config.put("topK", it) }
-''')
-
-          # OpenAI-compatible Chat Completions: top_p is portable; top_k is not.
-          p = 'src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt'
-          anchor = '''    override fun streamMessageClamped(
-              messages: List<LLMMessage>,
-              systemPrompt: String?,
-              maxTokens: Int,
-              temperature: Double?,
-              imageParts: List<LLMMessage.ImagePart>,
-              tools: List<AgentToolDefinition>,
-              thinkingLevel: ThinkingLevel,
-          ): Flow<LLMStreamChunk> = rawStreamMessage(
-              messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-          ).failOnSilentEmptyCompletion(name)
-'''
-          replace_once(p, anchor, anchor + '''
-              override fun streamMessageSamplingClamped(
-                  messages: List<LLMMessage>,
-                  systemPrompt: String?,
-                  maxTokens: Int,
-                  temperature: Double?,
-                  imageParts: List<LLMMessage.ImagePart>,
-                  tools: List<AgentToolDefinition>,
-                  thinkingLevel: ThinkingLevel,
-                  topP: Double?,
-                  topK: Int?,
-              ): Flow<LLMStreamChunk> = rawStreamMessage(
-                  messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-                  topP = topP,
-              ).failOnSilentEmptyCompletion(name)
-''')
-          replace_once(p,
-          '''        thinkingLevel: ThinkingLevel,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-''',
-          '''        thinkingLevel: ThinkingLevel,
-                  topP: Double? = null,
-              ): Flow<LLMStreamChunk> = callbackFlow {
-''')
-          replace_once(p,
-          '''            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
-''',
-          '''            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, topP = topP, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
-''')
-          replace_once(p,
-          '''        stream: Boolean,
-                  temperature: Double?,
-                  imageParts: List<LLMMessage.ImagePart>,
-''',
-          '''        stream: Boolean,
-                  temperature: Double?,
-                  topP: Double? = null,
-                  imageParts: List<LLMMessage.ImagePart>,
-''')
-          replace_once(p,
-          '''        if (temperature != null) {
-                  body.put("temperature", temperature)
-              }
-''',
-          '''        if (temperature != null) {
-                  body.put("temperature", temperature)
-              }
-              topP?.let { body.put("top_p", it) }
-''')
-
-          # Agent loop: use the provider-aware sampling entry.
-          p = 'src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt'
-          replace_once(p,
-          '''                currentProvider.streamMessage(
-                      messages = applyRequestImageBudget(effectiveAgentHistory()),
-''',
-          '''                currentProvider.streamMessageWithSampling(
-                      messages = applyRequestImageBudget(effectiveAgentHistory()),
-''')
-          replace_once(p,
-          '''                    temperature = sessionOverrides.temperature,
-                      tools = turnTools,
-''',
-          '''                    temperature = sessionOverrides.temperature,
-                      tools = turnTools,
-                      topP = sessionOverrides.topP,
-                      topK = sessionOverrides.topK,
-''')
-
-          PY
+          python3 scripts/gh32_sampling_patch.py
           git diff --check
-      - name: Commit sampling wiring and remove temporary workflow
-        shell: bash
+          git diff -- src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt
+
+      - name: Commit sampling wiring and remove temporary files
         run: |
-          rm .github/workflows/gh32-sampling-patch.yml
+          rm .github/workflows/gh32-sampling-patch.yml scripts/gh32_sampling_patch.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt \
-                  src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt \
-                  src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt \
-                  src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt \
-                  .github/workflows/gh32-sampling-patch.yml
+          git add src/android/app/src/main/java/com/openminis/app/provider/anthropic/AnthropicProvider.kt src/android/app/src/main/java/com/openminis/app/provider/gemini/GeminiProvider.kt src/android/app/src/main/java/com/openminis/app/provider/openai/OpenAIProvider.kt src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt .github/workflows/gh32-sampling-patch.yml scripts/gh32_sampling_patch.py
+          git diff --cached --check
           git commit -m 'feat(session): apply top-p and top-k by provider capability'
           git push origin HEAD:feature/issue-32-session-overrides
