@@ -11,12 +11,7 @@ const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BRIDGE_BYTES: usize = 2 * 1024 * 1024;
 const MAGIC: &str = "MINISCFG1";
 
-#[derive(Debug, Clone)]
-struct ProxyInfo {
-    port: u16,
-}
-
-static STARTED: OnceLock<Result<ProxyInfo, String>> = OnceLock::new();
+static STARTED: OnceLock<Result<(), String>> = OnceLock::new();
 
 /// Start the guest-facing minis-config proxy once per minisd process.
 ///
@@ -30,10 +25,12 @@ pub fn ensure_started(app_uid: u32) {
     if app_uid == 0 {
         return;
     }
-    let _ = STARTED.get_or_init(|| start_proxy(app_uid));
+    if let Err(error) = STARTED.get_or_init(|| start_proxy(app_uid)) {
+        eprintln!("minis-config proxy init failed: {error}");
+    }
 }
 
-fn start_proxy(app_uid: u32) -> Result<ProxyInfo, String> {
+fn start_proxy(app_uid: u32) -> Result<(), String> {
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .map_err(|e| format!("bind minis-config proxy: {e}"))?;
     let port = listener
@@ -47,7 +44,7 @@ fn start_proxy(app_uid: u32) -> Result<ProxyInfo, String> {
         .name("minisd-config-proxy".into())
         .spawn(move || accept_loop(listener, token, bridge_name))
         .map_err(|e| format!("spawn minis-config proxy: {e}"))?;
-    Ok(ProxyInfo { port })
+    Ok(())
 }
 
 fn accept_loop(listener: TcpListener, token: String, bridge_name: String) {
@@ -156,7 +153,7 @@ fn forward_to_android(
     #[cfg(not(unix))]
     {
         let _ = (bridge_name, args, cwd, session);
-        return Err("Android config bridge requires unix".into());
+        Err("Android config bridge requires unix".into())
     }
     #[cfg(unix)]
     {
@@ -258,9 +255,7 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
     std::fs::create_dir_all(&usr_local_bin)
         .map_err(|e| format!("mkdir {}: {e}", usr_local_bin.display()))?;
 
-    let config = format!(
-        "MINIS_CONFIG_PROXY_PORT={port}\nMINIS_CONFIG_PROXY_TOKEN='{token}'\n"
-    );
+    let config = format!("MINIS_CONFIG_PROXY_PORT={port}\nMINIS_CONFIG_PROXY_TOKEN='{token}'\n");
     std::fs::write(etc_dir.join("minis-config-proxy"), config)
         .map_err(|e| format!("write minis-config proxy config: {e}"))?;
 
@@ -358,14 +353,15 @@ fn random_token() -> Result<String, String> {
 fn read_line_limited<R: BufRead>(reader: &mut R, max: usize) -> Result<String, String> {
     let mut out = Vec::new();
     loop {
-        if out.len() > max {
-            return Err("proxy line too large".into());
-        }
         let buf = reader.fill_buf().map_err(|e| e.to_string())?;
         if buf.is_empty() {
             return Err("unexpected EOF".into());
         }
-        let take = buf.iter().position(|b| *b == b'\n').map(|i| i + 1).unwrap_or(buf.len());
+        let take = buf
+            .iter()
+            .position(|b| *b == b'\n')
+            .map(|i| i + 1)
+            .unwrap_or(buf.len());
         let remaining = max.saturating_add(1).saturating_sub(out.len());
         if take > remaining {
             return Err("proxy line too large".into());
