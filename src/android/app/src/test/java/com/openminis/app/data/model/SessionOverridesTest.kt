@@ -45,6 +45,16 @@ class SessionOverridesTest {
     }
 
     @Test
+    fun `non array tool allow-list safely inherits without discarding valid siblings`() {
+        val decoded = SessionOverrides.fromJson(
+            """{"temperature":0.5,"enabledTools":"file_read"}""",
+        )
+
+        assertEquals(0.5, decoded.temperature!!, 0.0)
+        assertNull(decoded.enabledTools)
+    }
+
+    @Test
     fun `malformed and out of range fields fall back independently`() {
         val decoded = SessionOverrides.fromJson(
             """{
