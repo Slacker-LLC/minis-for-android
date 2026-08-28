@@ -79,6 +79,61 @@ interface LLMProvider {
     )
 
     /**
+     * GH#32 provider-aware sampling entry used by the per-session agent loop.
+     * Existing callers and provider/test implementations keep using
+     * [streamMessage] unchanged. Providers that can safely map top-p/top-k to
+     * their wire format override [streamMessageSamplingClamped]; the default
+     * deliberately ignores unsupported sampling fields instead of emitting
+     * unknown keys to strict OpenAI-compatible relays.
+     */
+    fun streamMessageWithSampling(
+        messages: List<LLMMessage>,
+        systemPrompt: String?,
+        maxTokens: Int,
+        temperature: Double? = null,
+        imageParts: List<LLMMessage.ImagePart> = emptyList(),
+        tools: List<AgentToolDefinition> = emptyList(),
+        thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
+        topP: Double? = null,
+        topK: Int? = null,
+    ): Flow<LLMStreamChunk> = streamMessageSamplingClamped(
+        messages = messages,
+        systemPrompt = systemPrompt,
+        maxTokens = maxTokens,
+        temperature = temperature,
+        imageParts = imageParts,
+        tools = tools,
+        thinkingLevel = clampThinkingLevel(thinkingLevel),
+        topP = topP,
+        topK = topK,
+    )
+
+    /**
+     * Provider hook for [streamMessageWithSampling]. Default behavior preserves
+     * the historical request shape and ignores sampling knobs the provider has
+     * not explicitly opted into.
+     */
+    fun streamMessageSamplingClamped(
+        messages: List<LLMMessage>,
+        systemPrompt: String?,
+        maxTokens: Int,
+        temperature: Double?,
+        imageParts: List<LLMMessage.ImagePart>,
+        tools: List<AgentToolDefinition>,
+        thinkingLevel: ThinkingLevel,
+        topP: Double?,
+        topK: Int?,
+    ): Flow<LLMStreamChunk> = streamMessageClamped(
+        messages = messages,
+        systemPrompt = systemPrompt,
+        maxTokens = maxTokens,
+        temperature = temperature,
+        imageParts = imageParts,
+        tools = tools,
+        thinkingLevel = thinkingLevel,
+    )
+
+    /**
      * [T-android-thinking-level-arch] Provider implementations override THIS
      * (not [sendMessage]). The `thinkingLevel` received here has already been
      * clamped to the model's ceiling by [sendMessage] — implementations must NOT
