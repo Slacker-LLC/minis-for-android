@@ -1,4 +1,4 @@
-use crate::protocol::{is_known_method, ErrorCode};
+use crate::protocol::{is_known_method, ErrorCode, LEGACY_REMOVED_METHODS};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -56,8 +56,16 @@ fn is_builtin_root_exec_tool(tool: &str) -> bool {
 
 impl PolicyFile {
     pub fn parse(json: &str) -> Result<Self, String> {
-        let policy: PolicyFile =
+        let mut policy: PolicyFile =
             serde_json::from_str(json).map_err(|e| format!("policy json: {e}"))?;
+        // In-place upgrades keep the previous installation's policy file until
+        // the app materializes a fresh one. Methods that were intentionally
+        // removed are dropped instead of fatal: dispatch never consults them,
+        // so retaining them could only block startup. Unknown methods remain a
+        // hard error so a malformed or future policy still fails closed.
+        policy
+            .methods
+            .retain(|name, _| !LEGACY_REMOVED_METHODS.contains(&name.as_str()));
         policy.validate()?;
         Ok(policy)
     }
@@ -167,6 +175,17 @@ mod tests {
         )
         .is_err());
         assert!(PolicyFile::parse("{").is_err());
+    }
+
+    #[test]
+    fn legacy_removed_methods_are_stripped_but_unknown_methods_still_fail() {
+        let legacy = PolicyFile::parse(
+            r#"{"methods":{"policy.reload":{"mode":"allow"},"system.ping":{"mode":"allow"}}}"#,
+        )
+        .unwrap();
+        assert!(legacy.method("policy.reload").is_none());
+        assert!(legacy.method("system.ping").is_some());
+        assert!(PolicyFile::parse(r#"{"methods":{"nope":{"mode":"allow"}}}"#).is_err());
     }
 
     #[test]

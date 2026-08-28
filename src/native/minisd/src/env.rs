@@ -73,22 +73,38 @@ pub fn parse_dumpsys_dns(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in text.lines() {
         let lower = line.to_ascii_lowercase();
-        if !(lower.contains("dnsaddresses")
-            || lower.contains("dnsservers")
-            || lower.contains("dns server"))
-        {
+        let Some(start) = lower.find("dnsaddresses") else {
             continue;
-        }
-        for token in line.split(|c: char| !c.is_ascii_hexdigit() && c != '.' && c != ':') {
+        };
+        // A NetworkAgentInfo line also embeds LinkAddresses, PcscfAddresses,
+        // and Routes. Only the bracket group immediately following the
+        // `DnsAddresses:` label contains resolvers; parsing the whole line
+        // would drag in the device's own IPs and route peers.
+        let rest = &line[start..];
+        let Some(open) = rest.find('[') else {
+            continue;
+        };
+        let Some(close) = rest[open..].find(']') else {
+            continue;
+        };
+        let inner = &rest[open + 1..open + close];
+        for token in inner.split(|c: char| !c.is_ascii_hexdigit() && c != '.' && c != ':') {
             if token.is_empty() {
                 continue;
             }
-            if (token.parse::<std::net::Ipv4Addr>().is_ok()
-                || token.parse::<std::net::Ipv6Addr>().is_ok())
-                && token != "127.0.0.1"
-                && token != "::1"
-                && !out.iter().any(|s| s == token)
-            {
+            let usable = if let Ok(ip4) = token.parse::<std::net::Ipv4Addr>() {
+                !ip4.is_unspecified() && !ip4.is_loopback() && !ip4.is_broadcast()
+            } else if let Ok(ip6) = token.parse::<std::net::Ipv6Addr>() {
+                let first = ip6.segments()[0];
+                !ip6.is_unspecified()
+                    && !ip6.is_loopback()
+                    // fe80::/10 needs an interface scope and cannot be a
+                    // usable nameserver entry.
+                    && first & 0xffc0 != 0xfe80
+            } else {
+                false
+            };
+            if usable && !out.iter().any(|s| s == token) {
                 out.push(token.to_string());
             }
         }
@@ -189,7 +205,27 @@ pub fn discover_dns() -> Vec<String> {
             }
         }
     }
-    found
+    // Modern Android keeps the authoritative per-network resolvers in
+    // `dumpsys connectivity`; the legacy getprop keys above are empty on
+    // private-DNS devices. Extract every live network's resolvers before
+    // falling back, so the guest can use the same DNS the phone is using
+    // (router DNS, carrier DNS, or an active VPN's DNS).
+    if let Ok(out) = std::process::Command::new("/system/bin/dumpsys")
+        .args(["connectivity"])
+        .output()
+    {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            found.extend(parse_dumpsys_dns(&text));
+        }
+    }
+    let mut deduped: Vec<String> = Vec::new();
+    for server in found {
+        if !deduped.iter().any(|existing| existing == &server) {
+            deduped.push(server);
+        }
+    }
+    deduped
 }
 
 pub fn discover_tz() -> String {
@@ -279,9 +315,11 @@ mod tests {
 
     #[test]
     fn dumpsys_dns_extract() {
-        let sample = "    DnsAddresses: [ /192.168.1.1 , /2001:4860:4860::8888 ]\n";
+        let sample = "LinkAddresses: [ /2408:853f:4c60:5179::1/64 ] DnsAddresses: [ /192.168.1.1 , /2001:4860:4860::8888 ] PcscfAddresses: [ /2408:8141:8000:1:4::1c8 ]\n";
         let got = parse_dumpsys_dns(sample);
         assert!(got.contains(&"192.168.1.1".into()));
+        assert!(got.contains(&"2001:4860:4860::8888".into()));
+        assert!(!got.iter().any(|s| s.contains("2408")));
     }
 
     #[test]
