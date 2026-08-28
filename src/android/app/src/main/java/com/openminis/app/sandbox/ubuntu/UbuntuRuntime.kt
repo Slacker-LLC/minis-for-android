@@ -178,8 +178,10 @@ object UbuntuRuntime {
                 "Root authorization denied or unavailable (exit=${rootProbe.exitValue()}): $detail",
             )
         }
-        val effectiveUid = rootOutput.lineSequence().map { it.trim() }.lastOrNull { it.isNotEmpty() }
-        if (effectiveUid != "0") {
+        val effectiveUid = rootOutput.lineSequence()
+            .mapNotNull { it.trim().toIntOrNull() }
+            .firstOrNull()
+        if (effectiveUid != 0) {
             return@withContext MinisdSpawnResult(
                 false,
                 "Root authorization invalid: su returned uid=${effectiveUid ?: "unknown"}, expected 0",
