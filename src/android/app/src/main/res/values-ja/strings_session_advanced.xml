@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">このセッションで永続メモリを注入して使用できるようにします。</string>
     <string name="session_advanced_thinking">思考レベル</string>
     <string name="session_advanced_thinking_not_supported">現在のモデルではサポートされていません</string>
-    <string name="session_advanced_instructions_section">指示</string>
-    <string name="session_advanced_system_prompt">セッション指示</string>
-    <string name="session_advanced_system_prompt_hint">このセッション用の追加指示</string>
+    <string name="session_advanced_instructions_section">セッション Soul</string>
+    <string name="session_advanced_system_prompt">セッション人格</string>
+    <string name="session_advanced_system_prompt_hint">この会話での役割、人格、口調、振る舞い。</string>
+    <string name="session_advanced_soul_help">既定ではグローバル SOUL.md を使用します。最初のメッセージ前にセッション Soul を設定すると、この会話ではグローバル Soul の代わりに使用されます。チャット開始後は選択がロックされます。</string>
+    <string name="session_advanced_soul_locked_help">この会話はすでに開始されています。Soul の選択はロックされており、チャット履歴を消去しても変更できません。</string>
+    <string name="session_advanced_soul_locked_custom">カスタム Soul · ロック済み</string>
+    <string name="session_advanced_soul_locked_global">グローバル Soul · ロック済み</string>
     <string name="session_advanced_model_section">モデルパラメータ</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">上書きをリセット</string>
     <string name="session_advanced_loading">セッション設定を準備しています…</string>
     <string name="session_advanced_missing_session">このセッションを準備できませんでした。</string>
-    <string name="session_advanced_invalid_prompt">セッション指示を入力するか、「カスタム」をオフにしてください。</string>
+    <string name="session_advanced_invalid_prompt">セッション人格を入力するか、「カスタム」をオフにしてください。</string>
     <string name="session_advanced_invalid_temperature">Temperature は 0.0 から 2.0 の範囲で指定してください。</string>
     <string name="session_advanced_invalid_max_tokens">最大出力トークンは正の整数で指定してください。</string>
     <string name="session_advanced_save_failed">セッション設定を保存できませんでした。</string>
