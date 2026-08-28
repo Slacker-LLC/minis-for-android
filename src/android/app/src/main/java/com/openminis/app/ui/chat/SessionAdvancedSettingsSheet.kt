@@ -47,6 +47,10 @@ import kotlinx.coroutines.launch
  * which means the next request inherits the then-current global/model default.
  * Memory and thinking deliberately reuse ChatViewModel's existing per-session
  * state/persistence paths instead of being duplicated inside SessionOverrides.
+ *
+ * Session Soul is special: null means "use global SOUL.md". A custom Soul may
+ * only be selected while the conversation is still empty. Once the first user
+ * message exists, that choice is immutable for the lifetime of the session.
  */
 @Composable
 fun SessionAdvancedSettingsSheet(
@@ -72,6 +76,8 @@ fun SessionAdvancedSettingsSheet(
 
     var customInstructions by remember(sessionId) { mutableStateOf(false) }
     var instructionsText by remember(sessionId) { mutableStateOf("") }
+    var soulLocked by remember(sessionId) { mutableStateOf(false) }
+    var lockedSoulText by remember(sessionId) { mutableStateOf<String?>(null) }
     var customTemperature by remember(sessionId) { mutableStateOf(false) }
     var temperatureText by remember(sessionId) { mutableStateOf("") }
     var customMaxTokens by remember(sessionId) { mutableStateOf(false) }
@@ -85,6 +91,23 @@ fun SessionAdvancedSettingsSheet(
     val invalidPromptMessage = stringResource(R.string.session_advanced_invalid_prompt)
     val invalidTemperatureMessage = stringResource(R.string.session_advanced_invalid_temperature)
     val invalidMaxTokensMessage = stringResource(R.string.session_advanced_invalid_max_tokens)
+
+    /**
+     * Re-check at write time, not only when the sheet opened. A remote send or
+     * another surface could start the conversation while this sheet is still
+     * visible. lastMessage keeps the lock sticky even after Clear Chat removes
+     * message rows, while the user-row check covers sessions whose preview has
+     * not been populated yet.
+     */
+    suspend fun currentSoulLockState(sid: String): Pair<Boolean, String?> {
+        val latestSession = runCatching { chatRepository.dao.getSession(sid) }.getOrNull()
+        val hasUserMessage = runCatching {
+            chatRepository.dao.loadMessages(sid).any { it.role == "user" }
+        }.getOrDefault(false)
+        val locked = hasUserMessage || latestSession?.lastMessage != null
+        val soul = SessionOverrides.fromJson(latestSession?.sessionOverrides).editableSystemPrompt()
+        return locked to soul
+    }
 
     LaunchedEffect(sessionId) {
         // A brand-new chat uses a synthetic __new__ id until first send. Opening
@@ -102,8 +125,12 @@ fun SessionAdvancedSettingsSheet(
 
         persistedSessionId = sid
         val overrides = SessionOverrides.fromJson(session.sessionOverrides)
-        customInstructions = overrides.systemPrompt != null
-        instructionsText = overrides.systemPrompt.orEmpty()
+        val editableSoul = overrides.editableSystemPrompt()
+        val (locked, persistedSoul) = currentSoulLockState(sid)
+        soulLocked = locked
+        lockedSoulText = persistedSoul
+        customInstructions = editableSoul != null
+        instructionsText = editableSoul.orEmpty()
         customTemperature = overrides.temperature != null
         temperatureText = overrides.temperature?.toString().orEmpty()
         customMaxTokens = overrides.maxTokens != null
@@ -116,7 +143,11 @@ fun SessionAdvancedSettingsSheet(
     fun buildOverridesOrShowError(): SessionOverrides? {
         errorText = null
 
-        val prompt = if (customInstructions) {
+        val prompt = if (soulLocked) {
+            // Immutable after the first user message: always preserve the value
+            // that was already persisted when the session became active.
+            lockedSoulText
+        } else if (customInstructions) {
             instructionsText.trim().takeIf { it.isNotEmpty() }
                 ?: run {
                     errorText = invalidPromptMessage
@@ -136,7 +167,6 @@ fun SessionAdvancedSettingsSheet(
         } else {
             null
         }
-
 
         val maxTokens = if (customMaxTokens) {
             val value = maxTokensText.trim().toIntOrNull()
@@ -217,26 +247,54 @@ fun SessionAdvancedSettingsSheet(
             item {
                 SettingsSection(
                     header = stringResource(R.string.session_advanced_instructions_section),
-                    footer = stringResource(R.string.session_advanced_settings_inherit_help),
+                    footer = if (soulLocked) {
+                        stringResource(R.string.session_advanced_soul_locked_help)
+                    } else {
+                        stringResource(R.string.session_advanced_soul_help)
+                    },
                 ) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.session_advanced_system_prompt),
-                        subtitle = stringResource(R.string.session_advanced_custom),
-                        checked = customInstructions,
-                        onCheckedChange = { customInstructions = it; errorText = null },
-                        showDivider = customInstructions,
-                    )
-                    if (customInstructions) {
-                        OutlinedTextField(
-                            value = instructionsText,
-                            onValueChange = { instructionsText = it; errorText = null },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            placeholder = { Text(stringResource(R.string.session_advanced_system_prompt_hint)) },
-                            minLines = 4,
-                            maxLines = 10,
+                    if (soulLocked) {
+                        SettingsValueRow(
+                            title = stringResource(R.string.session_advanced_system_prompt),
+                            value = if (customInstructions) {
+                                stringResource(R.string.session_advanced_soul_locked_custom)
+                            } else {
+                                stringResource(R.string.session_advanced_soul_locked_global)
+                            },
+                            showDivider = customInstructions,
                         )
+                        if (customInstructions) {
+                            OutlinedTextField(
+                                value = instructionsText,
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                minLines = 4,
+                                maxLines = 10,
+                            )
+                        }
+                    } else {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.session_advanced_system_prompt),
+                            subtitle = stringResource(R.string.session_advanced_custom),
+                            checked = customInstructions,
+                            onCheckedChange = { customInstructions = it; errorText = null },
+                            showDivider = customInstructions,
+                        )
+                        if (customInstructions) {
+                            OutlinedTextField(
+                                value = instructionsText,
+                                onValueChange = { instructionsText = it; errorText = null },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                placeholder = { Text(stringResource(R.string.session_advanced_system_prompt_hint)) },
+                                minLines = 4,
+                                maxLines = 10,
+                            )
+                        }
                     }
                 }
             }
@@ -354,7 +412,15 @@ fun SessionAdvancedSettingsSheet(
                             errorText = null
                             scope.launch {
                                 val result = runCatching {
-                                    chatRepository.dao.updateSessionOverrides(sid, null)
+                                    val (lockedNow, existingSoul) = currentSoulLockState(sid)
+                                    val resetValue = if (lockedNow) {
+                                        // Reset every mutable advanced override, but never
+                                        // change the Soul decision after the chat has begun.
+                                        SessionOverrides(systemPrompt = existingSoul).toJsonOrNull()
+                                    } else {
+                                        null
+                                    }
+                                    chatRepository.dao.updateSessionOverrides(sid, resetValue)
                                 }
                                 isSaving = false
                                 if (result.isSuccess) {
@@ -372,13 +438,22 @@ fun SessionAdvancedSettingsSheet(
                         enabled = !isSaving && persistedSessionId != null && errorText != missingSessionMessage,
                         onClick = save@{
                             val sid = persistedSessionId ?: return@save
-                            val overrides = buildOverridesOrShowError() ?: return@save
+                            val requested = buildOverridesOrShowError() ?: return@save
                             isSaving = true
                             scope.launch {
                                 val result = runCatching {
+                                    // Re-check the lock immediately before the write. If
+                                    // another surface sent the first message while this
+                                    // sheet was open, preserve the already-persisted Soul.
+                                    val (lockedNow, existingSoul) = currentSoulLockState(sid)
+                                    val safeOverrides = if (lockedNow) {
+                                        requested.copy(systemPrompt = existingSoul)
+                                    } else {
+                                        requested
+                                    }
                                     chatRepository.dao.updateSessionOverrides(
                                         sid,
-                                        overrides.toJsonOrNull(),
+                                        safeOverrides.toJsonOrNull(),
                                     )
                                 }
                                 isSaving = false
