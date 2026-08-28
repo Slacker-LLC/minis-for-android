@@ -16,6 +16,11 @@
     <string name="session_advanced_model_section">Modellparameter</string>
     <string name="session_advanced_temperature">Temperatur</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_top_p">Top P</string>
+    <string name="session_advanced_top_p_hint">0.0–1.0</string>
+    <string name="session_advanced_top_k">Top K</string>
+    <string name="session_advanced_top_k_hint">Positive Ganzzahl</string>
+    <string name="session_advanced_sampling_help">Top P wird von unterstützten Anbietern angewendet. Top K wird von Anthropic und Gemini angewendet; nicht unterstützte Anbieter ignorieren es sicher.</string>
     <string name="session_advanced_max_tokens">Maximale Ausgabetokens</string>
     <string name="session_advanced_max_tokens_hint">Positive Ganzzahl</string>
     <string name="session_advanced_tools_section">Werkzeuge</string>
@@ -27,6 +32,8 @@
     <string name="session_advanced_missing_session">Diese Sitzung konnte nicht vorbereitet werden.</string>
     <string name="session_advanced_invalid_prompt">Geben Sie Sitzungsanweisungen ein oder deaktivieren Sie „Benutzerdefiniert“.</string>
     <string name="session_advanced_invalid_temperature">Die Temperatur muss zwischen 0.0 und 2.0 liegen.</string>
+    <string name="session_advanced_invalid_top_p">Top P muss zwischen 0.0 und 1.0 liegen.</string>
+    <string name="session_advanced_invalid_top_k">Top K muss eine positive Ganzzahl sein.</string>
     <string name="session_advanced_invalid_max_tokens">Die maximale Anzahl der Ausgabetokens muss eine positive Ganzzahl sein.</string>
     <string name="session_advanced_save_failed">Sitzungseinstellungen konnten nicht gespeichert werden.</string>
     <string name="session_advanced_reset_failed">Sitzungseinstellungen konnten nicht zurückgesetzt werden.</string>
