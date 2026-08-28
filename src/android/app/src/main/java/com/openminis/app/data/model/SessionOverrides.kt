@@ -91,16 +91,19 @@ data class SessionOverrides(
             val topK = json.optInt(KEY_TOP_K, -1).takeIf { it > 0 }
             val maxTokens = json.optInt(KEY_MAX_TOKENS, -1).takeIf { it > 0 }
 
-            val enabledTools = if (json.has(KEY_ENABLED_TOOLS) && !json.isNull(KEY_ENABLED_TOOLS)) {
+            val enabledTools: Set<String>? = if (
+                json.has(KEY_ENABLED_TOOLS) && !json.isNull(KEY_ENABLED_TOOLS)
+            ) {
                 val array = json.optJSONArray(KEY_ENABLED_TOOLS)
                 if (array == null) {
                     null
                 } else {
-                    buildSet {
-                        for (i in 0 until array.length()) {
-                            array.optString(i, "").trim().takeIf { it.isNotEmpty() }?.let(::add)
-                        }
+                    val parsed = linkedSetOf<String>()
+                    for (i in 0 until array.length()) {
+                        val toolId = array.optString(i, "").trim()
+                        if (toolId.isNotEmpty()) parsed.add(toolId)
                     }
+                    parsed
                 }
             } else {
                 null
