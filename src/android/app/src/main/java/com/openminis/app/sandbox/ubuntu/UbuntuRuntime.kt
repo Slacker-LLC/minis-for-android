@@ -84,31 +84,38 @@ object UbuntuRuntime {
     }
 
     suspend fun ensureReady(): Snapshot = startLock.withLock {
-        var cur = client.ubuntuStatusLocal()?.let { apply(it) } ?: Snapshot()
+        val initialStatus = client.ubuntuStatusLocal()
+        var cur = initialStatus?.let { apply(it) } ?: Snapshot()
         if (cur.running) {
             redirectPaths = true
             return cur
         }
-        // minisd down (e.g. after reboot) → actively establish root authorization,
-        // then spawn the watchdog. B13's pidfile flock makes a duplicate spawn harmless.
-        val spawn = ensureMinisdUp()
-        if (!spawn.started) {
-            val failed = Snapshot(
-                running = false,
-                available = false,
-                lastError = spawn.error ?: "minisd watchdog could not be started",
-            )
-            _snapshot.value = failed
-            redirectPaths = false
-            Log.w(TAG, "ensureReady failed: ${failed.lastError}")
-            return failed
+
+        if (initialStatus?.ok != true) {
+            // Broker is absent (e.g. after reboot) → actively establish root
+            // authorization, then spawn its watchdog.
+            val spawn = ensureMinisdUp()
+            if (!spawn.started) {
+                val failed = Snapshot(
+                    running = false,
+                    available = false,
+                    lastError = spawn.error ?: "minisd watchdog could not be started",
+                )
+                _snapshot.value = failed
+                redirectPaths = false
+                Log.w(TAG, "ensureReady failed: ${failed.lastError}")
+                return failed
+            }
+            // Wait only for the app socket to answer. Ubuntu itself may still be
+            // stopped; ubuntu.start below is responsible for bringing it up.
+            for (i in 0 until 10) {
+                delay(300)
+                val status = client.ubuntuStatusLocal() ?: continue
+                cur = apply(status)
+                if (status.ok) break
+            }
         }
-        for (i in 0 until 10) {
-            delay(300)
-            val status = client.ubuntuStatusLocal() ?: continue
-            cur = apply(status)
-            if (status.ok) break
-        }
+
         if (cur.running) {
             redirectPaths = true
             return cur
@@ -134,7 +141,7 @@ object UbuntuRuntime {
      * Establishes a real uid-0 `su` session first, so KernelSU can grant or
      * reject the current install explicitly. The app UID is then injected as a
      * trusted root-process environment override; the watchdog and every child
-     * inherit it, so policy reload/reparse cannot fall back to a device UID.
+     * inherit it, so every policy parse keeps the current install's UID.
      */
     private suspend fun ensureMinisdUp(): MinisdSpawnResult = withContext(Dispatchers.IO) {
         val su = resolveSu()
