@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">高级设置</string>
+    <string name="session_advanced_settings_menu">高级设置</string>
+    <string name="session_advanced_settings_inherit_help">覆盖项仅作用于当前会话。关闭“自定义”后，将继承当前全局或模型默认值。</string>
+    <string name="session_advanced_custom">自定义</string>
+    <string name="session_advanced_runtime_section">会话行为</string>
+    <string name="session_advanced_runtime_help">记忆和思考复用现有的会话级控制，因此修改会立即生效，也不会重复写入覆盖配置 JSON。</string>
+    <string name="session_advanced_memory">记忆</string>
+    <string name="session_advanced_memory_help">允许此会话注入并使用持久记忆。</string>
+    <string name="session_advanced_thinking">思考级别</string>
+    <string name="session_advanced_thinking_not_supported">当前模型不支持</string>
+    <string name="session_advanced_instructions_section">指令</string>
+    <string name="session_advanced_system_prompt">会话指令</string>
+    <string name="session_advanced_system_prompt_hint">为此会话添加额外指令</string>
+    <string name="session_advanced_model_section">模型参数</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">最大输出 Token</string>
+    <string name="session_advanced_max_tokens_hint">正整数</string>
+    <string name="session_advanced_tools_section">工具</string>
+    <string name="session_advanced_tools">自定义工具白名单</string>
+    <string name="session_advanced_tools_help">限制此会话原本可使用的工具。模型能力、记忆、预设和运行时能力检查仍可能进一步移除工具。</string>
+    <string name="session_advanced_save">保存</string>
+    <string name="session_advanced_reset_all">重置覆盖项</string>
+    <string name="session_advanced_loading">正在准备会话设置…</string>
+    <string name="session_advanced_missing_session">无法准备此会话。</string>
+    <string name="session_advanced_invalid_prompt">请输入会话指令，或关闭“自定义”。</string>
+    <string name="session_advanced_invalid_temperature">Temperature 必须在 0.0 到 2.0 之间。</string>
+    <string name="session_advanced_invalid_max_tokens">最大输出 Token 必须是正整数。</string>
+    <string name="session_advanced_save_failed">无法保存会话设置。</string>
+    <string name="session_advanced_reset_failed">无法重置会话设置。</string>
+</resources>
