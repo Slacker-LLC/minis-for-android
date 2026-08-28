@@ -16,6 +16,11 @@
     <string name="session_advanced_model_section">模型参数</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_top_p">Top P</string>
+    <string name="session_advanced_top_p_hint">0.0–1.0</string>
+    <string name="session_advanced_top_k">Top K</string>
+    <string name="session_advanced_top_k_hint">正整数</string>
+    <string name="session_advanced_sampling_help">Top P 会在支持的 Provider 上生效。Top K 目前由 Anthropic 和 Gemini 应用；不支持的 Provider 会安全忽略。</string>
     <string name="session_advanced_max_tokens">最大输出 Token</string>
     <string name="session_advanced_max_tokens_hint">正整数</string>
     <string name="session_advanced_tools_section">工具</string>
@@ -27,6 +32,8 @@
     <string name="session_advanced_missing_session">无法准备此会话。</string>
     <string name="session_advanced_invalid_prompt">请输入会话指令，或关闭“自定义”。</string>
     <string name="session_advanced_invalid_temperature">Temperature 必须在 0.0 到 2.0 之间。</string>
+    <string name="session_advanced_invalid_top_p">Top P 必须在 0.0 到 1.0 之间。</string>
+    <string name="session_advanced_invalid_top_k">Top K 必须是正整数。</string>
     <string name="session_advanced_invalid_max_tokens">最大输出 Token 必须是正整数。</string>
     <string name="session_advanced_save_failed">无法保存会话设置。</string>
     <string name="session_advanced_reset_failed">无法重置会话设置。</string>
