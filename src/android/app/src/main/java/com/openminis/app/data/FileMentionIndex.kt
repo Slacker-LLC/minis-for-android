@@ -20,8 +20,8 @@ import java.util.UUID
  * roots, then (if mounts are attached) external mounts.
  *
  * ### Layers
- *   1. **Session roots** — `workspace/<sid>` + `attachments/<sid>`.
- *   2. **Shared roots** — `shared/`, `skills/`, `memory/`.
+ *   1. **Session roots** — `minis-sessions/<sid>/{workspace,attachments}`.
+ *   2. **Shared roots** — `minis-global/{shared,skills,memory}`.
  *   3. **Mount roots** — each entry in [mountsProvider] (e.g. SAF-attached
  *      folders). Each mount always gets a self-entry so `@<mountName>` works.
  *
@@ -43,7 +43,7 @@ class FileMentionIndex(
     private val cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    constructor(context: Context) : this(File(context.filesDir, "minis-global"))
+    constructor(context: Context) : this(context.filesDir)
 
     /**
      * Scope priorities — `order` doubles as the empty-query default sort key
@@ -116,14 +116,18 @@ class FileMentionIndex(
         _isScanning.value = true
         val collected = mutableListOf<Entry>()
         try {
+            if (!com.openminis.app.sandbox.ubuntu.UbuntuPaths.isSafeSessionId(sessionId)) {
+                publish(token, collected)
+                return
+            }
             // Layer 1: session-local roots.
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(filesDir, "workspace/$sessionId") to Scope.WORKSPACE,
-                    File(filesDir, "attachments/$sessionId") to Scope.ATTACHMENTS,
+                    File(filesDir, "minis-sessions/$sessionId/workspace") to Scope.WORKSPACE,
+                    File(filesDir, "minis-sessions/$sessionId/attachments") to Scope.ATTACHMENTS,
                 ),
-                linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}/$sessionId" },
+                linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->
                 collected += newBatch
                 publish(token, collected)
@@ -133,9 +137,9 @@ class FileMentionIndex(
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(filesDir, "shared") to Scope.SHARED,
-                    File(filesDir, "skills") to Scope.SKILLS,
-                    File(filesDir, "memory") to Scope.MEMORY,
+                    File(filesDir, "minis-global/shared") to Scope.SHARED,
+                    File(filesDir, "minis-global/skills") to Scope.SKILLS,
+                    File(filesDir, "minis-global/memory") to Scope.MEMORY,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->

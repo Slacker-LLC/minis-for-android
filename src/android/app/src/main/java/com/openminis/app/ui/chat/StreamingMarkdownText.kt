@@ -1897,14 +1897,20 @@ private fun RenderBlock(block: MdBlock) {
             val context = LocalContext.current
             val sessionId = LocalMarkdownSessionId.current
             // Resolve to a host File via the session-scoped resolver before
-            // handing off to Coil. AsyncImage(model = "minis://...") routes
-            // through MinisImageFetcher → MinisKernel.resolveHostPath, which
-            // reads the *global* bindMounts map — last-writer-wins across
-            // sessions. When another session booted its shell more recently,
-            // that global lookup answers with the wrong session's path (or
-            // null) and the image quietly renders as a 0-height placeholder.
-            // The video/audio renderers already follow this pattern.
+            // handing off to Coil. The generic minis:// fetcher has no chat
+            // identity, so a known-session miss must never fall through to it.
             val file = remember(block.url, sessionId) { resolveMdMediaFile(context, block.url, sessionId) }
+            val imageData = remember(file, block.url, sessionId) {
+                if (file != null) {
+                    file
+                } else if (sessionId != null && block.url.substringBefore('?').startsWith("minis://")) {
+                    // A deterministic non-existent file makes Coil surface its
+                    // error placeholder without probing another chat's mounts.
+                    File(context.cacheDir, ".missing-minis-media/${block.url.hashCode()}")
+                } else {
+                    block.url
+                }
+            }
             // T146: 1dp hairline + 2dp soft shadow so a white-bg PNG (matplotlib
             // chart, screenshot…) reads as a discrete card against the chat
             // surface. Same ChatColors.thumbnailBorder / inputShadow recipe as
@@ -1944,9 +1950,9 @@ private fun RenderBlock(block: MdBlock) {
             // Remembered per (file, url): this renderer recomposes on every
             // streaming token, and rebuilding the request each time would churn
             // allocations in a hot path.
-            val imageRequest = remember(file, block.url) {
+            val imageRequest = remember(imageData) {
                 ImageRequest.Builder(context)
-                    .data(file ?: block.url)
+                    .data(imageData)
                     .limitDisplaySize()
                     .build()
             }
@@ -2253,13 +2259,8 @@ private fun BrokenImagePlaceholder(alt: String?) {
  * Resolve a markdown media URL (`minis://attachments/foo.mp4`, file://, or
  * plain absolute path) to a host File.
  *
- * First tries `MinisKernel.resolveHostPath` (same as MinisImageFetcher). If
- * that fails — e.g. bind mounts are pointing at a different session, or the
- * file was written under a `__new__...` draft id that predates
- * `ensureSession()` rename — we fall back to scanning all per-session
- * attachment directories for a file of the same basename. Mirrors the iOS
- * attach-path resolution which walks the session cache when the primary
- * lookup misses.
+ * A caller with a session id resolves only within that session. Sessionless
+ * legacy callers retain the old compatibility search across draft folders.
  */
 internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String? = null): File? {
     if (url.isBlank()) return null
@@ -2289,6 +2290,11 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
         return primary
     }
 
+    // With an owning session, a miss must stay a miss. Searching every chat
+    // would make a known filename from another session readable and would
+    // make historical links resolve nondeterministically.
+    if (sessionId != null) return null
+
     // Fallback: search every minis-sessions/<id>/{attachments,workspace,offloads,browser}
     // subtree for a file whose basename matches. Handles leftover files from a
     // draft session whose bind mount has already switched over, and the case
@@ -2311,7 +2317,7 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
             }
         }
     }
-    // Also probe `minis-global/<subdir>` for shared/memory/skills buckets.
+    // Also probe the App-global shared/memory/skills buckets.
     val globalCandidate = File(context.filesDir, "minis-global/$subdir/$basename")
     if (globalCandidate.exists() && globalCandidate.isFile) {
         android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> global=${globalCandidate.absolutePath}")
@@ -3668,4 +3674,3 @@ private fun isTablePipeArtifact(content: String): Boolean {
     }
     return bareCount % 2 == 1
 }
-

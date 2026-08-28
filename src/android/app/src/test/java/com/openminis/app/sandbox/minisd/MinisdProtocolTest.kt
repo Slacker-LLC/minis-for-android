@@ -38,13 +38,18 @@ class MinisdProtocolTest {
     @Test
     fun `ubuntu exec argv is structured not a raw cmd string`() {
         val raw = MinisdProtocol.encodeRequest(
-            MinisdProtocol.ubuntuExec(listOf("/usr/bin/id"), cwd = "/workspace"),
+            MinisdProtocol.ubuntuExec(
+                listOf("/usr/bin/id"),
+                cwd = "/workspace",
+                sessionId = "session-a",
+            ),
         )
         val obj = JSONObject(raw)
         assertEquals("ubuntu.exec", obj.getString("method"))
         val argv = obj.getJSONObject("params").getJSONArray("argv")
         assertEquals("/usr/bin/id", argv.getString(0))
         assertFalse(obj.getJSONObject("params").has("cmd"))
+        assertEquals("session-a", obj.getJSONObject("params").getString("session_id"))
     }
 
     @Test
@@ -88,6 +93,7 @@ class MinisdProtocolTest {
                 memory = "/data/adb/minis/memory",
                 skills = "/data/adb/minis/skills",
                 shared = "/data/adb/minis/shared",
+                sessionsRoot = "/data/user/0/app/files/minis-sessions",
             ),
         )
         val obj = JSONObject(raw)
@@ -99,6 +105,10 @@ class MinisdProtocolTest {
         assertEquals("/data/adb/minis/memory", params.getString("memory"))
         assertEquals("/data/adb/minis/skills", params.getString("skills"))
         assertEquals("/data/adb/minis/shared", params.getString("shared"))
+        assertEquals(
+            "/data/user/0/app/files/minis-sessions",
+            params.getString("sessions_root"),
+        )
     }
 
     @Test

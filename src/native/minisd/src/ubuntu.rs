@@ -43,6 +43,7 @@ pub struct UbuntuExec {
     pub timeout_ms: u64,
     pub cwd: String,
     pub env: BTreeMap<String, String>,
+    pub session_id: Option<String>,
 }
 
 pub fn parse_ubuntu_exec(params: &Value) -> Result<UbuntuExec, ErrorCode> {
@@ -81,12 +82,31 @@ pub fn parse_ubuntu_exec(params: &Value) -> Result<UbuntuExec, ErrorCode> {
         return Err(ErrorCode::BadParams);
     }
     let env = parse_env_map(params.get("env"))?;
+    let session_id = parse_session_id(params.get("session_id"))?;
     Ok(UbuntuExec {
         argv,
         timeout_ms,
         cwd,
         env,
+        session_id,
     })
+}
+
+fn parse_session_id(value: Option<&Value>) -> Result<Option<String>, ErrorCode> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let session_id = value.as_str().ok_or(ErrorCode::BadParams)?;
+    if session_id.is_empty()
+        || session_id.len() > 128
+        || matches!(session_id, "." | "..")
+        || !session_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err(ErrorCode::BadParams);
+    }
+    Ok(Some(session_id.to_string()))
 }
 
 fn parse_env_map(v: Option<&Value>) -> Result<BTreeMap<String, String>, ErrorCode> {
@@ -112,9 +132,19 @@ pub fn start(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode, 
     if state.mock {
         state.ubuntu.running = true;
         state.ubuntu.rootfs = HOST_ROOTFS.to_string();
+        state.ubuntu.sessions_root = params
+            .get("sessions_root")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         state.ubuntu.version = Some("24.04-mock".into());
         state.ubuntu.provisioned = true;
-        return Ok(json!({"running": true, "mock": true, "rootfs": HOST_ROOTFS}));
+        return Ok(json!({
+            "running": true,
+            "mock": true,
+            "rootfs": HOST_ROOTFS,
+            "sessions_root": state.ubuntu.sessions_root,
+        }));
     }
     #[cfg(not(unix))]
     {
@@ -158,6 +188,7 @@ pub fn status(state: &mut AppState) -> Value {
         "available": state.mock || state.ubuntu.running || rootfs_looks_valid(&state.ubuntu.rootfs_or_default()),
         "pid": state.ubuntu.pid,
         "rootfs": state.ubuntu.rootfs_or_default(),
+        "sessions_root": state.ubuntu.sessions_root,
         "version": state.ubuntu.version,
         "provisioned": state.ubuntu.provisioned,
         "uid": guest_ids(state).0,
@@ -242,6 +273,110 @@ fn validate_host_path(p: &str, require_minis: bool) -> Result<(), String> {
 }
 
 #[cfg(unix)]
+pub fn prepare_session_root(
+    sessions_root: &str,
+    session_id: &str,
+    uid: u32,
+    gid: u32,
+) -> Result<String, (ErrorCode, String)> {
+    parse_session_id(Some(&Value::String(session_id.to_string())))
+        .map_err(|code| (code, "invalid session_id".to_string()))?;
+    validate_host_path(sessions_root, false).map_err(|detail| (ErrorCode::BadParams, detail))?;
+    if sessions_root.is_empty() {
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "session workspace root is not configured; restart the privileged runtime".into(),
+        ));
+    }
+
+    use std::os::unix::fs::MetadataExt;
+    let root = std::fs::canonicalize(sessions_root).map_err(|e| {
+        (
+            ErrorCode::RuntimeUnavailable,
+            format!("session workspace root unavailable at {sessions_root}: {e}"),
+        )
+    })?;
+    let root_meta = std::fs::metadata(&root).map_err(|e| {
+        (
+            ErrorCode::RuntimeUnavailable,
+            format!("stat session workspace root {}: {e}", root.display()),
+        )
+    })?;
+    if !root_meta.is_dir() || root_meta.uid() != uid {
+        return Err((
+            ErrorCode::NotAuthorized,
+            format!(
+                "session workspace root must be an app-owned directory (path={}, owner={}, expected={uid})",
+                root.display(),
+                root_meta.uid()
+            ),
+        ));
+    }
+
+    let session = root.join(session_id);
+    std::fs::create_dir_all(&session).map_err(|e| {
+        (
+            ErrorCode::Internal,
+            format!("create session workspace {}: {e}", session.display()),
+        )
+    })?;
+    let canonical_session = std::fs::canonicalize(&session).map_err(|e| {
+        (
+            ErrorCode::Internal,
+            format!("canonicalize session workspace {}: {e}", session.display()),
+        )
+    })?;
+    if !canonical_session.starts_with(&root) || canonical_session == root {
+        return Err((
+            ErrorCode::NotAuthorized,
+            "session workspace escapes the configured sessions root".into(),
+        ));
+    }
+
+    for subdir in ["workspace", "attachments", "offloads", "browser"] {
+        let path = canonical_session.join(subdir);
+        if path
+            .symlink_metadata()
+            .is_ok_and(|meta| meta.file_type().is_symlink())
+        {
+            return Err((
+                ErrorCode::NotAuthorized,
+                format!("session mount must not be a symlink: {}", path.display()),
+            ));
+        }
+        std::fs::create_dir_all(&path).map_err(|e| {
+            (
+                ErrorCode::Internal,
+                format!("create session mount {}: {e}", path.display()),
+            )
+        })?;
+        let canonical = std::fs::canonicalize(&path).map_err(|e| {
+            (
+                ErrorCode::Internal,
+                format!("canonicalize session mount {}: {e}", path.display()),
+            )
+        })?;
+        if !canonical.starts_with(&canonical_session) {
+            return Err((
+                ErrorCode::NotAuthorized,
+                format!("session mount escapes its session root: {}", path.display()),
+            ));
+        }
+        if let Ok(c_path) = std::ffi::CString::new(canonical.as_os_str().as_encoded_bytes()) {
+            unsafe {
+                libc::chown(c_path.as_ptr(), uid, gid);
+            }
+        }
+    }
+    if let Ok(c_path) = std::ffi::CString::new(canonical_session.as_os_str().as_encoded_bytes()) {
+        unsafe {
+            libc::chown(c_path.as_ptr(), uid, gid);
+        }
+    }
+    Ok(canonical_session.to_string_lossy().into_owned())
+}
+
+#[cfg(unix)]
 fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode, String)> {
     refresh_live(state);
     let rootfs = params
@@ -269,16 +404,25 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+    let sessions_root = params
+        .get("sessions_root")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     for (p, require_minis) in [
         (&rootfs, true),
         (&workspace, false),
         (&memory, false),
         (&skills, false),
         (&shared, false),
+        (&sessions_root, false),
     ] {
         validate_host_path(p, require_minis).map_err(|e| (ErrorCode::BadParams, e))?;
     }
     if state.ubuntu.running {
+        if !sessions_root.is_empty() {
+            state.ubuntu.sessions_root = sessions_root;
+        }
         let exe = std::env::current_exe().ok();
         let proxy_ok = exe.as_ref().map(|p| spawn_netproxy(p)).unwrap_or(false);
         write_apt_proxy(&state.ubuntu.rootfs_or_default());
@@ -287,6 +431,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
             "already": true,
             "pid": state.ubuntu.pid,
             "rootfs": state.ubuntu.rootfs,
+            "sessions_root": state.ubuntu.sessions_root,
             "version": state.ubuntu.version,
             "provisioned": state.ubuntu.provisioned,
             "proxy": crate::proxy::PROXY_URI,
@@ -332,6 +477,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
             state.ubuntu.running = true;
             state.ubuntu.pid = Some(pid);
             state.ubuntu.rootfs = rootfs.clone();
+            state.ubuntu.sessions_root = sessions_root;
             state.ubuntu.version = read_os_release(&rootfs);
             state.ubuntu.provisioned = is_provisioned(&rootfs);
             state.ubuntu.last_error = None;
@@ -345,6 +491,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
                 "already": false,
                 "pid": pid,
                 "rootfs": rootfs,
+                "sessions_root": state.ubuntu.sessions_root,
                 "version": state.ubuntu.version,
                 "provisioned": state.ubuntu.provisioned,
                 "resolv": resolv.trim(),
@@ -438,10 +585,35 @@ fn stop_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
 #[cfg(unix)]
 fn spawn_netproxy(exe: &std::path::Path) -> bool {
     if let Some(pid) = read_proxy_pid() {
-        if pid_alive(pid) {
+        if pid_alive(pid) && is_netproxy(pid) && proxy_listener_ready() {
             return true;
         }
+        // A pidfile can outlive its process and Android can reuse the PID for
+        // an unrelated app. Never treat mere PID liveness as proxy health and
+        // never signal a process whose command line is not our netproxy.
+        if pid_alive(pid) && is_netproxy(pid) {
+            unsafe {
+                libc::kill(pid, libc::SIGTERM);
+            }
+        }
+        let _ = std::fs::remove_file(UBUNTU_PROXY_PID_FILE);
     }
+
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/data/adb/minis/log/ubuntu-proxy.log")
+        .ok();
+    let stdout = log
+        .as_ref()
+        .and_then(|file| file.try_clone().ok())
+        .map(std::process::Stdio::from)
+        .unwrap_or_else(std::process::Stdio::null);
+    let stderr = log
+        .and_then(|file| file.try_clone().ok())
+        .map(std::process::Stdio::from)
+        .unwrap_or_else(std::process::Stdio::null);
+
     match std::process::Command::new(exe)
         .args([
             "--helper",
@@ -450,19 +622,63 @@ fn spawn_netproxy(exe: &std::path::Path) -> bool {
             crate::proxy::PROXY_LISTEN,
         ])
         .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
         .spawn()
     {
-        Ok(child) => {
+        Ok(mut child) => {
             let pid = child.id() as i32;
-            let _ = std::fs::write(UBUNTU_PROXY_PID_FILE, format!("{pid}\n"));
-            std::thread::spawn(move || {
-                let _ = child.wait_with_output();
-            });
-            true
+            let deadline = std::time::Instant::now() + Duration::from_secs(2);
+            while std::time::Instant::now() < deadline {
+                match child.try_wait() {
+                    Ok(Some(_)) | Err(_) => {
+                        let _ = std::fs::remove_file(UBUNTU_PROXY_PID_FILE);
+                        return false;
+                    }
+                    Ok(None) if proxy_listener_ready() => {
+                        if write_proxy_pid(pid).is_err() {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            return false;
+                        }
+                        std::thread::spawn(move || {
+                            let _ = child.wait();
+                            if read_proxy_pid() == Some(pid) {
+                                let _ = std::fs::remove_file(UBUNTU_PROXY_PID_FILE);
+                            }
+                        });
+                        return true;
+                    }
+                    Ok(None) => std::thread::sleep(Duration::from_millis(25)),
+                }
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = std::fs::remove_file(UBUNTU_PROXY_PID_FILE);
+            false
         }
         Err(_) => false,
+    }
+}
+
+#[cfg(unix)]
+fn proxy_listener_ready() -> bool {
+    let Ok(addr) = crate::proxy::PROXY_LISTEN.parse() else {
+        return false;
+    };
+    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+}
+
+#[cfg(unix)]
+fn write_proxy_pid(pid: i32) -> std::io::Result<()> {
+    let tmp = format!("{UBUNTU_PROXY_PID_FILE}.tmp.{}", std::process::id());
+    std::fs::write(&tmp, format!("{pid}\n"))?;
+    match std::fs::rename(&tmp, UBUNTU_PROXY_PID_FILE) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let _ = std::fs::remove_file(&tmp);
+            Err(error)
+        }
     }
 }
 
@@ -501,6 +717,7 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
         timeout_ms: 180_000,
         cwd: "/".into(),
         env: apt_env(),
+        session_id: None,
     };
     let upd = exec_live(state, &update, true)?;
     if upd.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
@@ -518,6 +735,7 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
         timeout_ms: 600_000,
         cwd: "/".into(),
         env: apt_env(),
+        session_id: None,
     };
     let ins = exec_live(state, &install, true)?;
     if ins.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
@@ -713,8 +931,24 @@ fn is_keeper(pid: i32) -> bool {
 #[cfg(unix)]
 fn is_netproxy(pid: i32) -> bool {
     let raw = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
-    let s = String::from_utf8_lossy(&raw);
-    s.contains("--helper") && s.contains("netproxy")
+    netproxy_cmdline_matches(&raw)
+}
+
+fn netproxy_cmdline_matches(raw: &[u8]) -> bool {
+    let args = raw
+        .split(|byte| *byte == 0)
+        .filter(|arg| !arg.is_empty())
+        .collect::<Vec<_>>();
+    let is_minisd = args
+        .first()
+        .is_some_and(|arg| arg.rsplit(|byte| *byte == b'/').next() == Some(b"minisd".as_slice()));
+    let helper = args
+        .windows(2)
+        .any(|pair| pair[0] == b"--helper" && pair[1] == b"netproxy");
+    let listener = args
+        .windows(2)
+        .any(|pair| pair[0] == b"--listen" && pair[1] == crate::proxy::PROXY_LISTEN.as_bytes());
+    is_minisd && helper && listener
 }
 
 #[cfg(unix)]
@@ -811,6 +1045,15 @@ mod tests {
         let ok = parse_ubuntu_exec(&json!({"argv":["/usr/bin/id"],"cwd":"/workspace"})).unwrap();
         assert_eq!(ok.argv[0], "/usr/bin/id");
         assert_eq!(ok.cwd, "/workspace");
+        let scoped =
+            parse_ubuntu_exec(&json!({"argv":["/usr/bin/id"],"session_id":"__new__abc-123"}))
+                .unwrap();
+        assert_eq!(scoped.session_id.as_deref(), Some("__new__abc-123"));
+        for invalid in ["", ".", "..", "../other", "a/b", "会话"] {
+            assert!(
+                parse_ubuntu_exec(&json!({"argv":["/usr/bin/id"],"session_id":invalid}),).is_err()
+            );
+        }
     }
 
     #[test]
@@ -824,9 +1067,14 @@ mod tests {
     #[test]
     fn mock_start_exec_stop() {
         let mut state = AppState::new(true, PolicyFile::default_policy());
-        assert!(start(&mut state, &json!({})).is_ok());
+        assert!(start(
+            &mut state,
+            &json!({"sessions_root":"/data/user/0/app/files/minis-sessions"}),
+        )
+        .is_ok());
         let st = status(&mut state);
         assert_eq!(st["running"], true);
+        assert_eq!(st["sessions_root"], "/data/user/0/app/files/minis-sessions");
         let out = exec(&mut state, &json!({"argv":["/usr/bin/id"]}), false).unwrap();
         assert_eq!(out["exit_code"], 0);
         assert!(out["stdout"].as_str().unwrap().contains("10000"));
@@ -844,5 +1092,55 @@ mod tests {
         assert!(validate_host_path("/data/adb/minis/rootfs", true).is_ok());
         assert!(validate_host_path("/data/adb/minis2", true).is_err());
         assert!(validate_host_path("/sdcard/x", false).is_ok());
+    }
+
+    #[test]
+    fn netproxy_pid_identity_requires_exact_helper_and_listener() {
+        assert!(netproxy_cmdline_matches(
+            b"/data/adb/minis/bin/minisd\0--helper\0netproxy\0--listen\x00127.0.0.1:18787\0"
+        ));
+        assert!(!netproxy_cmdline_matches(b"com.tencent.mobileqq\0"));
+        assert!(!netproxy_cmdline_matches(
+            b"/data/adb/minis/bin/minisd\0--helper\0keep\0--listen\x00127.0.0.1:18787\0"
+        ));
+        assert!(!netproxy_cmdline_matches(
+            b"/data/adb/minis/bin/minisd\0--helper\0netproxy\0--listen\x00127.0.0.1:9999\0"
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn session_root_is_isolated_and_rejects_symlink_mounts() {
+        use std::os::unix::fs::symlink;
+
+        let unique = format!(
+            "minisd-sessions-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&root).unwrap();
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+
+        let session = prepare_session_root(root.to_str().unwrap(), "session-a", uid, gid).unwrap();
+        for subdir in ["workspace", "attachments", "offloads", "browser"] {
+            assert!(Path::new(&session).join(subdir).is_dir());
+        }
+        let other = prepare_session_root(root.to_str().unwrap(), "session-b", uid, gid).unwrap();
+        assert_ne!(session, other);
+
+        let escaped = root.join("escaped");
+        std::fs::create_dir_all(&escaped).unwrap();
+        let outside = std::env::temp_dir().join(format!("{session}-outside"));
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, escaped.join("workspace")).unwrap();
+        assert!(prepare_session_root(root.to_str().unwrap(), "escaped", uid, gid).is_err());
+
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&outside);
     }
 }

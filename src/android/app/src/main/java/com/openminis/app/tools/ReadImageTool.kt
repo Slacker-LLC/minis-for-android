@@ -54,11 +54,11 @@ object ReadImageTool {
                 "/var/minis/" + java.net.URLDecoder.decode(rawPath.removePrefix("minis://"), "UTF-8")
             } else rawPath
 
-            val file = (
-                if (sessionId != null && context != null) {
+            val file = if (sessionId != null && context != null) {
                     MinisKernel.resolveSessionHostPath(sessionId, path, context)
-                } else null
-            ) ?: MinisKernel.resolveHostPath(path)
+                } else {
+                    MinisKernel.resolveHostPath(path)
+                }
                 ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
 
             if (!file.exists()) {

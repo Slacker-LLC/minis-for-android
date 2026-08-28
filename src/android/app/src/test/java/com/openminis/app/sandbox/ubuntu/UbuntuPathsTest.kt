@@ -65,4 +65,70 @@ class UbuntuPathsTest {
             outside.toFile().deleteRecursively()
         }
     }
+
+    @Test
+    fun `session paths isolate identical guest names and clean up independently`() {
+        val filesDir = Files.createTempDirectory("minis-session-paths").toFile()
+        try {
+            val first = UbuntuPaths.resolveSessionPath(
+                filesDir,
+                "session-a",
+                "/var/minis/workspace/report.txt",
+            )!!
+            val second = UbuntuPaths.resolveSessionPath(
+                filesDir,
+                "session-b",
+                "/var/minis/workspace/report.txt",
+            )!!
+            assertTrue(first.absolutePath.contains("minis-sessions${java.io.File.separator}session-a"))
+            assertTrue(second.absolutePath.contains("minis-sessions${java.io.File.separator}session-b"))
+            assertTrue(first.absolutePath != second.absolutePath)
+            first.writeText("a")
+            second.writeText("b")
+            assertEquals("a", first.readText())
+            assertEquals("b", second.readText())
+
+            val attachment = UbuntuPaths.resolveSessionPath(
+                filesDir,
+                "session-a",
+                "/var/minis/attachments/photo.png",
+            )!!
+            assertTrue(attachment.path.contains("attachments"))
+            assertTrue(!attachment.path.contains("workspace${java.io.File.separator}attachments"))
+            assertEquals(
+                attachment.canonicalFile,
+                UbuntuPaths.resolveSessionPath(
+                    filesDir,
+                    "session-a",
+                    "/workspace/attachments/photo.png",
+                )!!.canonicalFile,
+            )
+            assertEquals(
+                attachment.canonicalFile,
+                UbuntuPaths.resolveSessionPath(
+                    filesDir,
+                    "session-a",
+                    "/var/minis/workspace/attachments/photo.png",
+                )!!.canonicalFile,
+            )
+
+            assertTrue(UbuntuPaths.deleteSessionFiles(filesDir, "session-a"))
+            assertTrue(!first.exists())
+            assertTrue(second.exists())
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session resolver rejects traversal and invalid ids`() {
+        val filesDir = Files.createTempDirectory("minis-session-invalid").toFile()
+        try {
+            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "../escape", "/workspace/a"))
+            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "session", "/workspace/../a"))
+            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "会话", "/workspace/a"))
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
 }

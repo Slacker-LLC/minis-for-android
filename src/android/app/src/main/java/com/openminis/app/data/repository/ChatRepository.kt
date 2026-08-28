@@ -6,9 +6,14 @@ import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.data.db.MessageEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
-class ChatRepository(internal val dao: ChatDao) {
+class ChatRepository(
+    internal val dao: ChatDao,
+    private val onSessionDeleted: (String) -> Unit = {},
+) {
 
     fun observeSessions(): Flow<List<ChatSessionEntity>> = dao.observeSessions()
 
@@ -108,6 +113,9 @@ class ChatRepository(internal val dao: ChatDao) {
     suspend fun deleteSession(id: String) {
         dao.deleteMessages(id)
         dao.deleteSession(id)
+        withContext(Dispatchers.IO) {
+            runCatching { onSessionDeleted(id) }
+        }
     }
 
     // ─── Session groups ("folders") ────────────────────────────────────────

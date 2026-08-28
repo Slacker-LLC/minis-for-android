@@ -39,7 +39,7 @@ internal object MinisdBootstrap {
         if (forceRestart) {
             commands += "pid=\"\""
             commands += "if [ -r ${shellQuote(PID_FILE)} ]; then pid=\$(cat ${shellQuote(PID_FILE)} 2>/dev/null || true); fi"
-            commands += "case \"\$pid\" in ''|*[!0-9]*) ;; *) ppid=\$(awk '/^PPid:/{print \$2; exit}' \"/proc/\$pid/status\" 2>/dev/null || true); case \"\$ppid\" in ''|*[!0-9]*) ;; *) parent_cmd=\$(tr '\\000' ' ' < \"/proc/\$ppid/cmdline\" 2>/dev/null || true); case \"\$parent_cmd\" in *minisd*--watchdog*) kill \"\$ppid\" 2>/dev/null || true ;; esac ;; esac; kill \"\$pid\" 2>/dev/null || true ;; esac"
+            commands += "case \"\$pid\" in ''|*[!0-9]*) ;; *) child_cmd=\$(tr '\\000' ' ' < \"/proc/\$pid/cmdline\" 2>/dev/null || true); case \"\$child_cmd\" in *minisd*--socket*/data/adb/minis/run/minisd.sock*) ppid=\$(awk '/^PPid:/{print \$2; exit}' \"/proc/\$pid/status\" 2>/dev/null || true); case \"\$ppid\" in ''|*[!0-9]*) ;; *) parent_cmd=\$(tr '\\000' ' ' < \"/proc/\$ppid/cmdline\" 2>/dev/null || true); case \"\$parent_cmd\" in *minisd*--watchdog*) kill \"\$ppid\" 2>/dev/null || true; kill \"\$pid\" 2>/dev/null || true ;; esac ;; esac ;; esac ;; esac"
             commands += "sleep 1"
         }
 
@@ -50,4 +50,10 @@ internal object MinisdBootstrap {
 
     internal fun shellQuote(value: String): String =
         "'" + value.replace("'", "'\"'\"'") + "'"
+
+    /** Extracts an exact numeric uid line while tolerating su diagnostics. */
+    internal fun parseEffectiveUid(output: String): Int? = output
+        .lineSequence()
+        .map { it.trim() }
+        .firstNotNullOfOrNull { line -> line.toIntOrNull() }
 }
