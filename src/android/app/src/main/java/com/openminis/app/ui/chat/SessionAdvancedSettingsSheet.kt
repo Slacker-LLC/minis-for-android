@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,14 +28,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.data.model.SessionOverrides
+import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.tools.AgentTools
+import com.openminis.app.ui.settings.SettingsChoiceRow
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
+import com.openminis.app.ui.settings.SettingsValueRow
 import kotlinx.coroutines.launch
 
 /**
@@ -41,18 +45,19 @@ import kotlinx.coroutines.launch
  *
  * Storage stays sparse: a disabled "Custom" switch writes null for that field,
  * which means the next request inherits the then-current global/model default.
- * This sheet intentionally edits only parameters that are already enforced by
- * the Android runtime. topP/topK remain preserved in the JSON payload until the
- * provider API can actually apply them, so opening/saving this UI cannot erase
- * values written by minis-config or a future client.
+ * Memory and thinking deliberately reuse ChatViewModel's existing per-session
+ * state/persistence paths instead of being duplicated inside SessionOverrides.
  */
 @Composable
 fun SessionAdvancedSettingsSheet(
     sessionId: String,
     chatRepository: ChatRepository,
+    viewModel: ChatViewModel,
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val memoryEnabled by viewModel.memoryEnabled.collectAsState()
+    val thinkingLevel by viewModel.thinkingLevel.collectAsState()
     val toolDefinitions = remember {
         AgentTools.makeAgentTools()
             .distinctBy { it.name }
@@ -60,6 +65,7 @@ fun SessionAdvancedSettingsSheet(
     }
     val allToolIds = remember(toolDefinitions) { toolDefinitions.map { it.name }.toSet() }
 
+    var persistedSessionId by remember(sessionId) { mutableStateOf<String?>(null) }
     var isLoading by remember(sessionId) { mutableStateOf(true) }
     var isSaving by remember(sessionId) { mutableStateOf(false) }
     var errorText by remember(sessionId) { mutableStateOf<String?>(null) }
@@ -82,13 +88,20 @@ fun SessionAdvancedSettingsSheet(
     val invalidMaxTokensMessage = stringResource(R.string.session_advanced_invalid_max_tokens)
 
     LaunchedEffect(sessionId) {
-        val session = runCatching { chatRepository.dao.getSession(sessionId) }.getOrNull()
-        if (session == null) {
+        // A brand-new chat uses a synthetic __new__ id until first send. Opening
+        // settings is itself a durable per-session action, so materialize the row
+        // first and then edit the real id instead of reporting a false "missing".
+        val sid = runCatching { viewModel.ensureSessionForSettings() }.getOrNull()
+        val session = sid?.let { realId ->
+            runCatching { chatRepository.dao.getSession(realId) }.getOrNull()
+        }
+        if (sid == null || session == null) {
             isLoading = false
             errorText = missingSessionMessage
             return@LaunchedEffect
         }
 
+        persistedSessionId = sid
         val overrides = SessionOverrides.fromJson(session.sessionOverrides)
         loadedOverrides = overrides
         customInstructions = overrides.systemPrompt != null
@@ -169,6 +182,43 @@ fun SessionAdvancedSettingsSheet(
         }
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
+                SettingsSection(
+                    header = stringResource(R.string.session_advanced_runtime_section),
+                    footer = stringResource(R.string.session_advanced_runtime_help),
+                ) {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_memory),
+                        subtitle = stringResource(R.string.session_advanced_memory_help),
+                        checked = memoryEnabled,
+                        onCheckedChange = viewModel::setMemoryEnabledForSession,
+                        showDivider = true,
+                    )
+
+                    if (viewModel.currentModelSupportsReasoning) {
+                        val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
+                        levels.distinct().forEachIndexed { index, level ->
+                            SettingsChoiceRow(
+                                title = if (index == 0) {
+                                    "${stringResource(R.string.session_advanced_thinking)} · ${level.displayName}"
+                                } else {
+                                    level.displayName
+                                },
+                                selected = thinkingLevel == level,
+                                onSelect = { viewModel.setThinkingLevel(level) },
+                                showDivider = index < levels.distinct().lastIndex,
+                            )
+                        }
+                    } else {
+                        SettingsValueRow(
+                            title = stringResource(R.string.session_advanced_thinking),
+                            value = stringResource(R.string.session_advanced_thinking_not_supported),
+                            showDivider = false,
+                        )
+                    }
+                }
+            }
+
             item {
                 SettingsSection(
                     header = stringResource(R.string.session_advanced_instructions_section),
@@ -253,7 +303,7 @@ fun SessionAdvancedSettingsSheet(
                         checked = customTools,
                         onCheckedChange = { enabled ->
                             customTools = enabled
-                            if (enabled) selectedToolIds = allToolIds
+                            if (enabled && selectedToolIds.isEmpty()) selectedToolIds = allToolIds
                             errorText = null
                         },
                         showDivider = customTools && toolDefinitions.isNotEmpty(),
@@ -299,13 +349,14 @@ fun SessionAdvancedSettingsSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(
-                        enabled = !isSaving,
+                        enabled = !isSaving && persistedSessionId != null,
                         onClick = {
+                            val sid = persistedSessionId ?: return@TextButton
                             isSaving = true
                             errorText = null
                             scope.launch {
                                 val result = runCatching {
-                                    chatRepository.dao.updateSessionOverrides(sessionId, null)
+                                    chatRepository.dao.updateSessionOverrides(sid, null)
                                 }
                                 isSaving = false
                                 if (result.isSuccess) {
@@ -320,14 +371,15 @@ fun SessionAdvancedSettingsSheet(
                     }
 
                     Button(
-                        enabled = !isSaving && errorText != missingSessionMessage,
+                        enabled = !isSaving && persistedSessionId != null && errorText != missingSessionMessage,
                         onClick = save@{
+                            val sid = persistedSessionId ?: return@save
                             val overrides = buildOverridesOrShowError() ?: return@save
                             isSaving = true
                             scope.launch {
                                 val result = runCatching {
                                     chatRepository.dao.updateSessionOverrides(
-                                        sessionId,
+                                        sid,
                                         overrides.toJsonOrNull(),
                                     )
                                 }
