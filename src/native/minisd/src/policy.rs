@@ -2,6 +2,8 @@ use crate::protocol::{is_known_method, ErrorCode};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
+pub const APP_UID_ENV: &str = "MINIS_APP_UID";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
@@ -56,14 +58,29 @@ fn is_builtin_root_exec_tool(tool: &str) -> bool {
 
 impl PolicyFile {
     pub fn parse(json: &str) -> Result<Self, String> {
-        let policy: PolicyFile =
+        let mut policy: PolicyFile =
             serde_json::from_str(json).map_err(|e| format!("policy json: {e}"))?;
         policy.validate()?;
+        policy.apply_runtime_app_uid_from_env()?;
         Ok(policy)
     }
 
     pub fn default_policy() -> Self {
         Self::parse(DEFAULT_POLICY_JSON).expect("embedded default policy")
+    }
+
+    fn apply_runtime_app_uid_from_env(&mut self) -> Result<(), String> {
+        let Ok(raw) = std::env::var(APP_UID_ENV) else {
+            return Ok(());
+        };
+        let app_uid = raw
+            .parse::<u32>()
+            .map_err(|_| format!("{APP_UID_ENV} must be a positive Android uid"))?;
+        if app_uid == 0 {
+            return Err(format!("{APP_UID_ENV} must be a positive Android uid"));
+        }
+        self.caller.app_uid = app_uid;
+        Ok(())
     }
 
     pub fn validate(&self) -> Result<(), String> {
