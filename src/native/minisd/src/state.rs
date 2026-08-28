@@ -4,17 +4,15 @@ use crate::session::SessionTable;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone)]
-pub struct PendingConfirm {
-    pub method: String,
-    pub expires: Instant,
-}
-
 #[derive(Debug, Default)]
 pub struct UbuntuState {
     pub running: bool,
     pub pid: Option<i32>,
     pub rootfs: String,
+    pub workspace: String,
+    pub memory: String,
+    pub skills: String,
+    pub shared: String,
     pub version: Option<String>,
     pub provisioned: bool,
     pub last_error: Option<String>,
@@ -28,6 +26,44 @@ impl UbuntuState {
             self.rootfs.clone()
         }
     }
+
+    pub fn workspace_or_default(&self) -> String {
+        if self.workspace.is_empty() {
+            crate::layout::HOST_WORKSPACE.to_string()
+        } else {
+            self.workspace.clone()
+        }
+    }
+
+    pub fn memory_or_default(&self) -> String {
+        if self.memory.is_empty() {
+            crate::layout::HOST_MEMORY.to_string()
+        } else {
+            self.memory.clone()
+        }
+    }
+
+    pub fn skills_or_default(&self) -> String {
+        if self.skills.is_empty() {
+            crate::layout::HOST_SKILLS.to_string()
+        } else {
+            self.skills.clone()
+        }
+    }
+
+    pub fn shared_or_default(&self) -> String {
+        if self.shared.is_empty() {
+            crate::layout::HOST_SHARED.to_string()
+        } else {
+            self.shared.clone()
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingConfirm {
+    pub method: String,
+    pub expires: Instant,
 }
 
 pub struct AppState {
@@ -181,5 +217,19 @@ mod tests {
     #[test]
     fn zero_uid_never_starts_config_proxy() {
         assert!(!should_start_config_proxy(false, 0));
+    }
+
+    #[test]
+    fn runtime_layout_defaults_only_when_not_recorded() {
+        let state = UbuntuState::default();
+        assert_eq!(state.workspace_or_default(), crate::layout::HOST_WORKSPACE);
+        let state = UbuntuState {
+            workspace: "/data/user/0/example/files/minis/workspace".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            state.workspace_or_default(),
+            "/data/user/0/example/files/minis/workspace"
+        );
     }
 }
