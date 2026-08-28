@@ -1,12 +1,12 @@
 use crate::auth::{check_hello, check_peer, PeerCred};
 use crate::exec::{parse_exec, run_exec, validate_exec};
-use crate::path_guard::{resolve_workspace, HOST_WORKSPACE};
+use crate::path_guard::resolve_workspace;
 use crate::policy::{decide_method, MethodPolicy, Mode};
 use crate::probe::{live_probe, mock_probe};
 use crate::protocol::{is_known_method, ErrorCode, Request, Response};
 use crate::session::{RecordingKiller, Session};
 use crate::state::AppState;
-use serde_json::json;
+use serde_json::{json, Value};
 
 /// Performs all mutable request-gate work (peer auth, hello/capability checks,
 /// confirmation consumption and rate limiting) without executing the method.
@@ -77,6 +77,113 @@ pub fn handle(state: &mut AppState, req: Request, peer: Option<PeerCred>) -> Res
     dispatch_authorized(state, &req)
 }
 
+fn requested_runtime_layout(params: &Value) -> (String, String, String, String) {
+    fn path_or(params: &Value, key: &str, fallback: &str) -> String {
+        params
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(fallback)
+            .to_string()
+    }
+    (
+        path_or(params, "workspace", crate::layout::HOST_WORKSPACE),
+        path_or(params, "memory", crate::layout::HOST_MEMORY),
+        path_or(params, "skills", crate::layout::HOST_SKILLS),
+        path_or(params, "shared", crate::layout::HOST_SHARED),
+    )
+}
+
+fn runtime_layout_known(state: &AppState) -> bool {
+    !state.ubuntu.workspace.is_empty()
+        && !state.ubuntu.memory.is_empty()
+        && !state.ubuntu.skills.is_empty()
+        && !state.ubuntu.shared.is_empty()
+}
+
+/// `ubuntu.start` is also the single source of truth for host bind paths. A
+/// recovered keeper whose original bind layout is unknown must be restarted;
+/// silently accepting new paths while reusing the old keeper would recreate the
+/// split-brain workspace bug.
+fn start_ubuntu_with_layout(state: &mut AppState, req: &Request) -> Response {
+    let (workspace, memory, skills, shared) = requested_runtime_layout(&req.params);
+
+    if state.ubuntu.running {
+        if !runtime_layout_known(state) {
+            return Response::err(
+                req.id,
+                ErrorCode::RuntimeLayoutMismatch,
+                "running keeper bind layout is unknown; stop and restart required",
+            );
+        }
+        if state.ubuntu.workspace != workspace
+            || state.ubuntu.memory != memory
+            || state.ubuntu.skills != skills
+            || state.ubuntu.shared != shared
+        {
+            return Response::err(
+                req.id,
+                ErrorCode::RuntimeLayoutMismatch,
+                "requested host bind paths differ from the running keeper",
+            );
+        }
+    }
+
+    match crate::ubuntu::start(state, &req.params) {
+        Ok(v) => {
+            if v.get("running").and_then(Value::as_bool) == Some(true) {
+                state.ubuntu.workspace = workspace;
+                state.ubuntu.memory = memory;
+                state.ubuntu.skills = skills;
+                state.ubuntu.shared = shared;
+            }
+            Response::ok(req.id, v)
+        }
+        Err((code, detail)) => Response::err(req.id, code, detail),
+    }
+}
+
+fn ubuntu_status_with_layout(state: &mut AppState) -> Value {
+    let mut value = crate::ubuntu::status(state);
+    if let Some(obj) = value.as_object_mut() {
+        let known = runtime_layout_known(state);
+        obj.insert("layout_known".into(), Value::Bool(known));
+        obj.insert(
+            "workspace".into(),
+            if known {
+                Value::String(state.ubuntu.workspace.clone())
+            } else {
+                Value::Null
+            },
+        );
+        obj.insert(
+            "memory".into(),
+            if known {
+                Value::String(state.ubuntu.memory.clone())
+            } else {
+                Value::Null
+            },
+        );
+        obj.insert(
+            "skills".into(),
+            if known {
+                Value::String(state.ubuntu.skills.clone())
+            } else {
+                Value::Null
+            },
+        );
+        obj.insert(
+            "shared".into(),
+            if known {
+                Value::String(state.ubuntu.shared.clone())
+            } else {
+                Value::Null
+            },
+        );
+    }
+    value
+}
+
 /// Dispatch a request that has already passed [authorize_request].
 pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
     match req.method.as_str() {
@@ -96,13 +203,16 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
         "root.shellRaw" => {
             Response::err(req.id, ErrorCode::PolicyDenied, "root.shellRaw is INTERNAL")
         }
-        "ubuntu.status" => Response::ok(req.id, crate::ubuntu::status(state)),
-        "ubuntu.start" => match crate::ubuntu::start(state, &req.params) {
-            Ok(v) => Response::ok(req.id, v),
-            Err((code, detail)) => Response::err(req.id, code, detail),
-        },
+        "ubuntu.status" => Response::ok(req.id, ubuntu_status_with_layout(state)),
+        "ubuntu.start" => start_ubuntu_with_layout(state, req),
         "ubuntu.stop" => match crate::ubuntu::stop(state) {
-            Ok(v) => Response::ok(req.id, v),
+            Ok(v) => {
+                state.ubuntu.workspace.clear();
+                state.ubuntu.memory.clear();
+                state.ubuntu.skills.clear();
+                state.ubuntu.shared.clear();
+                Response::ok(req.id, v)
+            }
             Err((code, detail)) => Response::err(req.id, code, detail),
         },
         "ubuntu.exec" => match crate::ubuntu::exec(state, &req.params, false) {
@@ -142,8 +252,13 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
         "workspace.info" => Response::ok(
             req.id,
             json!({
-                "path": HOST_WORKSPACE,
+                "path": if runtime_layout_known(state) {
+                    Some(state.ubuntu.workspace.clone())
+                } else {
+                    None::<String>
+                },
                 "guest": "/workspace",
+                "layout_known": runtime_layout_known(state),
                 "quota_bytes": state.workspace_quota_bytes
             }),
         ),
@@ -163,18 +278,25 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
                 "appUid": state.policy.caller.app_uid
             }),
         ),
-        "health.get" => Response::ok(
-            req.id,
-            json!({
-                "ok": true,
-                "mock": state.mock,
-                "ubuntu": state.ubuntu.running,
-                "ubuntu_pid": state.ubuntu.pid,
-                "ubuntu_version": state.ubuntu.version,
-                "sessions": state.sessions.len(),
-                "selinux_enforcing": true
-            }),
-        ),
+        "health.get" => {
+            let rootfs = crate::layout::rootfs_health(&state.ubuntu.rootfs_or_default());
+            let layout_known = runtime_layout_known(state);
+            Response::ok(
+                req.id,
+                json!({
+                    "ok": rootfs.is_ok() && (!state.ubuntu.running || layout_known),
+                    "mock": state.mock,
+                    "ubuntu": state.ubuntu.running,
+                    "ubuntu_pid": state.ubuntu.pid,
+                    "ubuntu_version": state.ubuntu.version,
+                    "rootfs_ok": rootfs.is_ok(),
+                    "rootfs_error": rootfs.err(),
+                    "layout_known": layout_known,
+                    "sessions": state.sessions.len(),
+                    "selinux_enforcing": true
+                }),
+            )
+        }
         _ => Response::err(req.id, ErrorCode::BadParams, "unknown method"),
     }
 }
@@ -390,5 +512,39 @@ mod tests {
         let parsed = parse_request(raw).unwrap();
         let resp = handle(&mut state, parsed, None);
         assert!(resp.ok);
+    }
+
+    #[test]
+    fn running_keeper_rejects_layout_change() {
+        let mut state = AppState::new(true, PolicyFile::default_policy());
+        let first = handle(
+            &mut state,
+            req(
+                "ubuntu.start",
+                json!({
+                    "workspace": "/data/user/0/app/files/minis/workspace",
+                    "memory": "/data/user/0/app/files/minis/memory",
+                    "skills": "/data/user/0/app/files/minis/skills",
+                    "shared": "/data/user/0/app/files/minis/shared"
+                }),
+            ),
+            None,
+        );
+        assert!(first.ok);
+        let changed = handle(
+            &mut state,
+            req(
+                "ubuntu.start",
+                json!({
+                    "workspace": "/data/user/0/other/files/minis/workspace",
+                    "memory": "/data/user/0/app/files/minis/memory",
+                    "skills": "/data/user/0/app/files/minis/skills",
+                    "shared": "/data/user/0/app/files/minis/shared"
+                }),
+            ),
+            None,
+        );
+        assert!(!changed.ok);
+        assert_eq!(changed.error.unwrap().code, "RUNTIME_LAYOUT_MISMATCH");
     }
 }
