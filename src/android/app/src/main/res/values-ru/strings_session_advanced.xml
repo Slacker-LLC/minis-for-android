@@ -16,11 +16,6 @@
     <string name="session_advanced_model_section">Параметры модели</string>
     <string name="session_advanced_temperature">Температура</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
-    <string name="session_advanced_top_p">Top P</string>
-    <string name="session_advanced_top_p_hint">0.0–1.0</string>
-    <string name="session_advanced_top_k">Top K</string>
-    <string name="session_advanced_top_k_hint">Положительное целое число</string>
-    <string name="session_advanced_sampling_help">Переопределения сэмплирования применяются по официальному API конкретного провайдера и модели. Неподдерживаемые или устаревшие параметры не отправляются; Gemini 3.x использует значения модели по умолчанию.</string>
     <string name="session_advanced_max_tokens">Максимум выходных токенов</string>
     <string name="session_advanced_max_tokens_hint">Положительное целое число</string>
     <string name="session_advanced_tools_section">Инструменты</string>
@@ -32,8 +27,6 @@
     <string name="session_advanced_missing_session">Не удалось подготовить этот сеанс.</string>
     <string name="session_advanced_invalid_prompt">Введите инструкции сеанса или отключите «Пользовательские».</string>
     <string name="session_advanced_invalid_temperature">Температура должна быть от 0.0 до 2.0.</string>
-    <string name="session_advanced_invalid_top_p">Top P должен быть от 0.0 до 1.0.</string>
-    <string name="session_advanced_invalid_top_k">Top K должен быть положительным целым числом.</string>
     <string name="session_advanced_invalid_max_tokens">Максимум выходных токенов должен быть положительным целым числом.</string>
     <string name="session_advanced_save_failed">Не удалось сохранить настройки сеанса.</string>
     <string name="session_advanced_reset_failed">Не удалось сбросить настройки сеанса.</string>

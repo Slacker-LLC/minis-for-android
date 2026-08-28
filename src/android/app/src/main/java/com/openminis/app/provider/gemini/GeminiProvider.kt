@@ -13,7 +13,6 @@ import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.LLMProvider
-import com.openminis.app.provider.SamplingPolicy
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -97,21 +96,6 @@ class GeminiProvider(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
     ).failOnSilentEmptyCompletion(name)
 
-    override fun streamMessageSamplingClamped(
-        messages: List<LLMMessage>,
-        systemPrompt: String?,
-        maxTokens: Int,
-        temperature: Double?,
-        imageParts: List<LLMMessage.ImagePart>,
-        tools: List<AgentToolDefinition>,
-        thinkingLevel: ThinkingLevel,
-        topP: Double?,
-        topK: Int?,
-    ): Flow<LLMStreamChunk> = rawStreamMessage(
-        messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-        topP = topP, topK = topK,
-    ).failOnSilentEmptyCompletion(name)
-
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
         systemPrompt: String?,
@@ -120,10 +104,8 @@ class GeminiProvider(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
-        topP: Double? = null,
-        topK: Int? = null,
     ): Flow<LLMStreamChunk> = callbackFlow {
-        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel, topP = topP, topK = topK)
+        val body = buildRequestBody(messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel)
         val url = "$basePath/models/${model.id}:streamGenerateContent?alt=sse&key=$apiKey"
         val request = Request.Builder()
             .url(url)
@@ -206,8 +188,6 @@ class GeminiProvider(
         // [T-android-thinking-level-arch] Already clamped to the model ceiling by
         // LLMProvider.streamMessage/sendMessage before reaching here.
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
-        topP: Double? = null,
-        topK: Int? = null,
     ): JSONObject {
         val body = JSONObject()
 
@@ -353,10 +333,9 @@ class GeminiProvider(
 
         val config = JSONObject()
         config.put("maxOutputTokens", maxTokens)
-        val sampling = SamplingPolicy.gemini(model, temperature, topP, topK)
-        sampling.temperature?.let { config.put("temperature", it) }
-        sampling.topP?.let { config.put("topP", it) }
-        sampling.topK?.let { config.put("topK", it) }
+        if (temperature != null) {
+            config.put("temperature", temperature)
+        }
 
         // Thinking configuration (model-specific)
         buildThinkingConfig(thinkingLevel)?.let { thinkingConfig ->

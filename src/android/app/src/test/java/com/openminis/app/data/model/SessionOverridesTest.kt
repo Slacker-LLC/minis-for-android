@@ -20,8 +20,6 @@ class SessionOverridesTest {
         val original = SessionOverrides(
             systemPrompt = "Prefer concise answers.",
             temperature = 0.25,
-            topP = 0.8,
-            topK = 32,
             maxTokens = 4096,
             enabledTools = setOf("file_read", "shell_execute"),
         )
@@ -32,19 +30,6 @@ class SessionOverridesTest {
         assertEquals(original, decoded)
     }
 
-    @Test
-    fun `sampling boundaries are accepted and invalid neighbors inherit`() {
-        val low = SessionOverrides.fromJson("""{"topP":0.0,"topK":1}""")
-        val high = SessionOverrides.fromJson("""{"topP":1.0,"topK":2147483647}""")
-        val invalid = SessionOverrides.fromJson("""{"topP":1.0001,"topK":0}""")
-
-        assertEquals(0.0, low.topP!!, 0.0)
-        assertEquals(1, low.topK)
-        assertEquals(1.0, high.topP!!, 0.0)
-        assertEquals(Int.MAX_VALUE, high.topK)
-        assertNull(invalid.topP)
-        assertNull(invalid.topK)
-    }
 
     @Test
     fun `tool allow-list serialization is deterministic`() {
@@ -87,8 +72,6 @@ class SessionOverridesTest {
             """{
                 "systemPrompt":"  Keep code runnable.  ",
                 "temperature":3.5,
-                "topP":-0.1,
-                "topK":0,
                 "maxTokens":-2,
                 "enabledTools":[" file_read ","", "shell_execute"]
             }""".trimIndent(),
@@ -96,8 +79,6 @@ class SessionOverridesTest {
 
         assertEquals("Keep code runnable.", decoded.systemPrompt)
         assertNull(decoded.temperature)
-        assertNull(decoded.topP)
-        assertNull(decoded.topK)
         assertNull(decoded.maxTokens)
         assertEquals(setOf("file_read", "shell_execute"), decoded.enabledTools)
 

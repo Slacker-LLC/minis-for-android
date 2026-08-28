@@ -7165,7 +7165,7 @@ class ChatViewModel(
                     // [_compactSummary] is prepended as a `<context-summary>`
                     // user message. Falls through to the raw agentHistory when
                     // no compact has happened, so the common path stays zero-copy.
-                    currentProvider.streamMessageWithSampling(
+                    currentProvider.streamMessage(
                         messages = applyRequestImageBudget(effectiveAgentHistory()),
                         systemPrompt = effectiveSystemPrompt,
                         maxTokens = sessionOverrides.effectiveMaxTokens(
@@ -7173,8 +7173,6 @@ class ChatViewModel(
                         ),
                         temperature = sessionOverrides.temperature,
                         tools = turnTools,
-                        topP = sessionOverrides.topP,
-                        topK = sessionOverrides.topK,
                         thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
                     ).collect { chunk ->
                 when (chunk) {

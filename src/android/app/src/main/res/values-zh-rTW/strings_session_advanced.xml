@@ -16,11 +16,6 @@
     <string name="session_advanced_model_section">模型參數</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
-    <string name="session_advanced_top_p">Top P</string>
-    <string name="session_advanced_top_p_hint">0.0–1.0</string>
-    <string name="session_advanced_top_k">Top K</string>
-    <string name="session_advanced_top_k_hint">正整數</string>
-    <string name="session_advanced_sampling_help">取樣覆蓋嚴格依各 Provider 與具體模型的官方 API 能力套用；不支援或已棄用的參數不會送出，Gemini 3.x 保持模型預設值。</string>
     <string name="session_advanced_max_tokens">最大輸出 Token</string>
     <string name="session_advanced_max_tokens_hint">正整數</string>
     <string name="session_advanced_tools_section">工具</string>
@@ -32,8 +27,6 @@
     <string name="session_advanced_missing_session">無法準備此工作階段。</string>
     <string name="session_advanced_invalid_prompt">請輸入工作階段指令，或關閉「自訂」。</string>
     <string name="session_advanced_invalid_temperature">Temperature 必須介於 0.0 與 2.0 之間。</string>
-    <string name="session_advanced_invalid_top_p">Top P 必須介於 0.0 與 1.0 之間。</string>
-    <string name="session_advanced_invalid_top_k">Top K 必須是正整數。</string>
     <string name="session_advanced_invalid_max_tokens">最大輸出 Token 必須是正整數。</string>
     <string name="session_advanced_save_failed">無法儲存工作階段設定。</string>
     <string name="session_advanced_reset_failed">無法重設工作階段設定。</string>

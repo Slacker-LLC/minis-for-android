@@ -16,8 +16,6 @@ import org.json.JSONObject
 data class SessionOverrides(
     val systemPrompt: String? = null,
     val temperature: Double? = null,
-    val topP: Double? = null,
-    val topK: Int? = null,
     val maxTokens: Int? = null,
     val enabledTools: Set<String>? = null,
 ) {
@@ -25,8 +23,6 @@ data class SessionOverrides(
     fun isEmpty(): Boolean =
         systemPrompt == null &&
             temperature == null &&
-            topP == null &&
-            topK == null &&
             maxTokens == null &&
             enabledTools == null
 
@@ -39,8 +35,6 @@ data class SessionOverrides(
         val json = JSONObject()
         systemPrompt?.let { json.put(KEY_SYSTEM_PROMPT, it) }
         temperature?.let { json.put(KEY_TEMPERATURE, it) }
-        topP?.let { json.put(KEY_TOP_P, it) }
-        topK?.let { json.put(KEY_TOP_K, it) }
         maxTokens?.let { json.put(KEY_MAX_TOKENS, it) }
         enabledTools?.let { tools ->
             val array = JSONArray()
@@ -66,8 +60,6 @@ data class SessionOverrides(
     companion object {
         private const val KEY_SYSTEM_PROMPT = "systemPrompt"
         private const val KEY_TEMPERATURE = "temperature"
-        private const val KEY_TOP_P = "topP"
-        private const val KEY_TOP_K = "topK"
         private const val KEY_MAX_TOKENS = "maxTokens"
         private const val KEY_ENABLED_TOOLS = "enabledTools"
 
@@ -86,9 +78,6 @@ data class SessionOverrides(
 
             val temperature = json.optDouble(KEY_TEMPERATURE, Double.NaN)
                 .takeIf { it.isFinite() && it in 0.0..2.0 }
-            val topP = json.optDouble(KEY_TOP_P, Double.NaN)
-                .takeIf { it.isFinite() && it in 0.0..1.0 }
-            val topK = json.optInt(KEY_TOP_K, -1).takeIf { it > 0 }
             val maxTokens = json.optInt(KEY_MAX_TOKENS, -1).takeIf { it > 0 }
 
             val enabledTools: Set<String>? = if (
@@ -112,8 +101,6 @@ data class SessionOverrides(
             return SessionOverrides(
                 systemPrompt = prompt,
                 temperature = temperature,
-                topP = topP,
-                topK = topK,
                 maxTokens = maxTokens,
                 enabledTools = enabledTools,
             )

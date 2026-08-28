@@ -16,11 +16,6 @@
     <string name="session_advanced_model_section">Paramètres du modèle</string>
     <string name="session_advanced_temperature">Température</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
-    <string name="session_advanced_top_p">Top P</string>
-    <string name="session_advanced_top_p_hint">0.0–1.0</string>
-    <string name="session_advanced_top_k">Top K</string>
-    <string name="session_advanced_top_k_hint">Entier positif</string>
-    <string name="session_advanced_sampling_help">Les réglages d’échantillonnage suivent l’API officielle de chaque fournisseur et modèle. Les paramètres non pris en charge ou obsolètes sont omis ; Gemini 3.x conserve les valeurs par défaut du modèle.</string>
     <string name="session_advanced_max_tokens">Jetons de sortie maximum</string>
     <string name="session_advanced_max_tokens_hint">Entier positif</string>
     <string name="session_advanced_tools_section">Outils</string>
@@ -32,8 +27,6 @@
     <string name="session_advanced_missing_session">Impossible de préparer cette session.</string>
     <string name="session_advanced_invalid_prompt">Saisissez des instructions de session ou désactivez « Personnalisé ».</string>
     <string name="session_advanced_invalid_temperature">La température doit être comprise entre 0.0 et 2.0.</string>
-    <string name="session_advanced_invalid_top_p">Top P doit être compris entre 0.0 et 1.0.</string>
-    <string name="session_advanced_invalid_top_k">Top K doit être un entier positif.</string>
     <string name="session_advanced_invalid_max_tokens">Le nombre maximal de jetons de sortie doit être un entier positif.</string>
     <string name="session_advanced_save_failed">Impossible d’enregistrer les paramètres de session.</string>
     <string name="session_advanced_reset_failed">Impossible de réinitialiser les paramètres de session.</string>

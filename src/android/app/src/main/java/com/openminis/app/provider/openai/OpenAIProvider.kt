@@ -14,7 +14,6 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.thinking.ThinkingResolveContext
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
-import com.openminis.app.provider.SamplingPolicy
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.CancellationException
@@ -476,12 +475,6 @@ class OpenAIProvider private constructor(
         it.contains("api.x.ai") || it.contains("//x.ai")
     }
 
-    /** GH#32: only api.openai.com gets OpenAI's official sampling contract. */
-    private val isOfficialOpenAIEndpoint: Boolean
-        get() = !isOAuth && basePath.lowercase().trimEnd('/').let {
-            it == "https://api.openai.com" || it == "https://api.openai.com/v1"
-        }
-
     /**
      * [T-unified-reasoning-effort] Whether this endpoint applies OpenAI's
      * `reasoning_effort` (Chat) / `reasoning.effort` (Responses) uniformly to
@@ -599,30 +592,6 @@ class OpenAIProvider private constructor(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
     ).failOnSilentEmptyCompletion(name)
 
-    override fun streamMessageSamplingClamped(
-        messages: List<LLMMessage>,
-        systemPrompt: String?,
-        maxTokens: Int,
-        temperature: Double?,
-        imageParts: List<LLMMessage.ImagePart>,
-        tools: List<AgentToolDefinition>,
-        thinkingLevel: ThinkingLevel,
-        topP: Double?,
-        topK: Int?,
-    ): Flow<LLMStreamChunk> {
-        val sampling = SamplingPolicy.openAI(
-            modelId = model.id,
-            firstParty = isOfficialOpenAIEndpoint,
-            thinkingLevel = thinkingLevel,
-            temperature = temperature,
-            topP = topP,
-        )
-        return rawStreamMessage(
-            messages, systemPrompt, maxTokens, sampling.temperature, imageParts, tools, thinkingLevel,
-            topP = sampling.topP,
-        ).failOnSilentEmptyCompletion(name)
-    }
-
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
         systemPrompt: String?,
@@ -631,7 +600,6 @@ class OpenAIProvider private constructor(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
-        topP: Double? = null,
     ): Flow<LLMStreamChunk> = callbackFlow {
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
@@ -658,13 +626,9 @@ class OpenAIProvider private constructor(
             )
             buildCodexImageBody(messages)
         } else if (usesChatCompletionsAPI) {
-            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, topP = topP, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         } else {
-            buildResponsesAPIBody(
-                messages, systemPrompt, maxTokens, stream = true,
-                temperature = temperature, topP = topP,
-                imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel,
-            )
+            buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
         // T302: serialize the request body exactly once. Pre-T302 we called
         // body.toString() three times per request (debug log + OAuth byte
@@ -1829,7 +1793,6 @@ class OpenAIProvider private constructor(
         maxTokens: Int,
         stream: Boolean,
         temperature: Double?,
-        topP: Double? = null,
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition> = emptyList(),
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
@@ -1855,7 +1818,6 @@ class OpenAIProvider private constructor(
         if (temperature != null) {
             body.put("temperature", temperature)
         }
-        topP?.let { body.put("top_p", it) }
 
         if (stream && !isOpenRouter) {
             body.put("stream_options", JSONObject().put("include_usage", true))
@@ -2709,8 +2671,6 @@ class OpenAIProvider private constructor(
         systemPrompt: String?,
         maxTokens: Int,
         stream: Boolean,
-        temperature: Double? = null,
-        topP: Double? = null,
         /**
          * [T-android-responses-toplevel-images] Images passed as the top-level
          * argument rather than on `msg.contentParts`, attached to the LAST user
@@ -2741,13 +2701,6 @@ class OpenAIProvider private constructor(
         body.put("stream", stream)
         body.put("store", false)
         body.put("parallel_tool_calls", true)
-        // OpenAI Responses API supports the same sampling fields as Chat. Keep
-        // the Codex OAuth fingerprint unchanged; session sampling is first-party
-        // public API only and reaches this builder already capability-filtered.
-        if (!isOAuth) {
-            temperature?.let { body.put("temperature", it) }
-            topP?.let { body.put("top_p", it) }
-        }
         // Stable per-conversation cache key so the Responses API can hit prompt
         // cache across turns. Codex CLI sets this to its conversation_id; at
         // this layer we don't have one, so we hash the first user message —

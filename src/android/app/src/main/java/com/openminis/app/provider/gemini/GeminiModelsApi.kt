@@ -86,25 +86,7 @@ object GeminiModelsApi {
                         }
                     } == true
                 if (supportsGen) {
-                    fun finiteDouble(key: String): Double? =
-                        if (obj.has(key) && !obj.isNull(key)) {
-                            obj.optDouble(key, Double.NaN).takeIf { it.isFinite() }
-                        } else null
-                    val topK = if (obj.has("topK") && !obj.isNull("topK")) {
-                        obj.optInt("topK", -1).takeIf { it >= 0 }
-                    } else null
-                    result.add(
-                        LLMModel(
-                            id = name,
-                            displayName = displayName,
-                            provider = "Google",
-                            samplingDefaultTemperature = finiteDouble("temperature"),
-                            samplingMaxTemperature = finiteDouble("maxTemperature"),
-                            samplingDefaultTopP = finiteDouble("topP"),
-                            samplingDefaultTopK = topK,
-                            samplingMetadataKnown = true,
-                        ),
-                    )
+                    result.add(LLMModel(name, displayName, "Google"))
                 }
             }
             if (result.isEmpty()) return@withContext LLMModel.allGemini

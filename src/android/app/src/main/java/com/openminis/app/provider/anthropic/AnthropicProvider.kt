@@ -13,7 +13,6 @@ import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.ImageBudget
 import com.openminis.app.provider.LLMProvider
-import com.openminis.app.provider.SamplingPolicy
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.Dispatchers
@@ -120,21 +119,6 @@ class AnthropicProvider(
         messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
     ).failOnSilentEmptyCompletion(name)
 
-    override fun streamMessageSamplingClamped(
-        messages: List<LLMMessage>,
-        systemPrompt: String?,
-        maxTokens: Int,
-        temperature: Double?,
-        imageParts: List<LLMMessage.ImagePart>,
-        tools: List<AgentToolDefinition>,
-        thinkingLevel: ThinkingLevel,
-        topP: Double?,
-        topK: Int?,
-    ): Flow<LLMStreamChunk> = rawStreamMessage(
-        messages, systemPrompt, maxTokens, temperature, imageParts, tools, thinkingLevel,
-        topP = topP, topK = topK,
-    ).failOnSilentEmptyCompletion(name)
-
     private fun rawStreamMessage(
         messages: List<LLMMessage>,
         systemPrompt: String?,
@@ -143,10 +127,8 @@ class AnthropicProvider(
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
-        topP: Double? = null,
-        topK: Int? = null,
     ): Flow<LLMStreamChunk> = callbackFlow {
-        val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, topP = topP, topK = topK, thinkingLevel = thinkingLevel)
+        val body = buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         // T302: serialize the body exactly once and pass the string to
         // buildRequest. Pre-T302 body.toString() ran twice per call (once
         // here, once inside buildRequest); each emitted string was tens of
@@ -352,8 +334,6 @@ class AnthropicProvider(
         temperature: Double?,
         imageParts: List<LLMMessage.ImagePart>,
         tools: List<AgentToolDefinition> = emptyList(),
-        topP: Double? = null,
-        topK: Int? = null,
         // [T-android-thinking-level-arch] Already clamped to the model ceiling by
         // LLMProvider.streamMessage/sendMessage before reaching here.
         thinkingLevel: ThinkingLevel = ThinkingLevel.OFF,
@@ -363,16 +343,9 @@ class AnthropicProvider(
         body.put("max_tokens", maxTokens)
         body.put("stream", stream)
 
-        val sampling = SamplingPolicy.anthropic(
-            modelId = model.id,
-            thinkingEnabled = thinkingLevel.isEnabled,
-            temperature = temperature,
-            topP = topP,
-            topK = topK,
-        )
-        sampling.temperature?.let { body.put("temperature", it) }
-        sampling.topP?.let { body.put("top_p", it) }
-        sampling.topK?.let { body.put("top_k", it) }
+        if (temperature != null && !thinkingLevel.isEnabled && !modelRejectsTemperature(model.id)) {
+            body.put("temperature", temperature)
+        }
 
         // Thinking / extended thinking. Two protocol shapes:
         //   - Claude 4.6+ (adaptive): thinking.type="adaptive" + output_config.effort.
