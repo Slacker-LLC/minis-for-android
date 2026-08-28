@@ -121,12 +121,51 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn rootfs_looks_valid(rootfs: &str) -> bool {
+/// Validate the runtime contract rather than merely checking that two files
+/// happen to exist. A partial extraction must never be reported as available.
+pub fn rootfs_health(rootfs: &str) -> Result<(), String> {
     let root = std::path::Path::new(rootfs);
-    root.join("etc/os-release").is_file()
-        && (root.join("bin/bash").exists()
-            || root.join("usr/bin/bash").exists()
-            || root.join("bin/sh").exists())
+    if !root.is_dir() {
+        return Err(format!("rootfs missing: {rootfs}"));
+    }
+
+    let os_path = root.join("etc/os-release");
+    let os_release = std::fs::read_to_string(&os_path)
+        .map_err(|e| format!("read {}: {e}", os_path.display()))?;
+    let distro = os_release
+        .lines()
+        .find_map(|line| line.strip_prefix("ID="))
+        .map(|value| value.trim().trim_matches('"'))
+        .unwrap_or("");
+    if distro != "ubuntu" {
+        return Err(format!("unexpected rootfs distro: {distro}"));
+    }
+
+    if !(root.join("bin/bash").exists()
+        || root.join("usr/bin/bash").exists()
+        || root.join("bin/sh").exists())
+    {
+        return Err("rootfs shell missing".into());
+    }
+
+    let marker_path = root.join(ROOTFS_MARKER);
+    let marker_raw = std::fs::read_to_string(&marker_path)
+        .map_err(|e| format!("read {}: {e}", marker_path.display()))?;
+    let marker: serde_json::Value = serde_json::from_str(&marker_raw)
+        .map_err(|e| format!("parse {}: {e}", marker_path.display()))?;
+    let marker_distro = marker.get("distro").and_then(|v| v.as_str()).unwrap_or("");
+    let marker_arch = marker.get("arch").and_then(|v| v.as_str()).unwrap_or("");
+    if marker_distro != "ubuntu" {
+        return Err(format!("rootfs marker distro mismatch: {marker_distro}"));
+    }
+    if marker_arch != "arm64" {
+        return Err(format!("rootfs marker arch mismatch: {marker_arch}"));
+    }
+    Ok(())
+}
+
+pub fn rootfs_looks_valid(rootfs: &str) -> bool {
+    rootfs_health(rootfs).is_ok()
 }
 
 pub fn read_os_release(rootfs: &str) -> Option<String> {
@@ -213,6 +252,39 @@ mod tests {
     }
 
     #[test]
+    fn partial_rootfs_without_marker_is_rejected() {
+        let root = temp_root("partial");
+        std::fs::create_dir_all(root.join("etc")).unwrap();
+        std::fs::create_dir_all(root.join("bin")).unwrap();
+        std::fs::write(root.join("etc/os-release"), "ID=ubuntu\nVERSION_ID=\"24.04\"\n").unwrap();
+        std::fs::write(root.join("bin/bash"), "").unwrap();
+        assert!(!rootfs_looks_valid(root.to_str().unwrap()));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn rootfs_marker_must_match_ubuntu_arm64() {
+        let root = temp_root("marker");
+        std::fs::create_dir_all(root.join("etc/minis")).unwrap();
+        std::fs::create_dir_all(root.join("bin")).unwrap();
+        std::fs::write(root.join("etc/os-release"), "ID=ubuntu\nVERSION_ID=\"24.04\"\n").unwrap();
+        std::fs::write(root.join("bin/bash"), "").unwrap();
+        std::fs::write(
+            root.join(ROOTFS_MARKER),
+            r#"{"distro":"ubuntu","arch":"x86_64"}"#,
+        )
+        .unwrap();
+        assert!(!rootfs_looks_valid(root.to_str().unwrap()));
+        std::fs::write(
+            root.join(ROOTFS_MARKER),
+            r#"{"distro":"ubuntu","arch":"arm64"}"#,
+        )
+        .unwrap();
+        assert!(rootfs_looks_valid(root.to_str().unwrap()));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn guest_identity_replaces_stale_minis_entries() {
         let unique = format!(
             "minisd-layout-{}-{}",
@@ -233,13 +305,9 @@ mod tests {
         std::fs::write(etc.join("group"), "root:x:0:\nminis:x:10000:\n").unwrap();
 
         ensure_guest_user_ids(root.to_str().unwrap(), 12345, 12345).unwrap();
-
         let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
         let group = std::fs::read_to_string(etc.join("group")).unwrap();
-        assert_eq!(
-            passwd.lines().filter(|l| l.starts_with("minis:")).count(),
-            1
-        );
+        assert_eq!(passwd.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert!(passwd.contains("minis:x:12345:12345:"));
         assert!(group.contains("minis:x:12345:"));
@@ -251,5 +319,17 @@ mod tests {
         assert!(passwd.contains("minis:x:23456:23456:"));
 
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn temp_root(label: &str) -> std::path::PathBuf {
+        let unique = format!(
+            "minisd-layout-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        std::env::temp_dir().join(unique)
     }
 }
