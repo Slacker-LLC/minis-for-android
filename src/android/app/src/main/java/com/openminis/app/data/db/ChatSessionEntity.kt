@@ -37,6 +37,13 @@ data class ChatSessionEntity(
     // choice that survives cold-start.
     @ColumnInfo(name = "thinking_override") val thinkingOverride: String? = null,
     /**
+     * Sparse per-session configuration encoded by SessionOverrides.
+     * null = inherit all current global/model defaults. Keeping the payload in
+     * one nullable JSON column means adding future knobs does not require one
+     * Room migration per preference.
+     */
+    @ColumnInfo(name = "session_overrides") val sessionOverrides: String? = null,
+    /**
      * [T-android-session-grouping] Group membership. NULL = ungrouped.
      *
      * Deliberately NOT a declared @ForeignKey. A folder_id pointing at a group
