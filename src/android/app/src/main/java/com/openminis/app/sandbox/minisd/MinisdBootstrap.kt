@@ -25,12 +25,14 @@ internal object MinisdBootstrap {
     ): String {
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}"
-        commands += "ROOTFS=${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}"
         commands += "POLICY=${shellQuote(POLICY_PATH)}"
         commands += "APP_SOCKET=${shellQuote(appSocket)}"
+        // The root broker must be able to start even when Ubuntu is missing or
+        // damaged. Rootfs validation/repair is a separate recovery stage owned
+        // by UbuntuRuntime/RootfsManager. Making watchdog startup depend on a
+        // healthy rootfs creates a deadlock: the privileged broker cannot start
+        // precisely when the app needs it most for runtime recovery.
         commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
-        commands += "if [ ! -f \"\$ROOTFS/etc/os-release\" ]; then echo \"ubuntu rootfs missing: \$ROOTFS/etc/os-release\" >&2; exit 41; fi"
-        commands += "if [ ! -e \"\$ROOTFS/bin/bash\" ] && [ ! -e \"\$ROOTFS/usr/bin/bash\" ] && [ ! -e \"\$ROOTFS/bin/sh\" ]; then echo \"ubuntu rootfs missing shell under \$ROOTFS\" >&2; exit 42; fi"
         commands += "mkdir -p ${shellQuote(POLICY_DIR)} || { echo \"cannot create minisd policy directory\" >&2; exit 43; }"
         commands += "umask 077"
         commands += "printf '%s' ${shellQuote(policyJson)} > \"\$POLICY.tmp\" || { echo \"cannot write minisd policy\" >&2; exit 44; }"
