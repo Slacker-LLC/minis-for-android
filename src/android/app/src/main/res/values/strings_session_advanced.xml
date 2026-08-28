@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">Advanced settings</string>
+    <string name="session_advanced_settings_menu">Advanced settings</string>
+    <string name="session_advanced_settings_inherit_help">Overrides apply only to this session. Turn off Custom to inherit the current global or model default.</string>
+    <string name="session_advanced_custom">Custom</string>
+    <string name="session_advanced_instructions_section">Instructions</string>
+    <string name="session_advanced_system_prompt">Session instructions</string>
+    <string name="session_advanced_system_prompt_hint">Additional instructions for this session</string>
+    <string name="session_advanced_model_section">Model parameters</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">Max output tokens</string>
+    <string name="session_advanced_max_tokens_hint">Positive integer</string>
+    <string name="session_advanced_tools_section">Tools</string>
+    <string name="session_advanced_tools">Custom tool allow-list</string>
+    <string name="session_advanced_tools_help">Limits the tools otherwise available to this session. Model, memory, preset, and runtime capability checks can still remove tools.</string>
+    <string name="session_advanced_save">Save</string>
+    <string name="session_advanced_reset_all">Reset all</string>
+    <string name="session_advanced_loading">Loading session settings…</string>
+    <string name="session_advanced_missing_session">This session no longer exists.</string>
+    <string name="session_advanced_invalid_prompt">Enter session instructions or turn off Custom.</string>
+    <string name="session_advanced_invalid_temperature">Temperature must be between 0.0 and 2.0.</string>
+    <string name="session_advanced_invalid_max_tokens">Max output tokens must be a positive integer.</string>
+    <string name="session_advanced_save_failed">Could not save session settings.</string>
+    <string name="session_advanced_reset_failed">Could not reset session settings.</string>
+</resources>
