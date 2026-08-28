@@ -1,9 +1,11 @@
 package com.openminis.app.config
 
 import android.content.Context
+import android.util.Log
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.sandbox.minisd.MinisdConfigBridgeServer
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -94,6 +96,8 @@ class ConfigRegistry private constructor() {
     }
 
     companion object {
+        private const val TAG = "ConfigRegistry"
+
         /**
          * Process-wide singleton. The first caller to invoke [init] wins;
          * subsequent calls are no-ops so idempotent registration is safe.
@@ -118,7 +122,11 @@ class ConfigRegistry private constructor() {
                         r, context, providerRepository, envVarRepository, chatRepository,
                     )
                 }
+                // Publish the registry before opening the minisd bridge. A bridge
+                // request can therefore never observe a half-initialized registry.
                 INSTANCE = r
+                runCatching { MinisdConfigBridgeServer.start(context.applicationContext) }
+                    .onFailure { Log.w(TAG, "minisd config bridge start failed: ${it.message}") }
                 return r
             }
         }
