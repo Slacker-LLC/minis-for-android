@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod config_proxy;
 pub mod dispatch;
 pub mod env;
 pub mod exec;
