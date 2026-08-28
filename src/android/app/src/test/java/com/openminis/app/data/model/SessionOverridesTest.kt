@@ -33,6 +33,19 @@ class SessionOverridesTest {
     }
 
     @Test
+    fun `tool allow-list serialization is deterministic`() {
+        val json = JSONObject(
+            SessionOverrides(enabledTools = linkedSetOf("shell_execute", "file_read"))
+                .toJsonOrNull()!!,
+        )
+        val tools = json.getJSONArray("enabledTools")
+
+        assertEquals(2, tools.length())
+        assertEquals("file_read", tools.getString(0))
+        assertEquals("shell_execute", tools.getString(1))
+    }
+
+    @Test
     fun `missing tool allow-list inherits while explicit empty list means chat only`() {
         val inherited = SessionOverrides.fromJson("{}")
         val chatOnly = SessionOverrides.fromJson("""{"enabledTools":[]}""")
