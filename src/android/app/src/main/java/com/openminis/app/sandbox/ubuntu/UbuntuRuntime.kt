@@ -150,6 +150,27 @@ object UbuntuRuntime {
         val expectedUid = ctx.applicationInfo.uid
         var cur = refresh()
 
+        // A full self-check also verifies the on-disk privileged broker against
+        // the APK's pinned checksum. If an app update carries a new minisd (or
+        // the old file is missing/corrupt), replace it and restart the watchdog
+        // even when the old in-memory broker still answers status calls.
+        if (forceCheck && cur.guestUid == expectedUid) {
+            val synced = syncBundledMinisd(force = false)
+            if (!synced.ok) {
+                return@withLock fail(synced.error ?: "minisd integrity check failed")
+            }
+            if (synced.changed) {
+                Log.w(TAG, "minisd binary changed during self-check; restarting broker")
+                val restarted = ensureMinisdUp(forceRestart = true)
+                if (!restarted.ok) {
+                    return@withLock fail(
+                        "minisd update restart failed: ${restarted.error ?: "unknown error"}",
+                    )
+                }
+                cur = awaitBroker(expectedUid)
+            }
+        }
+
         // Broker recovery comes first. minisd must be usable even when rootfs is
         // absent, because it is part of the trusted recovery path.
         if (cur.guestUid != null && cur.guestUid != expectedUid) {
@@ -306,11 +327,13 @@ object UbuntuRuntime {
             cwd = "/",
         )
         if (!resp.ok) {
-            return GuestProbe(
-                false,
-                "${resp.error?.code ?: "RUNTIME_UNAVAILABLE"}: ${resp.error?.detail ?: "probe RPC failed"}",
-                rootfsSuspect = resp.error?.detail?.contains("rootfs", ignoreCase = true) == true,
-            )
+            val code = resp.error?.code ?: "RUNTIME_UNAVAILABLE"
+            val detail = resp.error?.detail ?: "probe RPC failed"
+            val rootfsSuspect = code == "CHROOT_UNAVAILABLE" ||
+                code == "GUEST_EXECVE_FAILED" ||
+                code == "ROOTFS_INVALID" ||
+                detail.contains("rootfs", ignoreCase = true)
+            return GuestProbe(false, "$code: $detail", rootfsSuspect = rootfsSuspect)
         }
 
         val exit = resp.result?.optInt("exit_code", 255) ?: 255
@@ -321,9 +344,9 @@ object UbuntuRuntime {
             return GuestProbe(true, "ok")
         }
 
-        // `/usr/bin/true` itself never intentionally returns nonzero. At this
-        // probe boundary helper exit 4/5/6/7 is therefore unambiguously
-        // infrastructure failure and safe to recover before a real command.
+        // Compatibility fallback for a legacy broker that still flattened
+        // helper failures into exit codes. New minisd returns structured errors
+        // before this branch is reached.
         val stage = when (exit) {
             4 -> "KEEPER_NAMESPACE_LOST"
             5 -> "CHROOT_UNAVAILABLE"
@@ -355,6 +378,15 @@ object UbuntuRuntime {
         }
         return cur
     }
+
+    private suspend fun syncBundledMinisd(force: Boolean): BinarySyncResult =
+        withContext(Dispatchers.IO) {
+            val ctx = appContext
+                ?: return@withContext BinarySyncResult(false, error = "no app context")
+            val su = resolveSu()
+                ?: return@withContext BinarySyncResult(false, error = "no executable su binary")
+            ensureBundledMinisdInstalled(ctx, su, force)
+        }
 
     /**
      * Ensure the APK-bundled minisd exists before starting the watchdog. On a
@@ -621,12 +653,26 @@ object UbuntuRuntime {
             return ShellResult(detail, 1, System.currentTimeMillis() - startedAt)
         }
 
-        val resp = client.ubuntuExec(
+        suspend fun runOnce(): MinisdResponse = client.ubuntuExec(
             argv = listOf("/bin/bash", "-lc", command),
             timeoutMs = timeoutMs,
             cwd = MinisdProtocol.GUEST_WORKSPACE,
             env = env,
         )
+
+        var resp = runOnce()
+        if (isSafePreExecFailure(resp)) {
+            // Structured errors from minisd guarantee execve was never reached,
+            // so retrying after one bounded recovery cannot duplicate user side
+            // effects. Ordinary command exits and timeouts are never retried.
+            Log.w(TAG, "shell pre-exec failure ${resp.error?.code}; recovering once")
+            clearProbeCache()
+            val recovered = ensureReady(forceCheck = true)
+            if (recovered.running) {
+                resp = runOnce()
+            }
+        }
+
         val stdout = resp.result?.optString("stdout").orEmpty()
         val stderr = resp.result?.optString("stderr").orEmpty()
         val combined = when {
@@ -637,7 +683,7 @@ object UbuntuRuntime {
         val output = if (resp.ok) {
             combined
         } else {
-            val detail = resp.error?.detail ?: "ubuntu.exec failed"
+            val detail = resp.error?.let { "${it.code}: ${it.detail}" } ?: "ubuntu.exec failed"
             if (combined.isEmpty()) detail else "$combined\n$detail"
         }
         if (lineCallback != null && output.isNotEmpty()) {
@@ -650,6 +696,9 @@ object UbuntuRuntime {
             durationMs = System.currentTimeMillis() - startedAt,
         )
     }
+
+    private fun isSafePreExecFailure(resp: MinisdResponse): Boolean =
+        !resp.ok && resp.error?.code in SAFE_PREEXEC_ERRORS
 
     fun paths(): JSONObject = JSONObject()
         .put("hostWorkspace", UbuntuPaths.hostWorkspace)
@@ -702,6 +751,15 @@ object UbuntuRuntime {
         _snapshot.value = next
         return next
     }
+
+    private val SAFE_PREEXEC_ERRORS = setOf(
+        "KEEPER_NAMESPACE_LOST",
+        "CHROOT_UNAVAILABLE",
+        "GUEST_PRIVILEGE_SETUP_FAILED",
+        "GUEST_EXECVE_FAILED",
+        "ROOTFS_INVALID",
+        "RUNTIME_LAYOUT_MISMATCH",
+    )
 
     private const val MINISD_ASSET = "runtime/minisd-aarch64"
     private const val MINISD_SHA_ASSET = "runtime/minisd-aarch64.sha256"
