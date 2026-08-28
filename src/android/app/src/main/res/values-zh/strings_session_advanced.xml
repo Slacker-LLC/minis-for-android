@@ -12,7 +12,11 @@
     <string name="session_advanced_thinking_not_supported">当前模型不支持</string>
     <string name="session_advanced_instructions_section">会话灵魂</string>
     <string name="session_advanced_system_prompt">会话人格</string>
-    <string name="session_advanced_system_prompt_hint">仅作用于此会话的人设、角色、语气与行为；全局 SOUL.md 仍作为基础层。</string>
+    <string name="session_advanced_system_prompt_hint">此会话独立的人设、角色、语气与行为。</string>
+    <string name="session_advanced_soul_help">默认使用全局 SOUL.md。只有在发送第一条消息前设置“会话灵魂”，才会由当前会话完整覆盖全局灵魂；聊天开始后该选择永久锁定。</string>
+    <string name="session_advanced_soul_locked_help">此会话已经开始，灵魂选择已锁定，之后不能修改；即使清空聊天记录也不会重新解锁。</string>
+    <string name="session_advanced_soul_locked_custom">自定义灵魂 · 已锁定</string>
+    <string name="session_advanced_soul_locked_global">全局灵魂 · 已锁定</string>
     <string name="session_advanced_model_section">模型参数</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
