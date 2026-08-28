@@ -69,12 +69,15 @@ fun SessionAdvancedSettingsSheet(
     var isLoading by remember(sessionId) { mutableStateOf(true) }
     var isSaving by remember(sessionId) { mutableStateOf(false) }
     var errorText by remember(sessionId) { mutableStateOf<String?>(null) }
-    var loadedOverrides by remember(sessionId) { mutableStateOf(SessionOverrides()) }
 
     var customInstructions by remember(sessionId) { mutableStateOf(false) }
     var instructionsText by remember(sessionId) { mutableStateOf("") }
     var customTemperature by remember(sessionId) { mutableStateOf(false) }
     var temperatureText by remember(sessionId) { mutableStateOf("") }
+    var customTopP by remember(sessionId) { mutableStateOf(false) }
+    var topPText by remember(sessionId) { mutableStateOf("") }
+    var customTopK by remember(sessionId) { mutableStateOf(false) }
+    var topKText by remember(sessionId) { mutableStateOf("") }
     var customMaxTokens by remember(sessionId) { mutableStateOf(false) }
     var maxTokensText by remember(sessionId) { mutableStateOf("") }
     var customTools by remember(sessionId) { mutableStateOf(false) }
@@ -85,6 +88,8 @@ fun SessionAdvancedSettingsSheet(
     val resetFailedMessage = stringResource(R.string.session_advanced_reset_failed)
     val invalidPromptMessage = stringResource(R.string.session_advanced_invalid_prompt)
     val invalidTemperatureMessage = stringResource(R.string.session_advanced_invalid_temperature)
+    val invalidTopPMessage = stringResource(R.string.session_advanced_invalid_top_p)
+    val invalidTopKMessage = stringResource(R.string.session_advanced_invalid_top_k)
     val invalidMaxTokensMessage = stringResource(R.string.session_advanced_invalid_max_tokens)
 
     LaunchedEffect(sessionId) {
@@ -103,11 +108,14 @@ fun SessionAdvancedSettingsSheet(
 
         persistedSessionId = sid
         val overrides = SessionOverrides.fromJson(session.sessionOverrides)
-        loadedOverrides = overrides
         customInstructions = overrides.systemPrompt != null
         instructionsText = overrides.systemPrompt.orEmpty()
         customTemperature = overrides.temperature != null
         temperatureText = overrides.temperature?.toString().orEmpty()
+        customTopP = overrides.topP != null
+        topPText = overrides.topP?.toString().orEmpty()
+        customTopK = overrides.topK != null
+        topKText = overrides.topK?.toString().orEmpty()
         customMaxTokens = overrides.maxTokens != null
         maxTokensText = overrides.maxTokens?.toString().orEmpty()
         customTools = overrides.enabledTools != null
@@ -139,6 +147,28 @@ fun SessionAdvancedSettingsSheet(
             null
         }
 
+        val topP = if (customTopP) {
+            val value = topPText.trim().toDoubleOrNull()
+            if (value == null || !value.isFinite() || value !in 0.0..1.0) {
+                errorText = invalidTopPMessage
+                return null
+            }
+            value
+        } else {
+            null
+        }
+
+        val topK = if (customTopK) {
+            val value = topKText.trim().toIntOrNull()
+            if (value == null || value <= 0) {
+                errorText = invalidTopKMessage
+                return null
+            }
+            value
+        } else {
+            null
+        }
+
         val maxTokens = if (customMaxTokens) {
             val value = maxTokensText.trim().toIntOrNull()
             if (value == null || value <= 0) {
@@ -153,10 +183,8 @@ fun SessionAdvancedSettingsSheet(
         return SessionOverrides(
             systemPrompt = prompt,
             temperature = temperature,
-            // Preserve provider parameters that are not yet runtime-editable on
-            // Android. Saving the working subset must not silently clear them.
-            topP = loadedOverrides.topP,
-            topK = loadedOverrides.topK,
+            topP = topP,
+            topK = topK,
             maxTokens = maxTokens,
             enabledTools = if (customTools) selectedToolIds else null,
         )
@@ -247,7 +275,10 @@ fun SessionAdvancedSettingsSheet(
             }
 
             item {
-                SettingsSection(header = stringResource(R.string.session_advanced_model_section)) {
+                SettingsSection(
+                    header = stringResource(R.string.session_advanced_model_section),
+                    footer = stringResource(R.string.session_advanced_sampling_help),
+                ) {
                     SettingsSwitchRow(
                         title = stringResource(R.string.session_advanced_temperature),
                         subtitle = stringResource(R.string.session_advanced_custom),
@@ -266,6 +297,48 @@ fun SessionAdvancedSettingsSheet(
                             placeholder = { Text(stringResource(R.string.session_advanced_temperature_hint)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                    }
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_top_p),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customTopP,
+                        onCheckedChange = { customTopP = it; errorText = null },
+                        showDivider = true,
+                    )
+                    if (customTopP) {
+                        OutlinedTextField(
+                            value = topPText,
+                            onValueChange = { topPText = it; errorText = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            label = { Text(stringResource(R.string.session_advanced_top_p)) },
+                            placeholder = { Text(stringResource(R.string.session_advanced_top_p_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        )
+                    }
+
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.session_advanced_top_k),
+                        subtitle = stringResource(R.string.session_advanced_custom),
+                        checked = customTopK,
+                        onCheckedChange = { customTopK = it; errorText = null },
+                        showDivider = true,
+                    )
+                    if (customTopK) {
+                        OutlinedTextField(
+                            value = topKText,
+                            onValueChange = { topKText = it; errorText = null },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            label = { Text(stringResource(R.string.session_advanced_top_k)) },
+                            placeholder = { Text(stringResource(R.string.session_advanced_top_k_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
 
