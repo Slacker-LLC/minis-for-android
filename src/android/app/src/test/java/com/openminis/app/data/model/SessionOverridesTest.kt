@@ -30,6 +30,13 @@ class SessionOverridesTest {
         assertEquals(original, decoded)
     }
 
+    @Test
+    fun `removed sampling keys from older payloads are ignored`() {
+        val decoded = SessionOverrides.fromJson("""{"topP":0.8,"topK":32}""")
+
+        assertTrue(decoded.isEmpty())
+        assertNull(decoded.toJsonOrNull())
+    }
 
     @Test
     fun `tool allow-list serialization is deterministic`() {
