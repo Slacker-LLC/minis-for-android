@@ -138,7 +138,14 @@ fn classify_spawn_error(error: std::io::Error, argv0: &str) -> (ErrorCode, Strin
         // These are the normal execve/path failures. They happen after the
         // namespace/chroot/privilege boundary succeeded, but before user code
         // can run, so they are still safe pre-exec failures.
-        Some(libc::ENOENT | libc::EACCES | libc::ENOEXEC | libc::ENOTDIR | libc::ELOOP | libc::ETXTBSY) => (
+        Some(
+            libc::ENOENT
+            | libc::EACCES
+            | libc::ENOEXEC
+            | libc::ENOTDIR
+            | libc::ELOOP
+            | libc::ETXTBSY,
+        ) => (
             ErrorCode::GuestExecveFailed,
             format!("execve {argv0}: {error}"),
         ),
@@ -276,7 +283,8 @@ pub fn execute_ubuntu_snapshot(
         command.args(&req.argv[1..]);
         command.env_clear();
         command.envs(&env);
-        command.stdin(std::process::Stdio::null())
+        command
+            .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
         unsafe {
