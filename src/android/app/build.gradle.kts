@@ -20,24 +20,27 @@ val appCustomization = Properties().apply {
 fun customizationValue(key: String): String =
     (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
 
-// Issue #43: the APK carries a verified, known-good Ubuntu base archive so a
-// rooted device can repair a missing/corrupt runtime without requiring network
-// access at the moment of failure. The asset is generated from the same pinned
-// build script used by CI/release engineering; it is never checked into Git.
+// Issue #43: carry a known-good minisd + Ubuntu base inside the APK so runtime
+// repair does not depend on the network or a developer-side adb installer.
 val generatedRuntimeAssetsDir = layout.buildDirectory.dir("generated/runtime-assets")
-val prepareUbuntuRootfsAsset by tasks.registering(Exec::class) {
-    val script = rootProject.file("../../scripts/build-ubuntu-rootfs.sh")
+val prepareRuntimeRecoveryAssets by tasks.registering(Exec::class) {
+    val script = rootProject.file("../../scripts/prepare-android-runtime-assets.sh")
     val runtimeDir = generatedRuntimeAssetsDir.map { it.dir("runtime").asFile }
-    val workDir = layout.buildDirectory.dir("tmp/ubuntu-rootfs")
+    val workDir = layout.buildDirectory.dir("tmp/runtime-assets")
 
     inputs.file(script)
+    inputs.file(rootProject.file("../../scripts/build-ubuntu-rootfs.sh"))
+    inputs.file(rootProject.file("../../src/native/minisd/Cargo.toml"))
+    inputs.file(rootProject.file("../../src/native/minisd/Cargo.lock"))
+    inputs.dir(rootProject.file("../../src/native/minisd/src"))
+    outputs.file(runtimeDir.map { it.resolve("minisd-aarch64") })
+    outputs.file(runtimeDir.map { it.resolve("minisd-aarch64.sha256") })
     outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.tar.gz") })
     outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.tar.gz.sha256") })
     outputs.file(runtimeDir.map { it.resolve("ubuntu-arm64-rootfs.manifest.json") })
 
     doFirst {
-        val out = runtimeDir.get().apply { mkdirs() }
-        environment("DIST", out.absolutePath)
+        environment("OUT", generatedRuntimeAssetsDir.get().asFile.absolutePath)
         environment("WORK", workDir.get().asFile.absolutePath)
     }
     commandLine("bash", script.absolutePath)
@@ -134,11 +137,11 @@ android {
     }
 }
 
-// Any variant that merges production assets must first materialize the bundled
-// recovery image. This keeps debug/release behavior identical and makes a
-// missing recovery archive a build failure rather than a device-time surprise.
+// Every packaged Android variant must contain the offline recovery payload.
+// A missing minisd/rootfs therefore fails the build instead of surfacing later
+// as an unrecoverable device runtime.
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(prepareUbuntuRootfsAsset) }
+    .configureEach { dependsOn(prepareRuntimeRecoveryAssets) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.
@@ -245,7 +248,7 @@ dependencies {
 
     // Testing — JVM unit tests
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx-coroutines-test:1.9.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.json:json:20231013")
 
