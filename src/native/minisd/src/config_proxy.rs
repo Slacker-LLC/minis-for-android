@@ -424,7 +424,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 fn hex_decode(text: &str, max_bytes: usize) -> Result<Vec<u8>, String> {
-    if text.len() % 2 != 0 || text.len() / 2 > max_bytes {
+    if !text.len().is_multiple_of(2) || text.len() / 2 > max_bytes {
         return Err("invalid hex payload length".into());
     }
     let bytes = text.as_bytes();
