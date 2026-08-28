@@ -16,6 +16,11 @@
     <string name="session_advanced_model_section">모델 매개변수</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_top_p">Top P</string>
+    <string name="session_advanced_top_p_hint">0.0–1.0</string>
+    <string name="session_advanced_top_k">Top K</string>
+    <string name="session_advanced_top_k_hint">양의 정수</string>
+    <string name="session_advanced_sampling_help">Top P는 지원되는 제공자에서 적용됩니다. Top K는 Anthropic과 Gemini에서 적용되며 지원하지 않는 제공자는 안전하게 무시합니다.</string>
     <string name="session_advanced_max_tokens">최대 출력 토큰</string>
     <string name="session_advanced_max_tokens_hint">양의 정수</string>
     <string name="session_advanced_tools_section">도구</string>
@@ -27,6 +32,8 @@
     <string name="session_advanced_missing_session">이 세션을 준비할 수 없습니다.</string>
     <string name="session_advanced_invalid_prompt">세션 지침을 입력하거나 “사용자 지정”을 끄세요.</string>
     <string name="session_advanced_invalid_temperature">Temperature는 0.0에서 2.0 사이여야 합니다.</string>
+    <string name="session_advanced_invalid_top_p">Top P는 0.0에서 1.0 사이여야 합니다.</string>
+    <string name="session_advanced_invalid_top_k">Top K는 양의 정수여야 합니다.</string>
     <string name="session_advanced_invalid_max_tokens">최대 출력 토큰은 양의 정수여야 합니다.</string>
     <string name="session_advanced_save_failed">세션 설정을 저장할 수 없습니다.</string>
     <string name="session_advanced_reset_failed">세션 설정을 초기화할 수 없습니다.</string>

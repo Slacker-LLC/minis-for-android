@@ -16,6 +16,11 @@
     <string name="session_advanced_model_section">モデルパラメータ</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_top_p">Top P</string>
+    <string name="session_advanced_top_p_hint">0.0–1.0</string>
+    <string name="session_advanced_top_k">Top K</string>
+    <string name="session_advanced_top_k_hint">正の整数</string>
+    <string name="session_advanced_sampling_help">Top P は対応するプロバイダーで適用されます。Top K は Anthropic と Gemini で適用され、未対応のプロバイダーでは安全に無視されます。</string>
     <string name="session_advanced_max_tokens">最大出力トークン</string>
     <string name="session_advanced_max_tokens_hint">正の整数</string>
     <string name="session_advanced_tools_section">ツール</string>
@@ -27,6 +32,8 @@
     <string name="session_advanced_missing_session">このセッションを準備できませんでした。</string>
     <string name="session_advanced_invalid_prompt">セッション指示を入力するか、「カスタム」をオフにしてください。</string>
     <string name="session_advanced_invalid_temperature">Temperature は 0.0 から 2.0 の範囲で指定してください。</string>
+    <string name="session_advanced_invalid_top_p">Top P は 0.0 から 1.0 の範囲で指定してください。</string>
+    <string name="session_advanced_invalid_top_k">Top K は正の整数で指定してください。</string>
     <string name="session_advanced_invalid_max_tokens">最大出力トークンは正の整数で指定してください。</string>
     <string name="session_advanced_save_failed">セッション設定を保存できませんでした。</string>
     <string name="session_advanced_reset_failed">セッション設定をリセットできませんでした。</string>
