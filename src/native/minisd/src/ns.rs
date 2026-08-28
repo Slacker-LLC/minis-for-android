@@ -6,6 +6,9 @@ use std::path::Path;
 use std::ffi::CString;
 
 #[cfg(unix)]
+const ANDROID_AID_INET: libc::gid_t = 3003;
+
+#[cfg(unix)]
 fn cstr(s: &str) -> Result<CString, String> {
     CString::new(s).map_err(|_| format!("NUL in path: {s}"))
 }
@@ -163,9 +166,19 @@ pub fn chroot_to(path: &str) -> Result<(), String> {
 }
 
 #[cfg(unix)]
+fn guest_supplementary_groups() -> [libc::gid_t; 1] {
+    // Normal Android app processes that hold android.permission.INTERNET
+    // inherit AID_INET from zygote on releases that still enforce socket
+    // access through supplementary groups. minisd starts from root instead,
+    // so reproduce only that network group rather than retaining root's groups.
+    [ANDROID_AID_INET]
+}
+
+#[cfg(unix)]
 pub fn drop_privs(uid: u32, gid: u32) -> Result<(), String> {
-    if unsafe { libc::setgroups(0, std::ptr::null()) } != 0 {
-        return Err(last_err("setgroups"));
+    let groups = guest_supplementary_groups();
+    if unsafe { libc::setgroups(groups.len(), groups.as_ptr()) } != 0 {
+        return Err(last_err("setgroups(AID_INET)"));
     }
     if unsafe { libc::setgid(gid) } != 0 {
         return Err(last_err("setgid"));
@@ -475,4 +488,15 @@ pub fn poc_unshare_make_rprivate() -> Result<(), ErrorCode> {
 #[cfg(not(unix))]
 pub fn poc_unshare_make_rprivate() -> Result<(), ErrorCode> {
     Err(ErrorCode::RuntimeUnavailable)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn guest_network_group_matches_android_internet_permission() {
+        assert_eq!(guest_supplementary_groups(), [ANDROID_AID_INET]);
+        assert_eq!(ANDROID_AID_INET, 3003);
+    }
 }
