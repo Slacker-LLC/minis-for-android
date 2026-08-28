@@ -13,7 +13,7 @@ class SoulStoreRegressionTest {
             metadata = SoulMetadata(
                 name = "小米尼斯",
                 emoji = "",
-                style = "简洁、直接，保留 `code` 和 \\ 反斜杠",
+                style = "简洁、直接，保留 code 格式",
                 lang = "zh",
             ),
             body = """第一行
