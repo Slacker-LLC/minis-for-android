@@ -83,17 +83,41 @@ class ConfigRegistry private constructor() {
         val out = ArrayList<ConfigField>()
         for (f in fields.values) {
             if (f.access == ConfigAccess.HIDDEN) continue
-            if (f.path == topic || f.path.startsWith("$topic.")) out.add(f)
+            if (f.path == topic || f.path.startsWith("$topic.")) out.add(agentVisibleField(f))
         }
         val coll = collections[topic]
         if (coll != null) {
             val firstId = coll.childIds().firstOrNull()
             if (firstId != null) {
-                out.addAll(coll.fields(forId = firstId).filter { it.access != ConfigAccess.HIDDEN })
+                out.addAll(
+                    coll.fields(forId = firstId)
+                        .filter { it.access != ConfigAccess.HIDDEN }
+                        .map(::agentVisibleField),
+                )
             }
         }
         return out.sortedBy { it.path }
     }
+
+    /**
+     * Topic-help is part of the public Agent contract. Keep that contract
+     * aligned with current runtime behavior even while legacy field metadata
+     * is retained internally for source compatibility with upstream-derived
+     * code. SOUL body length is deliberately unrestricted; transport request
+     * ceilings are separate safety limits and are not personality limits.
+     */
+    private fun agentVisibleField(field: ConfigField): ConfigField =
+        if (field.path == "soul.body") {
+            object : ConfigField by field {
+                override val description: String =
+                    "Personality / voice instructions injected as a block in the system prompt. " +
+                        "No character or word-count cap is applied. Prompt-injection patterns " +
+                        "(for example, requests to ignore previous instructions) are rejected; " +
+                        "keep this field to genuine character / tone guidance."
+            }
+        } else {
+            field
+        }
 
     companion object {
         private const val TAG = "ConfigRegistry"
