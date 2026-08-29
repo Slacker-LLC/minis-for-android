@@ -51,24 +51,9 @@ Android App 是 Agent 状态、会话、工具权限、Provider 配置和持久�
 
 ## 构建
 
-推荐 Linux / WSL2。完整、权威的构建参数以 [BUILDING.md](BUILDING.md) 和 Gradle/Rust 源码为准。
+[BUILDING.md](BUILDING.md) 是本仓库唯一权威的构建与发布说明，定义当前支持的工具链、Android/Rust/rootfs 入口、验证命令和 Release 签名规则。[BUILDING.zh-CN.md](BUILDING.zh-CN.md) 仅作为中文翻译。
 
-```bash
-git clone https://github.com/Slacker-LLC/minis-for-android.git
-cd minis-for-android
-
-cp src/android/app/provider-customization.properties.example \
-   src/android/app/provider-customization.properties
-
-rustup target add aarch64-unknown-linux-musl
-cargo build --release --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
-
-./scripts/build-ubuntu-rootfs.sh
-
-cd src/android
-./gradlew :app:assembleDebug --no-daemon
-```
+不要从归档材料或上游 OpenMinis 文档直接复制旧构建命令到当前自动化；应先与 `BUILDING.md` 和实际构建文件核对。
 
 ## 文档规则
 
