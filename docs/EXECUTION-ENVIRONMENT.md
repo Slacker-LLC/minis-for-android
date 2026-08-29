@@ -10,8 +10,8 @@ The rooted-device Linux path is:
 Android kernel
   ↓
 Android app
-  ↓ root launch + setns(App mount namespace)
-minisd (root broker, Unix socket RPC)
+  ↓ Unix socket RPC
+minisd (root broker)
   ↓
 unshare + mount + chroot
   ↓
@@ -41,18 +41,6 @@ The app is not replaced by the Linux guest.
 
 The broker uses a private Unix socket, peer identity checks, framed messages, bounded request/response sizes, a compile-time capability ceiling, and runtime policy that may restrict but not expand that ceiling.
 
-Android App Data Isolation can present a `tmpfs_data` overlay for the App's
-private files when those files are viewed from the global root mount namespace.
-The App therefore starts the `minisd` watchdog with its current PID. Before
-recovering runtime state or spawning the server, the watchdog joins that PID's
-mount namespace. Server restarts inherit the same namespace, and the keeper
-then creates its own private child namespace for chroot mounts.
-
-The App compares `/proc/self/ns/mnt` with the namespace reported by
-`ubuntu.status`. A stale broker is retired and recreated. Runtime startup also
-rejects workspace, session, shared-resource, or home sources backed by tmpfs,
-so persistent mode fails closed instead of silently losing data.
-
 Long-running privileged operations are not allowed to hold a global broker state lock indefinitely.
 
 ### Ubuntu guest
@@ -73,32 +61,22 @@ Application-owned data directories are created under the app's private files dir
 
 Canonical guest mappings include:
 
-| Guest path | Host scope | Purpose |
-|---|---|---|
-| `/workspace` | `<filesDir>/minis-sessions/<sessionId>/workspace` | current chat workspace |
-| `/var/minis/attachments` | `<filesDir>/minis-sessions/<sessionId>/attachments` | attachments |
-| `/var/minis/offloads` | `<filesDir>/minis-sessions/<sessionId>/offloads` | tool/native offloads |
-| `/var/minis/browser` | `<filesDir>/minis-sessions/<sessionId>/browser` | browser data |
-| `/memory` / `/var/minis/memory` | `<filesDir>/minis-global/memory` | persistent memory |
-| `/skills` / `/var/minis/skills` | `<filesDir>/minis-global/skills` | skills |
-| `/shared` / `/var/minis/shared` | `<filesDir>/minis-global/shared` | shared files |
-| `/home/minis` | `<filesDir>/minis-global/home` | persistent Linux user home and CLI configuration |
-
-Sessionless compatibility commands use `<filesDir>/minis/workspace`. Normal
-chat commands receive the session-specific mapping above. The current working
-directory remains `/workspace`, while `HOME=/home/minis`. The fixed Bash
-entrypoint explicitly loads `/home/minis/.bashrc` with alias expansion enabled
-before it evaluates the structured user command.
+| Guest path | Purpose |
+|---|---|
+| `/workspace` | main agent workspace |
+| `/var/minis/workspace` | workspace alias |
+| `/var/minis/attachments` | attachments |
+| `/var/minis/offloads` | tool/native offloads |
+| `/var/minis/browser` | browser data |
+| `/memory` / `/var/minis/memory` | persistent memory |
+| `/skills` / `/var/minis/skills` | skills |
+| `/shared` / `/var/minis/shared` | shared files |
 
 Path resolution must enforce canonical containment and reject `..`, NUL, and escape attempts.
 
 ## Shell behavior
 
 The agent shell targets Ubuntu and executes through Bash. The public tool contract should describe the workspace as `/workspace` without exposing a fake or hard-coded host path.
-
-Files stored below `/home/minis` persist across sessions and App restarts.
-Environment variables created only by `export` remain process-local and are not
-persisted automatically.
 
 Shell execution is governed by timeout, dangerous-command policy, output limits/spill, job state, approval, and checkpoint rules where applicable.
 

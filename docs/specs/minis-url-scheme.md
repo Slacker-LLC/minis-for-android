@@ -121,12 +121,11 @@ After app initialization, `UbuntuPaths` maps the stable guest paths to app-priva
 | `/var/minis/attachments` | `<filesDir>/minis/workspace/attachments` |
 | `/var/minis/offloads` | `<filesDir>/minis/workspace/offloads` |
 | `/var/minis/browser` | `<filesDir>/minis/workspace/browser` |
-| `/memory`, `/var/minis/memory` | `<filesDir>/minis-global/memory` |
-| `/skills`, `/var/minis/skills` | `<filesDir>/minis-global/skills` |
-| `/shared`, `/var/minis/shared` | `<filesDir>/minis-global/shared` |
-| `/home/minis` | `<filesDir>/minis-global/home` |
+| `/memory`, `/var/minis/memory` | `<filesDir>/minis/memory` |
+| `/skills`, `/var/minis/skills` | `<filesDir>/minis/skills` |
+| `/shared`, `/var/minis/shared` | `<filesDir>/minis/shared` |
 
-`/data/adb/minis` is reserved for root-owned Ubuntu runtime state such as the rootfs and `minisd`; it is not the app workspace. The root broker joins the App mount namespace before binding these app-private paths, so its filesystem view matches the Android resolver instead of the global `tmpfs_data` overlay.
+`/data/adb/minis` is reserved for root-owned Ubuntu runtime state such as the rootfs and `minisd`; it is not the app workspace.
 
 Additional paths can be supplied by the runtime bind-mount registry, including user-authorized external folders.
 
@@ -134,7 +133,9 @@ Additional paths can be supplied by the runtime bind-mount registry, including u
 
 ## Session semantics
 
-`ChatLinkResolver` accepts an optional `sessionId` and prefers `MinisKernel.resolveSessionHostPath(...)` when a session and `Context` are available. Session-scoped workspace, attachment, offload, and browser paths resolve under `<filesDir>/minis-sessions/<sessionId>`. Memory, skills, shared files, the Linux user home, and user-authorized mounts remain App-global.
+`ChatLinkResolver` accepts an optional `sessionId` and prefers `MinisKernel.resolveSessionHostPath(...)` when a session and `Context` are available. However, the current Android implementation of `UbuntuPaths.resolveSessionHostPath(...)` ignores the `sessionId` and delegates directly to the global `resolveHostPath(...)` mapping.
+
+Therefore the current resource aliases above are app-scoped path mappings, not per-chat isolated stores. Do not document `minis://workspace/...` or `minis://attachments/...` as resolving to independent files for each chat unless the Android implementation changes.
 
 The `minis://session/<sessionId>/...` navigation form is different: its session id selects the chat/preview destination. It does not change the resource resolver into a per-session filesystem.
 
