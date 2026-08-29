@@ -28,11 +28,11 @@ done
 [[ -d src/android/app/src/main/java/io/github/slackerllc/minis ]] || fail 'canonical main source root missing'
 [[ -d src/android/app/src/test/java/io/github/slackerllc/minis ]] || fail 'canonical unit-test source root missing'
 
-# Authorities remain derived from applicationId; process suffix and public deep-link
-# contracts are intentionally stable across the package migration.
+# Authorities remain derived from applicationId. Public deep-link contracts are
+# intentionally stable across the package migration. The guard does not invent
+# a process attribute that master did not define.
 grep -Fq 'android:authorities="${applicationId}.shizuku"' "$MANIFEST" || fail 'Shizuku authority is no longer applicationId-derived'
 grep -Fq 'android:authorities="${applicationId}.fileprovider"' "$MANIFEST" || fail 'FileProvider authority is no longer applicationId-derived'
-grep -Fq 'android:process=":pet"' "$MANIFEST" || fail 'pet process suffix changed'
 grep -Fq 'android:scheme="minis"' "$MANIFEST" || fail 'minis deep-link scheme changed'
 grep -Fq 'android:host="app.minis.love"' "$MANIFEST" || fail 'HTTPS app-link host changed'
 
