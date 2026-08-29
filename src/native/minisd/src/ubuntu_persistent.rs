@@ -8,9 +8,9 @@ use serde_json::{json, Map, Value};
 use std::path::Path;
 use std::time::Duration;
 
-pub use crate::ubuntu_legacy::{BASE_PACKAGES, UbuntuExec};
 #[cfg(unix)]
 pub use crate::ubuntu_legacy::prepare_session_root;
+pub use crate::ubuntu_legacy::{UbuntuExec, BASE_PACKAGES};
 
 const MAX_CAPTURE: usize = 256 * 1024;
 
@@ -61,9 +61,19 @@ fn expected_persistent_path(key: &str) -> Option<&'static str> {
 
 fn validate_requested_persistent_paths(params: &Value) -> Result<(), (ErrorCode, String)> {
     let Some(object) = params.as_object() else {
-        return Err((ErrorCode::BadParams, "ubuntu.start params must be an object".into()));
+        return Err((
+            ErrorCode::BadParams,
+            "ubuntu.start params must be an object".into(),
+        ));
     };
-    for key in ["workspace", "sessions_root", "memory", "skills", "shared", "home"] {
+    for key in [
+        "workspace",
+        "sessions_root",
+        "memory",
+        "skills",
+        "shared",
+        "home",
+    ] {
         let Some(value) = object.get(key) else {
             continue;
         };
@@ -88,10 +98,10 @@ fn validate_requested_persistent_paths(params: &Value) -> Result<(), (ErrorCode,
 
 fn normalized_start_params(params: &Value) -> Result<Value, (ErrorCode, String)> {
     validate_requested_persistent_paths(params)?;
-    let mut object: Map<String, Value> = params
-        .as_object()
-        .cloned()
-        .ok_or((ErrorCode::BadParams, "ubuntu.start params must be an object".into()))?;
+    let mut object: Map<String, Value> = params.as_object().cloned().ok_or((
+        ErrorCode::BadParams,
+        "ubuntu.start params must be an object".into(),
+    ))?;
     for (key, value) in [
         ("workspace", HOST_WORKSPACE),
         ("sessions_root", HOST_SESSIONS),
@@ -110,8 +120,12 @@ fn prepare_persistent_layout(state: &AppState) -> Result<(), (ErrorCode, String)
         return Ok(());
     }
     let (uid, gid) = guest_ids(state);
-    ensure_host_layout_for(uid, gid)
-        .map_err(|e| (ErrorCode::RuntimeUnavailable, format!("persistent layout init failed: {e}")))?;
+    ensure_host_layout_for(uid, gid).map_err(|e| {
+        (
+            ErrorCode::RuntimeUnavailable,
+            format!("persistent layout init failed: {e}"),
+        )
+    })?;
     validate_persistent_backing().map_err(|e| {
         (
             ErrorCode::RuntimeUnavailable,
@@ -307,7 +321,8 @@ fn exec_live_persistent(
     if !fixed_runtime_state(state) {
         return Err((
             ErrorCode::RuntimeLayoutMismatch,
-            "keeper persistent layout is unknown or non-canonical; stop and restart required".into(),
+            "keeper persistent layout is unknown or non-canonical; stop and restart required"
+                .into(),
         ));
     }
 
@@ -335,8 +350,8 @@ fn exec_live_persistent(
         None
     };
 
-    let exe = std::env::current_exe()
-        .map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
+    let exe =
+        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
     let proxy = if admin {
         crate::env::discover_proxy()
@@ -392,11 +407,19 @@ fn enforce_session_modes(
     uid: u32,
     gid: u32,
 ) -> Result<(), (ErrorCode, String)> {
-    ensure_data_directory(session_root, uid, gid)
-        .map_err(|e| (ErrorCode::RuntimeUnavailable, format!("session layout: {e}")))?;
+    ensure_data_directory(session_root, uid, gid).map_err(|e| {
+        (
+            ErrorCode::RuntimeUnavailable,
+            format!("session layout: {e}"),
+        )
+    })?;
     for rel in ["workspace", "attachments", "offloads", "browser"] {
-        ensure_data_directory(&session_root.join(rel), uid, gid)
-            .map_err(|e| (ErrorCode::RuntimeUnavailable, format!("session layout: {e}")))?;
+        ensure_data_directory(&session_root.join(rel), uid, gid).map_err(|e| {
+            (
+                ErrorCode::RuntimeUnavailable,
+                format!("session layout: {e}"),
+            )
+        })?;
     }
     Ok(())
 }
