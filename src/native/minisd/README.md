@@ -16,7 +16,7 @@ Socket: `/data/adb/minis/run/minisd.sock`
 Persistent mode requires the watchdog to join the Android App mount namespace
 before it starts the broker. App-private workspace/session/global directories
 are then visible with their real local backing instead of the global
-`tmpfs_data` overlay. The guest home is mounted separately at `/home/minis`;
-the default command working directory remains `/workspace`.
+`tmpfs_data` overlay. The historical guest `HOME` and command working directory
+both remain `/workspace`; #50 does not introduce a new user-data location.
 
 Do not add HTTP. Structured RPC only.
