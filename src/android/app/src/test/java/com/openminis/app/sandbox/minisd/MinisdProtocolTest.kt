@@ -36,6 +36,76 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `helper setns failure is promoted to keeper namespace error`() {
+        val raw = MinisdResponse(
+            v = 1,
+            id = 4,
+            ok = true,
+            result = JSONObject().put("exit_code", 4).put("stderr", "setns failed"),
+            error = null,
+        )
+
+        val promoted = MinisdProtocol.promoteExecInfrastructureFailure(raw)
+
+        assertFalse(promoted.ok)
+        assertNull(promoted.result)
+        assertEquals(MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST, promoted.code)
+        assertTrue(MinisdProtocol.isRetrySafeKeeperFailure(raw))
+    }
+
+    @Test
+    fun `helper chroot and privilege failures are structured but not keeper retries`() {
+        val chroot = MinisdProtocol.promoteExecInfrastructureFailure(
+            MinisdResponse(1, 5, true, JSONObject().put("exit_code", 5), null),
+        )
+        val privilege = MinisdProtocol.promoteExecInfrastructureFailure(
+            MinisdResponse(1, 6, true, JSONObject().put("exit_code", 6), null),
+        )
+
+        assertEquals(MinisdProtocol.ERROR_CHROOT_UNAVAILABLE, chroot.code)
+        assertEquals(MinisdProtocol.ERROR_PRIVILEGE_SETUP_FAILED, privilege.code)
+        assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(chroot))
+        assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(privilege))
+    }
+
+    @Test
+    fun `ordinary command exit code remains a command result`() {
+        val raw = MinisdResponse(
+            1,
+            9,
+            true,
+            JSONObject().put("exit_code", 23).put("stderr", "user command failed"),
+            null,
+        )
+
+        val promoted = MinisdProtocol.promoteExecInfrastructureFailure(raw)
+
+        assertTrue(promoted.ok)
+        assertEquals(23, promoted.result!!.getInt("exit_code"))
+        assertNull(promoted.error)
+    }
+
+    @Test
+    fun `explicit future pre exec error is preserved structurally`() {
+        val raw = MinisdResponse(
+            1,
+            10,
+            true,
+            JSONObject()
+                .put("exit_code", 1)
+                .put("pre_exec_error", MinisdProtocol.ERROR_ROOTFS_INVALID)
+                .put("pre_exec_detail", "metadata mismatch"),
+            null,
+        )
+
+        val promoted = MinisdProtocol.promoteExecInfrastructureFailure(raw)
+
+        assertFalse(promoted.ok)
+        assertEquals(MinisdProtocol.ERROR_ROOTFS_INVALID, promoted.code)
+        assertEquals("metadata mismatch", promoted.error!!.detail)
+    }
+
+    @Test
     fun `ubuntu exec argv is structured not a raw cmd string`() {
         val raw = MinisdProtocol.encodeRequest(
             MinisdProtocol.ubuntuExec(
