@@ -9,9 +9,8 @@ Older experimental release notes contained references to removed Web Remote, Clo
 ### Persistent sandbox storage
 
 - Start `minisd` in the Android App mount namespace so the broker and App file tools use the same persistent local backing instead of the global `tmpfs_data` overlay.
-- Persist the Linux user home at `/home/minis`, including Git/GitHub CLI and shell configuration, while keeping `/workspace` as the command working directory.
-- Reject tmpfs-backed sources in persistent mode and recreate stale brokers whose mount namespace does not match the App.
-- Document a separate future branch for an explicit persistent/memory storage selector; the current repair remains persistent-only.
+- Keep the existing App-private workspace/session/global paths and the historical `HOME=/workspace` contract; this repair does not migrate user data to a new home directory.
+- Reject tmpfs-backed persistent sources and recreate stale brokers whose mount namespace does not match the App.
 
 ### Project identity and documentation
 
