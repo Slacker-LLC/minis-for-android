@@ -184,4 +184,36 @@ mod tests {
         assert!(ExecGuard::begin(Some("test-duplicate")).is_err());
         assert!(ExecGuard::begin(Some("bad/id")).is_err());
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancellation_terminates_hanging_process_group_and_cleans_registry() {
+        use std::os::unix::process::CommandExt;
+        use std::process::Command;
+
+        let execution_id = format!("test-hanging-process-{}", std::process::id());
+        let guard = ExecGuard::begin(Some(&execution_id)).unwrap();
+        let mut command = Command::new("/bin/sh");
+        command.arg("-c").arg("sleep 30");
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setpgid(0, 0) == 0 {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::last_os_error())
+                }
+            });
+        }
+        let mut child = command.spawn().expect("spawn hanging subprocess");
+        assert!(!guard.activate(child.id() as i32).unwrap());
+
+        let outcome = cancel(&execution_id).unwrap();
+        assert!(outcome.found);
+        assert!(outcome.killed);
+        let status = child.wait().expect("reap cancelled subprocess");
+        assert!(!status.success());
+
+        drop(guard);
+        assert!(!cancel(&execution_id).unwrap().found);
+    }
 }
