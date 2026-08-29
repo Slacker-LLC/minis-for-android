@@ -25,8 +25,8 @@ ROOTFS_SHA="$(sha256sum "$ROOTFS_TAR" | awk '{print $1}')"
 "$ADB" push "$ROOTFS_TAR" "$STAGING/ubuntu-arm64-rootfs.tar.gz"
 "$ADB" shell "chmod 0700 '$STAGING/minisd-arm64' && chmod 0600 '$STAGING/ubuntu-arm64-rootfs.tar.gz'"
 
-DEVICE_MINISD_SHA="$("$ADB" shell "sha256sum '$STAGING/minisd-arm64' | awk '{print \\$1}'" | tr -d '\r' | awk '{print $1}')"
-DEVICE_ROOTFS_SHA="$("$ADB" shell "sha256sum '$STAGING/ubuntu-arm64-rootfs.tar.gz' | awk '{print \\$1}'" | tr -d '\r' | awk '{print $1}')"
+DEVICE_MINISD_SHA="$("$ADB" shell "sha256sum '$STAGING/minisd-arm64'" | tr -d '\r' | awk '{print $1}')"
+DEVICE_ROOTFS_SHA="$("$ADB" shell "sha256sum '$STAGING/ubuntu-arm64-rootfs.tar.gz'" | tr -d '\r' | awk '{print $1}')"
 
 [[ "$DEVICE_MINISD_SHA" == "$MINISD_SHA" ]] || { echo "device minisd staging digest mismatch" >&2; exit 69; }
 [[ "$DEVICE_ROOTFS_SHA" == "$ROOTFS_SHA" ]] || { echo "device rootfs staging digest mismatch" >&2; exit 70; }
