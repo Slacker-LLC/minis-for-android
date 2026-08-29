@@ -52,11 +52,12 @@ internal object MinisdBootstrap {
 
         // The PID comes from the live Android process. Authenticate it against
         // the same UID already embedded in the minisd policy before allowing a
-        // privileged process to enter its mount namespace. This rejects stale
-        // or reused PIDs that now belong to another application.
+        // privileged process to enter its mount namespace. The expected UID is
+        // also passed into minisd so it can repeat the check against the exact
+        // proc handle used for setns, closing the shell-check/setns race.
         commands += "target_uid=\$(awk '/^Uid:/{print \$2; exit}' \"/proc/\$APP_MNT_PID/status\" 2>/dev/null || true)"
         commands += "if [ \"\$target_uid\" != \"\$APP_UID\" ] || [ ! -e \"/proc/\$APP_MNT_PID/ns/mnt\" ]; then echo \"app mount namespace target mismatch: pid=\$APP_MNT_PID uid=\${target_uid:-missing} expected=\$APP_UID\" >&2; exit 46; fi"
-        commands += "(\"\$BIN\" --watchdog --mount-ns-pid \"\$APP_MNT_PID\" --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
+        commands += "(MINIS_EXPECTED_APP_UID=\"\$APP_UID\" \"\$BIN\" --watchdog --mount-ns-pid \"\$APP_MNT_PID\" --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""
         return commands.joinToString("\n")
     }
