@@ -3,17 +3,17 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
+import com.openminis.app.sandbox.minisd.MinisdClient
 import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.ToolFailureKind
+import com.openminis.app.tools.ToolTimeoutPolicy
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/**
- * Compatibility name for structured Android-root execution.
- *
- * This deliberately has no `command` / shell-string parameter. Every call
- * travels through minisd `root.exec`, whose policy owns the executable
- * allowlist and argument deny rules; `root.shellRaw` remains denied.
- */
+/** Structured Android-root execution; arbitrary root shell strings stay denied. */
 class RootShellHandler : ToolHandler {
 
     override val definition: AgentToolDefinition = AgentToolDefinition(
@@ -49,14 +49,36 @@ class RootShellHandler : ToolHandler {
                 argv += value
             }
         }
-        val timeout = json.optLong("timeout_ms", 30_000).coerceIn(1_000, 120_000)
+        val requestedMs = if (json.has("timeout_ms")) json.optLong("timeout_ms") else null
+        val timeout = ToolTimeoutPolicy.resolve("root.shell", callerOverrideMs = requestedMs).timeoutMs
+            ?: 30_000L
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
-        val response = UbuntuRuntime.client.rootExec(tool, argv, timeout)
+        val executionId = MinisdClient.newExecutionId("root")
+        val response = try {
+            UbuntuRuntime.client.rootExec(tool, argv, timeout, executionId)
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
+            }
+            throw cancelled
+        }
         if (!response.ok) {
-            val error = response.error
+            val code = response.error?.code ?: "RUNTIME_UNAVAILABLE"
+            if (code == "USER_CANCELLATION") {
+                throw CancellationException(response.error?.detail ?: "root execution cancelled by user")
+            }
+            val kind = when (code) {
+                "TOOL_TIMEOUT", "TIMEOUT" -> ToolFailureKind.TOOL_TIMEOUT
+                "TRANSPORT_TIMEOUT" -> ToolFailureKind.TRANSPORT_TIMEOUT
+                "PROCESS_KILLED" -> ToolFailureKind.PROCESS_KILLED
+                "CLEANUP_FAILURE" -> ToolFailureKind.CLEANUP_FAILURE
+                else -> null
+            }
             return ToolExecutionResult(
-                "Error: ${error?.code ?: "RUNTIME_UNAVAILABLE"}: ${error?.detail ?: "minisd root.exec failed"}",
-                false,
+                output = "Error: $code: ${response.error?.detail ?: "minisd root.exec failed"}",
+                success = false,
+                timedOut = kind == ToolFailureKind.TOOL_TIMEOUT,
+                failureKind = kind,
             )
         }
         val result = response.result ?: return ToolExecutionResult("Error: malformed minisd root.exec result", false)
