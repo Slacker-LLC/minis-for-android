@@ -82,6 +82,8 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(mock: bool, policy: PolicyFile) -> Self {
+        prepare_persistent_layout_on_start(mock, &policy);
+
         let mut sessions = SessionTable::default();
         sessions.enable_subreaper();
         if should_start_config_proxy(mock, policy.caller.app_uid) {
@@ -152,6 +154,32 @@ impl AppState {
     }
 }
 
+fn prepare_persistent_layout_on_start(mock: bool, policy: &PolicyFile) {
+    if mock {
+        return;
+    }
+    #[cfg(all(unix, not(test)))]
+    {
+        if unsafe { libc::geteuid() } != 0 {
+            return;
+        }
+        let uid = if policy.caller.app_uid != 0 {
+            policy.caller.app_uid
+        } else {
+            crate::layout::GUEST_UID
+        };
+        if let Err(error) = crate::layout::ensure_host_layout_for(uid, uid)
+            .and_then(|()| crate::layout::validate_persistent_backing())
+        {
+            panic!("persistent storage initialization failed closed: {error}");
+        }
+    }
+    #[cfg(any(not(unix), test))]
+    {
+        let _ = policy;
+    }
+}
+
 fn should_start_config_proxy(mock: bool, app_uid: u32) -> bool {
     if mock || app_uid == 0 {
         return false;
@@ -218,5 +246,10 @@ mod tests {
     #[test]
     fn zero_uid_never_starts_config_proxy() {
         assert!(!should_start_config_proxy(false, 0));
+    }
+
+    #[test]
+    fn mock_startup_does_not_touch_persistent_host_layout() {
+        prepare_persistent_layout_on_start(true, &crate::policy::PolicyFile::default_policy());
     }
 }

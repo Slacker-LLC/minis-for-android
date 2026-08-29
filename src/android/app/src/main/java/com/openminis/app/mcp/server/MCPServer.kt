@@ -258,7 +258,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         // without burning a user confirmation (ACC-T-02 semantics). One-shot
         // revive: when minisd is already up this is a cheap status refresh.
         if (canonicalName.startsWith("linux.") && !canonicalName.startsWith("linux.file.") && !MCPServerManager.linuxToolsAvailable()) {
-            if (!com.openminis.app.sandbox.ubuntu.UbuntuRuntime.ensureReady().running) {
+            if (!com.openminis.app.runtime.ubuntu.UbuntuRuntime.ensureReady().running) {
                 val err = com.openminis.app.tools.ToolExecutionResult(
                     output = "Error: ubuntu_runtime_unavailable: $canonicalName",
                     success = false,

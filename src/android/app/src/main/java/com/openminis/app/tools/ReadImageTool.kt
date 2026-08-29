@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -27,7 +27,7 @@ object ReadImageTool {
 
     /**
      * T178: when the caller knows the owning session, prefer
-     * [MinisKernel.resolveSessionHostPath] so per-session subdirs
+     * [RuntimePathRegistry.resolveSessionHostPath] so per-session subdirs
      * (`/var/minis/{attachments,workspace,offloads,browser}/...`) resolve
      * directly against this session's host dir instead of consulting the
      * global, last-writer-wins `bindMounts` map. Without this, an agent
@@ -55,9 +55,9 @@ object ReadImageTool {
             } else rawPath
 
             val file = if (sessionId != null && context != null) {
-                    MinisKernel.resolveSessionHostPath(sessionId, path, context)
+                    RuntimePathRegistry.resolveSessionHostPath(sessionId, path, context)
                 } else {
-                    MinisKernel.resolveHostPath(path)
+                    RuntimePathRegistry.resolveHostPath(path)
                 }
                 ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
 

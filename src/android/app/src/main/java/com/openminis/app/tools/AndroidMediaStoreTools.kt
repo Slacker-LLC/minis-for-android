@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.offload.PhotosOffloadHandler
+import com.openminis.app.runtime.guest.PhotosOffloadHandler
 
 /** Thin structured adapter over the existing MediaStore-backed android-photos handler. */
 class AndroidMediaImagesHandler : AndroidSystemHandler() {
