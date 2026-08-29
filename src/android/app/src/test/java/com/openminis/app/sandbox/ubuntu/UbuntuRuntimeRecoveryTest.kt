@@ -2,6 +2,9 @@ package com.openminis.app.sandbox.ubuntu
 
 import com.openminis.app.sandbox.minisd.MinisdError
 import com.openminis.app.sandbox.minisd.MinisdProtocol
+import com.openminis.app.sandbox.minisd.MinisdResponse
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +32,62 @@ class UbuntuRuntimeRecoveryTest {
         assertFalse(UbuntuRuntime.shouldRetryAfterPreExecFailure(chroot, 0))
         assertFalse(UbuntuRuntime.shouldRetryAfterPreExecFailure(runtime, 0))
         assertFalse(UbuntuRuntime.shouldRetryAfterPreExecFailure(privilege, 0))
+    }
+
+    @Test
+    fun `shell wrapper emits execution marker before user command`() {
+        val marker = UbuntuRuntime.shellStartMarker(0x1234)
+        val wrapped = UbuntuRuntime.wrapShellCommand("touch /tmp/side-effect", marker)
+
+        assertEquals("__MINIS_EXEC_STARTED_1234__", marker)
+        assertTrue(wrapped.startsWith("printf '%s\\n' '$marker' >&2\n"))
+        assertTrue(wrapped.endsWith("touch /tmp/side-effect"))
+    }
+
+    @Test
+    fun `execution marker proves command wrapper started`() {
+        val marker = UbuntuRuntime.shellStartMarker(99)
+        val response = MinisdResponse(
+            1,
+            1,
+            true,
+            JSONObject()
+                .put("exit_code", 4)
+                .put("stderr", "profile warning\n$marker\nuser output\n"),
+            null,
+        )
+
+        assertTrue(UbuntuRuntime.didUserCommandStart(response, marker))
+        assertEquals(
+            "profile warning\nuser output\n",
+            UbuntuRuntime.stripShellStartMarker(response.result!!.getString("stderr"), marker),
+        )
+        val classified = MinisdProtocol.promoteExecInfrastructureFailure(
+            response,
+            userCommandStarted = UbuntuRuntime.didUserCommandStart(response, marker),
+        )
+        assertTrue(classified.ok)
+        assertEquals(4, classified.result!!.getInt("exit_code"))
+    }
+
+    @Test
+    fun `missing execution marker permits pre exec classification`() {
+        val marker = UbuntuRuntime.shellStartMarker(100)
+        val response = MinisdResponse(
+            1,
+            2,
+            true,
+            JSONObject().put("exit_code", 4).put("stderr", "setns failed"),
+            null,
+        )
+
+        assertFalse(UbuntuRuntime.didUserCommandStart(response, marker))
+        val classified = MinisdProtocol.promoteExecInfrastructureFailure(
+            response,
+            userCommandStarted = UbuntuRuntime.didUserCommandStart(response, marker),
+        )
+        assertFalse(classified.ok)
+        assertEquals(MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST, classified.code)
     }
 
     @Test
