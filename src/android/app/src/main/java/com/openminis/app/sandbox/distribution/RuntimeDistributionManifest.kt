@@ -1,5 +1,6 @@
 package com.openminis.app.sandbox.distribution
 
+import com.openminis.app.sandbox.minisd.MinisdProtocol
 import org.json.JSONObject
 
 /**
@@ -53,6 +54,7 @@ data class RuntimeDistributionManifest(
     companion object {
         const val ASSET_PATH = "runtime-distribution.json"
         const val CURRENT_SCHEMA_VERSION = 1
+        const val CURRENT_LAYOUT_VERSION = 2
         const val SUPPORTED_ABI = "arm64"
         const val STAGING_ROOT = "/data/local/tmp/minis-runtime"
 
@@ -78,7 +80,13 @@ data class RuntimeDistributionManifest(
             val runtimeVersion = obj.requireString("runtimeVersion")
             require(VERSION.matches(runtimeVersion)) { "invalid runtimeVersion" }
             val protocolVersion = obj.requirePositiveInt("protocolVersion")
+            require(protocolVersion == MinisdProtocol.PROTOCOL_V) {
+                "runtime protocolVersion=$protocolVersion does not match APK protocol=${MinisdProtocol.PROTOCOL_V}"
+            }
             val layoutVersion = obj.requirePositiveInt("layoutVersion")
+            require(layoutVersion == CURRENT_LAYOUT_VERSION) {
+                "unsupported runtime layoutVersion=$layoutVersion"
+            }
             val abi = obj.requireString("abi")
             require(abi == SUPPORTED_ABI) { "unsupported runtime ABI: $abi" }
             val distributionReady = obj.optBoolean("distributionReady", false)
@@ -87,21 +95,26 @@ data class RuntimeDistributionManifest(
             val minisd = Artifact(
                 source = Source.parse(minisdObj.requireString("source")),
                 file = minisdObj.requireSafeFile("file"),
-                stagedPath = minisdObj.requireStagedPath("stagedPath"),
+                stagedPath = minisdObj.requireString("stagedPath"),
                 sha256 = minisdObj.optionalSha("sha256"),
-            )
+            ).also { artifact -> validateStagedArtifact(artifact.file, artifact.stagedPath) }
 
             val rootfsObj = obj.requireObject("rootfs")
             val rootfs = RootfsArtifact(
                 source = Source.parse(rootfsObj.requireString("source")),
                 file = rootfsObj.requireSafeFile("file"),
-                stagedPath = rootfsObj.requireStagedPath("stagedPath"),
+                stagedPath = rootfsObj.requireString("stagedPath"),
                 sha256 = rootfsObj.optionalSha("sha256"),
                 version = rootfsObj.requireString("version"),
                 release = rootfsObj.requireString("release"),
                 profile = rootfsObj.requireString("profile"),
                 upstreamSha256 = rootfsObj.optionalSha("upstreamSha256"),
-            )
+            ).also { artifact ->
+                validateStagedArtifact(artifact.file, artifact.stagedPath)
+                require(VERSION.matches(artifact.version)) { "invalid rootfs version" }
+                require(VERSION.matches(artifact.release)) { "invalid rootfs release" }
+                require(VERSION.matches(artifact.profile)) { "invalid rootfs profile" }
+            }
             require(rootfs.release.startsWith("24.04")) { "unsupported rootfs release: ${rootfs.release}" }
             require(rootfs.profile == "base") { "unsupported rootfs profile: ${rootfs.profile}" }
 
@@ -136,6 +149,12 @@ data class RuntimeDistributionManifest(
 
         internal fun isSha256(value: String): Boolean = SHA256.matches(value)
 
+        private fun validateStagedArtifact(file: String, stagedPath: String) {
+            require(stagedPath == "$STAGING_ROOT/$file") {
+                "artifact stagedPath must equal $STAGING_ROOT/<file>"
+            }
+        }
+
         private fun JSONObject.requireObject(key: String): JSONObject =
             optJSONObject(key) ?: throw IllegalArgumentException("missing object: $key")
 
@@ -151,14 +170,6 @@ data class RuntimeDistributionManifest(
         private fun JSONObject.requireSafeFile(key: String): String {
             val value = requireString(key)
             require(!value.contains('/') && value != "." && value != "..") { "unsafe artifact file: $value" }
-            return value
-        }
-
-        private fun JSONObject.requireStagedPath(key: String): String {
-            val value = requireString(key)
-            require(value.startsWith("$STAGING_ROOT/") && !value.contains("/../")) {
-                "artifact stagedPath must stay under $STAGING_ROOT"
-            }
             return value
         }
 
