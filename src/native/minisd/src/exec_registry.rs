@@ -158,24 +158,20 @@ pub fn cancel(execution_id: &str) -> Result<CancelOutcome, ErrorCode> {
 }
 
 #[cfg(test)]
-pub fn active_count() -> usize {
-    table().lock().map(|t| t.len()).unwrap_or(usize::MAX)
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn registry_tracks_and_cleans_execution() {
-        assert_eq!(active_count(), 0);
+        let execution_id = "test-registry-cleanup";
         {
-            let guard = ExecGuard::begin(Some("test-registry-1")).unwrap();
-            assert_eq!(active_count(), 1);
+            let guard = ExecGuard::begin(Some(execution_id)).unwrap();
             assert!(!guard.was_cancelled());
             assert!(guard.activate(12345).is_ok());
+            assert!(ExecGuard::begin(Some(execution_id)).is_err());
         }
-        assert_eq!(active_count(), 0);
+        let guard = ExecGuard::begin(Some(execution_id)).unwrap();
+        drop(guard);
     }
 
     #[test]
