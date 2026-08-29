@@ -2,14 +2,15 @@ package com.openminis.app.mcp.client
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
-import java.io.InputStreamReader
 
 /**
- * stdio transport for local MCP servers (`command` + `args` in servers.json).
- * One JSON-RPC frame per line on stdin/stdout, per the spec's stdio transport.
+ * stdio transport for local MCP servers (`command` + `args` in servers.json`).
+ * A cancelled request closes pipes and destroys the server process so a
+ * blocking readLine cannot outlive the cancelled agent/tool call.
  */
 class MCPStdioTransport(
     private val command: String,
@@ -22,8 +23,11 @@ class MCPStdioTransport(
         private const val MAX_LINE = 64 * 1024
     }
 
+    @Volatile
     private var process: Process? = null
+    @Volatile
     private var writer: java.io.BufferedWriter? = null
+    @Volatile
     private var reader: BufferedReader? = null
 
     suspend fun start() = withContext(Dispatchers.IO) {
@@ -41,12 +45,14 @@ class MCPStdioTransport(
         process = p
         writer = p.outputStream.bufferedWriter()
         reader = p.inputStream.bufferedReader()
-        // Drain stderr so a chatty server never fills the pipe and deadlocks.
         Thread {
-            val err = p.errorStream.bufferedReader()
-            while (true) {
-                val line = err.readLine() ?: break
-                Log.d(TAG, "[$command] stderr: ${line.take(500)}")
+            runCatching {
+                p.errorStream.bufferedReader().use { err ->
+                    while (true) {
+                        val line = err.readLine() ?: break
+                        Log.d(TAG, "[$command] stderr: ${line.take(500)}")
+                    }
+                }
             }
         }.apply { isDaemon = true; name = "mcp-stderr-$command" }.start()
     }
@@ -54,27 +60,88 @@ class MCPStdioTransport(
     suspend fun send(frame: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val w = writer ?: throw MCPTransportException("stdio transport not started")
         val r = reader ?: throw MCPTransportException("stdio transport not started")
+        val p = process ?: throw MCPTransportException("stdio transport process missing")
         val line = MCPClientCodec.encodeFrame(frame).replace("\n", "")
-        w.write(line)
-        w.write("\n")
-        w.flush()
-        val reply = r.readLine() ?: throw MCPTransportException("$command closed stdout")
-        if (reply.length > MAX_LINE) {
-            throw MCPTransportException("oversized reply from $command")
-        }
         try {
-            JSONObject(reply)
+            w.write(line)
+            w.write("\n")
+            w.flush()
         } catch (t: Throwable) {
-            throw MCPTransportException("invalid JSON from $command: ${reply.take(120)}")
+            throw MCPTransportException(
+                "failed to write MCP request to $command: ${t.message}",
+                if (!p.isAlive) MCPTransportFailureKind.PROCESS_KILLED else MCPTransportFailureKind.TRANSPORT_FAILURE,
+            )
+        }
+
+        suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { close() }
+            Thread {
+                try {
+                    val reply = r.readLine()
+                    if (!continuation.isActive) return@Thread
+                    if (reply == null) {
+                        continuation.resumeWith(
+                            Result.failure(
+                                MCPTransportException(
+                                    "$command closed stdout",
+                                    if (!p.isAlive) MCPTransportFailureKind.PROCESS_KILLED else MCPTransportFailureKind.TRANSPORT_FAILURE,
+                                ),
+                            ),
+                        )
+                        return@Thread
+                    }
+                    if (reply.length > MAX_LINE) {
+                        continuation.resumeWith(Result.failure(MCPTransportException("oversized reply from $command")))
+                        return@Thread
+                    }
+                    val parsed = try {
+                        JSONObject(reply)
+                    } catch (t: Throwable) {
+                        continuation.resumeWith(
+                            Result.failure(MCPTransportException("invalid JSON from $command: ${reply.take(120)}")),
+                        )
+                        return@Thread
+                    }
+                    continuation.resumeWith(Result.success(parsed))
+                } catch (t: Throwable) {
+                    if (!continuation.isActive) return@Thread
+                    continuation.resumeWith(
+                        Result.failure(
+                            MCPTransportException(
+                                "MCP stdio read failed: ${t.message}",
+                                if (!p.isAlive) MCPTransportFailureKind.PROCESS_KILLED else MCPTransportFailureKind.TRANSPORT_FAILURE,
+                            ),
+                        ),
+                    )
+                }
+            }.apply {
+                isDaemon = true
+                name = "mcp-read-$command"
+                start()
+            }
         }
     }
 
+    @Synchronized
     fun close() {
-        writer?.runCatching { close() }
-        reader?.runCatching { close() }
-        process?.destroy()
+        val p = process
         process = null
+        val w = writer
         writer = null
+        val r = reader
         reader = null
+
+        // A reader thread may be blocked in BufferedReader.readLine(). Closing
+        // that same reader first can wait on its lock and prevent us from ever
+        // reaching Process.destroy(). Kill the subprocess first so stdout closes
+        // and the blocked read unblocks, then close the streams.
+        p?.let {
+            it.destroy()
+            if (it.isAlive) it.destroyForcibly()
+        }
+        w?.runCatching { close() }
+        r?.runCatching { close() }
     }
+
+    internal fun hasLiveProcessForTest(): Boolean = process?.isAlive == true
 }
