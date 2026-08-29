@@ -1,6 +1,7 @@
 use crate::layout::{
     ensure_host_layout, ensure_rootfs_layout, is_provisioned, read_os_release, rootfs_looks_valid,
-    GUEST_HOME, GUEST_UID, HOST_ROOTFS, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
+    GUEST_UID, GUEST_WORKSPACE, HOST_HOME, HOST_MEMORY, HOST_ROOTFS, HOST_SHARED, HOST_SKILLS,
+    HOST_WORKSPACE, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
 };
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use crate::state::AppState;
@@ -20,6 +21,50 @@ fn guest_ids(state: &AppState) -> (u32, u32) {
         GUEST_UID
     };
     (uid, uid)
+}
+
+fn current_mount_namespace() -> Option<String> {
+    #[cfg(unix)]
+    {
+        std::fs::read_link("/proc/self/ns/mnt")
+            .ok()
+            .map(|path| path.to_string_lossy().into_owned())
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+#[cfg(unix)]
+fn ensure_non_volatile_host_storage(label: &str, path: &str) -> Result<(), String> {
+    const TMPFS_MAGIC: u64 = 0x0102_1994;
+
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|e| format!("{label} host path unavailable at {path}: {e}"))?;
+    if !canonical.is_dir() {
+        return Err(format!(
+            "{label} host path is not a directory: {}",
+            canonical.display()
+        ));
+    }
+    let c_path = std::ffi::CString::new(canonical.as_os_str().as_encoded_bytes())
+        .map_err(|_| format!("{label} host path contains NUL"))?;
+    let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statfs(c_path.as_ptr(), &mut stat) } != 0 {
+        return Err(format!(
+            "statfs {}: {}",
+            canonical.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+    if stat.f_type as u64 == TMPFS_MAGIC {
+        return Err(format!(
+            "{label} host path is backed by tmpfs at {}; start minisd in the app mount namespace",
+            canonical.display()
+        ));
+    }
+    Ok(())
 }
 
 pub const BASE_PACKAGES: &[&str] = &[
@@ -76,7 +121,7 @@ pub fn parse_ubuntu_exec(params: &Value) -> Result<UbuntuExec, ErrorCode> {
     let cwd = params
         .get("cwd")
         .and_then(|v| v.as_str())
-        .unwrap_or(GUEST_HOME)
+        .unwrap_or(GUEST_WORKSPACE)
         .to_string();
     if !cwd.starts_with('/') || cwd.contains('\0') || cwd.split('/').any(|p| p == "..") {
         return Err(ErrorCode::BadParams);
@@ -193,6 +238,7 @@ pub fn status(state: &mut AppState) -> Value {
         "provisioned": state.ubuntu.provisioned,
         "uid": guest_ids(state).0,
         "gid": guest_ids(state).1,
+        "broker_mount_namespace": current_mount_namespace(),
         "last_error": state.ubuntu.last_error,
         "mock": state.mock
     })
@@ -404,6 +450,11 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+    let home = params
+        .get("home")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     let sessions_root = params
         .get("sessions_root")
         .and_then(|v| v.as_str())
@@ -415,6 +466,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         (&memory, false),
         (&skills, false),
         (&shared, false),
+        (&home, false),
         (&sessions_root, false),
     ] {
         validate_host_path(p, require_minis).map_err(|e| (ErrorCode::BadParams, e))?;
@@ -439,6 +491,55 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         }));
     }
     ensure_host_layout().map_err(|e| (ErrorCode::Internal, e))?;
+    for (label, path) in [
+        (
+            "workspace",
+            if workspace.is_empty() {
+                HOST_WORKSPACE
+            } else {
+                workspace.as_str()
+            },
+        ),
+        (
+            "memory",
+            if memory.is_empty() {
+                HOST_MEMORY
+            } else {
+                memory.as_str()
+            },
+        ),
+        (
+            "skills",
+            if skills.is_empty() {
+                HOST_SKILLS
+            } else {
+                skills.as_str()
+            },
+        ),
+        (
+            "shared",
+            if shared.is_empty() {
+                HOST_SHARED
+            } else {
+                shared.as_str()
+            },
+        ),
+        (
+            "home",
+            if home.is_empty() {
+                HOST_HOME
+            } else {
+                home.as_str()
+            },
+        ),
+    ] {
+        ensure_non_volatile_host_storage(label, path)
+            .map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
+    }
+    if !sessions_root.is_empty() {
+        ensure_non_volatile_host_storage("sessions", &sessions_root)
+            .map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
+    }
     if !rootfs_looks_valid(&rootfs) {
         return Err((
             ErrorCode::RuntimeUnavailable,
@@ -453,7 +554,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     let dns = crate::env::discover_dns();
     let resolv =
         crate::env::write_resolv_conf(&rootfs, &dns).map_err(|e| (ErrorCode::Internal, e))?;
-    chown_tree_best_effort(guid, ggid, &workspace, &memory, &skills, &shared);
+    chown_tree_best_effort(guid, ggid, &workspace, &memory, &skills, &shared, &home);
 
     let exe =
         std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
@@ -463,6 +564,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         .args(["--memory", &memory])
         .args(["--skills", &skills])
         .args(["--shared", &shared])
+        .args(["--home", &home])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -959,8 +1061,8 @@ fn chown_tree_best_effort(
     memory: &str,
     skills: &str,
     shared: &str,
+    home: &str,
 ) {
-    use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
     let workspace = if workspace.is_empty() {
         HOST_WORKSPACE
     } else {
@@ -981,7 +1083,8 @@ fn chown_tree_best_effort(
     } else {
         shared
     };
-    for path in [workspace, memory, skills, shared] {
+    let home = if home.is_empty() { HOST_HOME } else { home };
+    for path in [workspace, memory, skills, shared, home] {
         let c = match std::ffi::CString::new(path) {
             Ok(c) => c,
             Err(_) => continue,
@@ -1075,11 +1178,25 @@ mod tests {
         let st = status(&mut state);
         assert_eq!(st["running"], true);
         assert_eq!(st["sessions_root"], "/data/user/0/app/files/minis-sessions");
+        #[cfg(unix)]
+        assert!(st["broker_mount_namespace"].as_str().is_some());
         let out = exec(&mut state, &json!({"argv":["/usr/bin/id"]}), false).unwrap();
         assert_eq!(out["exit_code"], 0);
         assert!(out["stdout"].as_str().unwrap().contains("10000"));
         assert!(stop(&mut state).is_ok());
         assert_eq!(status(&mut state)["running"], false);
+    }
+
+    #[test]
+    fn default_exec_starts_in_workspace() {
+        let parsed = parse_ubuntu_exec(&json!({"argv":["/usr/bin/pwd"]})).unwrap();
+        assert_eq!(parsed.cwd, GUEST_WORKSPACE);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn tmpfs_is_rejected_for_persistent_host_storage() {
+        assert!(ensure_non_volatile_host_storage("test", "/dev/shm").is_err());
     }
 
     #[cfg(unix)]

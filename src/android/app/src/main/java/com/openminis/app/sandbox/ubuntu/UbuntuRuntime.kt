@@ -25,6 +25,13 @@ import java.util.concurrent.TimeUnit
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
     private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
+    private const val SHELL_COMMAND_ENV = "MINIS_INTERNAL_SHELL_COMMAND"
+    private const val SHELL_ENTRYPOINT =
+        "minis_command=\"\${MINIS_INTERNAL_SHELL_COMMAND-}\"\n" +
+            "unset MINIS_INTERNAL_SHELL_COMMAND\n" +
+            "shopt -s expand_aliases\n" +
+            "if [ -r \"\$HOME/.bashrc\" ]; then . \"\$HOME/.bashrc\"; fi\n" +
+            "eval \"\$minis_command\""
 
     data class Snapshot(
         val running: Boolean = false,
@@ -39,6 +46,8 @@ object UbuntuRuntime {
         val hostMemory: String? = null,
         val hostSkills: String? = null,
         val hostShared: String? = null,
+        val hostHome: String? = null,
+        val brokerMountNamespace: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -95,44 +104,48 @@ object UbuntuRuntime {
         val ctx = appContext
             ?: return@withLock fail("UbuntuRuntime.init(context) has not been called")
         val expectedUid = ctx.applicationInfo.uid
+        val expectedMountNamespace = currentMountNamespace()
+            ?: return@withLock fail("cannot identify the app mount namespace")
         var cur = refresh()
 
-        // A previous installation may have left a watchdog whose policy still
-        // names a different Android UID. Minisd status exposes the guest UID;
-        // root fallback in MinisdClient lets us inspect and repair that stale
-        // broker even when its app-private socket rejects the current process.
-        if (cur.guestUid != null && cur.guestUid != expectedUid) {
-            Log.w(TAG, "stale minisd identity brokerUid=${cur.guestUid} appUid=$expectedUid")
-            val restarted = ensureMinisdUp(forceRestart = true)
-            if (!restarted.ok) {
-                return@withLock fail(
-                    "minisd identity restart failed: ${restarted.error ?: "unknown error"}",
-                )
-            }
-            cur = awaitBroker(expectedUid)
-        } else if (cur.guestUid == null) {
-            val spawned = ensureMinisdUp(forceRestart = false)
+        // App Data Isolation gives the root namespace a tmpfs_data view of
+        // filesDir. The broker must join this App process's mount namespace so
+        // the privileged runtime and Android file tools see the same f2fs data.
+        if (!brokerIdentityMatches(cur, expectedUid, expectedMountNamespace)) {
+            Log.w(
+                TAG,
+                "stale minisd identity brokerUid=${cur.guestUid} appUid=$expectedUid " +
+                    "brokerMount=${cur.brokerMountNamespace} appMount=$expectedMountNamespace",
+            )
+            // An old broker in the global namespace is invisible through the
+            // App-private socket but still owns the shared /data/adb pid lock.
+            // Always retire that exact watchdog/server pair before spawning
+            // the namespace-aware broker.
+            val spawned = ensureMinisdUp(forceRestart = true)
             if (!spawned.ok) {
                 return@withLock fail(spawned.error ?: cur.lastError ?: "failed to start minisd")
             }
-            cur = awaitBroker(expectedUid)
+            cur = awaitBroker(expectedUid, expectedMountNamespace)
         }
 
         // One forced recovery covers a wedged/stale broker whose pidfile was
-        // present but whose status call did not expose the expected identity.
-        if (cur.guestUid != expectedUid) {
+        // present but whose status call did not expose the expected identity or
+        // mount namespace.
+        if (!brokerIdentityMatches(cur, expectedUid, expectedMountNamespace)) {
             val restarted = ensureMinisdUp(forceRestart = true)
             if (!restarted.ok) {
                 return@withLock fail(
                     "minisd recovery failed: ${restarted.error ?: "unknown error"}",
                 )
             }
-            cur = awaitBroker(expectedUid)
+            cur = awaitBroker(expectedUid, expectedMountNamespace)
         }
-        if (cur.guestUid != expectedUid) {
+        if (!brokerIdentityMatches(cur, expectedUid, expectedMountNamespace)) {
             return@withLock fail(
-                "minisd app identity mismatch: expected uid=$expectedUid, " +
-                    "broker uid=${cur.guestUid ?: "unknown"}; update/restart the privileged runtime",
+                "minisd app identity mismatch: expected uid=$expectedUid " +
+                    "mount=$expectedMountNamespace, broker uid=${cur.guestUid ?: "unknown"} " +
+                    "mount=${cur.brokerMountNamespace ?: "unknown"}; " +
+                    "update/restart the privileged runtime",
             )
         }
 
@@ -160,6 +173,7 @@ object UbuntuRuntime {
                 memory = UbuntuPaths.hostMemory,
                 skills = UbuntuPaths.hostSkills,
                 shared = UbuntuPaths.hostShared,
+                home = UbuntuPaths.hostHome,
                 sessionsRoot = UbuntuPaths.hostSessions,
             ),
         )
@@ -187,14 +201,23 @@ object UbuntuRuntime {
             snapshot.hostWorkspace == UbuntuPaths.hostWorkspace &&
             snapshot.hostMemory == UbuntuPaths.hostMemory &&
             snapshot.hostSkills == UbuntuPaths.hostSkills &&
-            snapshot.hostShared == UbuntuPaths.hostShared
+            snapshot.hostShared == UbuntuPaths.hostShared &&
+            snapshot.hostHome == UbuntuPaths.hostHome &&
+            snapshot.brokerMountNamespace == currentMountNamespace()
 
-    private suspend fun awaitBroker(expectedUid: Int): Snapshot {
+    internal fun brokerIdentityMatches(
+        snapshot: Snapshot,
+        expectedUid: Int,
+        expectedMountNamespace: String,
+    ): Boolean = snapshot.guestUid == expectedUid &&
+        snapshot.brokerMountNamespace == expectedMountNamespace
+
+    private suspend fun awaitBroker(expectedUid: Int, expectedMountNamespace: String): Snapshot {
         var cur = _snapshot.value
         repeat(10) {
             delay(300)
             cur = refresh()
-            if (cur.guestUid == expectedUid) return cur
+            if (brokerIdentityMatches(cur, expectedUid, expectedMountNamespace)) return cur
         }
         return cur
     }
@@ -286,6 +309,7 @@ object UbuntuRuntime {
                 appSocket = appSock,
                 policyJson = policy,
                 forceRestart = forceRestart,
+                appMountNamespacePid = android.os.Process.myPid(),
             )
 
             val proc = try {
@@ -367,13 +391,16 @@ object UbuntuRuntime {
                 )
             }
         }
-        val scopedEnv = if (sessionId == null) {
+        val sessionEnv = if (sessionId == null) {
             env
         } else {
             env + ("MINIS_CHAT_SESSION_ID" to sessionId)
         }
+        // The command remains a structured environment value while the fixed
+        // entrypoint loads persistent user aliases before eval parses it.
+        val scopedEnv = sessionEnv + (SHELL_COMMAND_ENV to command)
         val resp = client.ubuntuExec(
-            argv = listOf("/bin/bash", "-lc", command),
+            argv = listOf("/bin/bash", "-lc", SHELL_ENTRYPOINT),
             timeoutMs = timeoutMs,
             cwd = MinisdProtocol.GUEST_WORKSPACE,
             env = scopedEnv,
@@ -406,10 +433,20 @@ object UbuntuRuntime {
     fun paths(): JSONObject = JSONObject()
         .put("hostWorkspace", UbuntuPaths.hostWorkspace)
         .put("hostSessions", UbuntuPaths.hostSessions)
+        .put("hostHome", UbuntuPaths.hostHome)
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
+        .put("guestHome", MinisdProtocol.GUEST_HOME)
+        .put("appMountNamespace", currentMountNamespace())
+        .put("brokerMountNamespace", _snapshot.value.brokerMountNamespace)
+
+    internal fun currentMountNamespace(): String? = runCatching {
+        java.nio.file.Files.readSymbolicLink(
+            java.nio.file.Paths.get("/proc/self/ns/mnt"),
+        ).toString()
+    }.getOrNull()
 
     private fun fail(detail: String): Snapshot {
         val next = Snapshot(lastError = detail)
@@ -446,6 +483,8 @@ object UbuntuRuntime {
                 hostMemory = result.optNullableString("memory"),
                 hostSkills = result.optNullableString("skills"),
                 hostShared = result.optNullableString("shared"),
+                hostHome = result.optNullableString("home"),
+                brokerMountNamespace = result.optNullableString("broker_mount_namespace"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )

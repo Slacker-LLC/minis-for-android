@@ -22,7 +22,9 @@ internal object MinisdBootstrap {
         appSocket: String,
         policyJson: String,
         forceRestart: Boolean,
+        appMountNamespacePid: Int,
     ): String {
+        require(appMountNamespacePid > 0) { "appMountNamespacePid must be > 0" }
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}"
         commands += "ROOTFS=${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}"
@@ -43,7 +45,7 @@ internal object MinisdBootstrap {
             commands += "sleep 1"
         }
 
-        commands += "(\"\$BIN\" --watchdog --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
+        commands += "(\"\$BIN\" --watchdog --mount-ns-pid $appMountNamespacePid --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""
         return commands.joinToString("\n")
     }

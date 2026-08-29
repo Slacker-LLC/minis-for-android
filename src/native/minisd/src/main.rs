@@ -16,6 +16,8 @@ struct Args {
     call: bool,
     watchdog: bool,
     #[cfg_attr(not(unix), allow(dead_code))]
+    mount_ns_pid: Option<i32>,
+    #[cfg_attr(not(unix), allow(dead_code))]
     socket: PathBuf,
     #[cfg_attr(not(unix), allow(dead_code))]
     app_socket: Option<PathBuf>,
@@ -27,6 +29,7 @@ fn parse_args() -> Result<Args, String> {
     let mut once = false;
     let mut call = false;
     let mut watchdog = false;
+    let mut mount_ns_pid = None;
     let mut socket = PathBuf::from("/data/adb/minis/run/minisd.sock");
     let mut app_socket = None;
     let mut policy = None;
@@ -37,6 +40,10 @@ fn parse_args() -> Result<Args, String> {
             "--once" => once = true,
             "--call" => call = true,
             "--watchdog" => watchdog = true,
+            "--mount-ns-pid" => {
+                let raw = it.next().ok_or("--mount-ns-pid needs a pid")?;
+                mount_ns_pid = Some(parse_positive_pid(&raw)?);
+            }
             "--socket" => {
                 socket = PathBuf::from(it.next().ok_or("--socket needs a path")?);
             }
@@ -48,7 +55,7 @@ fn parse_args() -> Result<Args, String> {
             }
             "--help" | "-h" => {
                 eprintln!(
-                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket PATH] [--app-socket PATH] [--policy PATH]"
+                    "minisd [--mock] [--once] [--call] [--watchdog] [--mount-ns-pid PID] [--socket PATH] [--app-socket PATH] [--policy PATH]"
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
@@ -59,15 +66,29 @@ fn parse_args() -> Result<Args, String> {
             other => return Err(format!("unknown arg: {other}")),
         }
     }
+    if mount_ns_pid.is_some() && !watchdog {
+        return Err("--mount-ns-pid requires --watchdog".into());
+    }
     Ok(Args {
         mock,
         once,
         call,
         watchdog,
+        mount_ns_pid,
         socket,
         app_socket,
         policy,
     })
+}
+
+fn parse_positive_pid(raw: &str) -> Result<i32, String> {
+    let pid = raw
+        .parse::<i32>()
+        .map_err(|_| "--mount-ns-pid must be a positive integer".to_string())?;
+    if pid <= 0 {
+        return Err("--mount-ns-pid must be a positive integer".into());
+    }
+    Ok(pid)
 }
 
 fn load_policy(path: &Option<PathBuf>) -> Result<PolicyFile, String> {
@@ -137,15 +158,28 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     }
+    if !args.mock && !running_as_root() {
+        eprintln!("root required (KernelSU); or pass --mock");
+        return ExitCode::from(3);
+    }
+    if let Some(pid) = args.mount_ns_pid {
+        #[cfg(unix)]
+        if let Err(e) = minisd::ns::setns_mnt(pid) {
+            eprintln!("enter app mount namespace for pid {pid}: {e}");
+            return ExitCode::from(5);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = pid;
+            eprintln!("--mount-ns-pid requires unix");
+            return ExitCode::from(2);
+        }
+    }
     let mut state = AppState::new(args.mock, policy);
     if !args.mock {
         state.ubuntu = minisd::ubuntu::recover_state();
     }
     state.skip_peer = args.once;
-    if !args.mock && !running_as_root() {
-        eprintln!("root required (KernelSU); or pass --mock");
-        return ExitCode::from(3);
-    }
     if args.watchdog {
         return watchdog_loop(args.mock, args.socket, args.app_socket, args.policy);
     }
@@ -559,11 +593,12 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut memory = String::new();
     let mut skills = String::new();
     let mut shared = String::new();
+    let mut home = String::new();
     let mut session_root = String::new();
     let mut pid: i32 = 0;
     let mut uid = minisd::layout::GUEST_UID;
     let mut gid = minisd::layout::GUEST_GID;
-    let mut cwd = minisd::layout::GUEST_HOME.to_string();
+    let mut cwd = minisd::layout::GUEST_WORKSPACE.to_string();
     let mut listen = minisd::proxy::PROXY_LISTEN.to_string();
     let mut tz = "LCL-8".to_string();
     let mut proxy = String::new();
@@ -609,6 +644,13 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 shared = args
                     .get(i + 1)
                     .ok_or((8u8, "--shared needs value".into()))?
+                    .clone();
+                i += 2;
+            }
+            "--home" => {
+                home = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--home needs value".into()))?
                     .clone();
                 i += 2;
             }
@@ -684,7 +726,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
         }
     }
     match kind {
-        "keep" => helper_keep(&rootfs, &workspace, &memory, &skills, &shared),
+        "keep" => helper_keep(&rootfs, &workspace, &memory, &skills, &shared, &home),
         "exec" => helper_exec(
             pid,
             &rootfs,
@@ -709,6 +751,7 @@ fn helper_keep(
     memory: &str,
     skills: &str,
     shared: &str,
+    home: &str,
 ) -> Result<(), (u8, String)> {
     use minisd::ns;
     unsafe {
@@ -717,7 +760,8 @@ fn helper_keep(
     ns::set_process_name("minisd-keep");
     ns::unshare_mount().map_err(|e| (1u8, e))?;
     ns::make_rprivate_root().map_err(|e| (2u8, e))?;
-    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared).map_err(|e| (3u8, e))?;
+    ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared, home)
+        .map_err(|e| (3u8, e))?;
     println!("READY {}", std::process::id());
     let _ = std::io::Write::flush(&mut std::io::stdout());
     unsafe {
@@ -800,6 +844,19 @@ fn helper_exec(
         7,
         format!("execve {}: {}", argv[0], std::io::Error::last_os_error()),
     ))
+}
+
+#[cfg(test)]
+mod arg_tests {
+    use super::*;
+
+    #[test]
+    fn app_mount_namespace_pid_must_be_positive() {
+        assert_eq!(parse_positive_pid("4321").unwrap(), 4321);
+        for invalid in ["", "abc", "0", "-1"] {
+            assert!(parse_positive_pid(invalid).is_err());
+        }
+    }
 }
 
 #[cfg(all(test, unix))]

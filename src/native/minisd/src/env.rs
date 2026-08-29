@@ -334,11 +334,12 @@ mod tests {
 
     #[test]
     fn guest_env_has_tool_compat_and_no_uv_link_mode() {
-        let env = guest_env("LCL-8", "", "/workspace", &BTreeMap::new());
+        let env = guest_env("LCL-8", "", "/home/minis", &BTreeMap::new());
         assert_eq!(env["NO_COLOR"], "1");
         assert_eq!(env["PYTHONDONTWRITEBYTECODE"], "1");
         assert_eq!(env["GOMAXPROCS"], "2");
         assert_eq!(env["TZ"], "LCL-8");
+        assert_eq!(env["HOME"], "/home/minis");
         assert!(!env.contains_key("UV_LINK_MODE"));
         assert!(env["PATH"].contains("/usr/bin"));
     }

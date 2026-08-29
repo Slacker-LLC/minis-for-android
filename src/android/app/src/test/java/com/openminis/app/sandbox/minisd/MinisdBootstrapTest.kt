@@ -41,11 +41,12 @@ class MinisdBootstrapTest {
             appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = false,
+            appMountNamespacePid = 4321,
         )
 
         assertTrue(command.contains("minisd missing or not executable"))
         assertTrue(command.contains("ubuntu rootfs missing"))
-        assertTrue(command.contains("--watchdog --policy"))
+        assertTrue(command.contains("--watchdog --mount-ns-pid 4321 --policy"))
         assertTrue(command.contains("--app-socket"))
         assertFalse(command.contains("minisd.pid"))
     }
@@ -56,6 +57,7 @@ class MinisdBootstrapTest {
             appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = true,
+            appMountNamespacePid = 4321,
         )
 
         assertTrue(command.contains("/data/adb/minis/run/minisd.pid"))
@@ -70,6 +72,16 @@ class MinisdBootstrapTest {
         assertEquals(0, MinisdBootstrap.parseEffectiveUid("KernelSU warning\n0\n"))
         assertEquals(10394, MinisdBootstrap.parseEffectiveUid("notice\n10394\nmore"))
         assertEquals(null, MinisdBootstrap.parseEffectiveUid("permission denied"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `watchdog command rejects invalid app namespace pid`() {
+        MinisdBootstrap.watchdogCommand(
+            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
+            forceRestart = false,
+            appMountNamespacePid = 0,
+        )
     }
 
     @Test

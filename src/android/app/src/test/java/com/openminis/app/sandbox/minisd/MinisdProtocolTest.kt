@@ -93,6 +93,7 @@ class MinisdProtocolTest {
                 memory = "/data/adb/minis/memory",
                 skills = "/data/adb/minis/skills",
                 shared = "/data/adb/minis/shared",
+                home = "/data/adb/minis/home",
                 sessionsRoot = "/data/user/0/app/files/minis-sessions",
             ),
         )
@@ -105,6 +106,7 @@ class MinisdProtocolTest {
         assertEquals("/data/adb/minis/memory", params.getString("memory"))
         assertEquals("/data/adb/minis/skills", params.getString("skills"))
         assertEquals("/data/adb/minis/shared", params.getString("shared"))
+        assertEquals("/data/adb/minis/home", params.getString("home"))
         assertEquals(
             "/data/user/0/app/files/minis-sessions",
             params.getString("sessions_root"),
