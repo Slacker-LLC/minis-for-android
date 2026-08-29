@@ -41,7 +41,9 @@ class MinisdProtocolTest {
             v = 1,
             id = 4,
             ok = true,
-            result = JSONObject().put("exit_code", 4).put("stderr", "setns failed"),
+            result = JSONObject()
+                .put("exit_code", 4)
+                .put("stderr", "open /proc/8123/ns/mnt: No such file or directory"),
             error = null,
         )
 
@@ -57,10 +59,32 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `other proven namespace failure is layout error and not keeper retry`() {
+        val raw = MinisdResponse(
+            1,
+            5,
+            true,
+            JSONObject()
+                .put("exit_code", 4)
+                .put("stderr", "bind /data/adb/minis/sessions/a -> /workspace: Invalid argument"),
+            null,
+        )
+
+        val promoted = MinisdProtocol.promoteExecInfrastructureFailure(
+            raw,
+            userCommandStarted = false,
+        )
+
+        assertFalse(promoted.ok)
+        assertEquals(MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH, promoted.code)
+        assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(raw, userCommandStarted = false))
+    }
+
+    @Test
     fun `ambiguous or started exit four remains user command result`() {
         val raw = MinisdResponse(
             1,
-            4,
+            6,
             true,
             JSONObject().put("exit_code", 4).put("stderr", "user chose exit 4"),
             null,
@@ -81,27 +105,39 @@ class MinisdProtocolTest {
     }
 
     @Test
-    fun `proven pre exec chroot and privilege failures are structured but not retried`() {
+    fun `proven pre exec chroot privilege and execve failures are structured`() {
         val chroot = MinisdProtocol.promoteExecInfrastructureFailure(
-            MinisdResponse(1, 5, true, JSONObject().put("exit_code", 5), null),
+            MinisdResponse(1, 7, true, JSONObject().put("exit_code", 5), null),
             userCommandStarted = false,
         )
         val privilege = MinisdProtocol.promoteExecInfrastructureFailure(
-            MinisdResponse(1, 6, true, JSONObject().put("exit_code", 6), null),
+            MinisdResponse(1, 8, true, JSONObject().put("exit_code", 6), null),
+            userCommandStarted = false,
+        )
+        val execve = MinisdProtocol.promoteExecInfrastructureFailure(
+            MinisdResponse(
+                1,
+                9,
+                true,
+                JSONObject().put("exit_code", 7).put("stderr", "execve /bin/bash: ENOENT"),
+                null,
+            ),
             userCommandStarted = false,
         )
 
         assertEquals(MinisdProtocol.ERROR_CHROOT_UNAVAILABLE, chroot.code)
         assertEquals(MinisdProtocol.ERROR_PRIVILEGE_SETUP_FAILED, privilege.code)
+        assertEquals(MinisdProtocol.ERROR_EXEC_UNAVAILABLE, execve.code)
         assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(chroot))
         assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(privilege))
+        assertFalse(MinisdProtocol.isRetrySafeKeeperFailure(execve))
     }
 
     @Test
     fun `ordinary command exit code remains a command result`() {
         val raw = MinisdResponse(
             1,
-            9,
+            10,
             true,
             JSONObject().put("exit_code", 23).put("stderr", "user command failed"),
             null,
@@ -121,7 +157,7 @@ class MinisdProtocolTest {
     fun `explicit future pre exec error is preserved structurally without marker`() {
         val raw = MinisdResponse(
             1,
-            10,
+            11,
             true,
             JSONObject()
                 .put("exit_code", 1)
@@ -141,7 +177,7 @@ class MinisdProtocolTest {
     fun `structured keeper error is retry safe without legacy inference`() {
         val raw = MinisdResponse(
             1,
-            11,
+            12,
             false,
             null,
             MinisdError(MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST, "keeper gone"),
