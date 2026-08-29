@@ -239,21 +239,89 @@ pub fn lockdown_no_privs() -> Result<(), String> {
     Ok(())
 }
 
+fn parse_proc_status_uid(status: &str) -> Option<u32> {
+    status.lines().find_map(|line| {
+        let rest = line.strip_prefix("Uid:")?;
+        rest.split_whitespace().next()?.parse::<u32>().ok()
+    })
+}
+
 #[cfg(unix)]
 pub fn setns_mnt(pid: i32) -> Result<(), String> {
-    let path = format!("/proc/{pid}/ns/mnt");
-    let c = cstr(&path)?;
-    let fd = unsafe { libc::open(c.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
-    if fd < 0 {
-        return Err(last_err(&format!("open {path}")));
+    use std::io::Read as _;
+    use std::os::fd::FromRawFd as _;
+
+    let expected_uid = std::env::var("MINIS_EXPECTED_APP_UID")
+        .map_err(|_| "MINIS_EXPECTED_APP_UID is required with --mount-ns-pid".to_string())?
+        .parse::<u32>()
+        .map_err(|_| "MINIS_EXPECTED_APP_UID must be a positive integer".to_string())?;
+    if expected_uid == 0 {
+        return Err("MINIS_EXPECTED_APP_UID must be a positive integer".into());
     }
-    let rc = unsafe { libc::setns(fd, libc::CLONE_NEWNS) };
-    unsafe { libc::close(fd) };
-    if rc == 0 {
-        Ok(())
-    } else {
-        Err(last_err("setns CLONE_NEWNS"))
+
+    // Pin the proc task directory first. Both the UID check and namespace fd
+    // are then opened relative to this same directory handle, so PID reuse
+    // cannot redirect the privileged setns to a different process between the
+    // authentication check and namespace open.
+    let proc_path = format!("/proc/{pid}");
+    let c_proc = cstr(&proc_path)?;
+    let proc_fd = unsafe {
+        libc::open(
+            c_proc.as_ptr(),
+            libc::O_PATH | libc::O_DIRECTORY | libc::O_CLOEXEC,
+        )
+    };
+    if proc_fd < 0 {
+        return Err(last_err(&format!("open {proc_path}")));
     }
+
+    let result = (|| {
+        let c_status = cstr("status")?;
+        let status_fd = unsafe {
+            libc::openat(
+                proc_fd,
+                c_status.as_ptr(),
+                libc::O_RDONLY | libc::O_CLOEXEC,
+            )
+        };
+        if status_fd < 0 {
+            return Err(last_err(&format!("open {proc_path}/status")));
+        }
+        let mut status_file = unsafe { std::fs::File::from_raw_fd(status_fd) };
+        let mut status = String::new();
+        status_file
+            .read_to_string(&mut status)
+            .map_err(|e| format!("read {proc_path}/status: {e}"))?;
+        let actual_uid = parse_proc_status_uid(&status)
+            .ok_or_else(|| format!("missing Uid in {proc_path}/status"))?;
+        if actual_uid != expected_uid {
+            return Err(format!(
+                "mount namespace target uid mismatch: pid={pid} uid={actual_uid} expected={expected_uid}"
+            ));
+        }
+
+        let c_ns = cstr("ns/mnt")?;
+        let ns_fd = unsafe {
+            libc::openat(
+                proc_fd,
+                c_ns.as_ptr(),
+                libc::O_RDONLY | libc::O_CLOEXEC,
+            )
+        };
+        if ns_fd < 0 {
+            return Err(last_err(&format!("open {proc_path}/ns/mnt")));
+        }
+        let rc = unsafe { libc::setns(ns_fd, libc::CLONE_NEWNS) };
+        unsafe { libc::close(ns_fd) };
+        if rc == 0 {
+            Ok(())
+        } else {
+            Err(last_err("setns CLONE_NEWNS"))
+        }
+    })();
+
+    unsafe { libc::close(proc_fd) };
+    result
 }
 
 #[cfg(unix)]
@@ -556,5 +624,12 @@ mod tests {
     fn guest_network_group_matches_android_internet_permission() {
         assert_eq!(guest_supplementary_groups(), [ANDROID_AID_INET]);
         assert_eq!(ANDROID_AID_INET, 3003);
+    }
+
+    #[test]
+    fn proc_status_uid_parser_uses_real_uid() {
+        let status = "Name:\tapp_process\nUid:\t10394\t10394\t10394\t10394\nGid:\t10394\t10394\t10394\t10394\n";
+        assert_eq!(parse_proc_status_uid(status), Some(10394));
+        assert_eq!(parse_proc_status_uid("Name:\tmissing\n"), None);
     }
 }
