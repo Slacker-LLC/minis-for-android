@@ -5,7 +5,7 @@ import android.util.Log
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.ProviderRepository
-import com.openminis.app.sandbox.minisd.MinisdConfigBridgeServer
+import com.openminis.app.runtime.minisd.MinisdConfigBridgeServer
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
