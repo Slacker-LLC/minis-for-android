@@ -784,10 +784,7 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     };
     let upd = exec_live(state, &update, true)?;
     if upd.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
-        return Err((
-            ErrorCode::Internal,
-            format!("apt-get update failed: {upd}"),
-        ));
+        return Err((ErrorCode::Internal, format!("apt-get update failed: {upd}")));
     }
     let mut argv = vec![
         "/usr/bin/apt-get".into(),
