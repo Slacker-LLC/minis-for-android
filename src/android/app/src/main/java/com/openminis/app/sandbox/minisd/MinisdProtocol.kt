@@ -47,11 +47,13 @@ object MinisdProtocol {
     const val ERROR_CHROOT_UNAVAILABLE = "CHROOT_UNAVAILABLE"
     const val ERROR_RUNTIME_LAYOUT_MISMATCH = "RUNTIME_LAYOUT_MISMATCH"
     const val ERROR_PRIVILEGE_SETUP_FAILED = "PRIVILEGE_SETUP_FAILED"
+    const val ERROR_EXEC_UNAVAILABLE = "EXEC_UNAVAILABLE"
     const val ERROR_RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
 
-    private const val HELPER_SETNS_FAILED = 4
+    private const val HELPER_NAMESPACE_FAILED = 4
     private const val HELPER_CHROOT_FAILED = 5
     private const val HELPER_PRIVILEGE_FAILED = 6
+    private const val HELPER_EXECVE_FAILED = 7
 
     fun encodeRequest(req: MinisdRequest): String {
         val client = JSONObject().put("id", req.clientId)
@@ -96,12 +98,12 @@ object MinisdProtocol {
      * Promotes infrastructure failures into structured errors without ever
      * guessing whether a user command ran. Newer brokers may provide an
      * explicit `pre_exec_error`, which is authoritative. Legacy helper exit
-     * statuses 4/5/6 are only interpreted when the caller has positive proof
-     * that guest execve did not start the user-command wrapper.
+     * statuses are interpreted only when the caller has positive proof that
+     * guest execve did not start the user-command wrapper.
      *
      * `userCommandStarted == null` deliberately disables legacy numeric
      * promotion. This is required for raw argv/admin execution where exit 4,
-     * 5 or 6 can legitimately be returned by the user's process.
+     * 5, 6 or 7 can legitimately be returned by the user's process.
      */
     fun promoteExecInfrastructureFailure(
         response: MinisdResponse,
@@ -116,30 +118,13 @@ object MinisdProtocol {
             ERROR_ROOTFS_INVALID,
             ERROR_RUNTIME_LAYOUT_MISMATCH,
             ERROR_PRIVILEGE_SETUP_FAILED,
+            ERROR_EXEC_UNAVAILABLE,
             -> MinisdError(
                 explicit,
                 result.optString("pre_exec_detail").ifBlank { explicit },
             )
             else -> if (userCommandStarted == false) {
-                when (result.optInt("exit_code", Int.MIN_VALUE)) {
-                    HELPER_SETNS_FAILED -> MinisdError(
-                        ERROR_KEEPER_NAMESPACE_LOST,
-                        result.optString("stderr").ifBlank {
-                            "keeper mount namespace is no longer available"
-                        },
-                    )
-                    HELPER_CHROOT_FAILED -> MinisdError(
-                        ERROR_CHROOT_UNAVAILABLE,
-                        result.optString("stderr").ifBlank { "Ubuntu chroot is unavailable" },
-                    )
-                    HELPER_PRIVILEGE_FAILED -> MinisdError(
-                        ERROR_PRIVILEGE_SETUP_FAILED,
-                        result.optString("stderr").ifBlank {
-                            "runtime privilege setup failed before execve"
-                        },
-                    )
-                    else -> null
-                }
+                classifyLegacyPreExec(result)
             } else {
                 null
             }
@@ -154,6 +139,41 @@ object MinisdProtocol {
                 result = null,
                 error = error,
             )
+        }
+    }
+
+    private fun classifyLegacyPreExec(result: JSONObject): MinisdError? {
+        val stderr = result.optString("stderr")
+        return when (result.optInt("exit_code", Int.MIN_VALUE)) {
+            HELPER_NAMESPACE_FAILED -> {
+                val keeperLost =
+                    (stderr.contains("open /proc/") && stderr.contains("/ns/mnt")) ||
+                        stderr.contains("setns CLONE_NEWNS")
+                if (keeperLost) {
+                    MinisdError(
+                        ERROR_KEEPER_NAMESPACE_LOST,
+                        stderr.ifBlank { "keeper mount namespace is no longer available" },
+                    )
+                } else {
+                    MinisdError(
+                        ERROR_RUNTIME_LAYOUT_MISMATCH,
+                        stderr.ifBlank { "runtime namespace or session mount setup failed" },
+                    )
+                }
+            }
+            HELPER_CHROOT_FAILED -> MinisdError(
+                ERROR_CHROOT_UNAVAILABLE,
+                stderr.ifBlank { "Ubuntu chroot is unavailable" },
+            )
+            HELPER_PRIVILEGE_FAILED -> MinisdError(
+                ERROR_PRIVILEGE_SETUP_FAILED,
+                stderr.ifBlank { "runtime privilege setup failed before execve" },
+            )
+            HELPER_EXECVE_FAILED -> MinisdError(
+                ERROR_EXEC_UNAVAILABLE,
+                stderr.ifBlank { "guest executable could not be started" },
+            )
+            else -> null
         }
     }
 
