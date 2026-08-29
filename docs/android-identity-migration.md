@@ -25,11 +25,11 @@ If a future release adds legacy-data transfer, it must use an explicit, independ
 
 The source, unit-test, and instrumentation-test package roots move from `com.openminis.app` to `io.github.slackerllc.minis`. JNI class symbols and active build/debug tooling move with the Kotlin/Java package so native bindings remain exact.
 
-Manifest component names remain relative to the canonical namespace. Provider authorities remain `${applicationId}`-derived so the new app receives its own collision-free authorities. The `:pet` process suffix remains unchanged.
+Manifest component names remain relative to the canonical namespace. Provider authorities remain `${applicationId}`-derived so the new app receives its own collision-free authorities. The migration preserves the process attributes actually present on master; it does not add a new package-specific process split.
 
-User-facing/product deep-link contracts are not renamed merely because the Android package changes. Existing `minis:` links and HTTPS app links such as `app.minis.love` remain product contracts. Package-scoped internal intent actions that were explicitly based on the old Kotlin namespace move to the canonical namespace together with their callers.
+User-facing/product deep-link contracts are not renamed merely because the Android package changes. The existing `minis:` scheme and localhost OAuth callback filters remain unchanged. Package-scoped internal intent actions that were explicitly based on the old Kotlin namespace move to the canonical namespace together with their callers.
 
-Changing applicationId can require external configuration updates that are not provable from this repository alone, including Digital Asset Links, OAuth/app-registration allowlists, package-name/certificate bindings, device roles, and store/distribution metadata. Repository CI verifies the APK package identity but does not claim those external systems are already updated.
+Changing applicationId can require external configuration updates that are not provable from this repository alone, including OAuth/app-registration allowlists, package-name/certificate bindings, device roles, and store/distribution metadata. If HTTPS App Links are added or managed externally, their Digital Asset Links configuration must likewise reference the new package and signing certificate. Repository CI verifies the APK package identity but does not claim external systems are already updated.
 
 ## Regression policy
 
