@@ -14,6 +14,9 @@ pub mod proxy;
 pub mod rate;
 pub mod session;
 pub mod state;
+#[path = "ubuntu.rs"]
+mod ubuntu_legacy;
+#[path = "ubuntu_persistent.rs"]
 pub mod ubuntu;
 
 pub use dispatch::handle;
