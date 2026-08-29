@@ -89,10 +89,10 @@ class MinisdProtocolTest {
             MinisdProtocol.ubuntuStart(
                 id = 7,
                 rootfs = "/data/adb/minis/rootfs",
-                workspace = "/data/adb/minis/workspace",
-                memory = "/data/adb/minis/memory",
-                skills = "/data/adb/minis/skills",
-                shared = "/data/adb/minis/shared",
+                workspace = "/data/user/0/app/files/minis/workspace",
+                memory = "/data/user/0/app/files/minis-global/memory",
+                skills = "/data/user/0/app/files/minis-global/skills",
+                shared = "/data/user/0/app/files/minis-global/shared",
                 sessionsRoot = "/data/user/0/app/files/minis-sessions",
             ),
         )
@@ -101,10 +101,14 @@ class MinisdProtocolTest {
         assertEquals("ubuntu.start", obj.getString("method"))
         val params = obj.getJSONObject("params")
         assertEquals("/data/adb/minis/rootfs", params.getString("rootfs"))
-        assertEquals("/data/adb/minis/workspace", params.getString("workspace"))
-        assertEquals("/data/adb/minis/memory", params.getString("memory"))
-        assertEquals("/data/adb/minis/skills", params.getString("skills"))
-        assertEquals("/data/adb/minis/shared", params.getString("shared"))
+        assertEquals("/data/user/0/app/files/minis/workspace", params.getString("workspace"))
+        assertEquals(
+            params.getString("workspace"),
+            params.getString("home"),
+        )
+        assertEquals("/data/user/0/app/files/minis-global/memory", params.getString("memory"))
+        assertEquals("/data/user/0/app/files/minis-global/skills", params.getString("skills"))
+        assertEquals("/data/user/0/app/files/minis-global/shared", params.getString("shared"))
         assertEquals(
             "/data/user/0/app/files/minis-sessions",
             params.getString("sessions_root"),
