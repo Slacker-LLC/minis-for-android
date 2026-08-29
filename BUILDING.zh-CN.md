@@ -1,6 +1,21 @@
 # Minis for Android 构建说明（中文翻译）
 
-> [BUILDING.md](BUILDING.md) 是权威英文构建文档。本文件只作为中文翻译；如果版本号、命令或行为与英文文档冲突，以英文文档和实际构建脚本为准。
+> [BUILDING.md](BUILDING.md) 是当前 `master` 唯一权威的构建与发布文档。本文件只作为中文翻译；如果版本号、命令或行为与英文文档冲突，以英文文档和实际构建脚本为准。
+
+## Canonical 构建入口
+
+当前构建直接使用本仓库源码，不会在 Android 构建过程中重新克隆或 patch 上游仓库。
+
+| 用途 | 当前入口 |
+|---|---|
+| Android Debug APK | `cd src/android && ./gradlew :app:assembleDebug --no-daemon` |
+| Windows PowerShell Debug APK | `./scripts/build-android-debug.ps1` |
+| Android Release APK | `cd src/android && ./gradlew :app:assembleRelease --no-daemon` |
+| Rust `minisd` | `cargo ... --manifest-path src/native/minisd/Cargo.toml` |
+| Ubuntu rootfs | `./scripts/build-ubuntu-rootfs.sh` |
+| CI | `.github/workflows/ci.yml` |
+
+PowerShell 脚本只是对同一个 `src/android` Gradle 工程的便捷封装，不允许演变成第二套构建链。
 
 ## 当前工具链
 
@@ -56,12 +71,20 @@ cargo build --locked --release \
 
 ## 5. 构建 Debug APK
 
+Linux / WSL2：
+
 ```bash
 cd src/android
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
-产物：
+Windows PowerShell，从仓库根目录执行：
+
+```powershell
+./scripts/build-android-debug.ps1
+```
+
+两者都构建仓库中的 `src/android` 工程，产物为：
 
 ```text
 src/android/app/build/outputs/apk/debug/app-debug.apk
@@ -77,6 +100,8 @@ APK/AAB 只作为本地或 CI 构建产物，不应提交到 Git。
 
 ## 6. 测试
 
+Android：
+
 ```bash
 cd src/android
 ./gradlew :app:testDebugUnitTest --no-daemon
@@ -91,6 +116,14 @@ Rust：
 cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
 cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
 cargo test --locked --manifest-path src/native/minisd/Cargo.toml
+```
+
+构建路径回归检查：
+
+```bash
+python3 scripts/test_build_cleanup_guard.py
+python3 scripts/check_build_cleanup.py
+bash -n scripts/update_models_dev.sh
 ```
 
 ## 7. Release 签名
