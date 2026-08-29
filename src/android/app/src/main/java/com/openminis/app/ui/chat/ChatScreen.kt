@@ -2293,7 +2293,7 @@ fun ChatScreen(
                 ?: 0
             val items = refs.map { ref ->
                 // Resolve minis://... / file:// / /abs → host File so Coil
-                // doesn't have to re-walk MinisKernel for every page swipe.
+                // doesn't have to re-walk RuntimePathRegistry for every page swipe.
                 // For an owned minis:// URL, a miss stays a miss instead of
                 // falling through to the global, sessionless fetcher.
                 val resolved = resolveMdMediaFile(context, ref.source, sessionId)

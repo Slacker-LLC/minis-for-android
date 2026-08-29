@@ -3,8 +3,8 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.minisd.MinisdClient
-import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.minisd.MinisdClient
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy

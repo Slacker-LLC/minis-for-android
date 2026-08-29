@@ -128,7 +128,7 @@
         errorLine1="            json.put(&quot;internal_total_gb&quot;, String.format(&quot;%.1f&quot;, total / 1e9))"
         errorLine2="                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/DeviceOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
             line="127"
             column="43"/>
     </issue>
@@ -139,7 +139,7 @@
         errorLine1="                .put(&quot;internal_free_gb&quot;, String.format(&quot;%.1f&quot;, free / 1e9))"
         errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/DeviceOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
             line="128"
             column="42"/>
     </issue>
@@ -150,7 +150,7 @@
         errorLine1="                .put(&quot;internal_used_gb&quot;, String.format(&quot;%.1f&quot;, (total - free) / 1e9))"
         errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/DeviceOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
             line="129"
             column="42"/>
     </issue>
@@ -161,7 +161,7 @@
         errorLine1="        json.put(&quot;app_data_mb&quot;, String.format(&quot;%.1f&quot;, dirSize(context.filesDir) / 1e6))"
         errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/DeviceOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
             line="134"
             column="33"/>
     </issue>
@@ -172,7 +172,7 @@
         errorLine1="            .put(&quot;app_cache_mb&quot;, String.format(&quot;%.1f&quot;, dirSize(context.cacheDir) / 1e6))"
         errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/DeviceOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
             line="135"
             column="34"/>
     </issue>
@@ -183,7 +183,7 @@
         errorLine1="            .put(&quot;total_size_mb&quot;, String.format(&quot;%.1f&quot;, totalSize / 1e6))"
         errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/PhotosOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
             line="936"
             column="35"/>
     </issue>
@@ -194,7 +194,7 @@
         errorLine1="                        .put(&quot;distance_km&quot;, String.format(&quot;%.2f&quot;, dist))"
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/PhotosOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
             line="995"
             column="45"/>
     </issue>
@@ -216,7 +216,7 @@
         errorLine1="                            if (confs != null &amp;&amp; i &lt; confs.size) a.put(&quot;confidence&quot;, String.format(&quot;%.2f&quot;, confs[i]))"
         errorLine2="                                                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/SpeechOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/SpeechOffloadHandler.kt"
             line="367"
             column="86"/>
     </issue>
@@ -579,7 +579,7 @@
         errorLine1="            val cls = Class.forName(&quot;android.os.SystemProperties&quot;)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/OsCompat.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/OsCompat.kt"
             line="44"
             column="23"/>
     </issue>
@@ -1096,7 +1096,7 @@
         errorLine1="                        10 -> &quot;Too many recognition requests — the system recognizer service is saturated (orphaned sessions?)&quot;"
         errorLine2="                        ~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/SpeechOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/SpeechOffloadHandler.kt"
             line="393"
             column="25"/>
     </issue>
@@ -8191,7 +8191,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="189"
             column="13"/>
     </issue>
@@ -8202,7 +8202,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/NotificationOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
             line="61"
             column="13"/>
     </issue>
@@ -8213,7 +8213,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/NotificationOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
             line="400"
             column="13"/>
     </issue>
@@ -8246,7 +8246,7 @@
         errorLine1="            val hint = if (!hasMediaLoc &amp;&amp; Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {"
         errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/PhotosOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
             line="1001"
             column="44"/>
     </issue>
@@ -8392,7 +8392,7 @@
         errorLine1="    var envVarRepository: EnvVarRepository? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/ExecutionCoordinator.kt"
+            file="src/main/java/com/openminis/app/runtime/ExecutionCoordinator.kt"
             line="32"
             column="5"/>
     </issue>
@@ -8469,7 +8469,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/sandbox/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="92"
             column="5"/>
     </issue>
@@ -10514,7 +10514,7 @@
         errorLine1="            val s = Bitmap.createScaledBitmap(raw, w, h, true)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/AccessibilityOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/AccessibilityOffloadHandler.kt"
             line="388"
             column="21"/>
     </issue>
@@ -11768,7 +11768,7 @@
         errorLine1="        val treeUri = Uri.parse(treeUriString)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="154"
             column="23"/>
     </issue>
@@ -11955,7 +11955,7 @@
         errorLine1="                Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/OpenOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/OpenOffloadHandler.kt"
             line="58"
             column="44"/>
     </issue>
@@ -11966,7 +11966,7 @@
         errorLine1="            val pkg = Uri.parse(url).getQueryParameter(&quot;id&quot;)"
         errorLine2="                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/OpenOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/OpenOffloadHandler.kt"
             line="101"
             column="23"/>
     </issue>
@@ -12208,7 +12208,7 @@
         errorLine1="            android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/offload/PhotosOffloadHandler.kt"
+            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
             line="620"
             column="13"/>
     </issue>

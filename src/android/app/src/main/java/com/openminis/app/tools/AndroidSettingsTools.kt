@@ -4,7 +4,7 @@ import android.content.Context
 import android.provider.Settings
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

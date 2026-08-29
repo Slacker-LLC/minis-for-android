@@ -103,7 +103,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -240,7 +240,7 @@ val LocalMarkdownImageTapHandler =
 
 /**
  * Session id that owns the currently-rendering markdown. Used by
- * `resolveMdMediaFile` to prefer `MinisKernel.resolveSessionHostPath` — the
+ * `resolveMdMediaFile` to prefer `RuntimePathRegistry.resolveSessionHostPath` — the
  * session-scoped resolver — over the global `bindMounts` map, which is
  * last-writer-wins across sessions. Null in contexts that don't know the
  * owning session (e.g. standalone previews).
@@ -2278,8 +2278,8 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
             // another session boots its shell, so without sessionId we'd route
             // this chat's attachment lookup to whichever session happened to
             // boot last.
-            if (sessionId != null) MinisKernel.resolveSessionHostPath(sessionId, linuxPath, context)
-            else MinisKernel.resolveHostPath(linuxPath)
+            if (sessionId != null) RuntimePathRegistry.resolveSessionHostPath(sessionId, linuxPath, context)
+            else RuntimePathRegistry.resolveHostPath(linuxPath)
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
         stripped.startsWith("/") -> File(stripped)
