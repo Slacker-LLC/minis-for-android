@@ -25,7 +25,6 @@ Chinese translations:
 | Document | Purpose |
 |---|---|
 | [`specs/minis-url-scheme.md`](specs/minis-url-scheme.md) | `minis://` URL scheme |
-| [`specs/sandbox-storage-modes.md`](specs/sandbox-storage-modes.md) | future persistent/memory sandbox storage selector |
 | [`specs/debug-server-api.md`](specs/debug-server-api.md) | DebugServer API reference; runtime discovery/source remain authoritative |
 
 ## Documentation authority
