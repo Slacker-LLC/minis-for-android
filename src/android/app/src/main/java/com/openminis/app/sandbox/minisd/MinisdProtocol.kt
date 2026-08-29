@@ -3,7 +3,6 @@ package com.openminis.app.sandbox.minisd
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Wire types for minisd JSON-RPC v1. */
 data class MinisdRequest(
     val id: Long,
     val method: String,
@@ -82,9 +81,7 @@ object MinisdProtocol {
     }
 
     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
-
-    fun ubuntuStatus(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.status")
+    fun ubuntuStatus(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.status")
 
     fun ubuntuStart(
         id: Long = 1,
@@ -104,8 +101,7 @@ object MinisdProtocol {
         return MinisdRequest(id = id, method = "ubuntu.start", params = params)
     }
 
-    fun ubuntuStop(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.stop")
+    fun ubuntuStop(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.stop")
 
     fun ubuntuExec(
         argv: List<String>,
@@ -114,6 +110,7 @@ object MinisdProtocol {
         env: Map<String, String> = emptyMap(),
         id: Long = 1,
         sessionId: String? = null,
+        executionId: String? = null,
     ): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }
@@ -127,29 +124,32 @@ object MinisdProtocol {
             params.put("env", obj)
         }
         sessionId?.takeIf { it.isNotEmpty() }?.let { params.put("session_id", it) }
-        return MinisdRequest(
-            id = id,
-            method = "ubuntu.exec",
-            params = params,
-        )
+        executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+        return MinisdRequest(id = id, method = "ubuntu.exec", params = params)
     }
 
-    fun ubuntuProvision(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.provision")
+    fun execCancel(executionId: String, id: Long = 1): MinisdRequest = MinisdRequest(
+        id = id,
+        method = "exec.cancel",
+        params = JSONObject().put("execution_id", executionId),
+    )
+
+    fun ubuntuProvision(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.provision")
 
     fun rootExec(
         tool: String,
         args: List<String> = emptyList(),
         timeoutMs: Long = 30_000,
         id: Long = 1,
-    ): MinisdRequest = MinisdRequest(
-        id = id,
-        method = "root.exec",
-        params = JSONObject()
+        executionId: String? = null,
+    ): MinisdRequest {
+        val params = JSONObject()
             .put("tool", tool)
             .put("args", JSONArray(args))
-            .put("timeout_ms", timeoutMs),
-    )
+            .put("timeout_ms", timeoutMs)
+        executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+        return MinisdRequest(id = id, method = "root.exec", params = params)
+    }
 
     fun ubuntuAdminExec(
         argv: List<String>,
