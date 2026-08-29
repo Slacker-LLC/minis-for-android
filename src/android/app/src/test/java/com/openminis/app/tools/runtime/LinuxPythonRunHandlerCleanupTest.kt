@@ -1,7 +1,7 @@
 package com.openminis.app.tools.runtime
 
+import android.content.ContextWrapper
 import android.content.SharedPreferences
-import android.test.mock.MockContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -37,7 +37,7 @@ class LinuxPythonRunHandlerCleanupTest {
         }
     }
 
-    private class TestContext(private val root: File) : MockContext() {
+    private class TestContext(private val root: File) : ContextWrapper(null) {
         private val preferences = EmptySharedPreferences()
 
         override fun getFilesDir(): File = root
