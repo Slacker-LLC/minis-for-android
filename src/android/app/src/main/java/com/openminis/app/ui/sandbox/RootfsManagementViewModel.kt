@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.distribution.RuntimeDistributionCode
+import com.openminis.app.sandbox.distribution.RuntimeDistributionManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,11 @@ data class RootfsManagementUiState(
     val hasBackup: Boolean = false,
     /** Current install phase + 0..1 progress (null when not installing). */
     val installProgress: Float? = null,
+    val runtimeReady: Boolean = false,
+    val runtimeDesiredVersion: String? = null,
+    val runtimeInstalledVersion: String? = null,
+    val runtimeStatus: String = "Not probed",
+    val runtimeDetail: String = "",
 )
 
 class RootfsManagementViewModel : ViewModel() {
@@ -33,11 +40,6 @@ class RootfsManagementViewModel : ViewModel() {
     private var backupDir: File? = null
     private var progressJob: Job? = null
 
-    /**
-     * Subscribe to the manager's installState and mirror progress + status
-     * text into [_uiState]. Cancelled on completion so we don't leak a job
-     * across multiple install() calls.
-     */
     private fun observeInstallProgress(manager: RootfsManager) {
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
@@ -70,48 +72,65 @@ class RootfsManagementViewModel : ViewModel() {
     }
 
     fun refresh(context: Context) {
-        val manager = RootfsManager.getInstance(context)
+        val rootfs = RootfsManager.getInstance(context)
+        val distribution = RuntimeDistributionManager.getInstance(context)
+        _uiState.value = _uiState.value.copy(rootfsPath = rootfs.rootfsDir.absolutePath)
 
-        _uiState.value = _uiState.value.copy(
-            isInstalled = manager.isInstalled,
-            rootfsPath = manager.rootfsDir.absolutePath,
-        )
-
-        if (manager.isInstalled) {
-            viewModelScope.launch {
-                try {
-                    val size = manager.getRootfsSize()
-                    _uiState.value = _uiState.value.copy(rootfsSize = size)
-                } catch (_: Exception) { }
+        viewModelScope.launch {
+            val health = rootfs.checkHealth()
+            val runtime = distribution.probe()
+            val size = if (health.healthy) {
+                runCatching { rootfs.getRootfsSize() }.getOrDefault(0L)
+            } else {
+                0L
             }
+            _uiState.value = _uiState.value.copy(
+                isInstalled = health.healthy,
+                rootfsSize = size,
+                runtimeReady = runtime.ready,
+                runtimeDesiredVersion = runtime.desiredVersion,
+                runtimeInstalledVersion = runtime.installedVersion,
+                runtimeStatus = runtime.code.name,
+                runtimeDetail = runtime.detail,
+            )
         }
     }
 
     fun install(context: Context) {
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = "Installing rootfs...",
+            statusMessage = "Installing/upgrading Minis runtime…",
             resultMessage = null,
-            installProgress = 0f,
+            installProgress = null,
         )
 
-        val manager = RootfsManager.getInstance(context)
-        observeInstallProgress(manager)
+        val distribution = RuntimeDistributionManager.getInstance(context)
         viewModelScope.launch {
-            try {
-                manager.installIfNeeded()
+            val result = runCatching { distribution.installOrUpgrade() }
+            result.onSuccess { outcome ->
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
-                    lastOperationSuccess = true,
-                    resultMessage = "Rootfs installed successfully",
+                    lastOperationSuccess = outcome.success,
+                    resultMessage = if (outcome.success) {
+                        "Runtime ${outcome.snapshot.desiredVersion ?: ""} is ready"
+                    } else {
+                        "Runtime installation stopped safely: ${outcome.snapshot.detail}"
+                    },
+                    runtimeReady = outcome.snapshot.ready,
+                    runtimeDesiredVersion = outcome.snapshot.desiredVersion,
+                    runtimeInstalledVersion = outcome.snapshot.installedVersion,
+                    runtimeStatus = outcome.snapshot.code.name,
+                    runtimeDetail = outcome.snapshot.detail,
                     installProgress = null,
                 )
                 refresh(context)
-            } catch (e: Exception) {
+            }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = false,
-                    resultMessage = "Installation failed: ${e.message}",
+                    resultMessage = "Runtime installation failed: ${error.message}",
+                    runtimeStatus = RuntimeDistributionCode.FAILED.name,
+                    runtimeDetail = error.message.orEmpty(),
                     installProgress = null,
                 )
             }
