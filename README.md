@@ -100,30 +100,9 @@ The rootfs is built by `scripts/build-ubuntu-rootfs.sh` and verified against a p
 
 ## Build from source
 
-Recommended host: Linux or WSL2.
+[BUILDING.md](BUILDING.md) is the single canonical build and release guide for this repository. It defines the supported toolchain, Android/Rust/rootfs entry points, validation commands, release-signing gate, and troubleshooting steps.
 
-```bash
-git clone https://github.com/Slacker-LLC/minis-for-android.git
-cd minis-for-android
-
-cp src/android/app/provider-customization.properties.example \
-   src/android/app/provider-customization.properties
-
-export ANDROID_HOME="$HOME/Android/Sdk"
-export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
-
-rustup target add aarch64-unknown-linux-musl
-cargo build --release --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
-
-./scripts/build-ubuntu-rootfs.sh
-
-cd src/android
-./gradlew :app:assembleDebug --no-daemon
-```
-
-See [BUILDING.md](BUILDING.md) for toolchain versions, tests, release signing, and troubleshooting.
+Do not copy build commands from archived material or upstream OpenMinis documentation into current automation without checking them against `BUILDING.md` and the repository build files.
 
 ## Repository layout
 
