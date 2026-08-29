@@ -33,12 +33,8 @@ object UbuntuRuntime {
         val version: String? = null,
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
+        val rootfs: String? = null,
         val sessionsRoot: String? = null,
-        val layoutKnown: Boolean = false,
-        val hostWorkspace: String? = null,
-        val hostMemory: String? = null,
-        val hostSkills: String? = null,
-        val hostShared: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -142,31 +138,24 @@ object UbuntuRuntime {
         }
 
         if (cur.running) {
-            // A keeper created before session isolation has its bind mounts
-            // frozen in the old namespace. Merely updating broker state would
-            // leave memory/skills/shared (and the compatibility workspace)
-            // attached to stale host directories, so recreate the keeper.
+            // A keeper from an older contract can still be alive even though
+            // the broker binary has been updated. Recreate it unless status
+            // confirms the fixed rootfs + sessions root used by #50.
             val stopped = apply(client.ubuntuStop())
             if (stopped.running) {
                 return@withLock fail(
-                    "failed to restart the privileged runtime with session workspace isolation",
+                    "failed to restart the privileged runtime with the persistent layout",
                 )
             }
         }
 
-        val raw = apply(
-            client.ubuntuStart(
-                workspace = UbuntuPaths.hostWorkspace,
-                memory = UbuntuPaths.hostMemory,
-                skills = UbuntuPaths.hostSkills,
-                shared = UbuntuPaths.hostShared,
-                sessionsRoot = UbuntuPaths.hostSessions,
-            ),
-        )
+        // Persistent bind sources are server-owned. Passing Android filesDir
+        // (or any client-selected source) would violate minisd's #50 contract.
+        val raw = apply(client.ubuntuStart())
         val started = if (raw.running) refresh() else raw
         if (!runtimeLayoutMatches(started)) {
             return@withLock fail(
-                "fresh keeper did not confirm the requested runtime bind layout",
+                "fresh keeper did not confirm the fixed persistent runtime layout",
             )
         }
         redirectPaths = started.running && runtimeLayoutMatches(started)
@@ -174,7 +163,7 @@ object UbuntuRuntime {
             Log.i(
                 TAG,
                 "ubuntu.start ok pid=${started.pid} version=${started.version} " +
-                    "uid=$expectedUid layoutKnown=${started.layoutKnown}",
+                    "uid=$expectedUid rootfs=${started.rootfs} sessions=${started.sessionsRoot}",
             )
         } else {
             Log.w(TAG, "ubuntu.start failed: ${started.lastError}")
@@ -182,12 +171,9 @@ object UbuntuRuntime {
         started
     }
 
-    private fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
-        snapshot.layoutKnown &&
-            snapshot.hostWorkspace == UbuntuPaths.hostWorkspace &&
-            snapshot.hostMemory == UbuntuPaths.hostMemory &&
-            snapshot.hostSkills == UbuntuPaths.hostSkills &&
-            snapshot.hostShared == UbuntuPaths.hostShared
+    internal fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
+        snapshot.rootfs == UbuntuPaths.HOST_ROOTFS &&
+            snapshot.sessionsRoot == UbuntuPaths.HOST_SESSIONS
 
     private suspend fun awaitBroker(expectedUid: Int): Snapshot {
         var cur = _snapshot.value
@@ -357,15 +343,12 @@ object UbuntuRuntime {
         lineCallback: ((String) -> Unit)? = null,
     ): ShellResult {
         val start = System.currentTimeMillis()
-        if (sessionId != null) {
-            val ctx = appContext
-            if (ctx == null || UbuntuPaths.ensureSessionDirs(ctx.filesDir, sessionId) == null) {
-                return ShellResult(
-                    output = "invalid or unavailable session workspace: $sessionId",
-                    exitCode = 1,
-                    durationMs = System.currentTimeMillis() - start,
-                )
-            }
+        if (sessionId != null && !UbuntuPaths.isSafeSessionId(sessionId)) {
+            return ShellResult(
+                output = "invalid session id: $sessionId",
+                exitCode = 1,
+                durationMs = System.currentTimeMillis() - start,
+            )
         }
         val scopedEnv = if (sessionId == null) {
             env
@@ -406,7 +389,12 @@ object UbuntuRuntime {
     fun paths(): JSONObject = JSONObject()
         .put("hostWorkspace", UbuntuPaths.hostWorkspace)
         .put("hostSessions", UbuntuPaths.hostSessions)
+        .put("hostMemory", UbuntuPaths.hostMemory)
+        .put("hostSkills", UbuntuPaths.hostSkills)
+        .put("hostShared", UbuntuPaths.hostShared)
+        .put("hostHome", UbuntuPaths.hostHome)
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
+        .put("guestHome", MinisdProtocol.GUEST_HOME)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
@@ -438,14 +426,12 @@ object UbuntuRuntime {
                 } else {
                     _snapshot.value.guestUid
                 },
+                rootfs = result.optString("rootfs")
+                    .ifEmpty { _snapshot.value.rootfs.orEmpty() }
+                    .takeIf { it.isNotEmpty() },
                 sessionsRoot = result.optString("sessions_root")
                     .ifEmpty { _snapshot.value.sessionsRoot.orEmpty() }
                     .takeIf { it.isNotEmpty() },
-                layoutKnown = result.optBoolean("layout_known", false),
-                hostWorkspace = result.optNullableString("workspace"),
-                hostMemory = result.optNullableString("memory"),
-                hostSkills = result.optNullableString("skills"),
-                hostShared = result.optNullableString("shared"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )
@@ -459,7 +445,4 @@ object UbuntuRuntime {
         _snapshot.value = next
         return next
     }
-
-    private fun JSONObject.optNullableString(key: String): String? =
-        if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
 }
