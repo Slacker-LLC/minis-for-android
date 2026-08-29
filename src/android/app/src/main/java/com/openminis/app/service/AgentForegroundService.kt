@@ -122,8 +122,33 @@ class AgentForegroundService : Service() {
     private var hasCompletionPending = false
     private var wasBusy = false
 
+    private fun startBootstrapForeground() {
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Minis")
+            .setContentText(getString(R.string.bg_service_channel_description))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
+        // startForegroundService() starts a system deadline immediately. A
+        // rapid navigation start/stop may otherwise destroy this service before
+        // onStartCommand() gets a chance to promote it, while Android still
+        // crashes the process when that original deadline expires.
+        startBootstrapForeground()
         // Safe-mode bail-out. Gate on the Application's authoritative
         // subsystemsReady() flag — NOT CrashFrequencyDetector.isSafeMode(),
         // which flips back to false as soon as the crash dialog is dismissed
@@ -135,10 +160,8 @@ class AgentForegroundService : Service() {
         // already uses this same predicate; keep them in sync.
         if (!((applicationContext as? com.openminis.app.MinisApp)?.subsystemsReady() == true)) {
             Log.w(TAG, "subsystems not ready — skipping overlay/wake-lock bring-up")
-            createNotificationChannel()
             return
         }
-        createNotificationChannel()
         startTimeMs = SystemClock.elapsedRealtime()
         acquireWakeLock()
         startOverlayObserver()
