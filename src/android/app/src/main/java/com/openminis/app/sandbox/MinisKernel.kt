@@ -16,8 +16,8 @@ import kotlin.math.abs
 
 /**
  * P2: PRoot removed. This object is the Minis sandbox path/mount registry:
- * guest `/workspace` ↔ App filesDir workspaces, SAF external mounts, and the
- * POSIX TZ helper. No proot process management; execution goes through
+ * guest `/workspace` ↔ minisd persistent workspaces, SAF external mounts, and
+ * the POSIX TZ helper. No proot process management; execution goes through
  * [com.openminis.app.sandbox.ubuntu.UbuntuRuntime] / minisd.
  */
 object MinisKernel {
@@ -70,20 +70,19 @@ object MinisKernel {
     /**
      * Register the global (session-independent) Minis bind mounts so direct
      * file I/O tools (file_read, file_edit) can resolve
-     * `/var/minis/{memory,skills,shared}/...`. Safe to call repeatedly.
+     * `/var/minis/{memory,skills,shared}/...`. Persistent roots are prepared
+     * by minisd; Android only records their fixed paths here.
      */
     fun registerGlobalBindMounts(context: Context) {
         val paths = com.openminis.app.sandbox.ubuntu.UbuntuPaths
-        val base = File(context.filesDir, "minis-global")
-        listOf("memory", "skills", "shared", "mcp-servers").forEach { subdir ->
-            val hostDir = when (subdir) {
-                "memory" -> File(paths.hostMemory)
-                "skills" -> File(paths.hostSkills)
-                "shared" -> File(paths.hostShared)
-                else -> File(base, subdir)
-            }.also { it.mkdirs() }
-            bindMounts["/var/minis/$subdir"] = hostDir.absolutePath
-        }
+        bindMounts["/var/minis/memory"] = paths.hostMemory
+        bindMounts["/var/minis/skills"] = paths.hostSkills
+        bindMounts["/var/minis/shared"] = paths.hostShared
+
+        // mcp-servers is App-private state and is not part of #50's persistent
+        // Agent-data contract, so it remains under filesDir.
+        val mcpServers = File(context.filesDir, "minis-global/mcp-servers").also { it.mkdirs() }
+        bindMounts["/var/minis/mcp-servers"] = mcpServers.absolutePath
     }
 
     // ── User-mounted external folders (T219) ──────────────────────────────
