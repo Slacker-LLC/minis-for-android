@@ -2,7 +2,7 @@ package com.openminis.app.mcp.server
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

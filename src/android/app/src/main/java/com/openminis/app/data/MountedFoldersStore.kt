@@ -77,7 +77,7 @@ class MountedFoldersStore(private val context: Context) {
 
     /**
      * T219-5: fired after every CRUD operation that mutates the persisted
-     * list. MinisApp wires this to `MinisKernel.applyMountedFoldersSnapshot`
+     * list. MinisApp wires this to `RuntimePathRegistry.applyMountedFoldersSnapshot`
      * so future shells pick up the new bind specs without a process restart.
      * Note that already-running proot processes are unaffected — proot is
      * one-shot and the next `shell_execute` is what carries the new mounts.
@@ -158,7 +158,7 @@ class MountedFoldersStore(private val context: Context) {
                 android.content.pm.PackageManager.PERMISSION_GRANTED
             // Issue #118: Environment.isExternalStorageLegacy() is API 29, but this
             // branch covers everything below R (30) — i.e. our whole 26..28 floor.
-            // Same defect as MinisKernel.storageAccessDiag; both are reachable from
+            // Same defect as RuntimePathRegistry.storageAccessDiag; both are reachable from
             // the boot path, so an unguarded call is a NoSuchMethodError that kills
             // the process in Application.onCreate. Below 29 scoped storage doesn't
             // exist, so the legacy view is unconditionally in effect.
