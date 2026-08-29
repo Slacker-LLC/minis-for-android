@@ -159,7 +159,7 @@ class LinuxShellHandler : ToolHandler {
             return ToolExecutionResult("Error: 'command' is required", false)
         }
         val timeoutSec = args.optInt("timeout", 900).coerceIn(1, 900)
-        val result = com.openminis.app.sandbox.ExecutionCoordinator.execute(
+        val result = com.openminis.app.runtime.ExecutionCoordinator.execute(
             sessionId = sessionId,
             command = command,
             timeout = timeoutSec * 1000L,
@@ -204,7 +204,7 @@ class LinuxPythonRunHandler : ToolHandler {
             sessionId, context,
         )
         if (!write.success) return write
-        val result = com.openminis.app.sandbox.ExecutionCoordinator.execute(
+        val result = com.openminis.app.runtime.ExecutionCoordinator.execute(
             sessionId = sessionId,
             command = "python3 /workspace/$scriptPath",
             timeout = timeoutSec * 1000L,

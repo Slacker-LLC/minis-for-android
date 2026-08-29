@@ -52,7 +52,7 @@ import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
-import com.openminis.app.sandbox.ExecutionCoordinator
+import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.ContextPressure
@@ -1173,13 +1173,13 @@ class ChatViewModel(
     val fileMentionIndex: FileMentionIndex by lazy {
         // T219: provide the SAF-mounted external folders so `@<mountName>`
         // resolves to /var/minis/mounts/<name>/... in the chat composer.
-        // MinisKernel holds the MountedFoldersStore reference (set at app
+        // RuntimePathRegistry holds the MountedFoldersStore reference (set at app
         // launch by MinisApp); reading via a closure means the index sees
         // an up-to-date snapshot on every rescan without a manual refresh.
         FileMentionIndex(
             filesDir = context.applicationContext.filesDir,
             mountsProvider = {
-                com.openminis.app.sandbox.MinisKernel
+                com.openminis.app.runtime.RuntimePathRegistry
                     .mountEntriesForIndex(context.applicationContext)
             },
         )
