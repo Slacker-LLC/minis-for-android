@@ -28,6 +28,7 @@ class MinisdClient(
     private val nextId = AtomicLong(1)
     private val activeSockets = ConcurrentHashMap<String, LocalSocket>()
     private val activeHelpers = ConcurrentHashMap<String, Process>()
+    private val activeSessionExecutions = ConcurrentHashMap<String, String>()
 
     suspend fun ping(): MinisdResponse = call(MinisdProtocol.ping(nextId()))
     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
@@ -53,11 +54,18 @@ class MinisdClient(
         env: Map<String, String> = emptyMap(),
         sessionId: String? = null,
         executionId: String = newExecutionId("ubuntu"),
-    ): MinisdResponse = call(
-        MinisdProtocol.ubuntuExec(argv, timeoutMs, cwd, env, nextId(), sessionId, executionId),
-        timeoutMs + 5_000,
-        cancellationKey = executionId,
-    )
+    ): MinisdResponse {
+        if (sessionId != null) activeSessionExecutions[sessionId] = executionId
+        return try {
+            call(
+                MinisdProtocol.ubuntuExec(argv, timeoutMs, cwd, env, nextId(), sessionId, executionId),
+                timeoutMs + 5_000,
+                cancellationKey = executionId,
+            )
+        } finally {
+            if (sessionId != null) activeSessionExecutions.remove(sessionId, executionId)
+        }
+    }
 
     suspend fun ubuntuProvision(timeoutMs: Long = 600_000): MinisdResponse =
         call(MinisdProtocol.ubuntuProvision(nextId()), timeoutMs + 5_000)
@@ -82,18 +90,24 @@ class MinisdClient(
         cancellationKey = executionId,
     )
 
-    /** Close the caller-side transport immediately; process cancellation is a
-     * separate RPC so a wedged response socket cannot prevent the kill. */
     fun cancelTransport(executionId: String) {
         activeSockets.remove(executionId)?.runCatching { close() }
         activeHelpers.remove(executionId)?.runCatching { destroyForcibly() }
     }
 
+    /** Synchronous half of user Stop: close any blocked client transport now. */
+    fun cancelSessionTransport(sessionId: String): String? =
+        activeSessionExecutions[sessionId]?.also(::cancelTransport)
+
+    /** Process half of user Stop, issued on a fresh broker connection. */
+    suspend fun cancelSessionExecution(sessionId: String): MinisdResponse? {
+        val executionId = activeSessionExecutions[sessionId] ?: return null
+        return cancelExecution(executionId)
+    }
+
     suspend fun cancelExecution(executionId: String): MinisdResponse {
         cancelTransport(executionId)
         var last: MinisdResponse? = null
-        // The cancel can race the broker between request acceptance and spawn.
-        // Retry only the idempotent cancel RPC; never replay the exec itself.
         repeat(8) {
             currentCoroutineContext().ensureActive()
             val response = call(MinisdProtocol.execCancel(executionId, nextId()), timeoutMs = 5_000)
@@ -117,13 +131,10 @@ class MinisdClient(
                     if (local.code != "NOT_AUTHORIZED") return@withContext local
                     Log.w(TAG, "local minisd rejected app identity; retrying through su")
                 }
-                // If callLocal was interrupted by user Stop, never fall through
-                // and replay the same request through su.
                 currentCoroutineContext().ensureActive()
             }
         }
-        val su = resolveSu()
-            ?: return@withContext unavailable("no executable su; minisd --call needs root")
+        val su = resolveSu() ?: return@withContext unavailable("no executable su; minisd --call needs root")
         val cmd = "$minisdPath --call --socket $socketPath"
         val proc = try {
             ProcessBuilder(su, "-c", cmd).redirectErrorStream(false).start()
@@ -208,7 +219,7 @@ class MinisdClient(
             val response = ByteArray(responseSize)
             input.readFully(response)
             MinisdProtocol.decodeResponse(response.toString(Charsets.UTF_8))
-        } catch (timeout: SocketTimeoutException) {
+        } catch (_: SocketTimeoutException) {
             transportTimeout("local minisd transport timed out after ${timeoutMs}ms")
         } catch (t: Throwable) {
             Log.d(TAG, "local $path: ${t.message}")
