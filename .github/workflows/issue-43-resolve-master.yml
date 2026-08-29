@@ -1,0 +1,88 @@
+name: Issue 43 resolve master merge
+
+on:
+  push:
+    branches: [fix/issue-43-runtime-recovery]
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Merge master and resolve expected Issue 43 conflicts
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git merge-base --is-ancestor origin/master HEAD; then
+            echo 'latest master already present'
+            exit 0
+          fi
+          git merge --no-ff --no-edit origin/master || true
+          mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+          printf 'conflict=%s\n' "${conflicts[@]}"
+          if [ "${#conflicts[@]}" -ne 2 ]; then
+            echo "unexpected conflict count: ${#conflicts[@]}" >&2
+            exit 43
+          fi
+          expected_runtime='src/android/app/src/main/java/com/openminis/app/runtime/ubuntu/UbuntuRuntime.kt'
+          expected_test='src/android/app/src/test/java/com/openminis/app/runtime/ubuntu/UbuntuRuntimeRecoveryTest.kt'
+          printf '%s\n' "${conflicts[@]}" | grep -Fx "$expected_runtime" >/dev/null
+          printf '%s\n' "${conflicts[@]}" | grep -Fx "$expected_test" >/dev/null
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/android/app/src/main/java/com/openminis/app/runtime/ubuntu/UbuntuRuntime.kt')
+          lines = path.read_text().splitlines(keepends=True)
+          out = []
+          i = 0
+          blocks = 0
+          while i < len(lines):
+              if lines[i].startswith('<<<<<<< '):
+                  blocks += 1
+                  i += 1
+                  ours = []
+                  while i < len(lines) and not lines[i].startswith('======='):
+                      ours.append(lines[i]); i += 1
+                  if i >= len(lines): raise SystemExit('unterminated conflict before =======')
+                  i += 1
+                  while i < len(lines) and not lines[i].startswith('>>>>>>> '):
+                      i += 1
+                  if i >= len(lines): raise SystemExit('unterminated conflict before >>>>>>>')
+                  i += 1
+                  out.extend(ours)
+              else:
+                  out.append(lines[i]); i += 1
+          if blocks != 2:
+              raise SystemExit(f'expected exactly 2 UbuntuRuntime conflict blocks, got {blocks}')
+          text = ''.join(out)
+          text = text.replace('com.openminis.app.sandbox.minisd.', 'com.openminis.app.runtime.minisd.')
+          if '<<<<<<<' in text or '=======' in text or '>>>>>>>' in text:
+              raise SystemExit('conflict marker remains in UbuntuRuntime')
+          path.write_text(text)
+          PY
+          git add "$expected_runtime"
+
+          test -f "$expected_test"
+          sed -i 's/^package com\.openminis\.app\.sandbox\.ubuntu$/package com.openminis.app.runtime.ubuntu/' "$expected_test"
+          sed -i 's/com\.openminis\.app\.sandbox\.minisd\./com.openminis.app.runtime.minisd./g' "$expected_test"
+          git add "$expected_test"
+          git rm -f --ignore-unmatch src/android/app/src/test/java/com/openminis/app/sandbox/ubuntu/UbuntuRuntimeRecoveryTest.kt
+
+          remaining="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$remaining" ]; then
+            echo "unresolved conflicts remain:" >&2
+            echo "$remaining" >&2
+            exit 44
+          fi
+
+          git rm -f .github/workflows/issue-43-update-master.yml .github/workflows/issue-43-diagnose-merge.yml .github/workflows/issue-43-resolve-master.yml
+          git commit --no-edit
+          git push origin HEAD:fix/issue-43-runtime-recovery
