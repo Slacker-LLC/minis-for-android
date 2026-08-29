@@ -13,6 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs-provenance:
+    name: Documentation provenance guard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guard unit tests
+        run: python3 scripts/test_docs_provenance.py
+      - name: Check current docs and provenance allowlist
+        run: python3 scripts/check_docs_provenance.py
+
   minisd:
     name: minisd quality
     runs-on: ubuntu-24.04
@@ -60,41 +70,23 @@ jobs:
           chmod +x gradlew
           for attempt in 1 2 3; do
             echo "Gradle dependency-resolution attempt $attempt/3"
-            if ./gradlew help --refresh-dependencies --no-parallel --max-workers=2 --stacktrace; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "Gradle plugin/dependency resolution failed after 3 attempts" >&2
-              exit 1
-            fi
+            if ./gradlew help --refresh-dependencies --no-parallel --max-workers=2 --stacktrace; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then echo "Gradle plugin/dependency resolution failed after 3 attempts" >&2; exit 1; fi
             sleep $((attempt * 10))
           done
       - name: Verify missing release credentials fail closed
         working-directory: src/android
         run: |
           set +e
-          output="$(env -u RELEASE_KEYSTORE -u RELEASE_STORE_PASSWORD -u RELEASE_KEY_ALIAS -u RELEASE_KEY_PASSWORD \
-            ./gradlew :app:requireReleaseSigning --no-parallel --max-workers=2 --stacktrace 2>&1)"
+          output="$(env -u RELEASE_KEYSTORE -u RELEASE_STORE_PASSWORD -u RELEASE_KEY_ALIAS -u RELEASE_KEY_PASSWORD ./gradlew :app:requireReleaseSigning --no-parallel --max-workers=2 --stacktrace 2>&1)"
           status=$?
           set -e
           printf '%s\n' "$output"
-          if [ "$status" -eq 0 ]; then
-            echo "release signing gate unexpectedly succeeded without credentials" >&2
-            exit 1
-          fi
-          if ! grep -Fq "Production release signing is not configured." <<<"$output"; then
-            echo "release signing check failed for an unexpected reason" >&2
-            exit 1
-          fi
+          if [ "$status" -eq 0 ]; then echo "release signing gate unexpectedly succeeded without credentials" >&2; exit 1; fi
+          if ! grep -Fq "Production release signing is not configured." <<<"$output"; then echo "release signing check failed for an unexpected reason" >&2; exit 1; fi
       - name: Generate ephemeral CI release key
         run: |
-          keytool -genkeypair -noprompt \
-            -keystore "$RELEASE_KEYSTORE" \
-            -storepass "$RELEASE_STORE_PASSWORD" \
-            -keypass "$RELEASE_KEY_PASSWORD" \
-            -alias "$RELEASE_KEY_ALIAS" \
-            -keyalg RSA -keysize 2048 -validity 2 \
-            -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
+          keytool -genkeypair -noprompt -keystore "$RELEASE_KEYSTORE" -storepass "$RELEASE_STORE_PASSWORD" -keypass "$RELEASE_KEY_PASSWORD" -alias "$RELEASE_KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 2 -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
       - name: Android unit tests
         working-directory: src/android
         run: ./gradlew :app:testDebugUnitTest --no-parallel --max-workers=2 --stacktrace
