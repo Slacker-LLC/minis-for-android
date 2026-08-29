@@ -24,17 +24,17 @@ pub use state::AppState;
 /// Public request entry. `exec.cancel` is deliberately handled outside the
 /// normal stateful dispatcher: the execution registry is process-global and
 /// cancellation must not wait behind a long AppState operation.
-pub fn handle(
-    state: &mut AppState,
-    req: Request,
-    peer: Option<auth::PeerCred>,
-) -> Response {
+pub fn handle(state: &mut AppState, req: Request, peer: Option<auth::PeerCred>) -> Response {
     if req.method == "exec.cancel" {
         if let Err(resp) = dispatch::authorize_request(state, &req, peer) {
             return resp;
         }
         let Some(execution_id) = req.params.get("execution_id").and_then(|v| v.as_str()) else {
-            return Response::err(req.id, protocol::ErrorCode::BadParams, "execution_id required");
+            return Response::err(
+                req.id,
+                protocol::ErrorCode::BadParams,
+                "execution_id required",
+            );
         };
         return match exec_registry::cancel(execution_id) {
             Ok(outcome) => Response::ok(
