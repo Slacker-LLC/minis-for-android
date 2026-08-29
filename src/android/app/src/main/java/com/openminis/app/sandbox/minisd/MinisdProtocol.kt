@@ -39,7 +39,13 @@ object MinisdProtocol {
     const val DEFAULT_BIN = "/data/adb/minis/bin/minisd"
     const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"
     const val HOST_WORKSPACE = "/data/adb/minis/workspace"
+    const val HOST_SESSIONS = "/data/adb/minis/sessions"
+    const val HOST_MEMORY = "/data/adb/minis/memory"
+    const val HOST_SKILLS = "/data/adb/minis/skills"
+    const val HOST_SHARED = "/data/adb/minis/shared"
+    const val HOST_HOME = "/data/adb/minis/home"
     const val GUEST_WORKSPACE = "/workspace"
+    const val GUEST_HOME = "/home/minis"
     const val GUEST_UID = 10000
 
     fun encodeRequest(req: MinisdRequest): String {
@@ -86,23 +92,12 @@ object MinisdProtocol {
     fun ubuntuStatus(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.status")
 
-    fun ubuntuStart(
-        id: Long = 1,
-        rootfs: String = DEFAULT_ROOTFS,
-        workspace: String = "",
-        memory: String = "",
-        skills: String = "",
-        shared: String = "",
-        sessionsRoot: String = "",
-    ): MinisdRequest {
-        val params = JSONObject().put("rootfs", rootfs)
-        if (workspace.isNotEmpty()) params.put("workspace", workspace)
-        if (memory.isNotEmpty()) params.put("memory", memory)
-        if (skills.isNotEmpty()) params.put("skills", skills)
-        if (shared.isNotEmpty()) params.put("shared", shared)
-        if (sessionsRoot.isNotEmpty()) params.put("sessions_root", sessionsRoot)
-        return MinisdRequest(id = id, method = "ubuntu.start", params = params)
-    }
+    /**
+     * Persistent bind sources are minisd-owned constants. Android deliberately
+     * sends no workspace/session/memory/skills/shared/home override parameters.
+     */
+    fun ubuntuStart(id: Long = 1): MinisdRequest =
+        MinisdRequest(id = id, method = "ubuntu.start")
 
     fun ubuntuStop(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.stop")
