@@ -3,6 +3,7 @@ pub mod config_proxy;
 pub mod dispatch;
 pub mod env;
 pub mod exec;
+pub mod exec_registry;
 pub mod ipc_exec;
 pub mod layout;
 pub mod ns;
