@@ -162,6 +162,13 @@ object UbuntuPaths {
             resolveHostPath(linuxPath)
         }
 
+    /** Existing linux.file.* call sites keep Context for permission checks; path resolution does not use it. */
+    fun resolveSessionHostPath(
+        sessionId: String,
+        linuxPath: String,
+        @Suppress("UNUSED_PARAMETER") context: Context,
+    ): File? = resolveSessionHostPath(sessionId, linuxPath)
+
     private fun isSessionScopedPath(linuxPath: String): Boolean {
         if (!linuxPath.startsWith('/')) return true
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
