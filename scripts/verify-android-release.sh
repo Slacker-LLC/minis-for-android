@@ -35,7 +35,7 @@ fi
 # guarded by BuildConfig.DEBUG=false in release. Scan every DEX for the source
 # descriptor/string as a regression backstop.
 while IFS= read -r dex; do
-  if unzip -p "$APK" "$dex" | strings | grep -Fq 'com/openminis/app/debug/DebugServer'; then
+  if unzip -p "$APK" "$dex" | strings | grep -Fq 'io/github/slackerllc/minis/debug/DebugServer'; then
     echo "release APK still contains DebugServer in $dex" >&2
     exit 1
   fi

@@ -21,13 +21,14 @@ fun customizationValue(key: String): String =
     (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
 
 android {
-    namespace = "com.openminis.app"
+    namespace = "io.github.slackerllc.minis"
+    testNamespace = "io.github.slackerllc.minis.test"
     // Compile against Android 16 APIs used by the Live Updates path. targetSdk
     // remains 35; Android 16-only behavior is runtime-gated by SDK level.
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.openminispet.android"
+        applicationId = "io.github.slackerllc.minis"
         minSdk = 26
         targetSdk = 35
         versionCode = 39
