@@ -40,7 +40,6 @@ object MinisdProtocol {
     const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"
     const val HOST_WORKSPACE = "/data/adb/minis/workspace"
     const val GUEST_WORKSPACE = "/workspace"
-    const val GUEST_HOME = "/home/minis"
     const val GUEST_UID = 10000
 
     fun encodeRequest(req: MinisdRequest): String {
@@ -94,7 +93,6 @@ object MinisdProtocol {
         memory: String = "",
         skills: String = "",
         shared: String = "",
-        home: String = "",
         sessionsRoot: String = "",
     ): MinisdRequest {
         val params = JSONObject().put("rootfs", rootfs)
@@ -102,7 +100,6 @@ object MinisdProtocol {
         if (memory.isNotEmpty()) params.put("memory", memory)
         if (skills.isNotEmpty()) params.put("skills", skills)
         if (shared.isNotEmpty()) params.put("shared", shared)
-        if (home.isNotEmpty()) params.put("home", home)
         if (sessionsRoot.isNotEmpty()) params.put("sessions_root", sessionsRoot)
         return MinisdRequest(id = id, method = "ubuntu.start", params = params)
     }

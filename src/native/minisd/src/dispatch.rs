@@ -77,7 +77,7 @@ pub fn handle(state: &mut AppState, req: Request, peer: Option<PeerCred>) -> Res
     dispatch_authorized(state, &req)
 }
 
-fn requested_runtime_layout(params: &Value) -> (String, String, String, String, String) {
+fn requested_runtime_layout(params: &Value) -> (String, String, String, String) {
     fn path_or(params: &Value, key: &str, fallback: &str) -> String {
         params
             .get(key)
@@ -91,7 +91,6 @@ fn requested_runtime_layout(params: &Value) -> (String, String, String, String, 
         path_or(params, "memory", crate::layout::HOST_MEMORY),
         path_or(params, "skills", crate::layout::HOST_SKILLS),
         path_or(params, "shared", crate::layout::HOST_SHARED),
-        path_or(params, "home", crate::layout::HOST_HOME),
     )
 }
 
@@ -100,7 +99,6 @@ fn runtime_layout_known(state: &AppState) -> bool {
         && !state.ubuntu.memory.is_empty()
         && !state.ubuntu.skills.is_empty()
         && !state.ubuntu.shared.is_empty()
-        && !state.ubuntu.home.is_empty()
 }
 
 /// `ubuntu.start` is also the single source of truth for host bind paths. A
@@ -108,7 +106,7 @@ fn runtime_layout_known(state: &AppState) -> bool {
 /// silently accepting new paths while reusing the old keeper would recreate the
 /// split-brain workspace bug.
 fn start_ubuntu_with_layout(state: &mut AppState, req: &Request) -> Response {
-    let (workspace, memory, skills, shared, home) = requested_runtime_layout(&req.params);
+    let (workspace, memory, skills, shared) = requested_runtime_layout(&req.params);
 
     if state.ubuntu.running {
         if !runtime_layout_known(state) {
@@ -122,7 +120,6 @@ fn start_ubuntu_with_layout(state: &mut AppState, req: &Request) -> Response {
             || state.ubuntu.memory != memory
             || state.ubuntu.skills != skills
             || state.ubuntu.shared != shared
-            || state.ubuntu.home != home
         {
             return Response::err(
                 req.id,
@@ -139,7 +136,6 @@ fn start_ubuntu_with_layout(state: &mut AppState, req: &Request) -> Response {
                 state.ubuntu.memory = memory;
                 state.ubuntu.skills = skills;
                 state.ubuntu.shared = shared;
-                state.ubuntu.home = home;
             }
             Response::ok(req.id, v)
         }
@@ -184,14 +180,6 @@ fn ubuntu_status_with_layout(state: &mut AppState) -> Value {
                 Value::Null
             },
         );
-        obj.insert(
-            "home".into(),
-            if known {
-                Value::String(state.ubuntu.home.clone())
-            } else {
-                Value::Null
-            },
-        );
     }
     value
 }
@@ -223,7 +211,6 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
                 state.ubuntu.memory.clear();
                 state.ubuntu.skills.clear();
                 state.ubuntu.shared.clear();
-                state.ubuntu.home.clear();
                 Response::ok(req.id, v)
             }
             Err((code, detail)) => Response::err(req.id, code, detail),
@@ -524,30 +511,5 @@ mod tests {
         let parsed = parse_request(raw).unwrap();
         let resp = handle(&mut state, parsed, None);
         assert!(resp.ok);
-    }
-
-    #[test]
-    fn mock_status_reports_persistent_home_layout() {
-        let mut state = AppState::new(true, PolicyFile::default_policy());
-        let started = handle(
-            &mut state,
-            req(
-                "ubuntu.start",
-                json!({
-                    "workspace": "/persistent/workspace",
-                    "memory": "/persistent/memory",
-                    "skills": "/persistent/skills",
-                    "shared": "/persistent/shared",
-                    "home": "/persistent/home"
-                }),
-            ),
-            None,
-        );
-        assert!(started.ok);
-
-        let status = handle(&mut state, req("ubuntu.status", json!({})), None);
-        let result = status.result.unwrap();
-        assert_eq!(result["layout_known"], true);
-        assert_eq!(result["home"], "/persistent/home");
     }
 }

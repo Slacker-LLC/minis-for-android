@@ -306,11 +306,8 @@ pub fn setup_rootfs_mounts(
     memory: &str,
     skills: &str,
     shared: &str,
-    home: &str,
 ) -> Result<(), String> {
-    use crate::layout::{
-        GUEST_HOME, HOST_HOME, HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
-    };
+    use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
     let workspace = if workspace.is_empty() {
         HOST_WORKSPACE
     } else {
@@ -331,7 +328,6 @@ pub fn setup_rootfs_mounts(
     } else {
         shared
     };
-    let home = if home.is_empty() { HOST_HOME } else { home };
 
     let root = Path::new(rootfs);
     for rel in [
@@ -346,7 +342,6 @@ pub fn setup_rootfs_mounts(
         "memory",
         "skills",
         "shared",
-        "home/minis",
     ] {
         std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
     }
@@ -446,13 +441,6 @@ pub fn setup_rootfs_mounts(
     let _ = bind_mount(memory, &root.join("memory").to_string_lossy(), false);
     let _ = bind_mount(skills, &root.join("skills").to_string_lossy(), false);
     let _ = bind_mount(shared, &root.join("shared").to_string_lossy(), false);
-    bind_mount(
-        home,
-        &root
-            .join(GUEST_HOME.trim_start_matches('/'))
-            .to_string_lossy(),
-        false,
-    )?;
     Ok(())
 }
 

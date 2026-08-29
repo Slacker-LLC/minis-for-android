@@ -20,7 +20,6 @@ pub struct UbuntuState {
     pub memory: String,
     pub skills: String,
     pub shared: String,
-    pub home: String,
     pub version: Option<String>,
     pub provisioned: bool,
     pub last_error: Option<String>,
@@ -64,14 +63,6 @@ impl UbuntuState {
             crate::layout::HOST_SHARED.to_string()
         } else {
             self.shared.clone()
-        }
-    }
-
-    pub fn home_or_default(&self) -> String {
-        if self.home.is_empty() {
-            crate::layout::HOST_HOME.to_string()
-        } else {
-            self.home.clone()
         }
     }
 }
