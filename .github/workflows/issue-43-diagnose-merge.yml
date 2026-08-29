@@ -1,0 +1,29 @@
+name: Issue 43 diagnose master merge
+
+on:
+  push:
+    branches: [fix/issue-43-runtime-recovery]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Print merge conflicts
+        run: |
+          set -uo pipefail
+          git fetch origin master
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-ff --no-edit origin/master || true
+          echo '--- merge status ---'
+          git status --short
+          echo '--- UbuntuRuntime conflict ---'
+          git diff --cc -- src/android/app/src/main/java/com/openminis/app/runtime/ubuntu/UbuntuRuntime.kt || true
+          test -n "$(git diff --name-only --diff-filter=U)"
