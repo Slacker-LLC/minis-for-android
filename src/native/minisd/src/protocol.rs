@@ -133,7 +133,13 @@ pub struct Response {
 
 impl Response {
     pub fn ok(id: u64, result: serde_json::Value) -> Self {
-        Self { v: PROTOCOL_V, id, ok: true, result: Some(result), error: None }
+        Self {
+            v: PROTOCOL_V,
+            id,
+            ok: true,
+            result: Some(result),
+            error: None,
+        }
     }
 
     pub fn err(id: u64, code: ErrorCode, detail: impl Into<String>) -> Self {
@@ -152,26 +158,45 @@ impl Response {
     }
 
     pub fn unsupported(id: u64) -> Self {
-        let mut r = Self::err(id, ErrorCode::UnsupportedVersion, "unsupported protocol version");
-        if let Some(e) = r.error.as_mut() { e.supported = Some(SUPPORTED_VERSIONS.to_vec()); }
+        let mut r = Self::err(
+            id,
+            ErrorCode::UnsupportedVersion,
+            "unsupported protocol version",
+        );
+        if let Some(e) = r.error.as_mut() {
+            e.supported = Some(SUPPORTED_VERSIONS.to_vec());
+        }
         r
     }
 
     pub fn confirm(id: u64, confirm_id: String) -> Self {
-        let mut r = Self::err(id, ErrorCode::ConfirmRequired, "human confirmation required");
-        if let Some(e) = r.error.as_mut() { e.confirm_id = Some(confirm_id); }
+        let mut r = Self::err(
+            id,
+            ErrorCode::ConfirmRequired,
+            "human confirmation required",
+        );
+        if let Some(e) = r.error.as_mut() {
+            e.confirm_id = Some(confirm_id);
+        }
         r
     }
 }
 
 pub fn frame_header(len: usize, max: usize) -> Result<[u8; FRAME_HEADER_BYTES], ErrorCode> {
-    if len == 0 || len > max || len > u32::MAX as usize { return Err(ErrorCode::BadParams); }
+    if len == 0 || len > max || len > u32::MAX as usize {
+        return Err(ErrorCode::BadParams);
+    }
     Ok((len as u32).to_be_bytes())
 }
 
-pub fn decode_frame_len(header: [u8; FRAME_HEADER_BYTES], max: usize) -> Result<usize, ErrorCode> {
+pub fn decode_frame_len(
+    header: [u8; FRAME_HEADER_BYTES],
+    max: usize,
+) -> Result<usize, ErrorCode> {
     let len = u32::from_be_bytes(header) as usize;
-    if len == 0 || len > max { return Err(ErrorCode::BadParams); }
+    if len == 0 || len > max {
+        return Err(ErrorCode::BadParams);
+    }
     Ok(len)
 }
 
@@ -185,13 +210,27 @@ pub fn encode_frame(payload: &[u8], max: usize) -> Result<Vec<u8>, ErrorCode> {
 
 #[allow(clippy::result_large_err)]
 pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
-    if bytes.len() > MAX_REQUEST_BYTES { return Err(Response::err(0, ErrorCode::BadParams, "request too large")); }
+    if bytes.len() > MAX_REQUEST_BYTES {
+        return Err(Response::err(
+            0,
+            ErrorCode::BadParams,
+            "request too large",
+        ));
+    }
     let raw = std::str::from_utf8(bytes)
         .map_err(|_| Response::err(0, ErrorCode::BadParams, "request is not utf-8"))?;
     let req: Request = serde_json::from_str(raw)
         .map_err(|e| Response::err(0, ErrorCode::BadParams, format!("invalid json: {e}")))?;
-    if req.v != PROTOCOL_V { return Err(Response::unsupported(req.id)); }
-    if req.method.is_empty() { return Err(Response::err(req.id, ErrorCode::BadParams, "missing method")); }
+    if req.v != PROTOCOL_V {
+        return Err(Response::unsupported(req.id));
+    }
+    if req.method.is_empty() {
+        return Err(Response::err(
+            req.id,
+            ErrorCode::BadParams,
+            "missing method",
+        ));
+    }
     Ok(req)
 }
 
@@ -200,16 +239,36 @@ pub fn encode_response(resp: &Response) -> Result<String, String> {
 }
 
 pub const KNOWN_METHODS: &[&str] = &[
-    "system.hello", "system.ping", "root.probe", "root.exec", "root.shellRaw",
-    "ubuntu.start", "ubuntu.stop", "ubuntu.status", "ubuntu.exec", "ubuntu.adminExec",
-    "ubuntu.provision", "exec.cancel", "proc.killTree", "mount.list", "mount.prepare",
-    "workspace.info", "workspace.setQuota", "policy.get", "health.get",
+    "system.hello",
+    "system.ping",
+    "root.probe",
+    "root.exec",
+    "root.shellRaw",
+    "ubuntu.start",
+    "ubuntu.stop",
+    "ubuntu.status",
+    "ubuntu.exec",
+    "ubuntu.adminExec",
+    "ubuntu.provision",
+    "exec.cancel",
+    "proc.killTree",
+    "mount.list",
+    "mount.prepare",
+    "workspace.info",
+    "workspace.setQuota",
+    "policy.get",
+    "health.get",
 ];
 
-pub fn is_known_method(method: &str) -> bool { KNOWN_METHODS.contains(&method) }
+pub fn is_known_method(method: &str) -> bool {
+    KNOWN_METHODS.contains(&method)
+}
 
 pub const LEGACY_REMOVED_METHODS: &[&str] = &[
-    "policy.reload", "supervisor.status", "supervisor.restartCloudflared", "supervisor.stopCloudflared",
+    "policy.reload",
+    "supervisor.status",
+    "supervisor.restartCloudflared",
+    "supervisor.stopCloudflared",
 ];
 
 #[cfg(test)]
@@ -222,7 +281,10 @@ mod tests {
         let req = parse_request(raw.as_bytes()).unwrap();
         assert_eq!(req.method, "root.exec");
         assert_eq!(req.params["tool"], "pm");
-        let resp = Response::ok(1, serde_json::json!({"exit_code":0,"stdout":"ok","stderr":""}));
+        let resp = Response::ok(
+            1,
+            serde_json::json!({"exit_code":0,"stdout":"ok","stderr":""}),
+        );
         let encoded = encode_response(&resp).unwrap();
         let back: Response = serde_json::from_str(&encoded).unwrap();
         assert!(back.ok);
@@ -237,9 +299,21 @@ mod tests {
         let len = decode_frame_len(header, MAX_REQUEST_BYTES).unwrap();
         assert_eq!(len, payload.len());
         assert_eq!(&frame[FRAME_HEADER_BYTES..], payload);
-        assert_eq!(frame_header(0, MAX_REQUEST_BYTES), Err(ErrorCode::BadParams));
-        assert_eq!(frame_header(MAX_REQUEST_BYTES + 1, MAX_REQUEST_BYTES), Err(ErrorCode::BadParams));
-        assert_eq!(decode_frame_len(((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes(), MAX_REQUEST_BYTES), Err(ErrorCode::BadParams));
+        assert_eq!(
+            frame_header(0, MAX_REQUEST_BYTES),
+            Err(ErrorCode::BadParams)
+        );
+        assert_eq!(
+            frame_header(MAX_REQUEST_BYTES + 1, MAX_REQUEST_BYTES),
+            Err(ErrorCode::BadParams)
+        );
+        assert_eq!(
+            decode_frame_len(
+                ((MAX_REQUEST_BYTES + 1) as u32).to_be_bytes(),
+                MAX_REQUEST_BYTES
+            ),
+            Err(ErrorCode::BadParams)
+        );
     }
 
     #[test]
