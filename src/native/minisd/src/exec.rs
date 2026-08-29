@@ -17,57 +17,97 @@ pub struct ExecRequest {
 }
 
 pub fn parse_exec(params: &serde_json::Value) -> Result<ExecRequest, ErrorCode> {
-    let tool = params.get("tool").and_then(|v| v.as_str()).ok_or(ErrorCode::BadParams)?.to_string();
-    if tool.is_empty() || tool.contains('/') || tool.contains('\0') { return Err(ErrorCode::BadParams); }
+    let tool = params
+        .get("tool")
+        .and_then(|v| v.as_str())
+        .ok_or(ErrorCode::BadParams)?
+        .to_string();
+    if tool.is_empty() || tool.contains('/') || tool.contains('\0') {
+        return Err(ErrorCode::BadParams);
+    }
     let args = match params.get("args") {
         None => Vec::new(),
         Some(serde_json::Value::Array(items)) => {
-            if items.len() > MAX_ARGS { return Err(ErrorCode::BadParams); }
+            if items.len() > MAX_ARGS {
+                return Err(ErrorCode::BadParams);
+            }
             let mut out = Vec::with_capacity(items.len());
             for item in items {
                 let s = item.as_str().ok_or(ErrorCode::BadParams)?;
-                if s.len() > MAX_ARG_BYTES || s.contains('\0') { return Err(ErrorCode::BadParams); }
+                if s.len() > MAX_ARG_BYTES || s.contains('\0') {
+                    return Err(ErrorCode::BadParams);
+                }
                 out.push(s.to_string());
             }
             out
         }
         Some(_) => return Err(ErrorCode::BadParams),
     };
-    if params.get("command").is_some() { return Err(ErrorCode::BadParams); }
-    let timeout_ms = params.get("timeout_ms").and_then(|v| v.as_u64()).unwrap_or(30_000).clamp(1_000, 600_000);
-    let execution_id = params.get("execution_id").and_then(|v| v.as_str()).map(str::to_string);
-    Ok(ExecRequest { tool, args, timeout_ms, execution_id })
+    if params.get("command").is_some() {
+        return Err(ErrorCode::BadParams);
+    }
+    let timeout_ms = params
+        .get("timeout_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(30_000)
+        .clamp(1_000, 600_000);
+    let execution_id = params
+        .get("execution_id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    Ok(ExecRequest {
+        tool,
+        args,
+        timeout_ms,
+        execution_id,
+    })
 }
 
 pub fn effective_allowlist(spec: Option<&MethodPolicy>) -> Vec<&str> {
     match spec.and_then(|s| s.tool_allowlist.as_ref()) {
-        Some(policy_tools) => policy_tools.iter().map(String::as_str).filter(|tool| DEFAULT_TOOLS.contains(tool)).collect(),
+        Some(policy_tools) => policy_tools
+            .iter()
+            .map(String::as_str)
+            .filter(|tool| DEFAULT_TOOLS.contains(tool))
+            .collect(),
         None => DEFAULT_TOOLS.to_vec(),
     }
 }
 
 pub fn validate_exec(spec: Option<&MethodPolicy>, req: &ExecRequest) -> Result<(), ErrorCode> {
     let allow = effective_allowlist(spec);
-    if !allow.iter().any(|t| *t == req.tool) { return Err(ErrorCode::PolicyDenied); }
+    if !allow.iter().any(|t| *t == req.tool) {
+        return Err(ErrorCode::PolicyDenied);
+    }
     if let Some(spec) = spec {
         if let Some(rule) = spec.arg_rules.get(&req.tool) {
-            if args_denied(rule, &req.args) { return Err(ErrorCode::PolicyDenied); }
+            if args_denied(rule, &req.args) {
+                return Err(ErrorCode::PolicyDenied);
+            }
         }
     }
     Ok(())
 }
 
 pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode> {
-    if !allow.contains(&tool) { return Err(ErrorCode::PolicyDenied); }
+    if !allow.contains(&tool) {
+        return Err(ErrorCode::PolicyDenied);
+    }
     for prefix in ["/system/bin/", "/system/xbin/", "/vendor/bin/"] {
         let p = format!("{prefix}{tool}");
-        if std::path::Path::new(&p).exists() { return Ok(p); }
+        if std::path::Path::new(&p).exists() {
+            return Ok(p);
+        }
     }
     Err(ErrorCode::BadParams)
 }
 
 #[derive(Debug)]
-struct CapturedOutput { retained: Vec<u8>, total_bytes: u64, truncated: bool }
+struct CapturedOutput {
+    retained: Vec<u8>,
+    total_bytes: u64,
+    truncated: bool,
+}
 
 fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<CapturedOutput> {
     let mut retained = Vec::with_capacity(limit.min(8192));
@@ -75,14 +115,20 @@ fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<Capt
     let mut buf = [0u8; 8192];
     loop {
         let n = reader.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         total_bytes = total_bytes.saturating_add(n as u64);
         if retained.len() < limit {
             let keep = (limit - retained.len()).min(n);
             retained.extend_from_slice(&buf[..keep]);
         }
     }
-    Ok(CapturedOutput { truncated: total_bytes > retained.len() as u64, retained, total_bytes })
+    Ok(CapturedOutput {
+        truncated: total_bytes > retained.len() as u64,
+        retained,
+        total_bytes,
+    })
 }
 
 pub struct ExecOutput {
@@ -116,7 +162,9 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
         use std::os::unix::process::CommandExt;
         unsafe {
             cmd.pre_exec(|| {
-                if libc::setpgid(0, 0) != 0 { return Err(std::io::Error::last_os_error()); }
+                if libc::setpgid(0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
                 Ok(())
             });
         }
@@ -136,11 +184,24 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
 
     loop {
         if wait_handle.is_finished() {
-            let status = wait_handle.join().map_err(|_| ErrorCode::Internal)?.map_err(|_| ErrorCode::Internal)?;
-            let stdout = stdout_handle.join().map_err(|_| ErrorCode::Internal)?.map_err(|_| ErrorCode::Internal)?;
-            let stderr = stderr_handle.join().map_err(|_| ErrorCode::Internal)?.map_err(|_| ErrorCode::Internal)?;
-            if guard.was_cancelled() { return Err(ErrorCode::UserCancelled); }
-            let Some(exit_code) = status.code() else { return Err(ErrorCode::ProcessKilled); };
+            let status = wait_handle
+                .join()
+                .map_err(|_| ErrorCode::Internal)?
+                .map_err(|_| ErrorCode::Internal)?;
+            let stdout = stdout_handle
+                .join()
+                .map_err(|_| ErrorCode::Internal)?
+                .map_err(|_| ErrorCode::Internal)?;
+            let stderr = stderr_handle
+                .join()
+                .map_err(|_| ErrorCode::Internal)?
+                .map_err(|_| ErrorCode::Internal)?;
+            if guard.was_cancelled() {
+                return Err(ErrorCode::UserCancelled);
+            }
+            let Some(exit_code) = status.code() else {
+                return Err(ErrorCode::ProcessKilled);
+            };
             return Ok(ExecOutput {
                 exit_code,
                 stdout: String::from_utf8_lossy(&stdout.retained).into_owned(),
@@ -155,10 +216,14 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
             #[cfg(unix)]
             kill_process_tree(pid);
             for _ in 0..50 {
-                if wait_handle.is_finished() { break; }
+                if wait_handle.is_finished() {
+                    break;
+                }
                 std::thread::sleep(Duration::from_millis(20));
             }
-            if wait_handle.is_finished() { let _ = wait_handle.join(); }
+            if wait_handle.is_finished() {
+                let _ = wait_handle.join();
+            }
             return Err(ErrorCode::ToolTimeout);
         }
         std::thread::sleep(Duration::from_millis(20));
@@ -178,9 +243,15 @@ mod tests {
         let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["force-stop","a.b"]})).unwrap();
         assert!(validate_exec(spec, &ok).is_ok());
         let bad_tool = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
-        assert_eq!(validate_exec(spec, &bad_tool).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(spec, &bad_tool).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let denied = parse_exec(&serde_json::json!({"tool":"pm","args":["shell","su"]})).unwrap();
-        assert_eq!(validate_exec(spec, &denied).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(spec, &denied).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
@@ -188,19 +259,29 @@ mod tests {
 
     #[test]
     fn execution_id_is_carried_for_targeted_cancel() {
-        let parsed = parse_exec(&serde_json::json!({"tool":"pm","args":[],"execution_id":"root:s1:42"})).unwrap();
+        let parsed =
+            parse_exec(&serde_json::json!({"tool":"pm","args":[],"execution_id":"root:s1:42"}))
+                .unwrap();
         assert_eq!(parsed.execution_id.as_deref(), Some("root:s1:42"));
     }
 
     #[test]
     fn runtime_allowlist_can_only_narrow_builtin_tools() {
-        let spec = MethodPolicy { mode: Mode::Allow, tool_allowlist: Some(vec!["pm".into(), "reboot".into()]), arg_rules: Default::default(), rate_per_min: None };
+        let spec = MethodPolicy {
+            mode: Mode::Allow,
+            tool_allowlist: Some(vec!["pm".into(), "reboot".into()]),
+            arg_rules: Default::default(),
+            rate_per_min: None,
+        };
         let allow = effective_allowlist(Some(&spec));
         assert_eq!(allow, vec!["pm"]);
         let pm = parse_exec(&serde_json::json!({"tool":"pm","args":[]})).unwrap();
         assert!(validate_exec(Some(&spec), &pm).is_ok());
         let reboot = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
-        assert_eq!(validate_exec(Some(&spec), &reboot).unwrap_err(), ErrorCode::PolicyDenied);
+        assert_eq!(
+            validate_exec(Some(&spec), &reboot).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
     }
 
     #[test]
@@ -222,9 +303,20 @@ mod tests {
 
     #[test]
     fn bounded_collectors_handle_combined_large_output_independently() {
-        let stdout = collect_bounded(Cursor::new(vec![b'o'; MAX_CAPTURE_BYTES + 10]), MAX_CAPTURE_BYTES).unwrap();
-        let stderr = collect_bounded(Cursor::new(vec![b'e'; MAX_CAPTURE_BYTES + 20]), MAX_CAPTURE_BYTES).unwrap();
+        let stdout = collect_bounded(
+            Cursor::new(vec![b'o'; MAX_CAPTURE_BYTES + 10]),
+            MAX_CAPTURE_BYTES,
+        )
+        .unwrap();
+        let stderr = collect_bounded(
+            Cursor::new(vec![b'e'; MAX_CAPTURE_BYTES + 20]),
+            MAX_CAPTURE_BYTES,
+        )
+        .unwrap();
         assert!(stdout.truncated && stderr.truncated);
-        assert_eq!(stdout.retained.len() + stderr.retained.len(), MAX_CAPTURE_BYTES * 2);
+        assert_eq!(
+            stdout.retained.len() + stderr.retained.len(),
+            MAX_CAPTURE_BYTES * 2
+        );
     }
 }
