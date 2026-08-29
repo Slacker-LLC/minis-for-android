@@ -5,13 +5,16 @@ pub const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
 pub const HOST_MEMORY: &str = "/data/adb/minis/memory";
 pub const HOST_SKILLS: &str = "/data/adb/minis/skills";
 pub const HOST_SHARED: &str = "/data/adb/minis/shared";
+// #50 keeps the historical HOME contract. The compatibility `home` field is
+// deliberately an alias of the existing workspace, not a new data location.
+pub const HOST_HOME: &str = HOST_WORKSPACE;
 pub const HOST_RUN: &str = "/data/adb/minis/run";
 pub const HOST_LOG: &str = "/data/adb/minis/log";
 
 pub const GUEST_UID: u32 = 10_000;
 pub const GUEST_GID: u32 = 10_000;
 pub const GUEST_USER: &str = "minis";
-pub const GUEST_HOME: &str = "/workspace";
+pub const GUEST_HOME: &str = GUEST_WORKSPACE;
 pub const GUEST_MEMORY: &str = "/memory";
 pub const GUEST_SKILLS: &str = "/skills";
 pub const GUEST_SHARED: &str = "/shared";
@@ -59,6 +62,7 @@ pub fn ensure_host_layout() -> Result<(), String> {
         HOST_MEMORY,
         HOST_SKILLS,
         HOST_SHARED,
+        HOST_HOME,
         HOST_RUN,
         HOST_LOG,
     ] {
@@ -96,6 +100,7 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
         "var/minis",
         "etc/minis",
         "home",
+        "home/minis",
         "root",
     ] {
         std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
@@ -153,7 +158,7 @@ pub fn ensure_guest_user(rootfs: &str) -> Result<(), String> {
 
 pub fn ensure_guest_user_ids(rootfs: &str, uid: u32, gid: u32) -> Result<(), String> {
     let root = std::path::Path::new(rootfs);
-    let passwd = format!("minis:x:{uid}:{gid}:Minis:/workspace:/bin/bash\n");
+    let passwd = format!("minis:x:{uid}:{gid}:Minis:{GUEST_HOME}:/bin/bash\n");
     let group = format!("minis:x:{gid}:\n");
     upsert_named_line(root.join("etc/passwd"), "minis:", &passwd)?;
     upsert_named_line(root.join("etc/group"), "minis:", &group)?;
@@ -191,7 +196,9 @@ pub fn host_paths() -> serde_json::Value {
         "memory": HOST_MEMORY,
         "skills": HOST_SKILLS,
         "shared": HOST_SHARED,
+        "home": HOST_HOME,
         "guest_workspace": GUEST_WORKSPACE,
+        "guest_home": GUEST_HOME,
         "guest_uid": GUEST_UID,
         "guest_gid": GUEST_GID
     })
@@ -242,6 +249,7 @@ mod tests {
         );
         assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert!(passwd.contains("minis:x:12345:12345:"));
+        assert!(passwd.contains("Minis:/workspace:/bin/bash"));
         assert!(group.contains("minis:x:12345:"));
         assert!(passwd.contains("root:x:0:0:"));
 
