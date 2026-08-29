@@ -81,14 +81,16 @@ object OpenRouterOAuthManager {
                     .appendQueryParameter("code_challenge_method", "S256")
                     .appendQueryParameter("_nc", System.currentTimeMillis().toString()) // cache-bust
                     .build()
-                Log.d(TAG, "Auth URL: $authUrl")
+                val secureAuthUrl = ProviderTransportPolicy
+                    .requireHttps(authUrl.toString(), "OpenRouter authorization URL")
+                Log.d(TAG, "Auth URL: $secureAuthUrl")
 
                 // Open in Chrome Custom Tab (in-app browser, like iOS SFSafariViewController)
                 val customTabsIntent = CustomTabsIntent.Builder()
                     .setShowTitle(true)
                     .build()
                 customTabsIntent.intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                customTabsIntent.launchUrl(context, authUrl)
+                customTabsIntent.launchUrl(context, Uri.parse(secureAuthUrl.toString()))
                 Log.i(TAG, "Opened Custom Tab for OpenRouter authorization")
             }
 
@@ -158,7 +160,7 @@ object OpenRouterOAuthManager {
         Log.d(TAG, "Verifier (${verifier.length} chars): ${verifier.take(20)}...${verifier.takeLast(10)}")
 
         val request = Request.Builder()
-            .url(KEYS_URL)
+            .url(ProviderTransportPolicy.requireHttps(KEYS_URL, "OpenRouter key exchange URL"))
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://github.com/limuzi013/minis-for-android")
