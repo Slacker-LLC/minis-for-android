@@ -16,6 +16,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import kotlin.coroutines.resume
 
+/** Explicit runtime result for an integration compiled out of this build. */
+class ProviderCustomizationUnavailableException :
+    IllegalStateException(ClaudeOAuthManager.NOT_AVAILABLE_IN_THIS_BUILD)
+
 /**
  * OAuth manager for Anthropic (Claude) OAuth flow.
  *
@@ -38,28 +42,40 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
 
     companion object {
         private const val TAG = "ClaudeOAuth"
+        const val NOT_AVAILABLE_IN_THIS_BUILD = "NOT_AVAILABLE_IN_THIS_BUILD"
+        private const val INVALID_BUILD_CAPABILITY = "INVALID_CLAUDE_OAUTH_BUILD_CAPABILITY"
+
+        /** True only when this APK was built with the required Claude OAuth customization. */
+        val isAvailableInThisBuild: Boolean
+            get() = BuildConfig.CLAUDE_OAUTH_CUSTOMIZATION_AVAILABLE
+
+        /**
+         * Fail before starting any OAuth side effect when this integration is
+         * intentionally unavailable in the current build. Parameters are
+         * injectable for focused JVM tests; production callers use BuildConfig.
+         */
+        internal fun requireCustomizationAvailable(
+            available: Boolean = BuildConfig.CLAUDE_OAUTH_CUSTOMIZATION_AVAILABLE,
+            prompt: String = BuildConfig.ANTHROPIC_OAUTH_IDENTIFIER_PROMPT,
+        ): String {
+            if (!available || prompt == NOT_AVAILABLE_IN_THIS_BUILD) {
+                throw ProviderCustomizationUnavailableException()
+            }
+            if (prompt.isBlank()) {
+                throw IllegalStateException(INVALID_BUILD_CAPABILITY)
+            }
+            return prompt
+        }
 
         /**
          * System prompt prefix required by Anthropic for Claude Code OAuth
-         * credentials.
-         *
-         * The value is not hardcoded: it is supplied at build time via the
-         * `ANTHROPIC_OAUTH_IDENTIFIER_PROMPT` BuildConfig field, populated from
-         * `app/provider-customization.properties`. That file is tracked in the private
-         * repo (filled in) but excluded from the public mirror, which ships
-         * only `provider-customization.properties.example` with an empty value. Reading
-         * it without a configured value throws — by design — the first time an
-         * OAuth (Claude Code) request needs the prompt.
+         * credentials. The build capability is explicit: public builds use
+         * NOT_AVAILABLE_IN_THIS_BUILD rather than an empty string, while
+         * required/private builds are rejected by Gradle when the value is
+         * missing or blank.
          */
         val ANTHROPIC_OAUTH_IDENTIFIER_PROMPT: String
-            get() = BuildConfig.ANTHROPIC_OAUTH_IDENTIFIER_PROMPT.ifEmpty {
-                throw IllegalStateException(
-                    "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT is not configured. Copy "
-                        + "app/provider-customization.properties.example to "
-                        + "app/provider-customization.properties and set "
-                        + "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT before using Claude Code OAuth."
-                )
-            }
+            get() = requireCustomizationAvailable()
 
         /**
          * How long before expiry we proactively refresh. Mirrors iOS
@@ -88,6 +104,7 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
          * Returns the access token.
          */
         suspend fun login(context: Context, instanceId: String, providerRepository: ProviderRepository): String {
+            requireCustomizationAvailable()
             val manager = ClaudeOAuthManager(context, instanceId)
             val token = manager.performLogin(context)
             providerRepository.saveApiKey(instanceId, token)
@@ -119,11 +136,20 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
     override val redirectPath = "/callback"
     override val scopes = "org:create_api_key user:profile user:inference"
 
+    /** Authorization entry point. Disabled builds stop before PKCE/state storage. */
+    override fun buildAuthorizationUrl(): String {
+        requireCustomizationAvailable()
+        return super.buildAuthorizationUrl()
+    }
+
     /**
      * Perform the full OAuth login flow (mirrors OpenRouterOAuthManager.login pattern).
      * Returns the access token. Throws on failure.
      */
     suspend fun performLogin(context: Context): String {
+        // Must be the first operation: no callback server, browser, state write,
+        // or network activity is allowed when customization is unavailable.
+        requireCustomizationAvailable()
         Log.i(TAG, "=== Anthropic OAuth login started (instance: $instanceId) ===")
 
         callbackServer?.stop()
@@ -183,6 +209,9 @@ class ClaudeOAuthManager(context: Context, instanceId: String) : OAuthManager(co
      * Anthropic requires application/json, NOT form-urlencoded.
      */
     private fun exchangeCodeJson(code: String): String {
+        // Guard again at the token-exchange boundary so future callers cannot
+        // bypass the loopback/login check and accidentally reach the network.
+        requireCustomizationAvailable()
         val body = JSONObject().apply {
             put("grant_type", "authorization_code")
             put("client_id", clientId)
