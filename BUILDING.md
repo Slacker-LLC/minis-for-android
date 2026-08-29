@@ -1,8 +1,23 @@
 # Building Minis for Android
 
-This is the primary build guide for the current `master` branch. The public repository currently distributes source code rather than production APK releases.
+This is the single canonical build and release guide for the current `master` branch. The public repository currently distributes source code rather than production APK releases.
 
 Chinese translation: [BUILDING.zh-CN.md](BUILDING.zh-CN.md)
+
+## Canonical entry points
+
+Current builds operate directly on this repository. They do not clone or patch an upstream checkout as part of the Android build.
+
+| Purpose | Canonical entry point |
+|---|---|
+| Android debug APK | `cd src/android && ./gradlew :app:assembleDebug --no-daemon` |
+| Android debug APK on Windows PowerShell | `./scripts/build-android-debug.ps1` |
+| Android release APK | `cd src/android && ./gradlew :app:assembleRelease --no-daemon` |
+| Rust `minisd` | `cargo ... --manifest-path src/native/minisd/Cargo.toml` |
+| Ubuntu rootfs | `./scripts/build-ubuntu-rootfs.sh` |
+| CI | `.github/workflows/ci.yml` |
+
+The PowerShell wrapper is a convenience entry point around the same checked-in Android Gradle project; it must not introduce a second build pipeline.
 
 ## Toolchain
 
@@ -73,12 +88,20 @@ This project does not use the upstream Alpine + PRoot runtime as its active Andr
 
 ## 5. Build a debug APK
 
+Linux / WSL2:
+
 ```bash
 cd src/android
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
-Output:
+Windows PowerShell from the repository root:
+
+```powershell
+./scripts/build-android-debug.ps1
+```
+
+Both entry points build the checked-in `src/android` Gradle project and produce:
 
 ```text
 src/android/app/build/outputs/apk/debug/app-debug.apk
@@ -136,6 +159,14 @@ Rootfs verification:
 bash scripts/test-build-ubuntu-rootfs-verification.sh
 ```
 
+Build cleanup regression guard:
+
+```bash
+python3 scripts/test_build_cleanup_guard.py
+python3 scripts/check_build_cleanup.py
+bash -n scripts/update_models_dev.sh
+```
+
 ## 7. Release builds
 
 Release signing is fail-closed. A production release package requires all four environment variables:
@@ -158,6 +189,7 @@ Without explicit release credentials, the release-signing gate must fail. Debug 
 
 The repository CI validates:
 
+- obsolete build-path regression guard;
 - Rust format, Clippy, tests, and release build;
 - rootfs checksum failure paths;
 - Android unit tests;
