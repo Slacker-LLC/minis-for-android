@@ -6,13 +6,11 @@ import java.io.File
 /**
  * Normal commands resolve `/workspace` through the owning chat's
  * `<filesDir>/minis-sessions/<sessionId>/workspace` directory. Memory, skills,
- * shared, and the Linux user home remain App-global under
- * `<filesDir>/minis-global`.
+ * and shared remain App-global under `<filesDir>/minis-global`.
  *
  * `/data/adb/minis` is reserved for root-owned runtime state such as the Ubuntu
  * rootfs and minisd. It is not the App workspace. minisd bind-mounts the
- * App-private directories into the chroot after joining the App mount
- * namespace, so both sides resolve the same persistent backing files.
+ * App-private directories into the chroot when Ubuntu starts.
  */
 object UbuntuPaths {
     const val HOST_MINIS = "/data/adb/minis"
@@ -26,8 +24,6 @@ object UbuntuPaths {
     var hostSkills: String = "$HOST_MINIS/skills"
         private set
     var hostShared: String = "$HOST_MINIS/shared"
-        private set
-    var hostHome: String = "$HOST_MINIS/home"
         private set
     var hostSessions: String = "$HOST_MINIS/sessions"
         private set
@@ -46,7 +42,6 @@ object UbuntuPaths {
         "/var/minis/skills" to { hostSkills },
         "/shared" to { hostShared },
         "/var/minis/shared" to { hostShared },
-        "/home/minis" to { hostHome },
     )
 
     private val sessionAliases = listOf(
@@ -71,7 +66,6 @@ object UbuntuPaths {
         hostMemory = File(globalBase, "memory").absolutePath
         hostSkills = File(globalBase, "skills").absolutePath
         hostShared = File(globalBase, "shared").absolutePath
-        hostHome = File(globalBase, "home").absolutePath
         hostSessions = File(context.filesDir, "minis-sessions").absolutePath
         File(hostWorkspace, "attachments").mkdirs()
         File(hostWorkspace, "offloads").mkdirs()
@@ -80,7 +74,6 @@ object UbuntuPaths {
         File(hostMemory).mkdirs()
         File(hostSkills).mkdirs()
         File(hostShared).mkdirs()
-        File(hostHome).mkdirs()
     }
 
     /** Resolves a child only when its canonical target remains below [base]. */

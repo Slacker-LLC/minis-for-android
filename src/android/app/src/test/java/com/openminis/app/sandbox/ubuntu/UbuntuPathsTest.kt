@@ -24,14 +24,6 @@ class UbuntuPathsTest {
     }
 
     @Test
-    fun `persistent home maps GitHub CLI configuration`() {
-        val resolved = UbuntuPaths.resolveGuest("/home/minis/.config/gh/hosts.yml")!!
-            .path
-            .replace('\\', '/')
-        assertTrue(resolved.endsWith("/data/adb/minis/home/.config/gh/hosts.yml"))
-    }
-
-    @Test
     fun `resolveHostPath uses bind mounts`() {
         UbuntuPaths.bindMounts["/mnt/docs"] = "/storage/emulated/0/Documents"
         try {

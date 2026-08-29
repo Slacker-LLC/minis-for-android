@@ -38,7 +38,6 @@ class MinisdClient(
         memory: String = "",
         skills: String = "",
         shared: String = "",
-        home: String = "",
         sessionsRoot: String = "",
     ): MinisdResponse = call(
         MinisdProtocol.ubuntuStart(
@@ -48,7 +47,6 @@ class MinisdClient(
             memory = memory,
             skills = skills,
             shared = shared,
-            home = home,
             sessionsRoot = sessionsRoot,
         ),
         timeoutMs = 20_000,
