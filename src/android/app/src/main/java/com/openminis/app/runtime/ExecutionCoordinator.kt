@@ -148,13 +148,8 @@ object ExecutionCoordinator {
      * unblocks immediately; the idempotent broker kill runs on a separate scope
      * and targets only the captured execution id.
      */
-    fun stopCurrentCommand(sessionId: String? = null) {
-        if (sessionId == null) {
-            mutexes.clear()
-            return
-        }
+    fun stopCurrentCommand(sessionId: String) {
         val executionId = UbuntuRuntime.client.cancelSessionTransport(sessionId)
-        mutexes.remove(sessionId)
         if (executionId != null) {
             cancellationScope.launch {
                 runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
@@ -163,7 +158,17 @@ object ExecutionCoordinator {
         }
     }
 
-    fun stopCurrentCommand() = stopCurrentCommand(sessionId = null)
+    /** Stops every currently tracked session, for runtime-wide mount/config changes. */
+    fun stopCurrentCommand() {
+        UbuntuRuntime.client.cancelAllSessionTransports().forEach { target ->
+            cancellationScope.launch {
+                runCatching { UbuntuRuntime.client.cancelExecution(target.executionId) }
+                    .onFailure {
+                        Log.w(TAG, "[${target.sessionId}] global exec.cancel failed: ${it.message}")
+                    }
+            }
+        }
+    }
 
     suspend fun broadcastTimezoneChange() {
         Log.d(TAG, "broadcastTimezoneChange: no-op (minisd resolves TZ per exec)")
