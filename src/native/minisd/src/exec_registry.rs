@@ -142,10 +142,10 @@ pub fn cancel(execution_id: &str) -> Result<CancelOutcome, ErrorCode> {
         if group_or_process_alive(pid) {
             signal_pid_and_group(pid, libc::SIGKILL);
         }
-        return Ok(CancelOutcome {
+        Ok(CancelOutcome {
             found: true,
             killed: true,
-        });
+        })
     }
     #[cfg(not(unix))]
     {
