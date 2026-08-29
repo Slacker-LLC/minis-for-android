@@ -25,11 +25,16 @@ internal object MinisdBootstrap {
         appMountNamespacePid: Int,
     ): String {
         require(appMountNamespacePid > 0) { "appMountNamespacePid must be > 0" }
+        val appUid = JSONObject(policyJson).optJSONObject("caller")?.optInt("appUid", 0) ?: 0
+        require(appUid > 0) { "policy caller.appUid must be > 0" }
+
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}"
         commands += "ROOTFS=${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}"
         commands += "POLICY=${shellQuote(POLICY_PATH)}"
         commands += "APP_SOCKET=${shellQuote(appSocket)}"
+        commands += "APP_MNT_PID=$appMountNamespacePid"
+        commands += "APP_UID=$appUid"
         commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
         commands += "if [ ! -f \"\$ROOTFS/etc/os-release\" ]; then echo \"ubuntu rootfs missing: \$ROOTFS/etc/os-release\" >&2; exit 41; fi"
         commands += "if [ ! -e \"\$ROOTFS/bin/bash\" ] && [ ! -e \"\$ROOTFS/usr/bin/bash\" ] && [ ! -e \"\$ROOTFS/bin/sh\" ]; then echo \"ubuntu rootfs missing shell under \$ROOTFS\" >&2; exit 42; fi"
@@ -45,7 +50,13 @@ internal object MinisdBootstrap {
             commands += "sleep 1"
         }
 
-        commands += "(\"\$BIN\" --watchdog --mount-ns-pid $appMountNamespacePid --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
+        // The PID comes from the live Android process. Authenticate it against
+        // the same UID already embedded in the minisd policy before allowing a
+        // privileged process to enter its mount namespace. This rejects stale
+        // or reused PIDs that now belong to another application.
+        commands += "target_uid=\$(awk '/^Uid:/{print \$2; exit}' \"/proc/\$APP_MNT_PID/status\" 2>/dev/null || true)"
+        commands += "if [ \"\$target_uid\" != \"\$APP_UID\" ] || [ ! -e \"/proc/\$APP_MNT_PID/ns/mnt\" ]; then echo \"app mount namespace target mismatch: pid=\$APP_MNT_PID uid=\${target_uid:-missing} expected=\$APP_UID\" >&2; exit 46; fi"
+        commands += "(\"\$BIN\" --watchdog --mount-ns-pid \"\$APP_MNT_PID\" --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""
         return commands.joinToString("\n")
     }
