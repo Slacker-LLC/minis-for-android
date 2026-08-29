@@ -5,7 +5,7 @@ import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -382,7 +382,7 @@ class ConfigOffloadHandler : NativeOffloadHandler {
      * null when the path can't be resolved, doesn't exist, or read fails.
      */
     private fun readLinuxPath(linuxPath: String): String? {
-        val hostFile: File = MinisKernel.resolveHostPath(linuxPath) ?: return null
+        val hostFile: File = RuntimePathRegistry.resolveHostPath(linuxPath) ?: return null
         if (!hostFile.exists() || !hostFile.isFile) return null
         return try { hostFile.readText() } catch (_: Throwable) { null }
     }

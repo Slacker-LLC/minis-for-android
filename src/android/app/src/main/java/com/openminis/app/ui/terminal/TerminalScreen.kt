@@ -58,7 +58,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.openminis.app.runtime.terminal.TerminalSession
+import com.openminis.app.sandbox.TerminalSession
 import com.openminis.app.terminal.MinisOpenUrlBroker
 import com.openminis.app.ui.terminal.canvas.TerminalNativeViewCompose
 import com.openminis.app.ui.terminal.canvas.TerminalInputView

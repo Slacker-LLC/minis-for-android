@@ -1,4 +1,4 @@
-package com.openminis.app.runtime
+package com.openminis.app.sandbox
 
 import org.junit.After
 import org.junit.Assert.*

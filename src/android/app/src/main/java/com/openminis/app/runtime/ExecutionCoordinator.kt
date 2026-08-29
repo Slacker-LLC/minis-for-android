@@ -4,15 +4,17 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.terminal.TerminalSanitizer
 import com.openminis.app.tools.DangerousCommandPolicy
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Executes `shell_execute` in the on-device Ubuntu runtime (minisd chroot).
- * PRoot/PersistentShell paths removed at P2. Serialization per session is
- * kept via a simple mutex so same-session commands don't interleave.
+ * Android orchestration boundary for guest command execution. It serializes
+ * commands per chat session and delegates runtime readiness plus execution to
+ * [UbuntuRuntime]; minisd owns privileged broker, mount namespace and chroot
+ * infrastructure.
  */
 object ExecutionCoordinator {
 

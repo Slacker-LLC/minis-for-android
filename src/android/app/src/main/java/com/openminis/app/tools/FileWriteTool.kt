@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.tools.internal.FileMutationQueue
 import com.openminis.app.tools.internal.FileRevision
 import org.json.JSONObject
@@ -57,9 +57,9 @@ object FileWriteTool {
             // T219: read-only mount guard. Reject before opening so we don't
             // half-create files inside a Locked external mount and surface a
             // friendly hint pointing the user at Settings. Mirrors iOS
-            // MountedFolderCoordinator.isLinuxPathUnderReadOnlyMount used by
+            // ExternalMountCoordinator.isLinuxPathUnderReadOnlyMount used by
             // AIChatViewModel.fileWrite (AIChatViewModel.swift:8333-8341).
-            if (MinisKernel.isLinuxPathUnderReadOnlyMount(path)) {
+            if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
                         "Toggle writability in Settings → Mount External Folders if this is a mistake.",

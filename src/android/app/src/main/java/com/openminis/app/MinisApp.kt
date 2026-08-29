@@ -32,10 +32,10 @@ import com.openminis.app.network.NetworkMonitor
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.provider.ModelsDevApi
 import com.openminis.app.runtime.ExecutionCoordinator
-import com.openminis.app.runtime.MountedFolderCoordinator
+import com.openminis.app.runtime.ExternalMountCoordinator
 import com.openminis.app.runtime.guest.NativeOffloadServer
-import com.openminis.app.runtime.MinisKernel
-import com.openminis.app.runtime.RootfsManager
+import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.runtime.guest.AccessibilityOffloadHandler
 import com.openminis.app.runtime.guest.AlarmOffloadHandler
@@ -642,7 +642,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Register global /var/minis/{memory,skills,shared} bind mounts up-front
         // so direct file I/O tools (file_read) resolve these paths even before
         // PRoot has booted or any shell has started.
-        MinisKernel.registerGlobalBindMounts(this)
+        RuntimePathRegistry.registerGlobalBindMounts(this)
 
         // T219-1: load user-mounted external folders and seed PRoot's
         // bindMounts before the first proot invocation, so the very first
@@ -651,24 +651,24 @@ class MinisApp : Application(), ImageLoaderFactory {
         // (cloud providers, unmounted SD card) are silently skipped by
         // bindMountSpecs.
         mountedFoldersStore = MountedFoldersStore(this)
-        // T219-5: hand the singleton to MinisKernel so applyMountedFoldersSnapshot
+        // T219-5: hand the singleton to RuntimePathRegistry so applyMountedFoldersSnapshot
         // can read the live state, and wire an onChange callback so any UI CRUD
         // (add/remove/rename/toggle) re-applies the snapshot.
         // P2: Ubuntu 会话经 minisd 每次 exec 重新解析 SAF 挂载（无长驻 shell
         // 持有旧 bind 集），applyMountedFoldersSnapshot 后无需杀会话。
-        MinisKernel.mountedFoldersStore = mountedFoldersStore
+        RuntimePathRegistry.mountedFoldersStore = mountedFoldersStore
         mountedFoldersStore.onChange = {
-            MinisKernel.applyMountedFoldersSnapshot(this)
+            RuntimePathRegistry.applyMountedFoldersSnapshot(this)
             ExecutionCoordinator.stopCurrentCommand()
         }
         // T219-6: route launch-time seeding through applyMountedFoldersSnapshot
         // so it (a) reads the live store consistently and (b) materializes the
         // /var/minis/mounts/<name> placeholder dirs that PRoot's `-b` needs.
-        // Note: this runs before MinisKernel.boot, so rootfs may not yet exist —
+        // Note: this runs before RuntimePathRegistry.boot, so rootfs may not yet exist —
         // applyMountedFoldersSnapshot tolerates that case (mkdirs fails silently
-        // and MinisKernel.boot calls applyMountedFoldersSnapshot again at the
+        // and RuntimePathRegistry.boot calls applyMountedFoldersSnapshot again at the
         // end of boot to materialize the targets once rootfs is on disk).
-        MinisKernel.applyMountedFoldersSnapshot(this)
+        RuntimePathRegistry.applyMountedFoldersSnapshot(this)
 
         // Register native_offload handlers and start the server eagerly —
         // the server only needs the rootfs tmp directory, which can be
@@ -699,7 +699,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         )
         NativeOffloadServer.register("minis-browser-use", BrowserUseOffloadHandler(this))
         // T188: minis-sessions-cli — agent-side query of chat history.
-        // Registers next to the other minis-* tools so MinisKernel.
+        // Registers next to the other minis-* tools so RuntimePathRegistry.
         // installHandlerStubs() picks it up on the next rootfs boot
         // (writes a 17-byte exit-0 stub at /usr/local/bin/minis-sessions-cli
         // so PATH lookup succeeds; PRoot intercepts the execve before
@@ -723,7 +723,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // T-android-minis-debug-cli: shell-side CLI wrapper around the in-app
         // DebugServer (127.0.0.1:5321) JSON-RPC. DEBUG-only — Release builds
         // ship neither the DebugServer nor this handler, so the
-        // `/usr/local/bin/minis-debug` stub is also absent (MinisKernel.
+        // `/usr/local/bin/minis-debug` stub is also absent (RuntimePathRegistry.
         // installHandlerStubs enumerates currently-registered handlers).
         if (BuildConfig.DEBUG) {
             NativeOffloadServer.register(
@@ -880,7 +880,7 @@ class MinisApp : Application(), ImageLoaderFactory {
 
         // Propagate system timezone and HTTP-proxy changes into the sandbox.
         // iOS recomputes TZ for every command (ISHShellExecutor.m:335-353);
-        // here we update MinisKernel.customEnvironment and push `export …`
+        // here we update RuntimePathRegistry.customEnvironment and push `export …`
         // into every live shell so interactive sessions pick up the change
         // without a restart.
         val sandboxSystemReceiver = object : BroadcastReceiver() {

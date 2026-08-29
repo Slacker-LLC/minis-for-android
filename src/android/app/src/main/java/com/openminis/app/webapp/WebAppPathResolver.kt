@@ -3,7 +3,7 @@ package com.openminis.app.webapp
 import android.content.Context
 import com.openminis.app.data.db.WebAppShortcutEntity
 import com.openminis.app.data.repository.WebAppShortcutRepository
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import java.io.File
 
 /**
@@ -16,8 +16,8 @@ import java.io.File
  *   - session_attachment → `<filesDir>/sessions/<sessionId>/attachments/<htmlPath>`
  *     (htmlPath relative to the session's attachments dir; absolute paths
  *      under /var/minis/<sub>/ are also accepted via resolveSessionHostPath)
- *   - shared             → resolved via [MinisKernel.resolveHostPath]
- *   - mount              → resolved via [MinisKernel.resolveHostPath]
+ *   - shared             → resolved via [RuntimePathRegistry.resolveHostPath]
+ *   - mount              → resolved via [RuntimePathRegistry.resolveHostPath]
  *                          (longest-prefix match against bindMounts)
  */
 object WebAppPathResolver {
@@ -25,8 +25,8 @@ object WebAppPathResolver {
     fun resolve(context: Context, shortcut: WebAppShortcutEntity): File? {
         val file = when (shortcut.pathScope) {
             WebAppShortcutRepository.SCOPE_SESSION_ATTACHMENT -> resolveSession(context, shortcut)
-            WebAppShortcutRepository.SCOPE_SHARED -> MinisKernel.resolveHostPath(shortcut.htmlPath)
-            WebAppShortcutRepository.SCOPE_MOUNT -> MinisKernel.resolveHostPath(shortcut.htmlPath)
+            WebAppShortcutRepository.SCOPE_SHARED -> RuntimePathRegistry.resolveHostPath(shortcut.htmlPath)
+            WebAppShortcutRepository.SCOPE_MOUNT -> RuntimePathRegistry.resolveHostPath(shortcut.htmlPath)
             else -> null
         }
         return file?.takeIf { it.exists() && it.isFile }
@@ -36,7 +36,7 @@ object WebAppPathResolver {
      * T-pwa-3: reverse-resolve a host file path to a `(pathScope,
      * scopeContext, linuxPath)` triple suitable for
      * [WebAppShortcutRepository.create]. Walks the
-     * [MinisKernel.bindMounts] map looking for an entry whose host
+     * [RuntimePathRegistry.bindMounts] map looking for an entry whose host
      * directory is a prefix of [hostFile]; returns null if none matches
      * (caller should hide the "Add to Home Screen" menu item).
      *
@@ -48,7 +48,7 @@ object WebAppPathResolver {
     fun inferScope(hostFile: File): Triple<String, String?, String>? {
         val hostAbs = hostFile.absolutePath
         // Longest host-prefix wins, mirroring resolveHostPath's longest-key match.
-        val sorted = com.openminis.app.runtime.MinisKernel
+        val sorted = com.openminis.app.runtime.RuntimePathRegistry
             .bindMounts.entries.sortedByDescending { it.value.length }
         for ((linuxPrefix, hostBase) in sorted) {
             val baseNorm = hostBase.trimEnd('/')
@@ -72,10 +72,10 @@ object WebAppPathResolver {
 
     private fun resolveSession(context: Context, shortcut: WebAppShortcutEntity): File? {
         val sessionId = shortcut.scopeContext ?: return null
-        // Absolute /var/minis/<perSession>/... — go through MinisKernel which
+        // Absolute /var/minis/<perSession>/... — go through RuntimePathRegistry which
         // knows how to map per-session subdirs to <filesDir>/minis-sessions/<id>/<sub>.
         if (shortcut.htmlPath.startsWith("/var/minis/")) {
-            return MinisKernel.resolveSessionHostPath(sessionId, shortcut.htmlPath, context)
+            return RuntimePathRegistry.resolveSessionHostPath(sessionId, shortcut.htmlPath, context)
         }
         // Relative path — under the session's attachments dir.
         val attachmentsDir = File(context.filesDir, "sessions/$sessionId/attachments")

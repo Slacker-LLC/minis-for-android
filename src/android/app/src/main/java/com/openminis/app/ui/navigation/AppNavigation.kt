@@ -73,8 +73,8 @@ import com.openminis.app.ui.settings.MemoryFileEditScreen
 import com.openminis.app.ui.settings.MemoryManagementScreen
 import com.openminis.app.ui.settings.OffloadPermissionScreen
 import com.openminis.app.ui.settings.ShizukuPermissionScreen
-import com.openminis.app.runtime.RootfsManager
-import com.openminis.app.runtime.terminal.TerminalSession
+import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.sandbox.TerminalSession
 import com.openminis.app.ui.terminal.TerminalScreen
 import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
 
@@ -223,10 +223,10 @@ fun AppNavigation(
     val context = LocalContext.current
 
     // T219-5: use the application-scoped singleton from MinisApp so UI
-    // add/remove shares state with MinisKernel and the lifecycle re-probe
+    // add/remove shares state with RuntimePathRegistry and the lifecycle re-probe
     // path. Pre-T219-5 this `remember { MountedFoldersStore(...) }` created
     // a SECOND independent instance — UI list updated but PRoot never
-    // saw the change because MinisKernel.mountedFoldersStore pointed at
+    // saw the change because RuntimePathRegistry.mountedFoldersStore pointed at
     // the application-scoped singleton in MinisApp.
     val mountedFoldersStore = remember {
         (context.applicationContext as com.openminis.app.MinisApp).mountedFoldersStore
@@ -949,7 +949,7 @@ fun AppNavigation(
                     rootPath = rootfs.rootfsDir,
                     initialPath = varMinis.takeIf { it.exists() },
                     rootLabel = "/",
-                    // T121: route directory listings through MinisKernel bind
+                    // T121: route directory listings through RuntimePathRegistry bind
                     // mounts so /var/minis/{skills,memory,shared} resolve to
                     // their backing host dirs (filesDir/minis-global/<subdir>).
                     // Without this the browser walks the rootfs tarball

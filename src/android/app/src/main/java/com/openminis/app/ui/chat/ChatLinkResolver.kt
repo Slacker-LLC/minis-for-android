@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.core.net.toUri
 import com.openminis.app.deeplink.DeepLinkAction
 import com.openminis.app.deeplink.DeepLinkHandler
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.ui.sandbox.FileItem
 import java.io.File
 
@@ -45,7 +45,7 @@ object ChatLinkResolver {
 
         // 2. Sandbox file resolution — prefer a session-scoped resolver when
         //    the caller knows which chat this link belongs to. The global
-        //    `MinisKernel.bindMounts` is last-writer-wins, so on a device
+        //    `RuntimePathRegistry.bindMounts` is last-writer-wins, so on a device
         //    with multiple sessions the resolver otherwise points at
         //    whichever session booted its shell most recently.
         val hostFile = resolveSandboxFile(trimmed, scheme, sessionId, context)
@@ -84,9 +84,9 @@ object ChatLinkResolver {
     ): File? {
         fun lookup(linuxPath: String): File? =
             if (sessionId != null && context != null) {
-                MinisKernel.resolveSessionHostPath(sessionId, linuxPath, context)
+                RuntimePathRegistry.resolveSessionHostPath(sessionId, linuxPath, context)
             } else {
-                MinisKernel.resolveHostPath(linuxPath)
+                RuntimePathRegistry.resolveHostPath(linuxPath)
             }
         return when (scheme) {
             "minis" -> {

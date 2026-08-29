@@ -15,21 +15,21 @@ import java.util.TimeZone
 import kotlin.math.abs
 
 /**
- * P2: PRoot removed. This object is the Minis sandbox path/mount registry:
- * guest `/workspace` ↔ App filesDir workspaces, SAF external mounts, and the
- * POSIX TZ helper. No proot process management; execution goes through
- * [com.openminis.app.runtime.ubuntu.UbuntuRuntime] / minisd.
+ * Android-side registry for host/guest path resolution and bind-mount inputs.
+ * Ubuntu process and mount-namespace lifecycle is owned by minisd; this object
+ * only maintains the app-visible path registry, SAF mount snapshots, and host
+ * environment helpers consumed while constructing runtime requests.
  */
-object MinisKernel {
+object RuntimePathRegistry {
 
-    private const val TAG = "MinisKernel"
+    private const val TAG = "RuntimePathRegistry"
 
-    /** True once the sandbox (Ubuntu) has been initialized by the App. */
-    var isBooted: Boolean = false
+    /** True once the Android-side path registry has been initialized. */
+    var isInitialized: Boolean = false
         private set
 
-    internal fun markBooted() {
-        isBooted = true
+    internal fun markInitialized() {
+        isInitialized = true
     }
 
     /** Bind mounts: Linux path -> host filesystem path. */
@@ -41,12 +41,12 @@ object MinisKernel {
      * MinisApp.onCreate. Ubuntu runtime start is handled by
      * [com.openminis.app.runtime.ubuntu.UbuntuRuntime.ensureReady].
      */
-    fun boot(context: Context) {
-        if (isBooted) return
+    fun initialize(context: Context) {
+        if (isInitialized) return
         registerGlobalBindMounts(context)
         applyMountedFoldersSnapshot(context)
-        markBooted()
-        Log.i(TAG, "sandbox path registry seeded bindMounts=${bindMounts.size}")
+        markInitialized()
+        Log.i(TAG, "runtime path registry seeded bindMounts=${bindMounts.size}")
     }
 
     fun addBindMount(linuxPath: String, hostPath: String) {

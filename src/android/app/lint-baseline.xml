@@ -8191,7 +8191,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="189"
             column="13"/>
     </issue>
@@ -8469,7 +8469,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/runtime/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="92"
             column="5"/>
     </issue>
@@ -8480,7 +8480,7 @@
         errorLine1="        private var instance: RootfsManager? = null"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/RootfsManager.kt"
+            file="src/main/java/com/openminis/app/sandbox/RootfsManager.kt"
             line="181"
             column="9"/>
     </issue>
@@ -11768,7 +11768,7 @@
         errorLine1="        val treeUri = Uri.parse(treeUriString)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/MinisKernel.kt"
+            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
             line="154"
             column="23"/>
     </issue>

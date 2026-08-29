@@ -1,4 +1,4 @@
-package com.openminis.app.runtime
+package com.openminis.app.sandbox
 
 import android.content.Context
 import android.net.ConnectivityManager

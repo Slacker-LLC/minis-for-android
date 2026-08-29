@@ -2,13 +2,13 @@ package com.openminis.app.offload
 
 import android.media.MediaPlayer
 import android.util.Log
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import java.io.File
 
 /**
  * Manages multiple concurrent MediaPlayer sessions keyed by session ID.
  * Supports audio playback with play/pause/resume/seek/stop/status operations.
- * Paths are resolved through MinisKernel.resolveHostPath().
+ * Paths are resolved through RuntimePathRegistry.resolveHostPath().
  */
 object MediaPlayerManager {
 
@@ -42,7 +42,7 @@ object MediaPlayerManager {
             releaseSession(existing)
         }
 
-        val hostFile = MinisKernel.resolveHostPath(filePath)
+        val hostFile = RuntimePathRegistry.resolveHostPath(filePath)
             ?: return "Error: cannot resolve path '$filePath'"
 
         if (!hostFile.exists()) {

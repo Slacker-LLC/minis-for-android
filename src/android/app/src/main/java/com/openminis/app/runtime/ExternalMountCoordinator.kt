@@ -3,20 +3,12 @@ package com.openminis.app.runtime
 import com.openminis.app.data.MountedFoldersStore
 
 /**
- * Bridges the user-facing [MountedFoldersStore] to the parts of the app
- * that enforce read-only-mount semantics and feed bind specs into PRoot.
- * Mirrors iOS `MountedFolderCoordinator` but only the methods we actually
- * need on Android — there is no NSFileCoordinator equivalent here because
- * once Option A resolves a SAF tree URI to a real POSIX path, the kernel
- * (not the app) handles cross-process consistency.
- *
- * Consumers (per T219 spec):
- *  - T219-3 MinisKernel: [bindMountSpecs] to seed `proot -b` flags.
- *  - T219-3 FileWriteTool / FileEditTool: [requireWritable] /
- *    [isLinuxPathUnderReadOnlyMount] to short-circuit writes against
- *    locked mounts before touching disk.
+ * Maps user-selected SAF folders into the current Ubuntu runtime contract.
+ * Resolved host paths become bind-mount inputs for the minisd-owned mount
+ * namespace; guest paths live under `/var/minis/mounts/<name>`. This layer
+ * also enforces the user-visible read-only policy before file tools write.
  */
-object MountedFolderCoordinator {
+object ExternalMountCoordinator {
 
     /** Linux prefix under which all bind-mounted external folders live. */
     private const val MOUNTS_PREFIX = "/var/minis/mounts/"
@@ -54,7 +46,7 @@ object MountedFolderCoordinator {
     }
 
     /**
-     * Snapshot of bind-mount specs PRoot should inject. Only entries with a
+     * Snapshot of bind-mount specs supplied to the Ubuntu/minisd runtime. Only entries with a
      * resolved POSIX path are returned — entries whose URI resolution
      * failed (e.g. cloud provider, removable volume unmounted) silently
      * drop out of the snapshot until their state changes.

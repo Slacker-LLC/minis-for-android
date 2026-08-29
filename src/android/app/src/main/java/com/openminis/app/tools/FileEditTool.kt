@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.tools.internal.FileEditEngine
 import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONArray
@@ -59,7 +59,7 @@ object FileEditTool {
                 )
             }
 
-            if (MinisKernel.isLinuxPathUnderReadOnlyMount(path)) {
+            if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
                         "Toggle writability in Settings → Mount External Folders if this is a mistake.",

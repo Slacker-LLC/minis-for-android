@@ -8,7 +8,7 @@ import com.openminis.app.browser.BrowserActionResult
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RuntimePathRegistry
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -172,9 +172,9 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         val cookiesFile = args.get("cookies-file", "cookies_file")
         val cookiesRaw: String? = if (cookiesFile != null) {
             val host = if (sessionId != null) {
-                MinisKernel.resolveSessionHostPath(sessionId, cookiesFile, app.applicationContext)
+                RuntimePathRegistry.resolveSessionHostPath(sessionId, cookiesFile, app.applicationContext)
             } else {
-                MinisKernel.resolveHostPath(cookiesFile)
+                RuntimePathRegistry.resolveHostPath(cookiesFile)
             }
                 ?: throw IllegalArgumentException("--cookies-file: cannot resolve path '$cookiesFile'")
             runCatching { host.readText() }.getOrNull()
@@ -254,9 +254,9 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // reference the JPEG via image_path + minis_url instead of piping
         // base64 through stdout.
         val browserHostDir: File? = if (sessionId != null) {
-            MinisKernel.resolveSessionHostPath(sessionId, VAR_MINIS_BROWSER, app.applicationContext)
+            RuntimePathRegistry.resolveSessionHostPath(sessionId, VAR_MINIS_BROWSER, app.applicationContext)
         } else {
-            MinisKernel.resolveHostPath(VAR_MINIS_BROWSER)
+            RuntimePathRegistry.resolveHostPath(VAR_MINIS_BROWSER)
         }
         browserHostDir?.also {
             try { it.mkdirs() } catch (_: Throwable) { /* non-fatal — write will fail below */ }
