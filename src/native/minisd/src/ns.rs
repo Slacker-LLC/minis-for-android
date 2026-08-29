@@ -277,13 +277,8 @@ pub fn setns_mnt(pid: i32) -> Result<(), String> {
 
     let result = (|| {
         let c_status = cstr("status")?;
-        let status_fd = unsafe {
-            libc::openat(
-                proc_fd,
-                c_status.as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC,
-            )
-        };
+        let status_fd =
+            unsafe { libc::openat(proc_fd, c_status.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
         if status_fd < 0 {
             return Err(last_err(&format!("open {proc_path}/status")));
         }
@@ -301,13 +296,8 @@ pub fn setns_mnt(pid: i32) -> Result<(), String> {
         }
 
         let c_ns = cstr("ns/mnt")?;
-        let ns_fd = unsafe {
-            libc::openat(
-                proc_fd,
-                c_ns.as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC,
-            )
-        };
+        let ns_fd =
+            unsafe { libc::openat(proc_fd, c_ns.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
         if ns_fd < 0 {
             return Err(last_err(&format!("open {proc_path}/ns/mnt")));
         }
