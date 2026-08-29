@@ -47,9 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
+      - name: Runtime package boundary contract
+        run: bash scripts/check-runtime-package-boundary.sh
 
   android:
     name: Android build, test and release checks

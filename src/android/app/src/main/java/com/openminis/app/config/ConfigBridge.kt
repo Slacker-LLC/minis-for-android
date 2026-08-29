@@ -24,7 +24,7 @@ import java.util.UUID
  * log). Mirrors iOS `ConfigOffloadBridge.swift`.
  *
  * Returns plain [JSONObject] envelopes so the handler just wraps them
- * in [com.openminis.app.sandbox.NativeOffloadResult]. The handler
+ * in [com.openminis.app.runtime.guest.NativeOffloadResult]. The handler
  * thread is on a background pool, so write paths block via runBlocking
  * on the gate suspend — matching the iOS semaphore-on-detached-Task
  * pattern.
