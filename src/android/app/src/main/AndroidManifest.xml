@@ -10,17 +10,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Generic agent/shell execution uses a truthful specialUse FGS on API 34+.
+         It is neither media playback nor data synchronization. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- T-android-fgs-timeout-crash: switched from dataSync to mediaPlayback.
-         dataSync has a hard 6h/24h cumulative cap on Android 14+, after
-         which the system throws ForegroundServiceDidNotStopInTimeException
-         and force-kills the process. Long-running novel-writing / shell /
-         iSH sessions reliably hit this on OnePlus PJZ110 / Android 16.
-         mediaPlayback has no such cap and AOSP's foreground-service-type
-         validation accepts it as long as the permission is held; the
-         "must use MediaStyle / play actual media" rule is Play Store
-         policy, not an OS runtime check, and Minis ships as a sideload.
-    -->
+    <!-- Retained for genuine audio/media playback surfaces that may require a
+         dedicated mediaPlayback FGS. AgentForegroundService does not declare or
+         request this type. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- T50: PARTIAL_WAKE_LOCK held by AgentForegroundService while sessions
          are streaming so Doze + OEM CPU throttling don't stall long shell
@@ -471,14 +466,18 @@
             </intent-filter>
         </activity>
 
-        <!-- Agent foreground service -->
-        <!-- T-android-fgs-timeout-crash: type=mediaPlayback to escape the
-             dataSync 6h cap. See FOREGROUND_SERVICE_MEDIA_PLAYBACK
-             permission comment above. -->
+        <!-- Generic agent/shell execution foreground service. `specialUse` is
+             the narrow truthful type because interactive/headless agent turns do
+             not match mediaPlayback or dataSync. The subtype is required for
+             Android 14+ specialUse declarations. -->
         <service
             android:name=".service.AgentForegroundService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Active AI agent turn with model streaming and bounded tool execution" />
+        </service>
 
         <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling).
              exported=false: BOOT_COMPLETED is a protected broadcast that the
