@@ -189,10 +189,7 @@ pub fn frame_header(len: usize, max: usize) -> Result<[u8; FRAME_HEADER_BYTES], 
     Ok((len as u32).to_be_bytes())
 }
 
-pub fn decode_frame_len(
-    header: [u8; FRAME_HEADER_BYTES],
-    max: usize,
-) -> Result<usize, ErrorCode> {
+pub fn decode_frame_len(header: [u8; FRAME_HEADER_BYTES], max: usize) -> Result<usize, ErrorCode> {
     let len = u32::from_be_bytes(header) as usize;
     if len == 0 || len > max {
         return Err(ErrorCode::BadParams);
@@ -211,11 +208,7 @@ pub fn encode_frame(payload: &[u8], max: usize) -> Result<Vec<u8>, ErrorCode> {
 #[allow(clippy::result_large_err)]
 pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
     if bytes.len() > MAX_REQUEST_BYTES {
-        return Err(Response::err(
-            0,
-            ErrorCode::BadParams,
-            "request too large",
-        ));
+        return Err(Response::err(0, ErrorCode::BadParams, "request too large"));
     }
     let raw = std::str::from_utf8(bytes)
         .map_err(|_| Response::err(0, ErrorCode::BadParams, "request is not utf-8"))?;
