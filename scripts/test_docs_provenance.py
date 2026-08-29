@@ -17,18 +17,16 @@ def write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def valid_execution_text() -> str:
-    return " ".join(guard.REQUIRED_EXECUTION_TERMS) + "\n"
-
-
-def valid_readme_text() -> str:
-    return "# Minis for Android\n" + " ".join(guard.REQUIRED_README_TERMS) + "\n"
+def required_text(terms: tuple[str, ...]) -> str:
+    return " ".join(terms) + "\n"
 
 
 def valid_fixture(root: Path) -> None:
-    write(root, "README.md", valid_readme_text())
-    write(root, "README.zh-CN.md", valid_readme_text())
-    write(root, "docs/EXECUTION-ENVIRONMENT.md", valid_execution_text())
+    write(root, "README.md", "# Minis for Android\n" + required_text(guard.REQUIRED_README_TERMS))
+    write(root, "README.zh-CN.md", "# Minis for Android\n" + required_text(guard.REQUIRED_README_TERMS))
+    write(root, "CONTRIBUTING.md", required_text(guard.REQUIRED_CONTRIBUTING_TERMS))
+    write(root, "docs/SECURITY.md", required_text(guard.REQUIRED_SECURITY_TERMS))
+    write(root, "docs/EXECUTION-ENVIRONMENT.md", required_text(guard.REQUIRED_EXECUTION_TERMS))
     write(
         root,
         "PROVENANCE.md",
@@ -41,7 +39,13 @@ class ProvenanceGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             valid_fixture(root)
-            write(root, "README.md", valid_readme_text() + "Current project differs from OpenMinis and PRoot.\n")
+            write(
+                root,
+                "README.md",
+                "# Minis for Android\n"
+                + required_text(guard.REQUIRED_README_TERMS)
+                + "Current project differs from OpenMinis and PRoot.\n",
+            )
             errors = guard.check_tree(root)
             self.assertTrue(any("README.md" in error for error in errors))
 
@@ -63,7 +67,7 @@ class ProvenanceGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             valid_fixture(root)
-            text = valid_execution_text().replace("mount namespace", "")
+            text = required_text(guard.REQUIRED_EXECUTION_TERMS).replace("mount namespace", "")
             write(root, "docs/EXECUTION-ENVIRONMENT.md", text)
             self.assertTrue(any("mount namespace" in error for error in guard.check_tree(root)))
 
@@ -71,7 +75,7 @@ class ProvenanceGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             valid_fixture(root)
-            text = valid_execution_text().replace("/data/adb/minis/home", "")
+            text = required_text(guard.REQUIRED_EXECUTION_TERMS).replace("/data/adb/minis/home", "")
             write(root, "docs/EXECUTION-ENVIRONMENT.md", text)
             self.assertTrue(any("/data/adb/minis/home" in error for error in guard.check_tree(root)))
 
@@ -87,6 +91,32 @@ class ProvenanceGuardTests(unittest.TestCase):
             errors = guard.check_tree(root)
             self.assertTrue(any("App-filesDir" in error for error in errors))
 
+    def test_current_docs_reject_stale_single_authority_persistence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_fixture(root)
+            write(
+                root,
+                "CONTRIBUTING.md",
+                required_text(guard.REQUIRED_CONTRIBUTING_TERMS)
+                + "The Android app is the single source of truth for persistence.\n",
+            )
+            errors = guard.check_tree(root)
+            self.assertTrue(any("single-authority persistence" in error for error in errors))
+
+    def test_current_docs_reject_app_private_workspace_framing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_fixture(root)
+            write(
+                root,
+                "docs/SECURITY.md",
+                required_text(guard.REQUIRED_SECURITY_TERMS)
+                + "SAF and app-private workspace are separate trust domains.\n",
+            )
+            errors = guard.check_tree(root)
+            self.assertTrue(any("app-private workspace" in error for error in errors))
+
     def test_readmes_require_current_runtime_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -94,6 +124,22 @@ class ProvenanceGuardTests(unittest.TestCase):
             write(root, "README.zh-CN.md", "# Minis for Android\n")
             errors = guard.check_tree(root)
             self.assertTrue(any("README.zh-CN.md" in error and "/data/adb/minis" in error for error in errors))
+
+    def test_contributing_requires_persistent_runtime_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_fixture(root)
+            write(root, "CONTRIBUTING.md", "minisd mount namespace\n")
+            errors = guard.check_tree(root)
+            self.assertTrue(any("CONTRIBUTING.md" in error and "/data/adb/minis" in error for error in errors))
+
+    def test_security_requires_persistent_backing_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_fixture(root)
+            write(root, "docs/SECURITY.md", "minisd /data/adb/minis\n")
+            errors = guard.check_tree(root)
+            self.assertTrue(any("docs/SECURITY.md" in error and "tmpfs" in error for error in errors))
 
     def test_provenance_requires_source_and_license(self):
         with tempfile.TemporaryDirectory() as tmp:

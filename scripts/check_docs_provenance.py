@@ -28,6 +28,11 @@ BANNED_PATTERNS = {
         r"Context\.filesDir|app(?:'s)? private files directory|App 私有 files 目录",
         re.IGNORECASE,
     ),
+    "stale app-private workspace framing": re.compile(r"app-private workspace", re.IGNORECASE),
+    "stale single-authority persistence framing": re.compile(
+        r"single source of truth[^\n]{0,180}persistence",
+        re.IGNORECASE,
+    ),
 }
 REQUIRED_EXECUTION_TERMS = (
     "Ubuntu 24.04",
@@ -42,6 +47,8 @@ REQUIRED_EXECUTION_TERMS = (
     "/data/adb/minis/home",
 )
 REQUIRED_README_TERMS = ("Ubuntu 24.04", "minisd", "/data/adb/minis")
+REQUIRED_CONTRIBUTING_TERMS = ("minisd", "/data/adb/minis", "mount namespace")
+REQUIRED_SECURITY_TERMS = ("minisd", "/data/adb/minis", "tmpfs")
 REQUIRED_PROVENANCE_TERMS = (
     "OpenMinis/OpenMinis",
     "GPL-3.0",
@@ -98,6 +105,18 @@ def check_tree(root: Path) -> list[str]:
     )
     require_terms(errors, root / "README.md", "README.md", REQUIRED_README_TERMS)
     require_terms(errors, root / "README.zh-CN.md", "README.zh-CN.md", REQUIRED_README_TERMS)
+    require_terms(
+        errors,
+        root / "CONTRIBUTING.md",
+        "CONTRIBUTING.md",
+        REQUIRED_CONTRIBUTING_TERMS,
+    )
+    require_terms(
+        errors,
+        root / "docs/SECURITY.md",
+        "docs/SECURITY.md",
+        REQUIRED_SECURITY_TERMS,
+    )
 
     provenance = root / "PROVENANCE.md"
     if not provenance.is_file():
