@@ -8,17 +8,61 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Optional provider customization is local build configuration. The repository
-// tracks only provider-customization.properties.example; the real
-// provider-customization.properties file is gitignored. Features that require
-// a missing private OAuth identifier must fail closed at their feature boundary,
-// while unrelated API-key paths must remain usable.
+// Provider customization is local build configuration. Public-source builds
+// intentionally omit provider-customization.properties and compile the
+// affected integration as an explicit disabled capability. Private/production
+// builds opt into strict validation with -PproviderCustomizationRequired=true.
+val providerCustomizationFile = rootProject.file("app/provider-customization.properties")
+val providerCustomizationRequired = providers.gradleProperty("providerCustomizationRequired")
+    .orNull
+    ?.trim()
+    ?.lowercase()
+    ?.let { raw ->
+        when (raw) {
+            "true" -> true
+            "false" -> false
+            else -> throw GradleException(
+                "providerCustomizationRequired must be either true or false."
+            )
+        }
+    }
+    ?: false
+
 val appCustomization = Properties().apply {
-    val f = rootProject.file("app/provider-customization.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
+    if (providerCustomizationFile.isFile) {
+        providerCustomizationFile.inputStream().use { load(it) }
+    }
 }
-fun customizationValue(key: String): String =
-    (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
+
+val providerCustomizationUnavailable = "NOT_AVAILABLE_IN_THIS_BUILD"
+val anthropicOAuthIdentifierPrompt = appCustomization
+    .getProperty("ANTHROPIC_OAUTH_IDENTIFIER_PROMPT")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+
+if (providerCustomizationRequired && !providerCustomizationFile.isFile) {
+    throw GradleException(
+        "provider-customization.properties is required when " +
+            "-PproviderCustomizationRequired=true."
+    )
+}
+if (providerCustomizationRequired && anthropicOAuthIdentifierPrompt == null) {
+    throw GradleException(
+        "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT must be present and non-blank when " +
+            "-PproviderCustomizationRequired=true."
+    )
+}
+
+val claudeOAuthCustomizationAvailable = anthropicOAuthIdentifierPrompt != null
+val compiledAnthropicOAuthIdentifierPrompt =
+    anthropicOAuthIdentifierPrompt ?: providerCustomizationUnavailable
+
+fun buildConfigString(value: String): String =
+    "\"" + value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n") + "\""
 
 android {
     namespace = "com.openminis.app"
@@ -35,12 +79,17 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Optional Anthropic OAuth identifier prompt. Empty when the local
-        // provider customization file does not configure it.
+        // Claude OAuth is either explicitly available with a configured prompt,
+        // or explicitly disabled. Never compile an empty-string third state.
+        buildConfigField(
+            "boolean",
+            "CLAUDE_OAUTH_CUSTOMIZATION_AVAILABLE",
+            claudeOAuthCustomizationAvailable.toString()
+        )
         buildConfigField(
             "String",
             "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT",
-            "\"${customizationValue("ANTHROPIC_OAUTH_IDENTIFIER_PROMPT")}\""
+            buildConfigString(compiledAnthropicOAuthIdentifierPrompt)
         )
 
         ndk {
@@ -104,6 +153,19 @@ android {
         // Existing debt snapshot only. New findings must fail CI; this file may
         // only shrink as historical findings are fixed.
         baseline = file("lint-baseline.xml")
+    }
+}
+
+// Deterministic, non-secret diagnostic used by CI to exercise public,
+// required-missing, and configured provider-customization build paths. Never
+// print the configured customization value itself.
+tasks.register("printProviderCustomizationCapability") {
+    doLast {
+        println("CLAUDE_OAUTH_CUSTOMIZATION_AVAILABLE=$claudeOAuthCustomizationAvailable")
+        println(
+            "ANTHROPIC_OAUTH_IDENTIFIER_PROMPT_STATE=" +
+                if (claudeOAuthCustomizationAvailable) "CONFIGURED" else providerCustomizationUnavailable
+        )
     }
 }
 
