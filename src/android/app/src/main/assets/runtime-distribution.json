@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "runtimeVersion": "2026.08.29.1",
+  "protocolVersion": 1,
+  "layoutVersion": 2,
+  "abi": "arm64",
+  "distributionReady": false,
+  "minisd": {
+    "source": "external_staged",
+    "file": "minisd-arm64",
+    "stagedPath": "/data/local/tmp/minis-runtime/minisd-arm64",
+    "sha256": null
+  },
+  "rootfs": {
+    "source": "external_staged",
+    "file": "ubuntu-arm64-rootfs.tar.gz",
+    "stagedPath": "/data/local/tmp/minis-runtime/ubuntu-arm64-rootfs.tar.gz",
+    "sha256": null,
+    "version": "ubuntu-24.04-r1",
+    "release": "24.04",
+    "profile": "base",
+    "upstreamSha256": null
+  },
+  "provisionRevision": 1,
+  "requiredCommands": ["python3", "git", "curl"],
+  "note": "Fail-closed development manifest. Release packaging must inject verified minisd/rootfs SHA-256 values and set distributionReady=true before claiming self-contained first-install support."
+}
