@@ -50,6 +50,7 @@ class MinisdBootstrapTest {
         assertTrue(command.contains("APP_UID=12345"))
         assertTrue(command.contains("/^Uid:/"))
         assertTrue(command.contains("app mount namespace target mismatch"))
+        assertTrue(command.contains("MINIS_EXPECTED_APP_UID=\"\$APP_UID\""))
         assertTrue(command.contains("--watchdog --mount-ns-pid \"\$APP_MNT_PID\" --policy"))
         assertTrue(command.contains("--app-socket"))
         assertFalse(command.contains("minisd.pid"))
