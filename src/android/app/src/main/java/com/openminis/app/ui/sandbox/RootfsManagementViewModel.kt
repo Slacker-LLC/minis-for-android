@@ -7,6 +7,7 @@ import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.distribution.RuntimeDistributionCode
 import com.openminis.app.sandbox.distribution.RuntimeDistributionManager
+import com.openminis.app.sandbox.distribution.RuntimeDistributionSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,20 @@ data class RootfsManagementUiState(
     val runtimeInstalledVersion: String? = null,
     val runtimeStatus: String = "Not probed",
     val runtimeDetail: String = "",
+)
+
+internal fun RootfsManagementUiState.withRuntimeProbe(
+    rootfsHealthy: Boolean,
+    rootfsSize: Long,
+    runtime: RuntimeDistributionSnapshot,
+): RootfsManagementUiState = copy(
+    isInstalled = rootfsHealthy && runtime.ready,
+    rootfsSize = rootfsSize,
+    runtimeReady = runtime.ready,
+    runtimeDesiredVersion = runtime.desiredVersion,
+    runtimeInstalledVersion = runtime.installedVersion,
+    runtimeStatus = runtime.code.name,
+    runtimeDetail = runtime.detail,
 )
 
 class RootfsManagementViewModel : ViewModel() {
@@ -84,14 +99,10 @@ class RootfsManagementViewModel : ViewModel() {
             } else {
                 0L
             }
-            _uiState.value = _uiState.value.copy(
-                isInstalled = health.healthy,
+            _uiState.value = _uiState.value.withRuntimeProbe(
+                rootfsHealthy = health.healthy,
                 rootfsSize = size,
-                runtimeReady = runtime.ready,
-                runtimeDesiredVersion = runtime.desiredVersion,
-                runtimeInstalledVersion = runtime.installedVersion,
-                runtimeStatus = runtime.code.name,
-                runtimeDetail = runtime.detail,
+                runtime = runtime,
             )
         }
     }
