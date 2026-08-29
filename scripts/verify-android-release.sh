@@ -19,6 +19,18 @@ if [[ -z "$APKSIGNER" || ! -x "$APKSIGNER" ]]; then
   exit 2
 fi
 
+AAPT2="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name aapt2 -print | sort -V | tail -n1)"
+if [[ -z "$AAPT2" || ! -x "$AAPT2" ]]; then
+  echo "aapt2 not found" >&2
+  exit 2
+fi
+
+APK_PACKAGE="$($AAPT2 dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n1)"
+if [[ "$APK_PACKAGE" != "io.github.slackerllc.minis" ]]; then
+  echo "release APK package mismatch: got '${APK_PACKAGE:-unknown}', expected 'io.github.slackerllc.minis'" >&2
+  exit 1
+fi
+
 CERT="$($APKSIGNER verify --print-certs "$APK")"
 printf '%s\n' "$CERT"
 if grep -Fq 'CN=Android Debug' <<<"$CERT"; then
@@ -41,4 +53,4 @@ while IFS= read -r dex; do
   fi
 done < <(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$')
 
-echo "release APK verification passed"
+echo "release APK verification passed for $APK_PACKAGE"
