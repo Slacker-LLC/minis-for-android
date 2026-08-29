@@ -15,17 +15,15 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
 /**
- * Host-side endpoint of the proot `native_offload` extension.
+ * Android-side endpoint for the guest offload RPC compatibility transport.
  *
- * The guest issues `execve("<handler-name>", argv, envp)`; the proot
- * extension sends argv/env/cwd over an abstract unix socket to this
- * server. The server dispatches to the registered [NativeOffloadHandler],
- * writes the handler's combined output into a tmpfile inside the guest's
- * /tmp, and replies with `(exit_code, guest_tmpfile_path)`. The extension
- * then rewrites the execve into `/bin/cat <tmpfile>` so the guest sees
- * the handler output as plain stdout.
+ * Guest tools issue `execve("<handler-name>", argv, envp)` and a guest-side
+ * compatibility shim forwards argv/env/cwd over an abstract unix socket. This
+ * server dispatches to registered [NativeOffloadHandler] implementations and
+ * returns output through the retained tmp-file framing contract.
  *
- * Mirrors iOS `native_offload_add_handler` + `native_offload_exec`.
+ * This bridge does not own Ubuntu process, mount-namespace, or chroot
+ * lifecycle. Those privileged runtime boundaries belong to minisd.
  */
 data class NativeOffloadRequest(
     val pid: Int,
@@ -133,15 +131,16 @@ object NativeOffloadServer {
      *
      * WHY THESE LEAK. Each offload call writes the handler's combined output to
      * `<rootfs>/tmp/.native-offload-<pid>-<seq>` and returns the GUEST path;
-     * proot's native_offload extension then rewrites the tracee's execve into
-     * `/bin/cat <tmpfile>`. So the host cannot delete the file at reply time —
-     * `cat` has not run yet, and deleting it would turn every offload call into
-     * "No such file or directory". Nothing else ever removed them either
-     * (`delete`/`cleanup` were zero occurrences in this file), so one file
-     * accumulated per offload call, forever: measured on a dev device, 35 files
-     * spanning 12 days and surviving many app restarts, growing +1 per call.
-     * On a heavy user's device this reached thousands of files / GBs, showing
-     * up as an inflated "Shell container" figure on the storage screen.
+     * the guest-side native_offload compatibility shim then rewrites the
+     * tracee's execve into `/bin/cat <tmpfile>`. So the host cannot delete the
+     * file at reply time — `cat` has not run yet, and deleting it would turn
+     * every offload call into "No such file or directory". Nothing else ever
+     * removed them either (`delete`/`cleanup` were zero occurrences in this
+     * file), so one file accumulated per offload call, forever: measured on a
+     * dev device, 35 files spanning 12 days and surviving many app restarts,
+     * growing +1 per call. On a heavy user's device this reached thousands of
+     * files / GBs, showing up as an inflated "Shell container" figure on the
+     * storage screen.
      *
      * WHY DELETING IS SAFE HERE.
      *  - [all] = true is used at server start. Any file present then belongs to
@@ -208,7 +207,7 @@ object NativeOffloadServer {
                 Log.i(TAG, "accept loop terminated: ${e.message}")
                 return
             }
-            Log.d(TAG, "accepted client from proot extension")
+            Log.d(TAG, "accepted client from guest offload transport")
             thread(name = "native-offload-worker", isDaemon = true) {
                 try {
                     handleClient(client)
