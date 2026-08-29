@@ -1,6 +1,7 @@
 package com.openminis.app.sandbox.ubuntu
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,7 +9,28 @@ import java.nio.file.Files
 
 class UbuntuPathsTest {
     @Test
-    fun `workspace and var minis aliases map to host`() {
+    fun `persistent host paths are fixed and never filesDir based`() {
+        assertEquals("/data/adb/minis/workspace", UbuntuPaths.hostWorkspace)
+        assertEquals("/data/adb/minis/sessions", UbuntuPaths.hostSessions)
+        assertEquals("/data/adb/minis/memory", UbuntuPaths.hostMemory)
+        assertEquals("/data/adb/minis/skills", UbuntuPaths.hostSkills)
+        assertEquals("/data/adb/minis/shared", UbuntuPaths.hostShared)
+        assertEquals("/data/adb/minis/home", UbuntuPaths.hostHome)
+        listOf(
+            UbuntuPaths.hostWorkspace,
+            UbuntuPaths.hostSessions,
+            UbuntuPaths.hostMemory,
+            UbuntuPaths.hostSkills,
+            UbuntuPaths.hostShared,
+            UbuntuPaths.hostHome,
+        ).forEach { path ->
+            assertFalse(path.contains("/data/user/"))
+            assertFalse(path.contains("/files/"))
+        }
+    }
+
+    @Test
+    fun `workspace home and global aliases map to distinct persistent sources`() {
         assertEquals(
             "/data/adb/minis/workspace/x.xlsx",
             UbuntuPaths.resolveGuest("/workspace/x.xlsx")!!.path.replace('\\', '/'),
@@ -21,6 +43,13 @@ class UbuntuPathsTest {
             "/data/adb/minis/memory/notes.md",
             UbuntuPaths.resolveGuest("/memory/notes.md")!!.path.replace('\\', '/'),
         )
+        assertEquals(
+            "/data/adb/minis/home/.profile",
+            UbuntuPaths.resolveGuest("/home/minis/.profile")!!.path.replace('\\', '/'),
+        )
+        assertTrue(UbuntuPaths.hostHome != UbuntuPaths.hostWorkspace)
+        assertEquals("/home/minis", UbuntuPaths.GUEST_HOME)
+        assertEquals("/workspace", UbuntuPaths.GUEST_WORKSPACE)
     }
 
     @Test
@@ -34,14 +63,11 @@ class UbuntuPathsTest {
         } finally {
             UbuntuPaths.bindMounts.remove("/mnt/docs")
         }
-        // relative path falls back to workspace (linux.file.* contract)
-        run {
-            val p = UbuntuPaths.resolveHostPath("e2e/ok.txt")
-            assertTrue(p != null && p!!.path.replace('\\', '/').endsWith("/workspace/e2e/ok.txt"))
-            val q = UbuntuPaths.resolveHostPath("ok.txt")
-            assertTrue(q != null && q!!.path.replace('\\', '/').endsWith("/workspace/ok.txt"))
-            assertNull(UbuntuPaths.resolveHostPath("../escape.txt"))
-        }
+        val p = UbuntuPaths.resolveHostPath("e2e/ok.txt")
+        assertTrue(p != null && p.path.replace('\\', '/').endsWith("/workspace/e2e/ok.txt"))
+        val q = UbuntuPaths.resolveHostPath("ok.txt")
+        assertTrue(q != null && q.path.replace('\\', '/').endsWith("/workspace/ok.txt"))
+        assertNull(UbuntuPaths.resolveHostPath("../escape.txt"))
     }
 
     @Test
@@ -67,68 +93,86 @@ class UbuntuPathsTest {
     }
 
     @Test
-    fun `session paths isolate identical guest names and clean up independently`() {
-        val filesDir = Files.createTempDirectory("minis-session-paths").toFile()
+    fun `session paths isolate identical guest names and delete without orphans`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-paths").toFile()
         try {
-            val first = UbuntuPaths.resolveSessionPath(
-                filesDir,
+            val first = UbuntuPaths.resolveSessionPathAt(
+                sessionsRoot,
                 "session-a",
                 "/var/minis/workspace/report.txt",
             )!!
-            val second = UbuntuPaths.resolveSessionPath(
-                filesDir,
+            val second = UbuntuPaths.resolveSessionPathAt(
+                sessionsRoot,
                 "session-b",
                 "/var/minis/workspace/report.txt",
             )!!
-            assertTrue(first.absolutePath.contains("minis-sessions${java.io.File.separator}session-a"))
-            assertTrue(second.absolutePath.contains("minis-sessions${java.io.File.separator}session-b"))
+            assertTrue(first.absolutePath.contains("session-a${java.io.File.separator}workspace"))
+            assertTrue(second.absolutePath.contains("session-b${java.io.File.separator}workspace"))
             assertTrue(first.absolutePath != second.absolutePath)
             first.writeText("a")
             second.writeText("b")
             assertEquals("a", first.readText())
             assertEquals("b", second.readText())
 
-            val attachment = UbuntuPaths.resolveSessionPath(
-                filesDir,
+            val attachment = UbuntuPaths.resolveSessionPathAt(
+                sessionsRoot,
                 "session-a",
                 "/var/minis/attachments/photo.png",
             )!!
             assertTrue(attachment.path.contains("attachments"))
-            assertTrue(!attachment.path.contains("workspace${java.io.File.separator}attachments"))
+            assertFalse(attachment.path.contains("workspace${java.io.File.separator}attachments"))
             assertEquals(
                 attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
+                UbuntuPaths.resolveSessionPathAt(
+                    sessionsRoot,
                     "session-a",
                     "/workspace/attachments/photo.png",
                 )!!.canonicalFile,
             )
             assertEquals(
                 attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
+                UbuntuPaths.resolveSessionPathAt(
+                    sessionsRoot,
                     "session-a",
                     "/var/minis/workspace/attachments/photo.png",
                 )!!.canonicalFile,
             )
 
-            assertTrue(UbuntuPaths.deleteSessionFiles(filesDir, "session-a"))
-            assertTrue(!first.exists())
+            val firstRoot = java.io.File(sessionsRoot, "session-a")
+            val secondRoot = java.io.File(sessionsRoot, "session-b")
+            assertTrue(UbuntuPaths.deleteSessionFilesAt(sessionsRoot, "session-a"))
+            assertFalse(firstRoot.exists())
+            assertTrue(secondRoot.exists())
             assertTrue(second.exists())
+            assertEquals(listOf("session-b"), sessionsRoot.list()?.sorted())
         } finally {
-            filesDir.deleteRecursively()
+            sessionsRoot.deleteRecursively()
         }
     }
 
     @Test
-    fun `session resolver rejects traversal and invalid ids`() {
-        val filesDir = Files.createTempDirectory("minis-session-invalid").toFile()
+    fun `session resolver rejects traversal invalid ids and symlink mounts`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-invalid").toFile()
+        val outside = Files.createTempDirectory("minis-session-outside")
         try {
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "../escape", "/workspace/a"))
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "session", "/workspace/../a"))
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "会话", "/workspace/a"))
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "../escape", "/workspace/a"))
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "session", "/workspace/../a"))
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "会话", "/workspace/a"))
+
+            val session = UbuntuPaths.ensureSessionDirsAt(sessionsRoot, "symlink-session")!!
+            val workspace = session.toPath().resolve("workspace")
+            workspace.toFile().deleteRecursively()
+            Files.createSymbolicLink(workspace, outside)
+            assertNull(
+                UbuntuPaths.resolveSessionPathAt(
+                    sessionsRoot,
+                    "symlink-session",
+                    "/workspace/secret.txt",
+                ),
+            )
         } finally {
-            filesDir.deleteRecursively()
+            sessionsRoot.deleteRecursively()
+            outside.toFile().deleteRecursively()
         }
     }
 }
