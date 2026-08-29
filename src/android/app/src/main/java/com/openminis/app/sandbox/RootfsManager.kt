@@ -36,7 +36,7 @@ class RootfsManager private constructor(private val context: Context) {
 
     // Ubuntu rootfs is managed by minisd (host path /data/adb/minis/rootfs);
     // kept as a stub for UI compatibility — install state is always Installed.
-    val rootfsDir: File = File(context.filesDir, "minis-rootfs")
+    val rootfsDir: File = File(com.openminis.app.sandbox.ubuntu.UbuntuPaths.HOST_ROOTFS)
 
     val isInstalled: Boolean
         get() = true
