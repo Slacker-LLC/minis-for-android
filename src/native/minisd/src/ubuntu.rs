@@ -1,14 +1,14 @@
 use crate::layout::{
-    ensure_host_layout, ensure_rootfs_layout, is_provisioned, read_os_release, rootfs_looks_valid,
-    validate_persistent_backing, DEFAULT_GUEST_CWD, GUEST_UID, HOST_HOME, HOST_MEMORY, HOST_ROOTFS,
-    HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE, PERSISTENT_DATA_MODE, UBUNTU_PID_FILE,
-    UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
+    ensure_host_layout_for, ensure_rootfs_layout, is_provisioned, read_os_release,
+    rootfs_looks_valid, validate_persistent_backing, DEFAULT_GUEST_CWD, GUEST_UID, HOST_HOME,
+    HOST_MEMORY, HOST_ROOTFS, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
+    PERSISTENT_DATA_MODE, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
 };
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use crate::state::AppState;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 30_000;
@@ -294,9 +294,7 @@ pub fn prepare_session_root(
     if sessions_root != HOST_SESSIONS {
         return Err((
             ErrorCode::BadParams,
-            format!(
-                "sessions_root is fixed to {HOST_SESSIONS}; refusing source {sessions_root}"
-            ),
+            format!("sessions_root is fixed to {HOST_SESSIONS}; refusing source {sessions_root}"),
         ));
     }
     prepare_session_root_at(Path::new(HOST_SESSIONS), session_id, uid, gid)
@@ -316,7 +314,10 @@ fn prepare_session_root_at(
     let root = std::fs::canonicalize(root).map_err(|e| {
         (
             ErrorCode::RuntimeUnavailable,
-            format!("session workspace root unavailable at {}: {e}", root.display()),
+            format!(
+                "session workspace root unavailable at {}: {e}",
+                root.display()
+            ),
         )
     })?;
     let root_meta = std::fs::metadata(&root).map_err(|e| {
@@ -489,7 +490,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
 
     retire_stale_keeper();
     let (guid, ggid) = guest_ids(state);
-    ensure_host_layout(guid, ggid).map_err(|e| (ErrorCode::Internal, e))?;
+    ensure_host_layout_for(guid, ggid).map_err(|e| (ErrorCode::Internal, e))?;
     validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
     if !rootfs_looks_valid(HOST_ROOTFS) {
         return Err((
@@ -501,8 +502,8 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     crate::layout::ensure_guest_user_ids(HOST_ROOTFS, guid, ggid)
         .map_err(|e| (ErrorCode::Internal, e))?;
     let dns = crate::env::discover_dns();
-    let resolv = crate::env::write_resolv_conf(HOST_ROOTFS, &dns)
-        .map_err(|e| (ErrorCode::Internal, e))?;
+    let resolv =
+        crate::env::write_resolv_conf(HOST_ROOTFS, &dns).map_err(|e| (ErrorCode::Internal, e))?;
 
     let exe =
         std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
@@ -783,7 +784,10 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     };
     let upd = exec_live(state, &update, true)?;
     if upd.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
-        return Err((ErrorCode::Internal, format!("apt-get update failed: {upd}")));
+        return Err((
+            ErrorCode::Internal,
+            format!("apt-get update failed: {upd}"),
+        ));
     }
     let mut argv = vec![
         "/usr/bin/apt-get".into(),
@@ -964,7 +968,8 @@ fn refresh_live(state: &mut AppState) {
         }
     }
     if state.ubuntu.running {
-        state.ubuntu.last_error = Some("keeper process gone or persistent layout identity mismatch".into());
+        state.ubuntu.last_error =
+            Some("keeper process gone or persistent layout identity mismatch".into());
     }
     state.ubuntu.running = false;
     state.ubuntu.pid = None;
@@ -1012,10 +1017,11 @@ fn keeper_cmdline_matches(raw: &[u8]) -> bool {
         .windows(2)
         .any(|pair| pair[0] == b"--rootfs" && pair[1] == HOST_ROOTFS.as_bytes());
     let has_legacy_source_override = args.iter().any(|arg| {
-        matches!(
-            *arg,
-            b"--workspace" | b"--memory" | b"--skills" | b"--shared" | b"--home"
-        )
+        *arg == b"--workspace"
+            || *arg == b"--memory"
+            || *arg == b"--skills"
+            || *arg == b"--shared"
+            || *arg == b"--home"
     });
     helper && rootfs && !has_legacy_source_override
 }
@@ -1197,8 +1203,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn session_root_is_isolated_and_rejects_symlink_mounts() {
-        use std::os::unix::fs::PermissionsExt;
         use std::os::unix::fs::symlink;
+        use std::os::unix::fs::PermissionsExt;
 
         let unique = format!(
             "minisd-sessions-{}-{}",
