@@ -8,7 +8,7 @@ import org.json.JSONObject
 import java.io.BufferedReader
 
 /**
- * stdio transport for local MCP servers (`command` + `args` in servers.json).
+ * stdio transport for local MCP servers (`command` + `args` in servers.json`).
  * A cancelled request closes pipes and destroys the server process so a
  * blocking readLine cannot outlive the cancelled agent/tool call.
  */
@@ -124,15 +124,23 @@ class MCPStdioTransport(
 
     @Synchronized
     fun close() {
-        writer?.runCatching { close() }
-        reader?.runCatching { close() }
-        process?.let { p ->
-            p.destroy()
-            if (p.isAlive) p.destroyForcibly()
-        }
+        val p = process
         process = null
+        val w = writer
         writer = null
+        val r = reader
         reader = null
+
+        // A reader thread may be blocked in BufferedReader.readLine(). Closing
+        // that same reader first can wait on its lock and prevent us from ever
+        // reaching Process.destroy(). Kill the subprocess first so stdout closes
+        // and the blocked read unblocks, then close the streams.
+        p?.let {
+            it.destroy()
+            if (it.isAlive) it.destroyForcibly()
+        }
+        w?.runCatching { close() }
+        r?.runCatching { close() }
     }
 
     internal fun hasLiveProcessForTest(): Boolean = process?.isAlive == true
