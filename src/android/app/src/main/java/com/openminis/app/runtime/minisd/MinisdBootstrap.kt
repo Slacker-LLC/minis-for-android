@@ -18,6 +18,11 @@ internal object MinisdBootstrap {
         return root.toString()
     }
 
+    /**
+     * Starts the privileged broker independently of Ubuntu rootfs health.
+     * Rootfs validation belongs to the runtime recovery state machine after
+     * the broker is reachable; otherwise a missing rootfs deadlocks recovery.
+     */
     fun watchdogCommand(
         appSocket: String,
         policyJson: String,
@@ -25,21 +30,25 @@ internal object MinisdBootstrap {
     ): String {
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}"
-        commands += "ROOTFS=${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}"
         commands += "POLICY=${shellQuote(POLICY_PATH)}"
         commands += "APP_SOCKET=${shellQuote(appSocket)}"
+        commands += "PIDFILE=${shellQuote(PID_FILE)}"
         commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
-        commands += "if [ ! -f \"\$ROOTFS/etc/os-release\" ]; then echo \"ubuntu rootfs missing: \$ROOTFS/etc/os-release\" >&2; exit 41; fi"
-        commands += "if [ ! -e \"\$ROOTFS/bin/bash\" ] && [ ! -e \"\$ROOTFS/usr/bin/bash\" ] && [ ! -e \"\$ROOTFS/bin/sh\" ]; then echo \"ubuntu rootfs missing shell under \$ROOTFS\" >&2; exit 42; fi"
         commands += "mkdir -p ${shellQuote(POLICY_DIR)} || { echo \"cannot create minisd policy directory\" >&2; exit 43; }"
         commands += "umask 077"
         commands += "printf '%s' ${shellQuote(policyJson)} > \"\$POLICY.tmp\" || { echo \"cannot write minisd policy\" >&2; exit 44; }"
         commands += "mv -f \"\$POLICY.tmp\" \"\$POLICY\" || { echo \"cannot install minisd policy\" >&2; exit 45; }"
 
+        // A syntactically invalid pidfile, or one naming a process that no
+        // longer exists, is stale state and can be removed without killing
+        // anything. Never trust a numeric pid until its cmdline is verified.
+        commands += "pid=\"\""
+        commands += "if [ -r \"\$PIDFILE\" ]; then pid=\$(cat \"\$PIDFILE\" 2>/dev/null || true); fi"
+        commands += "case \"\$pid\" in ''|*[!0-9]*) [ -e \"\$PIDFILE\" ] && rm -f \"\$PIDFILE\" ;; *) [ -d \"/proc/\$pid\" ] || { rm -f \"\$PIDFILE\"; pid=\"\"; } ;; esac"
+
         if (forceRestart) {
-            commands += "pid=\"\""
-            commands += "if [ -r ${shellQuote(PID_FILE)} ]; then pid=\$(cat ${shellQuote(PID_FILE)} 2>/dev/null || true); fi"
             commands += "case \"\$pid\" in ''|*[!0-9]*) ;; *) child_cmd=\$(tr '\\000' ' ' < \"/proc/\$pid/cmdline\" 2>/dev/null || true); case \"\$child_cmd\" in *minisd*--socket*/data/adb/minis/run/minisd.sock*) ppid=\$(awk '/^PPid:/{print \$2; exit}' \"/proc/\$pid/status\" 2>/dev/null || true); case \"\$ppid\" in ''|*[!0-9]*) ;; *) parent_cmd=\$(tr '\\000' ' ' < \"/proc/\$ppid/cmdline\" 2>/dev/null || true); case \"\$parent_cmd\" in *minisd*--watchdog*) kill \"\$ppid\" 2>/dev/null || true; kill \"\$pid\" 2>/dev/null || true ;; esac ;; esac ;; esac ;; esac"
+            commands += "rm -f \"\$PIDFILE\""
             commands += "sleep 1"
         }
 

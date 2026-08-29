@@ -36,7 +36,7 @@ class MinisdBootstrapTest {
     }
 
     @Test
-    fun `watchdog command validates runtime assets before spawn`() {
+    fun `watchdog bootstrap is independent of rootfs health`() {
         val command = MinisdBootstrap.watchdogCommand(
             appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
@@ -44,25 +44,43 @@ class MinisdBootstrapTest {
         )
 
         assertTrue(command.contains("minisd missing or not executable"))
-        assertTrue(command.contains("ubuntu rootfs missing"))
         assertTrue(command.contains("--watchdog --policy"))
         assertTrue(command.contains("--app-socket"))
-        assertFalse(command.contains("minisd.pid"))
+        assertFalse(command.contains("ubuntu rootfs missing"))
+        assertFalse(command.contains("ROOTFS="))
     }
 
     @Test
-    fun `force restart targets watchdog parent through pidfile`() {
+    fun `stale pidfile is cleaned without killing unverified process`() {
+        val command = MinisdBootstrap.watchdogCommand(
+            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
+            forceRestart = false,
+        )
+
+        assertTrue(command.contains("PIDFILE='/data/adb/minis/run/minisd.pid'"))
+        assertTrue(command.contains("*[!0-9]*"))
+        assertTrue(command.contains("[ -d \"/proc/\$pid\" ] ||"))
+        assertTrue(command.contains("rm -f \"\$PIDFILE\""))
+        assertFalse(command.contains("kill \"\$pid\""))
+    }
+
+    @Test
+    fun `force restart only kills verified watchdog lineage`() {
         val command = MinisdBootstrap.watchdogCommand(
             appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = true,
         )
 
-        assertTrue(command.contains("/data/adb/minis/run/minisd.pid"))
         assertTrue(command.contains("child_cmd"))
         assertTrue(command.contains("--socket*/data/adb/minis/run/minisd.sock"))
         assertTrue(command.contains("PPid:"))
-        assertTrue(command.contains("--watchdog"))
+        assertTrue(command.contains("parent_cmd"))
+        assertTrue(command.contains("*minisd*--watchdog*"))
+        assertTrue(command.contains("kill \"\$ppid\""))
+        assertTrue(command.contains("kill \"\$pid\""))
+        assertTrue(command.contains("rm -f \"\$PIDFILE\""))
     }
 
     @Test
