@@ -286,6 +286,7 @@
     <string name="provider_detail_show_model">顯示模型</string>
     <string name="provider_detail_sign_out">退出登錄</string>
     <string name="provider_detail_sign_in">登錄</string>
+    <string name="provider_oauth_not_available_in_this_build">目前組建未啟用此 OAuth 登入。請改用 API key，或安裝已啟用供應商自訂的版本。</string>
     <string name="common_cancel">取消</string>
     <string name="provider_detail_save_key">儲存金鑰</string>
     <string name="common_edit">編輯</string>

@@ -648,6 +648,7 @@
     <string name="provider_detail_delete_model">Delete Model</string>
     <string name="provider_detail_sign_out">サインアウト</string>
     <string name="provider_detail_sign_in">サインイン</string>
+    <string name="provider_oauth_not_available_in_this_build">このビルドでは、この OAuth サインインは利用できません。API キーを使用するか、プロバイダーのカスタマイズが有効なビルドをインストールしてください。</string>
     <string name="provider_detail_save_key">キーを保存</string>
     <string name="provider_detail_paste_bearer_token">ベアラートークンを貼り付け</string>
     <string name="provider_detail_save_token">トークンを保存</string>

@@ -689,6 +689,8 @@ private fun ColumnScope.OAuthConfigSection(
     var isAuthenticated by remember { mutableStateOf(false) }
     var maskedToken by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val oauthAvailableInThisBuild = providerType != ProviderType.anthropic ||
+        com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
 
     // Manual OAuth token entry state
     var manualToken by remember { mutableStateOf("") }
@@ -777,7 +779,11 @@ private fun ColumnScope.OAuthConfigSection(
         // ── Sign In ────────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.provider_detail_sign_in),
-            footer = stringResource(R.string.add_provider_opens_the_provider_s_web_sign_in_flow_af),
+            footer = if (oauthAvailableInThisBuild) {
+                stringResource(R.string.add_provider_opens_the_provider_s_web_sign_in_flow_af)
+            } else {
+                stringResource(R.string.provider_oauth_not_available_in_this_build)
+            },
         ) {
             SettingsCardBlock {
                 MinisButton(
@@ -835,10 +841,12 @@ private fun ColumnScope.OAuthConfigSection(
                                 // (4xx, token format) keep their raw
                                 // message so we don't lose diagnostic
                                 // signal.
-                                errorMessage = if (e is com.openminis.app.auth.OAuthNetworkUnreachableException) {
-                                    context.getString(R.string.add_provider_oauth_network_unreachable)
-                                } else {
-                                    e.message ?: "Authentication failed"
+                                errorMessage = when (e) {
+                                    is com.openminis.app.auth.ProviderCustomizationUnavailableException ->
+                                        context.getString(R.string.provider_oauth_not_available_in_this_build)
+                                    is com.openminis.app.auth.OAuthNetworkUnreachableException ->
+                                        context.getString(R.string.add_provider_oauth_network_unreachable)
+                                    else -> e.message ?: "Authentication failed"
                                 }
                             } finally {
                                 isAuthenticating = false
@@ -846,7 +854,7 @@ private fun ColumnScope.OAuthConfigSection(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isAuthenticating,
+                    enabled = !isAuthenticating && oauthAvailableInThisBuild,
                 ) {
                     if (isAuthenticating) {
                         CircularProgressIndicator(

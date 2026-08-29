@@ -863,6 +863,7 @@
     <string name="provider_detail_show_model">显示模型</string>
     <string name="provider_detail_sign_out">退出登录</string>
     <string name="provider_detail_sign_in">登录</string>
+    <string name="provider_oauth_not_available_in_this_build">当前构建未启用此 OAuth 登录。请改用 API key，或安装已启用供应商定制的版本。</string>
     <string name="provider_detail_save_key">保存密钥</string>
     <string name="provider_detail_paste_bearer_token">粘贴 bearer token</string>
     <string name="provider_detail_save_token">保存 Token</string>

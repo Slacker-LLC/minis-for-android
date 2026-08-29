@@ -648,6 +648,7 @@
     <string name="provider_detail_delete_model">Delete Model</string>
     <string name="provider_detail_sign_out">로그아웃</string>
     <string name="provider_detail_sign_in">로그인</string>
+    <string name="provider_oauth_not_available_in_this_build">이 빌드에서는 이 OAuth 로그인을 사용할 수 없습니다. API 키를 사용하거나 공급자 사용자 지정이 활성화된 빌드를 설치하세요.</string>
     <string name="provider_detail_save_key">키 저장</string>
     <string name="provider_detail_paste_bearer_token">베어러 토큰 붙여넣기</string>
     <string name="provider_detail_save_token">토큰 저장</string>
