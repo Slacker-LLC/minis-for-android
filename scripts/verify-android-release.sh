@@ -31,6 +31,48 @@ if unzip -Z1 "$APK" | grep -Eq '(^|/)debug-skill(/|$)'; then
   exit 1
 fi
 
+if ! unzip -Z1 "$APK" | grep -Fxq 'assets/runtime-distribution.json'; then
+  echo "release APK is missing assets/runtime-distribution.json" >&2
+  exit 1
+fi
+
+unzip -p "$APK" assets/runtime-distribution.json | python3 - <<'PY'
+import json
+import re
+import sys
+
+try:
+    obj = json.load(sys.stdin)
+except Exception as exc:
+    raise SystemExit(f"invalid packaged runtime-distribution.json: {exc}")
+
+required = {
+    "schemaVersion": 1,
+    "protocolVersion": 1,
+    "layoutVersion": 2,
+    "abi": "arm64",
+}
+for key, expected in required.items():
+    if obj.get(key) != expected:
+        raise SystemExit(f"runtime distribution {key}={obj.get(key)!r}, expected {expected!r}")
+
+if not isinstance(obj.get("runtimeVersion"), str) or not obj["runtimeVersion"]:
+    raise SystemExit("runtime distribution runtimeVersion missing")
+if not isinstance(obj.get("provisionRevision"), int) or obj["provisionRevision"] <= 0:
+    raise SystemExit("runtime distribution provisionRevision invalid")
+
+ready = obj.get("distributionReady") is True
+if ready:
+    sha = re.compile(r"^[0-9a-fA-F]{64}$")
+    for component in ("minisd", "rootfs"):
+        digest = (obj.get(component) or {}).get("sha256", "")
+        if not sha.fullmatch(str(digest)):
+            raise SystemExit(f"distributionReady=true but {component}.sha256 is invalid")
+    print("runtime distribution manifest: deployable")
+else:
+    print("runtime distribution manifest: fail-closed (external release artifacts not injected)")
+PY
+
 # R8 should eliminate the debug RPC server because every startup/reference is
 # guarded by BuildConfig.DEBUG=false in release. Scan every DEX for the source
 # descriptor/string as a regression backstop.
