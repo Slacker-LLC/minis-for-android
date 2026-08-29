@@ -7,12 +7,13 @@ English is the primary language for current project documentation. Translations 
 | Document | Purpose |
 |---|---|
 | [`../README.md`](../README.md) | project overview and architecture |
-| [`../BUILDING.md`](../BUILDING.md) | authoritative build and release guide |
+| [`../BUILDING.md`](../BUILDING.md) | single canonical build and release guide |
 | [`../UPSTREAM.md`](../UPSTREAM.md) | OpenMinis provenance and synchronization policy |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | current project change history |
 | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | current engineering state and active risk areas |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | rooted-device Ubuntu/minisd execution model |
 | [`SECURITY.md`](SECURITY.md) | security boundaries and hardening rules |
+| [`BUILD-CLEANUP-AUDIT.md`](BUILD-CLEANUP-AUDIT.md) | Issue #53 build-path classification and allowlist decisions |
 | [`VOICE.md`](VOICE.md) | speech recognition, voice provider, TTS, and pet/chat voice paths |
 
 Chinese translations:
