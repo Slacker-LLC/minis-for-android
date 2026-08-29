@@ -13,6 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-cleanup:
+    name: Build cleanup regression guard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guard unit tests
+        run: python3 scripts/test_build_cleanup_guard.py
+      - name: Reject obsolete build paths
+        run: python3 scripts/check_build_cleanup.py
+      - name: Models.dev tooling syntax
+        run: bash -n scripts/update_models_dev.sh
+
   minisd:
     name: minisd quality
     runs-on: ubuntu-24.04
