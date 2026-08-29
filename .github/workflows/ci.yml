@@ -35,9 +35,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh
+        run: >-
+          bash -n
+          scripts/build-ubuntu-rootfs.sh
+          scripts/test-build-ubuntu-rootfs-verification.sh
+          scripts/prepare-runtime-distribution.sh
+          scripts/stage-runtime-distribution.sh
+          scripts/test-runtime-distribution-packaging.sh
+          scripts/verify-android-release.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
+      - name: Runtime distribution packaging tests
+        run: bash scripts/test-runtime-distribution-packaging.sh
 
   android:
     name: Android build, test and release checks
