@@ -96,7 +96,13 @@ object MinisdProtocol {
         sessionsRoot: String = "",
     ): MinisdRequest {
         val params = JSONObject().put("rootfs", rootfs)
-        if (workspace.isNotEmpty()) params.put("workspace", workspace)
+        if (workspace.isNotEmpty()) {
+            params.put("workspace", workspace)
+            // Native #50 compatibility plumbing still accepts `home`. Keep it
+            // exactly identical to the requested workspace so it can never
+            // fall back to a different host directory and mask /workspace.
+            params.put("home", workspace)
+        }
         if (memory.isNotEmpty()) params.put("memory", memory)
         if (skills.isNotEmpty()) params.put("skills", skills)
         if (shared.isNotEmpty()) params.put("shared", shared)
