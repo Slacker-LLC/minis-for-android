@@ -36,13 +36,15 @@ if ! unzip -Z1 "$APK" | grep -Fxq 'assets/runtime-distribution.json'; then
   exit 1
 fi
 
-unzip -p "$APK" assets/runtime-distribution.json | python3 - <<'PY'
+RUNTIME_MANIFEST_JSON="$(unzip -p "$APK" assets/runtime-distribution.json)"
+export RUNTIME_MANIFEST_JSON
+python3 - <<'PY'
 import json
+import os
 import re
-import sys
 
 try:
-    obj = json.load(sys.stdin)
+    obj = json.loads(os.environ["RUNTIME_MANIFEST_JSON"])
 except Exception as exc:
     raise SystemExit(f"invalid packaged runtime-distribution.json: {exc}")
 
@@ -72,6 +74,7 @@ if ready:
 else:
     print("runtime distribution manifest: fail-closed (external release artifacts not injected)")
 PY
+unset RUNTIME_MANIFEST_JSON
 
 # R8 should eliminate the debug RPC server because every startup/reference is
 # guarded by BuildConfig.DEBUG=false in release. Scan every DEX for the source
