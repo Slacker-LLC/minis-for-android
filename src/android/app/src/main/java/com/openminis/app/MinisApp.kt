@@ -411,7 +411,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
         com.openminis.app.mcp.client.MCPProvider.init(mcpRepository, this)
         com.openminis.app.mcp.client.MCPProvider.reload()
-        memoryRepository = MemoryRepository(java.io.File(filesDir, "minis-global/memory"))
+        memoryRepository = MemoryRepository(
+            java.io.File(com.openminis.app.sandbox.ubuntu.UbuntuPaths.hostMemory),
+        )
         webAppShortcutRepository = WebAppShortcutRepository(database.webAppShortcutDao())
 
         // T-android-safemode-lateinit-crash: every repository the UI layer
@@ -747,7 +749,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         // displayed in the session-list cell corner. Init early so the
         // session list can read persisted PAUSED badges on first compose.
         com.openminis.app.service.SessionBadgeStore.init(this)
-
         // [T-android-session-paused-badge-hardkill] Reconcile PAUSED badges
         // against the DB's interrupted-session set. The lifecycle-callback push
         // (onActivityStarted, below) only fires on a graceful background→
