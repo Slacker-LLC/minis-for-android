@@ -2,31 +2,34 @@ package com.openminis.app.sandbox.ubuntu
 
 import android.content.Context
 import java.io.File
+import java.nio.file.Files
 
 /**
- * Normal commands resolve `/workspace` through the owning chat's
- * `<filesDir>/minis-sessions/<sessionId>/workspace` directory. Memory, skills,
- * and shared remain App-global under `<filesDir>/minis-global`.
+ * Android-side view of minisd's fixed persistent data contract.
  *
- * `/data/adb/minis` is reserved for root-owned runtime state such as the Ubuntu
- * rootfs and minisd. It is not the App workspace. minisd bind-mounts the
- * App-private directories into the chroot when Ubuntu starts.
+ * Agent data has one host source of truth under `/data/adb/minis`. The App must
+ * not redirect these paths to `filesDir`; minisd prepares and validates the
+ * persistent layout before keeper/session mount namespaces are created.
  */
 object UbuntuPaths {
     const val HOST_MINIS = "/data/adb/minis"
     const val HOST_ROOTFS = "$HOST_MINIS/rootfs"
+    const val HOST_WORKSPACE = "$HOST_MINIS/workspace"
+    const val HOST_SESSIONS = "$HOST_MINIS/sessions"
+    const val HOST_MEMORY = "$HOST_MINIS/memory"
+    const val HOST_SKILLS = "$HOST_MINIS/skills"
+    const val HOST_SHARED = "$HOST_MINIS/shared"
+    const val HOST_HOME = "$HOST_MINIS/home"
 
-    // Defaults for tests / mock; real values set by [init].
-    var hostWorkspace: String = "$HOST_MINIS/workspace"
-        private set
-    var hostMemory: String = "$HOST_MINIS/memory"
-        private set
-    var hostSkills: String = "$HOST_MINIS/skills"
-        private set
-    var hostShared: String = "$HOST_MINIS/shared"
-        private set
-    var hostSessions: String = "$HOST_MINIS/sessions"
-        private set
+    const val GUEST_WORKSPACE = "/workspace"
+    const val GUEST_HOME = "/home/minis"
+
+    val hostWorkspace: String = HOST_WORKSPACE
+    val hostMemory: String = HOST_MEMORY
+    val hostSkills: String = HOST_SKILLS
+    val hostShared: String = HOST_SHARED
+    val hostSessions: String = HOST_SESSIONS
+    val hostHome: String = HOST_HOME
 
     val bindMounts: MutableMap<String, String> = linkedMapOf()
 
@@ -42,6 +45,7 @@ object UbuntuPaths {
         "/var/minis/skills" to { hostSkills },
         "/shared" to { hostShared },
         "/var/minis/shared" to { hostShared },
+        GUEST_HOME to { hostHome },
     )
 
     private val sessionAliases = listOf(
@@ -58,23 +62,11 @@ object UbuntuPaths {
         "/var/minis/browser" to "browser",
     )
 
-    /** Called from MinisApp.onCreate once. Safe to call twice. */
-    fun init(context: Context) {
-        val legacyWorkspaceBase = File(context.filesDir, "minis")
-        val globalBase = File(context.filesDir, "minis-global")
-        hostWorkspace = File(legacyWorkspaceBase, "workspace").absolutePath
-        hostMemory = File(globalBase, "memory").absolutePath
-        hostSkills = File(globalBase, "skills").absolutePath
-        hostShared = File(globalBase, "shared").absolutePath
-        hostSessions = File(context.filesDir, "minis-sessions").absolutePath
-        File(hostWorkspace, "attachments").mkdirs()
-        File(hostWorkspace, "offloads").mkdirs()
-        File(hostWorkspace, "browser").mkdirs()
-        File(hostSessions).mkdirs()
-        File(hostMemory).mkdirs()
-        File(hostSkills).mkdirs()
-        File(hostShared).mkdirs()
-    }
+    /**
+     * Kept as a stable Application init hook. Persistent directories are
+     * deliberately not created here; minisd owns preparation/owner/mode checks.
+     */
+    fun init(@Suppress("UNUSED_PARAMETER") context: Context) = Unit
 
     /** Resolves a child only when its canonical target remains below [base]. */
     private fun childOf(base: String, rest: String): File? = runCatching {
@@ -105,8 +97,7 @@ object UbuntuPaths {
                 return childOf(hostBase, linuxPath.removePrefix(mount).removePrefix("/"))
             }
         }
-        // Relative path falls back to the workspace (schema contracts of the
-        // linux.file.* tools say "relative to workspace").
+        // Relative paths are linux.file.* workspace paths.
         if (!linuxPath.startsWith("/")) return resolveGuest("/workspace/$linuxPath")
         return null
     }
@@ -120,41 +111,53 @@ object UbuntuPaths {
                 it.code < 128 && (it.isLetterOrDigit() || it == '-' || it == '_' || it == '.')
             }
 
-    internal fun ensureSessionDirs(filesDir: File, sessionId: String): File? {
+    private fun ensureDirectory(path: File): Boolean {
+        if (runCatching { Files.isSymbolicLink(path.toPath()) }.getOrDefault(false)) return false
+        return path.isDirectory || path.mkdirs()
+    }
+
+    /** Production session creation uses only minisd's fixed sessions root. */
+    internal fun ensureSessionDirs(sessionId: String): File? =
+        ensureSessionDirsAt(File(hostSessions), sessionId)
+
+    /** Injectable root is test-only plumbing; production callers use [ensureSessionDirs]. */
+    internal fun ensureSessionDirsAt(sessionsRoot: File, sessionId: String): File? {
         if (!isSafeSessionId(sessionId)) return null
-        val sessions = File(filesDir, "minis-sessions")
-        if (!sessions.isDirectory && !sessions.mkdirs()) return null
-        val session = childOf(sessions.absolutePath, sessionId) ?: return null
+        if (!ensureDirectory(sessionsRoot)) return null
+        val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return null
+        if (!ensureDirectory(session)) return null
         listOf("workspace", "attachments", "offloads", "browser").forEach { subdir ->
-            val dir = File(session, subdir)
-            if (!dir.isDirectory && !dir.mkdirs()) return null
+            if (!ensureDirectory(File(session, subdir))) return null
         }
         return session
     }
 
-    internal fun resolveSessionPath(filesDir: File, sessionId: String, linuxPath: String): File? {
+    internal fun resolveSessionPath(sessionId: String, linuxPath: String): File? =
+        resolveSessionPathAt(File(hostSessions), sessionId, linuxPath)
+
+    /** Injectable root is used by JVM tests without touching `/data/adb`. */
+    internal fun resolveSessionPathAt(sessionsRoot: File, sessionId: String, linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
-        val session = ensureSessionDirs(filesDir, sessionId) ?: return null
+        val session = ensureSessionDirsAt(sessionsRoot, sessionId) ?: return null
         val normalized = if (linuxPath.startsWith('/')) linuxPath else "/workspace/$linuxPath"
         val match = sessionAliases
             .filter { normalized == it.first || normalized.startsWith(it.first + "/") }
             .maxByOrNull { it.first.length }
             ?: return null
         val base = File(session, match.second)
+        if (runCatching { Files.isSymbolicLink(base.toPath()) }.getOrDefault(false)) return null
         val rest = normalized.removePrefix(match.first).removePrefix("/")
         return childOf(base.absolutePath, rest)
     }
 
     /**
-     * Resolve task/output resources against the owning chat. Global resources
-     * and user mounts deliberately fall back to [resolveHostPath]. The former
-     * App-wide workspace remains at [hostWorkspace] as a legacy compatibility
-     * location for callers that genuinely have no session context; it is never
-     * silently shared into a session.
+     * Resolve task/output resources against the owning chat. Session paths are
+     * rooted under `/data/adb/minis/sessions/<sessionId>`; global persistent
+     * resources and user mounts use [resolveHostPath].
      */
-    fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? =
+    fun resolveSessionHostPath(sessionId: String, linuxPath: String): File? =
         if (isSessionScopedPath(linuxPath)) {
-            resolveSessionPath(context.filesDir, sessionId, linuxPath)
+            resolveSessionPath(sessionId, linuxPath)
         } else {
             resolveHostPath(linuxPath)
         }
@@ -164,14 +167,12 @@ object UbuntuPaths {
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
     }
 
-    /** Best-effort cleanup used after the database has deleted a chat. */
-    internal fun deleteSessionFiles(filesDir: File, sessionId: String): Boolean {
+    internal fun deleteSessionFilesAt(sessionsRoot: File, sessionId: String): Boolean {
         if (!isSafeSessionId(sessionId)) return false
-        val sessions = File(filesDir, "minis-sessions")
-        val session = childOf(sessions.absolutePath, sessionId) ?: return false
+        val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return false
         return !session.exists() || session.deleteRecursively()
     }
 
-    fun deleteSession(context: Context, sessionId: String): Boolean =
-        deleteSessionFiles(context.filesDir, sessionId)
+    fun deleteSession(@Suppress("UNUSED_PARAMETER") context: Context, sessionId: String): Boolean =
+        deleteSessionFilesAt(File(hostSessions), sessionId)
 }
