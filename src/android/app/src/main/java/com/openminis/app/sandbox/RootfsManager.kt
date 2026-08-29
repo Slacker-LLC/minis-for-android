@@ -2,7 +2,9 @@ package com.openminis.app.sandbox
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.sandbox.minisd.MinisdProtocol
+import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.runtime.ubuntu.RootfsHealth
+import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,22 +23,6 @@ sealed class RootfsInstallState {
     object Finalizing : RootfsInstallState()
     object Installed : RootfsInstallState()
     data class Failed(val error: String) : RootfsInstallState()
-}
-
-enum class RootfsHealthCode {
-    HEALTHY,
-    MISSING,
-    CORRUPT,
-    INCOMPATIBLE,
-    ROOT_UNAVAILABLE,
-}
-
-data class RootfsHealth(
-    val code: RootfsHealthCode,
-    val detail: String,
-    val metadata: JSONObject? = null,
-) {
-    val healthy: Boolean get() = code == RootfsHealthCode.HEALTHY
 }
 
 /**

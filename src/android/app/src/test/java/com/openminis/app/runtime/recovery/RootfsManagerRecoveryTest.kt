@@ -1,6 +1,6 @@
 package com.openminis.app.runtime.recovery
 
-import com.openminis.app.sandbox.RootfsHealthCode
+import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import com.openminis.app.sandbox.RootfsManager
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
