@@ -84,31 +84,42 @@ class MinisdProtocolTest {
     }
 
     @Test
-    fun `ubuntu start carries rootfs and optional mounts`() {
-        val raw = MinisdProtocol.encodeRequest(
-            MinisdProtocol.ubuntuStart(
-                id = 7,
-                rootfs = "/data/adb/minis/rootfs",
-                workspace = "/data/adb/minis/workspace",
-                memory = "/data/adb/minis/memory",
-                skills = "/data/adb/minis/skills",
-                shared = "/data/adb/minis/shared",
-                sessionsRoot = "/data/user/0/app/files/minis-sessions",
-            ),
-        )
+    fun `ubuntu start has no client selected persistent paths`() {
+        val raw = MinisdProtocol.encodeRequest(MinisdProtocol.ubuntuStart(id = 7))
         val obj = JSONObject(raw)
         assertEquals(7, obj.getLong("id"))
         assertEquals("ubuntu.start", obj.getString("method"))
         val params = obj.getJSONObject("params")
-        assertEquals("/data/adb/minis/rootfs", params.getString("rootfs"))
-        assertEquals("/data/adb/minis/workspace", params.getString("workspace"))
-        assertEquals("/data/adb/minis/memory", params.getString("memory"))
-        assertEquals("/data/adb/minis/skills", params.getString("skills"))
-        assertEquals("/data/adb/minis/shared", params.getString("shared"))
-        assertEquals(
-            "/data/user/0/app/files/minis-sessions",
-            params.getString("sessions_root"),
+        listOf(
+            "rootfs",
+            "workspace",
+            "sessions_root",
+            "memory",
+            "skills",
+            "shared",
+            "home",
+        ).forEach { key -> assertFalse("client must not send $key", params.has(key)) }
+        assertEquals(0, params.length())
+    }
+
+    @Test
+    fun `persistent constants match minisd contract and exclude app filesDir`() {
+        val persistent = listOf(
+            MinisdProtocol.HOST_WORKSPACE,
+            MinisdProtocol.HOST_SESSIONS,
+            MinisdProtocol.HOST_MEMORY,
+            MinisdProtocol.HOST_SKILLS,
+            MinisdProtocol.HOST_SHARED,
+            MinisdProtocol.HOST_HOME,
         )
+        assertEquals("/workspace", MinisdProtocol.GUEST_WORKSPACE)
+        assertEquals("/home/minis", MinisdProtocol.GUEST_HOME)
+        assertTrue(MinisdProtocol.HOST_WORKSPACE != MinisdProtocol.HOST_HOME)
+        persistent.forEach { path ->
+            assertTrue(path.startsWith("/data/adb/minis/"))
+            assertFalse(path.contains("/data/user/"))
+            assertFalse(path.contains("/files/"))
+        }
     }
 
     @Test
