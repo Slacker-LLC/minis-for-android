@@ -31,30 +31,30 @@ import com.openminis.app.logging.AppLogger
 import com.openminis.app.network.NetworkMonitor
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.provider.ModelsDevApi
-import com.openminis.app.sandbox.ExecutionCoordinator
-import com.openminis.app.sandbox.MountedFolderCoordinator
-import com.openminis.app.sandbox.NativeOffloadServer
-import com.openminis.app.sandbox.MinisKernel
-import com.openminis.app.sandbox.RootfsManager
-import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
-import com.openminis.app.sandbox.offload.AccessibilityOffloadHandler
-import com.openminis.app.sandbox.offload.AlarmOffloadHandler
-import com.openminis.app.sandbox.offload.BrowserUseOffloadHandler
-import com.openminis.app.sandbox.offload.CalendarOffloadHandler
-import com.openminis.app.sandbox.offload.ClipboardOffloadHandler
-import com.openminis.app.sandbox.offload.ContactsOffloadHandler
-import com.openminis.app.sandbox.offload.DeviceOffloadHandler
-import com.openminis.app.sandbox.offload.LocationOffloadHandler
-import com.openminis.app.sandbox.offload.ModelUseOffloadHandler
-import com.openminis.app.sandbox.offload.SessionsOffloadHandler
-import com.openminis.app.sandbox.offload.ShizukuOffloadHandler
-import com.openminis.app.sandbox.offload.NotificationOffloadHandler
-import com.openminis.app.sandbox.offload.OpenOffloadHandler
-import com.openminis.app.sandbox.offload.PhotosOffloadHandler
-import com.openminis.app.sandbox.offload.PlayerOffloadHandler
-import com.openminis.app.sandbox.offload.SpeakOffloadHandler
-import com.openminis.app.sandbox.offload.SpeechOffloadHandler
-import com.openminis.app.sandbox.offload.WeatherOffloadHandler
+import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.MountedFolderCoordinator
+import com.openminis.app.runtime.guest.NativeOffloadServer
+import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.RootfsManager
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.guest.AccessibilityOffloadHandler
+import com.openminis.app.runtime.guest.AlarmOffloadHandler
+import com.openminis.app.runtime.guest.BrowserUseOffloadHandler
+import com.openminis.app.runtime.guest.CalendarOffloadHandler
+import com.openminis.app.runtime.guest.ClipboardOffloadHandler
+import com.openminis.app.runtime.guest.ContactsOffloadHandler
+import com.openminis.app.runtime.guest.DeviceOffloadHandler
+import com.openminis.app.runtime.guest.LocationOffloadHandler
+import com.openminis.app.runtime.guest.ModelUseOffloadHandler
+import com.openminis.app.runtime.guest.SessionsOffloadHandler
+import com.openminis.app.runtime.guest.ShizukuOffloadHandler
+import com.openminis.app.runtime.guest.NotificationOffloadHandler
+import com.openminis.app.runtime.guest.OpenOffloadHandler
+import com.openminis.app.runtime.guest.PhotosOffloadHandler
+import com.openminis.app.runtime.guest.PlayerOffloadHandler
+import com.openminis.app.runtime.guest.SpeakOffloadHandler
+import com.openminis.app.runtime.guest.SpeechOffloadHandler
+import com.openminis.app.runtime.guest.WeatherOffloadHandler
 import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.ui.MinisImageFetcher
 import kotlinx.coroutines.launch
@@ -388,7 +388,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         try {
         database = AppDatabase.getInstance(this)
         chatRepository = ChatRepository(database.chatDao()) { sessionId ->
-            com.openminis.app.sandbox.ubuntu.UbuntuPaths.deleteSession(
+            com.openminis.app.runtime.ubuntu.UbuntuPaths.deleteSession(
                 applicationContext,
                 sessionId,
             )
@@ -695,7 +695,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Mirrors iOS `config_offload_register()` in ISHKernel.m.
         NativeOffloadServer.register(
             "minis-config",
-            com.openminis.app.sandbox.offload.ConfigOffloadHandler(),
+            com.openminis.app.runtime.guest.ConfigOffloadHandler(),
         )
         NativeOffloadServer.register("minis-browser-use", BrowserUseOffloadHandler(this))
         // T188: minis-sessions-cli — agent-side query of chat history.
@@ -710,7 +710,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Scheduled Tasks editor and the iOS Shortcuts intent set.
         NativeOffloadServer.register(
             "minis-scheduled",
-            com.openminis.app.sandbox.offload.ScheduledTaskOffloadHandler(this),
+            com.openminis.app.runtime.guest.ScheduledTaskOffloadHandler(this),
         )
         // T322: android-shizuku-cli — privileged Android control via Shizuku.
         // The handler short-circuits with a typed error envelope when the
@@ -728,7 +728,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         if (BuildConfig.DEBUG) {
             NativeOffloadServer.register(
                 "minis-debug",
-                com.openminis.app.sandbox.offload.DebugOffloadHandler(this),
+                com.openminis.app.runtime.guest.DebugOffloadHandler(this),
             )
         }
 

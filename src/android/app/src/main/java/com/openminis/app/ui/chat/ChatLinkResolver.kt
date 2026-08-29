@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.core.net.toUri
 import com.openminis.app.deeplink.DeepLinkAction
 import com.openminis.app.deeplink.DeepLinkHandler
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import com.openminis.app.ui.sandbox.FileItem
 import java.io.File
 

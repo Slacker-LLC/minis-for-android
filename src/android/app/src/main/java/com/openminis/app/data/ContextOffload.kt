@@ -18,7 +18,7 @@ import java.io.File
  *
  * Linux-visible mount: `/var/minis/offloads/tools/<file>`. The host base
  * `filesDir/minis-sessions/<sid>/offloads` is bind-mounted into the
- * sandbox by [com.openminis.app.sandbox.MinisKernel.perSessionSubdirs]
+ * sandbox by [com.openminis.app.runtime.MinisKernel.perSessionSubdirs]
  * (which already includes the "offloads" subdir — no kernel changes
  * required for this feature).
  */

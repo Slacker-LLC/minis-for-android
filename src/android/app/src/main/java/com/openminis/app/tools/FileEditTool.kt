@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import com.openminis.app.tools.internal.FileEditEngine
 import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONArray
@@ -67,7 +67,7 @@ object FileEditTool {
                 )
             }
 
-            val file = com.openminis.app.sandbox.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
+            val file = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
                 ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
             if (!file.exists()) return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             if (!file.isFile) return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)

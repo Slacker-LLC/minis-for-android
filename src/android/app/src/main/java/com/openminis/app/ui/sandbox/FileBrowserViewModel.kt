@@ -258,11 +258,11 @@ class FileBrowserViewModel(
             val sid = sessionId
             val ctx = appContext
             if (sid != null && ctx != null) {
-                com.openminis.app.sandbox.MinisKernel
+                com.openminis.app.runtime.MinisKernel
                     .resolveSessionHostPath(sid, linuxPath, ctx)
                     ?.let { return it }
             } else {
-                com.openminis.app.sandbox.MinisKernel.resolveHostPath(linuxPath)?.let { return it }
+                com.openminis.app.runtime.MinisKernel.resolveHostPath(linuxPath)?.let { return it }
             }
         }
         return if (relativePath.isEmpty()) rootPath else File(rootPath, relativePath)

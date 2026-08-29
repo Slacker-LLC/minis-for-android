@@ -3,7 +3,7 @@ package com.openminis.app.webapp
 import android.content.Context
 import com.openminis.app.data.db.WebAppShortcutEntity
 import com.openminis.app.data.repository.WebAppShortcutRepository
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import java.io.File
 
 /**
@@ -48,7 +48,7 @@ object WebAppPathResolver {
     fun inferScope(hostFile: File): Triple<String, String?, String>? {
         val hostAbs = hostFile.absolutePath
         // Longest host-prefix wins, mirroring resolveHostPath's longest-key match.
-        val sorted = com.openminis.app.sandbox.MinisKernel
+        val sorted = com.openminis.app.runtime.MinisKernel
             .bindMounts.entries.sortedByDescending { it.value.length }
         for ((linuxPrefix, hostBase) in sorted) {
             val baseNorm = hostBase.trimEnd('/')

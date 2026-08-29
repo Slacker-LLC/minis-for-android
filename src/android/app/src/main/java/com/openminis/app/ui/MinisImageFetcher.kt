@@ -8,7 +8,7 @@ import coil.fetch.Fetcher
 import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import okio.buffer
 import okio.source
 import java.io.File

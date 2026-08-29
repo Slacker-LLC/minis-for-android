@@ -73,8 +73,8 @@ import com.openminis.app.ui.settings.MemoryFileEditScreen
 import com.openminis.app.ui.settings.MemoryManagementScreen
 import com.openminis.app.ui.settings.OffloadPermissionScreen
 import com.openminis.app.ui.settings.ShizukuPermissionScreen
-import com.openminis.app.sandbox.RootfsManager
-import com.openminis.app.sandbox.TerminalSession
+import com.openminis.app.runtime.RootfsManager
+import com.openminis.app.runtime.terminal.TerminalSession
 import com.openminis.app.ui.terminal.TerminalScreen
 import com.openminis.app.ui.onboarding.OnboardingModelSelectionScreen
 

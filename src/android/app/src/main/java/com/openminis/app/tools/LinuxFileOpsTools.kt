@@ -3,8 +3,8 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.MinisKernel
-import com.openminis.app.sandbox.ubuntu.UbuntuPaths
+import com.openminis.app.runtime.MinisKernel
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.tools.internal.FileMutationQueue
 import com.openminis.app.tools.runtime.ToolHandler
 import org.json.JSONArray

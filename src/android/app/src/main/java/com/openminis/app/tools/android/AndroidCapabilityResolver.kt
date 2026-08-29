@@ -9,7 +9,7 @@ import android.os.StatFs
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File

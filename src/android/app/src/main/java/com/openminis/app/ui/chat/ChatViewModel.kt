@@ -52,7 +52,7 @@ import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
-import com.openminis.app.sandbox.ExecutionCoordinator
+import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.ContextPressure
@@ -1179,7 +1179,7 @@ class ChatViewModel(
         FileMentionIndex(
             filesDir = context.applicationContext.filesDir,
             mountsProvider = {
-                com.openminis.app.sandbox.MinisKernel
+                com.openminis.app.runtime.MinisKernel
                     .mountEntriesForIndex(context.applicationContext)
             },
         )

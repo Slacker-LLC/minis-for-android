@@ -3,7 +3,7 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.ToolExecutionResult
 import org.json.JSONObject
 

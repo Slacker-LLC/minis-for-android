@@ -118,7 +118,7 @@ object AndroidUiController {
         val bytes = output.toByteArray()
         val linuxPath = ContextOffload.offloadImage(context, sessionId, bytes, toolId, "image/png")
         val host = linuxPath.takeIf(String::isNotEmpty)?.let {
-            com.openminis.app.sandbox.MinisKernel.resolveSessionHostPath(sessionId, it, context)?.absolutePath
+            com.openminis.app.runtime.MinisKernel.resolveSessionHostPath(sessionId, it, context)?.absolutePath
         }
         val json = JSONObject()
             .put("status", CapabilityStatus.AVAILABLE.name)

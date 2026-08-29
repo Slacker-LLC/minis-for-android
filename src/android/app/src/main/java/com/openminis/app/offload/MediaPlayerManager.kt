@@ -2,7 +2,7 @@ package com.openminis.app.offload
 
 import android.media.MediaPlayer
 import android.util.Log
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.MinisKernel
 import java.io.File
 
 /**

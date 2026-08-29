@@ -11,8 +11,8 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import com.openminis.app.BuildConfig
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.sandbox.ExecutionCoordinator
-import com.openminis.app.sandbox.MinisKernel
+import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.MinisKernel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -306,7 +306,7 @@ class DebugRPCHandler(private val context: Context) {
             put("sdkVersion", Build.VERSION.SDK_INT)
             put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
             put("androidVersion", Build.VERSION.RELEASE)
-            val ubuntuRunning = com.openminis.app.sandbox.ubuntu.UbuntuRuntime.snapshot.value.running
+            val ubuntuRunning = com.openminis.app.runtime.ubuntu.UbuntuRuntime.snapshot.value.running
             // P2: PRoot gone; prootBooted kept as an alias for old tooling.
             put("prootBooted", ubuntuRunning)
             put("ubuntu", ubuntuRunning)
@@ -1178,7 +1178,7 @@ class DebugRPCHandler(private val context: Context) {
         // want to stage files BEFORE booting, so route through the rootfs
         // dir directly when the kernel isn't ready yet.
         val hostFile = MinisKernel.resolveHostPath(path) ?: run {
-            val rootfsDir = com.openminis.app.sandbox.RootfsManager.getInstance(context).rootfsDir
+            val rootfsDir = com.openminis.app.runtime.RootfsManager.getInstance(context).rootfsDir
             File(rootfsDir, path.removePrefix("/"))
         }
 
@@ -1262,7 +1262,7 @@ class DebugRPCHandler(private val context: Context) {
     }
 
     /**
-     * T344: Direct invocation of [com.openminis.app.sandbox.offload.ShizukuOffloadHandler]
+     * T344: Direct invocation of [com.openminis.app.runtime.guest.ShizukuOffloadHandler]
      * for e2e harnesses. Bypasses the agent loop so debug clients can verify Shizuku
      * CLI behavior without driving a chat. DEBUG-build only — gated in [dispatch].
      *
@@ -1283,10 +1283,10 @@ class DebugRPCHandler(private val context: Context) {
             else -> throw RPCException(-32602, "Missing 'args' (array) or 'command' (string)")
         }
         AppLogger.info("DebugRPC", "debug.shizuku.exec argv=${argvTail.joinToString(" ")}")
-        val handler = com.openminis.app.sandbox.offload.ShizukuOffloadHandler(context)
+        val handler = com.openminis.app.runtime.guest.ShizukuOffloadHandler(context)
         // ShizukuOffloadHandler.handle() drops argv[0]; prepend the CLI name so the
         // tail aligns with what `android-shizuku-cli` would receive in-shell.
-        val request = com.openminis.app.sandbox.NativeOffloadRequest(
+        val request = com.openminis.app.runtime.guest.NativeOffloadRequest(
             pid = -1,
             argv = listOf("android-shizuku-cli") + argvTail,
             env = emptyMap(),
@@ -1302,7 +1302,7 @@ class DebugRPCHandler(private val context: Context) {
     }
 
     /**
-     * Direct invocation of [com.openminis.app.sandbox.offload.ModelUseOffloadHandler]
+     * Direct invocation of [com.openminis.app.runtime.guest.ModelUseOffloadHandler]
      * for e2e harnesses. Mirrors [handleShizukuExec]; lets callers exercise the
      * `minis-model-use` CLI without going through a real Alpine shell prompt.
      * DEBUG-only.
@@ -1327,7 +1327,7 @@ class DebugRPCHandler(private val context: Context) {
         val finalArgv: List<String> = if (params.has("input")) {
             val inputBlob = params.optString("input", "")
             val linuxPath = "/tmp/.debug-modeluse-input-${System.currentTimeMillis()}.json"
-            val hostFile = com.openminis.app.sandbox.MinisKernel.resolveHostPath(linuxPath)
+            val hostFile = com.openminis.app.runtime.MinisKernel.resolveHostPath(linuxPath)
                 ?: throw RPCException(-32603, "cannot resolve $linuxPath under rootfs")
             hostFile.parentFile?.mkdirs()
             hostFile.writeText(inputBlob)
@@ -1336,8 +1336,8 @@ class DebugRPCHandler(private val context: Context) {
 
         AppLogger.info("DebugRPC", "debug.modelUse.exec argv=${finalArgv.joinToString(" ")}")
         val app = context.applicationContext as com.openminis.app.MinisApp
-        val handler = com.openminis.app.sandbox.offload.ModelUseOffloadHandler(context, app.providerRepository)
-        val request = com.openminis.app.sandbox.NativeOffloadRequest(
+        val handler = com.openminis.app.runtime.guest.ModelUseOffloadHandler(context, app.providerRepository)
+        val request = com.openminis.app.runtime.guest.NativeOffloadRequest(
             pid = -1,
             argv = listOf("minis-model-use") + finalArgv,
             env = emptyMap(),
@@ -1354,7 +1354,7 @@ class DebugRPCHandler(private val context: Context) {
 
     /**
      * [T-android-sessions-cli-full] Direct invocation of
-     * [com.openminis.app.sandbox.offload.SessionsOffloadHandler] for e2e
+     * [com.openminis.app.runtime.guest.SessionsOffloadHandler] for e2e
      * harnesses. Mirrors [handleModelUseExec]; lets callers exercise the
      * `minis-sessions-cli` CLI (list / search / messages, incl. --full)
      * without going through a real Alpine shell prompt. DEBUG-only.
@@ -1374,8 +1374,8 @@ class DebugRPCHandler(private val context: Context) {
 
         AppLogger.info("DebugRPC", "debug.sessions.exec argv=${argvTail.joinToString(" ")}")
         val app = context.applicationContext as com.openminis.app.MinisApp
-        val handler = com.openminis.app.sandbox.offload.SessionsOffloadHandler(app.chatRepository)
-        val request = com.openminis.app.sandbox.NativeOffloadRequest(
+        val handler = com.openminis.app.runtime.guest.SessionsOffloadHandler(app.chatRepository)
+        val request = com.openminis.app.runtime.guest.NativeOffloadRequest(
             pid = -1,
             argv = listOf("minis-sessions-cli") + argvTail,
             env = emptyMap(),

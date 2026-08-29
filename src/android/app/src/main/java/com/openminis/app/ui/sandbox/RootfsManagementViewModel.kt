@@ -3,8 +3,8 @@ package com.openminis.app.ui.sandbox
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.openminis.app.sandbox.RootfsInstallState
-import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.runtime.RootfsInstallState
+import com.openminis.app.runtime.RootfsManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

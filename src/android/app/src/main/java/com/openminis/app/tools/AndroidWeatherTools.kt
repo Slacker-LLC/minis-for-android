@@ -4,8 +4,8 @@ import android.content.Context
 import android.location.Geocoder
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.offload.LocationOffloadHandler
-import com.openminis.app.sandbox.offload.WeatherOffloadHandler
+import com.openminis.app.runtime.guest.LocationOffloadHandler
+import com.openminis.app.runtime.guest.WeatherOffloadHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
