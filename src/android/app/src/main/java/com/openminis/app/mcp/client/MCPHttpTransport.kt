@@ -1,18 +1,22 @@
 package com.openminis.app.mcp.client
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Streamable HTTP transport for the MCP client (spec 2025-06-18).
- * One POST per JSON-RPC frame; accepts `application/json` or
- * `text/event-stream` responses (SSE `data:` lines are unwrapped).
- * Maintains the optional `Mcp-Session-Id` header returned by the server.
+ * One POST per JSON-RPC frame; coroutine cancellation calls OkHttp Call.cancel()
+ * so a hanging socket is actually closed instead of merely abandoning a waiter.
  */
 class MCPHttpTransport(
     private val url: String,
@@ -33,8 +37,9 @@ class MCPHttpTransport(
 
     @Volatile
     private var sessionId: String? = null
+    private val activeCalls = ConcurrentHashMap.newKeySet<Call>()
 
-    suspend fun send(frame: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun send(frame: JSONObject): JSONObject {
         val body = MCPClientCodec.encodeFrame(frame).toRequestBody(JSON)
         val reqBuilder = Request.Builder()
             .url(url)
@@ -47,44 +52,60 @@ class MCPHttpTransport(
         }
         sessionId?.let { reqBuilder.header("Mcp-Session-Id", it) }
 
-        client.newCall(reqBuilder.build()).execute().use { resp ->
-            val code = resp.code
-            val raw = resp.body?.string().orEmpty()
-            if (code == 404 || code == 405) {
-                // Spec: server without streamable HTTP returns 404/405 —
-                // client must fall back to SSE transport; we surface a clear error.
-                throw MCPTransportException(
-                    "server does not support Streamable HTTP (HTTP $code): $raw",
-                )
-            }
-            if (code !in 200..299) {
-                throw MCPTransportException("HTTP $code: ${raw.take(200)}")
-            }
-            resp.header("Mcp-Session-Id")?.takeIf { it.isNotBlank() }?.let { sessionId = it }
-            parseBody(raw, resp.header("Content-Type"))
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(reqBuilder.build())
+            activeCalls += call
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    activeCalls -= call
+                    if (!continuation.isActive) return
+                    val timeout = e is SocketTimeoutException || e.cause is SocketTimeoutException
+                    val error = MCPTransportException(
+                        message = if (timeout) "MCP HTTP transport timed out: ${e.message}" else "MCP HTTP transport failed: ${e.message}",
+                        kind = if (timeout) MCPTransportFailureKind.TRANSPORT_TIMEOUT else MCPTransportFailureKind.TRANSPORT_FAILURE,
+                    )
+                    continuation.resumeWith(Result.failure(error))
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    activeCalls -= call
+                    if (!continuation.isActive) {
+                        response.close()
+                        return
+                    }
+                    try {
+                        response.use { resp ->
+                            val code = resp.code
+                            val raw = resp.body?.string().orEmpty()
+                            if (code == 404 || code == 405) {
+                                throw MCPTransportException("server does not support Streamable HTTP (HTTP $code): $raw")
+                            }
+                            if (code !in 200..299) {
+                                throw MCPTransportException("HTTP $code: ${raw.take(200)}")
+                            }
+                            resp.header("Mcp-Session-Id")?.takeIf { it.isNotBlank() }?.let { sessionId = it }
+                            continuation.resumeWith(Result.success(parseBody(raw, resp.header("Content-Type"))))
+                        }
+                    } catch (t: Throwable) {
+                        if (continuation.isActive) continuation.resumeWith(Result.failure(t))
+                    }
+                }
+            })
         }
     }
 
-    /** JSON body or SSE stream: unwrap `data:` lines and join them. */
     private fun parseBody(raw: String, contentType: String?): JSONObject {
         val trimmed = raw.trim()
-        // Empty body is valid for notifications (HTTP 202/204) — return an
-        // empty frame; callers of request/response methods will reject it.
         if (trimmed.isEmpty()) return JSONObject()
-        if (trimmed.startsWith("{")) {
-            return JSONObject(trimmed)
-        }
-        // SSE: collect data: lines
+        if (trimmed.startsWith("{")) return JSONObject(trimmed)
         val dataLines = mutableListOf<String>()
         for (line in trimmed.lines()) {
-            when {
-                line.startsWith("data:") -> dataLines.add(line.removePrefix("data:").trim())
-            }
+            if (line.startsWith("data:")) dataLines.add(line.removePrefix("data:").trim())
         }
         if (dataLines.isEmpty()) {
             throw MCPTransportException("unrecognized MCP response body: ${trimmed.take(120)}")
         }
-        // The final data line of a JSON-RPC response carries the frame.
         for (line in dataLines.asReversed()) {
             val t = line.trim()
             if (t.startsWith("{")) return JSONObject(t)
@@ -93,8 +114,20 @@ class MCPHttpTransport(
     }
 
     fun close() {
-        // OkHttp pools connections per client; nothing to release eagerly.
+        activeCalls.toList().forEach(Call::cancel)
+        activeCalls.clear()
     }
+
+    internal fun activeCallCountForTest(): Int = activeCalls.size
 }
 
-class MCPTransportException(message: String) : Exception(message)
+enum class MCPTransportFailureKind {
+    TRANSPORT_TIMEOUT,
+    PROCESS_KILLED,
+    TRANSPORT_FAILURE,
+}
+
+class MCPTransportException(
+    message: String,
+    val kind: MCPTransportFailureKind = MCPTransportFailureKind.TRANSPORT_FAILURE,
+) : Exception(message)
