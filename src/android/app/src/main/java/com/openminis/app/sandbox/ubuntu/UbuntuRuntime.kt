@@ -25,13 +25,6 @@ import java.util.concurrent.TimeUnit
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
     private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
-    private const val SHELL_COMMAND_ENV = "MINIS_INTERNAL_SHELL_COMMAND"
-    private const val SHELL_ENTRYPOINT =
-        "minis_command=\"\${MINIS_INTERNAL_SHELL_COMMAND-}\"\n" +
-            "unset MINIS_INTERNAL_SHELL_COMMAND\n" +
-            "shopt -s expand_aliases\n" +
-            "if [ -r \"\$HOME/.bashrc\" ]; then . \"\$HOME/.bashrc\"; fi\n" +
-            "eval \"\$minis_command\""
 
     data class Snapshot(
         val running: Boolean = false,
@@ -46,7 +39,6 @@ object UbuntuRuntime {
         val hostMemory: String? = null,
         val hostSkills: String? = null,
         val hostShared: String? = null,
-        val hostHome: String? = null,
         val brokerMountNamespace: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
@@ -173,7 +165,6 @@ object UbuntuRuntime {
                 memory = UbuntuPaths.hostMemory,
                 skills = UbuntuPaths.hostSkills,
                 shared = UbuntuPaths.hostShared,
-                home = UbuntuPaths.hostHome,
                 sessionsRoot = UbuntuPaths.hostSessions,
             ),
         )
@@ -202,7 +193,6 @@ object UbuntuRuntime {
             snapshot.hostMemory == UbuntuPaths.hostMemory &&
             snapshot.hostSkills == UbuntuPaths.hostSkills &&
             snapshot.hostShared == UbuntuPaths.hostShared &&
-            snapshot.hostHome == UbuntuPaths.hostHome &&
             snapshot.brokerMountNamespace == currentMountNamespace()
 
     internal fun brokerIdentityMatches(
@@ -391,16 +381,13 @@ object UbuntuRuntime {
                 )
             }
         }
-        val sessionEnv = if (sessionId == null) {
+        val scopedEnv = if (sessionId == null) {
             env
         } else {
             env + ("MINIS_CHAT_SESSION_ID" to sessionId)
         }
-        // The command remains a structured environment value while the fixed
-        // entrypoint loads persistent user aliases before eval parses it.
-        val scopedEnv = sessionEnv + (SHELL_COMMAND_ENV to command)
         val resp = client.ubuntuExec(
-            argv = listOf("/bin/bash", "-lc", SHELL_ENTRYPOINT),
+            argv = listOf("/bin/bash", "-lc", command),
             timeoutMs = timeoutMs,
             cwd = MinisdProtocol.GUEST_WORKSPACE,
             env = scopedEnv,
@@ -433,12 +420,10 @@ object UbuntuRuntime {
     fun paths(): JSONObject = JSONObject()
         .put("hostWorkspace", UbuntuPaths.hostWorkspace)
         .put("hostSessions", UbuntuPaths.hostSessions)
-        .put("hostHome", UbuntuPaths.hostHome)
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
-        .put("guestHome", MinisdProtocol.GUEST_HOME)
         .put("appMountNamespace", currentMountNamespace())
         .put("brokerMountNamespace", _snapshot.value.brokerMountNamespace)
 
@@ -483,7 +468,6 @@ object UbuntuRuntime {
                 hostMemory = result.optNullableString("memory"),
                 hostSkills = result.optNullableString("skills"),
                 hostShared = result.optNullableString("shared"),
-                hostHome = result.optNullableString("home"),
                 brokerMountNamespace = result.optNullableString("broker_mount_namespace"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
