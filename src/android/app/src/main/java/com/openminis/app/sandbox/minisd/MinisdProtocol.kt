@@ -42,6 +42,17 @@ object MinisdProtocol {
     const val GUEST_WORKSPACE = "/workspace"
     const val GUEST_UID = 10000
 
+    const val ERROR_ROOTFS_INVALID = "ROOTFS_INVALID"
+    const val ERROR_KEEPER_NAMESPACE_LOST = "KEEPER_NAMESPACE_LOST"
+    const val ERROR_CHROOT_UNAVAILABLE = "CHROOT_UNAVAILABLE"
+    const val ERROR_RUNTIME_LAYOUT_MISMATCH = "RUNTIME_LAYOUT_MISMATCH"
+    const val ERROR_PRIVILEGE_SETUP_FAILED = "PRIVILEGE_SETUP_FAILED"
+    const val ERROR_RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
+
+    private const val HELPER_SETNS_FAILED = 4
+    private const val HELPER_CHROOT_FAILED = 5
+    private const val HELPER_PRIVILEGE_FAILED = 6
+
     fun encodeRequest(req: MinisdRequest): String {
         val client = JSONObject().put("id", req.clientId)
         req.token?.let { client.put("token", it) }
@@ -80,6 +91,65 @@ object MinisdProtocol {
             error = error,
         )
     }
+
+    /**
+     * Older minisd helpers report failures that happen before execve through
+     * reserved helper exit statuses. Promote those to structured runtime
+     * errors so callers never confuse them with the user's command exit code.
+     * A future minisd may return the same structured codes directly; those are
+     * preserved unchanged.
+     */
+    fun promoteExecInfrastructureFailure(response: MinisdResponse): MinisdResponse {
+        if (!response.ok) return response
+        val result = response.result ?: return response
+        val explicit = result.optString("pre_exec_error").takeIf { it.isNotBlank() }
+        val error = when (explicit) {
+            ERROR_KEEPER_NAMESPACE_LOST,
+            ERROR_CHROOT_UNAVAILABLE,
+            ERROR_ROOTFS_INVALID,
+            ERROR_RUNTIME_LAYOUT_MISMATCH,
+            ERROR_PRIVILEGE_SETUP_FAILED,
+            -> MinisdError(explicit, result.optString("pre_exec_detail").ifBlank { explicit })
+            else -> when (result.optInt("exit_code", Int.MIN_VALUE)) {
+                HELPER_SETNS_FAILED -> MinisdError(
+                    ERROR_KEEPER_NAMESPACE_LOST,
+                    result.optString("stderr").ifBlank { "keeper mount namespace is no longer available" },
+                )
+                HELPER_CHROOT_FAILED -> MinisdError(
+                    ERROR_CHROOT_UNAVAILABLE,
+                    result.optString("stderr").ifBlank { "Ubuntu chroot is unavailable" },
+                )
+                HELPER_PRIVILEGE_FAILED -> MinisdError(
+                    ERROR_PRIVILEGE_SETUP_FAILED,
+                    result.optString("stderr").ifBlank { "runtime privilege setup failed before execve" },
+                )
+                else -> null
+            }
+        }
+        return if (error == null) {
+            response
+        } else {
+            MinisdResponse(
+                v = response.v,
+                id = response.id,
+                ok = false,
+                result = null,
+                error = error,
+            )
+        }
+    }
+
+    fun isRetrySafeKeeperFailure(response: MinisdResponse): Boolean =
+        promoteExecInfrastructureFailure(response).error?.code == ERROR_KEEPER_NAMESPACE_LOST
+
+    fun runtimeError(code: String, detail: String, id: Long = 0): MinisdResponse =
+        MinisdResponse(
+            v = PROTOCOL_V,
+            id = id,
+            ok = false,
+            result = null,
+            error = MinisdError(code = code, detail = detail),
+        )
 
     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
 
