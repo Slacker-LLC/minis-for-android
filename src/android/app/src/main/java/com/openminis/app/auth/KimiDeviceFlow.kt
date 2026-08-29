@@ -1,5 +1,6 @@
 package com.openminis.app.auth
 
+import com.openminis.app.provider.ProviderTransportPolicy
 import org.json.JSONObject
 
 /**
@@ -44,16 +45,28 @@ object KimiDeviceFlow {
      * field (device_code / user_code / a verification URI) is missing —
      * caller surfaces a provider error. Accepts both `verification_uri` and
      * `verification_url` spellings (iOS parity).
+     *
+     * Verification URLs are OAuth authorization surfaces and therefore never
+     * inherit the provider cleartext exception. Reject server-supplied HTTP
+     * here, before the UI can hand it to a browser.
      */
     fun parseDeviceAuthorization(json: JSONObject): DeviceAuthorization? {
         val deviceCode = json.optString("device_code", "").ifEmpty { return null }
         val userCode = json.optString("user_code", "").ifEmpty { return null }
-        val uri = json.optString("verification_uri", "")
+        val rawUri = json.optString("verification_uri", "")
             .ifEmpty { json.optString("verification_url", "") }
             .ifEmpty { return null }
-        val uriComplete = json.optString("verification_uri_complete", "")
+        val uri = runCatching {
+            ProviderTransportPolicy.requireHttps(rawUri, "Kimi verification URL").toString()
+        }.getOrElse { return null }
+        val rawUriComplete = json.optString("verification_uri_complete", "")
             .ifEmpty { json.optString("verification_url_complete", "") }
             .ifEmpty { null }
+        val uriComplete = rawUriComplete?.let { candidate ->
+            runCatching {
+                ProviderTransportPolicy.requireHttps(candidate, "Kimi verification URL").toString()
+            }.getOrElse { return null }
+        }
         return DeviceAuthorization(
             deviceCode = deviceCode,
             userCode = userCode,

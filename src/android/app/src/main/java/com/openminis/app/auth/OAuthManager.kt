@@ -153,7 +153,9 @@ abstract class OAuthManager(
         }
         callbackServer?.start()
 
-        val url = buildAuthorizationUrl()
+        val url = com.openminis.app.provider.ProviderTransportPolicy
+            .requireHttps(buildAuthorizationUrl(), "OAuth authorization URL")
+            .toString()
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -165,7 +167,10 @@ abstract class OAuthManager(
             val params = buildTokenParams(code)
             val formBody = params.entries.joinToString("&") { "${it.key}=${Uri.encode(it.value)}" }
             val request = Request.Builder()
-                .url(tokenURL)
+                .url(
+                    com.openminis.app.provider.ProviderTransportPolicy
+                        .requireHttps(tokenURL, "OAuth token URL")
+                )
                 .post(formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
                 .build()
             val response = httpClient.newCall(request).execute()
@@ -217,7 +222,10 @@ abstract class OAuthManager(
 
             val formBody = params.entries.joinToString("&") { "${it.key}=${Uri.encode(it.value)}" }
             val request = Request.Builder()
-                .url(tokenURL)
+                .url(
+                    com.openminis.app.provider.ProviderTransportPolicy
+                        .requireHttps(tokenURL, "OAuth token URL")
+                )
                 .post(formBody.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
                 .build()
             val response = httpClient.newCall(request).execute()
