@@ -110,26 +110,11 @@ impl PersistentLayout {
 
     pub fn keeper_bind_sources(&self) -> Vec<BindSource> {
         vec![
-            BindSource {
-                host: self.workspace(),
-                guest: GUEST_WORKSPACE,
-            },
-            BindSource {
-                host: self.memory(),
-                guest: GUEST_MEMORY,
-            },
-            BindSource {
-                host: self.skills(),
-                guest: GUEST_SKILLS,
-            },
-            BindSource {
-                host: self.shared(),
-                guest: GUEST_SHARED,
-            },
-            BindSource {
-                host: self.home(),
-                guest: GUEST_HOME,
-            },
+            BindSource { host: self.workspace(), guest: GUEST_WORKSPACE },
+            BindSource { host: self.memory(), guest: GUEST_MEMORY },
+            BindSource { host: self.skills(), guest: GUEST_SKILLS },
+            BindSource { host: self.shared(), guest: GUEST_SHARED },
+            BindSource { host: self.home(), guest: GUEST_HOME },
         ]
     }
 
@@ -156,35 +141,15 @@ impl PersistentLayout {
         runtime_gid: u32,
     ) -> Result<(), String> {
         ensure_directory(&self.root, runtime_uid, runtime_gid, HOST_ROOT_MODE)?;
-        ensure_directory(
-            &self.rootfs(),
-            runtime_uid,
-            runtime_gid,
-            HOST_ROOTFS_MODE,
-        )?;
-        ensure_directory(
-            &self.run(),
-            runtime_uid,
-            runtime_gid,
-            HOST_RUNTIME_MODE,
-        )?;
-        ensure_directory(
-            &self.log(),
-            runtime_uid,
-            runtime_gid,
-            HOST_RUNTIME_MODE,
-        )?;
+        ensure_directory(&self.rootfs(), runtime_uid, runtime_gid, HOST_ROOTFS_MODE)?;
+        ensure_directory(&self.run(), runtime_uid, runtime_gid, HOST_RUNTIME_MODE)?;
+        ensure_directory(&self.log(), runtime_uid, runtime_gid, HOST_RUNTIME_MODE)?;
 
         for (_, path) in self.persistent_sources() {
             ensure_directory(&path, data_uid, data_gid, PERSISTENT_DATA_MODE)?;
         }
         for sub in WORKSPACE_SUBDIRS {
-            ensure_directory(
-                &self.workspace().join(sub),
-                data_uid,
-                data_gid,
-                PERSISTENT_DATA_MODE,
-            )?;
+            ensure_directory(&self.workspace().join(sub), data_uid, data_gid, PERSISTENT_DATA_MODE)?;
         }
 
         let readme = self.workspace().join("README");
@@ -218,12 +183,37 @@ separate persistent sources.
 "
 }
 
-pub fn ensure_host_layout(uid: u32, gid: u32) -> Result<(), String> {
+pub fn ensure_host_layout_for(uid: u32, gid: u32) -> Result<(), String> {
     PersistentLayout::system().initialize(uid, gid)
+}
+
+pub fn ensure_host_layout() -> Result<(), String> {
+    let layout = PersistentLayout::system();
+    let (uid, gid) = existing_data_owner(&layout.workspace()).unwrap_or((GUEST_UID, GUEST_GID));
+    layout.initialize(uid, gid)
+}
+
+pub fn ensure_data_directory(path: &Path, uid: u32, gid: u32) -> Result<(), String> {
+    ensure_directory(path, uid, gid, PERSISTENT_DATA_MODE)
 }
 
 pub fn validate_persistent_backing() -> Result<(), String> {
     PersistentLayout::system().validate_persistent_backing()
+}
+
+#[cfg(unix)]
+fn existing_data_owner(path: &Path) -> Option<(u32, u32)> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = std::fs::symlink_metadata(path).ok()?;
+    if !meta.is_dir() || meta.file_type().is_symlink() {
+        return None;
+    }
+    Some((meta.uid(), meta.gid()))
+}
+
+#[cfg(not(unix))]
+fn existing_data_owner(_path: &Path) -> Option<(u32, u32)> {
+    None
 }
 
 fn ensure_directory(path: &Path, uid: u32, gid: u32, mode: u32) -> Result<(), String> {
@@ -249,28 +239,30 @@ fn set_owner_mode(path: &Path, uid: u32, gid: u32, mode: u32) -> Result<(), Stri
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
-    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| format!("NUL in path: {}", path.display()))?;
-    if unsafe { libc::chown(c_path.as_ptr(), uid, gid) } != 0 {
-        return Err(format!(
-            "chown {} to {uid}:{gid}: {}",
-            path.display(),
-            std::io::Error::last_os_error()
-        ));
+    let before = std::fs::metadata(path).map_err(|e| format!("stat {}: {e}", path.display()))?;
+    if before.uid() != uid || before.gid() != gid {
+        let c_path = std::ffi::CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| format!("NUL in path: {}", path.display()))?;
+        if unsafe { libc::chown(c_path.as_ptr(), uid, gid) } != 0 {
+            return Err(format!(
+                "chown {} to {uid}:{gid}: {}",
+                path.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
     }
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
-        .map_err(|e| format!("chmod {:o} {}: {e}", mode, path.display()))?;
+    let current_mode = before.permissions().mode() & 0o777;
+    if current_mode != mode {
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+            .map_err(|e| format!("chmod {:o} {}: {e}", mode, path.display()))?;
+    }
 
     let meta = std::fs::metadata(path).map_err(|e| format!("stat {}: {e}", path.display()))?;
     let actual_mode = meta.permissions().mode() & 0o777;
     if meta.uid() != uid || meta.gid() != gid || actual_mode != mode {
         return Err(format!(
             "persistent path ownership/mode mismatch at {}: got {}:{} {:o}, expected {uid}:{gid} {:o}",
-            path.display(),
-            meta.uid(),
-            meta.gid(),
-            actual_mode,
-            mode
+            path.display(), meta.uid(), meta.gid(), actual_mode, mode
         ));
     }
     Ok(())
@@ -278,11 +270,7 @@ fn set_owner_mode(path: &Path, uid: u32, gid: u32, mode: u32) -> Result<(), Stri
 
 #[cfg(not(unix))]
 fn set_owner_mode(path: &Path, _uid: u32, _gid: u32, _mode: u32) -> Result<(), String> {
-    if path.exists() {
-        Ok(())
-    } else {
-        Err(format!("path missing: {}", path.display()))
-    }
+    if path.exists() { Ok(()) } else { Err(format!("path missing: {}", path.display())) }
 }
 
 #[cfg(unix)]
@@ -292,31 +280,20 @@ fn ensure_non_tmpfs_directory(label: &str, path: &Path) -> Result<(), String> {
     let canonical = std::fs::canonicalize(path)
         .map_err(|e| format!("{label} persistent source unavailable at {}: {e}", path.display()))?;
     if !canonical.is_dir() {
-        return Err(format!(
-            "{label} persistent source is not a directory: {}",
-            canonical.display()
-        ));
+        return Err(format!("{label} persistent source is not a directory: {}", canonical.display()));
     }
     let c_path = std::ffi::CString::new(canonical.as_os_str().as_bytes())
         .map_err(|_| format!("{label} persistent source contains NUL"))?;
     let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
     if unsafe { libc::statfs(c_path.as_ptr(), &mut stat) } != 0 {
-        return Err(format!(
-            "statfs {}: {}",
-            canonical.display(),
-            std::io::Error::last_os_error()
-        ));
+        return Err(format!("statfs {}: {}", canonical.display(), std::io::Error::last_os_error()));
     }
     reject_tmpfs_type(label, &canonical, stat.f_type as u64)
 }
 
 #[cfg(not(unix))]
 fn ensure_non_tmpfs_directory(_label: &str, path: &Path) -> Result<(), String> {
-    if path.is_dir() {
-        Ok(())
-    } else {
-        Err(format!("persistent source is not a directory: {}", path.display()))
-    }
+    if path.is_dir() { Ok(()) } else { Err(format!("persistent source is not a directory: {}", path.display())) }
 }
 
 fn reject_tmpfs_type(label: &str, path: &Path, fs_type: u64) -> Result<(), String> {
@@ -336,23 +313,8 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
         return Err(format!("rootfs missing: {rootfs}"));
     }
     for rel in [
-        "proc",
-        "sys",
-        "dev",
-        "dev/pts",
-        "dev/shm",
-        "tmp",
-        "run",
-        "workspace",
-        "memory",
-        "skills",
-        "shared",
-        "mnt",
-        "var/minis",
-        "etc/minis",
-        "home",
-        "home/minis",
-        "root",
+        "proc", "sys", "dev", "dev/pts", "dev/shm", "tmp", "run", "workspace", "memory",
+        "skills", "shared", "mnt", "var/minis", "etc/minis", "home", "home/minis", "root",
     ] {
         std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
     }
@@ -380,9 +342,7 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
 pub fn rootfs_looks_valid(rootfs: &str) -> bool {
     let root = Path::new(rootfs);
     root.join("etc/os-release").is_file()
-        && (root.join("bin/bash").exists()
-            || root.join("usr/bin/bash").exists()
-            || root.join("bin/sh").exists())
+        && (root.join("bin/bash").exists() || root.join("usr/bin/bash").exists() || root.join("bin/sh").exists())
 }
 
 pub fn read_os_release(rootfs: &str) -> Option<String> {
@@ -395,8 +355,7 @@ pub fn read_os_release(rootfs: &str) -> Option<String> {
 }
 
 pub fn is_provisioned(rootfs: &str) -> bool {
-    Path::new(rootfs).join(PROVISION_MARKER).is_file()
-        || Path::new(rootfs).join("usr/bin/python3").exists()
+    Path::new(rootfs).join(PROVISION_MARKER).is_file() || Path::new(rootfs).join("usr/bin/python3").exists()
 }
 
 pub fn ensure_guest_user(rootfs: &str) -> Result<(), String> {
@@ -456,10 +415,7 @@ mod tests {
         let unique = format!(
             "minisd-{name}-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
         );
         PersistentLayout::new(std::env::temp_dir().join(unique))
     }
@@ -480,22 +436,13 @@ mod tests {
     #[test]
     fn persistent_layout_init_is_idempotent_and_keeps_explicit_modes() {
         use std::os::unix::fs::PermissionsExt;
-
         let layout = temp_layout("layout-init");
         let uid = unsafe { libc::geteuid() };
         let gid = unsafe { libc::getegid() };
-        layout
-            .initialize_with_owners(uid, gid, uid, gid)
-            .unwrap();
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
         std::fs::write(layout.workspace().join("keep.txt"), "persist").unwrap();
-        layout
-            .initialize_with_owners(uid, gid, uid, gid)
-            .unwrap();
-
-        assert_eq!(
-            std::fs::read_to_string(layout.workspace().join("keep.txt")).unwrap(),
-            "persist"
-        );
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
+        assert_eq!(std::fs::read_to_string(layout.workspace().join("keep.txt")).unwrap(), "persist");
         for (_, path) in layout.persistent_sources() {
             let mode = std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
             assert_eq!(mode, PERSISTENT_DATA_MODE);
@@ -539,19 +486,11 @@ mod tests {
         let second = PersistentLayout::new(first.root().to_path_buf());
         let uid = unsafe { libc::geteuid() };
         let gid = unsafe { libc::getegid() };
-        first
-            .initialize_with_owners(uid, gid, uid, gid)
-            .unwrap();
+        first.initialize_with_owners(uid, gid, uid, gid).unwrap();
         std::fs::write(first.home().join(".restart-probe"), "stable").unwrap();
-        second
-            .initialize_with_owners(uid, gid, uid, gid)
-            .unwrap();
-
+        second.initialize_with_owners(uid, gid, uid, gid).unwrap();
         assert_eq!(first, second);
-        assert_eq!(
-            std::fs::read_to_string(second.home().join(".restart-probe")).unwrap(),
-            "stable"
-        );
+        assert_eq!(std::fs::read_to_string(second.home().join(".restart-probe")).unwrap(), "stable");
         let _ = std::fs::remove_dir_all(first.root());
     }
 
@@ -569,24 +508,17 @@ mod tests {
         std::fs::write(
             etc.join("passwd"),
             "root:x:0:0:root:/root:/bin/sh\nminis:x:10000:10000:Minis:/workspace:/bin/bash\n",
-        )
-        .unwrap();
+        ).unwrap();
         std::fs::write(etc.join("group"), "root:x:0:\nminis:x:10000:\n").unwrap();
-
         ensure_guest_user_ids(root.to_str().unwrap(), 12345, 12345).unwrap();
-
         let passwd = std::fs::read_to_string(etc.join("passwd")).unwrap();
         let group = std::fs::read_to_string(etc.join("group")).unwrap();
-        assert_eq!(
-            passwd.lines().filter(|l| l.starts_with("minis:")).count(),
-            1
-        );
+        assert_eq!(passwd.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert_eq!(group.lines().filter(|l| l.starts_with("minis:")).count(), 1);
         assert!(passwd.contains("minis:x:12345:12345:"));
         assert!(passwd.contains("Minis:/home/minis:/bin/bash"));
         assert!(group.contains("minis:x:12345:"));
         assert!(passwd.contains("root:x:0:0:"));
-
         let _ = std::fs::remove_dir_all(root);
     }
 }
