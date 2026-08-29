@@ -290,12 +290,13 @@ pub fn set_process_name(name: &str) {
     }
 }
 
-fn fixed_bind_source<'a>(requested: &'a str, expected: &'static str, label: &str) -> Result<&'a str, String> {
-    if requested.is_empty() {
+fn fixed_bind_source(
+    requested: &str,
+    expected: &'static str,
+    label: &str,
+) -> Result<&'static str, String> {
+    if requested.is_empty() || requested == expected {
         return Ok(expected);
-    }
-    if requested == expected {
-        return Ok(requested);
     }
     Err(format!(
         "{label} bind source is fixed to {expected}; refusing {requested}"
@@ -426,11 +427,7 @@ pub fn setup_rootfs_mounts(
         Some("mode=0755"),
     )?;
 
-    bind_mount(
-        workspace,
-        &root.join("workspace").to_string_lossy(),
-        false,
-    )?;
+    bind_mount(workspace, &root.join("workspace").to_string_lossy(), false)?;
     bind_mount(memory, &root.join("memory").to_string_lossy(), false)?;
     bind_mount(skills, &root.join("skills").to_string_lossy(), false)?;
     bind_mount(shared, &root.join("shared").to_string_lossy(), false)?;
@@ -553,7 +550,10 @@ mod tests {
 
     #[test]
     fn fixed_bind_sources_reject_app_files_and_tmp_paths() {
-        assert_eq!(fixed_bind_source("", HOST_WORKSPACE, "workspace").unwrap(), HOST_WORKSPACE);
+        assert_eq!(
+            fixed_bind_source("", HOST_WORKSPACE, "workspace").unwrap(),
+            HOST_WORKSPACE
+        );
         assert_eq!(
             fixed_bind_source(HOST_MEMORY, HOST_MEMORY, "memory").unwrap(),
             HOST_MEMORY
