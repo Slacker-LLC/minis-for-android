@@ -32,23 +32,9 @@ class MinisdClient(
 
     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
 
-    suspend fun ubuntuStart(
-        rootfs: String = MinisdProtocol.DEFAULT_ROOTFS,
-        workspace: String = "",
-        memory: String = "",
-        skills: String = "",
-        shared: String = "",
-        sessionsRoot: String = "",
-    ): MinisdResponse = call(
-        MinisdProtocol.ubuntuStart(
-            id = nextId(),
-            rootfs = rootfs,
-            workspace = workspace,
-            memory = memory,
-            skills = skills,
-            shared = shared,
-            sessionsRoot = sessionsRoot,
-        ),
+    /** Persistent source paths are fixed by minisd and are not client inputs. */
+    suspend fun ubuntuStart(): MinisdResponse = call(
+        MinisdProtocol.ubuntuStart(id = nextId()),
         timeoutMs = 20_000,
     )
 
