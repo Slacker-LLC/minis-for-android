@@ -213,7 +213,7 @@ unshare + mount + chroot
 Ubuntu 24.04 userspace
 ```
 
-The guest reuses the Android kernel and runs with the app guest UID. Host workspace/memory/skills/shared directories are created under the app's private files directory and bind-mounted into the chroot.
+The guest reuses the Android kernel and runs with the app guest UID. Persistent agent data uses the fixed root-managed layout under `/data/adb/minis/`: `workspace/`, `sessions/`, `memory/`, `skills/`, `shared/`, and `home/`. `minisd` rejects alternate or App-filesDir persistent sources; these directories are prepared as the bind sources before the private mount namespace/chroot is established.
 
 ## Troubleshooting
 
