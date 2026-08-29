@@ -33,6 +33,7 @@ A change should preserve these project invariants:
 7. Security-sensitive paths fail closed.
 8. Tests and English primary documentation are updated with behavior changes.
 9. GPL and third-party license obligations are preserved.
+10. Build/tooling changes use the canonical entry points in [BUILDING.md](BUILDING.md) and must not reintroduce an upstream clone/patch build pipeline.
 
 ## Runtime architecture
 
@@ -96,6 +97,14 @@ Security tests should cover negative cases, not only successful paths.
 ## Validation
 
 Use the narrowest relevant checks locally, and rely on repository CI for the full gate.
+
+Build/tooling changes:
+
+```bash
+python3 scripts/test_build_cleanup_guard.py
+python3 scripts/check_build_cleanup.py
+bash -n scripts/update_models_dev.sh
+```
 
 Android:
 
