@@ -3,6 +3,9 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.ToolFailureKind
+import com.openminis.app.tools.ToolTimeoutPolicy
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 /**
@@ -25,8 +28,6 @@ object ToolRegistry {
 
     fun register(handler: ToolHandler, aliasNames: List<String> = emptyList()) {
         handlers[handler.definition.name] = handler
-        // The provider wire name (dots → underscores) must resolve back to the
-        // same handler when the model echoes it in a tool call.
         val apiName = handler.definition.apiName
         if (apiName != handler.definition.name) {
             aliases[apiName] = handler.definition.name
@@ -34,7 +35,6 @@ object ToolRegistry {
         for (a in aliasNames) aliases[a] = handler.definition.name
     }
 
-    /** Removes a tool and any alias pointing at it (MCPProvider hot-reload). */
     fun unregister(name: String) {
         val canonical = canonicalName(name) ?: return
         handlers.remove(canonical)
@@ -54,11 +54,6 @@ object ToolRegistry {
 
     fun contains(name: String): Boolean = canonicalName(name) != null
 
-    /**
-     * Definitions visible to [caller]: local sees everything registered;
-     * MCP sees only tools allowed by the permission table (local-only and
-     * denied are filtered out) that also have a handler here.
-     */
     fun definitionsForCaller(caller: String): List<AgentToolDefinition> {
         if (caller == ToolPermissionManager.CALLER_LOCAL) return definitions()
         val mcpVisible = ToolPermissionManager.mcpVisibleTools()
@@ -68,13 +63,7 @@ object ToolRegistry {
     }
 }
 
-/**
- * Tool executor: gates via [ToolPermissionManager], runs the handler,
- * fixes error semantics for linux.* availability.
- */
 object ToolExecutor {
-
-    /** Runs [name] for [caller]; returns structured result. */
     suspend fun execute(
         name: String,
         argsJson: String,
@@ -82,7 +71,6 @@ object ToolExecutor {
         context: Context,
         caller: String = ToolPermissionManager.CALLER_LOCAL,
         toolId: String = "",
-        /** True when an MCP_CONFIRM gate was already consumed by the caller (MCP confirm flow). */
         confirmBypassed: Boolean = false,
     ): ToolExecutionResult {
         val canonical = ToolRegistry.canonicalName(name)
@@ -98,9 +86,6 @@ object ToolExecutor {
         val handler = ToolRegistry.handler(canonical)
             ?: return ToolExecutionResult("Error: no handler for $canonical", false)
 
-        // P4 (06 §1): a provider claiming this name wraps handler execution
-        // (e.g. LinuxProvider's ubuntu_runtime_unavailable gate). No provider
-        // → unchanged default handler path (backward compatible).
         val provider = ProviderRouter.route(canonical)
             ?: return handler.execute(argsJson, sessionId, context, toolId)
 
@@ -110,17 +95,11 @@ object ToolExecutor {
     }
 }
 
-/** A registered tool: definition + execution. */
 interface ToolHandler {
     val definition: AgentToolDefinition
     suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String = ""): ToolExecutionResult
 }
 
-// ── linux.* handlers (P3 first wave) ────────────────────────────────────────
-// File handlers reuse the existing FileRead/Write/Edit implementations
-// (identical semantics to the old flat tools) and expose the D12 names.
-
-/** `linux.file.read` — same implementation as file_read. */
 class LinuxFileReadHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.FileReadTool.definition().copy(name = "linux.file.read")
@@ -129,7 +108,6 @@ class LinuxFileReadHandler : ToolHandler {
         com.openminis.app.tools.FileReadTool.execute(argsJson, sessionId, context)
 }
 
-/** `linux.file.write` — same implementation as file_write. */
 class LinuxFileWriteHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.FileWriteTool.definition().copy(name = "linux.file.write")
@@ -138,7 +116,6 @@ class LinuxFileWriteHandler : ToolHandler {
         com.openminis.app.tools.FileWriteTool.execute(argsJson, sessionId, context)
 }
 
-/** `linux.file.edit` — same implementation as file_edit. */
 class LinuxFileEditHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.FileEditTool.definition().copy(name = "linux.file.edit")
@@ -147,33 +124,35 @@ class LinuxFileEditHandler : ToolHandler {
         com.openminis.app.tools.FileEditTool.execute(argsJson, sessionId, context)
 }
 
-/** `linux.shell` — same implementation as shell_execute (Ubuntu runtime). */
 class LinuxShellHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.AgentTools.shellExecuteDefinition(name = "linux.shell")
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
-        val args = org.json.JSONObject(argsJson)
+        val args = JSONObject(argsJson)
         val command = args.optString("command")
         if (command.isBlank()) {
             return ToolExecutionResult("Error: 'command' is required", false)
         }
-        val timeoutSec = args.optInt("timeout", 900).coerceIn(1, 900)
+        val requestedMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else null
+        val timeoutMs = ToolTimeoutPolicy.resolve("linux.shell", callerOverrideMs = requestedMs).timeoutMs
+            ?: 900_000L
         val result = com.openminis.app.sandbox.ExecutionCoordinator.execute(
             sessionId = sessionId,
             command = command,
-            timeout = timeoutSec * 1000L,
+            timeout = timeoutMs,
         )
+        val failureKind = result.failureKind.toToolFailureKind()
         return ToolExecutionResult(
             output = result.output,
-            success = result.exitCode == 0 || result.exitCode == 124,
+            success = result.exitCode == 0 && failureKind == null,
             toolTitle = args.optString("tool_title", "linux.shell"),
-            timedOut = result.exitCode == 124,
+            timedOut = failureKind == ToolFailureKind.TOOL_TIMEOUT,
+            failureKind = failureKind,
         )
     }
 }
 
-/** `linux.python.run` — run a python script/code snippet in the Ubuntu runtime. */
 class LinuxPythonRunHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "linux.python.run",
@@ -187,43 +166,88 @@ class LinuxPythonRunHandler : ToolHandler {
         ),
         required = listOf("tool_title", "code"),
         propertyOrdering = listOf("tool_title", "code", "timeout"),
-        timeoutMs = 300_000L,
+        timeoutMs = null,
     )
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
-        val args = org.json.JSONObject(argsJson)
+        val args = JSONObject(argsJson)
         val code = args.optString("code")
         if (code.isBlank()) {
             return ToolExecutionResult("Error: 'code' is required", false)
         }
-        val timeoutSec = args.optInt("timeout", 300).coerceIn(1, 900)
-        // Write to a temp script in workspace then run; keeps output bounded.
-        val scriptPath = "python_run_${System.currentTimeMillis()}.py"
-        val write = com.openminis.app.tools.FileWriteTool.execute(
-            """{"tool_title":"write python script","path":"/workspace/$scriptPath","content":${org.json.JSONObject.quote(code)}}""",
-            sessionId, context,
-        )
-        if (!write.success) return write
-        val result = com.openminis.app.sandbox.ExecutionCoordinator.execute(
-            sessionId = sessionId,
-            command = "python3 /workspace/$scriptPath",
-            timeout = timeoutSec * 1000L,
-        )
-        return ToolExecutionResult(
-            output = result.output,
-            success = result.exitCode == 0 || result.exitCode == 124,
-            toolTitle = args.optString("tool_title", "linux.python.run"),
-            timedOut = result.exitCode == 124,
+        val requestedMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else null
+        val timeoutMs = ToolTimeoutPolicy.resolve("linux.python.run", callerOverrideMs = requestedMs).timeoutMs
+            ?: 300_000L
+        val scriptPath = "/workspace/python_run_${System.currentTimeMillis()}_${toolId.ifBlank { "tool" }}.py"
+        var primary: ToolExecutionResult? = null
+        var cancelled: CancellationException? = null
+        var cleanupFailure: String? = null
+        try {
+            val write = com.openminis.app.tools.FileWriteTool.execute(
+                """{"tool_title":"write python script","path":${JSONObject.quote(scriptPath)},"content":${JSONObject.quote(code)}}""",
+                sessionId,
+                context,
+            )
+            if (!write.success) {
+                primary = write
+            } else {
+                val result = com.openminis.app.sandbox.ExecutionCoordinator.execute(
+                    sessionId = sessionId,
+                    command = "python3 ${shellQuote(scriptPath)}",
+                    timeout = timeoutMs,
+                )
+                val failureKind = result.failureKind.toToolFailureKind()
+                primary = ToolExecutionResult(
+                    output = result.output,
+                    success = result.exitCode == 0 && failureKind == null,
+                    toolTitle = args.optString("tool_title", "linux.python.run"),
+                    timedOut = failureKind == ToolFailureKind.TOOL_TIMEOUT,
+                    failureKind = failureKind,
+                )
+            }
+        } catch (c: CancellationException) {
+            cancelled = c
+        } finally {
+            val host = com.openminis.app.sandbox.ubuntu.UbuntuPaths.resolveSessionHostPath(
+                sessionId,
+                scriptPath,
+                context,
+            )
+            cleanupFailure = when {
+                host == null -> "CLEANUP_FAILURE: unable to resolve temporary script $scriptPath"
+                !host.exists() -> null
+                host.delete() -> null
+                else -> "CLEANUP_FAILURE: unable to delete temporary script $scriptPath"
+            }
+        }
+
+        cancelled?.let { c ->
+            cleanupFailure?.let { c.addSuppressed(IllegalStateException(it)) }
+            throw c
+        }
+        val result = primary ?: ToolExecutionResult("Error: python execution produced no result", false)
+        if (cleanupFailure == null) return result
+        android.util.Log.e("LinuxPythonRunHandler", cleanupFailure)
+        val kind = result.failureKind ?: ToolFailureKind.CLEANUP_FAILURE
+        return result.copy(
+            output = result.output + "\n" + cleanupFailure,
+            success = false,
+            failureKind = kind,
+            cleanupFailure = cleanupFailure,
         )
     }
+
+    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 }
 
-// ── android.* handlers (P3, read-oriented first wave) ────────────────────────
-// One generic handler forwards to AndroidAgentTools.execute by old name;
-// each registered D12 name maps to the corresponding legacy tool. The
-// action gate (info-only vs mutating) stays in AndroidAgentTools itself.
+private fun com.openminis.app.sandbox.ExecutionCoordinator.FailureKind?.toToolFailureKind(): ToolFailureKind? = when (this) {
+    com.openminis.app.sandbox.ExecutionCoordinator.FailureKind.TOOL_TIMEOUT -> ToolFailureKind.TOOL_TIMEOUT
+    com.openminis.app.sandbox.ExecutionCoordinator.FailureKind.TRANSPORT_TIMEOUT -> ToolFailureKind.TRANSPORT_TIMEOUT
+    com.openminis.app.sandbox.ExecutionCoordinator.FailureKind.PROCESS_KILLED -> ToolFailureKind.PROCESS_KILLED
+    com.openminis.app.sandbox.ExecutionCoordinator.FailureKind.CLEANUP_FAILURE -> ToolFailureKind.CLEANUP_FAILURE
+    com.openminis.app.sandbox.ExecutionCoordinator.FailureKind.RUNTIME_FAILURE, null -> null
+}
 
-/** Generic android.* handler bound to one legacy AndroidAgentTools name. */
 class AndroidToolHandler(
     private val legacyName: String,
     private val newName: String,
@@ -246,9 +270,6 @@ class AndroidToolHandler(
         )
 }
 
-// ── image read + agent.*/system.jobs handlers (P3 read-first wave 2) ────────
-
-/** `linux.file.image.read` — same implementation as read_image. */
 class LinuxReadImageHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.ReadImageTool.definition().copy(name = "linux.file.image.read")
@@ -257,7 +278,6 @@ class LinuxReadImageHandler : ToolHandler {
         com.openminis.app.tools.ReadImageTool.execute(argsJson, sessionId, context)
 }
 
-/** `agent.goal` — get_goal / create_goal / update_goal dispatched by args action. */
 class AgentGoalHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "agent.goal",
@@ -273,12 +293,11 @@ class AgentGoalHandler : ToolHandler {
     )
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
-        val name = org.json.JSONObject(argsJson).optString("action")
+        val name = JSONObject(argsJson).optString("action")
         return com.openminis.app.tools.GoalTools.execute(name, argsJson, sessionId, context)
     }
 }
 
-/** `agent.todo` — same implementation as todo_write. */
 class AgentTodoHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "agent.todo",
@@ -307,7 +326,6 @@ class AgentTodoHandler : ToolHandler {
         com.openminis.app.tools.TodoTool.execute(argsJson, sessionId, context)
 }
 
-/** `agent.subagent` — same implementation as subagent. */
 class AgentSubagentHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "agent.subagent",
@@ -326,7 +344,6 @@ class AgentSubagentHandler : ToolHandler {
         com.openminis.app.tools.SubagentTool.execute(argsJson, sessionId, context)
 }
 
-/** `agent.ask` — same implementation as ask_user_question. */
 class AgentAskHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "agent.ask",
@@ -360,7 +377,6 @@ class AgentAskHandler : ToolHandler {
         com.openminis.app.tools.AskUserQuestionTool.execute(argsJson, sessionId, context)
 }
 
-/** `system.jobs` — job_list / job_kill / job_output dispatched by args action. */
 class SystemJobsHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "system.jobs",
@@ -380,12 +396,11 @@ class SystemJobsHandler : ToolHandler {
     )
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
-        val name = org.json.JSONObject(argsJson).optString("action")
+        val name = JSONObject(argsJson).optString("action")
         return com.openminis.app.tools.JobTools.execute(name, argsJson, sessionId, context)
     }
 }
 
-/** `agent.ralph` — same implementation as ralph. */
 class AgentRalphHandler : ToolHandler {
     override val definition: AgentToolDefinition =
         com.openminis.app.tools.RalphTool.definition().copy(name = "agent.ralph")
