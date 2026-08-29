@@ -2,7 +2,7 @@
 
 > [README.md](README.md) 是英文主文档；本文件是中文说明，不单独定义不同的工程行为。
 
-**Minis for Android** 是面向 Root Android 设备的 AI Agent Runtime。它由原生 Android App、Rust Root Broker `minisd`、Ubuntu 24.04 userspace、Android 原生工具、MCP、持久化 Agent 状态、任务/子 Agent、语音与设备级集成组成。
+**Minis for Android** 是面向 Root Android 设备的 AI Agent Runtime。它由原生 Android App、Rust Root Broker `minisd`、Ubuntu 24.04 userspace、Android 原生工具、MCP、持久化 Agent 数据、任务/子 Agent、语音与设备级集成组成。
 
 ## 当前架构
 
@@ -23,7 +23,22 @@ minisd Root Broker
 Ubuntu 24.04 userspace
 ```
 
-Android App 是 Agent 状态、会话、工具权限、Provider 配置和持久化数据的权威来源。`minisd` 只负责受控的特权运行时操作；Linux guest 复用 Android 内核，Agent 代码以 App guest UID 运行。
+Android App 负责应用/数据库状态、Provider/Model 配置、工具权限、审批与运行时编排。`minisd` 负责特权 Linux 运行时边界，并在 keeper 的 mount namespace 建立前准备固定的持久化数据源。Agent 命令以 App guest UID 运行，不保留无限制 root 身份。
+
+## Linux 持久化数据
+
+固定 host 布局位于 `/data/adb/minis/`：
+
+| Host 路径 | Guest / 运行时用途 |
+|---|---|
+| `/data/adb/minis/workspace` | `/workspace` |
+| `/data/adb/minis/sessions` | 每 Session 的 workspace 数据源 |
+| `/data/adb/minis/memory` | `/memory` |
+| `/data/adb/minis/skills` | `/skills` |
+| `/data/adb/minis/shared` | `/shared` |
+| `/data/adb/minis/home` | `/home/minis` |
+
+`minisd` 会在 keeper 启动前创建并验证这些数据源。持久化数据目录使用 guest UID/GID 与 `0700` 权限；非固定持久化来源以及位于 tmpfs 上的持久化来源都会被拒绝。
 
 ## 当前状态
 

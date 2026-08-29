@@ -187,7 +187,18 @@ mount namespace + bind mounts + chroot
 Ubuntu 24.04 userspace
 ```
 
-The guest reuses the Android kernel and runs with the app guest UID. Host workspace/memory/skills/shared directories are created under the app's private files directory and bind-mounted into the chroot.
+The guest reuses the Android kernel and runs with the app guest UID. `minisd` prepares the canonical persistent host sources under `/data/adb/minis/` before keeper startup:
+
+```text
+/data/adb/minis/workspace
+/data/adb/minis/sessions
+/data/adb/minis/memory
+/data/adb/minis/skills
+/data/adb/minis/shared
+/data/adb/minis/home
+```
+
+These sources are fixed runtime inputs. Startup rejects alternate persistent paths, and persistent backing must not be tmpfs.
 
 ## Troubleshooting
 

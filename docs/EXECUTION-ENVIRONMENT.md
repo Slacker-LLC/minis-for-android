@@ -24,7 +24,7 @@ The Ubuntu environment reuses the Android kernel. It is not a VM and does not bo
 
 ### Android app
 
-The app owns agent/session state, provider/model state, tool registration and permissions, workspace-related host paths, user approvals, execution checkpoints, and runtime readiness/recovery logic.
+The app owns application/database state, provider/model state, tool registration and permissions, user approvals, execution checkpoints, and runtime readiness/recovery orchestration.
 
 ### `minisd`
 
@@ -32,40 +32,68 @@ The app owns agent/session state, provider/model state, tool registration and pe
 
 The broker uses a private Unix socket, peer identity checks, framed messages, bounded request/response sizes, a compile-time capability ceiling, and runtime policy that may restrict but not expand that ceiling.
 
+`minisd` also owns the canonical host-side persistent filesystem layout used by the Linux guest. It prepares and validates those persistent sources before keeper mount-namespace creation.
+
 ### Ubuntu guest
 
 The guest is Ubuntu 24.04 userspace entered through a chroot inside the mount namespace prepared by `minisd`.
 
 Root establishes the namespace, mounts, and chroot. Agent commands run under the app guest UID rather than retaining unrestricted root identity.
 
-## Host and guest paths
+## Canonical persistent host layout
 
-The rootfs lives under the root-managed Minis area:
+The root-managed Minis area is `/data/adb/minis`.
 
-```text
-/data/adb/minis/rootfs
-```
-
-On the current `master` baseline, application-owned workspace/memory/skills/shared directories are resolved from the app's private files directory and bind-mounted into the guest. The exact host prefix is determined from `Context.filesDir` at runtime.
-
-Canonical guest mappings include:
-
-| Guest path | Purpose |
+| Host path | Purpose / guest mapping |
 |---|---|
-| `/workspace` | main agent workspace |
-| `/var/minis/workspace` | workspace alias |
-| `/var/minis/attachments` | attachments |
-| `/var/minis/offloads` | tool/native offloads |
-| `/var/minis/browser` | browser data |
-| `/memory` / `/var/minis/memory` | persistent memory |
-| `/skills` / `/var/minis/skills` | skills |
-| `/shared` / `/var/minis/shared` | shared files |
+| `/data/adb/minis/rootfs` | Ubuntu rootfs |
+| `/data/adb/minis/workspace` | global `/workspace` backing |
+| `/data/adb/minis/sessions` | per-session workspace backing |
+| `/data/adb/minis/memory` | `/memory` backing |
+| `/data/adb/minis/skills` | `/skills` backing |
+| `/data/adb/minis/shared` | `/shared` backing |
+| `/data/adb/minis/home` | `/home/minis` backing |
+| `/data/adb/minis/run` | broker/runtime state |
+| `/data/adb/minis/log` | broker/runtime logs |
 
-Path resolution must enforce canonical containment and reject traversal, NUL input, and escape attempts.
+Persistent data directories (`workspace`, `sessions`, `memory`, `skills`, `shared`, and `home`) are prepared for the guest UID/GID with mode `0700`. The rootfs, run, and log directories use separate root/runtime modes defined by `src/native/minisd/src/layout.rs`.
+
+The persistent start parameters are fixed. `ubuntu.start` rejects alternate values for rootfs, workspace, sessions, memory, skills, shared data, or HOME rather than silently changing persistence backing.
+
+Persistent sources are validated before keeper startup and must not be tmpfs-backed. A layout that cannot be prepared or validated causes runtime startup to fail closed.
+
+## Guest paths
+
+The current canonical guest data paths are:
+
+| Guest path | Backing |
+|---|---|
+| `/workspace` | `/data/adb/minis/workspace` or the selected session workspace |
+| `/memory` | `/data/adb/minis/memory` |
+| `/skills` | `/data/adb/minis/skills` |
+| `/shared` | `/data/adb/minis/shared` |
+| `/home/minis` | `/data/adb/minis/home` |
+
+When a valid `session_id` is supplied, `minisd` creates that session below `/data/adb/minis/sessions/<session_id>/` and prepares its `workspace`, `attachments`, `offloads`, and `browser` directories under the same containment and ownership checks.
+
+Path handling must reject traversal, NUL input, symlink escapes, and any session path that escapes the configured sessions root.
+
+## Startup order
+
+The rooted Ubuntu startup path is ordered so persistent bind sources exist before the keeper establishes its private mount namespace:
+
+1. validate fixed persistent start parameters;
+2. retire stale keeper state when needed;
+3. create/repair the `/data/adb/minis` host layout with the required ownership and modes;
+4. validate persistent backing, including the tmpfs rejection;
+5. validate and prepare the Ubuntu rootfs;
+6. spawn the keeper;
+7. establish the private mount namespace, bind mounts, and chroot;
+8. mark the runtime ready only after keeper readiness is reported.
 
 ## Shell behavior
 
-The agent shell targets Ubuntu and executes through Bash. Public tool contracts should expose guest paths such as `/workspace`, not invent hard-coded host paths.
+The agent shell targets Ubuntu and executes through Bash. Public tool contracts should expose guest paths such as `/workspace`, not hard-coded host paths.
 
 Shell execution is governed by timeout, dangerous-command policy, output limits/spill, persisted job state, approvals, and checkpoints where applicable.
 
@@ -86,5 +114,7 @@ The project does not disable SELinux globally for compatibility. Runtime setup m
 ## Failure and recovery
 
 Android may kill the app or foreground services. Long-running work must rely on persisted jobs/checkpoints rather than assuming one process remains alive indefinitely.
+
+A recovered keeper whose persistent bind provenance cannot be proven is not accepted as a known-good canonical layout; the runtime requires an explicit stop/start before Agent execution continues.
 
 After uncertain termination of a side-effecting operation, recovery logic must not blindly repeat it. Unknown outcome remains distinct from clean failure.

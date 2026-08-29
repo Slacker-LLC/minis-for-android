@@ -4,7 +4,7 @@
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-**Minis for Android** is an Android AI agent runtime for rooted devices. It combines a native Android application with a Rust root broker (`minisd`), an Ubuntu 24.04 userspace, Android-native tools, MCP integrations, persistent agent state, jobs, subagents, voice/assistant features, and device-level automation.
+**Minis for Android** is an Android AI agent runtime for rooted devices. It combines a native Android application with a Rust root broker (`minisd`), an Ubuntu 24.04 userspace, Android-native tools, MCP integrations, persistent agent data, jobs, subagents, voice/assistant features, and device-level automation.
 
 Chinese overview: [README.zh-CN.md](README.zh-CN.md)
 
@@ -27,7 +27,22 @@ private mount namespace + bind mounts + chroot
 Ubuntu 24.04 userspace
 ```
 
-The Android app remains the source of truth for agent state, sessions, tool permissions, provider configuration, and persistence. `minisd` performs narrowly scoped privileged runtime setup; the Linux guest reuses the Android kernel and runs agent code under the app guest UID.
+The Android app owns application/database state, provider/model configuration, tool permissions, approvals, and runtime orchestration. `minisd` owns the privileged Linux runtime boundary and prepares the canonical persistent guest-data backing before the keeper mount namespace is created. Agent commands run under the app guest UID rather than retaining unrestricted root identity.
+
+## Persistent Linux data
+
+The canonical host layout is rooted at `/data/adb/minis/`:
+
+| Host path | Guest/runtime purpose |
+|---|---|
+| `/data/adb/minis/workspace` | `/workspace` |
+| `/data/adb/minis/sessions` | per-session workspace backing |
+| `/data/adb/minis/memory` | `/memory` |
+| `/data/adb/minis/skills` | `/skills` |
+| `/data/adb/minis/shared` | `/shared` |
+| `/data/adb/minis/home` | `/home/minis` |
+
+`minisd` creates and validates these sources before keeper startup. Persistent data directories use the guest UID/GID with mode `0700`; non-canonical persistent sources and tmpfs-backed persistent sources are rejected.
 
 ## Current status
 

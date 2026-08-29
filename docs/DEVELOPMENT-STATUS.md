@@ -15,16 +15,20 @@ Build metadata such as `versionName` and `versionCode` lives in `src/android/app
 
 ```text
 Android app
-├─ Agent runtime / sessions / persistence
+├─ Agent runtime / sessions / application persistence
 ├─ Provider and model runtime
 ├─ Tool runtime / permission gates
 ├─ Android-native tools
 ├─ jobs / goals / todos / subagents
 ├─ MCP client + local MCP server
 ├─ voice / assistant / overlay integrations
-└─ minisd root broker
+└─ Unix socket RPC
+   ↓
+minisd root broker
+   ├─ canonical /data/adb/minis persistent layout
    └─ private mount namespace + bind mounts + chroot
-      └─ Ubuntu 24.04 userspace
+      ↓
+Ubuntu 24.04 userspace
 ```
 
 ## Implemented areas
@@ -32,13 +36,14 @@ Android app
 - multi-provider/model support, OAuth/API-key flows, image input, streaming, and tool calls;
 - persistent sessions, goals, todos, jobs, subagents, structured questions, memory, and skills;
 - loopback MCP server with bearer authentication and external MCP integration;
-- Compose UI, Room-backed state, Accessibility and Android-native system tools;
+- Compose UI, Room-backed application state, Accessibility and Android-native system tools;
 - voice, assistant, overlay, ASR/TTS integrations;
-- Rust `minisd`, verified Ubuntu 24.04 rootfs, private mount namespace, explicit bind mounts, chroot entry, and guest execution under the app UID.
+- Rust `minisd`, verified Ubuntu 24.04 rootfs, private mount namespace, explicit bind mounts, chroot entry, and guest execution under the app UID;
+- fixed Linux guest-data sources under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`, prepared before keeper startup and rejected if non-canonical or tmpfs-backed.
 
 ## CI and release engineering
 
-Repository CI covers Rust formatting/Clippy/tests/release build, rootfs checksum failure paths, Android unit tests, Debug/Release lint, Debug packaging, Release Kotlin compilation and packaging, fail-closed release signing, and release APK verification.
+Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs checksum failure paths, Android unit tests, Debug/Release lint, Debug packaging, Release Kotlin compilation and packaging, fail-closed release signing, and release APK verification.
 
 ## Current risk areas
 
@@ -63,6 +68,8 @@ Use the live [GitHub Issues](https://github.com/Slacker-LLC/minis-for-android/is
 | MCP | `src/android/app/src/main/java/com/openminis/app/mcp/` |
 | Ubuntu runtime | `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/` |
 | Root broker | `src/native/minisd/` |
+| Persistent layout contract | `src/native/minisd/src/layout.rs` |
+| Persistent Ubuntu runtime | `src/native/minisd/src/ubuntu_persistent.rs` |
 | Rootfs build | `scripts/build-ubuntu-rootfs.sh` |
 | CI | `.github/workflows/ci.yml` |
 
