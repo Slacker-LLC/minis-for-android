@@ -54,7 +54,7 @@ root = Path('src/android')
 text_suffixes = {'.kt', '.kts', '.java', '.xml', '.c', '.cc', '.cpp', '.h', '.hpp', '.md', '.txt'}
 
 # Ordered exact namespace substitutions. Specific responsibility classes run before
-# the core fallback so their imports cannot accidentally land in runtime.*.
+# the core fallback so guest/terminal/minisd/ubuntu imports land in the right package.
 subs = [
     ('com.openminis.app.sandbox.minisd', 'com.openminis.app.runtime.minisd'),
     ('com.openminis.app.sandbox.ubuntu', 'com.openminis.app.runtime.ubuntu'),
@@ -63,11 +63,7 @@ subs = [
     ('com.openminis.app.sandbox.ShellTimeoutPolicy', 'com.openminis.app.runtime.terminal.ShellTimeoutPolicy'),
     ('com.openminis.app.sandbox.TerminalSanitizer', 'com.openminis.app.runtime.terminal.TerminalSanitizer'),
     ('com.openminis.app.sandbox.TerminalSession', 'com.openminis.app.runtime.terminal.TerminalSession'),
-    ('com.openminis.app.sandbox.ExecutionCoordinator', 'com.openminis.app.runtime.ExecutionCoordinator'),
-    ('com.openminis.app.sandbox.MinisKernel', 'com.openminis.app.runtime.MinisKernel'),
-    ('com.openminis.app.sandbox.MountedFolderCoordinator', 'com.openminis.app.runtime.MountedFolderCoordinator'),
-    ('com.openminis.app.sandbox.ReadOnlyMountException', 'com.openminis.app.runtime.ReadOnlyMountException'),
-    ('com.openminis.app.sandbox.RootfsManager', 'com.openminis.app.runtime.RootfsManager'),
+    ('com.openminis.app.sandbox.', 'com.openminis.app.runtime.'),
 ]
 
 for p in root.rglob('*'):
