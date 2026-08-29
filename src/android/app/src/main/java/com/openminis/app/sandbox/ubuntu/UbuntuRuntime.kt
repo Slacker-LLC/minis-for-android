@@ -2,8 +2,11 @@ package com.openminis.app.sandbox.ubuntu
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.sandbox.RootfsHealthCode
+import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.sandbox.minisd.MinisdBootstrap
 import com.openminis.app.sandbox.minisd.MinisdClient
+import com.openminis.app.sandbox.minisd.MinisdError
 import com.openminis.app.sandbox.minisd.MinisdProtocol
 import com.openminis.app.sandbox.minisd.MinisdResponse
 import kotlinx.coroutines.Dispatchers
@@ -18,9 +21,8 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * App-side Ubuntu Runtime. [init] is lazy (no su). [ensureReady] starts
- * minisd's keeper. [shell] is what [com.openminis.app.sandbox.ExecutionCoordinator]
- * uses for `shell_execute`.
+ * App-side Ubuntu Runtime. [init] is lazy (no su). [ensureReady] starts the
+ * minisd broker independently, validates/repairs rootfs, then creates a keeper.
  */
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
@@ -49,6 +51,9 @@ object UbuntuRuntime {
         val durationMs: Long,
     )
 
+    class RuntimeInfrastructureException(val runtimeError: MinisdError) :
+        IllegalStateException("${runtimeError.code}: ${runtimeError.detail}")
+
     private data class BrokerStartResult(
         val ok: Boolean,
         val error: String? = null,
@@ -58,7 +63,6 @@ object UbuntuRuntime {
     var isInitialized: Boolean = false
         private set
 
-    /** Once Ubuntu is the live backend, file tools resolve via [UbuntuPaths]. */
     @Volatile
     var redirectPaths: Boolean = false
         private set
@@ -86,26 +90,22 @@ object UbuntuRuntime {
         Log.i(TAG, "initialized (lazy) appSocket=${dir}/minisd.sock uid=${ctx.applicationInfo.uid}")
     }
 
-    suspend fun refresh(): Snapshot {
-        val resp = client.ubuntuStatus()
-        return apply(resp)
-    }
+    suspend fun refresh(): Snapshot = apply(client.ubuntuStatus())
 
     suspend fun ensureReady(): Snapshot = startLock.withLock {
         val ctx = appContext
-            ?: return@withLock fail("UbuntuRuntime.init(context) has not been called")
+            ?: return@withLock fail("${MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: UbuntuRuntime.init(context) has not been called")
         val expectedUid = ctx.applicationInfo.uid
         var cur = refresh()
 
-        // A previous installation may have left a watchdog whose policy still
-        // names a different Android UID. Minisd status exposes the guest UID;
-        // root fallback in MinisdClient lets us inspect and repair that stale
-        // broker even when its app-private socket rejects the current process.
+        // Broker recovery is deliberately before rootfs health. A broken or
+        // missing rootfs must never prevent the privileged broker from starting.
         if (cur.guestUid != null && cur.guestUid != expectedUid) {
             Log.w(TAG, "stale minisd identity brokerUid=${cur.guestUid} appUid=$expectedUid")
             val restarted = ensureMinisdUp(forceRestart = true)
             if (!restarted.ok) {
-                return@withLock fail(
+                return@withLock failStructured(
+                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
                     "minisd identity restart failed: ${restarted.error ?: "unknown error"}",
                 )
             }
@@ -113,27 +113,57 @@ object UbuntuRuntime {
         } else if (cur.guestUid == null) {
             val spawned = ensureMinisdUp(forceRestart = false)
             if (!spawned.ok) {
-                return@withLock fail(spawned.error ?: cur.lastError ?: "failed to start minisd")
+                return@withLock failStructured(
+                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                    spawned.error ?: cur.lastError ?: "failed to start minisd",
+                )
             }
             cur = awaitBroker(expectedUid)
         }
 
-        // One forced recovery covers a wedged/stale broker whose pidfile was
-        // present but whose status call did not expose the expected identity.
+        // One forced broker restart covers stale pidfile / old installation UID.
         if (cur.guestUid != expectedUid) {
             val restarted = ensureMinisdUp(forceRestart = true)
             if (!restarted.ok) {
-                return@withLock fail(
+                return@withLock failStructured(
+                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
                     "minisd recovery failed: ${restarted.error ?: "unknown error"}",
                 )
             }
             cur = awaitBroker(expectedUid)
         }
-        if (cur.guestUid != expectedUid) {
-            return@withLock fail(
-                "minisd app identity mismatch: expected uid=$expectedUid, " +
-                    "broker uid=${cur.guestUid ?: "unknown"}; update/restart the privileged runtime",
+        if (!brokerIdentityMatches(cur, expectedUid)) {
+            return@withLock failStructured(
+                MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                "minisd app identity mismatch: expected uid=$expectedUid, broker uid=${cur.guestUid ?: "unknown"}",
             )
+        }
+
+        // Rootfs health is authoritative and metadata/layout based. If a keeper
+        // is still alive on a damaged tree, stop it before an atomic replacement.
+        val rootfs = RootfsManager.getInstance(ctx)
+        var health = rootfs.checkHealth()
+        if (!health.healthy) {
+            if (cur.running) {
+                cur = apply(client.ubuntuStop())
+                if (cur.running) {
+                    return@withLock failStructured(
+                        MinisdProtocol.ERROR_ROOTFS_INVALID,
+                        "cannot stop keeper before rootfs recovery",
+                    )
+                }
+            }
+            rootfs.installIfNeeded()
+            health = rootfs.checkHealth()
+            if (!health.healthy) {
+                val code = if (health.code == RootfsHealthCode.ROOT_UNAVAILABLE) {
+                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE
+                } else {
+                    MinisdProtocol.ERROR_ROOTFS_INVALID
+                }
+                return@withLock failStructured(code, health.detail)
+            }
+            cur = refresh()
         }
 
         if (cur.running && runtimeLayoutMatches(cur)) {
@@ -142,14 +172,11 @@ object UbuntuRuntime {
         }
 
         if (cur.running) {
-            // A keeper created before session isolation has its bind mounts
-            // frozen in the old namespace. Merely updating broker state would
-            // leave memory/skills/shared (and the compatibility workspace)
-            // attached to stale host directories, so recreate the keeper.
             val stopped = apply(client.ubuntuStop())
             if (stopped.running) {
-                return@withLock fail(
-                    "failed to restart the privileged runtime with session workspace isolation",
+                return@withLock failStructured(
+                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                    "failed to stop keeper with stale runtime bind layout",
                 )
             }
         }
@@ -164,30 +191,72 @@ object UbuntuRuntime {
             ),
         )
         val started = if (raw.running) refresh() else raw
+        if (!started.running) {
+            return@withLock failStructured(
+                MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                started.lastError ?: "ubuntu.start failed",
+            )
+        }
         if (!runtimeLayoutMatches(started)) {
-            return@withLock fail(
-                "fresh keeper did not confirm the requested runtime bind layout",
+            runCatching { client.ubuntuStop() }
+            return@withLock failStructured(
+                MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                layoutMismatchDetail(
+                    started,
+                    UbuntuPaths.hostWorkspace,
+                    UbuntuPaths.hostMemory,
+                    UbuntuPaths.hostSkills,
+                    UbuntuPaths.hostShared,
+                ),
             )
         }
-        redirectPaths = started.running && runtimeLayoutMatches(started)
-        if (started.running) {
-            Log.i(
-                TAG,
-                "ubuntu.start ok pid=${started.pid} version=${started.version} " +
-                    "uid=$expectedUid layoutKnown=${started.layoutKnown}",
-            )
-        } else {
-            Log.w(TAG, "ubuntu.start failed: ${started.lastError}")
-        }
+        redirectPaths = true
+        Log.i(
+            TAG,
+            "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid layoutKnown=${started.layoutKnown}",
+        )
         started
     }
 
     private fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
-        snapshot.layoutKnown &&
-            snapshot.hostWorkspace == UbuntuPaths.hostWorkspace &&
-            snapshot.hostMemory == UbuntuPaths.hostMemory &&
-            snapshot.hostSkills == UbuntuPaths.hostSkills &&
-            snapshot.hostShared == UbuntuPaths.hostShared
+        runtimeLayoutMatches(
+            snapshot,
+            UbuntuPaths.hostWorkspace,
+            UbuntuPaths.hostMemory,
+            UbuntuPaths.hostSkills,
+            UbuntuPaths.hostShared,
+        )
+
+    internal fun runtimeLayoutMatches(
+        snapshot: Snapshot,
+        expectedWorkspace: String,
+        expectedMemory: String,
+        expectedSkills: String,
+        expectedShared: String,
+    ): Boolean = snapshot.layoutKnown &&
+        snapshot.hostWorkspace == expectedWorkspace &&
+        snapshot.hostMemory == expectedMemory &&
+        snapshot.hostSkills == expectedSkills &&
+        snapshot.hostShared == expectedShared
+
+    internal fun layoutMismatchDetail(
+        snapshot: Snapshot,
+        expectedWorkspace: String,
+        expectedMemory: String,
+        expectedSkills: String,
+        expectedShared: String,
+    ): String = "runtime layout mismatch: " +
+        "workspace=${snapshot.hostWorkspace ?: "unknown"} expected=$expectedWorkspace, " +
+        "memory=${snapshot.hostMemory ?: "unknown"} expected=$expectedMemory, " +
+        "skills=${snapshot.hostSkills ?: "unknown"} expected=$expectedSkills, " +
+        "shared=${snapshot.hostShared ?: "unknown"} expected=$expectedShared, " +
+        "layoutKnown=${snapshot.layoutKnown}"
+
+    internal fun brokerIdentityMatches(snapshot: Snapshot, expectedUid: Int): Boolean =
+        snapshot.guestUid == expectedUid
+
+    internal fun shouldRetryAfterPreExecFailure(error: MinisdError?, attempt: Int): Boolean =
+        attempt == 0 && error?.code == MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST
 
     private suspend fun awaitBroker(expectedUid: Int): Snapshot {
         var cur = _snapshot.value
@@ -199,19 +268,11 @@ object UbuntuRuntime {
         return cur
     }
 
-    /**
-     * Materializes a policy for the current installation UID and starts the
-     * watchdog via su. When [forceRestart] is true, a stale watchdog parent
-     * and its server child are terminated through the broker pidfile first.
-     */
     private suspend fun ensureMinisdUp(forceRestart: Boolean): BrokerStartResult =
         withContext(Dispatchers.IO) {
             val ctx = appContext
                 ?: return@withContext BrokerStartResult(false, "no app context")
             if (forceRestart) {
-                // A broker restart alone does not stop a keeper started by an
-                // older minisd. Stop the live runtime first so the next
-                // ubuntu.start builds a fresh keeper with current mounts.
                 runCatching { client.ubuntuStop() }
             }
             val su = listOf(
@@ -316,8 +377,7 @@ object UbuntuRuntime {
                 }
                 Log.i(
                     TAG,
-                    "ensureMinisdUp forceRestart=$forceRestart uid=${ctx.applicationInfo.uid} " +
-                        output.take(200),
+                    "ensureMinisdUp forceRestart=$forceRestart uid=${ctx.applicationInfo.uid} ${output.take(200)}",
                 )
                 BrokerStartResult(true)
             } finally {
@@ -337,16 +397,41 @@ object UbuntuRuntime {
         argv: List<String>,
         timeoutMs: Long = 30_000,
         sessionId: String? = null,
-    ): MinisdResponse {
-        return client.ubuntuExec(argv, timeoutMs, sessionId = sessionId)
+    ): MinisdResponse = execWithRecovery {
+        client.ubuntuExec(argv, timeoutMs, sessionId = sessionId)
     }
 
-    suspend fun adminExec(argv: List<String>, timeoutMs: Long = 120_000, confirmId: String? = null): MinisdResponse {
-        return client.ubuntuAdminExec(argv, timeoutMs, confirmId)
-    }
+    suspend fun adminExec(
+        argv: List<String>,
+        timeoutMs: Long = 120_000,
+        confirmId: String? = null,
+    ): MinisdResponse = MinisdProtocol.promoteExecInfrastructureFailure(
+        client.ubuntuAdminExec(argv, timeoutMs, confirmId),
+    )
 
-    suspend fun provision(timeoutMs: Long = 600_000): MinisdResponse {
-        return client.ubuntuProvision(timeoutMs)
+    suspend fun provision(timeoutMs: Long = 600_000): MinisdResponse =
+        client.ubuntuProvision(timeoutMs)
+
+    private suspend fun execWithRecovery(call: suspend () -> MinisdResponse): MinisdResponse {
+        var attempt = 0
+        var response = MinisdProtocol.promoteExecInfrastructureFailure(call())
+        if (!shouldRetryAfterPreExecFailure(response.error, attempt)) return response
+
+        // KEEPER_NAMESPACE_LOST corresponds to helper setns failure before
+        // execve, so retrying once cannot duplicate user-command side effects.
+        // No other failure is blindly retried: transport/RPC/chroot failures may
+        // not prove whether a command already began.
+        attempt += 1
+        runCatching { client.ubuntuStop() }
+        val ready = ensureReady()
+        if (!ready.running) {
+            return MinisdProtocol.runtimeError(
+                MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                ready.lastError ?: "keeper recovery failed",
+            )
+        }
+        response = MinisdProtocol.promoteExecInfrastructureFailure(call())
+        return response
     }
 
     suspend fun shell(
@@ -360,45 +445,47 @@ object UbuntuRuntime {
         if (sessionId != null) {
             val ctx = appContext
             if (ctx == null || UbuntuPaths.ensureSessionDirs(ctx.filesDir, sessionId) == null) {
-                return ShellResult(
-                    output = "invalid or unavailable session workspace: $sessionId",
-                    exitCode = 1,
-                    durationMs = System.currentTimeMillis() - start,
+                throw RuntimeInfrastructureException(
+                    MinisdError(
+                        MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                        "invalid or unavailable session workspace: $sessionId",
+                    ),
                 )
             }
         }
-        val scopedEnv = if (sessionId == null) {
-            env
-        } else {
-            env + ("MINIS_CHAT_SESSION_ID" to sessionId)
+        val scopedEnv = if (sessionId == null) env else env + ("MINIS_CHAT_SESSION_ID" to sessionId)
+        val resp = execWithRecovery {
+            client.ubuntuExec(
+                argv = listOf("/bin/bash", "-lc", command),
+                timeoutMs = timeoutMs,
+                cwd = MinisdProtocol.GUEST_WORKSPACE,
+                env = scopedEnv,
+                sessionId = sessionId,
+            )
         }
-        val resp = client.ubuntuExec(
-            argv = listOf("/bin/bash", "-lc", command),
-            timeoutMs = timeoutMs,
-            cwd = MinisdProtocol.GUEST_WORKSPACE,
-            env = scopedEnv,
-            sessionId = sessionId,
-        )
+
+        if (!resp.ok) {
+            throw RuntimeInfrastructureException(
+                resp.error ?: MinisdError(
+                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                    "ubuntu.exec failed without structured error",
+                ),
+            )
+        }
+
         val stdout = resp.result?.optString("stdout").orEmpty()
         val stderr = resp.result?.optString("stderr").orEmpty()
-        val combined = when {
+        val output = when {
             stdout.isEmpty() -> stderr
             stderr.isEmpty() -> stdout
             else -> stdout + stderr
         }
-        val output = if (resp.ok) {
-            combined
-        } else {
-            val detail = resp.error?.detail ?: "ubuntu.exec failed"
-            if (combined.isEmpty()) detail else "$combined\n$detail"
-        }
         if (lineCallback != null && output.isNotEmpty()) {
             output.lineSequence().forEach { lineCallback(it) }
         }
-        val exit = if (resp.ok) resp.result?.optInt("exit_code", 1) ?: 1 else 1
         return ShellResult(
             output = output,
-            exitCode = exit,
+            exitCode = resp.result?.optInt("exit_code", 1) ?: 1,
             durationMs = System.currentTimeMillis() - start,
         )
     }
@@ -410,6 +497,8 @@ object UbuntuRuntime {
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
+
+    private fun failStructured(code: String, detail: String): Snapshot = fail("$code: $detail")
 
     private fun fail(detail: String): Snapshot {
         val next = Snapshot(lastError = detail)
@@ -453,7 +542,7 @@ object UbuntuRuntime {
             Snapshot(
                 running = false,
                 available = false,
-                lastError = resp.error?.detail ?: "ubuntu rpc failed",
+                lastError = resp.error?.let { "${it.code}: ${it.detail}" } ?: "ubuntu rpc failed",
             )
         }
         _snapshot.value = next
