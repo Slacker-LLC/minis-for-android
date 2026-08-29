@@ -69,6 +69,8 @@ jobs:
             fi
             sleep $((attempt * 10))
           done
+      - name: Provider customization build modes
+        run: bash scripts/test-provider-customization.sh
       - name: Verify missing release credentials fail closed
         working-directory: src/android
         run: |
