@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit
  */
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
+    private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
 
     data class Snapshot(
         val running: Boolean = false,
@@ -32,6 +33,7 @@ object UbuntuRuntime {
         val version: String? = null,
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
+        val sessionsRoot: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -129,9 +131,22 @@ object UbuntuRuntime {
             )
         }
 
-        if (cur.running) {
+        if (cur.running && cur.sessionsRoot == UbuntuPaths.hostSessions) {
             redirectPaths = true
             return@withLock cur
+        }
+
+        if (cur.running) {
+            // A keeper created before session isolation has its bind mounts
+            // frozen in the old namespace. Merely updating broker state would
+            // leave memory/skills/shared (and the compatibility workspace)
+            // attached to stale host directories, so recreate the keeper.
+            val stopped = apply(client.ubuntuStop())
+            if (stopped.running) {
+                return@withLock fail(
+                    "failed to restart the privileged runtime with session workspace isolation",
+                )
+            }
         }
 
         val started = apply(
@@ -140,8 +155,14 @@ object UbuntuRuntime {
                 memory = UbuntuPaths.hostMemory,
                 skills = UbuntuPaths.hostSkills,
                 shared = UbuntuPaths.hostShared,
+                sessionsRoot = UbuntuPaths.hostSessions,
             ),
         )
+        if (started.running && started.sessionsRoot != UbuntuPaths.hostSessions) {
+            return@withLock fail(
+                "privileged runtime does not support session workspace isolation; update minisd and retry",
+            )
+        }
         redirectPaths = started.running
         if (started.running) {
             Log.i(
@@ -177,9 +198,53 @@ object UbuntuRuntime {
                 "/system/bin/su",
                 "/system/xbin/su",
                 "/sbin/su",
+                "/su/bin/su",
+                "/data/adb/ksu/bin/su",
                 "/debug_ramdisk/su",
             ).firstOrNull { java.io.File(it).canExecute() }
-                ?: return@withContext BrokerStartResult(false, "no executable su binary")
+                ?: System.getenv("PATH").orEmpty()
+                    .split(java.io.File.pathSeparatorChar)
+                    .asSequence()
+                    .map { java.io.File(it, "su") }
+                    .firstOrNull { it.canExecute() }
+                    ?.absolutePath
+                ?: return@withContext BrokerStartResult(
+                    false,
+                    "Root unavailable: no executable su found; grant this app access in KernelSU/Magisk",
+                )
+
+            val rootProbe = try {
+                ProcessBuilder(su, "-c", "id -u")
+                    .redirectErrorStream(true)
+                    .start()
+            } catch (t: Throwable) {
+                return@withContext BrokerStartResult(false, "failed to start su: ${t.message}")
+            }
+            if (!rootProbe.waitFor(ROOT_AUTH_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                rootProbe.destroyForcibly()
+                rootProbe.waitFor(1, TimeUnit.SECONDS)
+                return@withContext BrokerStartResult(
+                    false,
+                    "Root authorization timed out; approve this app in KernelSU/Magisk and retry",
+                )
+            }
+            val rootOutput = runCatching {
+                rootProbe.inputStream.bufferedReader().use { it.readText().trim() }
+            }.getOrDefault("")
+            if (rootProbe.exitValue() != 0) {
+                val detail = rootOutput.take(300).ifBlank { "su exited ${rootProbe.exitValue()}" }
+                return@withContext BrokerStartResult(
+                    false,
+                    "Root authorization denied or unavailable: $detail",
+                )
+            }
+            val effectiveUid = MinisdBootstrap.parseEffectiveUid(rootOutput)
+            if (effectiveUid != 0) {
+                return@withContext BrokerStartResult(
+                    false,
+                    "Root authorization invalid: su returned uid=${effectiveUid ?: "unknown"}, expected 0",
+                )
+            }
 
             val appSock = java.io.File(ctx.filesDir, "minis/minisd.sock").absolutePath
             val template = try {
@@ -248,8 +313,12 @@ object UbuntuRuntime {
         return apply(resp)
     }
 
-    suspend fun exec(argv: List<String>, timeoutMs: Long = 30_000): MinisdResponse {
-        return client.ubuntuExec(argv, timeoutMs)
+    suspend fun exec(
+        argv: List<String>,
+        timeoutMs: Long = 30_000,
+        sessionId: String? = null,
+    ): MinisdResponse {
+        return client.ubuntuExec(argv, timeoutMs, sessionId = sessionId)
     }
 
     suspend fun adminExec(argv: List<String>, timeoutMs: Long = 120_000, confirmId: String? = null): MinisdResponse {
@@ -262,16 +331,33 @@ object UbuntuRuntime {
 
     suspend fun shell(
         command: String,
+        sessionId: String? = null,
         timeoutMs: Long = 600_000,
         env: Map<String, String> = emptyMap(),
         lineCallback: ((String) -> Unit)? = null,
     ): ShellResult {
         val start = System.currentTimeMillis()
+        if (sessionId != null) {
+            val ctx = appContext
+            if (ctx == null || UbuntuPaths.ensureSessionDirs(ctx.filesDir, sessionId) == null) {
+                return ShellResult(
+                    output = "invalid or unavailable session workspace: $sessionId",
+                    exitCode = 1,
+                    durationMs = System.currentTimeMillis() - start,
+                )
+            }
+        }
+        val scopedEnv = if (sessionId == null) {
+            env
+        } else {
+            env + ("MINIS_CHAT_SESSION_ID" to sessionId)
+        }
         val resp = client.ubuntuExec(
             argv = listOf("/bin/bash", "-lc", command),
             timeoutMs = timeoutMs,
             cwd = MinisdProtocol.GUEST_WORKSPACE,
-            env = env,
+            env = scopedEnv,
+            sessionId = sessionId,
         )
         val stdout = resp.result?.optString("stdout").orEmpty()
         val stderr = resp.result?.optString("stderr").orEmpty()
@@ -298,7 +384,8 @@ object UbuntuRuntime {
     }
 
     fun paths(): JSONObject = JSONObject()
-        .put("hostWorkspace", MinisdProtocol.HOST_WORKSPACE)
+        .put("hostWorkspace", UbuntuPaths.hostWorkspace)
+        .put("hostSessions", UbuntuPaths.hostSessions)
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         .put("socket", MinisdProtocol.DEFAULT_SOCKET)
@@ -331,6 +418,9 @@ object UbuntuRuntime {
                 } else {
                     _snapshot.value.guestUid
                 },
+                sessionsRoot = result.optString("sessions_root")
+                    .ifEmpty { _snapshot.value.sessionsRoot.orEmpty() }
+                    .takeIf { it.isNotEmpty() },
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )

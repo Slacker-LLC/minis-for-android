@@ -11,6 +11,7 @@ const MAX_CAPTURE_BYTES: usize = 256 * 1024;
 pub struct UbuntuExecSnapshot {
     pub pid: i32,
     pub rootfs: String,
+    pub sessions_root: String,
     pub guest_uid: u32,
     pub guest_gid: u32,
 }
@@ -61,9 +62,15 @@ pub fn snapshot_ubuntu_exec(
         .and_then(Value::as_u64)
         .and_then(|n| u32::try_from(n).ok())
         .ok_or((ErrorCode::Internal, "ubuntu guest gid unavailable".into()))?;
+    let sessions_root = status
+        .get("sessions_root")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
     Ok(UbuntuExecSnapshot {
         pid,
         rootfs,
+        sessions_root,
         guest_uid,
         guest_gid,
     })
@@ -117,6 +124,16 @@ pub fn execute_ubuntu_snapshot(
     // configured. Do not force ordinary guest traffic through minisd's root
     // loopback proxy; direct sockets should use the app UID's host networking.
     let proxy = crate::env::discover_proxy();
+    let session_root = if admin {
+        None
+    } else {
+        req.session_id
+            .as_deref()
+            .map(|session_id| {
+                crate::ubuntu::prepare_session_root(&snapshot.sessions_root, session_id, uid, gid)
+            })
+            .transpose()?
+    };
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
@@ -137,6 +154,9 @@ pub fn execute_ubuntu_snapshot(
         "--proxy",
         &proxy,
     ]);
+    if let Some(session_root) = &session_root {
+        cmd.arg("--session-root").arg(session_root);
+    }
     for (k, v) in &req.env {
         cmd.arg("--env").arg(format!("{k}={v}"));
     }
@@ -186,7 +206,8 @@ pub fn execute_ubuntu_snapshot(
                 "stdout_truncated": stdout.truncated,
                 "stderr_truncated": stderr.truncated,
                 "uid": uid,
-                "admin": admin
+                "admin": admin,
+                "session_id": req.session_id
             }));
         }
         if start.elapsed() >= Duration::from_millis(req.timeout_ms) {

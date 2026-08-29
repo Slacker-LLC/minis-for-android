@@ -225,6 +225,17 @@ pub fn is_known_method(method: &str) -> bool {
     KNOWN_METHODS.contains(&method)
 }
 
+/// Methods that older installations may still reference in a persisted
+/// policy.json. They were deliberately removed from this broker: dispatch
+/// rejects them regardless of policy, so they are inert. Policy loading strips
+/// them so an in-place minisd upgrade cannot brick the runtime.
+pub const LEGACY_REMOVED_METHODS: &[&str] = &[
+    "policy.reload",
+    "supervisor.status",
+    "supervisor.restartCloudflared",
+    "supervisor.stopCloudflared",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;

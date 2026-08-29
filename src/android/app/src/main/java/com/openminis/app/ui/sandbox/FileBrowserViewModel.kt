@@ -261,8 +261,9 @@ class FileBrowserViewModel(
                 com.openminis.app.sandbox.MinisKernel
                     .resolveSessionHostPath(sid, linuxPath, ctx)
                     ?.let { return it }
+            } else {
+                com.openminis.app.sandbox.MinisKernel.resolveHostPath(linuxPath)?.let { return it }
             }
-            com.openminis.app.sandbox.MinisKernel.resolveHostPath(linuxPath)?.let { return it }
         }
         return if (relativePath.isEmpty()) rootPath else File(rootPath, relativePath)
     }

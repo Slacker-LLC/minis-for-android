@@ -38,8 +38,17 @@ class MinisdClient(
         memory: String = "",
         skills: String = "",
         shared: String = "",
+        sessionsRoot: String = "",
     ): MinisdResponse = call(
-        MinisdProtocol.ubuntuStart(nextId(), rootfs, workspace, memory, skills, shared),
+        MinisdProtocol.ubuntuStart(
+            id = nextId(),
+            rootfs = rootfs,
+            workspace = workspace,
+            memory = memory,
+            skills = skills,
+            shared = shared,
+            sessionsRoot = sessionsRoot,
+        ),
         timeoutMs = 20_000,
     )
 
@@ -50,8 +59,16 @@ class MinisdClient(
         timeoutMs: Long = 30_000,
         cwd: String = MinisdProtocol.GUEST_WORKSPACE,
         env: Map<String, String> = emptyMap(),
+        sessionId: String? = null,
     ): MinisdResponse = call(
-        MinisdProtocol.ubuntuExec(argv, timeoutMs, cwd, env, nextId()),
+        MinisdProtocol.ubuntuExec(
+            argv = argv,
+            timeoutMs = timeoutMs,
+            cwd = cwd,
+            env = env,
+            id = nextId(),
+            sessionId = sessionId,
+        ),
         timeoutMs + 5_000,
     )
 
@@ -193,9 +210,17 @@ class MinisdClient(
             "/system/bin/su",
             "/system/xbin/su",
             "/sbin/su",
+            "/su/bin/su",
+            "/data/adb/ksu/bin/su",
             "/debug_ramdisk/su",
         )
         return candidates.firstOrNull { File(it).canExecute() }
+            ?: System.getenv("PATH").orEmpty()
+                .split(File.pathSeparatorChar)
+                .asSequence()
+                .map { File(it, "su") }
+                .firstOrNull { it.canExecute() }
+                ?.absolutePath
     }
 
     private fun unavailable(detail: String) = MinisdResponse(

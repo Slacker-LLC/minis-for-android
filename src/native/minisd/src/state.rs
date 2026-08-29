@@ -15,6 +15,7 @@ pub struct UbuntuState {
     pub running: bool,
     pub pid: Option<i32>,
     pub rootfs: String,
+    pub sessions_root: String,
     pub version: Option<String>,
     pub provisioned: bool,
     pub last_error: Option<String>,

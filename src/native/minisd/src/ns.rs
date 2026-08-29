@@ -444,6 +444,52 @@ pub fn setup_rootfs_mounts(
     Ok(())
 }
 
+/// Overlay the four session-scoped resources in an exec-private mount
+/// namespace. The keeper's global workspace remains untouched and shared
+/// resources (`/memory`, `/skills`, `/shared`) continue to come from it.
+#[cfg(unix)]
+pub fn setup_session_mounts(rootfs: &str, session_root: &str) -> Result<(), String> {
+    let root = Path::new(rootfs);
+    let session = Path::new(session_root);
+    let workspace_src = session.join("workspace");
+    let workspace_dst = root.join("workspace");
+    if !workspace_src.is_dir() {
+        return Err(format!(
+            "session workspace missing: {}",
+            workspace_src.display()
+        ));
+    }
+    bind_mount(
+        &workspace_src.to_string_lossy(),
+        &workspace_dst.to_string_lossy(),
+        false,
+    )?;
+
+    for subdir in ["attachments", "offloads", "browser"] {
+        let src = session.join(subdir);
+        if !src.is_dir() {
+            return Err(format!("session mount missing: {}", src.display()));
+        }
+        // `/var/minis/<subdir>` is a symlink into `/workspace/<subdir>`, so
+        // mounting the sibling session directory here keeps shell paths and
+        // Android host-side resolvers on the same layout.
+        let dst = workspace_dst.join(subdir);
+        if dst
+            .symlink_metadata()
+            .is_ok_and(|meta| meta.file_type().is_symlink())
+        {
+            return Err(format!(
+                "session mountpoint must not be a symlink: {}",
+                dst.display()
+            ));
+        }
+        std::fs::create_dir_all(&dst)
+            .map_err(|e| format!("create session mountpoint {}: {e}", dst.display()))?;
+        bind_mount(&src.to_string_lossy(), &dst.to_string_lossy(), false)?;
+    }
+    Ok(())
+}
+
 /// PoC used by `mount.prepare`: fork + unshare + MS_PRIVATE, then exit.
 /// Kept for P1 compatibility; P2 keeper uses the helpers above in a fresh process.
 #[cfg(unix)]

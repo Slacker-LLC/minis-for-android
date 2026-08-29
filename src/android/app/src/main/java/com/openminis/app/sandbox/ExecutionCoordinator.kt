@@ -82,6 +82,7 @@ object ExecutionCoordinator {
             val envVars = envVarRepository?.allAsDict() ?: emptyMap()
             val ran = UbuntuRuntime.shell(
                 command = command,
+                sessionId = sessionId,
                 timeoutMs = timeout,
                 env = envVars,
                 lineCallback = lineCallback,

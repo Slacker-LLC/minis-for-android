@@ -59,8 +59,17 @@ class MinisdBootstrapTest {
         )
 
         assertTrue(command.contains("/data/adb/minis/run/minisd.pid"))
+        assertTrue(command.contains("child_cmd"))
+        assertTrue(command.contains("--socket*/data/adb/minis/run/minisd.sock"))
         assertTrue(command.contains("PPid:"))
         assertTrue(command.contains("--watchdog"))
+    }
+
+    @Test
+    fun `effective uid parser ignores su diagnostics`() {
+        assertEquals(0, MinisdBootstrap.parseEffectiveUid("KernelSU warning\n0\n"))
+        assertEquals(10394, MinisdBootstrap.parseEffectiveUid("notice\n10394\nmore"))
+        assertEquals(null, MinisdBootstrap.parseEffectiveUid("permission denied"))
     }
 
     @Test

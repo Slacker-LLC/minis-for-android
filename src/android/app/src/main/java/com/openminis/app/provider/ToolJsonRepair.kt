@@ -37,7 +37,7 @@ object ToolJsonRepair {
         rawTail: String?,
         tools: List<AgentToolDefinition>,
     ): List<String> {
-        val toolDef = tools.firstOrNull { it.name == toolName }
+        val toolDef = tools.firstOrNull { it.matchesName(toolName) }
             ?: return emptyList()
 
         val repairs = mutableListOf<String>()
@@ -133,4 +133,3 @@ object ToolJsonRepair {
         return true
     }
 }
-

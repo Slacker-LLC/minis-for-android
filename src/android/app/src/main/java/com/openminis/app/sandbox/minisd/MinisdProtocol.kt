@@ -93,12 +93,14 @@ object MinisdProtocol {
         memory: String = "",
         skills: String = "",
         shared: String = "",
+        sessionsRoot: String = "",
     ): MinisdRequest {
         val params = JSONObject().put("rootfs", rootfs)
         if (workspace.isNotEmpty()) params.put("workspace", workspace)
         if (memory.isNotEmpty()) params.put("memory", memory)
         if (skills.isNotEmpty()) params.put("skills", skills)
         if (shared.isNotEmpty()) params.put("shared", shared)
+        if (sessionsRoot.isNotEmpty()) params.put("sessions_root", sessionsRoot)
         return MinisdRequest(id = id, method = "ubuntu.start", params = params)
     }
 
@@ -111,6 +113,7 @@ object MinisdProtocol {
         cwd: String = GUEST_WORKSPACE,
         env: Map<String, String> = emptyMap(),
         id: Long = 1,
+        sessionId: String? = null,
     ): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }
@@ -123,6 +126,7 @@ object MinisdProtocol {
             env.forEach { (k, v) -> obj.put(k, v) }
             params.put("env", obj)
         }
+        sessionId?.takeIf { it.isNotEmpty() }?.let { params.put("session_id", it) }
         return MinisdRequest(
             id = id,
             method = "ubuntu.exec",

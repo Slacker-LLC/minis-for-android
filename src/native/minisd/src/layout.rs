@@ -38,16 +38,16 @@ pub const UBUNTU_PROXY_PID_FILE: &str = "/data/adb/minis/run/ubuntu-proxy.pid";
 
 pub fn workspace_readme() -> &'static str {
     "\
-Minis workspace (Q16)
-=====================
-Host:  /data/adb/minis/workspace
+Minis legacy workspace
+======================
 Guest: /workspace
 
-Default: every session shares this root.
-Optional isolation: /workspace/sessions/<sessionId>/
+Normal chat commands receive a private per-session workspace mount.
+Session-scoped resources: workspace, attachments, offloads, browser.
+App-global resources: /memory, /skills, /shared.
 
-Subdirs: attachments/ offloads/ browser/ sessions/ shared/
-Cross-session (not in this tree): /memory /skills /shared
+This host directory is retained only for sessionless compatibility and
+privileged maintenance; it is not shared into normal chat executions.
 "
 }
 
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn readme_mentions_q16() {
         assert!(workspace_readme().contains("/workspace"));
-        assert!(workspace_readme().contains("sessions/"));
+        assert!(workspace_readme().contains("per-session"));
     }
 
     #[test]

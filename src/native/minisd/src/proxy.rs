@@ -187,10 +187,27 @@ fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
         return Ok(ip);
     }
     let mut last = String::new();
-    for dns in ["8.8.8.8:53", "1.1.1.1:53"] {
-        match dns_query_a(host, dns) {
+    let mut tried = 0usize;
+    // Prefer the phone's live network resolvers (router/carrier/VPN DNS).
+    // Public recursive DNS is frequently unreachable on carrier networks,
+    // which is what previously made every proxy request fail with 000 even
+    // though the loopback socket itself was healthy.
+    for dns in crate::env::discover_dns() {
+        let Ok(server) = dns.parse::<Ipv4Addr>() else {
+            continue;
+        };
+        tried += 1;
+        match dns_query_a(host, &format!("{server}:53")) {
             Ok(ip) => return Ok(ip),
-            Err(e) => last = format!("{dns}: {e}"),
+            Err(e) => last = format!("{server}: {e}"),
+        }
+    }
+    if tried == 0 {
+        for dns in ["8.8.8.8:53", "1.1.1.1:53"] {
+            match dns_query_a(host, dns) {
+                Ok(ip) => return Ok(ip),
+                Err(e) => last = format!("{dns}: {e}"),
+            }
         }
     }
     Err(format!("dns {host}: {last}"))

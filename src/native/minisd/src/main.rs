@@ -52,7 +52,7 @@ fn parse_args() -> Result<Args, String> {
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
-                    "minisd --helper exec --pid N --rootfs PATH --uid N --gid N --cwd PATH -- ARGV"
+                    "minisd --helper exec --pid N --rootfs PATH [--session-root PATH] --uid N --gid N --cwd PATH -- ARGV"
                 );
                 std::process::exit(0);
             }
@@ -559,6 +559,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut memory = String::new();
     let mut skills = String::new();
     let mut shared = String::new();
+    let mut session_root = String::new();
     let mut pid: i32 = 0;
     let mut uid = minisd::layout::GUEST_UID;
     let mut gid = minisd::layout::GUEST_GID;
@@ -608,6 +609,13 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 shared = args
                     .get(i + 1)
                     .ok_or((8u8, "--shared needs value".into()))?
+                    .clone();
+                i += 2;
+            }
+            "--session-root" => {
+                session_root = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--session-root needs value".into()))?
                     .clone();
                 i += 2;
             }
@@ -680,6 +688,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
         "exec" => helper_exec(
             pid,
             &rootfs,
+            &session_root,
             uid,
             gid,
             &cwd,
@@ -729,6 +738,7 @@ fn helper_keep(
 fn helper_exec(
     pid: i32,
     rootfs: &str,
+    session_root: &str,
     uid: u32,
     gid: u32,
     cwd: &str,
@@ -748,6 +758,14 @@ fn helper_exec(
     }
     ns::set_process_name("minisd-exec");
     ns::setns_mnt(pid).map_err(|e| (4u8, e))?;
+    if !session_root.is_empty() {
+        // Each command receives a private copy of the keeper mount namespace.
+        // Session bind mounts therefore cannot race with another chat or
+        // mutate the long-lived keeper namespace.
+        ns::unshare_mount().map_err(|e| (4u8, e))?;
+        ns::make_rprivate_root().map_err(|e| (4u8, e))?;
+        ns::setup_session_mounts(rootfs, session_root).map_err(|e| (4u8, e))?;
+    }
     ns::chroot_to(rootfs).map_err(|e| (5u8, e))?;
     if std::env::set_current_dir(cwd).is_err() {
         let _ = std::env::set_current_dir("/");

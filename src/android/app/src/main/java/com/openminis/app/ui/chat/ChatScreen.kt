@@ -2252,8 +2252,7 @@ fun ChatScreen(
     // untouched (toolBlocks live in a separate AssistantBlock list, not
     // in `content`). Video/audio extensions are filtered out so the gallery
     // only contains still images. Resolution of `minis://` → host File is
-    // deferred to the gallery's Coil model — Coil's MinisImageFetcher walks
-    // the same session-aware resolver we use for inline rendering.
+    // resolved to a session-owned File before being handed to the gallery.
     val markdownImageTapHandler = remember<(String, String) -> Unit>(messages, sessionId) {
         handler@{ tappedMessageId, tappedUrl ->
             val imageRegex = Regex("!\\[([^\\]]*)\\]\\(([^)\\s]+)\\)")
@@ -2292,11 +2291,19 @@ fun ChatScreen(
             val items = refs.map { ref ->
                 // Resolve minis://... / file:// / /abs → host File so Coil
                 // doesn't have to re-walk MinisKernel for every page swipe.
-                // Falls back to the raw URL string when resolution misses —
-                // AsyncImage will route it through MinisImageFetcher anyway.
+                // For an owned minis:// URL, a miss stays a miss instead of
+                // falling through to the global, sessionless fetcher.
                 val resolved = resolveMdMediaFile(context, ref.source, sessionId)
+                val model = if (
+                    resolved == null &&
+                    ref.source.substringBefore('?').startsWith("minis://")
+                ) {
+                    java.io.File(context.cacheDir, ".missing-minis-media/${ref.source.hashCode()}")
+                } else {
+                    resolved ?: ref.source
+                }
                 com.openminis.app.ui.components.ImageGalleryItem(
-                    model = resolved ?: ref.source,
+                    model = model,
                     caption = ref.title,
                 )
             }

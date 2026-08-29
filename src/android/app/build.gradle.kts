@@ -131,7 +131,18 @@ val stageDebugSkillAssets by tasks.registering(Exec::class) {
     if (skillDir.isDirectory) inputs.dir(skillDir)
     if (script.isFile) inputs.file(script)
     outputs.dir(layout.projectDirectory.dir("src/debug/assets/debug-skill"))
-    commandLine("bash", script.absolutePath)
+    if (System.getProperty("os.name").startsWith("Windows")) {
+        val gitBash = file("C:/Program Files/Git/bin/bash.exe")
+        if (gitBash.isFile) {
+            commandLine(gitBash.absolutePath, script.absolutePath.replace('\\', '/'))
+        } else {
+            val windowsPath = script.absolutePath.replace('\\', '/')
+            val wslPath = "/mnt/${windowsPath.substringBefore(':').lowercase()}${windowsPath.substringAfter(':')}"
+            commandLine("wsl.exe", "-e", "bash", wslPath)
+        }
+    } else {
+        commandLine("bash", script.absolutePath)
+    }
 }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") && it.name.contains("Debug") }
     .configureEach { dependsOn(stageDebugSkillAssets) }

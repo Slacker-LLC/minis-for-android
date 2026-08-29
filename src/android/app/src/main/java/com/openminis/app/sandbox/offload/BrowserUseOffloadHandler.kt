@@ -60,7 +60,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
 
         // Parse args into the browser_use input shape.
         val inputJson = try {
-            buildInputJson(args)
+            buildInputJson(args, request.sessionId)
         } catch (e: IllegalArgumentException) {
             return emitError(action = "execute", code = ERR_INVALID_ARGS,
                 message = e.message ?: "invalid arguments",
@@ -115,14 +115,14 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
                 compact = compact, quiet = quiet, exit = 1)
         }
 
-        val data = encodeData(result, withBase64 = withBase64)
+        val data = encodeData(result, withBase64 = withBase64, sessionId = request.sessionId)
         val envelope = envelope(actionName, data)
         return NativeOffloadResult(0, emit(envelope, data, compact = compact, quiet = quiet))
     }
 
     // ── Input parsing ────────────────────────────────────────────────────
 
-    private fun buildInputJson(args: OffloadArgs): JSONObject {
+    private fun buildInputJson(args: OffloadArgs, sessionId: String?): JSONObject {
         // Explicit --json wins; action/flags are ignored in that case.
         args.get("json")?.let { raw ->
             return try {
@@ -171,7 +171,11 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // dropping the array (which used to reach set_cookies as empty).
         val cookiesFile = args.get("cookies-file", "cookies_file")
         val cookiesRaw: String? = if (cookiesFile != null) {
-            val host = MinisKernel.resolveHostPath(cookiesFile)
+            val host = if (sessionId != null) {
+                MinisKernel.resolveSessionHostPath(sessionId, cookiesFile, app.applicationContext)
+            } else {
+                MinisKernel.resolveHostPath(cookiesFile)
+            }
                 ?: throw IllegalArgumentException("--cookies-file: cannot resolve path '$cookiesFile'")
             runCatching { host.readText() }.getOrNull()
                 ?: throw IllegalArgumentException("--cookies-file: could not read '$cookiesFile'")
@@ -236,7 +240,11 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
 
     // ── Data encoding (iOS BrowserUseOffloadBridge.encode counterpart) ────
 
-    private fun encodeData(r: BrowserActionResult, withBase64: Boolean): JSONObject {
+    private fun encodeData(
+        r: BrowserActionResult,
+        withBase64: Boolean,
+        sessionId: String?,
+    ): JSONObject {
         val out = JSONObject()
         out.put("text", r.text)
         out.put("success", r.success)
@@ -245,7 +253,12 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // Persist screenshot bytes under /var/minis/browser/ so shells can
         // reference the JPEG via image_path + minis_url instead of piping
         // base64 through stdout.
-        val browserHostDir: File? = MinisKernel.resolveHostPath(VAR_MINIS_BROWSER)?.also {
+        val browserHostDir: File? = if (sessionId != null) {
+            MinisKernel.resolveSessionHostPath(sessionId, VAR_MINIS_BROWSER, app.applicationContext)
+        } else {
+            MinisKernel.resolveHostPath(VAR_MINIS_BROWSER)
+        }
+        browserHostDir?.also {
             try { it.mkdirs() } catch (_: Throwable) { /* non-fatal — write will fail below */ }
         }
 

@@ -387,7 +387,12 @@ class MinisApp : Application(), ImageLoaderFactory {
         // first Compose frame forever.
         try {
         database = AppDatabase.getInstance(this)
-        chatRepository = ChatRepository(database.chatDao())
+        chatRepository = ChatRepository(database.chatDao()) { sessionId ->
+            com.openminis.app.sandbox.ubuntu.UbuntuPaths.deleteSession(
+                applicationContext,
+                sessionId,
+            )
+        }
         // DSH-style append-only session events use the same database as chat
         // snapshots. The hub performs writes asynchronously, so raw model
         // chunks never block the main/UI thread.

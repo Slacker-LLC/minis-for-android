@@ -25,6 +25,12 @@ object ToolRegistry {
 
     fun register(handler: ToolHandler, aliasNames: List<String> = emptyList()) {
         handlers[handler.definition.name] = handler
+        // The provider wire name (dots → underscores) must resolve back to the
+        // same handler when the model echoes it in a tool call.
+        val apiName = handler.definition.apiName
+        if (apiName != handler.definition.name) {
+            aliases[apiName] = handler.definition.name
+        }
         for (a in aliasNames) aliases[a] = handler.definition.name
     }
 

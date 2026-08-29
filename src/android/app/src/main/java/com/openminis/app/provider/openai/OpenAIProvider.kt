@@ -3179,7 +3179,7 @@ class OpenAIProvider private constructor(
         }
         return JSONObject().apply {
             put("type", "function")
-            put("name", name)
+            put("name", apiName)
             put("description", description)
             put("parameters", params)
         }
