@@ -4,11 +4,15 @@ import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.io.IOException
 
 class ProviderTransportPolicyTest {
 
@@ -96,6 +100,32 @@ class ProviderTransportPolicyTest {
     }
 
     @Test
+    fun `changing cleartext port invalidates prior approval`() {
+        expectViolation {
+            ProviderTransportPolicy.requireAllowedInstanceBase(
+                instance(
+                    customBase = "http://192.168.1.20:11435",
+                    approvedOrigin = "http://192.168.1.20:11434",
+                ),
+                "http://192.168.1.20:11435/v1",
+            )
+        }
+    }
+
+    @Test
+    fun `changing cleartext scheme invalidates prior approval`() {
+        expectViolation {
+            ProviderTransportPolicy.requireAllowedInstanceBase(
+                instance(
+                    customBase = "http://192.168.1.20:11434",
+                    approvedOrigin = "https://192.168.1.20:11434",
+                ),
+                "http://192.168.1.20:11434/v1",
+            )
+        }
+    }
+
+    @Test
     fun `https client follows redirects but never scheme redirects`() {
         val client = ProviderTransportPolicy.configureClient(
             OkHttpClient.Builder(),
@@ -113,6 +143,50 @@ class ProviderTransportPolicyTest {
         ).build()
         assertFalse(client.followRedirects)
         assertFalse(client.followSslRedirects)
+    }
+
+    @Test
+    fun `protected client blocks direct cleartext before network send`() {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("should-not-arrive"))
+        server.start()
+        try {
+            val client = ProviderTransportPolicy.protectedHttpsClient()
+            val request = Request.Builder().url(server.url("/oauth/token")).build()
+            try {
+                client.newCall(request).execute().use { }
+                fail("Expected protected HTTPS client to reject cleartext")
+            } catch (e: IOException) {
+                assertTrue(e.message.orEmpty().contains("Cleartext HTTP is blocked"))
+            }
+            assertEquals(0, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `protected client does not follow https to http downgrade`() {
+        val client = ProviderTransportPolicy.protectedHttpsClient()
+        assertTrue(client.followRedirects)
+        assertFalse(client.followSslRedirects)
+    }
+
+    @Test
+    fun `protected endpoint validator rejects cleartext`() {
+        expectViolation {
+            ProviderTransportPolicy.requireHttps(
+                "http://127.0.0.1:8080/oauth/token",
+                "OAuth token URL",
+            )
+        }
+        assertEquals(
+            "https",
+            ProviderTransportPolicy.requireHttps(
+                "https://example.com/oauth/token",
+                "OAuth token URL",
+            ).scheme,
+        )
     }
 
     @Test
