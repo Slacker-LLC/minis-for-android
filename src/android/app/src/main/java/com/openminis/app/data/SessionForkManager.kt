@@ -43,6 +43,9 @@ class SessionForkManager(
      *   - `memoryEnabled` — user-toggled per-session; expectation is that
      *     the copy inherits the source's memory setting rather than
      *     defaulting to on.
+     *   - `sessionOverrides` — sparse per-session model/tool/system settings;
+     *     duplicating a tuned session keeps its explicit overrides while
+     *     leaving inherited fields inherited.
      *
      * Deliberately NOT copied (the duplicate is a new session at creation
      * time, not a clone of the source's lifecycle):
@@ -80,6 +83,11 @@ class SessionForkManager(
         // the matching state is already in place from createSession.
         if (source.memoryEnabled == 0) {
             chatRepository.dao.updateMemoryEnabled(new.id, 0)
+        }
+        // GH#32: preserve explicit session overrides verbatim. A null payload is
+        // intentionally left null so the copy continues inheriting globals.
+        source.sessionOverrides?.let { overrides ->
+            chatRepository.dao.updateSessionOverrides(new.id, overrides)
         }
         // T239: carry over the per-session thinking-mode override so a
         // duplicate of a "tuned to MEDIUM" session opens at MEDIUM rather
@@ -161,7 +169,7 @@ class SessionForkManager(
             TAG,
             "duplicated session $sessionId → ${new.id} (${messages.size} msgs, " +
                 "category=${source.category}, modelBinding=${source.modelBinding}, " +
-                "memoryEnabled=${source.memoryEnabled})",
+                "memoryEnabled=${source.memoryEnabled}, overrides=${source.sessionOverrides != null})",
         )
         return new.id
     }

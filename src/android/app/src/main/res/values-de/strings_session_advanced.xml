@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">Erweiterte Einstellungen</string>
+    <string name="session_advanced_settings_menu">Erweiterte Einstellungen</string>
+    <string name="session_advanced_settings_inherit_help">Überschreibungen gelten nur für diese Sitzung. Deaktivieren Sie „Benutzerdefiniert“, um die aktuellen globalen oder modellbezogenen Standardwerte zu übernehmen.</string>
+    <string name="session_advanced_custom">Benutzerdefiniert</string>
+    <string name="session_advanced_runtime_section">Sitzungsverhalten</string>
+    <string name="session_advanced_runtime_help">Speicher und Denkstufe verwenden die vorhandenen sitzungsbezogenen Steuerelemente. Änderungen wirken sofort und werden nicht zusätzlich im Override-JSON gespeichert.</string>
+    <string name="session_advanced_memory">Gedächtnis</string>
+    <string name="session_advanced_memory_help">Dieser Sitzung erlauben, dauerhaftes Gedächtnis einzubinden und zu verwenden.</string>
+    <string name="session_advanced_thinking">Denkstufe</string>
+    <string name="session_advanced_thinking_not_supported">Vom aktuellen Modell nicht unterstützt</string>
+    <string name="session_advanced_instructions_section">Anweisungen</string>
+    <string name="session_advanced_system_prompt">Sitzungsanweisungen</string>
+    <string name="session_advanced_system_prompt_hint">Zusätzliche Anweisungen für diese Sitzung</string>
+    <string name="session_advanced_model_section">Modellparameter</string>
+    <string name="session_advanced_temperature">Temperatur</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">Maximale Ausgabetokens</string>
+    <string name="session_advanced_max_tokens_hint">Positive Ganzzahl</string>
+    <string name="session_advanced_tools_section">Werkzeuge</string>
+    <string name="session_advanced_tools">Benutzerdefinierte Tool-Zulassungsliste</string>
+    <string name="session_advanced_tools_help">Begrenzt die Werkzeuge, die dieser Sitzung sonst zur Verfügung stehen. Modell-, Speicher-, Preset- und Laufzeitprüfungen können weitere Werkzeuge entfernen.</string>
+    <string name="session_advanced_save">Speichern</string>
+    <string name="session_advanced_reset_all">Überschreibungen zurücksetzen</string>
+    <string name="session_advanced_loading">Sitzungseinstellungen werden vorbereitet…</string>
+    <string name="session_advanced_missing_session">Diese Sitzung konnte nicht vorbereitet werden.</string>
+    <string name="session_advanced_invalid_prompt">Geben Sie Sitzungsanweisungen ein oder deaktivieren Sie „Benutzerdefiniert“.</string>
+    <string name="session_advanced_invalid_temperature">Die Temperatur muss zwischen 0.0 und 2.0 liegen.</string>
+    <string name="session_advanced_invalid_max_tokens">Die maximale Anzahl der Ausgabetokens muss eine positive Ganzzahl sein.</string>
+    <string name="session_advanced_save_failed">Sitzungseinstellungen konnten nicht gespeichert werden.</string>
+    <string name="session_advanced_reset_failed">Sitzungseinstellungen konnten nicht zurückgesetzt werden.</string>
+</resources>

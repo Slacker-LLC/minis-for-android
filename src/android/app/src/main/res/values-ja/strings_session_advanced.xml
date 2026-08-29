@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">詳細設定</string>
+    <string name="session_advanced_settings_menu">詳細設定</string>
+    <string name="session_advanced_settings_inherit_help">上書きはこのセッションにのみ適用されます。「カスタム」をオフにすると、現在のグローバル設定またはモデル既定値を継承します。</string>
+    <string name="session_advanced_custom">カスタム</string>
+    <string name="session_advanced_runtime_section">セッション動作</string>
+    <string name="session_advanced_runtime_help">メモリと思考レベルは既存のセッション単位の設定を再利用します。変更はすぐに反映され、上書き JSON に重複保存されません。</string>
+    <string name="session_advanced_memory">メモリ</string>
+    <string name="session_advanced_memory_help">このセッションで永続メモリを注入して使用できるようにします。</string>
+    <string name="session_advanced_thinking">思考レベル</string>
+    <string name="session_advanced_thinking_not_supported">現在のモデルではサポートされていません</string>
+    <string name="session_advanced_instructions_section">指示</string>
+    <string name="session_advanced_system_prompt">セッション指示</string>
+    <string name="session_advanced_system_prompt_hint">このセッション用の追加指示</string>
+    <string name="session_advanced_model_section">モデルパラメータ</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">最大出力トークン</string>
+    <string name="session_advanced_max_tokens_hint">正の整数</string>
+    <string name="session_advanced_tools_section">ツール</string>
+    <string name="session_advanced_tools">カスタムツール許可リスト</string>
+    <string name="session_advanced_tools_help">このセッションで通常利用できるツールを制限します。モデル、メモリ、プリセット、ランタイム能力のチェックによって、さらにツールが除外される場合があります。</string>
+    <string name="session_advanced_save">保存</string>
+    <string name="session_advanced_reset_all">上書きをリセット</string>
+    <string name="session_advanced_loading">セッション設定を準備しています…</string>
+    <string name="session_advanced_missing_session">このセッションを準備できませんでした。</string>
+    <string name="session_advanced_invalid_prompt">セッション指示を入力するか、「カスタム」をオフにしてください。</string>
+    <string name="session_advanced_invalid_temperature">Temperature は 0.0 から 2.0 の範囲で指定してください。</string>
+    <string name="session_advanced_invalid_max_tokens">最大出力トークンは正の整数で指定してください。</string>
+    <string name="session_advanced_save_failed">セッション設定を保存できませんでした。</string>
+    <string name="session_advanced_reset_failed">セッション設定をリセットできませんでした。</string>
+</resources>

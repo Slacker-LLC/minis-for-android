@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">Paramètres avancés</string>
+    <string name="session_advanced_settings_menu">Paramètres avancés</string>
+    <string name="session_advanced_settings_inherit_help">Les remplacements s’appliquent uniquement à cette session. Désactivez « Personnalisé » pour hériter des valeurs globales ou du modèle actuelles.</string>
+    <string name="session_advanced_custom">Personnalisé</string>
+    <string name="session_advanced_runtime_section">Comportement de la session</string>
+    <string name="session_advanced_runtime_help">La mémoire et le niveau de réflexion réutilisent les contrôles par session existants. Les modifications prennent effet immédiatement et ne sont pas dupliquées dans le JSON de remplacement.</string>
+    <string name="session_advanced_memory">Mémoire</string>
+    <string name="session_advanced_memory_help">Autoriser cette session à injecter et utiliser la mémoire persistante.</string>
+    <string name="session_advanced_thinking">Niveau de réflexion</string>
+    <string name="session_advanced_thinking_not_supported">Non pris en charge par le modèle actuel</string>
+    <string name="session_advanced_instructions_section">Instructions</string>
+    <string name="session_advanced_system_prompt">Instructions de session</string>
+    <string name="session_advanced_system_prompt_hint">Instructions supplémentaires pour cette session</string>
+    <string name="session_advanced_model_section">Paramètres du modèle</string>
+    <string name="session_advanced_temperature">Température</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">Jetons de sortie maximum</string>
+    <string name="session_advanced_max_tokens_hint">Entier positif</string>
+    <string name="session_advanced_tools_section">Outils</string>
+    <string name="session_advanced_tools">Liste d’autorisation d’outils personnalisée</string>
+    <string name="session_advanced_tools_help">Limite les outils normalement disponibles pour cette session. Les contrôles du modèle, de la mémoire, des préréglages et des capacités d’exécution peuvent encore retirer des outils.</string>
+    <string name="session_advanced_save">Enregistrer</string>
+    <string name="session_advanced_reset_all">Réinitialiser les remplacements</string>
+    <string name="session_advanced_loading">Préparation des paramètres de session…</string>
+    <string name="session_advanced_missing_session">Impossible de préparer cette session.</string>
+    <string name="session_advanced_invalid_prompt">Saisissez des instructions de session ou désactivez « Personnalisé ».</string>
+    <string name="session_advanced_invalid_temperature">La température doit être comprise entre 0.0 et 2.0.</string>
+    <string name="session_advanced_invalid_max_tokens">Le nombre maximal de jetons de sortie doit être un entier positif.</string>
+    <string name="session_advanced_save_failed">Impossible d’enregistrer les paramètres de session.</string>
+    <string name="session_advanced_reset_failed">Impossible de réinitialiser les paramètres de session.</string>
+</resources>

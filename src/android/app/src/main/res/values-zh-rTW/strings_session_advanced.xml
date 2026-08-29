@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">進階設定</string>
+    <string name="session_advanced_settings_menu">進階設定</string>
+    <string name="session_advanced_settings_inherit_help">覆寫項目只套用到此工作階段。關閉「自訂」後，將繼承目前的全域或模型預設值。</string>
+    <string name="session_advanced_custom">自訂</string>
+    <string name="session_advanced_runtime_section">工作階段行為</string>
+    <string name="session_advanced_runtime_help">記憶與思考等級會沿用既有的工作階段控制，因此變更會立即生效，也不會重複寫入覆寫 JSON。</string>
+    <string name="session_advanced_memory">記憶</string>
+    <string name="session_advanced_memory_help">允許此工作階段注入並使用持久記憶。</string>
+    <string name="session_advanced_thinking">思考等級</string>
+    <string name="session_advanced_thinking_not_supported">目前模型不支援</string>
+    <string name="session_advanced_instructions_section">指令</string>
+    <string name="session_advanced_system_prompt">工作階段指令</string>
+    <string name="session_advanced_system_prompt_hint">為此工作階段加入額外指令</string>
+    <string name="session_advanced_model_section">模型參數</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">最大輸出 Token</string>
+    <string name="session_advanced_max_tokens_hint">正整數</string>
+    <string name="session_advanced_tools_section">工具</string>
+    <string name="session_advanced_tools">自訂工具白名單</string>
+    <string name="session_advanced_tools_help">限制此工作階段原本可用的工具。模型能力、記憶、預設與執行階段能力檢查仍可能進一步移除工具。</string>
+    <string name="session_advanced_save">儲存</string>
+    <string name="session_advanced_reset_all">重設覆寫項目</string>
+    <string name="session_advanced_loading">正在準備工作階段設定…</string>
+    <string name="session_advanced_missing_session">無法準備此工作階段。</string>
+    <string name="session_advanced_invalid_prompt">請輸入工作階段指令，或關閉「自訂」。</string>
+    <string name="session_advanced_invalid_temperature">Temperature 必須介於 0.0 與 2.0 之間。</string>
+    <string name="session_advanced_invalid_max_tokens">最大輸出 Token 必須是正整數。</string>
+    <string name="session_advanced_save_failed">無法儲存工作階段設定。</string>
+    <string name="session_advanced_reset_failed">無法重設工作階段設定。</string>
+</resources>

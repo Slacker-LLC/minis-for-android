@@ -41,6 +41,7 @@ import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ModelGroup
+import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository
@@ -1519,6 +1520,20 @@ class ChatViewModel(
             return saved
         }
         return ""
+    }
+
+    /**
+     * Set memory for the active session from a settings surface. Unlike a raw
+     * DAO write this updates the live StateFlow first, so the next agent turn
+     * immediately rebuilds its memory-gated tool list and system prompt.
+     */
+    fun setMemoryEnabledForSession(enabled: Boolean) {
+        if (_memoryEnabled.value == enabled) return
+        _memoryEnabled.value = enabled
+        viewModelScope.launch {
+            val sid = ensureSession()
+            chatRepository.dao.updateMemoryEnabled(sid, if (enabled) 1 else 0)
+        }
     }
 
     /** Toggle memory writes on/off, persist to DB, and append a system-info message. */
@@ -3588,6 +3603,14 @@ class ChatViewModel(
     /** Public accessor used by ChatScreen to resolve session-scoped minis:// links. */
     val currentSessionId: String
         get() = activeSessionId
+
+    /**
+     * Ensure a durable row exists before a UI edits per-session settings.
+     * Draft chats normally materialize on first send; opening Advanced settings
+     * is also a durable session action and must not write against the synthetic
+     * `__new__` route id.
+     */
+    suspend fun ensureSessionForSettings(): String = ensureSession()
 
     /** T-chat-title-pill-edit: load the persisted [ChatSessionEntity] for the
      *  current session so the shared edit-title sheet (reused from the session
@@ -6725,6 +6748,34 @@ class ChatViewModel(
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
     ) {
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
+
+        // GH#32: resolve the sparse session payload once per agent-loop run.
+        // Settings changed while a loop is already in flight intentionally take
+        // effect on the next run rather than changing semantics mid-turn.
+        val sessionOverrides = runCatching {
+            SessionOverrides.fromJson(
+                chatRepository.getSession(activeSessionId)?.sessionOverrides,
+            )
+        }.onFailure { error ->
+            AppLogger.warning(TAG, "session overrides unavailable for $activeSessionId: ${error.message}")
+        }.getOrDefault(SessionOverrides())
+
+        // Preserve the app's core runtime/tool/safety prompt and append the
+        // session-specific instruction as a clearly delimited final layer.
+        // Replacing the core prompt would make a custom persona accidentally
+        // remove tool/runtime instructions.
+        val effectiveSystemPrompt = sessionOverrides.systemPrompt?.let { sessionPrompt ->
+            buildString {
+                if (!systemPrompt.isNullOrBlank()) {
+                    append(systemPrompt)
+                    append("\n\n")
+                }
+                append("<session-specific-instructions>\n")
+                append(sessionPrompt)
+                append("\n</session-specific-instructions>")
+            }
+        } ?: systemPrompt
+
         // [T-android-mem-probe-trust] Send-path context shape. The existing
         // `messages-shape` probe only runs on session LOAD, so the 2026-08-15
         // log described the session as it was opened, never as it was sent —
@@ -7041,7 +7092,15 @@ class ChatViewModel(
             // log it at turn-end alongside the empty-turn warning.
             var turnFinishReason: String? = null
             var lastUsage: LLMUsage? = null
-            val maxTokens = dynamicMaxTokens(provider, lastContextTokens)
+            // GH#32: null allow-list inherits every agent tool; an explicit
+            // empty list is chat-only. Keep this list stable for the whole
+            // provider retry/fallback cycle of this turn.
+            val turnTools = if (chatOnlyForNextTurn) {
+                emptyList()
+            } else {
+                sessionOverrides.filterTools(agentTools)
+            }
+            val turnToolNames = turnTools.mapTo(hashSetOf()) { it.name }
             val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args
             // [T-android-gemini3-thoughtsig / #179] toolCallId -> Gemini 3.x
             // thoughtSignature for this turn's calls (null for other providers).
@@ -7106,10 +7165,13 @@ class ChatViewModel(
                     // [_compactSummary] is prepended as a `<context-summary>`
                     // user message. Falls through to the raw agentHistory when
                     // no compact has happened, so the common path stays zero-copy.
-                    val turnTools = if (chatOnlyForNextTurn) emptyList() else agentTools
                     currentProvider.streamMessage(
-                        applyRequestImageBudget(effectiveAgentHistory()),
-                        systemPrompt, dynamicMaxTokens(currentProvider, lastContextTokens),
+                        messages = applyRequestImageBudget(effectiveAgentHistory()),
+                        systemPrompt = effectiveSystemPrompt,
+                        maxTokens = sessionOverrides.effectiveMaxTokens(
+                            dynamicMaxTokens(currentProvider, lastContextTokens),
+                        ),
+                        temperature = sessionOverrides.temperature,
                         tools = turnTools,
                         thinkingLevel = if (currentModelSupportsReasoning) _thinkingLevel.value else ThinkingLevel.OFF,
                     ).collect { chunk ->
@@ -7914,6 +7976,48 @@ class ChatViewModel(
             // Execute all tool calls
             val resultParts = mutableListOf<AgentContentPart>()
             for ((id, name, args) in toolCalls) {
+                // GH#32: schema filtering is not a security boundary. A stale
+                // provider response, retry, or hallucinated tool call can still
+                // name a tool that was not offered this turn. Reject it before
+                // repair, permission/status updates, or execution. This also
+                // makes chatOnlyForNextTurn fail closed.
+                if (name !in turnToolNames) {
+                    val blockedMessage = "Error: Tool '$name' is disabled for this session."
+                    AppLogger.warning(
+                        "ToolPreflight",
+                        "BLOCKED session-disabled tool=$name id=$id session=$activeSessionId",
+                    )
+                    val blockIdx = allToolBlocks.indexOfFirst { it.id == id }
+                    if (blockIdx >= 0) {
+                        val elapsed = System.currentTimeMillis() - allToolBlocks[blockIdx].startTimeMs
+                        allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
+                            toolStatus = ToolBlockStatus.FAILED,
+                            content = "Blocked by this session's tool allow-list",
+                            durationMs = elapsed,
+                        )
+                        sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])
+                    }
+                    toolLoopDetector.record(
+                        toolName = name,
+                        params = parseToolParams(args.toString()),
+                        result = null,
+                        errorMessage = blockedMessage,
+                        toolCallId = id,
+                    )
+                    resultParts.add(
+                        AgentContentPart.ToolResult(
+                            id = id,
+                            name = name,
+                            content = blockedMessage,
+                            isError = true,
+                        ),
+                    )
+                    withContext(Dispatchers.Main) {
+                        updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
+                    }
+                    continue
+                }
+
                 // [T-android-overlay-tool-title] Pull tool_title uniformly
                 // from args for ALL tools — without this browser_use's
                 // tool_title never reached the overlay (only shell_execute
@@ -7935,7 +8039,7 @@ class ChatViewModel(
                 // the repaired payload. Mirrors iOS repairToolArgs in
                 // AIChatViewModel.swift.
                 val repairs = com.openminis.app.provider.ToolJsonRepair.repair(
-                    name, args, toolInputChunkRings[id]?.lastOrNull(), agentTools,
+                    name, args, toolInputChunkRings[id]?.lastOrNull(), turnTools,
                 )
                 if (repairs.isNotEmpty()) {
                     AppLogger.warning(
@@ -8049,7 +8153,7 @@ class ChatViewModel(
                 // AIChatViewModel.swift. Synthesizes a tool_result error so the
                 // model can self-correct on the next turn without us spawning
                 // shells or touching the filesystem on `{}` args.
-                val preflightError = preflightValidateToolCall(name, args, agentTools)
+                val preflightError = preflightValidateToolCall(name, args, turnTools)
                 if (preflightError != null) {
                     val chunkRing: List<String> = toolInputChunkRings.remove(id) ?: emptyList()
                     AppLogger.warning(
