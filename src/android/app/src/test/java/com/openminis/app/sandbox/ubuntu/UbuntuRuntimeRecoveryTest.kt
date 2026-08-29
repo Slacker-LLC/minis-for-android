@@ -71,13 +71,15 @@ class UbuntuRuntimeRecoveryTest {
     }
 
     @Test
-    fun `missing execution marker permits pre exec classification`() {
+    fun `missing execution marker permits keeper pre exec classification`() {
         val marker = UbuntuRuntime.shellStartMarker(100)
         val response = MinisdResponse(
             1,
             2,
             true,
-            JSONObject().put("exit_code", 4).put("stderr", "setns failed"),
+            JSONObject()
+                .put("exit_code", 4)
+                .put("stderr", "open /proc/8123/ns/mnt: No such file or directory"),
             null,
         )
 
