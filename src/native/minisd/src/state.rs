@@ -16,6 +16,10 @@ pub struct UbuntuState {
     pub pid: Option<i32>,
     pub rootfs: String,
     pub sessions_root: String,
+    pub workspace: String,
+    pub memory: String,
+    pub skills: String,
+    pub shared: String,
     pub version: Option<String>,
     pub provisioned: bool,
     pub last_error: Option<String>,
@@ -27,6 +31,38 @@ impl UbuntuState {
             crate::layout::HOST_ROOTFS.to_string()
         } else {
             self.rootfs.clone()
+        }
+    }
+
+    pub fn workspace_or_default(&self) -> String {
+        if self.workspace.is_empty() {
+            crate::layout::HOST_WORKSPACE.to_string()
+        } else {
+            self.workspace.clone()
+        }
+    }
+
+    pub fn memory_or_default(&self) -> String {
+        if self.memory.is_empty() {
+            crate::layout::HOST_MEMORY.to_string()
+        } else {
+            self.memory.clone()
+        }
+    }
+
+    pub fn skills_or_default(&self) -> String {
+        if self.skills.is_empty() {
+            crate::layout::HOST_SKILLS.to_string()
+        } else {
+            self.skills.clone()
+        }
+    }
+
+    pub fn shared_or_default(&self) -> String {
+        if self.shared.is_empty() {
+            crate::layout::HOST_SHARED.to_string()
+        } else {
+            self.shared.clone()
         }
     }
 }

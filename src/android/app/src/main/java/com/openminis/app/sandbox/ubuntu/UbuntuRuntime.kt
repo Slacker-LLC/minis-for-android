@@ -34,6 +34,11 @@ object UbuntuRuntime {
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
         val sessionsRoot: String? = null,
+        val layoutKnown: Boolean = false,
+        val hostWorkspace: String? = null,
+        val hostMemory: String? = null,
+        val hostSkills: String? = null,
+        val hostShared: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
     )
@@ -131,7 +136,7 @@ object UbuntuRuntime {
             )
         }
 
-        if (cur.running && cur.sessionsRoot == UbuntuPaths.hostSessions) {
+        if (cur.running && runtimeLayoutMatches(cur)) {
             redirectPaths = true
             return@withLock cur
         }
@@ -149,7 +154,7 @@ object UbuntuRuntime {
             }
         }
 
-        val started = apply(
+        val raw = apply(
             client.ubuntuStart(
                 workspace = UbuntuPaths.hostWorkspace,
                 memory = UbuntuPaths.hostMemory,
@@ -158,22 +163,31 @@ object UbuntuRuntime {
                 sessionsRoot = UbuntuPaths.hostSessions,
             ),
         )
-        if (started.running && started.sessionsRoot != UbuntuPaths.hostSessions) {
+        val started = if (raw.running) refresh() else raw
+        if (!runtimeLayoutMatches(started)) {
             return@withLock fail(
-                "privileged runtime does not support session workspace isolation; update minisd and retry",
+                "fresh keeper did not confirm the requested runtime bind layout",
             )
         }
-        redirectPaths = started.running
+        redirectPaths = started.running && runtimeLayoutMatches(started)
         if (started.running) {
             Log.i(
                 TAG,
-                "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid",
+                "ubuntu.start ok pid=${started.pid} version=${started.version} " +
+                    "uid=$expectedUid layoutKnown=${started.layoutKnown}",
             )
         } else {
             Log.w(TAG, "ubuntu.start failed: ${started.lastError}")
         }
         started
     }
+
+    private fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
+        snapshot.layoutKnown &&
+            snapshot.hostWorkspace == UbuntuPaths.hostWorkspace &&
+            snapshot.hostMemory == UbuntuPaths.hostMemory &&
+            snapshot.hostSkills == UbuntuPaths.hostSkills &&
+            snapshot.hostShared == UbuntuPaths.hostShared
 
     private suspend fun awaitBroker(expectedUid: Int): Snapshot {
         var cur = _snapshot.value
@@ -194,6 +208,12 @@ object UbuntuRuntime {
         withContext(Dispatchers.IO) {
             val ctx = appContext
                 ?: return@withContext BrokerStartResult(false, "no app context")
+            if (forceRestart) {
+                // A broker restart alone does not stop a keeper started by an
+                // older minisd. Stop the live runtime first so the next
+                // ubuntu.start builds a fresh keeper with current mounts.
+                runCatching { client.ubuntuStop() }
+            }
             val su = listOf(
                 "/system/bin/su",
                 "/system/xbin/su",
@@ -421,6 +441,11 @@ object UbuntuRuntime {
                 sessionsRoot = result.optString("sessions_root")
                     .ifEmpty { _snapshot.value.sessionsRoot.orEmpty() }
                     .takeIf { it.isNotEmpty() },
+                layoutKnown = result.optBoolean("layout_known", false),
+                hostWorkspace = result.optNullableString("workspace"),
+                hostMemory = result.optNullableString("memory"),
+                hostSkills = result.optNullableString("skills"),
+                hostShared = result.optNullableString("shared"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
             )
@@ -434,4 +459,7 @@ object UbuntuRuntime {
         _snapshot.value = next
         return next
     }
+
+    private fun JSONObject.optNullableString(key: String): String? =
+        if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
 }
