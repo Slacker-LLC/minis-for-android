@@ -167,10 +167,6 @@ pub fn chroot_to(path: &str) -> Result<(), String> {
 
 #[cfg(unix)]
 fn guest_supplementary_groups() -> [libc::gid_t; 1] {
-    // Normal Android app processes that hold android.permission.INTERNET
-    // inherit AID_INET from zygote on releases that still enforce socket
-    // access through supplementary groups. minisd starts from root instead,
-    // so reproduce only that network group rather than retaining root's groups.
     [ANDROID_AID_INET]
 }
 
@@ -190,17 +186,12 @@ pub fn drop_privs(uid: u32, gid: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// 05 §4: admin (uid==0) entering the keeper mount namespace must not keep
-/// any privileges. Sets no_new_privs, drops the capability bounding set and
-/// empties the effective/permitted/inheritable capability sets.
 #[cfg(unix)]
 pub fn lockdown_no_privs() -> Result<(), String> {
     unsafe {
         if libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0 {
             return Err(last_err("prctl(PR_SET_NO_NEW_PRIVS)"));
         }
-        // CAP_LAST_CAP conservatively taken as 40; old kernels may report
-        // EINVAL for gaps, so per-cap failures are ignored.
         for cap in 0..=40 {
             libc::prctl(libc::PR_CAPBSET_DROP, cap, 0, 0, 0);
         }
@@ -217,7 +208,7 @@ pub fn lockdown_no_privs() -> Result<(), String> {
         inheritable: u32,
     }
     let header = CapHeader {
-        version: 0x2008_0522, // LINUX_CAPABILITY_VERSION_3
+        version: 0x2008_0522,
         pid: 0,
     };
     let data = [
@@ -299,6 +290,18 @@ pub fn set_process_name(name: &str) {
     }
 }
 
+fn fixed_bind_source<'a>(requested: &'a str, expected: &'static str, label: &str) -> Result<&'a str, String> {
+    if requested.is_empty() {
+        return Ok(expected);
+    }
+    if requested == expected {
+        return Ok(requested);
+    }
+    Err(format!(
+        "{label} bind source is fixed to {expected}; refusing {requested}"
+    ))
+}
+
 #[cfg(unix)]
 pub fn setup_rootfs_mounts(
     rootfs: &str,
@@ -307,27 +310,16 @@ pub fn setup_rootfs_mounts(
     skills: &str,
     shared: &str,
 ) -> Result<(), String> {
-    use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
-    let workspace = if workspace.is_empty() {
-        HOST_WORKSPACE
-    } else {
-        workspace
+    use crate::layout::{
+        validate_persistent_backing, GUEST_HOME, HOST_HOME, HOST_MEMORY, HOST_SHARED, HOST_SKILLS,
+        HOST_WORKSPACE,
     };
-    let memory = if memory.is_empty() {
-        HOST_MEMORY
-    } else {
-        memory
-    };
-    let skills = if skills.is_empty() {
-        HOST_SKILLS
-    } else {
-        skills
-    };
-    let shared = if shared.is_empty() {
-        HOST_SHARED
-    } else {
-        shared
-    };
+
+    validate_persistent_backing()?;
+    let workspace = fixed_bind_source(workspace, HOST_WORKSPACE, "workspace")?;
+    let memory = fixed_bind_source(memory, HOST_MEMORY, "memory")?;
+    let skills = fixed_bind_source(skills, HOST_SKILLS, "skills")?;
+    let shared = fixed_bind_source(shared, HOST_SHARED, "shared")?;
 
     let root = Path::new(rootfs);
     for rel in [
@@ -342,6 +334,7 @@ pub fn setup_rootfs_mounts(
         "memory",
         "skills",
         "shared",
+        "home/minis",
     ] {
         std::fs::create_dir_all(root.join(rel)).map_err(|e| format!("mkdir {rel}: {e}"))?;
     }
@@ -365,9 +358,6 @@ pub fn setup_rootfs_mounts(
     }
 
     let sys = root.join("sys").to_string_lossy().into_owned();
-    // B14: /sys must be bound AND remounted read-only; a writable /sys inside
-    // the guest namespace is host-writable — fail the start instead of
-    // continuing silently.
     bind_mount("/sys", &sys, true)?;
     remount_ro(&sys)?;
 
@@ -436,21 +426,40 @@ pub fn setup_rootfs_mounts(
         Some("mode=0755"),
     )?;
 
-    let ws = root.join("workspace").to_string_lossy().into_owned();
-    bind_mount(workspace, &ws, false)?;
-    let _ = bind_mount(memory, &root.join("memory").to_string_lossy(), false);
-    let _ = bind_mount(skills, &root.join("skills").to_string_lossy(), false);
-    let _ = bind_mount(shared, &root.join("shared").to_string_lossy(), false);
+    bind_mount(
+        workspace,
+        &root.join("workspace").to_string_lossy(),
+        false,
+    )?;
+    bind_mount(memory, &root.join("memory").to_string_lossy(), false)?;
+    bind_mount(skills, &root.join("skills").to_string_lossy(), false)?;
+    bind_mount(shared, &root.join("shared").to_string_lossy(), false)?;
+    bind_mount(
+        HOST_HOME,
+        &root
+            .join(GUEST_HOME.trim_start_matches('/'))
+            .to_string_lossy(),
+        false,
+    )?;
     Ok(())
 }
 
-/// Overlay the four session-scoped resources in an exec-private mount
-/// namespace. The keeper's global workspace remains untouched and shared
-/// resources (`/memory`, `/skills`, `/shared`) continue to come from it.
 #[cfg(unix)]
 pub fn setup_session_mounts(rootfs: &str, session_root: &str) -> Result<(), String> {
+    use crate::layout::HOST_SESSIONS;
+
+    let sessions = std::fs::canonicalize(HOST_SESSIONS)
+        .map_err(|e| format!("canonicalize sessions root {HOST_SESSIONS}: {e}"))?;
+    let session = std::fs::canonicalize(session_root)
+        .map_err(|e| format!("canonicalize session root {session_root}: {e}"))?;
+    if session == sessions || !session.starts_with(&sessions) {
+        return Err(format!(
+            "session mount source must stay under {HOST_SESSIONS}: {}",
+            session.display()
+        ));
+    }
+
     let root = Path::new(rootfs);
-    let session = Path::new(session_root);
     let workspace_src = session.join("workspace");
     let workspace_dst = root.join("workspace");
     if !workspace_src.is_dir() {
@@ -470,9 +479,6 @@ pub fn setup_session_mounts(rootfs: &str, session_root: &str) -> Result<(), Stri
         if !src.is_dir() {
             return Err(format!("session mount missing: {}", src.display()));
         }
-        // `/var/minis/<subdir>` is a symlink into `/workspace/<subdir>`, so
-        // mounting the sibling session directory here keeps shell paths and
-        // Android host-side resolvers on the same layout.
         let dst = workspace_dst.join(subdir);
         if dst
             .symlink_metadata()
@@ -490,8 +496,6 @@ pub fn setup_session_mounts(rootfs: &str, session_root: &str) -> Result<(), Stri
     Ok(())
 }
 
-/// PoC used by `mount.prepare`: fork + unshare + MS_PRIVATE, then exit.
-/// Kept for P1 compatibility; P2 keeper uses the helpers above in a fresh process.
 #[cfg(unix)]
 pub fn poc_unshare_make_rprivate() -> Result<(), ErrorCode> {
     let pid = unsafe { libc::fork() };
@@ -539,10 +543,28 @@ pub fn poc_unshare_make_rprivate() -> Result<(), ErrorCode> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use crate::layout::{HOST_MEMORY, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE};
 
     #[test]
     fn guest_network_group_matches_android_internet_permission() {
         assert_eq!(guest_supplementary_groups(), [ANDROID_AID_INET]);
         assert_eq!(ANDROID_AID_INET, 3003);
+    }
+
+    #[test]
+    fn fixed_bind_sources_reject_app_files_and_tmp_paths() {
+        assert_eq!(fixed_bind_source("", HOST_WORKSPACE, "workspace").unwrap(), HOST_WORKSPACE);
+        assert_eq!(
+            fixed_bind_source(HOST_MEMORY, HOST_MEMORY, "memory").unwrap(),
+            HOST_MEMORY
+        );
+        assert!(fixed_bind_source(
+            "/data/user/0/dev.openminispet.android/files/minis/workspace",
+            HOST_WORKSPACE,
+            "workspace"
+        )
+        .is_err());
+        assert!(fixed_bind_source("/dev/shm/skills", HOST_SKILLS, "skills").is_err());
+        assert!(fixed_bind_source("/tmp/shared", HOST_SHARED, "shared").is_err());
     }
 }
