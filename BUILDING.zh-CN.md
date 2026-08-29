@@ -158,7 +158,7 @@ unshare + mount + chroot
 Ubuntu 24.04 userspace
 ```
 
-guest 复用 Android 内核，并以 App guest UID 运行。workspace / memory / skills / shared 的 host 目录位于 App 私有 files 目录，再由 `minisd` bind mount 到 chroot。
+guest 复用 Android 内核，并以 App guest UID 运行。Agent 持久数据固定使用 `/data/adb/minis/` 下的 `workspace/`、`sessions/`、`memory/`、`skills/`、`shared/` 和 `home/`。`minisd` 会拒绝其他路径或 App filesDir 作为持久化数据源，并在 private mount namespace / chroot 建立前准备这些 bind source。
 
 更多内容：
 
