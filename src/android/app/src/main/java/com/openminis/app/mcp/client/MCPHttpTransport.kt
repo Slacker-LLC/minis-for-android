@@ -1,11 +1,16 @@
 package com.openminis.app.mcp.client
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
 
 /**
@@ -34,7 +39,7 @@ class MCPHttpTransport(
     @Volatile
     private var sessionId: String? = null
 
-    suspend fun send(frame: JSONObject): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun send(frame: JSONObject): JSONObject {
         val body = MCPClientCodec.encodeFrame(frame).toRequestBody(JSON)
         val reqBuilder = Request.Builder()
             .url(url)
@@ -46,22 +51,45 @@ class MCPHttpTransport(
             reqBuilder.header("Authorization", "Bearer $bearerToken")
         }
         sessionId?.let { reqBuilder.header("Mcp-Session-Id", it) }
+        val request = reqBuilder.build()
 
-        client.newCall(reqBuilder.build()).execute().use { resp ->
-            val code = resp.code
-            val raw = resp.body?.string().orEmpty()
-            if (code == 404 || code == 405) {
-                // Spec: server without streamable HTTP returns 404/405 —
-                // client must fall back to SSE transport; we surface a clear error.
-                throw MCPTransportException(
-                    "server does not support Streamable HTTP (HTTP $code): $raw",
-                )
-            }
-            if (code !in 200..299) {
-                throw MCPTransportException("HTTP $code: ${raw.take(200)}")
-            }
-            resp.header("Mcp-Session-Id")?.takeIf { it.isNotBlank() }?.let { sessionId = it }
-            parseBody(raw, resp.header("Content-Type"))
+        return suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(
+                object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        if (continuation.isActive) continuation.resumeWithException(e)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        if (!continuation.isActive) {
+                            response.close()
+                            return
+                        }
+                        try {
+                            response.use { resp ->
+                                val code = resp.code
+                                val raw = resp.body?.string().orEmpty()
+                                if (code == 404 || code == 405) {
+                                    throw MCPTransportException(
+                                        "server does not support Streamable HTTP (HTTP $code): $raw",
+                                    )
+                                }
+                                if (code !in 200..299) {
+                                    throw MCPTransportException("HTTP $code: ${raw.take(200)}")
+                                }
+                                resp.header("Mcp-Session-Id")
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { sessionId = it }
+                                continuation.resume(parseBody(raw, resp.header("Content-Type")))
+                            }
+                        } catch (t: Throwable) {
+                            if (continuation.isActive) continuation.resumeWithException(t)
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -93,7 +121,8 @@ class MCPHttpTransport(
     }
 
     fun close() {
-        // OkHttp pools connections per client; nothing to release eagerly.
+        // Requests are individually cancellable through coroutine cancellation;
+        // OkHttp pools idle connections per client, so no transport-wide close is needed.
     }
 }
 

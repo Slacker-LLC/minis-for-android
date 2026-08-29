@@ -390,7 +390,7 @@ fun AddToHomeSheet(
                                 is WebAppSource.HostFile -> {
                                     // T-pwa-3: link in place — htmlPath is the
                                     // /var/minis/... linux path; WebAppPathResolver
-                                    // routes through MinisKernel.resolveHostPath.
+                                    // routes through RuntimePathRegistry.resolveHostPath.
                                     app.webAppShortcutRepository.create(
                                         htmlPath = source.linuxPath,
                                         pathScope = source.pathScope,
