@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">이 세션에서 영구 메모리를 주입하고 사용할 수 있도록 허용합니다.</string>
     <string name="session_advanced_thinking">사고 수준</string>
     <string name="session_advanced_thinking_not_supported">현재 모델에서 지원되지 않음</string>
-    <string name="session_advanced_instructions_section">지침</string>
-    <string name="session_advanced_system_prompt">세션 지침</string>
-    <string name="session_advanced_system_prompt_hint">이 세션에 대한 추가 지침</string>
+    <string name="session_advanced_instructions_section">세션 Soul</string>
+    <string name="session_advanced_system_prompt">세션 인격</string>
+    <string name="session_advanced_system_prompt_hint">이 대화에서 사용할 역할, 인격, 말투와 행동.</string>
+    <string name="session_advanced_soul_help">기본적으로 전역 SOUL.md를 사용합니다. 첫 메시지를 보내기 전에 세션 Soul을 설정하면 이 대화에서는 전역 Soul을 대신합니다. 채팅이 시작되면 선택이 잠깁니다.</string>
+    <string name="session_advanced_soul_locked_help">이 대화는 이미 시작되었습니다. Soul 선택은 잠겨 있으며 채팅 기록을 지워도 변경할 수 없습니다.</string>
+    <string name="session_advanced_soul_locked_custom">사용자 지정 Soul · 잠김</string>
+    <string name="session_advanced_soul_locked_global">전역 Soul · 잠김</string>
     <string name="session_advanced_model_section">모델 매개변수</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">재정의 초기화</string>
     <string name="session_advanced_loading">세션 설정 준비 중…</string>
     <string name="session_advanced_missing_session">이 세션을 준비할 수 없습니다.</string>
-    <string name="session_advanced_invalid_prompt">세션 지침을 입력하거나 “사용자 지정”을 끄세요.</string>
+    <string name="session_advanced_invalid_prompt">세션 인격을 입력하거나 “사용자 지정”을 끄세요.</string>
     <string name="session_advanced_invalid_temperature">Temperature는 0.0에서 2.0 사이여야 합니다.</string>
     <string name="session_advanced_invalid_max_tokens">최대 출력 토큰은 양의 정수여야 합니다.</string>
     <string name="session_advanced_save_failed">세션 설정을 저장할 수 없습니다.</string>

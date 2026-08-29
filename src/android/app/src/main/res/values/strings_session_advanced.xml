@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">Allow this session to inject and use persistent memory.</string>
     <string name="session_advanced_thinking">Thinking level</string>
     <string name="session_advanced_thinking_not_supported">Not supported by the current model</string>
-    <string name="session_advanced_instructions_section">Instructions</string>
-    <string name="session_advanced_system_prompt">Session instructions</string>
-    <string name="session_advanced_system_prompt_hint">Additional instructions for this session</string>
+    <string name="session_advanced_instructions_section">Session Soul</string>
+    <string name="session_advanced_system_prompt">Session personality</string>
+    <string name="session_advanced_system_prompt_hint">Role, personality, tone, and behavior for this conversation.</string>
+    <string name="session_advanced_soul_help">Global SOUL.md is used by default. If you set a Session Soul before the first message, it replaces the global Soul for this conversation. The choice locks when chat starts.</string>
+    <string name="session_advanced_soul_locked_help">This conversation has already started. Its Soul choice is locked and cannot be changed, even after clearing chat history.</string>
+    <string name="session_advanced_soul_locked_custom">Custom Soul · locked</string>
+    <string name="session_advanced_soul_locked_global">Global Soul · locked</string>
     <string name="session_advanced_model_section">Model parameters</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">Reset overrides</string>
     <string name="session_advanced_loading">Preparing session settings…</string>
     <string name="session_advanced_missing_session">Could not prepare this session.</string>
-    <string name="session_advanced_invalid_prompt">Enter session instructions or turn off Custom.</string>
+    <string name="session_advanced_invalid_prompt">Enter a session personality or turn off Custom.</string>
     <string name="session_advanced_invalid_temperature">Temperature must be between 0.0 and 2.0.</string>
     <string name="session_advanced_invalid_max_tokens">Max output tokens must be a positive integer.</string>
     <string name="session_advanced_save_failed">Could not save session settings.</string>

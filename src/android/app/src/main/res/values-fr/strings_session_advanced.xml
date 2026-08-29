@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">Autoriser cette session à injecter et utiliser la mémoire persistante.</string>
     <string name="session_advanced_thinking">Niveau de réflexion</string>
     <string name="session_advanced_thinking_not_supported">Non pris en charge par le modèle actuel</string>
-    <string name="session_advanced_instructions_section">Instructions</string>
-    <string name="session_advanced_system_prompt">Instructions de session</string>
-    <string name="session_advanced_system_prompt_hint">Instructions supplémentaires pour cette session</string>
+    <string name="session_advanced_instructions_section">Âme de session</string>
+    <string name="session_advanced_system_prompt">Personnalité de session</string>
+    <string name="session_advanced_system_prompt_hint">Rôle, personnalité, ton et comportement pour cette conversation.</string>
+    <string name="session_advanced_soul_help">Le fichier global SOUL.md est utilisé par défaut. Si vous définissez une âme de session avant le premier message, elle remplace l’âme globale pour cette conversation. Le choix est verrouillé dès que le chat commence.</string>
+    <string name="session_advanced_soul_locked_help">Cette conversation a déjà commencé. Son choix d’âme est verrouillé et ne peut plus être modifié, même après avoir effacé l’historique du chat.</string>
+    <string name="session_advanced_soul_locked_custom">Âme personnalisée · verrouillée</string>
+    <string name="session_advanced_soul_locked_global">Âme globale · verrouillée</string>
     <string name="session_advanced_model_section">Paramètres du modèle</string>
     <string name="session_advanced_temperature">Température</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">Réinitialiser les remplacements</string>
     <string name="session_advanced_loading">Préparation des paramètres de session…</string>
     <string name="session_advanced_missing_session">Impossible de préparer cette session.</string>
-    <string name="session_advanced_invalid_prompt">Saisissez des instructions de session ou désactivez « Personnalisé ».</string>
+    <string name="session_advanced_invalid_prompt">Saisissez une personnalité de session ou désactivez « Personnalisé ».</string>
     <string name="session_advanced_invalid_temperature">La température doit être comprise entre 0.0 et 2.0.</string>
     <string name="session_advanced_invalid_max_tokens">Le nombre maximal de jetons de sortie doit être un entier positif.</string>
     <string name="session_advanced_save_failed">Impossible d’enregistrer les paramètres de session.</string>

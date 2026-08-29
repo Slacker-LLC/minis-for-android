@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">允许此会话注入并使用持久记忆。</string>
     <string name="session_advanced_thinking">思考级别</string>
     <string name="session_advanced_thinking_not_supported">当前模型不支持</string>
-    <string name="session_advanced_instructions_section">指令</string>
-    <string name="session_advanced_system_prompt">会话指令</string>
-    <string name="session_advanced_system_prompt_hint">为此会话添加额外指令</string>
+    <string name="session_advanced_instructions_section">会话灵魂</string>
+    <string name="session_advanced_system_prompt">会话人格</string>
+    <string name="session_advanced_system_prompt_hint">此会话独立的人设、角色、语气与行为。</string>
+    <string name="session_advanced_soul_help">默认使用全局 SOUL.md。只有在发送第一条消息前设置“会话灵魂”，才会由当前会话完整覆盖全局灵魂；聊天开始后该选择永久锁定。</string>
+    <string name="session_advanced_soul_locked_help">此会话已经开始，灵魂选择已锁定，之后不能修改；即使清空聊天记录也不会重新解锁。</string>
+    <string name="session_advanced_soul_locked_custom">自定义灵魂 · 已锁定</string>
+    <string name="session_advanced_soul_locked_global">全局灵魂 · 已锁定</string>
     <string name="session_advanced_model_section">模型参数</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">重置覆盖项</string>
     <string name="session_advanced_loading">正在准备会话设置…</string>
     <string name="session_advanced_missing_session">无法准备此会话。</string>
-    <string name="session_advanced_invalid_prompt">请输入会话指令，或关闭“自定义”。</string>
+    <string name="session_advanced_invalid_prompt">请输入会话人格内容，或关闭“自定义”。</string>
     <string name="session_advanced_invalid_temperature">Temperature 必须在 0.0 到 2.0 之间。</string>
     <string name="session_advanced_invalid_max_tokens">最大输出 Token 必须是正整数。</string>
     <string name="session_advanced_save_failed">无法保存会话设置。</string>

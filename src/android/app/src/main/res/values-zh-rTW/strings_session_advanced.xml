@@ -10,9 +10,13 @@
     <string name="session_advanced_memory_help">允許此工作階段注入並使用持久記憶。</string>
     <string name="session_advanced_thinking">思考等級</string>
     <string name="session_advanced_thinking_not_supported">目前模型不支援</string>
-    <string name="session_advanced_instructions_section">指令</string>
-    <string name="session_advanced_system_prompt">工作階段指令</string>
-    <string name="session_advanced_system_prompt_hint">為此工作階段加入額外指令</string>
+    <string name="session_advanced_instructions_section">工作階段靈魂</string>
+    <string name="session_advanced_system_prompt">工作階段人格</string>
+    <string name="session_advanced_system_prompt_hint">此工作階段獨立的人設、角色、語氣與行為。</string>
+    <string name="session_advanced_soul_help">預設使用全域 SOUL.md。只有在送出第一則訊息前設定「工作階段靈魂」，才會由目前工作階段完整覆蓋全域靈魂；聊天開始後此選擇永久鎖定。</string>
+    <string name="session_advanced_soul_locked_help">此工作階段已經開始，靈魂選擇已鎖定，之後不能修改；即使清除聊天記錄也不會重新解鎖。</string>
+    <string name="session_advanced_soul_locked_custom">自訂靈魂 · 已鎖定</string>
+    <string name="session_advanced_soul_locked_global">全域靈魂 · 已鎖定</string>
     <string name="session_advanced_model_section">模型參數</string>
     <string name="session_advanced_temperature">Temperature</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
@@ -25,7 +29,7 @@
     <string name="session_advanced_reset_all">重設覆寫項目</string>
     <string name="session_advanced_loading">正在準備工作階段設定…</string>
     <string name="session_advanced_missing_session">無法準備此工作階段。</string>
-    <string name="session_advanced_invalid_prompt">請輸入工作階段指令，或關閉「自訂」。</string>
+    <string name="session_advanced_invalid_prompt">請輸入工作階段人格內容，或關閉「自訂」。</string>
     <string name="session_advanced_invalid_temperature">Temperature 必須介於 0.0 與 2.0 之間。</string>
     <string name="session_advanced_invalid_max_tokens">最大輸出 Token 必須是正整數。</string>
     <string name="session_advanced_save_failed">無法儲存工作階段設定。</string>
