@@ -1,0 +1,33 @@
+name: Issue 54 update from master
+
+on:
+  push:
+    branches: [fix/issue-54-runtime-package-boundary]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Merge latest master into Issue 54 branch
+        run: |
+          set -euo pipefail
+          git fetch origin master
+          current="$(git rev-parse HEAD)"
+          master="$(git rev-parse origin/master)"
+          echo "issue54_head=$current"
+          echo "master_head=$master"
+          if git merge-base --is-ancestor "$master" "$current"; then
+            echo "Issue 54 branch already contains latest master."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-ff --no-edit origin/master
+          git push origin HEAD:fix/issue-54-runtime-package-boundary
