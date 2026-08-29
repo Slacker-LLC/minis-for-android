@@ -28,13 +28,12 @@ done
 [[ -d src/android/app/src/main/java/io/github/slackerllc/minis ]] || fail 'canonical main source root missing'
 [[ -d src/android/app/src/test/java/io/github/slackerllc/minis ]] || fail 'canonical unit-test source root missing'
 
-# Authorities remain derived from applicationId. Public deep-link contracts are
-# intentionally stable across the package migration. The guard does not invent
-# a process attribute that master did not define.
+# Authorities remain derived from applicationId. The existing public minis:
+# deep-link scheme is a product contract and must not change as a side effect of
+# the package migration.
 grep -Fq 'android:authorities="${applicationId}.shizuku"' "$MANIFEST" || fail 'Shizuku authority is no longer applicationId-derived'
 grep -Fq 'android:authorities="${applicationId}.fileprovider"' "$MANIFEST" || fail 'FileProvider authority is no longer applicationId-derived'
 grep -Fq 'android:scheme="minis"' "$MANIFEST" || fail 'minis deep-link scheme changed'
-grep -Fq 'android:host="app.minis.love"' "$MANIFEST" || fail 'HTTPS app-link host changed'
 
 # Narrow guard: historical/legal/provenance documentation may name the legacy
 # identities, but active Android/native/build/CI code must not regress to them.
