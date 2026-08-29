@@ -94,7 +94,9 @@ object UbuntuRuntime {
 
     suspend fun ensureReady(): Snapshot = startLock.withLock {
         val ctx = appContext
-            ?: return@withLock fail("${MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: UbuntuRuntime.init(context) has not been called")
+            ?: return@withLock fail(
+                "${MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: UbuntuRuntime.init(context) has not been called",
+            )
         val expectedUid = ctx.applicationInfo.uid
         var cur = refresh()
 
@@ -258,6 +260,24 @@ object UbuntuRuntime {
     internal fun shouldRetryAfterPreExecFailure(error: MinisdError?, attempt: Int): Boolean =
         attempt == 0 && error?.code == MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST
 
+    internal fun shellStartMarker(seed: Long): String =
+        "__MINIS_EXEC_STARTED_${seed.toString(16)}__"
+
+    internal fun wrapShellCommand(command: String, marker: String): String {
+        require(marker.matches(Regex("^[A-Za-z0-9_]+$"))) { "invalid shell start marker" }
+        return "printf '%s\\n' '$marker' >&2\n$command"
+    }
+
+    internal fun didUserCommandStart(response: MinisdResponse, marker: String): Boolean {
+        val stderr = response.result?.optString("stderr").orEmpty()
+        return stderr.split('\n').any { it.trimEnd('\r') == marker }
+    }
+
+    internal fun stripShellStartMarker(stderr: String, marker: String): String =
+        stderr.split('\n')
+            .filterNot { it.trimEnd('\r') == marker }
+            .joinToString("\n")
+
     private suspend fun awaitBroker(expectedUid: Int): Snapshot {
         var cur = _snapshot.value
         repeat(10) {
@@ -397,7 +417,7 @@ object UbuntuRuntime {
         argv: List<String>,
         timeoutMs: Long = 30_000,
         sessionId: String? = null,
-    ): MinisdResponse = execWithRecovery {
+    ): MinisdResponse = execWithStructuredRecovery {
         client.ubuntuExec(argv, timeoutMs, sessionId = sessionId)
     }
 
@@ -407,20 +427,27 @@ object UbuntuRuntime {
         confirmId: String? = null,
     ): MinisdResponse = MinisdProtocol.promoteExecInfrastructureFailure(
         client.ubuntuAdminExec(argv, timeoutMs, confirmId),
+        userCommandStarted = null,
     )
 
     suspend fun provision(timeoutMs: Long = 600_000): MinisdResponse =
         client.ubuntuProvision(timeoutMs)
 
-    private suspend fun execWithRecovery(call: suspend () -> MinisdResponse): MinisdResponse {
+    /**
+     * Raw argv execution cannot safely infer legacy helper pre-exec state from
+     * exit code alone. It retries only a broker-provided structured
+     * KEEPER_NAMESPACE_LOST error. Numeric 4/5/6 remain user exits here.
+     */
+    private suspend fun execWithStructuredRecovery(
+        call: suspend () -> MinisdResponse,
+    ): MinisdResponse {
         var attempt = 0
-        var response = MinisdProtocol.promoteExecInfrastructureFailure(call())
+        var response = MinisdProtocol.promoteExecInfrastructureFailure(
+            call(),
+            userCommandStarted = null,
+        )
         if (!shouldRetryAfterPreExecFailure(response.error, attempt)) return response
 
-        // KEEPER_NAMESPACE_LOST corresponds to helper setns failure before
-        // execve, so retrying once cannot duplicate user-command side effects.
-        // No other failure is blindly retried: transport/RPC/chroot failures may
-        // not prove whether a command already began.
         attempt += 1
         runCatching { client.ubuntuStop() }
         val ready = ensureReady()
@@ -430,7 +457,46 @@ object UbuntuRuntime {
                 ready.lastError ?: "keeper recovery failed",
             )
         }
-        response = MinisdProtocol.promoteExecInfrastructureFailure(call())
+        response = MinisdProtocol.promoteExecInfrastructureFailure(
+            call(),
+            userCommandStarted = null,
+        )
+        return response
+    }
+
+    /**
+     * shell_execute has an additional start-proof marker emitted by bash as
+     * the first script statement after helper execve. If the helper exits with
+     * a reserved 4/5/6 before that marker appears, the user command provably
+     * did not start and the failure can be structured. Only namespace loss is
+     * retried, once. If the marker exists, even exit 4/5/6 is a user result.
+     */
+    private suspend fun execShellWithRecovery(
+        marker: String,
+        call: suspend () -> MinisdResponse,
+    ): MinisdResponse {
+        var attempt = 0
+        var raw = call()
+        var response = MinisdProtocol.promoteExecInfrastructureFailure(
+            raw,
+            userCommandStarted = didUserCommandStart(raw, marker),
+        )
+        if (!shouldRetryAfterPreExecFailure(response.error, attempt)) return response
+
+        attempt += 1
+        runCatching { client.ubuntuStop() }
+        val ready = ensureReady()
+        if (!ready.running) {
+            return MinisdProtocol.runtimeError(
+                MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                ready.lastError ?: "keeper recovery failed",
+            )
+        }
+        raw = call()
+        response = MinisdProtocol.promoteExecInfrastructureFailure(
+            raw,
+            userCommandStarted = didUserCommandStart(raw, marker),
+        )
         return response
     }
 
@@ -453,10 +519,16 @@ object UbuntuRuntime {
                 )
             }
         }
-        val scopedEnv = if (sessionId == null) env else env + ("MINIS_CHAT_SESSION_ID" to sessionId)
-        val resp = execWithRecovery {
+        val scopedEnv = if (sessionId == null) {
+            env
+        } else {
+            env + ("MINIS_CHAT_SESSION_ID" to sessionId)
+        }
+        val marker = shellStartMarker(System.nanoTime())
+        val wrappedCommand = wrapShellCommand(command, marker)
+        val resp = execShellWithRecovery(marker) {
             client.ubuntuExec(
-                argv = listOf("/bin/bash", "-lc", command),
+                argv = listOf("/bin/bash", "-lc", wrappedCommand),
                 timeoutMs = timeoutMs,
                 cwd = MinisdProtocol.GUEST_WORKSPACE,
                 env = scopedEnv,
@@ -474,7 +546,10 @@ object UbuntuRuntime {
         }
 
         val stdout = resp.result?.optString("stdout").orEmpty()
-        val stderr = resp.result?.optString("stderr").orEmpty()
+        val stderr = stripShellStartMarker(
+            resp.result?.optString("stderr").orEmpty(),
+            marker,
+        )
         val output = when {
             stdout.isEmpty() -> stderr
             stderr.isEmpty() -> stdout
