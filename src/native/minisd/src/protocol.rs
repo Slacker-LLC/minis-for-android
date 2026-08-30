@@ -15,6 +15,11 @@ pub const CONFIRM_TTL_MS: u64 = 120_000;
 pub enum ErrorCode {
     PolicyDenied,
     Timeout,
+    ToolTimeout,
+    TransportTimeout,
+    ProcessKilled,
+    UserCancelled,
+    CleanupFailed,
     BadParams,
     NotAuthorized,
     RuntimeUnavailable,
@@ -35,6 +40,11 @@ impl ErrorCode {
         match self {
             Self::PolicyDenied => "POLICY_DENIED",
             Self::Timeout => "TIMEOUT",
+            Self::ToolTimeout => "TOOL_TIMEOUT",
+            Self::TransportTimeout => "TRANSPORT_TIMEOUT",
+            Self::ProcessKilled => "PROCESS_KILLED",
+            Self::UserCancelled => "USER_CANCELLATION",
+            Self::CleanupFailed => "CLEANUP_FAILURE",
             Self::BadParams => "BAD_PARAMS",
             Self::NotAuthorized => "NOT_AUTHORIZED",
             Self::RuntimeUnavailable => "RUNTIME_UNAVAILABLE",
@@ -55,6 +65,11 @@ impl ErrorCode {
         &[
             Self::PolicyDenied,
             Self::Timeout,
+            Self::ToolTimeout,
+            Self::TransportTimeout,
+            Self::ProcessKilled,
+            Self::UserCancelled,
+            Self::CleanupFailed,
             Self::BadParams,
             Self::NotAuthorized,
             Self::RuntimeUnavailable,
@@ -190,8 +205,6 @@ pub fn encode_frame(payload: &[u8], max: usize) -> Result<Vec<u8>, ErrorCode> {
     Ok(out)
 }
 
-// Parse failures are returned as complete wire-level responses so callers can
-// write them directly without a second error-to-protocol conversion/allocation.
 #[allow(clippy::result_large_err)]
 pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
     if bytes.len() > MAX_REQUEST_BYTES {
@@ -230,6 +243,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "ubuntu.exec",
     "ubuntu.adminExec",
     "ubuntu.provision",
+    "exec.cancel",
     "proc.killTree",
     "mount.list",
     "mount.prepare",
@@ -243,10 +257,6 @@ pub fn is_known_method(method: &str) -> bool {
     KNOWN_METHODS.contains(&method)
 }
 
-/// Methods that older installations may still reference in a persisted
-/// policy.json. They were deliberately removed from this broker: dispatch
-/// rejects them regardless of policy, so they are inert. Policy loading strips
-/// them so an in-place minisd upgrade cannot brick the runtime.
 pub const LEGACY_REMOVED_METHODS: &[&str] = &[
     "policy.reload",
     "supervisor.status",

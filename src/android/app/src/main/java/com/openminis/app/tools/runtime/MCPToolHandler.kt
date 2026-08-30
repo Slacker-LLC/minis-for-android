@@ -5,25 +5,29 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.mcp.client.MCPClientCodec
 import com.openminis.app.mcp.client.MCPClientSession
+import com.openminis.app.mcp.client.MCPTransportException
+import com.openminis.app.mcp.client.MCPTransportFailureKind
 import com.openminis.app.tools.ToolExecutionResult
+import com.openminis.app.tools.ToolFailureKind
+import com.openminis.app.tools.ToolTimeoutPolicy
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
-/**
- * A remote MCP tool exposed through the local ToolRegistry under the D12
- * `mcp.<server>.<tool>` name. Definition is derived from the remote
- * input_schema; execution forwards to the live [MCPClientSession].
- */
+/** A remote MCP tool exposed as `mcp.<server>.<tool>`. */
 class MCPToolHandler(
     val serverId: String,
     val remoteTool: MCPClientCodec.RemoteTool,
     private val session: MCPClientSession,
 ) : ToolHandler {
 
+    private val canonicalName = "mcp.$serverId.${remoteTool.name}"
+
     override val definition: AgentToolDefinition by lazy {
         AgentToolDefinition(
-            name = "mcp.$serverId.${remoteTool.name}",
+            name = canonicalName,
             description = remoteTool.description ?: "Remote MCP tool ${remoteTool.name} (server $serverId)",
             parameters = schemaToParams(remoteTool.inputSchema),
+            timeoutMs = ToolTimeoutPolicy.resolve(canonicalName).timeoutMs,
         )
     }
 
@@ -36,6 +40,21 @@ class MCPToolHandler(
         val args = runCatching { JSONObject(argsJson) }.getOrElse { JSONObject() }
         val result = try {
             session.callTool(remoteTool.name, args)
+        } catch (cancelled: CancellationException) {
+            // withTimeout/user Stop reaches the actual transport; HTTP cancels
+            // the Call and stdio closes pipes + kills its process.
+            throw cancelled
+        } catch (transport: MCPTransportException) {
+            val kind = when (transport.kind) {
+                MCPTransportFailureKind.TRANSPORT_TIMEOUT -> ToolFailureKind.TRANSPORT_TIMEOUT
+                MCPTransportFailureKind.PROCESS_KILLED -> ToolFailureKind.PROCESS_KILLED
+                MCPTransportFailureKind.TRANSPORT_FAILURE -> null
+            }
+            return ToolExecutionResult(
+                output = "mcp tool ${remoteTool.name} failed: ${transport.message}",
+                success = false,
+                failureKind = kind,
+            )
         } catch (t: Throwable) {
             return ToolExecutionResult(
                 "mcp tool ${remoteTool.name} failed: ${t.message}",
@@ -46,7 +65,6 @@ class MCPToolHandler(
     }
 
     companion object {
-        /** Converts a remote JSON schema {type,properties,required} to AgentToolParam map. */
         fun schemaToParams(schema: JSONObject?): Map<String, AgentToolParam> {
             if (schema == null) return emptyMap()
             val props = schema.optJSONObject("properties") ?: return emptyMap()

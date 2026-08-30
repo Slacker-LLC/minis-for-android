@@ -1,3 +1,4 @@
+use crate::exec_registry::ExecGuard;
 use crate::policy::{args_denied, MethodPolicy};
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use std::io::Read;
@@ -5,7 +6,6 @@ use std::time::{Duration, Instant};
 
 /// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
 pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
-/// Maximum bytes retained in memory for each root.exec output stream.
 pub const MAX_CAPTURE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone)]
@@ -13,6 +13,7 @@ pub struct ExecRequest {
     pub tool: String,
     pub args: Vec<String>,
     pub timeout_ms: u64,
+    pub execution_id: Option<String>,
 }
 
 pub fn parse_exec(params: &serde_json::Value) -> Result<ExecRequest, ErrorCode> {
@@ -50,14 +51,18 @@ pub fn parse_exec(params: &serde_json::Value) -> Result<ExecRequest, ErrorCode> 
         .and_then(|v| v.as_u64())
         .unwrap_or(30_000)
         .clamp(1_000, 600_000);
+    let execution_id = params
+        .get("execution_id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
     Ok(ExecRequest {
         tool,
         args,
         timeout_ms,
+        execution_id,
     })
 }
 
-/// Runtime policy can only narrow the built-in root.exec tool set.
 pub fn effective_allowlist(spec: Option<&MethodPolicy>) -> Vec<&str> {
     match spec.and_then(|s| s.tool_allowlist.as_ref()) {
         Some(policy_tools) => policy_tools
@@ -104,8 +109,6 @@ struct CapturedOutput {
     truncated: bool,
 }
 
-/// Drain the complete pipe so the child cannot block on a full stdout/stderr
-/// buffer, while retaining only a bounded prefix in broker memory.
 fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<CapturedOutput> {
     let mut retained = Vec::with_capacity(limit.min(8192));
     let mut total_bytes = 0u64;
@@ -138,18 +141,42 @@ pub struct ExecOutput {
     pub stderr_truncated: bool,
 }
 
+#[cfg(unix)]
+fn kill_process_tree(pid: i32) {
+    unsafe {
+        libc::kill(pid, libc::SIGKILL);
+        libc::kill(-pid, libc::SIGKILL);
+    }
+}
+
 pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCode> {
     let path = resolve_tool_path(&req.tool, allow)?;
+    let guard = ExecGuard::begin(req.execution_id.as_deref())?;
     let mut cmd = std::process::Command::new(&path);
     cmd.args(&req.args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        unsafe {
+            cmd.pre_exec(|| {
+                if libc::setpgid(0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
     let mut child = cmd.spawn().map_err(|_| ErrorCode::Internal)?;
     let pid = child.id() as i32;
+    if guard.activate(pid)? {
+        #[cfg(unix)]
+        kill_process_tree(pid);
+    }
     let stdout = child.stdout.take().ok_or(ErrorCode::Internal)?;
     let stderr = child.stderr.take().ok_or(ErrorCode::Internal)?;
-
     let stdout_handle = std::thread::spawn(move || collect_bounded(stdout, MAX_CAPTURE_BYTES));
     let stderr_handle = std::thread::spawn(move || collect_bounded(stderr, MAX_CAPTURE_BYTES));
     let wait_handle = std::thread::spawn(move || child.wait());
@@ -169,8 +196,14 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
                 .join()
                 .map_err(|_| ErrorCode::Internal)?
                 .map_err(|_| ErrorCode::Internal)?;
+            if guard.was_cancelled() {
+                return Err(ErrorCode::UserCancelled);
+            }
+            let Some(exit_code) = status.code() else {
+                return Err(ErrorCode::ProcessKilled);
+            };
             return Ok(ExecOutput {
-                exit_code: status.code().unwrap_or(255),
+                exit_code,
                 stdout: String::from_utf8_lossy(&stdout.retained).into_owned(),
                 stderr: String::from_utf8_lossy(&stderr.retained).into_owned(),
                 stdout_bytes: stdout.total_bytes,
@@ -181,23 +214,17 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
         }
         if start.elapsed() >= Duration::from_millis(req.timeout_ms) {
             #[cfg(unix)]
-            unsafe {
-                libc::kill(pid, libc::SIGKILL);
-            }
-            #[cfg(unix)]
-            {
-                // Give the wait thread a bounded opportunity to reap the killed child.
-                for _ in 0..50 {
-                    if wait_handle.is_finished() {
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(20));
-                }
+            kill_process_tree(pid);
+            for _ in 0..50 {
                 if wait_handle.is_finished() {
-                    let _ = wait_handle.join();
+                    break;
                 }
+                std::thread::sleep(Duration::from_millis(20));
             }
-            return Err(ErrorCode::Timeout);
+            if wait_handle.is_finished() {
+                let _ = wait_handle.join();
+            }
+            return Err(ErrorCode::ToolTimeout);
         }
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -228,6 +255,14 @@ mod tests {
         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
+    }
+
+    #[test]
+    fn execution_id_is_carried_for_targeted_cancel() {
+        let parsed =
+            parse_exec(&serde_json::json!({"tool":"pm","args":[],"execution_id":"root:s1:42"}))
+                .unwrap();
+        assert_eq!(parsed.execution_id.as_deref(), Some("root:s1:42"));
     }
 
     #[test]

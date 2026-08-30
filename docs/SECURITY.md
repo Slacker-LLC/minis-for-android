@@ -75,6 +75,10 @@ The Ubuntu guest is not a VM or a complete container security boundary. It share
 Security rules:
 
 - root establishes the namespace/chroot, but arbitrary agent code runs with the app guest UID;
+- persistent guest-data sources are fixed under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`;
+- `minisd` prepares and validates persistent bind sources before keeper mount-namespace creation;
+- persistent data directories use the guest UID/GID with mode `0700`;
+- non-canonical or tmpfs-backed persistent sources fail closed;
 - host/guest mounts are explicit;
 - guest paths are canonically contained;
 - unnecessary host paths are not made writable;
@@ -85,7 +89,7 @@ Security rules:
 
 File and mount paths must reject traversal, NUL input, canonical escape, and symlink escape where relevant.
 
-SAF-granted external locations and app-private workspace locations are separate trust domains.
+SAF-granted external locations and the root-managed `/data/adb/minis` Agent-data sources are separate trust domains. Access across those domains must use the intended Android/root-broker boundary rather than assuming direct path equivalence.
 
 Large tool output should be bounded or spilled to controlled storage instead of being allowed to exhaust memory or IPC buffers.
 

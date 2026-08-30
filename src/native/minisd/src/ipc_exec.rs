@@ -1,3 +1,4 @@
+use crate::exec_registry::ExecGuard;
 use crate::protocol::ErrorCode;
 use crate::state::AppState;
 use crate::ubuntu::parse_ubuntu_exec;
@@ -16,9 +17,6 @@ pub struct UbuntuExecSnapshot {
     pub guest_gid: u32,
 }
 
-/// Refresh Ubuntu state under the caller's short AppState lock and copy only
-/// immutable execution inputs. The actual helper process is launched later,
-/// after the global broker state lock has been released.
 pub fn snapshot_ubuntu_exec(
     state: &mut AppState,
 ) -> Result<UbuntuExecSnapshot, (ErrorCode, String)> {
@@ -105,8 +103,16 @@ fn collect_bounded<R: Read>(mut reader: R, limit: usize) -> std::io::Result<Capt
     })
 }
 
-/// Run ubuntu.exec / ubuntu.adminExec using a previously authorized and
-/// snapshotted keeper context. This function does not touch AppState.
+#[cfg(unix)]
+fn kill_process_tree(pid: i32) {
+    unsafe {
+        // PID handles cancellation before helper setpgid; -PID handles every
+        // descendant afterwards (including minis-mcp-cli/network helpers).
+        libc::kill(pid, libc::SIGKILL);
+        libc::kill(-pid, libc::SIGKILL);
+    }
+}
+
 pub fn execute_ubuntu_snapshot(
     snapshot: UbuntuExecSnapshot,
     params: Value,
@@ -114,15 +120,14 @@ pub fn execute_ubuntu_snapshot(
 ) -> Result<Value, (ErrorCode, String)> {
     let req =
         parse_ubuntu_exec(&params).map_err(|code| (code, "bad ubuntu exec params".to_string()))?;
+    let execution_id = params.get("execution_id").and_then(Value::as_str);
+    let guard = ExecGuard::begin(execution_id)
+        .map_err(|code| (code, "invalid or duplicate execution_id".into()))?;
     let uid = if admin { 0 } else { snapshot.guest_uid };
     let gid = if admin { 0 } else { snapshot.guest_gid };
     let exe =
         std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let tz = crate::env::discover_tz();
-    // Match upstream Android semantics: the guest shares the phone's network
-    // namespace and only mirrors the Android system proxy when one is actually
-    // configured. Do not force ordinary guest traffic through minisd's root
-    // loopback proxy; direct sockets should use the app UID's host networking.
     let proxy = crate::env::discover_proxy();
     let session_root = if admin {
         None
@@ -170,6 +175,13 @@ pub fn execute_ubuntu_snapshot(
         .spawn()
         .map_err(|e| (ErrorCode::Internal, format!("spawn exec helper: {e}")))?;
     let pid = child.id() as i32;
+    if guard
+        .activate(pid)
+        .map_err(|code| (code, "execution registry activation failed".into()))?
+    {
+        #[cfg(unix)]
+        kill_process_tree(pid);
+    }
     let stdout = child
         .stdout
         .take()
@@ -197,8 +209,20 @@ pub fn execute_ubuntu_snapshot(
                 .join()
                 .map_err(|_| (ErrorCode::Internal, "join stderr collector".into()))?
                 .map_err(|e| (ErrorCode::Internal, format!("read stderr: {e}")))?;
+            if guard.was_cancelled() {
+                return Err((
+                    ErrorCode::UserCancelled,
+                    "execution cancelled by caller".into(),
+                ));
+            }
+            let Some(exit_code) = status.code() else {
+                return Err((
+                    ErrorCode::ProcessKilled,
+                    "execution process was killed by a signal".into(),
+                ));
+            };
             return Ok(json!({
-                "exit_code": status.code().unwrap_or(255),
+                "exit_code": exit_code,
                 "stdout": String::from_utf8_lossy(&stdout.retained).into_owned(),
                 "stderr": String::from_utf8_lossy(&stderr.retained).into_owned(),
                 "stdout_bytes": stdout.total_bytes,
@@ -207,15 +231,13 @@ pub fn execute_ubuntu_snapshot(
                 "stderr_truncated": stderr.truncated,
                 "uid": uid,
                 "admin": admin,
-                "session_id": req.session_id
+                "session_id": req.session_id,
+                "execution_id": execution_id
             }));
         }
         if start.elapsed() >= Duration::from_millis(req.timeout_ms) {
             #[cfg(unix)]
-            unsafe {
-                libc::kill(pid, libc::SIGKILL);
-                libc::kill(-pid, libc::SIGKILL);
-            }
+            kill_process_tree(pid);
             for _ in 0..50 {
                 if wait_handle.is_finished() {
                     break;
@@ -226,7 +248,7 @@ pub fn execute_ubuntu_snapshot(
                 let _ = wait_handle.join();
             }
             return Err((
-                ErrorCode::Timeout,
+                ErrorCode::ToolTimeout,
                 format!("ubuntu exec exceeded {}ms", req.timeout_ms),
             ));
         }
