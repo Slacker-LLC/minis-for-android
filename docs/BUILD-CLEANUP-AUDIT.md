@@ -1,6 +1,6 @@
 # Issue #53 Build Cleanup Audit
 
-This audit records the build-path decisions for Issue #53. It is intentionally narrower than runtime cleanup and package-identity migration.
+This audit records the build-path decisions for Issue #53. It is intentionally narrower than runtime cleanup, package-identity migration, and source-provenance history.
 
 ## Classification
 
@@ -15,7 +15,7 @@ This audit records the build-path decisions for Issue #53. It is intentionally n
 
 ### Preserved migration-only identity
 
-The current Android build still uses legacy package identity in active source, including:
+The current Android build still uses migration-owned package identity in active source, including:
 
 - `namespace = "com.openminis.app"`
 - `applicationId = "dev.openminispet.android"`
@@ -24,18 +24,18 @@ These values are part of the current supported Android build and are therefore n
 
 ### Preserved legal/provenance material
 
-The following are explicitly outside the regression guard's cleanup target and must retain accurate historical attribution:
+Legal attribution and source-lineage records are outside the build-cleanup guard's target. Current authoritative locations include:
 
 - `LICENSE`
-- `UPSTREAM.md`
+- `PROVENANCE.md`
 - `THIRD_PARTY_LICENSES.md`
-- historical Git history and archived provenance material
+- historical Git history and explicitly archived material under `docs/archive/`
 
-References to OpenMinis in those locations are legal/provenance information, not active build dependencies.
+Issue #53 does not rewrite those records; it only prevents historical build mechanisms from becoming active tooling again.
 
 ### Deferred to other issues
 
-PRoot/Alpine runtime-history cleanup is not broadened into this build-path change. Issue #44 owns obsolete runtime/code-path cleanup; Issue #53 only prevents obsolete build pipelines from becoming active tooling again.
+Historical runtime/code-path cleanup is not broadened into this build-path change. Issue #44 owns obsolete runtime/code-path cleanup; Issue #53 only prevents obsolete build pipelines from becoming active tooling again.
 
 ## Canonical build contract
 
@@ -55,9 +55,9 @@ README files point to `BUILDING.md` instead of carrying a second copy of the ful
 
 - the removed legacy PowerShell build wrapper;
 - references from active tooling to the removed iOS source tree;
-- active tooling that clones the upstream OpenMinis repository as a build stage;
-- active tooling that applies an OpenMinis/OpenMinisPet patch pipeline.
+- active tooling that clones a historical upstream repository as a build stage;
+- active tooling that applies a historical upstream patch pipeline.
 
-`scripts/test_build_cleanup_guard.py` covers positive and negative fixtures, including explicit acceptance of migration-only Android package identity and provenance-only upstream references.
+`scripts/test_build_cleanup_guard.py` covers positive and negative fixtures, including explicit acceptance of migration-only Android package identity and provenance-only historical references.
 
-The guard deliberately does not scan legal/provenance documents or all application source for legacy naming. Doing so would conflate Issue #53 with the separate package-identity migration and could break the currently supported Android build.
+The guard deliberately does not scan legal/provenance documents or all application source for migration-owned naming. Doing so would conflate Issue #53 with the separate package-identity migration and could break the currently supported Android build.
