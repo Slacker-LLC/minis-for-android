@@ -180,16 +180,7 @@ fn main() -> ExitCode {
         }
     };
     if args.watchdog {
-        return watchdog_loop(
-            args.mock,
-            args.dev_filesystem_ipc,
-            args.socket,
-            args.app_socket,
-            args.policy,
-            args.policy_json,
-            args.lease_pid,
-            args.lease_starttime,
-        );
+        return watchdog_loop(args);
     }
     let policy = match load_policy(&args.policy, &args.policy_json) {
         Ok(p) => p,
@@ -232,16 +223,18 @@ fn main() -> ExitCode {
     }
 }
 
-fn watchdog_loop(
-    mock: bool,
-    dev_filesystem_ipc: bool,
-    socket: String,
-    app_socket: Option<String>,
-    policy: Option<PathBuf>,
-    policy_json: Option<String>,
-    lease_pid: Option<i32>,
-    lease_starttime: Option<u64>,
-) -> ExitCode {
+fn watchdog_loop(args: Args) -> ExitCode {
+    let Args {
+        mock,
+        dev_filesystem_ipc,
+        socket,
+        app_socket,
+        policy,
+        policy_json,
+        lease_pid,
+        lease_starttime,
+        ..
+    } = args;
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
