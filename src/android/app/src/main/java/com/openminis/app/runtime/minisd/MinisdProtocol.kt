@@ -27,6 +27,8 @@ data class MinisdResponse(
     val ok: Boolean,
     val result: JSONObject?,
     val error: MinisdError?,
+    /** UTF-8 bytes in the decoded response frame; zero for synthetic local errors. */
+    val wireBytes: Int = 0,
 ) {
     val code: String? get() = error?.code
 }
@@ -91,6 +93,7 @@ object MinisdProtocol {
             ok = obj.optBoolean("ok"),
             result = obj.optJSONObject("result"),
             error = error,
+            wireBytes = trimmed.toByteArray(Charsets.UTF_8).size,
         )
     }
 
@@ -120,6 +123,7 @@ object MinisdProtocol {
             ok = false,
             result = null,
             error = error,
+            wireBytes = response.wireBytes,
         )
     }
 
