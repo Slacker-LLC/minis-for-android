@@ -10,7 +10,7 @@ import android.os.Environment
  * bind-mount sources.
  *
  * A persisted SAF tree grant is necessary to remember the user's selection,
- * but it does not by itself grant arbitrary java.io/File access to the
+ * but it does not by itself grant arbitrary java.io.File access to the
  * corresponding `/storage/...` path. The current runtime resolves an
  * ExternalStorageProvider tree to a host path and asks minisd to bind that
  * path into its mount namespace, so raw-path access is a separate capability.
@@ -59,12 +59,18 @@ internal object ExternalStorageAccessPolicy {
 
     fun current(context: Context): Access {
         val sdk = Build.VERSION.SDK_INT
-        val allFiles = sdk >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+        // Keep API-specific framework calls inside branches that lint can prove
+        // are reachable only on the platform version that defines each API.
+        val allFiles = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            false
+        }
         val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
             PackageManager.PERMISSION_GRANTED
         val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
             PackageManager.PERMISSION_GRANTED
-        val legacyView = if (sdk == Build.VERSION_CODES.Q) {
+        val legacyView = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
             Environment.isExternalStorageLegacy()
         } else {
             true
