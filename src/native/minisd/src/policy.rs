@@ -10,6 +10,14 @@ pub enum Mode {
     Confirm,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AccessMode {
+    #[default]
+    Standard,
+    Full,
+}
+
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ArgRule {
     #[serde(default, rename = "regexDeny")]
@@ -39,6 +47,8 @@ pub struct CallerPolicy {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PolicyFile {
+    #[serde(default, rename = "accessMode")]
+    pub access_mode: AccessMode,
     #[serde(default)]
     pub methods: BTreeMap<String, MethodPolicy>,
     #[serde(default)]
@@ -50,7 +60,15 @@ pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
 fn is_builtin_root_exec_tool(tool: &str) -> bool {
     matches!(
         tool,
-        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount"
+        "pm"
+            | "am"
+            | "settings"
+            | "dumpsys"
+            | "getprop"
+            | "mount"
+            | "pidof"
+            | "ps"
+            | "logcat"
     )
 }
 
@@ -161,10 +179,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_policy_loads() {
+    fn default_policy_loads_in_standard_mode() {
         let p = PolicyFile::default_policy();
+        assert_eq!(p.access_mode, AccessMode::Standard);
         assert_eq!(p.implicit_mode("root.shellRaw"), Mode::Deny);
         assert_eq!(p.method("root.exec").unwrap().mode, Mode::Allow);
+    }
+
+    #[test]
+    fn full_access_mode_parses_only_from_policy() {
+        let p = PolicyFile::parse(
+            r#"{"accessMode":"full","methods":{"root.exec":{"mode":"allow"}}}"#,
+        )
+        .unwrap();
+        assert_eq!(p.access_mode, AccessMode::Full);
     }
 
     #[test]
@@ -191,7 +219,7 @@ mod tests {
     #[test]
     fn root_exec_policy_cannot_expand_builtin_capabilities() {
         assert!(PolicyFile::parse(
-            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm"]}}}"#
+            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm","logcat"]}}}"#
         )
         .is_ok());
         assert!(PolicyFile::parse(
