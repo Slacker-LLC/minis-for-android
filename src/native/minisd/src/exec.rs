@@ -4,8 +4,10 @@ use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use std::io::Read;
 use std::time::{Duration, Instant};
 
-/// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
-pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
+/// Compile-time Standard Mode capability set. Runtime policy may only narrow it.
+pub const DEFAULT_TOOLS: &[&str] = &[
+    "pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat",
+];
 pub const MAX_CAPTURE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone)]
@@ -93,6 +95,21 @@ pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode
     if !allow.contains(&tool) {
         return Err(ErrorCode::PolicyDenied);
     }
+    resolve_trusted_tool_path(tool)
+}
+
+/// Full Access Mode can select any executable exposed from trusted Android
+/// system/vendor binary directories. The request still uses structured argv;
+/// shell parsing exists only when the user has explicitly enabled Full Access
+/// and the requested tool itself is `sh` with `-c` in argv.
+pub fn resolve_unrestricted_tool_path(tool: &str) -> Result<String, ErrorCode> {
+    resolve_trusted_tool_path(tool)
+}
+
+fn resolve_trusted_tool_path(tool: &str) -> Result<String, ErrorCode> {
+    if tool.is_empty() || tool.contains('/') || tool.contains('\0') {
+        return Err(ErrorCode::BadParams);
+    }
     for prefix in ["/system/bin/", "/system/xbin/", "/vendor/bin/"] {
         let p = format!("{prefix}{tool}");
         if std::path::Path::new(&p).exists() {
@@ -151,8 +168,17 @@ fn kill_process_tree(pid: i32) {
 
 pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCode> {
     let path = resolve_tool_path(&req.tool, allow)?;
+    run_exec_path(req, &path)
+}
+
+pub fn run_exec_unrestricted(req: &ExecRequest) -> Result<ExecOutput, ErrorCode> {
+    let path = resolve_unrestricted_tool_path(&req.tool)?;
+    run_exec_path(req, &path)
+}
+
+fn run_exec_path(req: &ExecRequest, path: &str) -> Result<ExecOutput, ErrorCode> {
     let guard = ExecGuard::begin(req.execution_id.as_deref())?;
-    let mut cmd = std::process::Command::new(&path);
+    let mut cmd = std::process::Command::new(path);
     cmd.args(&req.args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -240,8 +266,10 @@ mod tests {
     fn t_u4_allowlist_and_deny() {
         let policy = PolicyFile::default_policy();
         let spec = policy.method("root.exec");
-        let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["force-stop","a.b"]})).unwrap();
+        let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["list","packages"]})).unwrap();
         assert!(validate_exec(spec, &ok).is_ok());
+        let logcat = parse_exec(&serde_json::json!({"tool":"logcat","args":["-d"]})).unwrap();
+        assert!(validate_exec(spec, &logcat).is_ok());
         let bad_tool = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
         assert_eq!(
             validate_exec(spec, &bad_tool).unwrap_err(),
@@ -252,9 +280,27 @@ mod tests {
             validate_exec(spec, &denied).unwrap_err(),
             ErrorCode::PolicyDenied
         );
+        let destructive = parse_exec(&serde_json::json!({"tool":"pm","args":["uninstall","com.example.test"]})).unwrap();
+        assert_eq!(
+            validate_exec(spec, &destructive).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
+    }
+
+    #[test]
+    fn full_access_request_is_still_structured_argv() {
+        let parsed = parse_exec(&serde_json::json!({
+            "tool":"sh",
+            "args":["-c","id; getenforce"],
+            "execution_id":"root:s1:42"
+        }))
+        .unwrap();
+        assert_eq!(parsed.tool, "sh");
+        assert_eq!(parsed.args, vec!["-c", "id; getenforce"]);
+        assert_eq!(parsed.execution_id.as_deref(), Some("root:s1:42"));
     }
 
     #[test]
