@@ -544,6 +544,11 @@ fn helper_main(args: &[String]) -> ExitCode {
         match helper_unix(args) {
             Ok(()) => ExitCode::SUCCESS,
             Err((code, msg)) => {
+                if let Ok(token) = std::env::var(minisd::protocol::PRE_EXEC_TOKEN_ENV) {
+                    if let Some(marker) = minisd::protocol::format_pre_exec_marker(&token, code) {
+                        eprintln!("{marker}");
+                    }
+                }
                 eprintln!("{msg}");
                 ExitCode::from(code)
             }
