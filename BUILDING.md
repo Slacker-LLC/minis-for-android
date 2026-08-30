@@ -84,8 +84,6 @@ cargo build --locked --release \
 
 The script downloads the pinned Ubuntu 24.04 arm64 base archive and verifies its SHA-256 digest before packaging the project rootfs layout.
 
-This project does not use the upstream Alpine + PRoot runtime as its active Android execution backend.
-
 ## 5. Build a debug APK
 
 Linux / WSL2:
@@ -159,6 +157,13 @@ Rootfs verification:
 bash scripts/test-build-ubuntu-rootfs-verification.sh
 ```
 
+Documentation provenance checks:
+
+```bash
+python3 scripts/test_docs_provenance.py
+python3 scripts/check_docs_provenance.py
+```
+
 Build cleanup regression guard:
 
 ```bash
@@ -197,7 +202,8 @@ The repository CI validates:
 - Debug packaging;
 - Release Kotlin compilation and packaging;
 - fail-closed release signing;
-- final release APK verification.
+- final release APK verification;
+- documentation provenance separation.
 
 ## Runtime notes
 
@@ -208,12 +214,23 @@ Android kernel
   ↓
 minisd
   ↓
-unshare + mount + chroot
+mount namespace + bind mounts + chroot
   ↓
 Ubuntu 24.04 userspace
 ```
 
-The guest reuses the Android kernel and runs with the app guest UID. Persistent agent data uses the fixed root-managed layout under `/data/adb/minis/`: `workspace/`, `sessions/`, `memory/`, `skills/`, `shared/`, and `home/`. `minisd` rejects alternate or App-filesDir persistent sources; these directories are prepared as the bind sources before the private mount namespace/chroot is established.
+The guest reuses the Android kernel and runs with the app guest UID. `minisd` prepares the canonical persistent host sources under `/data/adb/minis/` before keeper startup:
+
+```text
+/data/adb/minis/workspace
+/data/adb/minis/sessions
+/data/adb/minis/memory
+/data/adb/minis/skills
+/data/adb/minis/shared
+/data/adb/minis/home
+```
+
+These sources are fixed runtime inputs. Startup rejects alternate persistent paths, and persistent backing must not be tmpfs.
 
 ## Troubleshooting
 
@@ -238,7 +255,7 @@ Check whether the integration requires a build-time customization value that is 
 ## Related documents
 
 - [README.md](README.md)
-- [UPSTREAM.md](UPSTREAM.md)
+- [PROVENANCE.md](PROVENANCE.md)
 - [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)

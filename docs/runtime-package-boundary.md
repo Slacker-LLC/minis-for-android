@@ -23,7 +23,7 @@ This change is an ownership/package refactor. It does not change minisd protocol
 
 `MinisKernel` was renamed to `RuntimePathRegistry`, and its lifecycle-shaped `boot/isBooted` API became `initialize/isInitialized`. The object was already a path/mount registry; the new name/API states that responsibility directly.
 
-`MountedFolderCoordinator` was renamed to `ExternalMountCoordinator`. Its contract is expressed as SAF -> host path -> minisd-owned bind mount -> guest path. It no longer documents `proot -b` ownership.
+`MountedFolderCoordinator` was renamed to `ExternalMountCoordinator`. Its contract is expressed as SAF -> host path -> minisd-owned bind mount -> guest path. It no longer documents legacy userspace bind ownership.
 
 ## Explicit legacy allowlist
 
@@ -57,5 +57,5 @@ CI fails if:
 - `RootfsManager` or `TerminalSession` is moved into the active runtime tree;
 - `MinisKernel` or `MountedFolderCoordinator` returns as an active type;
 - active minisd/Ubuntu/offload packages return under `com.openminis.app.sandbox.*`;
-- mounted-folder documentation reintroduces PRoot bind semantics; or
+- mounted-folder documentation reintroduces legacy userspace bind ownership; or
 - the minisd protocol/path constants above change as part of this package-boundary work.

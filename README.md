@@ -4,11 +4,7 @@
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-**Minis for Android** is an independent, Android-focused AI agent runtime built on the open-source [OpenMinis](https://github.com/OpenMinis/OpenMinis) codebase.
-
-This project keeps the native Android agent experience while developing a separate execution architecture for rooted devices: a Rust root broker (`minisd`), an Ubuntu 24.04 chroot, native Android tools, MCP client/server support, persistent jobs, subagents, and device-level integrations.
-
-> This repository is developed as its own project. OpenMinis is the upstream codebase and origin of substantial shared application code; this repository is not the official OpenMinis Android distribution. See [UPSTREAM.md](UPSTREAM.md) for provenance and synchronization policy.
+**Minis for Android** is an Android AI agent runtime for rooted devices. It combines a native Android application with a Rust root broker (`minisd`), an Ubuntu 24.04 userspace, Android-native tools, MCP integrations, persistent agent data, jobs, subagents, voice/assistant features, and device-level automation.
 
 Chinese overview: [README.zh-CN.md](README.zh-CN.md)
 
@@ -22,87 +18,72 @@ Android native app
 ├─ Android-native tools
 ├─ MCP client + local MCP server
 ├─ Voice / assistant / overlay integrations
-└─ minisd root broker
-   └─ unshare + mount + chroot
-      └─ Ubuntu 24.04 userspace
+└─ Unix socket RPC
+   ↓
+minisd root broker
+   ↓
+private mount namespace + bind mounts + chroot
+   ↓
+Ubuntu 24.04 userspace
 ```
 
-The Android app remains the single source of truth for agent state, sessions, tool permissions, provider configuration, and persistence. MCP is an integration surface, not a second agent runtime.
+The Android app owns application/database state, provider/model configuration, tool permissions, approvals, and runtime orchestration. `minisd` owns the privileged Linux runtime boundary and prepares the canonical persistent guest-data backing before the keeper mount namespace is created. Agent commands run under the app guest UID rather than retaining unrestricted root identity.
 
-## What is different from upstream OpenMinis
+## Persistent Linux data
 
-OpenMinis prioritizes a portable Android sandbox based on PRoot. Minis for Android intentionally takes a different path on rooted devices:
+The canonical host layout is rooted at `/data/adb/minis/`:
 
-- Ubuntu 24.04 chroot instead of the upstream Alpine + PRoot runtime;
-- `minisd` as a structured root broker rather than exposing arbitrary root shell execution;
-- local MCP server plus external MCP provider integration;
-- expanded Android-native tool surface;
-- goals, todos, jobs, subagents, approval seams, execution checkpoints, and output spill/pruning;
-- source-first release engineering with release signing, lint, Android build checks, Rust checks, and rootfs verification in CI.
+| Host path | Guest/runtime purpose |
+|---|---|
+| `/data/adb/minis/workspace` | `/workspace` |
+| `/data/adb/minis/sessions` | per-session workspace backing |
+| `/data/adb/minis/memory` | `/memory` |
+| `/data/adb/minis/skills` | `/skills` |
+| `/data/adb/minis/shared` | `/shared` |
+| `/data/adb/minis/home` | `/home/minis` |
 
-The project does **not** carry the old Web Remote / Cloudflare Tunnel runtime that existed in earlier experiments.
+`minisd` creates and validates these sources before keeper startup. Persistent data directories use the guest UID/GID with mode `0700`; non-canonical persistent sources and tmpfs-backed persistent sources are rejected.
 
 ## Current status
 
-The public repository is under active development and currently distributes source code rather than production APK releases.
+The repository is under active development and currently distributes source code rather than promising production APK releases. Build metadata is defined in `src/android/app/build.gradle.kts`.
 
-Current Android build metadata is defined in `src/android/app/build.gradle.kts`; do not treat `versionName` as a promise that a matching GitHub Release exists.
-
-Important project references:
+Important references:
 
 - [Development status](docs/DEVELOPMENT-STATUS.md)
 - [Execution environment](docs/EXECUTION-ENVIRONMENT.md)
 - [Security model](docs/SECURITY.md)
 - [Build guide](BUILDING.md)
 - [Documentation index](docs/README.md)
+- [Source provenance and attribution](PROVENANCE.md)
 - [Active issues](https://github.com/Slacker-LLC/minis-for-android/issues)
 
 ## Main capabilities
 
-### Agent runtime
-
 - multiple providers, model groups, OAuth/API-key authentication, image input, streaming, and tool calls;
 - persistent sessions, memory, skills, goals, todos, jobs, subagents, and structured user questions;
-- context-pressure handling, token accounting, tool timeouts, checkpoints, dangerous-command policy, and large-output spill/pruning;
-- file, browser, Linux, memory, MCP, and Android-native tools through one runtime.
+- file, browser, Linux, memory, MCP, and Android-native tools through one runtime;
+- Accessibility, screenshots, logcat, package/deployment, media, assistant/overlay, speech recognition, and TTS integrations.
 
-### Linux runtime
+## Linux runtime
 
 ```text
 Android kernel
   ↓
-minisd (root broker)
+minisd
   ↓
-unshare + mount + chroot
+mount namespace + bind mounts + chroot
   ↓
 Ubuntu 24.04 userspace
 ```
 
-The guest reuses the Android kernel; it is not a virtual machine and does not boot a separate Linux kernel. The guest runs with the app UID rather than inheriting unrestricted root privileges.
-
-The rootfs is built by `scripts/build-ubuntu-rootfs.sh` and verified against a pinned SHA-256 digest.
-
-### MCP
-
-- local server on loopback (`127.0.0.1:18789` by default);
-- bearer-token authentication and caller-aware tool permissions;
-- confirmation flow for sensitive remote tools;
-- external MCP servers can be connected through the existing tool runtime.
-
-### Android integration
-
-- Accessibility-driven UI operations and diagnostics;
-- screenshots, logcat, package/deployment tooling, media and device capabilities;
-- desktop pet / overlay integration;
-- default digital-assistant / VoiceInteraction integration;
-- speech recognition and TTS;
-- ordinary Android API, Shizuku-compatible bridges, and root backends selected by capability rather than by a single privilege ladder.
+The rootfs is built by `scripts/build-ubuntu-rootfs.sh` and verified against a pinned SHA-256 digest. The guest shares the Android kernel; it is not a virtual machine.
 
 ## Build from source
 
 [BUILDING.md](BUILDING.md) is the single canonical build and release guide for this repository. It defines the supported toolchain, Android/Rust/rootfs entry points, validation commands, release-signing gate, and troubleshooting steps.
 
-Do not copy build commands from archived material or upstream OpenMinis documentation into current automation without checking them against `BUILDING.md` and the repository build files.
+Do not copy build commands from archived material or historical upstream documentation into current automation without checking them against `BUILDING.md` and the repository build files.
 
 ## Repository layout
 
@@ -110,27 +91,24 @@ Do not copy build commands from archived material or upstream OpenMinis document
 |---|---|
 | `src/android/` | Android application, Compose UI, Room, providers, MCP, tools |
 | `src/native/minisd/` | Rust root broker |
-| `src/shared/` | shared runtime resources still used by Android |
+| `src/shared/` | shared runtime resources used by Android |
 | `scripts/` | rootfs, verification, and maintenance scripts |
-| `docs/` | current architecture, security, status, and specifications |
-| `assets/` | project presentation assets |
+| `docs/` | current architecture, security, status, specifications, and archive |
 | `.github/` | CI and contribution templates |
 
 ## Documentation policy
 
-Primary project documentation is written in English. Translations are secondary and must not define behavior that differs from the English document.
+Current-state documentation describes Minis for Android directly. Historical architecture is isolated under `docs/archive/`; source lineage and required attribution are isolated in [PROVENANCE.md](PROVENANCE.md) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
-When documentation and implementation disagree, use this order of authority:
+Authority order:
 
 ```text
 source code and tests
   > current architecture/security documents
   > README and changelog
-  > archived material
+  > archived historical material
 ```
 
-Archived documents may describe removed experiments and are intentionally non-authoritative.
+## License and provenance
 
-## Upstream and license
-
-Minis for Android is built on OpenMinis and remains distributed under the [GNU General Public License v3.0](LICENSE). Upstream attribution and synchronization policy are documented in [UPSTREAM.md](UPSTREAM.md); third-party notices are in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Minis for Android is distributed under the [GNU General Public License v3.0](LICENSE). Source lineage, attribution obligations, and historical origin are documented in [PROVENANCE.md](PROVENANCE.md); third-party notices are in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

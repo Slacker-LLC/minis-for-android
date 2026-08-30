@@ -2,7 +2,7 @@
 
 Contributions to Minis for Android are welcome through GitHub Issues and Pull Requests.
 
-This repository is an independent Android project built on [OpenMinis](https://github.com/OpenMinis/OpenMinis). Before contributing, read [UPSTREAM.md](UPSTREAM.md) so upstream ports do not accidentally reintroduce architecture that this project intentionally replaced.
+This repository is independently maintained. When a change imports or adapts externally sourced code, read [PROVENANCE.md](PROVENANCE.md) and preserve applicable attribution and license obligations.
 
 ## Reporting bugs
 
@@ -24,7 +24,7 @@ Base new work on the current `master` branch unless the maintainers request othe
 
 A change should preserve these project invariants:
 
-1. The Android app remains the single source of truth for agent state, sessions, providers, tools, and persistence.
+1. The Android app remains the canonical authority for application/database state, providers, tool registration/permissions, approvals, and runtime orchestration; Linux guest persistent filesystem sources are fixed under `/data/adb/minis` and are prepared by `minisd`.
 2. New tools go through the existing Tool Registry, permission manager, runtime gates, and result model.
 3. Sensitive operations define caller scope and use confirmation or local-only policy where appropriate.
 4. Root operations use `minisd` or an existing controlled privileged backend; do not add raw `su -c <model output>` paths.
@@ -50,12 +50,14 @@ The active rooted-device execution path is:
 ```text
 minisd root broker
   ↓
-unshare + mount + chroot
+mount namespace + bind mounts + chroot
   ↓
 Ubuntu 24.04 userspace
 ```
 
-Do not reintroduce Alpine + PRoot as a parallel default runtime.
+Keep runtime changes aligned with this `minisd` + Ubuntu contract unless an explicitly reviewed architecture change replaces it.
+
+The persistent host inputs are fixed at `/data/adb/minis/workspace`, `/data/adb/minis/sessions`, `/data/adb/minis/memory`, `/data/adb/minis/skills`, `/data/adb/minis/shared`, and `/data/adb/minis/home`. Prepare and validate them before keeper mount-namespace creation; do not introduce alternate persistent backing or a silent fallback.
 
 `minisd` is part of the trusted computing base. New privileged RPC methods must be narrow, structured, auditable, and bounded by a compile-time capability ceiling. Runtime policy may restrict capabilities but must never expand that ceiling.
 
@@ -63,7 +65,7 @@ Do not disable SELinux globally for compatibility.
 
 ### MCP
 
-The remote tool surface is MCP. The removed Web Remote / Cloudflare Tunnel implementation must not return as a second control plane.
+MCP is the remote tool integration surface into the canonical Android runtime.
 
 External MCP servers still enter the canonical tool registry and permission system.
 
@@ -136,6 +138,13 @@ Rootfs changes:
 bash scripts/test-build-ubuntu-rootfs-verification.sh
 ```
 
+Documentation changes:
+
+```bash
+python3 scripts/test_docs_provenance.py
+python3 scripts/check_docs_provenance.py
+```
+
 Connected Android tests must run only on an explicitly authorized emulator/device.
 
 ## Documentation
@@ -155,6 +164,7 @@ See also:
 
 - [README.md](README.md)
 - [BUILDING.md](BUILDING.md)
+- [PROVENANCE.md](PROVENANCE.md)
 - [docs/README.md](docs/README.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)

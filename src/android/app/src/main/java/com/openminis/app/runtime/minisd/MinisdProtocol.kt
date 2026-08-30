@@ -94,17 +94,6 @@ object MinisdProtocol {
         )
     }
 
-    /**
-     * Promotes infrastructure failures into structured errors without ever
-     * guessing whether a user command ran. Newer brokers may provide an
-     * explicit `pre_exec_error`, which is authoritative. Legacy helper exit
-     * statuses are interpreted only when the caller has positive proof that
-     * guest execve did not start the user-command wrapper.
-     *
-     * `userCommandStarted == null` deliberately disables legacy numeric
-     * promotion. This is required for raw argv/admin execution where exit 4,
-     * 5, 6 or 7 can legitimately be returned by the user's process.
-     */
     fun promoteExecInfrastructureFailure(
         response: MinisdResponse,
         userCommandStarted: Boolean? = null,
@@ -123,23 +112,15 @@ object MinisdProtocol {
                 explicit,
                 result.optString("pre_exec_detail").ifBlank { explicit },
             )
-            else -> if (userCommandStarted == false) {
-                classifyLegacyPreExec(result)
-            } else {
-                null
-            }
+            else -> if (userCommandStarted == false) classifyLegacyPreExec(result) else null
         }
-        return if (error == null) {
-            response
-        } else {
-            MinisdResponse(
-                v = response.v,
-                id = response.id,
-                ok = false,
-                result = null,
-                error = error,
-            )
-        }
+        return if (error == null) response else MinisdResponse(
+            v = response.v,
+            id = response.id,
+            ok = false,
+            result = null,
+            error = error,
+        )
     }
 
     private fun classifyLegacyPreExec(result: JSONObject): MinisdError? {
@@ -226,6 +207,7 @@ object MinisdProtocol {
         env: Map<String, String> = emptyMap(),
         id: Long = 1,
         sessionId: String? = null,
+        executionId: String? = null,
     ): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }
@@ -239,12 +221,15 @@ object MinisdProtocol {
             params.put("env", obj)
         }
         sessionId?.takeIf { it.isNotEmpty() }?.let { params.put("session_id", it) }
-        return MinisdRequest(
-            id = id,
-            method = "ubuntu.exec",
-            params = params,
-        )
+        executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+        return MinisdRequest(id = id, method = "ubuntu.exec", params = params)
     }
+
+    fun execCancel(executionId: String, id: Long = 1): MinisdRequest = MinisdRequest(
+        id = id,
+        method = "exec.cancel",
+        params = JSONObject().put("execution_id", executionId),
+    )
 
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
@@ -254,14 +239,15 @@ object MinisdProtocol {
         args: List<String> = emptyList(),
         timeoutMs: Long = 30_000,
         id: Long = 1,
-    ): MinisdRequest = MinisdRequest(
-        id = id,
-        method = "root.exec",
-        params = JSONObject()
+        executionId: String? = null,
+    ): MinisdRequest {
+        val params = JSONObject()
             .put("tool", tool)
             .put("args", JSONArray(args))
-            .put("timeout_ms", timeoutMs),
-    )
+            .put("timeout_ms", timeoutMs)
+        executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+        return MinisdRequest(id = id, method = "root.exec", params = params)
+    }
 
     fun ubuntuAdminExec(
         argv: List<String>,
