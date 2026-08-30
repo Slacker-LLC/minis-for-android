@@ -132,7 +132,8 @@ done
 # it is excluded from this production scan rather than weakening the assertions.
 obsolete_pattern='external_staged|/data/local/tmp/minis-runtime|/data/adb/minis/bin/minisd|/data/adb/minis/run/minisd\.(sock|pid)|/data/adb/minis/policy/policy\.json'
 source_hits="$(git grep -n -E "$obsolete_pattern" -- src/android/app/src/main/java src/android/app/src/main/AndroidManifest.xml 2>/dev/null || true)"
-gradle_production_hits="$(awk '/^fun verifyPackagedRuntimeApk\(/ { exit } { print }' "$GRADLE" | grep -n -E "$obsolete_pattern" || true)"
+gradle_production="$(awk '/^fun verifyPackagedRuntimeApk\(/ { exit } { print }' "$GRADLE")"
+gradle_production_hits="$(printf '%s\n' "$gradle_production" | grep -n -E "$obsolete_pattern" || true)"
 if [[ -n "$source_hits" || -n "$gradle_production_hits" ]]; then
   [[ -z "$source_hits" ]] || printf '%s\n' "$source_hits" >&2
   [[ -z "$gradle_production_hits" ]] || printf '%s\n' "$gradle_production_hits" >&2
@@ -150,7 +151,7 @@ grep -Fq '"layoutVersion" to 2' "$GRADLE" || fail 'Gradle layout-v2 manifest gen
 grep -Fq '"requiredCommands" to commands' "$GRADLE" || fail 'Gradle requiredCommands manifest contract missing'
 grep -Fq 'ubuntu-arm64-rootfs.tar.gz' "$GRADLE" || fail 'Gradle packaged rootfs asset missing'
 grep -Fq 'dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)' "$GRADLE" || fail 'runtime assets are not ordered after both runtime producers'
-if grep -Fq '"managed"' "$GRADLE"; then fail 'Gradle runtime manifest still contains managed placeholder'; fi
+if grep -Fq '"managed"' <<<"$gradle_production"; then fail 'Gradle runtime producer still contains managed placeholder'; fi
 
 # Standalone/dev-only compatibility in native minisd may retain filesystem Unix
 # sockets and --policy PATH, but it must carry an explicit runtime guard. The
