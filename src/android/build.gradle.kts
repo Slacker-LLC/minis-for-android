@@ -9,6 +9,23 @@ plugins {
     id("com.google.devtools.ksp") version "2.1.0-1.0.29" apply false
 }
 
+private const val runtimeGzipAsset = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
+private const val runtimeGzipMergeName = "$runtimeGzipAsset.aapt-preserve"
+
+fun org.gradle.api.Task.requireOutputFile(relativePath: String): java.io.File {
+    val matches = outputs.files.files.asSequence()
+        .filter { it.isDirectory }
+        .map { it.resolve(relativePath) }
+        .filter { it.isFile }
+        .toList()
+    if (matches.size != 1) {
+        throw GradleException(
+            "$path expected exactly one output '$relativePath', found ${matches.map { it.absolutePath }}",
+        )
+    }
+    return matches.single()
+}
+
 subprojects {
     pluginManager.withPlugin("com.android.application") {
         val keystorePath = System.getenv("RELEASE_KEYSTORE")?.takeIf { it.isNotBlank() }
@@ -71,6 +88,41 @@ subprojects {
                 it.name == "packageRelease"
         }.configureEach {
             dependsOn(requireReleaseSigning)
+        }
+
+        // AAPT treats a terminal .gz asset as a pre-compressed input: it gunzips
+        // the payload and removes the suffix before the merged-assets artifact is
+        // handed to packaging. Keep the authoritative gzip bytes under an
+        // internal non-.gz suffix while AAPT merges assets, then restore the exact
+        // APK-owned runtime name before compress/package tasks consume the merge
+        // output. These are build-directory-only names; no external staging or
+        // source-tree mutation is involved.
+        afterEvaluate {
+            tasks.matching {
+                it.name == "packageDebugRuntimeAssets" || it.name == "packageReleaseRuntimeAssets"
+            }.configureEach {
+                doLast {
+                    val source = requireOutputFile(runtimeGzipAsset)
+                    val protected = source.parentFile.resolve(source.name + ".aapt-preserve")
+                    if (protected.exists()) {
+                        throw GradleException("AAPT-preserved runtime asset already exists: $protected")
+                    }
+                    java.nio.file.Files.move(source.toPath(), protected.toPath())
+                }
+            }
+
+            tasks.matching {
+                it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets"
+            }.configureEach {
+                doLast {
+                    val protected = requireOutputFile(runtimeGzipMergeName)
+                    val restored = protected.parentFile.resolve("ubuntu-arm64-rootfs.tar.gz")
+                    if (restored.exists()) {
+                        throw GradleException("Restored runtime gzip asset already exists: $restored")
+                    }
+                    java.nio.file.Files.move(protected.toPath(), restored.toPath())
+                }
+            }
         }
     }
 }
