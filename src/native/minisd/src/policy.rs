@@ -10,14 +10,6 @@ pub enum Mode {
     Confirm,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum AccessMode {
-    #[default]
-    Standard,
-    Full,
-}
-
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ArgRule {
     #[serde(default, rename = "regexDeny")]
@@ -47,8 +39,6 @@ pub struct CallerPolicy {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PolicyFile {
-    #[serde(default, rename = "accessMode")]
-    pub access_mode: AccessMode,
     #[serde(default)]
     pub methods: BTreeMap<String, MethodPolicy>,
     #[serde(default)]
@@ -76,11 +66,6 @@ impl PolicyFile {
     pub fn parse(json: &str) -> Result<Self, String> {
         let mut policy: PolicyFile =
             serde_json::from_str(json).map_err(|e| format!("policy json: {e}"))?;
-        // In-place upgrades keep the previous installation's policy file until
-        // the app materializes a fresh one. Methods that were intentionally
-        // removed are dropped instead of fatal: dispatch never consults them,
-        // so retaining them could only block startup. Unknown methods remain a
-        // hard error so a malformed or future policy still fails closed.
         policy
             .methods
             .retain(|name, _| !LEGACY_REMOVED_METHODS.contains(&name.as_str()));
@@ -179,20 +164,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_policy_loads_in_standard_mode() {
+    fn default_policy_loads() {
         let p = PolicyFile::default_policy();
-        assert_eq!(p.access_mode, AccessMode::Standard);
         assert_eq!(p.implicit_mode("root.shellRaw"), Mode::Deny);
         assert_eq!(p.method("root.exec").unwrap().mode, Mode::Allow);
-    }
-
-    #[test]
-    fn full_access_mode_parses_only_from_policy() {
-        let p = PolicyFile::parse(
-            r#"{"accessMode":"full","methods":{"root.exec":{"mode":"allow"}}}"#,
-        )
-        .unwrap();
-        assert_eq!(p.access_mode, AccessMode::Full);
     }
 
     #[test]
