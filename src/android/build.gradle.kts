@@ -9,8 +9,8 @@ plugins {
     id("com.google.devtools.ksp") version "2.1.0-1.0.29" apply false
 }
 
-private const val runtimeGzipAsset = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
-private const val runtimeGzipMergeName = "$runtimeGzipAsset.aapt-preserve"
+val runtimeGzipAsset = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
+val runtimeGzipMergeName = "$runtimeGzipAsset.aapt-preserve"
 
 fun org.gradle.api.Task.requireOutputFile(relativePath: String): java.io.File {
     val matches = outputs.files.files.asSequence()
