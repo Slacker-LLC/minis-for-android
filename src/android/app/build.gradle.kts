@@ -44,7 +44,9 @@ val minisdSourceDir = rootProject.file("../native/minisd")
 val minisdGeneratedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
 val minisdGeneratedAssets = layout.buildDirectory.dir("generated/minisdAssets")
 val runtimeDistDir = rootProject.file("../../dist")
+val runtimeRootfsBuilder = rootProject.file("../../scripts/build-ubuntu-rootfs.sh")
 val runtimeRootfsArchive = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
+val runtimeRootfsChecksum = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz.sha256")
 val runtimeRootfsBuildManifest = runtimeDistDir.resolve("ubuntu-arm64-rootfs.manifest.json")
 
 android {
@@ -220,6 +222,17 @@ val packageMinisdNative by tasks.registering(Copy::class) {
     into(minisdGeneratedJniLibs.map { it.dir("arm64-v8a") })
 }
 
+val buildPinnedUbuntuRootfs by tasks.registering(Exec::class) {
+    description = "Builds the pinned reproducible Ubuntu 24.04 arm64 runtime rootfs."
+    group = "build"
+    workingDir(rootProject.file("../.."))
+    inputs.file(runtimeRootfsBuilder)
+    outputs.file(runtimeRootfsArchive)
+    outputs.file(runtimeRootfsChecksum)
+    outputs.file(runtimeRootfsBuildManifest)
+    commandLine("bash", runtimeRootfsBuilder.absolutePath)
+}
+
 fun sha256(file: java.io.File): String = file.inputStream().use(::sha256)
 
 fun sha256(input: java.io.InputStream): String {
@@ -244,7 +257,7 @@ fun requireRuntimeInt(map: Map<*, *>, key: String): Int =
 val packageRuntimeAssets by tasks.registering {
     description = "Packages the reproducible Ubuntu rootfs and authoritative schema-v2 runtime manifest."
     group = "build"
-    dependsOn(packageMinisdNative)
+    dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
     val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
     val outputDir = minisdGeneratedAssets.map { it.dir("minis-runtime") }
     inputs.file(binary)
@@ -254,9 +267,7 @@ val packageRuntimeAssets by tasks.registering {
     doLast {
         val binaryFile = binary.get().asFile
         if (!runtimeRootfsArchive.isFile || !runtimeRootfsBuildManifest.isFile) {
-            throw GradleException(
-                "Pinned rootfs build output is missing. Run scripts/build-ubuntu-rootfs.sh before Gradle packaging.",
-            )
+            throw GradleException("Pinned rootfs Gradle producer did not create the required runtime outputs.")
         }
         @Suppress("UNCHECKED_CAST")
         val rootfs = JsonSlurper().parse(runtimeRootfsBuildManifest) as? Map<*, *>
