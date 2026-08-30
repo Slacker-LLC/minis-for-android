@@ -138,7 +138,7 @@ jobs:
         run: bash scripts/build-ubuntu-rootfs.sh
       - name: Verify rootfs build identity
         run: |
-          sha256sum -c dist/ubuntu-arm64-rootfs.tar.gz.sha256
+          (cd dist && sha256sum -c ubuntu-arm64-rootfs.tar.gz.sha256)
           python3 - <<'PY'
           import hashlib, json, pathlib, re
           root = pathlib.Path('dist')
