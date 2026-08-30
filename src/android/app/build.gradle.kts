@@ -260,7 +260,7 @@ abstract class PackageRuntimeAssetsTask : DefaultTask() {
     abstract val outputDirectory: DirectoryProperty
 }
 
-val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
+fun PackageRuntimeAssetsTask.configureRuntimeAssets() {
     description = "Packages the reproducible Ubuntu rootfs and authoritative schema-v2 runtime manifest."
     group = "build"
     dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
@@ -333,12 +333,26 @@ val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
     }
 }
 
+val packageRuntimeAssets by tasks.registering {
+    description = "Packages APK-owned runtime assets for all Android variants."
+    group = "build"
+    dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
+}
+
 androidComponents {
     onVariants(selector().all()) { variant ->
+        val variantName = variant.name.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+        val packageVariantRuntimeAssets =
+            tasks.register<PackageRuntimeAssetsTask>("package${variantName}RuntimeAssets") {
+                configureRuntimeAssets()
+            }
         variant.sources.assets?.addGeneratedSourceDirectory(
-            packageRuntimeAssets,
+            packageVariantRuntimeAssets,
             PackageRuntimeAssetsTask::outputDirectory,
         )
+        packageRuntimeAssets.configure { dependsOn(packageVariantRuntimeAssets) }
     }
 }
 
@@ -411,7 +425,6 @@ tasks.matching { it.name == "assembleRelease" }
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(packageMinisdNative) }
-tasks.named("preBuild") { dependsOn(packageRuntimeAssets) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.
@@ -477,7 +490,6 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
-
     implementation("com.github.helloooideeeeea:RealTimeCutVADLibraryForAndroid:1.0.5@aar")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
