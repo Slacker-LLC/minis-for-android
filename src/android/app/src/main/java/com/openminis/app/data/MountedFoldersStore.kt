@@ -23,20 +23,17 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Store for user-mounted external folders (SAF-picked trees). Mirrors iOS
- * `MountedFoldersManager` with the following deliberate differences:
+ * Store for user-mounted external folders selected through Android's Storage
+ * Access Framework (SAF).
  *
- *   - iOS uses `URL.bookmarkData` + `startAccessingSecurityScopedResource`;
- *     Android uses tree URIs + `takePersistableUriPermission`. The URI
- *     survives process death and reboots once persisted, so there's no
- *     "activation" step — access is always available while the permission
- *     grant is held.
- *   - The shell-level bind-mount at `/var/minis/mounts/<name>` is NOT
- *     implemented in this pass. DocumentFile doesn't expose POSIX paths,
- *     so exposing these trees inside the PRoot / iSH rootfs needs a
- *     FUSE bridge or a periodic mirror pass. Spec §2.9.4 calls out the
- *     tradeoffs; we ship MVP scaffolding (persistence + CRUD + StateFlow)
- *     and leave the shell mount as a follow-up.
+ * The persisted tree URI remembers the user's selection and grant. For the
+ * current Ubuntu/minisd runtime, on-device ExternalStorageProvider trees are
+ * additionally resolved to raw POSIX host paths. Those paths are bind-mounted
+ * by minisd into its mount namespace at `/var/minis/mounts/<name>`.
+ *
+ * A SAF grant and raw `/storage/...` access are deliberately treated as two
+ * separate capabilities. The store fails closed when Android scoped-storage
+ * policy prevents the app from reading the raw path that minisd would bind.
  *
  * Persistence: `filesDir/minis-config/mounted-folders.json`. The path is
  * intentionally outside `minis-global/` so it can't leak into the
@@ -76,11 +73,10 @@ class MountedFoldersStore(private val context: Context) {
     val entries: StateFlow<List<Entry>> = _entries.asStateFlow()
 
     /**
-     * T219-5: fired after every CRUD operation that mutates the persisted
-     * list. MinisApp wires this to `RuntimePathRegistry.applyMountedFoldersSnapshot`
-     * so future shells pick up the new bind specs without a process restart.
-     * Note that already-running proot processes are unaffected — proot is
-     * one-shot and the next `shell_execute` is what carries the new mounts.
+     * Fired after every CRUD/access-state change that changes the effective
+     * runtime mount snapshot. MinisApp wires this to
+     * `RuntimePathRegistry.applyMountedFoldersSnapshot`, so a later guest
+     * execution receives the current minisd bind-mount inputs.
      */
     var onChange: (() -> Unit)? = null
 
@@ -93,13 +89,10 @@ class MountedFoldersStore(private val context: Context) {
      * already called `contentResolver.takePersistableUriPermission(uri, …)`
      * — typically via the SAF picker result in [SafMountHelper.handlePickerResult].
      *
-     * Resolves the SAF tree URI to a real POSIX path under
-     * `/storage/emulated/0/...` (Option A — see T219 spec §1.3). Returns
-     * null when:
-     *   - the URI came from a non-externalstorage provider (Drive, Dropbox,
-     *     etc. have no POSIX path PRoot can `-b` mount);
-     *   - the resolved path doesn't exist or isn't readable by us;
-     *   - the name is invalid / duplicate / cap reached.
+     * The current runtime needs a readable raw POSIX path because minisd binds
+     * that host path into the guest. A persisted SAF grant alone is therefore
+     * not sufficient. Returns null when raw-path access is unavailable, the
+     * URI cannot map to on-device storage, or normal name/cap checks fail.
      */
     suspend fun add(
         treeUri: Uri,
@@ -110,18 +103,26 @@ class MountedFoldersStore(private val context: Context) {
         if (_entries.value.any { it.name.equals(name, ignoreCase = true) }) return@withLock null
         if (_entries.value.size >= MAX_MOUNTS) return@withLock null
 
+        val storageAccess = ExternalStorageAccessPolicy.current(context)
+        if (!storageAccess.rawPathReadable) {
+            AppLogger.warning(
+                TAG,
+                "add: raw external-storage path unavailable blocker=${storageAccess.blocker}",
+            )
+            return@withLock null
+        }
+
         val resolvedHostPath = resolvePosixPath(treeUri, context) ?: run {
-            AppLogger.warning(TAG, "add: rejected non-resolvable URI $treeUri")
+            AppLogger.warning(TAG, "add: rejected non-resolvable/inaccessible URI $treeUri")
             return@withLock null
         }
 
         val sourceDisplayName = DocumentsContract.getTreeDocumentId(treeUri)
             .substringAfterLast(':', treeUri.lastPathSegment.orEmpty())
             .ifEmpty { name }
-        // OS-level writability driven by the actual filesystem (Option A path
-        // is what PRoot will use, not the SAF grant). isWritePermission can
-        // be true while a per-package scoped-storage rule still rejects open(2).
-        val probedWritable = probeWritable(resolvedHostPath)
+        // The write probe targets the same raw host path minisd will bind. A
+        // writable SAF grant does not imply java.io.File/raw-path writability.
+        val probedWritable = storageAccess.rawPathWritable && probeWritable(resolvedHostPath)
         val entry = Entry(
             name = name,
             sourceDisplayName = sourceDisplayName,
@@ -140,35 +141,42 @@ class MountedFoldersStore(private val context: Context) {
         entry
     }
 
+    /** Current raw-path access state used by UI/diagnostics. */
+    internal fun rawPathAccess(): ExternalStorageAccessPolicy.Access =
+        ExternalStorageAccessPolicy.current(context)
+
     /**
-     * One-line storage-access diagnostic for the mount log. Distinguishes the
-     * two reasons a folder can read but not write: on Android 11+ it's All Files
-     * Access; on Android 10 it's whether WRITE_EXTERNAL_STORAGE was actually
-     * granted at runtime (legacy opt-in alone is not enough) and whether the
-     * process still holds the legacy storage view.
+     * Entries safe to hand to minisd as bind sources right now.
+     *
+     * Permission revocation, scoped-storage changes, unmounted removable media,
+     * and raw-path readdir denial all remove an entry from the runtime snapshot
+     * instead of producing an apparently mounted but empty guest directory.
      */
-    private fun storageDiag(context: Context): String {
-        val sdk = Build.VERSION.SDK_INT
-        return if (sdk >= Build.VERSION_CODES.R) {
-            "sdk=$sdk allFilesAccess=${Environment.isExternalStorageManager()}"
-        } else {
-            val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-            val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-            // Issue #118: Environment.isExternalStorageLegacy() is API 29, but this
-            // branch covers everything below R (30) — i.e. our whole 26..28 floor.
-            // Same defect as RuntimePathRegistry.storageAccessDiag; both are reachable from
-            // the boot path, so an unguarded call is a NoSuchMethodError that kills
-            // the process in Application.onCreate. Below 29 scoped storage doesn't
-            // exist, so the legacy view is unconditionally in effect.
-            val legacyView = if (sdk >= Build.VERSION_CODES.Q) {
-                Environment.isExternalStorageLegacy().toString()
-            } else {
-                "n/a(pre-Q)"
-            }
-            "sdk=$sdk readGranted=$read writeGranted=$write legacyView=$legacyView"
+    internal fun runtimeBindableEntries(): List<Entry> {
+        val access = rawPathAccess()
+        if (!access.rawPathReadable) {
+            AppLogger.warning(
+                TAG,
+                "runtime bind snapshot blocked: ${access.blocker}; no raw paths exported",
+            )
+            return emptyList()
         }
+        return _entries.value.filter { entry ->
+            val host = entry.resolvedHostPath ?: return@filter false
+            val dir = File(host)
+            val readable = dir.isDirectory && dir.list() != null
+            if (!readable) {
+                AppLogger.warning(TAG, "runtime bind snapshot skipped unreadable path: $host")
+            }
+            readable
+        }
+    }
+
+    /** One-line storage capability diagnostic for mount logs. */
+    private fun storageDiag(context: Context): String {
+        val access = ExternalStorageAccessPolicy.current(context)
+        return "sdk=${Build.VERSION.SDK_INT} rawRead=${access.rawPathReadable} " +
+            "rawWrite=${access.rawPathWritable} blocker=${access.blocker}"
     }
 
     suspend fun remove(id: String): Boolean = mutex.withLock {
@@ -224,12 +232,17 @@ class MountedFoldersStore(private val context: Context) {
      * on foreground resume so changes (user revoked permission, removed
      * the folder, removable storage unmounted, …) propagate into the UI
      * and the coordinator's bind specs. Entries whose `resolvedHostPath`
-     * is null (non-externalstorage) stay marked non-writable.
+     * is null stay marked non-writable.
      */
     suspend fun refreshWritability() = mutex.withLock {
         val before = _entries.value
+        val access = rawPathAccess()
         val after = before.map { e ->
-            val probed = e.resolvedHostPath?.let { probeWritable(it) } ?: false
+            val probed = if (access.rawPathReadable && access.rawPathWritable) {
+                e.resolvedHostPath?.let { probeWritable(it) } ?: false
+            } else {
+                false
+            }
             if (probed != e.isWritable) e.copy(isWritable = probed) else e
         }
         if (after != before) {
@@ -240,19 +253,15 @@ class MountedFoldersStore(private val context: Context) {
     }
 
     /**
-     * Decode a SAF tree URI into a POSIX host path PRoot can `-b` mount.
+     * Decode an ExternalStorageProvider SAF tree URI into the POSIX host path
+     * used as a minisd bind-mount source.
      *
-     * Only accepts `com.android.externalstorage.documents` URIs — those
-     * encode a `volume:relPath` document id where `volume` is either
-     * `primary` (the device's internal shared storage) or a removable
-     * storage UUID. Cloud providers (Drive, Dropbox, …) that return tree
-     * URIs without a real filesystem mapping are rejected with a null
-     * return so [add] can surface the "only on-device folders" error.
+     * Only `com.android.externalstorage.documents` can supply the volume/path
+     * identity required by this design. Cloud providers have no stable host
+     * filesystem path and are rejected.
      *
-     * Returns null on:
-     *   - non-externalstorage authority,
-     *   - unknown removable volume uuid,
-     *   - resolved File doesn't exist / isn't a directory / unreadable.
+     * Returns null on a non-externalstorage authority, unknown volume, missing
+     * directory, or a raw path whose directory entries cannot be read.
      */
     suspend fun resolvePosixPath(treeUri: Uri, context: Context): String? =
         withContext(Dispatchers.IO) {
@@ -277,27 +286,22 @@ class MountedFoldersStore(private val context: Context) {
                 AppLogger.warning(TAG, "resolvePosixPath: path missing or not dir: ${full.absolutePath}")
                 return@withContext null
             }
-            // Read probe: a resolvable dir the app can't actually readdir will
-            // mount but show empty. Surface it now so the log explains the
-            // eventual empty-folder report instead of leaving it silent.
             val children = full.list()
             if (children == null) {
                 AppLogger.warning(
                     TAG,
-                    "resolvePosixPath: ${full.absolutePath} canRead=${full.canRead()} but list()=null " +
-                        "(readdir blocked by scoped storage) — mount will read EMPTY on this device",
+                    "resolvePosixPath: ${full.absolutePath} raw readdir denied by storage policy",
                 )
-            } else {
-                AppLogger.info(TAG, "resolvePosixPath: ${full.absolutePath} ok childCount=${children.size}")
+                return@withContext null
             }
+            AppLogger.info(TAG, "resolvePosixPath: ${full.absolutePath} ok childCount=${children.size}")
             full.absolutePath
         }
 
     /**
-     * Try to create + delete a hidden probe file under [hostPath]. Captures
-     * the same reality PRoot will see — `open(O_WRONLY|O_CREAT)` against
-     * the real filesystem — so scoped-storage restrictions or freshly
-     * revoked permissions reflect honestly in the badge.
+     * Try to create + delete a hidden probe file under [hostPath]. This probes
+     * the same raw filesystem path minisd will expose to the guest, so scoped
+     * storage restrictions or revoked access become an honest read-only state.
      */
     fun probeWritable(hostPath: String): Boolean {
         val dir = File(hostPath)
@@ -347,7 +351,7 @@ class MountedFoldersStore(private val context: Context) {
     private fun sanitizeName(raw: String): String {
         val trimmed = raw.trim()
         if (trimmed == "." || trimmed == "..") return ""
-        if (trimmed.contains('/') || trimmed.contains(' ')) return ""
+        if (trimmed.contains('/') || trimmed.contains('\u0000')) return ""
         return trimmed.take(64)
     }
 
