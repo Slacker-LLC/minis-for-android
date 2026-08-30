@@ -53,8 +53,8 @@ impl ErrorCode {
             Self::RuntimeUnavailable => "RUNTIME_UNAVAILABLE",
             Self::KeeperNamespaceLost => "KEEPER_NAMESPACE_LOST",
             Self::ChrootUnavailable => "CHROOT_UNAVAILABLE",
-            Self::GuestPrivilegeSetupFailed => "GUEST_PRIVILEGE_SETUP_FAILED",
-            Self::GuestExecveFailed => "GUEST_EXECVE_FAILED",
+            Self::GuestPrivilegeSetupFailed => "PRIVILEGE_SETUP_FAILED",
+            Self::GuestExecveFailed => "EXEC_UNAVAILABLE",
             Self::RootfsInvalid => "ROOTFS_INVALID",
             Self::RuntimeSwitchUnknown => "RUNTIME_SWITCH_UNKNOWN",
             Self::RuntimeLayoutMismatch => "RUNTIME_LAYOUT_MISMATCH",
@@ -336,6 +336,18 @@ mod tests {
         assert!(!parse_request(br#"{"v":1,"id":2}"#).unwrap_err().ok);
         let err = parse_request(br#"{"v":99,"id":3,"method":"system.ping"}"#).unwrap_err();
         assert_eq!(err.error.unwrap().code, "UNSUPPORTED_VERSION");
+    }
+
+    #[test]
+    fn runtime_pre_exec_error_names_match_android_contract() {
+        assert_eq!(ErrorCode::KeeperNamespaceLost.as_str(), "KEEPER_NAMESPACE_LOST");
+        assert_eq!(ErrorCode::ChrootUnavailable.as_str(), "CHROOT_UNAVAILABLE");
+        assert_eq!(
+            ErrorCode::GuestPrivilegeSetupFailed.as_str(),
+            "PRIVILEGE_SETUP_FAILED"
+        );
+        assert_eq!(ErrorCode::GuestExecveFailed.as_str(), "EXEC_UNAVAILABLE");
+        assert_eq!(ErrorCode::RuntimeLayoutMismatch.as_str(), "RUNTIME_LAYOUT_MISMATCH");
     }
 
     #[test]
