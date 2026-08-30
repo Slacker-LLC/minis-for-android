@@ -27,19 +27,43 @@ pub struct UbuntuState {
 
 impl UbuntuState {
     pub fn rootfs_or_default(&self) -> String {
-        if self.rootfs.is_empty() { crate::layout::HOST_ROOTFS.to_string() } else { self.rootfs.clone() }
+        if self.rootfs.is_empty() {
+            crate::layout::HOST_ROOTFS.to_string()
+        } else {
+            self.rootfs.clone()
+        }
     }
+
     pub fn workspace_or_default(&self) -> String {
-        if self.workspace.is_empty() { crate::layout::HOST_WORKSPACE.to_string() } else { self.workspace.clone() }
+        if self.workspace.is_empty() {
+            crate::layout::HOST_WORKSPACE.to_string()
+        } else {
+            self.workspace.clone()
+        }
     }
+
     pub fn memory_or_default(&self) -> String {
-        if self.memory.is_empty() { crate::layout::HOST_MEMORY.to_string() } else { self.memory.clone() }
+        if self.memory.is_empty() {
+            crate::layout::HOST_MEMORY.to_string()
+        } else {
+            self.memory.clone()
+        }
     }
+
     pub fn skills_or_default(&self) -> String {
-        if self.skills.is_empty() { crate::layout::HOST_SKILLS.to_string() } else { self.skills.clone() }
+        if self.skills.is_empty() {
+            crate::layout::HOST_SKILLS.to_string()
+        } else {
+            self.skills.clone()
+        }
     }
+
     pub fn shared_or_default(&self) -> String {
-        if self.shared.is_empty() { crate::layout::HOST_SHARED.to_string() } else { self.shared.clone() }
+        if self.shared.is_empty() {
+            crate::layout::HOST_SHARED.to_string()
+        } else {
+            self.shared.clone()
+        }
     }
 }
 
@@ -59,6 +83,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(mock: bool, policy: PolicyFile) -> Self {
         prepare_persistent_layout_on_start(mock, &policy);
+
         let mut sessions = SessionTable::default();
         sessions.enable_subreaper();
         if should_start_config_proxy(mock, policy.caller.app_uid) {
@@ -78,8 +103,17 @@ impl AppState {
         }
     }
 
-    pub fn now(&self) -> Instant { if self.mock { self.clock } else { Instant::now() } }
-    pub fn advance(&mut self, d: Duration) { self.clock += d; }
+    pub fn now(&self) -> Instant {
+        if self.mock {
+            self.clock
+        } else {
+            Instant::now()
+        }
+    }
+
+    pub fn advance(&mut self, d: Duration) {
+        self.clock += d;
+    }
 
     pub fn issue_confirm(&mut self, request_key: &str) -> String {
         let id = format!("c-{}", self.confirms.len() + self.used_confirms.len() + 1);
@@ -115,11 +149,19 @@ impl AppState {
 }
 
 fn prepare_persistent_layout_on_start(mock: bool, policy: &PolicyFile) {
-    if mock { return; }
+    if mock {
+        return;
+    }
     #[cfg(all(unix, not(test)))]
     {
-        if unsafe { libc::geteuid() } != 0 { return; }
-        let uid = if policy.caller.app_uid != 0 { policy.caller.app_uid } else { crate::layout::GUEST_UID };
+        if unsafe { libc::geteuid() } != 0 {
+            return;
+        }
+        let uid = if policy.caller.app_uid != 0 {
+            policy.caller.app_uid
+        } else {
+            crate::layout::GUEST_UID
+        };
         if let Err(error) = crate::layout::ensure_host_layout_for(uid, uid)
             .and_then(|()| crate::layout::validate_persistent_backing())
         {
@@ -127,19 +169,32 @@ fn prepare_persistent_layout_on_start(mock: bool, policy: &PolicyFile) {
         }
     }
     #[cfg(any(not(unix), test))]
-    { let _ = policy; }
+    {
+        let _ = policy;
+    }
 }
 
 fn should_start_config_proxy(mock: bool, app_uid: u32) -> bool {
-    if mock || app_uid == 0 { return false; }
+    if mock || app_uid == 0 {
+        return false;
+    }
     let non_serving_mode = std::env::args_os().any(|arg| {
-        matches!(arg.to_str(), Some("--watchdog" | "--once" | "--call" | "--mock"))
+        matches!(
+            arg.to_str(),
+            Some("--watchdog" | "--once" | "--call" | "--mock")
+        )
     });
-    if non_serving_mode { return false; }
+    if non_serving_mode {
+        return false;
+    }
     #[cfg(unix)]
-    { unsafe { libc::geteuid() == 0 } }
+    {
+        unsafe { libc::geteuid() == 0 }
+    }
     #[cfg(not(unix))]
-    { false }
+    {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -169,7 +224,10 @@ mod tests {
         let key = "ubuntu.adminExec|argv";
         let id = state.issue_confirm(key);
         assert_eq!(state.consume_confirm(&id, key), Ok(()));
-        assert_eq!(state.consume_confirm(&id, key), Err(ErrorCode::PolicyDenied));
+        assert_eq!(
+            state.consume_confirm(&id, key),
+            Err(ErrorCode::PolicyDenied)
+        );
     }
 
     #[test]
@@ -177,15 +235,24 @@ mod tests {
         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
         let id = state.issue_confirm("root.exec|pm");
         state.advance(Duration::from_secs(121));
-        assert_eq!(state.consume_confirm(&id, "root.exec|pm"), Err(ErrorCode::PolicyDenied));
+        assert_eq!(
+            state.consume_confirm(&id, "root.exec|pm"),
+            Err(ErrorCode::PolicyDenied)
+        );
         assert!(!state.confirms.contains_key(&id));
         assert!(state.used_confirms.contains_key(&id));
     }
 
     #[test]
-    fn mock_never_starts_config_proxy() { assert!(!should_start_config_proxy(true, 12345)); }
+    fn mock_never_starts_config_proxy() {
+        assert!(!should_start_config_proxy(true, 12345));
+    }
+
     #[test]
-    fn zero_uid_never_starts_config_proxy() { assert!(!should_start_config_proxy(false, 0)); }
+    fn zero_uid_never_starts_config_proxy() {
+        assert!(!should_start_config_proxy(false, 0));
+    }
+
     #[test]
     fn mock_startup_does_not_touch_persistent_host_layout() {
         prepare_persistent_layout_on_start(true, &crate::policy::PolicyFile::default_policy());
