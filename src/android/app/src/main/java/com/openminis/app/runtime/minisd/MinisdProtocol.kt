@@ -41,6 +41,9 @@ object MinisdProtocol {
     const val HOST_WORKSPACE = "/data/adb/minis/workspace"
     const val GUEST_WORKSPACE = "/workspace"
     const val GUEST_UID = 10000
+    const val ACCESS_STANDARD = "standard"
+    const val ACCESS_FULL = "full"
+    const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
 
     const val ERROR_ROOTFS_INVALID = "ROOTFS_INVALID"
     const val ERROR_KEEPER_NAMESPACE_LOST = "KEEPER_NAMESPACE_LOST"
@@ -108,10 +111,7 @@ object MinisdProtocol {
             ERROR_RUNTIME_LAYOUT_MISMATCH,
             ERROR_PRIVILEGE_SETUP_FAILED,
             ERROR_EXEC_UNAVAILABLE,
-            -> MinisdError(
-                explicit,
-                result.optString("pre_exec_detail").ifBlank { explicit },
-            )
+            -> MinisdError(explicit, result.optString("pre_exec_detail").ifBlank { explicit })
             else -> if (userCommandStarted == false) classifyLegacyPreExec(result) else null
         }
         return if (error == null) response else MinisdResponse(
@@ -131,29 +131,14 @@ object MinisdProtocol {
                     (stderr.contains("open /proc/") && stderr.contains("/ns/mnt")) ||
                         stderr.contains("setns CLONE_NEWNS")
                 if (keeperLost) {
-                    MinisdError(
-                        ERROR_KEEPER_NAMESPACE_LOST,
-                        stderr.ifBlank { "keeper mount namespace is no longer available" },
-                    )
+                    MinisdError(ERROR_KEEPER_NAMESPACE_LOST, stderr.ifBlank { "keeper mount namespace is no longer available" })
                 } else {
-                    MinisdError(
-                        ERROR_RUNTIME_LAYOUT_MISMATCH,
-                        stderr.ifBlank { "runtime namespace or session mount setup failed" },
-                    )
+                    MinisdError(ERROR_RUNTIME_LAYOUT_MISMATCH, stderr.ifBlank { "runtime namespace or session mount setup failed" })
                 }
             }
-            HELPER_CHROOT_FAILED -> MinisdError(
-                ERROR_CHROOT_UNAVAILABLE,
-                stderr.ifBlank { "Ubuntu chroot is unavailable" },
-            )
-            HELPER_PRIVILEGE_FAILED -> MinisdError(
-                ERROR_PRIVILEGE_SETUP_FAILED,
-                stderr.ifBlank { "runtime privilege setup failed before execve" },
-            )
-            HELPER_EXECVE_FAILED -> MinisdError(
-                ERROR_EXEC_UNAVAILABLE,
-                stderr.ifBlank { "guest executable could not be started" },
-            )
+            HELPER_CHROOT_FAILED -> MinisdError(ERROR_CHROOT_UNAVAILABLE, stderr.ifBlank { "Ubuntu chroot is unavailable" })
+            HELPER_PRIVILEGE_FAILED -> MinisdError(ERROR_PRIVILEGE_SETUP_FAILED, stderr.ifBlank { "runtime privilege setup failed before execve" })
+            HELPER_EXECVE_FAILED -> MinisdError(ERROR_EXEC_UNAVAILABLE, stderr.ifBlank { "guest executable could not be started" })
             else -> null
         }
     }
@@ -162,22 +147,14 @@ object MinisdProtocol {
         response: MinisdResponse,
         userCommandStarted: Boolean? = null,
     ): Boolean = promoteExecInfrastructureFailure(response, userCommandStarted)
-        .error
-        ?.code == ERROR_KEEPER_NAMESPACE_LOST
+        .error?.code == ERROR_KEEPER_NAMESPACE_LOST
 
     fun runtimeError(code: String, detail: String, id: Long = 0): MinisdResponse =
-        MinisdResponse(
-            v = PROTOCOL_V,
-            id = id,
-            ok = false,
-            result = null,
-            error = MinisdError(code = code, detail = detail),
-        )
+        MinisdResponse(PROTOCOL_V, id, false, null, MinisdError(code = code, detail = detail))
 
     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
-
-    fun ubuntuStatus(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.status")
+    fun rootProbe(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "root.probe")
+    fun ubuntuStatus(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.status")
 
     fun ubuntuStart(
         id: Long = 1,
@@ -197,8 +174,7 @@ object MinisdProtocol {
         return MinisdRequest(id = id, method = "ubuntu.start", params = params)
     }
 
-    fun ubuntuStop(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.stop")
+    fun ubuntuStop(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.stop")
 
     fun ubuntuExec(
         argv: List<String>,
@@ -211,10 +187,7 @@ object MinisdProtocol {
     ): MinisdRequest {
         val arr = JSONArray()
         argv.forEach { arr.put(it) }
-        val params = JSONObject()
-            .put("argv", arr)
-            .put("timeout_ms", timeoutMs)
-            .put("cwd", cwd)
+        val params = JSONObject().put("argv", arr).put("timeout_ms", timeoutMs).put("cwd", cwd)
         if (env.isNotEmpty()) {
             val obj = JSONObject()
             env.forEach { (k, v) -> obj.put(k, v) }
@@ -231,22 +204,25 @@ object MinisdProtocol {
         params = JSONObject().put("execution_id", executionId),
     )
 
-    fun ubuntuProvision(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.provision")
+    fun ubuntuProvision(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.provision")
 
     fun rootExec(
         tool: String,
         args: List<String> = emptyList(),
         timeoutMs: Long = 30_000,
+        accessMode: String = ACCESS_STANDARD,
+        confirmId: String? = null,
         id: Long = 1,
         executionId: String? = null,
     ): MinisdRequest {
+        require(accessMode == ACCESS_STANDARD || accessMode == ACCESS_FULL) { "invalid access mode" }
         val params = JSONObject()
             .put("tool", tool)
             .put("args", JSONArray(args))
             .put("timeout_ms", timeoutMs)
+            .put("access_mode", accessMode)
         executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
-        return MinisdRequest(id = id, method = "root.exec", params = params)
+        return MinisdRequest(id = id, method = "root.exec", params = params, confirmId = confirmId)
     }
 
     fun ubuntuAdminExec(
