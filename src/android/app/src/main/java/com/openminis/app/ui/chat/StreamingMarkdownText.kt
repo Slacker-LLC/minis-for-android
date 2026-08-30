@@ -2307,7 +2307,7 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
     val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
     val basename = decoded.substringAfterLast('/')
     val subdir = decoded.substringBefore('/', missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: "attachments"
-    val root = File(context.filesDir, "minis-sessions")
+    val root = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
     if (root.isDirectory) {
         root.listFiles()?.forEach { sessionDir ->
             val candidate = File(sessionDir, "$subdir/$basename")
@@ -2317,8 +2317,7 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
             }
         }
     }
-    // Also probe the App-global shared/memory/skills buckets.
-    val globalCandidate = File(context.filesDir, "minis-global/$subdir/$basename")
+    val globalCandidate = File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_MINIS, subdir), basename)
     if (globalCandidate.exists() && globalCandidate.isFile) {
         android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> global=${globalCandidate.absolutePath}")
         return globalCandidate

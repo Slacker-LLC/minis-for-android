@@ -173,7 +173,7 @@ object AndroidApkInspector {
     private fun linuxPathFor(context: Context, sessionId: String, file: File): String? {
         val bases = listOf("workspace", "attachments", "offloads", "browser")
         for (base in bases) {
-            val host = File(context.filesDir, "minis-sessions/$sessionId/$base")
+            val host = File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId), base)
             val relative = runCatching { file.canonicalFile.relativeTo(host.canonicalFile).path }.getOrNull() ?: continue
             if (!relative.startsWith("..")) return "/var/minis/$base/${relative.replace(File.separatorChar, '/')}"
         }

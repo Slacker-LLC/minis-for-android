@@ -2,19 +2,11 @@
 
 本文记录 **master 代码尚未对齐合同** 的事实。允许出现遗留包名、旧路径与已废弃实现的名字，供排障与迁移使用。其它现行产品文档不得把下列缺口写成「已经如此」。
 
-## G1 存储死锁（P0）
+## G1 存储真源 — 代码已对齐合同
 
-合同：`03-STORAGE-CONTRACT.md`，真源为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。
+App 与 minisd 均以 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 为持久化真源。`ubuntu.start` 不再传 filesDir。旧 `Context.filesDir/minis*` 只做一次迁移。
 
-现状：
-
-- Android `UbuntuPaths.init()` 把 host workspace / memory / skills / shared / sessions 指到 App `Context.filesDir` 下（`minis/workspace`、`minis-global/*`、`minis-sessions`）。
-- `UbuntuRuntime.ensureReady()` 把这些路径传给 `ubuntu.start`。
-- `minisd` 拒绝非 `/data/adb/minis/*` 的持久化参数；即便 keeper 用合同路径起来，App 的 `runtimeLayoutMatches()` 仍按 filesDir 比对，对不上就停 keeper。
-
-结果：App 与 minisd 对持久化真源不一致。在开启 App Data Isolation 的设备上，root 视角的 filesDir 还可能是 tmpfs_data，数据会丢。IPC 若走 filesDir 上的 socket，App 与 root 也可能不是同一个文件。
-
-**下一轮代码只修这一条。**
+仍待真机验收：SELinux 标签、`df` 非 tmpfs、强停后文件仍在。IPC 仍可能走 filesDir 上的 app-socket（非本条范围）。
 
 ## G2 发行不能自举
 

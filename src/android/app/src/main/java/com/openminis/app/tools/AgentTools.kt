@@ -84,7 +84,7 @@ object AgentTools {
         name = name,
         description = "Execute a command in the on-device Ubuntu 24.04 environment (uid 10000). " +
             "The command runs via /bin/bash -lc with stdout and stderr merged. " +
-            "Workspace is /workspace, backed by the app-private <filesDir>/minis/workspace directory. " +
+            "Workspace is /workspace, backed by /data/adb/minis/workspace. " +
             "Default timeout is 15 minutes.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),

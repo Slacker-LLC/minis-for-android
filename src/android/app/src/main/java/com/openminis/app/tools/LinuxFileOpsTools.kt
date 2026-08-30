@@ -13,7 +13,7 @@ import java.io.File
 
 /**
  * linux.file.* operations — host-side implementations over the workspace
- * (App filesDir/minis/workspace, bind-mounted into the Ubuntu guest as
+ * (/data/adb/minis/workspace, bind-mounted into the Ubuntu guest as
  * /workspace). Pure [LinuxFileOps] + thin per-tool [ToolHandler]s so the
  * permission table keeps one policy key per tool.
  */

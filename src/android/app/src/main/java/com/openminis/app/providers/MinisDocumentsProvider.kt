@@ -78,7 +78,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
 
     private fun providerRoot(): File {
         val ctx = context ?: throw IllegalStateException("Provider has no context")
-        return File(ctx.filesDir, "minis-global").apply { mkdirs() }
+        return File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_MINIS).apply { mkdirs() }
     }
 
     private fun resolveDoc(documentId: String): File {

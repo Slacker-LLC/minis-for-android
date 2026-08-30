@@ -137,10 +137,7 @@ class RootfsManager private constructor(private val context: Context) {
     }
 
     fun ensureSessionDirs(sessionId: String) {
-        com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(
-            context.filesDir,
-            sessionId,
-        )
+        com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
     }
 
     fun refreshDns() = Unit

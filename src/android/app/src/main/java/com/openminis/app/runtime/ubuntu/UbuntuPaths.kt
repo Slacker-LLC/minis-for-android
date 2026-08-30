@@ -4,19 +4,14 @@ import android.content.Context
 import java.io.File
 
 /**
- * Normal commands resolve `/workspace` through the owning chat's
- * `<filesDir>/minis-sessions/<sessionId>/workspace` directory. Memory, skills,
- * and shared remain App-global under `<filesDir>/minis-global`.
- *
- * `/data/adb/minis` is reserved for root-owned runtime state such as the Ubuntu
- * rootfs and minisd. It is not the App workspace. minisd bind-mounts the
- * App-private directories into the chroot when Ubuntu starts.
+ * Persistent Linux guest data is contracted at `/data/adb/minis`.
+ * App file tools and minisd bind mounts must use these host paths.
  */
 object UbuntuPaths {
     const val HOST_MINIS = "/data/adb/minis"
     const val HOST_ROOTFS = "$HOST_MINIS/rootfs"
+    const val MIGRATION_MARKER = "$HOST_MINIS/run/legacy-filesdir-migrated"
 
-    // Defaults for tests / mock; real values set by [init].
     var hostWorkspace: String = "$HOST_MINIS/workspace"
         private set
     var hostMemory: String = "$HOST_MINIS/memory"
@@ -26,6 +21,8 @@ object UbuntuPaths {
     var hostShared: String = "$HOST_MINIS/shared"
         private set
     var hostSessions: String = "$HOST_MINIS/sessions"
+        private set
+    var hostHome: String = "$HOST_MINIS/home"
         private set
 
     val bindMounts: MutableMap<String, String> = linkedMapOf()
@@ -42,6 +39,7 @@ object UbuntuPaths {
         "/var/minis/skills" to { hostSkills },
         "/shared" to { hostShared },
         "/var/minis/shared" to { hostShared },
+        "/home/minis" to { hostHome },
     )
 
     private val sessionAliases = listOf(
@@ -58,33 +56,37 @@ object UbuntuPaths {
         "/var/minis/browser" to "browser",
     )
 
-    /** Called from MinisApp.onCreate once. Safe to call twice. */
+    data class LegacyMigrationResult(
+        val skipped: Boolean,
+        val copied: Boolean,
+        val error: String? = null,
+    )
+
     fun init(context: Context) {
-        val legacyWorkspaceBase = File(context.filesDir, "minis")
-        val globalBase = File(context.filesDir, "minis-global")
-        hostWorkspace = File(legacyWorkspaceBase, "workspace").absolutePath
-        hostMemory = File(globalBase, "memory").absolutePath
-        hostSkills = File(globalBase, "skills").absolutePath
-        hostShared = File(globalBase, "shared").absolutePath
-        hostSessions = File(context.filesDir, "minis-sessions").absolutePath
-        File(hostWorkspace, "attachments").mkdirs()
-        File(hostWorkspace, "offloads").mkdirs()
-        File(hostWorkspace, "browser").mkdirs()
-        File(hostSessions).mkdirs()
-        File(hostMemory).mkdirs()
-        File(hostSkills).mkdirs()
-        File(hostShared).mkdirs()
+        migrateLegacyFilesDir(context.filesDir)
     }
 
-    /** Resolves a child only when its canonical target remains below [base]. */
-    private fun childOf(base: String, rest: String): File? = runCatching {
-        val root = File(base).canonicalFile
-        val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
-        if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null
-    }.getOrNull()
+    internal fun useLayoutForTest(root: File) {
+        hostWorkspace = File(root, "workspace").absolutePath
+        hostMemory = File(root, "memory").absolutePath
+        hostSkills = File(root, "skills").absolutePath
+        hostShared = File(root, "shared").absolutePath
+        hostSessions = File(root, "sessions").absolutePath
+        hostHome = File(root, "home").absolutePath
+    }
 
-    private fun unsafePath(path: String): Boolean =
-        path.isEmpty() || path.contains('\u0000') || path.split('/').any { it == ".." }
+    internal fun resetLayoutForTest() {
+        hostWorkspace = "$HOST_MINIS/workspace"
+        hostMemory = "$HOST_MINIS/memory"
+        hostSkills = "$HOST_MINIS/skills"
+        hostShared = "$HOST_MINIS/shared"
+        hostSessions = "$HOST_MINIS/sessions"
+        hostHome = "$HOST_MINIS/home"
+    }
+
+    fun sessionDir(sessionId: String): File? = ensureSessionDirsAt(File(hostSessions), sessionId)
+
+    fun ensureSessionDirs(sessionId: String): File? = sessionDir(sessionId)
 
     fun resolveGuest(linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
@@ -105,8 +107,6 @@ object UbuntuPaths {
                 return childOf(hostBase, linuxPath.removePrefix(mount).removePrefix("/"))
             }
         }
-        // Relative path falls back to the workspace (schema contracts of the
-        // linux.file.* tools say "relative to workspace").
         if (!linuxPath.startsWith("/")) return resolveGuest("/workspace/$linuxPath")
         return null
     }
@@ -120,11 +120,10 @@ object UbuntuPaths {
                 it.code < 128 && (it.isLetterOrDigit() || it == '-' || it == '_' || it == '.')
             }
 
-    internal fun ensureSessionDirs(filesDir: File, sessionId: String): File? {
+    internal fun ensureSessionDirsAt(sessionsRoot: File, sessionId: String): File? {
         if (!isSafeSessionId(sessionId)) return null
-        val sessions = File(filesDir, "minis-sessions")
-        if (!sessions.isDirectory && !sessions.mkdirs()) return null
-        val session = childOf(sessions.absolutePath, sessionId) ?: return null
+        if (!sessionsRoot.isDirectory && !sessionsRoot.mkdirs()) return null
+        val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return null
         listOf("workspace", "attachments", "offloads", "browser").forEach { subdir ->
             val dir = File(session, subdir)
             if (!dir.isDirectory && !dir.mkdirs()) return null
@@ -132,9 +131,9 @@ object UbuntuPaths {
         return session
     }
 
-    internal fun resolveSessionPath(filesDir: File, sessionId: String, linuxPath: String): File? {
+    internal fun resolveSessionPath(sessionsRoot: File, sessionId: String, linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
-        val session = ensureSessionDirs(filesDir, sessionId) ?: return null
+        val session = ensureSessionDirsAt(sessionsRoot, sessionId) ?: return null
         val normalized = if (linuxPath.startsWith('/')) linuxPath else "/workspace/$linuxPath"
         val match = sessionAliases
             .filter { normalized == it.first || normalized.startsWith(it.first + "/") }
@@ -145,33 +144,115 @@ object UbuntuPaths {
         return childOf(base.absolutePath, rest)
     }
 
-    /**
-     * Resolve task/output resources against the owning chat. Global resources
-     * and user mounts deliberately fall back to [resolveHostPath]. The former
-     * App-wide workspace remains at [hostWorkspace] as a legacy compatibility
-     * location for callers that genuinely have no session context; it is never
-     * silently shared into a session.
-     */
     fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? =
+        resolveSessionHostPath(sessionId, linuxPath)
+
+    fun resolveSessionHostPath(sessionId: String, linuxPath: String): File? =
         if (isSessionScopedPath(linuxPath)) {
-            resolveSessionPath(context.filesDir, sessionId, linuxPath)
+            resolveSessionPath(File(hostSessions), sessionId, linuxPath)
         } else {
             resolveHostPath(linuxPath)
         }
+
+    internal fun deleteSessionFiles(sessionsRoot: File, sessionId: String): Boolean {
+        if (!isSafeSessionId(sessionId)) return false
+        val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return false
+        return !session.exists() || session.deleteRecursively()
+    }
+
+    fun deleteSession(context: Context, sessionId: String): Boolean {
+        val canonical = deleteSessionFiles(File(hostSessions), sessionId)
+        val legacy = deleteSessionFiles(File(context.filesDir, "minis-sessions"), sessionId)
+        return canonical || legacy
+    }
+
+    fun migrateLegacyFilesDir(filesDir: File, destRoot: File = File(HOST_MINIS)): LegacyMigrationResult =
+        migrateLegacyLayout(filesDir, destRoot)
+
+    internal fun migrateLegacyLayout(filesDir: File, destRoot: File): LegacyMigrationResult {
+        val marker = File(destRoot, "run/legacy-filesdir-migrated")
+        if (marker.isFile) {
+            return LegacyMigrationResult(skipped = true, copied = false)
+        }
+        val sources = listOf(
+            File(filesDir, "minis/workspace") to File(destRoot, "workspace"),
+            File(filesDir, "minis-global/memory") to File(destRoot, "memory"),
+            File(filesDir, "minis-global/skills") to File(destRoot, "skills"),
+            File(filesDir, "minis-global/shared") to File(destRoot, "shared"),
+            File(filesDir, "minis-sessions") to File(destRoot, "sessions"),
+            File(filesDir, "minis/home") to File(destRoot, "home"),
+        )
+        val present = sources.filter { it.first.isDirectory }
+        if (present.isEmpty()) {
+            return writeMarker(marker, destRoot)
+                ?: LegacyMigrationResult(skipped = true, copied = false)
+        }
+        if (!destRoot.exists() && !destRoot.mkdirs()) {
+            return LegacyMigrationResult(
+                skipped = false,
+                copied = false,
+                error = "persistent root unavailable: ${destRoot.path}",
+            )
+        }
+        for ((src, dest) in present) {
+            val error = copyDirectoryContents(src, dest)
+            if (error != null) {
+                return LegacyMigrationResult(skipped = false, copied = false, error = error)
+            }
+        }
+        return writeMarker(marker, destRoot)
+            ?: LegacyMigrationResult(skipped = false, copied = true)
+    }
+
+    private fun writeMarker(marker: File, destRoot: File): LegacyMigrationResult? {
+        val run = File(destRoot, "run")
+        if (!run.exists() && !run.mkdirs()) {
+            return LegacyMigrationResult(
+                skipped = false,
+                copied = false,
+                error = "cannot create ${run.path}",
+            )
+        }
+        return try {
+            marker.writeText("ok\n")
+            null
+        } catch (t: Throwable) {
+            LegacyMigrationResult(skipped = false, copied = false, error = t.message)
+        }
+    }
+
+    internal fun copyDirectoryContents(src: File, dest: File): String? {
+        if (!src.isDirectory) return null
+        if (!dest.exists() && !dest.mkdirs()) return "mkdir ${dest.path}"
+        src.walkTopDown().forEach { file ->
+            val rel = file.relativeTo(src)
+            if (rel.path.isEmpty()) return@forEach
+            val target = File(dest, rel.path)
+            when {
+                file.isDirectory -> {
+                    if (!target.exists() && !target.mkdirs()) return "mkdir ${target.path}"
+                }
+                !target.exists() -> {
+                    target.parentFile?.mkdirs()
+                    runCatching { file.copyTo(target, overwrite = false) }
+                        .onFailure { return "copy ${file.path}: ${it.message}" }
+                }
+            }
+        }
+        return null
+    }
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {
         if (!linuxPath.startsWith('/')) return true
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
     }
 
-    /** Best-effort cleanup used after the database has deleted a chat. */
-    internal fun deleteSessionFiles(filesDir: File, sessionId: String): Boolean {
-        if (!isSafeSessionId(sessionId)) return false
-        val sessions = File(filesDir, "minis-sessions")
-        val session = childOf(sessions.absolutePath, sessionId) ?: return false
-        return !session.exists() || session.deleteRecursively()
-    }
+    private fun childOf(base: String, rest: String): File? = runCatching {
+        val root = File(base).canonicalFile
+        val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
+        if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null
+    }.getOrNull()
 
-    fun deleteSession(context: Context, sessionId: String): Boolean =
-        deleteSessionFiles(context.filesDir, sessionId)
+    private fun unsafePath(path: String): Boolean =
+        path.isEmpty() || path.contains('\u0000') || path.split('/').any { it == ".." }
 }

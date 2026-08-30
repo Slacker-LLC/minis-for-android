@@ -411,7 +411,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
         com.openminis.app.mcp.client.MCPProvider.init(mcpRepository, this)
         com.openminis.app.mcp.client.MCPProvider.reload()
-        memoryRepository = MemoryRepository(java.io.File(filesDir, "minis-global/memory"))
+        memoryRepository = MemoryRepository(
+            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory),
+        )
         webAppShortcutRepository = WebAppShortcutRepository(database.webAppShortcutDao())
 
         // T-android-safemode-lateinit-crash: every repository the UI layer

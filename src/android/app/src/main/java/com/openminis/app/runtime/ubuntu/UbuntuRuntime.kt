@@ -211,10 +211,14 @@ object UbuntuRuntime {
                 ),
             )
         }
+        val migrated = UbuntuPaths.migrateLegacyFilesDir(ctx.filesDir)
+        if (migrated.error != null) {
+            Log.w(TAG, "legacy filesDir migration: ${migrated.error}")
+        }
         redirectPaths = true
         Log.i(
             TAG,
-            "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid layoutKnown=${started.layoutKnown}",
+            "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid layoutKnown=${started.layoutKnown} migrated=${migrated.copied}",
         )
         started
     }
@@ -509,7 +513,7 @@ object UbuntuRuntime {
         val start = System.currentTimeMillis()
         if (sessionId != null) {
             val ctx = appContext
-            if (ctx == null || UbuntuPaths.ensureSessionDirs(ctx.filesDir, sessionId) == null) {
+            if (ctx == null || UbuntuPaths.ensureSessionDirs(sessionId) == null) {
                 throw RuntimeInfrastructureException(
                     MinisdError(
                         MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,

@@ -2242,7 +2242,7 @@ class ChatViewModel(
         // For dropped images without a linuxPath, lazily spill to disk so
         // the placeholder still gives the model an addressable reference.
         val attachmentsRoot = activeSessionId?.let { sid ->
-            java.io.File(context.filesDir, "minis-sessions/$sid/attachments")
+            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sid/attachments")
         }
         val resolvedPaths = HashMap<ImageBudget.ImagePartId, String?>()
         for (ref in images) {
@@ -3723,7 +3723,7 @@ class ChatViewModel(
         // we can't reuse it after the migration.
         runCatching { ExecutionCoordinator.sessionDidTerminate(fromDraft) }
 
-        val base = java.io.File(context.filesDir, "minis-sessions")
+        val base = java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
         val draftBase = java.io.File(base, fromDraft)
         if (!draftBase.isDirectory) return
         val realBase = java.io.File(base, toReal).apply { mkdirs() }
@@ -8686,7 +8686,9 @@ class ChatViewModel(
     private fun persistBrowserArtifact(filename: String, data: ByteArray): String? {
         val sid = activeSessionId.takeIf { it.isNotEmpty() } ?: return null
         return try {
-            val dir = java.io.File(context.filesDir, "minis-sessions/$sid/browser").apply { mkdirs() }
+            val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sid)
+                ?: java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sid)
+            val dir = java.io.File(session, "browser").apply { mkdirs() }
             val file = java.io.File(dir, filename)
             file.writeBytes(data)
             file.absolutePath
@@ -9578,8 +9580,9 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // the same image accessible to the agent via shell tools (read_image
         // / cat / file) and matches the iOS uploads-directory convention.
         val uploadsHostDir = java.io.File(
-            context.filesDir,
-            "minis-sessions/$sessionId/attachments/uploads",
+            com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
+                ?: java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId),
+            "attachments/uploads",
         ).apply { mkdirs() }
         // Metadata captured per attachment for the <user-attached-files> XML.
         data class UploadMeta(val linuxPath: String, val size: Long, val modifiedIso: String)

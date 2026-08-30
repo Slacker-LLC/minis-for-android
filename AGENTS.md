@@ -37,7 +37,7 @@
 3. 不要为了兼容去关 SELinux。不要用 debug 签名冒充 release。
 4. 合同写**目标**；`06-CURRENT-GAPS.md` 写**现状**。禁止把未落地行为写成已实现。
 5. 本轮不要改 Gradle `applicationId`，不要搬 Java 包目录。身份迁移是后续独立工作，目标名已经定死。
-6. 不要平行开一批 Draft 同时改 runtime。下一轮代码只允许按 `03-STORAGE-CONTRACT.md` 对齐存储真源。
+6. 不要平行开一批 Draft 同时改 runtime。存储真源已按 `03-STORAGE-CONTRACT.md` 对齐；下一优先是发行自举（G2）或堵住 `su -c` 旁路（G4），不要混在同一 PR。
 7. 安全改动必须有否定用例（拒绝、越界、失败关闭），不能只有成功路径。
 8. 不要删除源文件版权头，不要改 `LICENSE` 为非 GPL。法律归属只收缩到 `PROVENANCE.md`，不能假装原创。
 

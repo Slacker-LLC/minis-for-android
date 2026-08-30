@@ -35,8 +35,10 @@ object ContextOffload {
      * created on first write — callers should call [ensureToolsDir] before
      * writing.
      */
-    fun toolsDir(context: Context, sessionId: String): File =
-        File(context.filesDir, "minis-sessions/$sessionId/offloads/tools")
+    fun toolsDir(context: Context, sessionId: String): File {
+        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
+        return File(session ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId), "offloads/tools")
+    }
 
     private fun ensureToolsDir(context: Context, sessionId: String): File {
         val dir = toolsDir(context, sessionId)

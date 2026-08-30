@@ -198,7 +198,7 @@ class SessionForkManager(
             AppLogger.warning(TAG, "copyMemory: rejecting unsafe fileName '$fileName'")
             return false
         }
-        val dir = File(filesDir, "minis-global/memory").apply { mkdirs() }
+         val dir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory).apply { mkdirs() }
         return try {
             File(dir, fileName).writeText(content)
             true

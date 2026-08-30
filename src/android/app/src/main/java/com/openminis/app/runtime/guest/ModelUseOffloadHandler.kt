@@ -1282,7 +1282,9 @@ class ModelUseOffloadHandler(
             ?: return null
         val sub = m.groupValues[1]
         val rest = m.groupValues[2].removePrefix("/")
-        val base = File(context.filesDir, "minis-sessions/$sessionId/$sub")
+        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
+            ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId)
+        val base = File(session, sub)
         return if (rest.isEmpty()) base else File(base, rest)
     }
 

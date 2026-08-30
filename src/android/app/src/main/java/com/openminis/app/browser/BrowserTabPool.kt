@@ -370,8 +370,9 @@ class BrowserTabPool(private val context: Context) {
      *  so the agent can read and operate on them in follow-up turns. */
     private fun sessionWorkspaceDir(): File? {
         val sid = sessionId ?: return null
-        return File(File(File(context.filesDir, "minis-sessions"), sid), "workspace")
-            .apply { mkdirs() }
+        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sid)
+            ?: return File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sid), "workspace").apply { mkdirs() }
+        return File(session, "workspace").apply { mkdirs() }
     }
 
     /** name.ext → name-1.ext → name-2.ext … until unused. */

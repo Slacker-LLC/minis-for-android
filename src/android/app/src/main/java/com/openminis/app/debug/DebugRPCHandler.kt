@@ -315,8 +315,10 @@ class DebugRPCHandler(private val context: Context) {
             put("totalLogSize", AppLogger.totalSize())
             put("diskUsage", JSONObject().apply {
                 put("filesDir", dirSize(filesDir))
-                put("sessions", dirSize(File(filesDir, "minis-sessions")))
-                put("global", dirSize(File(filesDir, "minis-global")))
+                put("sessions", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)))
+                put("memory", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory)))
+                put("skills", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills)))
+                put("shared", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared)))
             })
         }
     }
