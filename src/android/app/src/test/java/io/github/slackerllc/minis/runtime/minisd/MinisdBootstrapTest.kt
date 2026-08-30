@@ -45,7 +45,7 @@ class MinisdBootstrapTest {
         assertTrue(command.contains("LEASE_PID=4321"))
         assertTrue(command.contains("LEASE_STARTTIME=987654"))
         assertTrue(command.contains("/^Uid:/"))
-        assertTrue(command.contains("print \\$22"))
+        assertTrue(command.contains("print ${'$'}22"))
         assertTrue(command.contains("while kill -0 \"\$child\""))
         assertFalse(command.contains("--watchdog --socket"))
         assertFalse(command.contains("PIDFILE"))
@@ -66,12 +66,10 @@ class MinisdBootstrapTest {
         assertTrue(relabel > copy)
         assertTrue(aliases > relabel)
         assertTrue(marker > aliases)
-        assertTrue(command.contains("/data/adb/minis/workspace"))
-        assertTrue(command.contains("/data/adb/minis/sessions"))
-        assertTrue(command.contains("/data/adb/minis/memory"))
-        assertTrue(command.contains("/data/adb/minis/skills"))
-        assertTrue(command.contains("/data/adb/minis/shared"))
-        assertTrue(command.contains("/data/adb/minis/home"))
+        assertTrue(command.contains("ROOT='/data/adb/minis'"))
+        listOf("workspace", "sessions", "memory", "skills", "shared", "home").forEach { name ->
+            assertTrue(command.contains("\"${'$'}ROOT/$name\""))
+        }
         assertTrue(command.contains("app_data_file:s0:"))
         assertFalse(command.contains("chmod 0777"))
     }
