@@ -6,7 +6,9 @@ The runtime authority chain is:
 
 `Android app -> minisd root broker -> mount namespace -> chroot -> Ubuntu 24.04 guest`
 
-This change is an ownership/package refactor. It does not change minisd protocol version, privileged paths, guest paths, user-data layout, rootfs layout, UID policy, mount behavior, or command semantics.
+The current runtime keeps the protocol, privileged data paths, guest paths,
+user-data layout, rootfs layout, UID policy, mount behavior, and command
+semantics stable while moving the broker executable into the APK transaction.
 
 ## Active packages
 
@@ -36,18 +38,30 @@ The old `com.openminis.app.sandbox` package is not an active runtime module. It 
 
 No other production class may be added under `com.openminis.app.sandbox`. `scripts/check-runtime-package-boundary.sh` enforces this allowlist in CI.
 
-## Runtime contract preserved
+## Runtime contract
 
-Issue #54 intentionally preserves these existing minisd contract values:
+The runtime preserves these values:
 
 - protocol version: `1`
-- broker socket: `/data/adb/minis/run/minisd.sock`
-- broker binary: `/data/adb/minis/bin/minisd`
-- rootfs: `/data/adb/minis/rootfs`
+- broker socket: app-UID-scoped Linux abstract sockets (`@minis.minisd.root.<uid>.v1` and `@minis.minisd.app.<uid>.v1`)
+- broker binary: `ApplicationInfo.nativeLibraryDir/libminisd.so`, packaged as `lib/arm64-v8a/libminisd.so`
+- rootfs: `/data/adb/minis/runtime/rootfs/current` (legacy fallback:
+  `/data/adb/minis/rootfs`)
+- rootfs recovery registry: `/data/adb/minis/runtime/rootfs/{versions,staging,current}`;
+  `current` is the native runtime activation point and is switched only after
+  validation
 - host workspace: `/data/adb/minis/workspace`
 - guest workspace: `/workspace`
 
-The refactor moves package ownership and updates imports/call-site names only. Persistent user data, rootfs contents, mount targets, session paths, broker policy, UID handling, shell results, and recovery behavior are not migrated or rewritten here.
+The broker policy is loaded into memory at bootstrap and the watchdog holds an
+app-process lease. No broker `.sock`, `.pid`, policy file, or executable is
+created under `/data/adb/minis`; Package Manager owns the native executable's
+install, upgrade, and uninstall lifecycle. Persistent user data and rootfs
+remain under `/data/adb/minis` and are not deleted by ordinary APK uninstall.
+Recovery validates the archive before registering a revision and updates the
+`current` symlink only after validation. A failed pointer update leaves the
+previous rootfs active; a failed post-switch health check restores the
+`previous` pointer.
 
 ## Regression policy
 
@@ -58,4 +72,5 @@ CI fails if:
 - `MinisKernel` or `MountedFolderCoordinator` returns as an active type;
 - active minisd/Ubuntu/offload packages return under `com.openminis.app.sandbox.*`;
 - mounted-folder documentation reintroduces legacy userspace bind ownership; or
-- the minisd protocol/path constants above change as part of this package-boundary work.
+- the APK/native-library and abstract-socket boundary is bypassed by a new
+  externally staged `minisd` executable.

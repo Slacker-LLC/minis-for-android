@@ -28,7 +28,7 @@ pub struct UbuntuState {
 impl UbuntuState {
     pub fn rootfs_or_default(&self) -> String {
         if self.rootfs.is_empty() {
-            crate::layout::HOST_ROOTFS.to_string()
+            crate::layout::active_rootfs_path()
         } else {
             self.rootfs.clone()
         }

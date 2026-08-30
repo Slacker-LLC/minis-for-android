@@ -29,7 +29,7 @@
         errorLine1="        .put(&quot;name&quot;, name ?: &quot;&quot;)"
         errorLine2="                     ~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidConnectivityTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidConnectivityTools.kt"
             line="288"
             column="22"/>
     </issue>
@@ -40,7 +40,7 @@
         errorLine1="        .put(&quot;type&quot;, type.toDeviceType())"
         errorLine2="                     ~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidConnectivityTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidConnectivityTools.kt"
             line="290"
             column="22"/>
     </issue>
@@ -51,7 +51,7 @@
         errorLine1="        .put(&quot;bond_state&quot;, bondState.toBondState())"
         errorLine2="                           ~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidConnectivityTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidConnectivityTools.kt"
             line="291"
             column="28"/>
     </issue>
@@ -62,7 +62,7 @@
         errorLine1="        val timeString = String.format(&quot;%d:%02d&quot;, minutes, seconds)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="697"
             column="26"/>
     </issue>
@@ -73,7 +73,7 @@
         errorLine1="        if (seconds &lt; 10) String.format(&quot;%.1fs&quot;, seconds)"
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatAssistantMessageUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatAssistantMessageUI.kt"
             line="660"
             column="27"/>
     </issue>
@@ -84,7 +84,7 @@
         errorLine1="        else String.format(&quot;%.0fs&quot;, seconds)"
         errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatAssistantMessageUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatAssistantMessageUI.kt"
             line="661"
             column="14"/>
     </issue>
@@ -95,7 +95,7 @@
         errorLine1="        bytes >= 1024 -> String.format(&quot;%.1f KB&quot;, bytes / 1024.0)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatToolDetailUI.kt"
             line="1551"
             column="26"/>
     </issue>
@@ -106,7 +106,7 @@
         errorLine1="        seconds &lt; 1 -> String.format(&quot;%.1fs&quot;, seconds)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolFormatting.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatToolFormatting.kt"
             line="112"
             column="24"/>
     </issue>
@@ -117,7 +117,7 @@
         errorLine1="        seconds &lt; 60 -> String.format(&quot;%.0fs&quot;, seconds)"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolFormatting.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatToolFormatting.kt"
             line="113"
             column="25"/>
     </issue>
@@ -128,7 +128,7 @@
         errorLine1="            json.put(&quot;internal_total_gb&quot;, String.format(&quot;%.1f&quot;, total / 1e9))"
         errorLine2="                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/DeviceOffloadHandler.kt"
             line="127"
             column="43"/>
     </issue>
@@ -139,7 +139,7 @@
         errorLine1="                .put(&quot;internal_free_gb&quot;, String.format(&quot;%.1f&quot;, free / 1e9))"
         errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/DeviceOffloadHandler.kt"
             line="128"
             column="42"/>
     </issue>
@@ -150,7 +150,7 @@
         errorLine1="                .put(&quot;internal_used_gb&quot;, String.format(&quot;%.1f&quot;, (total - free) / 1e9))"
         errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/DeviceOffloadHandler.kt"
             line="129"
             column="42"/>
     </issue>
@@ -161,7 +161,7 @@
         errorLine1="        json.put(&quot;app_data_mb&quot;, String.format(&quot;%.1f&quot;, dirSize(context.filesDir) / 1e6))"
         errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/DeviceOffloadHandler.kt"
             line="134"
             column="33"/>
     </issue>
@@ -172,7 +172,7 @@
         errorLine1="            .put(&quot;app_cache_mb&quot;, String.format(&quot;%.1f&quot;, dirSize(context.cacheDir) / 1e6))"
         errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/DeviceOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/DeviceOffloadHandler.kt"
             line="135"
             column="34"/>
     </issue>
@@ -183,7 +183,7 @@
         errorLine1="            .put(&quot;total_size_mb&quot;, String.format(&quot;%.1f&quot;, totalSize / 1e6))"
         errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/PhotosOffloadHandler.kt"
             line="936"
             column="35"/>
     </issue>
@@ -194,7 +194,7 @@
         errorLine1="                        .put(&quot;distance_km&quot;, String.format(&quot;%.2f&quot;, dist))"
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/PhotosOffloadHandler.kt"
             line="995"
             column="45"/>
     </issue>
@@ -205,7 +205,7 @@
         errorLine1="                    String.format(&quot;%.1fs&quot;, run.elapsedMs / 1000.0),"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/components/QuickTestSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/components/QuickTestSheet.kt"
             line="308"
             column="21"/>
     </issue>
@@ -216,7 +216,7 @@
         errorLine1="                            if (confs != null &amp;&amp; i &lt; confs.size) a.put(&quot;confidence&quot;, String.format(&quot;%.2f&quot;, confs[i]))"
         errorLine2="                                                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/SpeechOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/SpeechOffloadHandler.kt"
             line="367"
             column="86"/>
     </issue>
@@ -227,7 +227,7 @@
         errorLine1="        String.format(&quot;CPU %.0f%%&quot;, cpuUsage.coerceAtLeast(0f))"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/SystemResourceMonitor.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/SystemResourceMonitor.kt"
             line="197"
             column="9"/>
     </issue>
@@ -238,7 +238,7 @@
         errorLine1="        if (compact) return String.format(&quot;MEM %.1fG&quot;, usedGB)"
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/SystemResourceMonitor.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/SystemResourceMonitor.kt"
             line="201"
             column="29"/>
     </issue>
@@ -249,7 +249,7 @@
         errorLine1="        return String.format(&quot;MEM %.1f/%.1f GB&quot;, usedGB, totalGB)"
         errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/SystemResourceMonitor.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/SystemResourceMonitor.kt"
             line="203"
             column="16"/>
     </issue>
@@ -260,7 +260,7 @@
         errorLine1="    n >= 1_000_000L -> String.format(&quot;%.1fM&quot;, n / 1_000_000.0)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/TokenUsageSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/TokenUsageSheet.kt"
             line="159"
             column="24"/>
     </issue>
@@ -271,7 +271,7 @@
         errorLine1="    n >= 1_000L -> String.format(&quot;%.1fK&quot;, n / 1_000.0)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/TokenUsageSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/TokenUsageSheet.kt"
             line="160"
             column="20"/>
     </issue>
@@ -282,7 +282,7 @@
         errorLine1="                grandTotal.cacheHitRate?.let { rate -> stringResource(R.string.usage_label_cache_hit_rate) to String.format(&quot;%.1f%%&quot;, rate) },"
         errorLine2="                                                                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/UsageStatsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/UsageStatsScreen.kt"
             line="160"
             column="111"/>
     </issue>
@@ -293,7 +293,7 @@
         errorLine1="                    DetailRow(stringResource(R.string.usage_label_cache_hit_rate), String.format(&quot;%.1f%%&quot;, rate))"
         errorLine2="                                                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/UsageStatsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/UsageStatsScreen.kt"
             line="229"
             column="84"/>
     </issue>
@@ -304,7 +304,7 @@
         errorLine1="    n >= 1_000_000 -> String.format(&quot;%.1fM&quot;, n / 1_000_000.0)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/UsageStatsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/UsageStatsScreen.kt"
             line="271"
             column="23"/>
     </issue>
@@ -315,7 +315,7 @@
         errorLine1="        else String.format(&quot;%.1fk&quot;, k)"
         errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/UsageStatsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/UsageStatsScreen.kt"
             line="275"
             column="14"/>
     </issue>
@@ -326,7 +326,7 @@
         errorLine1="                context.stopService(Intent(context, MCPKeepAliveService::class.java))"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/server/MCPKeepAliveService.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/server/MCPKeepAliveService.kt"
             line="38"
             column="37"/>
     </issue>
@@ -337,7 +337,7 @@
         errorLine1="        context.stopService(Intent(context, PetOverlayService::class.java))"
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetBridge.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetBridge.kt"
             line="51"
             column="29"/>
     </issue>
@@ -348,7 +348,7 @@
         errorLine1="                    .filter { includeHidden || it.SSID.isNotBlank() &amp;&amp; it.SSID != WifiManager.UNKNOWN_SSID }"
         errorLine2="                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidConnectivityTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidConnectivityTools.kt"
             line="115"
             column="83"/>
     </issue>
@@ -359,7 +359,7 @@
         errorLine1="        ?.takeUnless { it == WifiManager.UNKNOWN_SSID }"
         errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidConnectivityTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidConnectivityTools.kt"
             line="315"
             column="30"/>
     </issue>
@@ -370,7 +370,7 @@
         errorLine1="            manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="157"
             column="37"/>
     </issue>
@@ -381,7 +381,7 @@
         errorLine1="            manager.isRoleHeld(RoleManager.ROLE_ASSISTANT)"
         errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="160"
             column="32"/>
     </issue>
@@ -392,7 +392,7 @@
         errorLine1="                                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),"
         errorLine2="                                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="307"
             column="73"/>
     </issue>
@@ -403,7 +403,7 @@
         errorLine1="                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, readEnd)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="740"
             column="26"/>
     </issue>
@@ -414,7 +414,7 @@
         errorLine1="                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="741"
             column="26"/>
     </issue>
@@ -425,7 +425,7 @@
         errorLine1="                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, VoiceActivityDetector.SAMPLE_RATE)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="742"
             column="26"/>
     </issue>
@@ -436,7 +436,7 @@
         errorLine1="                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, 1)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="743"
             column="26"/>
     </issue>
@@ -447,7 +447,7 @@
         errorLine1="                    RecognizerIntent.EXTRA_SEGMENTED_SESSION,"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="775"
             column="21"/>
     </issue>
@@ -458,7 +458,7 @@
         errorLine1="                    RecognizerIntent.EXTRA_AUDIO_SOURCE,"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SystemSpeechRecognitionEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SystemSpeechRecognitionEngine.kt"
             line="776"
             column="21"/>
     </issue>
@@ -469,7 +469,7 @@
         errorLine1="            stream.readNBytes(limit)"
         errorLine2="                   ~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugRPCHandler.kt"
             line="509"
             column="20"/>
     </issue>
@@ -480,7 +480,7 @@
         errorLine1="            &quot;sdk=$sdk allFilesAccess=${Environment.isExternalStorageManager()}&quot;"
         errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/MountedFoldersStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/MountedFoldersStore.kt"
             line="153"
             column="52"/>
     </issue>
@@ -491,7 +491,7 @@
         errorLine1="                Environment.isExternalStorageLegacy().toString()"
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/MountedFoldersStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/MountedFoldersStore.kt"
             line="166"
             column="29"/>
     </issue>
@@ -502,7 +502,7 @@
         errorLine1="            android.icu.text.Transliterator.getInstance("
         errorLine2="                                            ~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/PhoneticNormalizer.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/PhoneticNormalizer.kt"
             line="77"
             column="45"/>
     </issue>
@@ -513,7 +513,7 @@
         errorLine1="        val latin = runCatching { t.transliterate(trimmed) }.getOrNull() ?: return &quot;&quot;"
         errorLine2="                                    ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/PhoneticNormalizer.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/PhoneticNormalizer.kt"
             line="89"
             column="37"/>
     </issue>
@@ -535,7 +535,7 @@
         errorLine1="            manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)"
         errorLine2="                    ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="157"
             column="21"/>
     </issue>
@@ -546,7 +546,7 @@
         errorLine1="            manager.isRoleHeld(RoleManager.ROLE_ASSISTANT)"
         errorLine2="                    ~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="160"
             column="21"/>
     </issue>
@@ -557,7 +557,7 @@
         errorLine1="                                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),"
         errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsScreen.kt"
             line="307"
             column="49"/>
     </issue>
@@ -579,7 +579,7 @@
         errorLine1="            val cls = Class.forName(&quot;android.os.SystemProperties&quot;)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/OsCompat.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/OsCompat.kt"
             line="44"
             column="23"/>
     </issue>
@@ -623,7 +623,7 @@
         errorLine1="            config.setLocales(list)"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/i18n/LocaleWrap.kt"
+            file="src/main/java/io/github/slackerllc/minis/i18n/LocaleWrap.kt"
             line="54"
             column="13"/>
     </issue>
@@ -700,7 +700,7 @@
         errorLine1="        val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)"
         errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/power/PowerOptimizationManager.kt"
             line="67"
             column="38"/>
     </issue>
@@ -909,7 +909,7 @@
         errorLine1="        val toolMenuWidthDp = minOf(220, LocalConfiguration.current.screenWidthDp).dp"
         errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatAssistantMessageUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatAssistantMessageUI.kt"
             line="807"
             column="42"/>
     </issue>
@@ -920,7 +920,7 @@
         errorLine1="            val userMenuWidthDp = minOf(220, LocalConfiguration.current.screenWidthDp).dp"
         errorLine2="                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatUserMessageUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatUserMessageUI.kt"
             line="474"
             column="46"/>
     </issue>
@@ -931,7 +931,7 @@
         errorLine1="    val screenH = LocalConfiguration.current.screenHeightDp.dp"
         errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/voice/InlineVoiceInputPanel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/voice/InlineVoiceInputPanel.kt"
             line="454"
             column="19"/>
     </issue>
@@ -942,7 +942,7 @@
         errorLine1="    val screenH = LocalConfiguration.current.screenHeightDp.dp"
         errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/voice/InlineVoiceInputPanel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/voice/InlineVoiceInputPanel.kt"
             line="848"
             column="19"/>
     </issue>
@@ -953,7 +953,7 @@
         errorLine1="    val sheetHeight = (configuration.screenHeightDp * heightFraction.coerceIn(0.1f, 1f)).dp"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/StandardChatSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/StandardChatSheet.kt"
             line="67"
             column="24"/>
     </issue>
@@ -964,7 +964,7 @@
         errorLine1="                            context.resources,"
         errorLine2="                            ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="594"
             column="29"/>
     </issue>
@@ -975,7 +975,7 @@
         errorLine1="            ctxForWidth.resources.displayMetrics.widthPixels.toFloat().toDp() - 16.dp"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/MinisTextKitGesture.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/MinisTextKitGesture.kt"
             line="772"
             column="13"/>
     </issue>
@@ -986,7 +986,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatComposerWidgets.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatComposerWidgets.kt"
             line="787"
             column="5"/>
     </issue>
@@ -997,7 +997,7 @@
         errorLine1="    dragHandleModifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ModelGroupsScreen.kt"
             line="662"
             column="5"/>
     </issue>
@@ -1008,7 +1008,7 @@
         errorLine1="    dragHandleModifier: Modifier? = null,"
         errorLine2="    ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ModelGroupsScreen.kt"
             line="862"
             column="5"/>
     </issue>
@@ -1019,7 +1019,7 @@
         errorLine1="    dragHandleModifier: Modifier? = null,"
         errorLine2="    ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ModelGroupsScreen.kt"
             line="862"
             column="5"/>
     </issue>
@@ -1030,7 +1030,7 @@
         errorLine1="    modifier: Modifier = Modifier,"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SettingsComponents.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SettingsComponents.kt"
             line="151"
             column="5"/>
     </issue>
@@ -1041,7 +1041,7 @@
         errorLine1="            remember(content.length / 2000) {"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/LargeContentGuard.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/LargeContentGuard.kt"
             line="227"
             column="13"/>
     </issue>
@@ -1052,7 +1052,7 @@
         errorLine1="            remember(stableKey, content.length) {"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/LargeContentGuard.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/LargeContentGuard.kt"
             line="249"
             column="13"/>
     </issue>
@@ -1063,7 +1063,7 @@
         errorLine1="    remember(stableKey) {"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/LargeContentGuard.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/LargeContentGuard.kt"
             line="281"
             column="5"/>
     </issue>
@@ -1074,7 +1074,7 @@
         errorLine1="                providerConfig = providerRepository.config.value,"
         errorLine2="                                                           ~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/navigation/AppNavigation.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/navigation/AppNavigation.kt"
             line="1177"
             column="60"/>
     </issue>
@@ -1085,7 +1085,7 @@
         errorLine1="                                    ?: viewModel.thinkingLevel.value"
         errorLine2="                                                               ~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="3829"
             column="64"/>
     </issue>
@@ -1096,7 +1096,7 @@
         errorLine1="                        10 -> &quot;Too many recognition requests — the system recognizer service is saturated (orphaned sessions?)&quot;"
         errorLine2="                        ~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/SpeechOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/SpeechOffloadHandler.kt"
             line="393"
             column="25"/>
     </issue>
@@ -7960,7 +7960,7 @@
         errorLine1="        target.setReadable(true, false)"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/android/AndroidApkInspector.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/android/AndroidApkInspector.kt"
             line="156"
             column="9"/>
     </issue>
@@ -7971,7 +7971,7 @@
         errorLine1="    override fun onReceive(context: Context, intent: Intent) {"
         errorLine2="                 ~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmReceiver.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmReceiver.kt"
             line="21"
             column="18"/>
     </issue>
@@ -8004,7 +8004,7 @@
         errorLine1="            val selPaint = Paint().apply {"
         errorLine2="                           ~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/canvas/TerminalNativeView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/canvas/TerminalNativeView.kt"
             line="355"
             column="28"/>
     </issue>
@@ -8015,7 +8015,7 @@
         errorLine1="                val cursorPaint = Paint().apply {"
         errorLine2="                                  ~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/canvas/TerminalNativeView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/canvas/TerminalNativeView.kt"
             line="378"
             column="35"/>
     </issue>
@@ -8026,7 +8026,7 @@
         errorLine1="                            val textPaint = Paint(basePaint).apply {"
         errorLine2="                                            ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/canvas/TerminalNativeView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/canvas/TerminalNativeView.kt"
             line="387"
             column="45"/>
     </issue>
@@ -8037,7 +8037,7 @@
         errorLine1="                acquire()"
         errorLine2="                ~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="578"
             column="17"/>
     </issue>
@@ -8048,7 +8048,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="67"
             column="17"/>
     </issue>
@@ -8059,7 +8059,7 @@
         errorLine1="                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="172"
             column="21"/>
     </issue>
@@ -8070,7 +8070,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="602"
             column="13"/>
     </issue>
@@ -8081,7 +8081,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="46"
             column="13"/>
     </issue>
@@ -8092,7 +8092,7 @@
         errorLine1="                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &amp;&amp;"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/android/AndroidCapabilityResolver.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/android/AndroidCapabilityResolver.kt"
             line="92"
             column="21"/>
     </issue>
@@ -8103,7 +8103,7 @@
         errorLine1="            Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M ||"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/BackgroundSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/BackgroundSettingsScreen.kt"
             line="101"
             column="13"/>
     </issue>
@@ -8114,7 +8114,7 @@
         errorLine1="                    Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M ||"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/BackgroundSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/BackgroundSettingsScreen.kt"
             line="121"
             column="21"/>
     </issue>
@@ -8125,7 +8125,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/notification/BackgroundTaskNotifier.kt"
+            file="src/main/java/io/github/slackerllc/minis/notification/BackgroundTaskNotifier.kt"
             line="152"
             column="13"/>
     </issue>
@@ -8136,7 +8136,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/notification/BackgroundTaskNotifier.kt"
+            file="src/main/java/io/github/slackerllc/minis/notification/BackgroundTaskNotifier.kt"
             line="168"
             column="13"/>
     </issue>
@@ -8147,7 +8147,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/notification/ConfigConfirmNotifier.kt"
+            file="src/main/java/io/github/slackerllc/minis/notification/ConfigConfirmNotifier.kt"
             line="114"
             column="13"/>
     </issue>
@@ -8158,7 +8158,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugRPCHandler.kt"
             line="360"
             column="17"/>
     </issue>
@@ -8169,7 +8169,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugScreenshotRing.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugScreenshotRing.kt"
             line="75"
             column="17"/>
     </issue>
@@ -8180,7 +8180,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/i18n/LocaleWrap.kt"
+            file="src/main/java/io/github/slackerllc/minis/i18n/LocaleWrap.kt"
             line="51"
             column="13"/>
     </issue>
@@ -8191,7 +8191,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/RuntimePathRegistry.kt"
             line="189"
             column="13"/>
     </issue>
@@ -8202,7 +8202,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/NotificationOffloadHandler.kt"
             line="61"
             column="13"/>
     </issue>
@@ -8213,7 +8213,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/NotificationOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/NotificationOffloadHandler.kt"
             line="400"
             column="13"/>
     </issue>
@@ -8224,7 +8224,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetBridge.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetBridge.kt"
             line="56"
             column="17"/>
     </issue>
@@ -8235,7 +8235,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayService.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayService.kt"
             line="876"
             column="13"/>
     </issue>
@@ -8246,7 +8246,7 @@
         errorLine1="            val hint = if (!hasMediaLoc &amp;&amp; Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {"
         errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/PhotosOffloadHandler.kt"
             line="1001"
             column="44"/>
     </issue>
@@ -8257,7 +8257,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M) return true"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/power/PowerOptimizationManager.kt"
             line="48"
             column="13"/>
     </issue>
@@ -8268,7 +8268,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M) return false"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/power/PowerOptimizationManager.kt"
             line="65"
             column="13"/>
     </issue>
@@ -8279,7 +8279,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledTaskManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/scheduled/ScheduledTaskManager.kt"
             line="156"
             column="13"/>
     </issue>
@@ -8290,7 +8290,7 @@
         errorLine1="            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/ShortcutPinner.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/ShortcutPinner.kt"
             line="35"
             column="13"/>
     </issue>
@@ -8301,7 +8301,7 @@
         errorLine1="        Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.M || Settings.canDrawOverlays(context)"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="143"
             column="9"/>
     </issue>
@@ -8312,7 +8312,7 @@
         errorLine1="        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="220"
             column="24"/>
     </issue>
@@ -8323,7 +8323,7 @@
         errorLine1="        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/UpdateChecker.kt"
             line="388"
             column="20"/>
     </issue>
@@ -8334,7 +8334,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT &lt; Build.VERSION_CODES.O) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/UpdateChecker.kt"
             line="401"
             column="13"/>
     </issue>
@@ -8359,7 +8359,7 @@
         errorLine1="        @Volatile"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserHistory.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/BrowserHistory.kt"
             line="21"
             column="9"/>
     </issue>
@@ -8370,7 +8370,7 @@
         errorLine1="    internal val context: Context,"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatViewModel.kt"
             line="95"
             column="5"/>
     </issue>
@@ -8381,7 +8381,7 @@
         errorLine1="    /**"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/data/EnvVarRedactor.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/EnvVarRedactor.kt"
             line="32"
             column="5"/>
     </issue>
@@ -8392,7 +8392,7 @@
         errorLine1="    var envVarRepository: EnvVarRepository? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/ExecutionCoordinator.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/ExecutionCoordinator.kt"
             line="32"
             column="5"/>
     </issue>
@@ -8403,7 +8403,7 @@
         errorLine1="internal object KatexWebViewPool {"
         errorLine2="^">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/KatexWebViewPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/KatexWebViewPool.kt"
             line="40"
             column="1"/>
     </issue>
@@ -8414,7 +8414,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/KatexWebViewPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/KatexWebViewPool.kt"
             line="132"
             column="5"/>
     </issue>
@@ -8425,7 +8425,7 @@
         errorLine1="/**"
         errorLine2="^">
         <location
-            file="src/main/java/com/openminis/app/mcp/client/MCPProvider.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/client/MCPProvider.kt"
             line="16"
             column="1"/>
     </issue>
@@ -8436,7 +8436,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/mcp/client/MCPProvider.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/client/MCPProvider.kt"
             line="44"
             column="5"/>
     </issue>
@@ -8447,7 +8447,7 @@
         errorLine1="    /** App context placeholder for handler dispatch (handlers ignore it). */"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/mcp/client/MCPProvider.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/client/MCPProvider.kt"
             line="47"
             column="5"/>
     </issue>
@@ -8458,7 +8458,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/mcp/server/MCPServerManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/server/MCPServerManager.kt"
             line="62"
             column="5"/>
     </issue>
@@ -8469,7 +8469,7 @@
         errorLine1="    @Volatile"
         errorLine2="    ^">
         <location
-            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/RuntimePathRegistry.kt"
             line="92"
             column="5"/>
     </issue>
@@ -8480,7 +8480,7 @@
         errorLine1="        private var instance: RootfsManager? = null"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/sandbox/RootfsManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/sandbox/RootfsManager.kt"
             line="181"
             column="9"/>
     </issue>
@@ -8491,7 +8491,7 @@
         errorLine1="    private val context: Context,"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListViewModel.kt"
             line="36"
             column="5"/>
     </issue>
@@ -8502,7 +8502,7 @@
         errorLine1="    private var recorder: VoiceCorrectionRecorder? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrection.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrection.kt"
             line="31"
             column="5"/>
     </issue>
@@ -8513,7 +8513,7 @@
         errorLine1="    private var vocabularyBuilder: TypedVocabularyBuilder? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrection.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrection.kt"
             line="33"
             column="5"/>
     </issue>
@@ -8524,7 +8524,7 @@
         errorLine1="    var currentIndex by remember { mutableStateOf(toolBlocks.lastIndex.coerceAtLeast(0)) }"
         errorLine2="                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatComposerWidgets.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatComposerWidgets.kt"
             line="795"
             column="36"/>
     </issue>
@@ -8535,7 +8535,7 @@
         errorLine1="    var lastSendTimeMs by remember { mutableStateOf(0L) }"
         errorLine2="                                     ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="642"
             column="38"/>
     </issue>
@@ -8546,7 +8546,7 @@
         errorLine1="    var lastUserAppendMs by remember { mutableStateOf(0L) }"
         errorLine2="                                       ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="666"
             column="40"/>
     </issue>
@@ -8557,7 +8557,7 @@
         errorLine1="    var lastStreamEndMs by remember { mutableStateOf(0L) }"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="670"
             column="39"/>
     </issue>
@@ -8568,7 +8568,7 @@
         errorLine1="    var sendSwipeProgress by remember { mutableStateOf(0f) }"
         errorLine2="                                        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="700"
             column="41"/>
     </issue>
@@ -8579,7 +8579,7 @@
         errorLine1="    var lastInterruptMs by remember { mutableStateOf(0L) }"
         errorLine2="                                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="1513"
             column="39"/>
     </issue>
@@ -8587,10 +8587,10 @@
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="    var messageFontLevel by remember { mutableStateOf(appearancePrefs.getInt(com.openminis.app.ui.settings.KEY_FONT_MESSAGE, 0)) }"
+        errorLine1="    var messageFontLevel by remember { mutableStateOf(appearancePrefs.getInt(io.github.slackerllc.minis.ui.settings.KEY_FONT_MESSAGE, 0)) }"
         errorLine2="                                       ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="2085"
             column="40"/>
     </issue>
@@ -8598,10 +8598,10 @@
     <issue
         id="AutoboxingStateCreation"
         message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
-        errorLine1="    var chatInputLevel by remember { mutableStateOf(appearancePrefs.getInt(com.openminis.app.ui.settings.KEY_FONT_CHAT_INPUT, 0)) }"
+        errorLine1="    var chatInputLevel by remember { mutableStateOf(appearancePrefs.getInt(io.github.slackerllc.minis.ui.settings.KEY_FONT_CHAT_INPUT, 0)) }"
         errorLine2="                                     ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="2086"
             column="38"/>
     </issue>
@@ -8612,7 +8612,7 @@
         errorLine1="                var toolBarHeightPx by remember { mutableStateOf(0) }"
         errorLine2="                                                  ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="2904"
             column="51"/>
     </issue>
@@ -8623,7 +8623,7 @@
         errorLine1="                var lastColdPrewarmMs by remember(sessionId) { mutableStateOf(-1L) }"
         errorLine2="                                                               ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="3063"
             column="64"/>
     </issue>
@@ -8634,7 +8634,7 @@
         errorLine1="                            var spokenUpTo by remember(lastAssistantId) { mutableStateOf(0) }"
         errorLine2="                                                                          ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatScreen.kt"
             line="5777"
             column="75"/>
     </issue>
@@ -8645,7 +8645,7 @@
         errorLine1="    var currentIdx by remember { mutableStateOf(initialIndex.coerceIn(0, toolBlocks.lastIndex.coerceAtLeast(0))) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatToolDetailUI.kt"
             line="290"
             column="34"/>
     </issue>
@@ -8656,7 +8656,7 @@
         errorLine1="    var revealed by remember(bodyText) { mutableStateOf(initialRevealChunks(chunks)) }"
         errorLine2="                                         ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatToolDetailUI.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatToolDetailUI.kt"
             line="1468"
             column="42"/>
     </issue>
@@ -8667,7 +8667,7 @@
         errorLine1="    var durationMs by remember { mutableStateOf(0) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/media/InlineMediaPlayer.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/media/InlineMediaPlayer.kt"
             line="386"
             column="34"/>
     </issue>
@@ -8678,7 +8678,7 @@
         errorLine1="    var positionMs by remember { mutableStateOf(0) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/media/InlineMediaPlayer.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/media/InlineMediaPlayer.kt"
             line="387"
             column="34"/>
     </issue>
@@ -8689,7 +8689,7 @@
         errorLine1="    var renderedCssWidth by remember(cacheKey) { mutableStateOf(0) }"
         errorLine2="                                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/KaTeXView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/KaTeXView.kt"
             line="167"
             column="50"/>
     </issue>
@@ -8700,7 +8700,7 @@
         errorLine1="    var renderedCssHeight by remember(cacheKey) { mutableStateOf(0) }"
         errorLine2="                                                  ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/KaTeXView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/KaTeXView.kt"
             line="168"
             column="51"/>
     </issue>
@@ -8711,7 +8711,7 @@
         errorLine1="    var totalSize by remember { mutableStateOf(0L) }"
         errorLine2="                                ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/LogManagementScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/LogManagementScreen.kt"
             line="85"
             column="33"/>
     </issue>
@@ -8722,7 +8722,7 @@
         errorLine1="    val refreshTrigger = remember { mutableStateOf(0) }"
         errorLine2="                                    ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/LogManagementScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/LogManagementScreen.kt"
             line="98"
             column="37"/>
     </issue>
@@ -8733,7 +8733,7 @@
         errorLine1="    var positionMs by remember { mutableStateOf(0) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/MarkdownText.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/MarkdownText.kt"
             line="861"
             column="34"/>
     </issue>
@@ -8744,7 +8744,7 @@
         errorLine1="    val tick = remember { androidx.compose.runtime.mutableStateOf(0) }"
         errorLine2="                                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/MinisTextKitGesture.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/MinisTextKitGesture.kt"
             line="398"
             column="52"/>
     </issue>
@@ -8755,7 +8755,7 @@
         errorLine1="    val tick = remember { androidx.compose.runtime.mutableStateOf(0) }"
         errorLine2="                                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/MinisTextKitGesture.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/MinisTextKitGesture.kt"
             line="679"
             column="52"/>
     </issue>
@@ -8766,7 +8766,7 @@
         errorLine1="    var testProgress by mutableStateOf(0f)"
         errorLine2="                        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/MirrorSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/MirrorSettingsScreen.kt"
             line="206"
             column="25"/>
     </issue>
@@ -8777,7 +8777,7 @@
         errorLine1="        mutableStateOf("
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ModelGroupDetailScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ModelGroupDetailScreen.kt"
             line="683"
             column="9"/>
     </issue>
@@ -8788,7 +8788,7 @@
         errorLine1="    var step by remember { mutableStateOf(0) }"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/onboarding/OnboardingScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/onboarding/OnboardingScreen.kt"
             line="63"
             column="28"/>
     </issue>
@@ -8799,7 +8799,7 @@
         errorLine1="    var reloadTick by remember(instance.id) { mutableStateOf(0) }"
         errorLine2="                                              ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ProviderDetailScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ProviderDetailScreen.kt"
             line="1051"
             column="47"/>
     </issue>
@@ -8810,7 +8810,7 @@
         errorLine1="    var elapsedMs by mutableStateOf(0L)"
         errorLine2="                     ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/components/QuickTestSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/components/QuickTestSheet.kt"
             line="125"
             column="22"/>
     </issue>
@@ -8821,7 +8821,7 @@
         errorLine1="    var hour by remember { mutableStateOf(9) }"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/scheduled/ScheduledTaskEditScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/scheduled/ScheduledTaskEditScreen.kt"
             line="103"
             column="28"/>
     </issue>
@@ -8832,7 +8832,7 @@
         errorLine1="    var minute by remember { mutableStateOf(0) }"
         errorLine2="                             ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/scheduled/ScheduledTaskEditScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/scheduled/ScheduledTaskEditScreen.kt"
             line="104"
             column="30"/>
     </issue>
@@ -8843,7 +8843,7 @@
         errorLine1="    var createdAt by remember { mutableStateOf(System.currentTimeMillis()) }"
         errorLine2="                                ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/scheduled/ScheduledTaskEditScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/scheduled/ScheduledTaskEditScreen.kt"
             line="107"
             column="33"/>
     </issue>
@@ -8854,7 +8854,7 @@
         errorLine1="    var positionMs by remember { mutableStateOf(0) }"
         errorLine2="                                 ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownText.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/StreamingMarkdownText.kt"
             line="2470"
             column="34"/>
     </issue>
@@ -8865,7 +8865,7 @@
         errorLine1="    var tick by remember { mutableStateOf(0) }"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/SystemResourceMonitor.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/SystemResourceMonitor.kt"
             line="220"
             column="28"/>
     </issue>
@@ -8876,7 +8876,7 @@
         errorLine1="    val scrollAccumPx = remember { mutableStateOf(0f) }"
         errorLine2="                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/canvas/TerminalCanvasView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/canvas/TerminalCanvasView.kt"
             line="99"
             column="36"/>
     </issue>
@@ -8887,7 +8887,7 @@
         errorLine1="    private val _version = mutableStateOf(0L)"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/emulator/TerminalEmulator.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/emulator/TerminalEmulator.kt"
             line="13"
             column="28"/>
     </issue>
@@ -8898,7 +8898,7 @@
         errorLine1="    var reloadKey by remember { mutableStateOf(0) }"
         errorLine2="                                ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/ThinkingRulesSection.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/ThinkingRulesSection.kt"
             line="89"
             column="33"/>
     </issue>
@@ -8909,7 +8909,7 @@
         errorLine1="        var interactionTick by remember { mutableStateOf(0) }"
         errorLine2="                                          ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/WebAppActivity.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/WebAppActivity.kt"
             line="278"
             column="43"/>
     </issue>
@@ -8920,7 +8920,7 @@
         errorLine1="        var interactionTick by remember { mutableStateOf(0) }"
         errorLine2="                                          ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewFullscreenScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewFullscreenScreen.kt"
             line="170"
             column="43"/>
     </issue>
@@ -10196,7 +10196,7 @@
         errorLine1="                modifier = Modifier.offset(y = offset.dp),"
         errorLine2="                                    ~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatIndicators.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatIndicators.kt"
             line="82"
             column="37"/>
     </issue>
@@ -10207,7 +10207,7 @@
         errorLine1="                    .offset(x = pressOffset.x, y = pressOffset.y)"
         errorLine2="                     ~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListScreen.kt"
             line="1794"
             column="22"/>
     </issue>
@@ -10218,7 +10218,7 @@
         errorLine1="                .offset(x = pressOffset.x, y = pressOffset.y)"
         errorLine2="                 ~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListScreen.kt"
             line="2284"
             column="18"/>
     </issue>
@@ -10514,7 +10514,7 @@
         errorLine1="            val s = Bitmap.createScaledBitmap(raw, w, h, true)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/AccessibilityOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/AccessibilityOffloadHandler.kt"
             line="388"
             column="21"/>
     </issue>
@@ -10525,7 +10525,7 @@
         errorLine1="            p.edit().putBoolean(KEY_EVER_GRANTED, true).apply()"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/accessibility/AccessibilityRecoveryManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/accessibility/AccessibilityRecoveryManager.kt"
             line="148"
             column="13"/>
     </issue>
@@ -10536,7 +10536,7 @@
         errorLine1="    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)"
         errorLine2="              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/AddToHomeSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/AddToHomeSheet.kt"
             line="495"
             column="15"/>
     </issue>
@@ -10547,7 +10547,7 @@
         errorLine1="        color = AGColor.parseColor(&quot;#FF3B82F6&quot;)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/AddToHomeSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/AddToHomeSheet.kt"
             line="500"
             column="17"/>
     </issue>
@@ -10558,7 +10558,7 @@
         errorLine1="        color = AGColor.parseColor(&quot;#FF3B82F6&quot;)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/AddToHomeSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/AddToHomeSheet.kt"
             line="500"
             column="17"/>
     </issue>
@@ -10569,7 +10569,7 @@
         errorLine1="                val scaled = Bitmap.createScaledBitmap(src, size, size, true)"
         errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/AddToHomeSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/AddToHomeSheet.kt"
             line="508"
             column="30"/>
     </issue>
@@ -10580,7 +10580,7 @@
         errorLine1="                val scaled = Bitmap.createScaledBitmap(src, size, size, true)"
         errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/webapp/AddToHomeSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/AddToHomeSheet.kt"
             line="517"
             column="30"/>
     </issue>
@@ -10591,7 +10591,7 @@
         errorLine1="                android.net.Uri.parse(&quot;package:$packageName&quot;),"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/AgentForegroundService.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/AgentForegroundService.kt"
             line="645"
             column="17"/>
     </issue>
@@ -10602,7 +10602,7 @@
         errorLine1="            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="            ^">
         <location
-            file="src/main/java/com/openminis/app/remote/AgentPresetRegistry.kt"
+            file="src/main/java/io/github/slackerllc/minis/remote/AgentPresetRegistry.kt"
             line="114"
             column="13"/>
     </issue>
@@ -10613,7 +10613,7 @@
         errorLine1="        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/remote/AgentPresetRegistry.kt"
+            file="src/main/java/io/github/slackerllc/minis/remote/AgentPresetRegistry.kt"
             line="144"
             column="9"/>
     </issue>
@@ -10624,7 +10624,7 @@
         errorLine1="            prefs.edit().putString(KEY_ALARMS, kept.toString()).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="226"
             column="13"/>
     </issue>
@@ -10635,7 +10635,7 @@
         errorLine1="            prefs.edit().putString(KEY_ALARMS, alarms.toString()).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="249"
             column="13"/>
     </issue>
@@ -10646,7 +10646,7 @@
         errorLine1="        prefs.edit().putString(KEY_ALARMS, alarms.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="276"
             column="9"/>
     </issue>
@@ -10657,7 +10657,7 @@
         errorLine1="        prefs.edit().remove(KEY_ALARMS).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="299"
             column="9"/>
     </issue>
@@ -10668,7 +10668,7 @@
         errorLine1="        prefs.edit().putString(KEY_ALARMS, alarms.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/AlarmOffloadManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/AlarmOffloadManager.kt"
             line="334"
             column="9"/>
     </issue>
@@ -10679,7 +10679,7 @@
         errorLine1="                data != null &amp;&amp; mimeType != null -> intent.setDataAndType(Uri.parse(data), mimeType)"
         errorLine2="                                                                          ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidSystemTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidSystemTools.kt"
             line="307"
             column="75"/>
     </issue>
@@ -10690,7 +10690,7 @@
         errorLine1="                data != null -> intent.data = Uri.parse(data)"
         errorLine2="                                              ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidSystemTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidSystemTools.kt"
             line="308"
             column="47"/>
     </issue>
@@ -10701,7 +10701,7 @@
         errorLine1="                data != null -> intent.data = Uri.parse(data)"
         errorLine2="                                              ~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidSystemTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidSystemTools.kt"
             line="308"
             column="47"/>
     </issue>
@@ -10712,7 +10712,7 @@
         errorLine1="            &quot;sent&quot; -> android.net.Uri.parse(&quot;content://sms/sent&quot;)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidTelephonyTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidTelephonyTools.kt"
             line="49"
             column="23"/>
     </issue>
@@ -10723,7 +10723,7 @@
         errorLine1="            &quot;all&quot; -> android.net.Uri.parse(&quot;content://sms&quot;)"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidTelephonyTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidTelephonyTools.kt"
             line="50"
             column="22"/>
     </issue>
@@ -10734,7 +10734,7 @@
         errorLine1="            &quot;inbox&quot;, &quot;&quot; -> android.net.Uri.parse(&quot;content://sms/inbox&quot;)"
         errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/AndroidTelephonyTools.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/AndroidTelephonyTools.kt"
             line="51"
             column="28"/>
     </issue>
@@ -10745,7 +10745,7 @@
         errorLine1="            val scaled = Bitmap.createScaledBitmap("
         errorLine2="                         ^">
         <location
-            file="src/main/java/com/openminis/app/tools/android/AndroidUiController.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/android/AndroidUiController.kt"
             line="104"
             column="26"/>
     </issue>
@@ -10756,7 +10756,7 @@
         errorLine1="            prefs(ctx).edit().putString(KEY_SELECTED_ID, target.id).apply()"
         errorLine2="            ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/AppIconRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/AppIconRepository.kt"
             line="77"
             column="13"/>
     </issue>
@@ -10767,7 +10767,7 @@
         errorLine1="        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/logging/AppLogger.kt"
+            file="src/main/java/io/github/slackerllc/minis/logging/AppLogger.kt"
             line="113"
             column="9"/>
     </issue>
@@ -10778,7 +10778,7 @@
         errorLine1="                        prefs.edit().putInt(KEY_THEME_MODE, idx).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="234"
             column="25"/>
     </issue>
@@ -10789,7 +10789,7 @@
         errorLine1="                        prefs.edit().putInt(KEY_UI_STYLE, idx).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="269"
             column="25"/>
     </issue>
@@ -10800,7 +10800,7 @@
         errorLine1="                        prefs.edit().putInt(KEY_LAUNCH_SESSION, idx).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="304"
             column="25"/>
     </issue>
@@ -10811,7 +10811,7 @@
         errorLine1="                        prefs.edit().putInt(KEY_RETURN_KEY_BEHAVIOR, row.value).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="337"
             column="25"/>
     </issue>
@@ -10822,7 +10822,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_KEEP_SCREEN_AWAKE, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="375"
             column="21"/>
     </issue>
@@ -10833,7 +10833,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_TOOL_PREVIEW, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="393"
             column="21"/>
     </issue>
@@ -10844,7 +10844,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_AUTO_EXPAND_THINKING, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="415"
             column="21"/>
     </issue>
@@ -10855,7 +10855,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_AUTO_FOCUS_AFTER_REPLY, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="435"
             column="21"/>
     </issue>
@@ -10866,7 +10866,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_SHOW_CHAT_TITLE, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="457"
             column="21"/>
     </issue>
@@ -10877,7 +10877,7 @@
         errorLine1="                    prefs.edit().putBoolean(KEY_AUTO_GROUPING, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="478"
             column="21"/>
     </issue>
@@ -10888,7 +10888,7 @@
         errorLine1="                    prefs.edit().putInt(KEY_FONT_CHAT_INPUT, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="503"
             column="21"/>
     </issue>
@@ -10899,7 +10899,7 @@
         errorLine1="                    prefs.edit().putInt(KEY_FONT_MESSAGE, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="512"
             column="21"/>
     </issue>
@@ -10910,7 +10910,7 @@
         errorLine1="                    prefs.edit().putInt(KEY_FONT_APP_BASE, it).apply()"
         errorLine2="                    ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="521"
             column="21"/>
     </issue>
@@ -10921,7 +10921,7 @@
         errorLine1="                        prefs.edit()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="534"
             column="25"/>
     </issue>
@@ -10932,7 +10932,7 @@
         errorLine1="                                android.graphics.Bitmap"
         errorLine2="                                ^">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="604"
             column="33"/>
     </issue>
@@ -10943,7 +10943,7 @@
         errorLine1="                        prefs.edit().putString(KEY_LANGUAGE, lang.code).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/AppearanceScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/AppearanceScreen.kt"
             line="691"
             column="25"/>
     </issue>
@@ -10954,7 +10954,7 @@
         errorLine1="        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/tools/ApprovalSeam.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/ApprovalSeam.kt"
             line="55"
             column="9"/>
     </issue>
@@ -10965,7 +10965,7 @@
         errorLine1="                .setData(Uri.parse(VOICE_ACTION_URI))"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/voice/AssistSession.kt"
+            file="src/main/java/io/github/slackerllc/minis/voice/AssistSession.kt"
             line="40"
             column="26"/>
     </issue>
@@ -10976,7 +10976,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/AutoCompactPrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/AutoCompactPrefs.kt"
             line="52"
             column="9"/>
     </issue>
@@ -10987,7 +10987,7 @@
         errorLine1="        appContext?.let { prefs(it).edit().putBoolean(KEY_ENABLED, enabled).apply() }"
         errorLine2="                          ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/AutoCompactPrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/AutoCompactPrefs.kt"
             line="63"
             column="27"/>
     </issue>
@@ -10998,7 +10998,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_TASK_NOTIFICATIONS, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/BackgroundSettingsRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/BackgroundSettingsRepository.kt"
             line="36"
             column="9"/>
     </issue>
@@ -11009,7 +11009,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_BG_OVERLAY_ENABLED, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/BackgroundSettingsRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/BackgroundSettingsRepository.kt"
             line="52"
             column="9"/>
     </issue>
@@ -11020,7 +11020,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_DYNAMIC_ISLAND_ENABLED, value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/BackgroundSettingsRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/BackgroundSettingsRepository.kt"
             line="71"
             column="9"/>
     </issue>
@@ -11031,7 +11031,7 @@
         errorLine1="        prefs.edit().putInt(KEY_BG_OVERLAY_X, x).putInt(KEY_BG_OVERLAY_Y, y).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/BackgroundSettingsRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/BackgroundSettingsRepository.kt"
             line="84"
             column="9"/>
     </issue>
@@ -11042,7 +11042,7 @@
         errorLine1="                                Uri.parse(&quot;package:&quot; + context.packageName),"
         errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/BackgroundSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/BackgroundSettingsScreen.kt"
             line="183"
             column="33"/>
     </issue>
@@ -11053,7 +11053,7 @@
         errorLine1="        val deepLink = Uri.parse(&quot;minis://session/$sessionId&quot;)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/notification/BackgroundTaskNotifier.kt"
+            file="src/main/java/io/github/slackerllc/minis/notification/BackgroundTaskNotifier.kt"
             line="102"
             column="24"/>
     </issue>
@@ -11064,7 +11064,7 @@
         errorLine1="                            prefs.edit()"
         errorLine2="                            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/browser/BrowserSettingsSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/browser/BrowserSettingsSheet.kt"
             line="190"
             column="29"/>
     </issue>
@@ -11075,7 +11075,7 @@
         errorLine1="                        prefs.edit().putString(&quot;custom_user_agent&quot;, it).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/browser/BrowserSettingsSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/browser/BrowserSettingsSheet.kt"
             line="215"
             column="25"/>
     </issue>
@@ -11086,7 +11086,7 @@
         errorLine1="        prefs.edit().putInt(PREF_IDLE_TIMEOUT_MINUTES, clamped).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserTabPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/BrowserTabPool.kt"
             line="245"
             column="9"/>
     </issue>
@@ -11097,7 +11097,7 @@
         errorLine1="            val uri = android.net.Uri.parse(raw)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserTabPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/BrowserTabPool.kt"
             line="991"
             column="23"/>
     </issue>
@@ -11108,7 +11108,7 @@
         errorLine1="        prefs.edit()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserTabPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/BrowserTabPool.kt"
             line="1099"
             column="9"/>
     </issue>
@@ -11119,7 +11119,7 @@
         errorLine1="            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/BrowserUseManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/BrowserUseManager.kt"
             line="814"
             column="26"/>
     </issue>
@@ -11130,7 +11130,7 @@
         errorLine1="        val resized = android.graphics.Bitmap.createScaledBitmap(bmp, w, h, true)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatViewModel.kt"
             line="8622"
             column="23"/>
     </issue>
@@ -11141,7 +11141,7 @@
         errorLine1="            val scaled = Bitmap.createScaledBitmap(original, w, h, true)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ChatViewModel.kt"
             line="9398"
             column="26"/>
     </issue>
@@ -11152,7 +11152,7 @@
         errorLine1="                                    Intent(Intent.ACTION_VIEW, Uri.parse(ann.item))"
         errorLine2="                                                               ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/CheckUpdateSection.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/CheckUpdateSection.kt"
             line="185"
             column="64"/>
     </issue>
@@ -11163,7 +11163,7 @@
         errorLine1="                customTabsIntent.launchUrl(context, Uri.parse(authUrl))"
         errorLine2="                                                    ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/ClaudeOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/ClaudeOAuthManager.kt"
             line="159"
             column="53"/>
     </issue>
@@ -11174,7 +11174,7 @@
         errorLine1="        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/ComposerInputModePrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/ComposerInputModePrefs.kt"
             line="30"
             column="9"/>
     </issue>
@@ -11185,7 +11185,7 @@
         errorLine1="        db.beginTransactionNonExclusive()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/audit/ConfigAuditLog.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/audit/ConfigAuditLog.kt"
             line="46"
             column="9"/>
     </issue>
@@ -11196,7 +11196,7 @@
         errorLine1="                prefs.edit().putInt(key, level).apply()"
         errorLine2="                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/ConfigBuiltins.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/ConfigBuiltins.kt"
             line="439"
             column="17"/>
     </issue>
@@ -11207,7 +11207,7 @@
         errorLine1="            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="            ^">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="124"
             column="13"/>
     </issue>
@@ -11218,7 +11218,7 @@
         errorLine1="            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="            ^">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="133"
             column="13"/>
     </issue>
@@ -11229,7 +11229,7 @@
         errorLine1="            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="            ^">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="150"
             column="13"/>
     </issue>
@@ -11240,7 +11240,7 @@
         errorLine1="                    Uri.parse(&quot;https://github.com/limuzi013/minis-for-android/issues/new&quot;),"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="568"
             column="21"/>
     </issue>
@@ -11251,7 +11251,7 @@
         errorLine1="                data = Uri.parse(&quot;mailto:&quot;)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="702"
             column="24"/>
     </issue>
@@ -11262,7 +11262,7 @@
         errorLine1="                data = Uri.parse(&quot;mailto:&quot;)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/crash/CrashFrequencyDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/crash/CrashFrequencyDetector.kt"
             line="702"
             column="24"/>
     </issue>
@@ -11273,7 +11273,7 @@
         errorLine1="        obj.put(&quot;visible&quot;, view.visibility == View.VISIBLE)"
         errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugInspectorMethods.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugInspectorMethods.kt"
             line="216"
             column="28"/>
     </issue>
@@ -11284,7 +11284,7 @@
         errorLine1="        &quot;purple&quot; -> Color.parseColor(&quot;#8E24AA&quot;)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugInspectorMethods.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugInspectorMethods.kt"
             line="360"
             column="21"/>
     </issue>
@@ -11295,7 +11295,7 @@
         errorLine1="        &quot;orange&quot; -> Color.parseColor(&quot;#FF9800&quot;)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugInspectorMethods.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugInspectorMethods.kt"
             line="361"
             column="21"/>
     </issue>
@@ -11306,7 +11306,7 @@
         errorLine1="        else -> runCatching { Color.parseColor(name) }.getOrDefault(Color.RED)"
         errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugInspectorMethods.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugInspectorMethods.kt"
             line="362"
             column="31"/>
     </issue>
@@ -11317,7 +11317,7 @@
         errorLine1="                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
         errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugRPCHandler.kt"
             line="363"
             column="30"/>
     </issue>
@@ -11328,7 +11328,7 @@
         errorLine1="        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugRPCHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugRPCHandler.kt"
             line="394"
             column="22"/>
     </issue>
@@ -11339,7 +11339,7 @@
         errorLine1="                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
         errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugScreenshotRing.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugScreenshotRing.kt"
             line="78"
             column="30"/>
     </issue>
@@ -11350,7 +11350,7 @@
         errorLine1="        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/DebugScreenshotRing.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/DebugScreenshotRing.kt"
             line="95"
             column="22"/>
     </issue>
@@ -11361,7 +11361,7 @@
         errorLine1="        prefs.edit().putString(KEY_DEVICE_ID, fresh).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/DeviceIdentity.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/DeviceIdentity.kt"
             line="36"
             column="9"/>
     </issue>
@@ -11372,7 +11372,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_CONFIRMED, true).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/EnhancedCachePrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/EnhancedCachePrefs.kt"
             line="27"
             column="9"/>
     </issue>
@@ -11383,7 +11383,7 @@
         errorLine1="        prefs?.edit()?.putBoolean(KEY, value)?.apply()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/EnvVarPrivacyStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/EnvVarPrivacyStore.kt"
             line="47"
             column="9"/>
     </issue>
@@ -11394,7 +11394,7 @@
         errorLine1="        encryptedPrefs.edit().putString(normalizedKey, sanitizeValue(value)).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/EnvVarRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/EnvVarRepository.kt"
             line="80"
             column="9"/>
     </issue>
@@ -11405,7 +11405,7 @@
         errorLine1="            encryptedPrefs.edit().remove(current.key).apply()"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/EnvVarRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/EnvVarRepository.kt"
             line="97"
             column="13"/>
     </issue>
@@ -11416,7 +11416,7 @@
         errorLine1="        encryptedPrefs.edit().putString(normalizedKey, sanitizeValue(newValue)).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/EnvVarRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/EnvVarRepository.kt"
             line="106"
             column="9"/>
     </issue>
@@ -11427,7 +11427,7 @@
         errorLine1="        encryptedPrefs.edit().remove(entry.key).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/EnvVarRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/EnvVarRepository.kt"
             line="114"
             column="9"/>
     </issue>
@@ -11438,7 +11438,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/FastModePrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/FastModePrefs.kt"
             line="49"
             column="9"/>
     </issue>
@@ -11449,7 +11449,7 @@
         errorLine1="        appContext"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FileBrowserViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FileBrowserViewModel.kt"
             line="295"
             column="9"/>
     </issue>
@@ -11460,7 +11460,7 @@
         errorLine1="                                val bmp = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)"
         errorLine2="                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FilePreviewScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FilePreviewScreen.kt"
             line="548"
             column="43"/>
     </issue>
@@ -11471,7 +11471,7 @@
         errorLine1="                .launchUrl(context, Uri.parse(url))"
         errorLine2="                                    ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/GoogleAuthRouter.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/GoogleAuthRouter.kt"
             line="58"
             column="37"/>
     </issue>
@@ -11482,7 +11482,7 @@
         errorLine1="                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                                        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/browser/GoogleAuthRouter.kt"
+            file="src/main/java/io/github/slackerllc/minis/browser/GoogleAuthRouter.kt"
             line="63"
             column="57"/>
     </issue>
@@ -11493,7 +11493,7 @@
         errorLine1="        prefs.edit()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/diagnostics/HangDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/diagnostics/HangDetector.kt"
             line="156"
             column="9"/>
     </issue>
@@ -11504,7 +11504,7 @@
         errorLine1="        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/diagnostics/HangDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/diagnostics/HangDetector.kt"
             line="179"
             column="9"/>
     </issue>
@@ -11515,7 +11515,7 @@
         errorLine1="        prefs.edit()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/diagnostics/HangDetector.kt"
+            file="src/main/java/io/github/slackerllc/minis/diagnostics/HangDetector.kt"
             line="320"
             column="9"/>
     </issue>
@@ -11526,7 +11526,7 @@
         errorLine1="                Bitmap.createScaledBitmap("
         errorLine2="                ^">
         <location
-            file="src/main/java/com/openminis/app/provider/ImageBudget.kt"
+            file="src/main/java/io/github/slackerllc/minis/provider/ImageBudget.kt"
             line="101"
             column="17"/>
     </issue>
@@ -11537,7 +11537,7 @@
         errorLine1="                mediaPlayer.setDataSource(context, Uri.parse(filePath))"
         errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/media/InlineMediaPlayer.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/media/InlineMediaPlayer.kt"
             line="98"
             column="52"/>
     </issue>
@@ -11548,7 +11548,7 @@
         errorLine1="                    val uri = if (file.exists()) Uri.fromFile(file) else Uri.parse(filePath)"
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/media/InlineMediaPlayer.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/media/InlineMediaPlayer.kt"
             line="255"
             column="74"/>
     </issue>
@@ -11559,7 +11559,7 @@
         errorLine1="                window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK))"
         errorLine2="                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/media/InlineMediaPlayer.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/media/InlineMediaPlayer.kt"
             line="360"
             column="46"/>
     </issue>
@@ -11570,7 +11570,7 @@
         errorLine1="            appContext?.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)"
         errorLine2="            ^">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/voice/InlineVoiceInputPanel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/voice/InlineVoiceInputPanel.kt"
             line="147"
             column="13"/>
     </issue>
@@ -11581,7 +11581,7 @@
         errorLine1="                            android.net.Uri.parse(&quot;minis://settings/providers&quot;),"
         errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/voice/InlineVoiceInputPanel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/voice/InlineVoiceInputPanel.kt"
             line="1279"
             column="29"/>
     </issue>
@@ -11592,7 +11592,7 @@
         errorLine1="        prefs.edit().putInt(KEY_DICT_VERSION, DICT_VERSION).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/shared/JiebaEngine.kt"
+            file="src/main/java/io/github/slackerllc/minis/shared/JiebaEngine.kt"
             line="106"
             column="9"/>
     </issue>
@@ -11603,7 +11603,7 @@
         errorLine1="                                    val bitmap = Bitmap.createBitmap(capW, capH, Bitmap.Config.ARGB_8888)"
         errorLine2="                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/KaTeXView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/KaTeXView.kt"
             line="271"
             column="50"/>
     </issue>
@@ -11614,7 +11614,7 @@
         errorLine1="            val bitmap = Bitmap.createBitmap(pxW, pxH, Bitmap.Config.ARGB_8888)"
         errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/KatexWebViewPool.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/KatexWebViewPool.kt"
             line="286"
             column="26"/>
     </issue>
@@ -11625,7 +11625,7 @@
         errorLine1="                        .launchUrl(context, Uri.parse(authUrl))"
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthController.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthController.kt"
             line="102"
             column="45"/>
     </issue>
@@ -11636,7 +11636,7 @@
         errorLine1="            p.edit().remove(secretKey(server)).apply()"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthStore.kt"
             line="46"
             column="13"/>
     </issue>
@@ -11647,7 +11647,7 @@
         errorLine1="            p.edit().putString(secretKey(server), secret).apply()"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthStore.kt"
             line="48"
             column="13"/>
     </issue>
@@ -11658,7 +11658,7 @@
         errorLine1="        prefs(context).edit().putString(tokensKey(server), json.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthStore.kt"
             line="63"
             column="9"/>
     </issue>
@@ -11669,7 +11669,7 @@
         errorLine1="        prefs(context).edit().remove(tokensKey(server)).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthStore.kt"
             line="84"
             column="9"/>
     </issue>
@@ -11680,7 +11680,7 @@
         errorLine1="        prefs(context).edit().remove(tokensKey(server)).remove(secretKey(server)).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/mcp/oauth/MCPOAuthStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/oauth/MCPOAuthStore.kt"
             line="89"
             column="9"/>
     </issue>
@@ -11691,7 +11691,7 @@
         errorLine1="        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/mcp/server/MCPServerManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/server/MCPServerManager.kt"
             line="196"
             column="9"/>
     </issue>
@@ -11702,7 +11702,7 @@
         errorLine1="                    Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                               ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/MarkdownText.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/MarkdownText.kt"
             line="533"
             column="48"/>
     </issue>
@@ -11713,7 +11713,7 @@
         errorLine1="        stripped.startsWith(&quot;file://&quot;) -> File(Uri.parse(stripped).path ?: return null)"
         errorLine2="                                               ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/markdown/MarkdownText.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/markdown/MarkdownText.kt"
             line="691"
             column="48"/>
     </issue>
@@ -11724,7 +11724,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_GLOBAL_ENABLED, enabled).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/MemoryGlobalPrefs.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/MemoryGlobalPrefs.kt"
             line="36"
             column="9"/>
     </issue>
@@ -11735,7 +11735,7 @@
         errorLine1="            prefs.edit().remove(&quot;alarms_json&quot;).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/MinisApp.kt"
+            file="src/main/java/io/github/slackerllc/minis/MinisApp.kt"
             line="952"
             column="13"/>
     </issue>
@@ -11746,7 +11746,7 @@
         errorLine1="            prefs.edit().remove(&quot;alarms_json&quot;).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/MinisApp.kt"
+            file="src/main/java/io/github/slackerllc/minis/MinisApp.kt"
             line="1002"
             column="13"/>
     </issue>
@@ -11757,7 +11757,7 @@
         errorLine1="        prefs?.edit()?.putBoolean(KEY, value)?.apply()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/MinisConfigPermissionStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/MinisConfigPermissionStore.kt"
             line="45"
             column="9"/>
     </issue>
@@ -11768,7 +11768,7 @@
         errorLine1="        val treeUri = Uri.parse(treeUriString)"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/RuntimePathRegistry.kt"
             line="154"
             column="23"/>
     </issue>
@@ -11779,7 +11779,7 @@
         errorLine1="        val parsed = runCatching { Uri.parse(uriString) }.getOrNull() ?: return"
         errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/terminal/MinisOpenUrlBroker.kt"
+            file="src/main/java/io/github/slackerllc/minis/terminal/MinisOpenUrlBroker.kt"
             line="41"
             column="36"/>
     </issue>
@@ -11790,7 +11790,7 @@
         errorLine1="        val editor = p.edit()"
         errorLine2="                     ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/MirrorSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/MirrorSettingsScreen.kt"
             line="233"
             column="22"/>
     </issue>
@@ -11801,7 +11801,7 @@
         errorLine1="        p.edit().remove(&quot;rootfs.freshInstall&quot;).apply()"
         errorLine2="        ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/MirrorSettingsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/MirrorSettingsScreen.kt"
             line="394"
             column="9"/>
     </issue>
@@ -11812,7 +11812,7 @@
         errorLine1="                                    Uri.parse(&quot;package:${context.packageName}&quot;),"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/MountedFoldersScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/MountedFoldersScreen.kt"
             line="218"
             column="37"/>
     </issue>
@@ -11823,7 +11823,7 @@
         errorLine1="                                        Uri.parse(&quot;package:${context.packageName}&quot;),"
         errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/MountedFoldersScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/MountedFoldersScreen.kt"
             line="228"
             column="41"/>
     </issue>
@@ -11834,7 +11834,7 @@
         errorLine1="                    Uri.parse(e.treeUri),"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/MountedFoldersStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/MountedFoldersStore.kt"
             line="183"
             column="21"/>
     </issue>
@@ -11845,7 +11845,7 @@
         errorLine1="        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {"
         errorLine2="                                                ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="156"
             column="49"/>
     </issue>
@@ -11856,7 +11856,7 @@
         errorLine1="        getEncryptedPrefs().edit()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="277"
             column="9"/>
     </issue>
@@ -11867,7 +11867,7 @@
         errorLine1="        getEncryptedPrefs().edit()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="289"
             column="9"/>
     </issue>
@@ -11878,7 +11878,7 @@
         errorLine1="        getEncryptedPrefs().edit().putString(&quot;oauth_${key}_$instanceId&quot;, value).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="300"
             column="9"/>
     </issue>
@@ -11889,7 +11889,7 @@
         errorLine1="        getEncryptedPrefs().edit()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="321"
             column="9"/>
     </issue>
@@ -11900,7 +11900,7 @@
         errorLine1="        getEncryptedPrefs().edit()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OAuthManager.kt"
             line="346"
             column="9"/>
     </issue>
@@ -11911,7 +11911,7 @@
         errorLine1="        context.getSharedPreferences(&quot;offload_permissions_asked&quot;, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/offload/OffloadPermissionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/OffloadPermissionManager.kt"
             line="304"
             column="9"/>
     </issue>
@@ -11922,7 +11922,7 @@
         errorLine1="        prefs.edit().putString(&quot;level_$toolName&quot;, level.name).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/OffloadPermissionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/OffloadPermissionManager.kt"
             line="325"
             column="9"/>
     </issue>
@@ -11933,7 +11933,7 @@
         errorLine1="        val editor = prefs.edit()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/OffloadPermissionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/OffloadPermissionManager.kt"
             line="329"
             column="22"/>
     </issue>
@@ -11944,7 +11944,7 @@
         errorLine1="                customTabsIntent.launchUrl(context, Uri.parse(authUrl))"
         errorLine2="                                                    ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OpenAIOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OpenAIOAuthManager.kt"
             line="92"
             column="53"/>
     </issue>
@@ -11955,7 +11955,7 @@
         errorLine1="                Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/OpenOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/OpenOffloadHandler.kt"
             line="58"
             column="44"/>
     </issue>
@@ -11966,7 +11966,7 @@
         errorLine1="            val pkg = Uri.parse(url).getQueryParameter(&quot;id&quot;)"
         errorLine2="                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/OpenOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/OpenOffloadHandler.kt"
             line="101"
             column="23"/>
     </issue>
@@ -11977,7 +11977,7 @@
         errorLine1="                val authUrl = Uri.parse(AUTH_BASE_URL).buildUpon()"
         errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/OpenRouterOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/OpenRouterOAuthManager.kt"
             line="77"
             column="31"/>
     </issue>
@@ -11988,7 +11988,7 @@
         errorLine1="        requirePrefs(context).edit().putString(KEY, json.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/PendingUpdateStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/PendingUpdateStore.kt"
             line="69"
             column="9"/>
     </issue>
@@ -11999,7 +11999,7 @@
         errorLine1="            p.edit().remove(KEY).apply()"
         errorLine2="            ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/PendingUpdateStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/PendingUpdateStore.kt"
             line="89"
             column="13"/>
     </issue>
@@ -12010,7 +12010,7 @@
         errorLine1="        requirePrefs(context).edit().remove(KEY).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/PendingUpdateStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/PendingUpdateStore.kt"
             line="109"
             column="9"/>
     </issue>
@@ -12021,7 +12021,7 @@
         errorLine1="        if (visible == (menuBar.visibility == View.VISIBLE)) return"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="189"
             column="25"/>
     </issue>
@@ -12032,7 +12032,7 @@
         errorLine1="    fun isMenuVisible(): Boolean = menuBar.visibility == View.VISIBLE"
         errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="194"
             column="36"/>
     </issue>
@@ -12043,7 +12043,7 @@
         errorLine1="        if (bubble.visibility == View.GONE) return"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="300"
             column="13"/>
     </issue>
@@ -12054,7 +12054,7 @@
         errorLine1="    fun isBubbleVisible(): Boolean = bubble.visibility == View.VISIBLE"
         errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="307"
             column="38"/>
     </issue>
@@ -12065,7 +12065,7 @@
         errorLine1="        if (visible == (inputBar.visibility == View.VISIBLE)) return"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="310"
             column="25"/>
     </issue>
@@ -12076,7 +12076,7 @@
         errorLine1="    fun isInputVisible(): Boolean = inputBar.visibility == View.VISIBLE"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayView.kt"
             line="321"
             column="37"/>
     </issue>
@@ -12087,7 +12087,7 @@
         errorLine1="    fun setEnabled(context: Context, enabled: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()"
         errorLine2="                                                         ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="27"
             column="58"/>
     </issue>
@@ -12098,7 +12098,7 @@
         errorLine1="    fun setSelectedPetId(context: Context, id: String?) = prefs(context).edit().putString(KEY_SELECTED, id).apply()"
         errorLine2="                                                          ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="30"
             column="59"/>
     </issue>
@@ -12109,7 +12109,7 @@
         errorLine1="    fun setScale(context: Context, value: Float) = prefs(context).edit().putFloat(KEY_SCALE, value.coerceIn(0.5f, 2.0f)).apply()"
         errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="33"
             column="52"/>
     </issue>
@@ -12120,7 +12120,7 @@
         errorLine1="    fun setSpeed(context: Context, value: Float) = prefs(context).edit().putFloat(KEY_SPEED, value.coerceIn(0.5f, 2.0f)).apply()"
         errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="36"
             column="52"/>
     </issue>
@@ -12131,7 +12131,7 @@
         errorLine1="    fun setPosition(context: Context, x: Int, y: Int) = prefs(context).edit().putInt(KEY_X, x).putInt(KEY_Y, y).apply()"
         errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="39"
             column="57"/>
     </issue>
@@ -12142,7 +12142,7 @@
         errorLine1="    fun setWanderEnabled(context: Context, value: Boolean) = prefs(context).edit().putBoolean(KEY_WANDER, value).apply()"
         errorLine2="                                                             ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="42"
             column="62"/>
     </issue>
@@ -12153,7 +12153,7 @@
         errorLine1="    fun setEdgeSnapEnabled(context: Context, value: Boolean) = prefs(context).edit().putBoolean(KEY_EDGE_SNAP, value).apply()"
         errorLine2="                                                               ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="45"
             column="64"/>
     </issue>
@@ -12164,7 +12164,7 @@
         errorLine1="    fun setAutoHideEnabled(context: Context, value: Boolean) = prefs(context).edit().putBoolean(KEY_AUTO_HIDE, value).apply()"
         errorLine2="                                                               ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="48"
             column="64"/>
     </issue>
@@ -12175,7 +12175,7 @@
         errorLine1="    fun setBubbleEnabled(context: Context, value: Boolean) = prefs(context).edit().putBoolean(KEY_BUBBLE, value).apply()"
         errorLine2="                                                             ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="51"
             column="62"/>
     </issue>
@@ -12186,7 +12186,7 @@
         errorLine1="    fun setTapOpensApp(context: Context, value: Boolean) = prefs(context).edit().putBoolean(KEY_TAP_OPENS_APP, value).apply()"
         errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="54"
             column="60"/>
     </issue>
@@ -12197,7 +12197,7 @@
         errorLine1="    fun setChatSessionId(context: Context, id: String?) = prefs(context).edit().putString(KEY_CHAT_SESSION, id).apply()"
         errorLine2="                                                          ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/pet/PetPreferences.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetPreferences.kt"
             line="61"
             column="59"/>
     </issue>
@@ -12208,7 +12208,7 @@
         errorLine1="            android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * scale).toInt(), (bmp.height * scale).toInt(), true)"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/runtime/guest/PhotosOffloadHandler.kt"
+            file="src/main/java/io/github/slackerllc/minis/runtime/guest/PhotosOffloadHandler.kt"
             line="620"
             column="13"/>
     </issue>
@@ -12219,7 +12219,7 @@
         errorLine1="            .setData(Uri.parse(&quot;package:${activity.packageName}&quot;))"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/power/PowerOptimizationManager.kt"
             line="68"
             column="22"/>
     </issue>
@@ -12230,7 +12230,7 @@
         errorLine1="            .setData(Uri.parse(&quot;package:${activity.packageName}&quot;))"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/power/PowerOptimizationManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/power/PowerOptimizationManager.kt"
             line="179"
             column="22"/>
     </issue>
@@ -12241,7 +12241,7 @@
         errorLine1="        prefs.edit().putBoolean(key, b).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="37"
             column="9"/>
     </issue>
@@ -12252,7 +12252,7 @@
         errorLine1="        prefs.edit().putInt(key, i).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="63"
             column="9"/>
     </issue>
@@ -12263,7 +12263,7 @@
         errorLine1="        prefs.edit().putLong(key, i.toLong()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="96"
             column="9"/>
     </issue>
@@ -12274,7 +12274,7 @@
         errorLine1="        prefs.edit().putFloat(key, d.toFloat()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="131"
             column="9"/>
     </issue>
@@ -12285,7 +12285,7 @@
         errorLine1="        prefs.edit().putString(key, s).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="156"
             column="9"/>
     </issue>
@@ -12296,7 +12296,7 @@
         errorLine1="        prefs.edit().putString(key, (value as ConfigValue.Str).value).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="184"
             column="9"/>
     </issue>
@@ -12307,7 +12307,7 @@
         errorLine1="        prefs.edit().putInt(key, idx).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/config/fields/PrefsFields.kt"
+            file="src/main/java/io/github/slackerllc/minis/config/fields/PrefsFields.kt"
             line="218"
             column="9"/>
     </issue>
@@ -12318,7 +12318,7 @@
         errorLine1="        prefs.edit().putLong(lastFetchKey(instanceId), System.currentTimeMillis()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="126"
             column="9"/>
     </issue>
@@ -12329,7 +12329,7 @@
         errorLine1="        prefs.edit().remove(lastFetchKey(instanceId)).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="144"
             column="9"/>
     </issue>
@@ -12340,7 +12340,7 @@
         errorLine1="                        prefs.edit().putString(KEY_LAST_USED_ENTRY, rewritten).apply()"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="366"
             column="25"/>
     </issue>
@@ -12351,7 +12351,7 @@
         errorLine1="            prefs.edit().apply {"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="923"
             column="13"/>
     </issue>
@@ -12362,7 +12362,7 @@
         errorLine1="            prefs.edit().putString(&quot;voice.input.overrideEntryId&quot;, value).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="1735"
             column="13"/>
     </issue>
@@ -12373,7 +12373,7 @@
         errorLine1="            prefs.edit().putString(&quot;voice.output.overrideEntryId&quot;, value).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="1870"
             column="13"/>
     </issue>
@@ -12384,7 +12384,7 @@
         errorLine1="        prefs.edit().putBoolean(&quot;voiceShadowDisabled.$instanceId&quot;, disabled).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="2002"
             column="9"/>
     </issue>
@@ -12395,7 +12395,7 @@
         errorLine1="            prefs.edit().putLong(key, now).apply()"
         errorLine2="            ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="2253"
             column="13"/>
     </issue>
@@ -12406,7 +12406,7 @@
         errorLine1="        encryptedPrefs.edit().putString(&quot;apikey_$instanceId&quot;, key).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="2286"
             column="9"/>
     </issue>
@@ -12417,7 +12417,7 @@
         errorLine1="        encryptedPrefs.edit().remove(&quot;apikey_$instanceId&quot;).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/ProviderRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/ProviderRepository.kt"
             line="2306"
             column="9"/>
     </issue>
@@ -12428,7 +12428,7 @@
         errorLine1="                    Bitmap.createScaledBitmap(original, w, h, true)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/ReadImageTool.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/ReadImageTool.kt"
             line="97"
             column="21"/>
     </issue>
@@ -12439,7 +12439,7 @@
         errorLine1="        val deepLink = Uri.parse(&quot;minis://session/$sessionId&quot;)"
         errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledAgentRunner.kt"
+            file="src/main/java/io/github/slackerllc/minis/scheduled/ScheduledAgentRunner.kt"
             line="295"
             column="24"/>
     </issue>
@@ -12450,7 +12450,7 @@
         errorLine1="        prefs.edit().putString(KEY, list.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/ScheduledNotificationStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/ScheduledNotificationStore.kt"
             line="27"
             column="9"/>
     </issue>
@@ -12461,7 +12461,7 @@
         errorLine1="                prefs.edit().putString(KEY, list.toString()).apply()"
         errorLine2="                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/ScheduledNotificationStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/ScheduledNotificationStore.kt"
             line="35"
             column="17"/>
     </issue>
@@ -12472,7 +12472,7 @@
         errorLine1="        prefs.edit().remove(KEY).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/ScheduledNotificationStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/ScheduledNotificationStore.kt"
             line="43"
             column="9"/>
     </issue>
@@ -12483,7 +12483,7 @@
         errorLine1="        if (dropped) prefs.edit().putString(KEY, kept.toString()).apply()"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/ScheduledNotificationStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/ScheduledNotificationStore.kt"
             line="78"
             column="22"/>
     </issue>
@@ -12494,7 +12494,7 @@
         errorLine1="        prefs.edit().remove(KEY_TASKS).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledTaskStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/scheduled/ScheduledTaskStore.kt"
             line="49"
             column="9"/>
     </issue>
@@ -12505,7 +12505,7 @@
         errorLine1="        prefs.edit().putString(KEY_TASKS, arr.toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/scheduled/ScheduledTaskStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/scheduled/ScheduledTaskStore.kt"
             line="55"
             column="9"/>
     </issue>
@@ -12516,7 +12516,7 @@
         errorLine1="        runCatching { p.edit().putString(KEY, encoded).apply() }"
         errorLine2="                      ~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/SessionBadgeStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/SessionBadgeStore.kt"
             line="136"
             column="23"/>
     </issue>
@@ -12527,7 +12527,7 @@
         errorLine1="                                prefs.edit().putBoolean(PREF_FAB_SWAPPED, isSwapped).apply()"
         errorLine2="                                ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListScreen.kt"
             line="1370"
             column="33"/>
     </issue>
@@ -12538,7 +12538,7 @@
         errorLine1="                                        prefs.edit().putBoolean(PREF_FAB_SWAPPED, isSwapped).apply()"
         errorLine2="                                        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListScreen.kt"
             line="1448"
             column="41"/>
     </issue>
@@ -12549,7 +12549,7 @@
         errorLine1="        uiPrefs.edit().putStringSet(&quot;collapsedFolderIds&quot;, ids).apply()"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sessions/SessionListViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sessions/SessionListViewModel.kt"
             line="194"
             column="9"/>
     </issue>
@@ -12560,7 +12560,7 @@
         errorLine1="        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()"
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/SessionPermissionStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/SessionPermissionStore.kt"
             line="45"
             column="22"/>
     </issue>
@@ -12571,7 +12571,7 @@
         errorLine1="        prefs.edit().putString(KEY_PENDING_SHARE, merged.toJson().toString()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/share/SharedShareStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/share/SharedShareStore.kt"
             line="78"
             column="9"/>
     </issue>
@@ -12582,7 +12582,7 @@
         errorLine1="        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/share/SharedShareStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/share/SharedShareStore.kt"
             line="94"
             column="9"/>
     </issue>
@@ -12593,7 +12593,7 @@
         errorLine1="        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                                ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/offload/ShizukuBackend.kt"
+            file="src/main/java/io/github/slackerllc/minis/offload/ShizukuBackend.kt"
             line="155"
             column="49"/>
     </issue>
@@ -12604,7 +12604,7 @@
         errorLine1="        db.beginTransaction()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/SkillRepository.kt"
             line="341"
             column="9"/>
     </issue>
@@ -12615,7 +12615,7 @@
         errorLine1="        val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/SkillRepository.kt"
             line="1053"
             column="25"/>
     </issue>
@@ -12626,7 +12626,7 @@
         errorLine1="        val uri = try { Uri.parse(normalized) } catch (_: Exception) { return null }"
         errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/repository/SkillRepository.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/repository/SkillRepository.kt"
             line="1085"
             column="25"/>
     </issue>
@@ -12637,7 +12637,7 @@
         errorLine1="        val host = runCatching { android.net.Uri.parse(url).host?.lowercase().orEmpty() }"
         errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/debug/SkillRpcMethods.kt"
+            file="src/main/java/io/github/slackerllc/minis/debug/SkillRpcMethods.kt"
             line="83"
             column="34"/>
     </issue>
@@ -12648,7 +12648,7 @@
         errorLine1="                            sortPrefs.edit().putBoolean(&quot;sort_by_modified&quot;, false).apply()"
         errorLine2="                            ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SkillsManagementScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SkillsManagementScreen.kt"
             line="188"
             column="29"/>
     </issue>
@@ -12659,7 +12659,7 @@
         errorLine1="                            sortPrefs.edit().putBoolean(&quot;sort_by_modified&quot;, true).apply()"
         errorLine2="                            ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SkillsManagementScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SkillsManagementScreen.kt"
             line="200"
             column="29"/>
     </issue>
@@ -12670,7 +12670,7 @@
         errorLine1="                            sortPrefs.edit().putBoolean(&quot;sort_ascending&quot;, sortAscending).apply()"
         errorLine2="                            ~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SkillsManagementScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SkillsManagementScreen.kt"
             line="220"
             column="29"/>
     </issue>
@@ -12681,7 +12681,7 @@
         errorLine1="        prefs.edit().putString(KEY_ENGINE_ID, id).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SpeechRecognitionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SpeechRecognitionManager.kt"
             line="249"
             column="9"/>
     </issue>
@@ -12692,7 +12692,7 @@
         errorLine1="        prefs.edit().putString(KEY_LOCALE, locale.toLanguageTag()).apply()"
         errorLine2="        ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SpeechRecognitionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SpeechRecognitionManager.kt"
             line="275"
             column="9"/>
     </issue>
@@ -12703,7 +12703,7 @@
         errorLine1="        stripped.startsWith(&quot;file://&quot;) -> File(Uri.parse(stripped).path ?: return null)"
         errorLine2="                                               ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/chat/StreamingMarkdownText.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/chat/StreamingMarkdownText.kt"
             line="2283"
             column="48"/>
     </issue>
@@ -12714,7 +12714,7 @@
         errorLine1="        prefs(context).edit()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/tools/SubagentLimits.kt"
+            file="src/main/java/io/github/slackerllc/minis/tools/SubagentLimits.kt"
             line="38"
             column="9"/>
     </issue>
@@ -12725,7 +12725,7 @@
         errorLine1="                                    Uri.parse(&quot;package:&quot; + context.packageName),"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/settings/SystemPermissionsScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/settings/SystemPermissionsScreen.kt"
             line="153"
             column="37"/>
     </issue>
@@ -12736,7 +12736,7 @@
         errorLine1="        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/mcp/server/TokenStore.kt"
+            file="src/main/java/io/github/slackerllc/minis/mcp/server/TokenStore.kt"
             line="72"
             column="9"/>
     </issue>
@@ -12747,7 +12747,7 @@
         errorLine1="        private val SUCCESS_COLOR = Color.parseColor(&quot;#4CAF50&quot;)"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="103"
             column="37"/>
     </issue>
@@ -12758,7 +12758,7 @@
         errorLine1="        private val FAILURE_COLOR = Color.parseColor(&quot;#E53935&quot;)"
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="104"
             column="37"/>
     </issue>
@@ -12769,7 +12769,7 @@
         errorLine1="                    data = Uri.parse(&quot;minis://session/$sid&quot;)"
         errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="658"
             column="28"/>
     </issue>
@@ -12780,7 +12780,7 @@
         errorLine1="                    data = Uri.parse(&quot;minis://session/$sid&quot;)"
         errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="658"
             column="28"/>
     </issue>
@@ -12791,7 +12791,7 @@
         errorLine1="            color = Color.parseColor(&quot;#4CAF50&quot;)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="835"
             column="21"/>
     </issue>
@@ -12802,7 +12802,7 @@
         errorLine1="            color = Color.parseColor(&quot;#4CAF50&quot;)"
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="835"
             column="21"/>
     </issue>
@@ -12813,7 +12813,7 @@
         errorLine1="            data = Uri.parse(&quot;package:${context.packageName}&quot;)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/UpdateChecker.kt"
             line="403"
             column="20"/>
     </issue>
@@ -12824,7 +12824,7 @@
         errorLine1="            data = Uri.parse(&quot;package:${context.packageName}&quot;)"
         errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/data/UpdateChecker.kt"
+            file="src/main/java/io/github/slackerllc/minis/data/UpdateChecker.kt"
             line="403"
             column="20"/>
     </issue>
@@ -12835,7 +12835,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrectionConsent.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrectionConsent.kt"
             line="31"
             column="9"/>
     </issue>
@@ -12846,7 +12846,7 @@
         errorLine1="        prefs(context).edit().putBoolean(KEY_PROMPTED, prompted).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrectionConsent.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrectionConsent.kt"
             line="42"
             column="9"/>
     </issue>
@@ -12857,7 +12857,7 @@
         errorLine1="            d.beginTransaction()"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrectionDb.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrectionDb.kt"
             line="392"
             column="13"/>
     </issue>
@@ -12868,7 +12868,7 @@
         errorLine1="        d.beginTransaction()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/correction/VoiceCorrectionDb.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/correction/VoiceCorrectionDb.kt"
             line="474"
             column="9"/>
     </issue>
@@ -12879,7 +12879,7 @@
         errorLine1="        prefs?.edit()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/VoiceOutputState.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/VoiceOutputState.kt"
             line="80"
             column="9"/>
     </issue>
@@ -12890,7 +12890,7 @@
         errorLine1="        prefs?.edit()?.putBoolean(KEY_ENABLED, value)?.apply()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/VoiceOutputState.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/VoiceOutputState.kt"
             line="167"
             column="9"/>
     </issue>
@@ -12901,7 +12901,7 @@
         errorLine1="        prefs?.edit()?.putBoolean(KEY_MUTED, value)?.apply()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/VoiceOutputState.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/VoiceOutputState.kt"
             line="180"
             column="9"/>
     </issue>
@@ -12912,7 +12912,7 @@
         errorLine1="        prefs?.edit()?.putFloat(KEY_SPEED, value)?.apply()"
         errorLine2="        ~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/VoiceOutputState.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/VoiceOutputState.kt"
             line="188"
             column="9"/>
     </issue>
@@ -12923,7 +12923,7 @@
         errorLine1="                    runCatching { Uri.parse(holder.currentUrl).host }.getOrNull()"
         errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewBottomSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewBottomSheet.kt"
             line="188"
             column="35"/>
     </issue>
@@ -12934,7 +12934,7 @@
         errorLine1="            val displayHost = runCatching { Uri.parse(holder.currentUrl).host }"
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewBottomSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewBottomSheet.kt"
             line="192"
             column="45"/>
     </issue>
@@ -12945,7 +12945,7 @@
         errorLine1="            val raw = Uri.parse(url).path ?: return@runCatching null"
         errorLine2="                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewBottomSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewBottomSheet.kt"
             line="459"
             column="23"/>
     </issue>
@@ -12956,7 +12956,7 @@
         errorLine1="        Intent(Intent.ACTION_VIEW, Uri.parse(url))"
         errorLine2="                                   ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewBottomSheet.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewBottomSheet.kt"
             line="476"
             column="36"/>
     </issue>
@@ -12967,7 +12967,7 @@
         errorLine1="        val absPath = Uri.parse(url).path.orEmpty()"
         errorLine2="                      ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewShortcut.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewShortcut.kt"
             line="48"
             column="23"/>
     </issue>
@@ -12978,7 +12978,7 @@
         errorLine1="        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)"
         errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewShortcut.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewShortcut.kt"
             line="115"
             column="19"/>
     </issue>
@@ -12989,7 +12989,7 @@
         errorLine1="        require(Uri.parse(authEndpoint).host?.endsWith(&quot;.x.ai&quot;) == true) {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/XAIOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/XAIOAuthManager.kt"
             line="167"
             column="17"/>
     </issue>
@@ -13000,7 +13000,7 @@
         errorLine1="        require(Uri.parse(tokenEndpoint).host?.endsWith(&quot;.x.ai&quot;) == true) {"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/XAIOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/XAIOAuthManager.kt"
             line="170"
             column="17"/>
     </issue>
@@ -13011,7 +13011,7 @@
         errorLine1="                    customTabsIntent.launchUrl(context, Uri.parse(authUrl))"
         errorLine2="                                                        ~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/auth/XAIOAuthManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/auth/XAIOAuthManager.kt"
             line="471"
             column="57"/>
     </issue>
@@ -13022,7 +13022,7 @@
         errorLine1="        row.setOnTouchListener { _, event ->"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/pet/PetChatWindowView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetChatWindowView.kt"
             line="139"
             column="9"/>
     </issue>
@@ -13033,7 +13033,7 @@
         errorLine1="        row.setOnTouchListener { _, event ->"
         errorLine2="                               ^">
         <location
-            file="src/main/java/com/openminis/app/pet/PetChatWindowView.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetChatWindowView.kt"
             line="139"
             column="32"/>
     </issue>
@@ -13044,7 +13044,7 @@
         errorLine1="        view.sprite.setOnTouchListener { _, event ->"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayService.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayService.kt"
             line="749"
             column="9"/>
     </issue>
@@ -13055,7 +13055,7 @@
         errorLine1="        view.sprite.setOnTouchListener { _, event ->"
         errorLine2="                                       ^">
         <location
-            file="src/main/java/com/openminis/app/pet/PetOverlayService.kt"
+            file="src/main/java/io/github/slackerllc/minis/pet/PetOverlayService.kt"
             line="749"
             column="40"/>
     </issue>
@@ -13066,7 +13066,7 @@
         errorLine1="    override fun onTouchEvent(event: MotionEvent): Boolean {"
         errorLine2="                 ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/terminal/canvas/TerminalNativeView.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/terminal/canvas/TerminalNativeView.kt"
             line="220"
             column="18"/>
     </issue>
@@ -13077,7 +13077,7 @@
         errorLine1="        target.setOnTouchListener { _, ev ->"
         errorLine2="                                  ^">
         <location
-            file="src/main/java/com/openminis/app/service/ToolOverlayController.kt"
+            file="src/main/java/io/github/slackerllc/minis/service/ToolOverlayController.kt"
             line="602"
             column="35"/>
     </issue>
@@ -13088,7 +13088,7 @@
         errorLine1="                    wv.setOnTouchListener { _, ev ->"
         errorLine2="                    ^">
         <location
-            file="src/main/java/com/openminis/app/webapp/WebAppActivity.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/WebAppActivity.kt"
             line="299"
             column="21"/>
     </issue>
@@ -13099,7 +13099,7 @@
         errorLine1="                    wv.setOnTouchListener { _, ev ->"
         errorLine2="                                          ^">
         <location
-            file="src/main/java/com/openminis/app/webapp/WebAppActivity.kt"
+            file="src/main/java/io/github/slackerllc/minis/webapp/WebAppActivity.kt"
             line="299"
             column="43"/>
     </issue>
@@ -13110,7 +13110,7 @@
         errorLine1="                    wv.setOnTouchListener { _, ev ->"
         errorLine2="                    ^">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewFullscreenScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewFullscreenScreen.kt"
             line="188"
             column="21"/>
     </issue>
@@ -13121,7 +13121,7 @@
         errorLine1="                    wv.setOnTouchListener { _, ev ->"
         errorLine2="                                          ^">
         <location
-            file="src/main/java/com/openminis/app/ui/preview/WebPreviewFullscreenScreen.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/preview/WebPreviewFullscreenScreen.kt"
             line="188"
             column="43"/>
     </issue>
@@ -13132,7 +13132,7 @@
         errorLine1="        private val timeFormatter = SimpleDateFormat(&quot;h:mm a&quot;, Locale.getDefault())"
         errorLine2="                                                               ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FileBrowserViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FileBrowserViewModel.kt"
             line="134"
             column="64"/>
     </issue>
@@ -13143,7 +13143,7 @@
         errorLine1="        private val weekdayFormatter = SimpleDateFormat(&quot;EEEE&quot;, Locale.getDefault())"
         errorLine2="                                                                ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FileBrowserViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FileBrowserViewModel.kt"
             line="135"
             column="65"/>
     </issue>
@@ -13154,7 +13154,7 @@
         errorLine1="        private val shortDateFormatter = SimpleDateFormat(&quot;MMM d, yyyy&quot;, Locale.getDefault())"
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FileBrowserViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FileBrowserViewModel.kt"
             line="136"
             column="74"/>
     </issue>
@@ -13165,7 +13165,7 @@
         errorLine1="        val dateFormatter = SimpleDateFormat(&quot;MMM d, yyyy HH:mm&quot;, Locale.getDefault())"
         errorLine2="                                                                  ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/ui/sandbox/FileBrowserViewModel.kt"
+            file="src/main/java/io/github/slackerllc/minis/ui/sandbox/FileBrowserViewModel.kt"
             line="501"
             column="67"/>
     </issue>
@@ -13176,7 +13176,7 @@
         errorLine1="    private val _locale = MutableStateFlow(Locale.getDefault())"
         errorLine2="                                           ~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/openminis/app/speech/SpeechRecognitionManager.kt"
+            file="src/main/java/io/github/slackerllc/minis/speech/SpeechRecognitionManager.kt"
             line="65"
             column="44"/>
     </issue>

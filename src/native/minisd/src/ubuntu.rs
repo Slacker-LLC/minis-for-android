@@ -1,7 +1,7 @@
 use crate::layout::{
-    ensure_host_layout_for, ensure_rootfs_layout, is_provisioned, read_os_release,
-    rootfs_looks_valid, validate_persistent_backing, DEFAULT_GUEST_CWD, GUEST_UID, HOST_HOME,
-    HOST_MEMORY, HOST_ROOTFS, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
+    active_rootfs_path, ensure_host_layout_for, ensure_rootfs_layout, is_provisioned,
+    read_os_release, rootfs_looks_valid, validate_persistent_backing, DEFAULT_GUEST_CWD, GUEST_UID,
+    HOST_HOME, HOST_MEMORY, HOST_ROOTFS, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
     PERSISTENT_DATA_MODE, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
 };
 use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
@@ -472,14 +472,15 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     if state.ubuntu.running {
         validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
         state.ubuntu.sessions_root = HOST_SESSIONS.to_string();
+        let rootfs = state.ubuntu.rootfs_or_default();
         let exe = std::env::current_exe().ok();
         let proxy_ok = exe.as_ref().map(|p| spawn_netproxy(p)).unwrap_or(false);
-        write_apt_proxy(HOST_ROOTFS);
+        write_apt_proxy(&rootfs);
         return Ok(json!({
             "running": true,
             "already": true,
             "pid": state.ubuntu.pid,
-            "rootfs": HOST_ROOTFS,
+            "rootfs": rootfs,
             "sessions_root": HOST_SESSIONS,
             "version": state.ubuntu.version,
             "provisioned": state.ubuntu.provisioned,
@@ -492,23 +493,24 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     let (guid, ggid) = guest_ids(state);
     ensure_host_layout_for(guid, ggid).map_err(|e| (ErrorCode::Internal, e))?;
     validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
-    if !rootfs_looks_valid(HOST_ROOTFS) {
+    let rootfs = active_rootfs_path();
+    if !rootfs_looks_valid(&rootfs) {
         return Err((
             ErrorCode::RuntimeUnavailable,
-            format!("rootfs not installed at {HOST_ROOTFS}"),
+            format!("rootfs not installed at {rootfs}"),
         ));
     }
-    ensure_rootfs_layout(HOST_ROOTFS).map_err(|e| (ErrorCode::Internal, e))?;
-    crate::layout::ensure_guest_user_ids(HOST_ROOTFS, guid, ggid)
+    ensure_rootfs_layout(&rootfs).map_err(|e| (ErrorCode::Internal, e))?;
+    crate::layout::ensure_guest_user_ids(&rootfs, guid, ggid)
         .map_err(|e| (ErrorCode::Internal, e))?;
     let dns = crate::env::discover_dns();
     let resolv =
-        crate::env::write_resolv_conf(HOST_ROOTFS, &dns).map_err(|e| (ErrorCode::Internal, e))?;
+        crate::env::write_resolv_conf(&rootfs, &dns).map_err(|e| (ErrorCode::Internal, e))?;
 
     let exe =
         std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
     let mut child = std::process::Command::new(&exe)
-        .args(["--helper", "keep", "--rootfs", HOST_ROOTFS])
+        .args(["--helper", "keep", "--rootfs", &rootfs])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -520,25 +522,25 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
         Ok(_) => {
             std::fs::write(UBUNTU_PID_FILE, format!("{pid}\n"))
                 .map_err(|e| (ErrorCode::Internal, format!("write ubuntu pid: {e}")))?;
-            std::fs::write(UBUNTU_ROOTFS_FILE, format!("{HOST_ROOTFS}\n"))
+            std::fs::write(UBUNTU_ROOTFS_FILE, format!("{rootfs}\n"))
                 .map_err(|e| (ErrorCode::Internal, format!("write ubuntu rootfs: {e}")))?;
             state.ubuntu.running = true;
             state.ubuntu.pid = Some(pid);
-            state.ubuntu.rootfs = HOST_ROOTFS.to_string();
+            state.ubuntu.rootfs = rootfs.clone();
             state.ubuntu.sessions_root = HOST_SESSIONS.to_string();
-            state.ubuntu.version = read_os_release(HOST_ROOTFS);
-            state.ubuntu.provisioned = is_provisioned(HOST_ROOTFS);
+            state.ubuntu.version = read_os_release(&rootfs);
+            state.ubuntu.provisioned = is_provisioned(&rootfs);
             state.ubuntu.last_error = None;
             std::thread::spawn(move || {
                 let _ = child.wait();
             });
             let proxy_ok = spawn_netproxy(&exe);
-            write_apt_proxy(HOST_ROOTFS);
+            write_apt_proxy(&rootfs);
             Ok(json!({
                 "running": true,
                 "already": false,
                 "pid": pid,
-                "rootfs": HOST_ROOTFS,
+                "rootfs": rootfs,
                 "sessions_root": HOST_SESSIONS,
                 "version": state.ubuntu.version,
                 "provisioned": state.ubuntu.provisioned,
@@ -953,14 +955,15 @@ fn wait_output_timeout(
 fn refresh_live(state: &mut AppState) {
     if let Some(pid) = state.ubuntu.pid.or_else(read_pidfile) {
         if pid_alive(pid) && is_keeper(pid) {
+            let rootfs = active_rootfs_path();
             state.ubuntu.running = true;
             state.ubuntu.pid = Some(pid);
-            state.ubuntu.rootfs = HOST_ROOTFS.to_string();
+            state.ubuntu.rootfs = rootfs.clone();
             state.ubuntu.sessions_root = HOST_SESSIONS.to_string();
             if state.ubuntu.version.is_none() {
-                state.ubuntu.version = read_os_release(HOST_ROOTFS);
+                state.ubuntu.version = read_os_release(&rootfs);
             }
-            state.ubuntu.provisioned = is_provisioned(HOST_ROOTFS);
+            state.ubuntu.provisioned = is_provisioned(&rootfs);
             return;
         }
     }
@@ -1012,7 +1015,7 @@ fn keeper_cmdline_matches(raw: &[u8]) -> bool {
         .any(|pair| pair[0] == b"--helper" && pair[1] == b"keep");
     let rootfs = args
         .windows(2)
-        .any(|pair| pair[0] == b"--rootfs" && pair[1] == HOST_ROOTFS.as_bytes());
+        .any(|pair| pair[0] == b"--rootfs" && pair[1] == active_rootfs_path().as_bytes());
     let has_legacy_source_override = args.iter().any(|arg| {
         *arg == b"--workspace"
             || *arg == b"--memory"
@@ -1072,8 +1075,9 @@ fn truncate(s: &str) -> String {
 }
 
 pub fn recover_state() -> crate::state::UbuntuState {
+    let rootfs = active_rootfs_path();
     let mut u = crate::state::UbuntuState {
-        rootfs: HOST_ROOTFS.to_string(),
+        rootfs: rootfs.clone(),
         sessions_root: HOST_SESSIONS.to_string(),
         ..Default::default()
     };
@@ -1083,12 +1087,12 @@ pub fn recover_state() -> crate::state::UbuntuState {
             if pid_alive(pid) && is_keeper(pid) {
                 u.running = true;
                 u.pid = Some(pid);
-                u.version = read_os_release(HOST_ROOTFS);
-                u.provisioned = is_provisioned(HOST_ROOTFS);
+                u.version = read_os_release(&rootfs);
+                u.provisioned = is_provisioned(&rootfs);
             }
-        } else if rootfs_looks_valid(HOST_ROOTFS) {
-            u.version = read_os_release(HOST_ROOTFS);
-            u.provisioned = is_provisioned(HOST_ROOTFS);
+        } else if rootfs_looks_valid(&rootfs) {
+            u.version = read_os_release(&rootfs);
+            u.provisioned = is_provisioned(&rootfs);
         }
     }
     u
@@ -1133,11 +1137,11 @@ mod tests {
         }))
         .is_ok());
         assert!(validate_persistent_start_params(&json!({
-            "workspace": "/data/user/0/dev.openminispet.android/files/minis/workspace"
+            "workspace": "/data/user/0/legacy.app/files/minis/workspace"
         }))
         .is_err());
         assert!(validate_persistent_start_params(&json!({
-            "sessions_root": "/data/user/0/dev.openminispet.android/files/minis-sessions"
+            "sessions_root": "/data/user/0/legacy.app/files/minis-sessions"
         }))
         .is_err());
         assert!(validate_persistent_start_params(&json!({"workspace": "/dev/shm/ws"})).is_err());

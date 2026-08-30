@@ -1,0 +1,142 @@
+package io.github.slackerllc.minis.tools
+
+import android.content.Context
+import io.github.slackerllc.minis.data.model.AgentToolDefinition
+import io.github.slackerllc.minis.data.model.AgentToolParam
+import io.github.slackerllc.minis.runtime.RuntimePathRegistry
+import io.github.slackerllc.minis.tools.internal.FileMutationQueue
+import io.github.slackerllc.minis.tools.internal.FileRevision
+import org.json.JSONObject
+
+object FileWriteTool {
+    const val NAME = "file_write"
+
+    fun definition(): AgentToolDefinition = AgentToolDefinition(
+        name = NAME,
+        description = "Write content to a file on the Linux filesystem. Faster than shell_execute for writing files. Creates the file if it doesn't exist. Use append mode to add to existing files.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Create Python statistics script', 'Write configuration file'). Use the same language as the user."),
+            "path" to AgentToolParam("string", "Absolute Linux path to write (e.g. /root/test.txt)"),
+            "content" to AgentToolParam("string", "The text content to write to the file"),
+            "append" to AgentToolParam("boolean", "If true, append to existing file instead of overwriting (default: false)"),
+            "create_dirs" to AgentToolParam("boolean", "If true, create parent directories if they don't exist (default: false)"),
+        ),
+        required = listOf("tool_title", "path", "content"),
+        propertyOrdering = listOf("tool_title", "path", "content", "append", "create_dirs"),
+        timeoutMs = 30_000L,
+    )
+
+    fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+        return try {
+            val args = JSONObject(argsJson)
+            val path = args.optString("path", "")
+            val content = args.optString("content", "")
+            val append = args.optBoolean("append", false)
+            val createDirs = args.optBoolean("create_dirs", false)
+            // Transport-only optimistic-concurrency guard used by Web Remote.
+            // It is intentionally not advertised in the LLM tool schema.
+            val expectedSha256 = args.optString("expected_sha256", "").trim().lowercase()
+            val toolTitle = args.optString("tool_title", NAME)
+
+            if (path.isBlank()) {
+                return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
+            }
+
+            // Per-session permission preset (DSH /permission) gate. read-only
+            // and workspace-write presets must really refuse out-of-bounds writes.
+            if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
+                return ToolExecutionResult(
+                    "Error: session permission preset `workspace-write` only allows writing under " +
+                        "/var/minis/workspace (and per-session /var/minis/* dirs). This path is not" +
+                        " allowed. Switch the session to `danger-full-access` on the device if this" +
+                        " write must proceed.",
+                    false, toolTitle = toolTitle,
+                )
+            }
+
+            // T219: read-only mount guard. Reject before opening so we don't
+            // half-create files inside a Locked external mount and surface a
+            // friendly hint pointing the user at Settings. Mirrors iOS
+            // ExternalMountCoordinator.isLinuxPathUnderReadOnlyMount used by
+            // AIChatViewModel.fileWrite (AIChatViewModel.swift:8333-8341).
+            if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
+                return ToolExecutionResult(
+                    "Error: $path is inside a read-only mounted folder and cannot be modified. " +
+                        "Toggle writability in Settings → Mount External Folders if this is a mistake.",
+                    false, toolTitle = toolTitle,
+                )
+            }
+
+            // T123: per-session resolver so /var/minis/workspace/...,
+            // /var/minis/attachments/..., /var/minis/offloads/...,
+            // /var/minis/browser/... land in this session's host dir
+            // rather than the global bind-mount map (which is overwritten
+            // every time another session boots its shell, last-writer-wins).
+            val file = io.github.slackerllc.minis.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
+                ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
+
+            // Validate UTF-8
+            try {
+                content.toByteArray(Charsets.UTF_8)
+            } catch (e: Exception) {
+                return ToolExecutionResult("Error: Content is not valid UTF-8", false, toolTitle = toolTitle)
+            }
+
+            // Pi-style per-file mutation queue: concurrent writes/edits against
+            // the same canonical target are serialized in request order.
+            FileMutationQueue.withFile(file) {
+                if (expectedSha256.isNotEmpty()) {
+                    if (!file.exists()) {
+                        return@withFile ToolExecutionResult(
+                            "Error: File changed since it was opened (it no longer exists): $path",
+                            false, toolTitle = toolTitle,
+                        )
+                    }
+                    val currentSha256 = FileRevision.sha256(file)
+                    if (!currentSha256.equals(expectedSha256, ignoreCase = true)) {
+                        return@withFile ToolExecutionResult(
+                            "Error: File changed since it was opened; reload before saving: $path",
+                            false, toolTitle = toolTitle,
+                        )
+                    }
+                }
+
+                // T123: mirror iOS AIChatViewModel L8339 — auto-create the
+                // parent dir whenever it doesn't exist, regardless of the
+                // create_dirs flag. Per-session subdirs (workspace, etc.) are
+                // materialized lazily.
+                val parent = file.parentFile
+                if (parent != null && (createDirs || !parent.exists())) {
+                    parent.mkdirs()
+                }
+
+                // Snapshot the pre-write size so a mount write can be verified
+                // afterwards: the old file.length() == bytes comparison was a
+                // tautology (both sides were read AFTER the write).
+                val oldBytes = if (file.exists()) file.length() else -1L
+                if (append) file.appendText(content) else file.writeText(content)
+
+                val bytes = file.length()
+                if (path.startsWith("/var/minis/mounts/")) {
+                    val landed = file.exists() && file.length() != oldBytes
+                    io.github.slackerllc.minis.logging.AppLogger.info(
+                        "FileWrite",
+                        "mount write path=$path host=${file.absolutePath} bytes=$bytes " +
+                            "oldBytes=$oldBytes exists=${file.exists()} landedOk=$landed",
+                    )
+                    if (!landed) {
+                        io.github.slackerllc.minis.logging.AppLogger.warning(
+                            "FileWrite",
+                            "mount write to $path reported success but did NOT persist to " +
+                                "${file.absolutePath} — likely missing WRITE_EXTERNAL_STORAGE / " +
+                                "shadowed FUSE view on this device",
+                        )
+                    }
+                }
+                ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)
+            }
+        } catch (e: Exception) {
+            ToolExecutionResult("Error writing file: ${e.message}", false)
+        }
+    }
+}
