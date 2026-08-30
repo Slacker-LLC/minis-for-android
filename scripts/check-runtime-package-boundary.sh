@@ -98,8 +98,15 @@ bootstrap="$RUNTIME/minisd/MinisdBootstrap.kt"
 grep -Fq 'const val MINISD_NATIVE_NAME = "libminisd.so"' "$bootstrap" || fail 'APK minisd name missing'
 grep -Fq 'context.applicationInfo.nativeLibraryDir' "$bootstrap" || fail 'nativeLibraryDir lookup missing'
 grep -Fq -- '--policy-json' "$bootstrap" || fail 'in-memory policy bootstrap missing'
-grep -Fq -- '--lease-pid' "$bootstrap" || fail 'app lease pid missing'
-grep -Fq -- '--lease-starttime' "$bootstrap" || fail 'app lease starttime missing'
+# Android production owns the lease supervisor itself. Verify the UID/PID/starttime
+# shell lease rather than requiring Rust standalone --watchdog CLI arguments.
+grep -Fq 'commands += "LEASE_PID=$leasePid"' "$bootstrap" || fail 'app lease pid missing'
+grep -Fq 'commands += "LEASE_STARTTIME=$leaseStartTime"' "$bootstrap" || fail 'app lease starttime missing'
+grep -Fq '/proc/\$LEASE_PID/status' "$bootstrap" || fail 'app lease UID check missing'
+grep -Fq '/proc/\$LEASE_PID/stat' "$bootstrap" || fail 'app lease proc starttime check missing'
+grep -Fq 'lease_start=\$(awk' "$bootstrap" || fail 'app lease starttime comparison missing'
+grep -Fq 'if ! lease_ok; then kill' "$bootstrap" || fail 'app lease child termination missing'
+if grep -Fq -- '--watchdog --socket' "$bootstrap"; then fail 'Android production returned to Rust compatibility watchdog'; fi
 grep -Fq 'startsWith('"'"'@'"'"')' "$bootstrap" || fail 'abstract socket guard missing'
 grep -Fq 'PERSISTENT_MIGRATION_MARKER' "$bootstrap" || fail '#50 migration marker missing'
 
@@ -139,6 +146,7 @@ grep -Fq '"schemaVersion" to 2' "$GRADLE" || fail 'Gradle schema-v2 manifest gen
 grep -Fq '"layoutVersion" to 2' "$GRADLE" || fail 'Gradle layout-v2 manifest generator missing'
 grep -Fq '"requiredCommands" to commands' "$GRADLE" || fail 'Gradle requiredCommands manifest contract missing'
 grep -Fq 'ubuntu-arm64-rootfs.tar.gz' "$GRADLE" || fail 'Gradle packaged rootfs asset missing'
+grep -Fq 'dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)' "$GRADLE" || fail 'runtime assets are not ordered after both runtime producers'
 if grep -Fq '"managed"' "$GRADLE"; then fail 'Gradle runtime manifest still contains managed placeholder'; fi
 
 # Standalone/dev-only compatibility in native minisd may retain filesystem Unix
