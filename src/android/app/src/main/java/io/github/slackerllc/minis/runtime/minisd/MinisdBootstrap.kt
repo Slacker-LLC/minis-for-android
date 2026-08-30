@@ -48,13 +48,12 @@ internal object MinisdBootstrap {
             ?.toLongOrNull()
 
     /**
-     * Starts an APK-owned broker watchdog. Production broker state is entirely
-     * process-local: abstract sockets, inline policy, and a UID/PID/starttime
-     * lease. No executable, policy, pidfile, or filesystem broker socket is
-     * written below `/data/adb/minis`.
-     *
-     * Root prepares the #50 persistent data roots before the broker starts.
-     * Legacy `filesDir` is a one-time migration input only.
+     * Starts the APK-owned broker under a root shell lease supervisor.
+     * Production uses only abstract sockets and inline policy. The supervisor
+     * checks app UID + PID + `/proc/<pid>/stat` starttime every second, so a
+     * force-stop or PID reuse terminates the broker without waiting for a child
+     * crash. Rust's standalone `--watchdog` remains compatibility-only and is
+     * not part of the Android production chain.
      */
     fun watchdogCommand(
         appSocket: String,
@@ -92,15 +91,16 @@ internal object MinisdBootstrap {
             commands += "sleep 1"
         }
 
-        commands += "(\"\$BIN\" --watchdog --socket \"\$SOCKET\" --policy-json \"\$POLICY_JSON\" --app-socket \"\$APP_SOCKET\" --lease-pid \"\$LEASE_PID\" --lease-starttime \"\$LEASE_STARTTIME\" >/dev/null 2>&1 &)"
-        commands += "echo \"minisd watchdog spawn requested\""
+        commands += "lease_ok() { [ -r \"/proc/\$LEASE_PID/stat\" ] || return 1; lease_uid=\$(awk '/^Uid:/{print \$2; exit}' \"/proc/\$LEASE_PID/status\" 2>/dev/null || true); [ \"\$lease_uid\" = \"\$APP_UID\" ] || return 1; lease_start=\$(awk '{print \$22}' \"/proc/\$LEASE_PID/stat\" 2>/dev/null || true); [ \"\$lease_start\" = \"\$LEASE_STARTTIME\" ]; }"
+        commands += "( while lease_ok; do \"\$BIN\" --socket \"\$SOCKET\" --policy-json \"\$POLICY_JSON\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 & child=\$!; while kill -0 \"\$child\" 2>/dev/null; do if ! lease_ok; then kill \"\$child\" 2>/dev/null || true; wait \"\$child\" 2>/dev/null || true; exit 0; fi; sleep 1; done; wait \"\$child\" 2>/dev/null || true; lease_ok || exit 0; sleep 1; done ) >/dev/null 2>&1 &"
+        commands += "echo \"minisd lease supervisor spawn requested\""
         return commands.joinToString("\n")
     }
 
     /**
      * Root-side, idempotent #50 migration. The marker is the final operation:
-     * interrupted copy/ownership/SELinux work therefore retries instead of
-     * exposing a partially migrated persistent source as complete.
+     * interrupted copy/ownership/SELinux/alias work retries rather than exposing
+     * a partially migrated persistent source as complete.
      */
     internal fun persistentDataPreparationCommand(
         appFilesDir: String,
@@ -126,7 +126,9 @@ internal object MinisdBootstrap {
             "APP_LABEL=\$(ls -Zd \"\$APP_FILES\" 2>/dev/null | awk '{print \$1; exit}')",
             "case \"\$APP_LABEL\" in u:object_r:app_data_file:s0:*) ;; *) echo \"unexpected filesDir SELinux label: \$APP_LABEL\" >&2; exit 59 ;; esac",
             "for d in \"\$ROOT/workspace\" \"\$ROOT/sessions\" \"\$ROOT/memory\" \"\$ROOT/skills\" \"\$ROOT/shared\" \"\$ROOT/home\"; do chcon -hR \"\$APP_LABEL\" \"\$d\" || { echo \"cannot relabel \$d\" >&2; exit 60; }; actual=\$(ls -Zd \"\$d\" 2>/dev/null | awk '{print \$1; exit}'); [ \"\$actual\" = \"\$APP_LABEL\" ] || { echo \"persistent SELinux label mismatch at \$d\" >&2; exit 61; }; done",
-            "if [ ! -e \"\$MIGRATION_MARKER\" ]; then umask 077; : > \"\$MIGRATION_MARKER.tmp\" || exit 62; chown 0:0 \"\$MIGRATION_MARKER.tmp\" || exit 63; chmod 0600 \"\$MIGRATION_MARKER.tmp\" || exit 64; mv -f \"\$MIGRATION_MARKER.tmp\" \"\$MIGRATION_MARKER\" || exit 65; fi",
+            "link_alias() { path=\"\$1\"; target=\"\$2\"; parent=\${path%/*}; mkdir -p \"\$parent\" || exit 62; if [ -L \"\$path\" ]; then [ \"\$(readlink \"\$path\" 2>/dev/null || true)\" = \"\$target\" ] || { echo \"unexpected legacy alias: \$path\" >&2; exit 63; }; return 0; fi; if [ -e \"\$path\" ]; then backup=\"\$path.pre-persistent-v1\"; if [ ! -e \"\$backup\" ]; then mv \"\$path\" \"\$backup\" || exit 64; else rm -rf \"\$path\" || exit 64; fi; fi; ln -s \"\$target\" \"\$path\" || exit 65; }",
+            "link_alias \"\$APP_FILES/minis/workspace\" \"\$ROOT/workspace\"; link_alias \"\$APP_FILES/minis-sessions\" \"\$ROOT/sessions\"; link_alias \"\$APP_FILES/minis-global/memory\" \"\$ROOT/memory\"; link_alias \"\$APP_FILES/minis-global/skills\" \"\$ROOT/skills\"; link_alias \"\$APP_FILES/minis-global/shared\" \"\$ROOT/shared\"; link_alias \"\$APP_FILES/minis-global/home\" \"\$ROOT/home\"",
+            "if [ ! -e \"\$MIGRATION_MARKER\" ]; then umask 077; : > \"\$MIGRATION_MARKER.tmp\" || exit 66; chown 0:0 \"\$MIGRATION_MARKER.tmp\" || exit 67; chmod 0600 \"\$MIGRATION_MARKER.tmp\" || exit 68; mv -f \"\$MIGRATION_MARKER.tmp\" \"\$MIGRATION_MARKER\" || exit 69; fi",
         ).joinToString("\n")
     }
 
