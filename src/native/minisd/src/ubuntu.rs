@@ -1091,9 +1091,9 @@ fn classify_pre_exec_failure(helper_code: u8, detail: &str) -> (ErrorCode, Strin
     let detail = detail.trim().to_string();
     let code = match helper_code {
         4 => {
-            let keeper_namespace_lost =
-                (detail.contains("open /proc/") && detail.contains("/ns/mnt"))
-                    || detail.contains("setns CLONE_NEWNS");
+            let keeper_namespace_lost = (detail.contains("open /proc/")
+                && detail.contains("/ns/mnt"))
+                || detail.contains("setns CLONE_NEWNS");
             if keeper_namespace_lost {
                 ErrorCode::KeeperNamespaceLost
             } else {
