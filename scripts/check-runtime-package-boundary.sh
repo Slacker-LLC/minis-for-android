@@ -2,9 +2,9 @@
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
-MAIN='src/android/app/src/main/java/com/openminis/app'
-TEST='src/android/app/src/test/java/com/openminis/app'
-ANDROID_TEST='src/android/app/src/androidTest/java/com/openminis/app'
+MAIN='src/android/app/src/main/java/io/github/slackerllc/minis'
+TEST='src/android/app/src/test/java/io/github/slackerllc/minis'
+ANDROID_TEST='src/android/app/src/androidTest/java/io/github/slackerllc/minis'
 RUNTIME="$MAIN/runtime"
 LEGACY="$MAIN/sandbox"
 
@@ -62,9 +62,9 @@ fi
 
 # Old active package families/names may not return. Compatibility references are
 # restricted to the three exact symbols still owned by the legacy shells.
-old_refs="$(git grep -n -E 'com\.openminis\.app\.sandbox\.' -- src/android 2>/dev/null || true)"
+old_refs="$(git grep -n -E 'io\.github\.slackerllc\.minis\.sandbox\.' -- src/android 2>/dev/null || true)"
 if [[ -n "$old_refs" ]]; then
-  unexpected="$(printf '%s\n' "$old_refs" | grep -Ev 'com\.openminis\.app\.sandbox\.(RootfsManager|RootfsInstallState|TerminalSession)([^A-Za-z0-9_]|$)' || true)"
+  unexpected="$(printf '%s\n' "$old_refs" | grep -Ev 'io\.github\.slackerllc\.minis\.sandbox\.(RootfsManager|RootfsInstallState|TerminalSession)([^A-Za-z0-9_]|$)' || true)"
   [[ -z "$unexpected" ]] || {
     printf '%s\n' "$unexpected" >&2
     fail "unexpected legacy sandbox FQN"

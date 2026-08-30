@@ -490,8 +490,8 @@ mod tests {
     #[test]
     fn alternate_app_filesdir_paths_are_rejected() {
         let error = normalized_start_params(&json!({
-            "workspace": "/data/user/0/com.openminis.app/files/workspace",
-            "sessions_root": "/data/user/0/com.openminis.app/files/sessions"
+            "workspace": "/data/user/0/legacy.app/files/workspace",
+            "sessions_root": "/data/user/0/legacy.app/files/sessions"
         }))
         .unwrap_err();
         assert_eq!(error.0, ErrorCode::BadParams);
