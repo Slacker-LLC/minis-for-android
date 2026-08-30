@@ -1,6 +1,8 @@
 import java.util.Properties
 import java.security.MessageDigest
 import java.util.zip.ZipFile
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import org.gradle.api.GradleException
 
 plugins {
@@ -41,6 +43,9 @@ val minisdReadelfName = "llvm-readelf" + if (minisdNdkHost.startsWith("windows")
 val minisdSourceDir = rootProject.file("../native/minisd")
 val minisdGeneratedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
 val minisdGeneratedAssets = layout.buildDirectory.dir("generated/minisdAssets")
+val runtimeDistDir = rootProject.file("../../dist")
+val runtimeRootfsArchive = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
+val runtimeRootfsBuildManifest = runtimeDistDir.resolve("ubuntu-arm64-rootfs.manifest.json")
 
 android {
     namespace = "io.github.slackerllc.minis"
@@ -117,15 +122,17 @@ android {
     }
 
     androidResources {
-        // The Ubuntu rootfs is packaged as a compressed tar archive.
+        // The authoritative Ubuntu rootfs is packaged as one compressed asset.
         noCompress += "tar.gz"
     }
 
     packaging {
         jniLibs {
-            // Cargo already emits a stripped, verified executable. Keeping its
-            // bytes stable is required because runtime-manifest.json records
-            // the exact SHA-256 shipped in the APK.
+            // minisd is an executable ELF distributed through the APK native
+            // library directory. Legacy packaging intentionally extracts the
+            // file into ApplicationInfo.nativeLibraryDir so root can execve the
+            // Package Manager-owned path; it is never copied to filesDir.
+            useLegacyPackaging = true
             keepDebugSymbols += "**/libminisd.so"
         }
     }
@@ -213,9 +220,7 @@ val packageMinisdNative by tasks.registering(Copy::class) {
     into(minisdGeneratedJniLibs.map { it.dir("arm64-v8a") })
 }
 
-fun sha256(file: java.io.File): String {
-    return file.inputStream().use(::sha256)
-}
+fun sha256(file: java.io.File): String = file.inputStream().use(::sha256)
 
 fun sha256(input: java.io.InputStream): String {
     val digest = MessageDigest.getInstance("SHA-256")
@@ -228,72 +233,151 @@ fun sha256(input: java.io.InputStream): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
-val generateMinisdRuntimeManifest by tasks.registering {
-    description = "Generates the APK runtime identity manifest for minisd."
+fun requireRuntimeString(map: Map<*, *>, key: String): String =
+    (map[key] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: throw GradleException("rootfs build manifest has no valid $key")
+
+fun requireRuntimeInt(map: Map<*, *>, key: String): Int =
+    (map[key] as? Number)?.toInt()?.takeIf { it > 0 }
+        ?: throw GradleException("rootfs build manifest has no positive $key")
+
+val packageRuntimeAssets by tasks.registering {
+    description = "Packages the reproducible Ubuntu rootfs and authoritative schema-v2 runtime manifest."
     group = "build"
     dependsOn(packageMinisdNative)
     val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
-    val manifest = minisdGeneratedAssets.map { it.file("minis-runtime/runtime-manifest.json") }
+    val outputDir = minisdGeneratedAssets.map { it.dir("minis-runtime") }
     inputs.file(binary)
-    outputs.file(manifest)
+    inputs.file(runtimeRootfsArchive)
+    inputs.file(runtimeRootfsBuildManifest)
+    outputs.dir(outputDir)
     doLast {
         val binaryFile = binary.get().asFile
-        val manifestFile = manifest.get().asFile
-        manifestFile.parentFile.mkdirs()
-        manifestFile.writeText(
-            """{
-              "runtimeVersion": "$appVersionName",
-              "minisdVersion": "$appVersionName",
-              "minisdSha256": "${sha256(binaryFile)}",
-              "protocolVersion": 1,
-              "layoutVersion": 1,
-              "rootfsVersion": "managed",
-              "rootfsSha256": "managed",
-              "provisionRevision": "managed",
-              "abi": "arm64-v8a"
+        if (!runtimeRootfsArchive.isFile || !runtimeRootfsBuildManifest.isFile) {
+            throw GradleException(
+                "Pinned rootfs build output is missing. Run scripts/build-ubuntu-rootfs.sh before Gradle packaging.",
+            )
+        }
+        @Suppress("UNCHECKED_CAST")
+        val rootfs = JsonSlurper().parse(runtimeRootfsBuildManifest) as? Map<*, *>
+            ?: throw GradleException("invalid rootfs build manifest")
+        val rootfsSha = requireRuntimeString(rootfs, "sha256").lowercase()
+        val actualRootfsSha = sha256(runtimeRootfsArchive)
+        check(rootfsSha.matches(Regex("^[0-9a-f]{64}$"))) { "invalid rootfs SHA-256" }
+        check(actualRootfsSha == rootfsSha) {
+            "rootfs build output SHA mismatch: actual=$actualRootfsSha declared=$rootfsSha"
+        }
+        val rootfsVersion = requireRuntimeString(rootfs, "version")
+        check(rootfsVersion.matches(Regex("^ubuntu-24\\.04-r[1-9][0-9]*-[0-9a-f]{16}$"))) {
+            "invalid rootfsVersion: $rootfsVersion"
+        }
+        check(rootfsVersion.endsWith(rootfsSha.take(16))) {
+            "rootfsVersion must be derived from final rootfs SHA-256"
+        }
+        val release = requireRuntimeString(rootfs, "release")
+        check(release.startsWith("24.04")) { "unsupported rootfs release: $release" }
+        val profile = requireRuntimeString(rootfs, "profile")
+        check(profile == "base") { "unsupported rootfs profile: $profile" }
+        val arch = requireRuntimeString(rootfs, "arch")
+        check(arch == "arm64-v8a") { "unsupported rootfs ABI: $arch" }
+        val upstream = requireRuntimeString(rootfs, "upstream_sha256").lowercase()
+        check(upstream.matches(Regex("^[0-9a-f]{64}$"))) { "invalid rootfs upstream SHA-256" }
+        val provisionRevision = requireRuntimeInt(rootfs, "provisionRevision")
+        val commands = (rootfs["requiredCommands"] as? List<*>)
+            ?.map { it as? String ?: throw GradleException("requiredCommands must contain strings") }
+            ?.takeIf { it.isNotEmpty() }
+            ?: throw GradleException("rootfs build manifest has no requiredCommands")
+        commands.forEach { command ->
+            check(command.matches(Regex("^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$"))) {
+                "invalid required command: $command"
             }
-            """.trimIndent() + "\n",
+        }
+
+        val runtimeDir = outputDir.get().asFile
+        runtimeDir.mkdirs()
+        runtimeRootfsArchive.copyTo(runtimeDir.resolve("ubuntu-arm64-rootfs.tar.gz"), overwrite = true)
+        val manifest = linkedMapOf<String, Any>(
+            "schemaVersion" to 2,
+            "runtimeVersion" to appVersionName,
+            "minisdVersion" to appVersionName,
+            "minisdSha256" to sha256(binaryFile),
+            "protocolVersion" to 1,
+            "layoutVersion" to 2,
+            "abi" to "arm64-v8a",
+            "rootfsVersion" to rootfsVersion,
+            "rootfsSha256" to rootfsSha,
+            "rootfsRelease" to release,
+            "rootfsProfile" to profile,
+            "rootfsUpstreamSha256" to upstream,
+            "provisionRevision" to provisionRevision,
+            "requiredCommands" to commands,
+        )
+        runtimeDir.resolve("runtime-manifest.json").writeText(
+            JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + "\n",
         )
     }
 }
 
-fun verifyPackagedMinisdApk(apk: java.io.File) {
+fun verifyPackagedRuntimeApk(apk: java.io.File) {
     if (!apk.isFile) throw GradleException("APK was not produced: $apk")
     ZipFile(apk).use { zip ->
         val lib = zip.getEntry("lib/arm64-v8a/libminisd.so")
             ?: throw GradleException("APK is missing lib/arm64-v8a/libminisd.so")
-        val manifest = zip.getEntry("assets/minis-runtime/runtime-manifest.json")
-            ?: throw GradleException("APK is missing assets/minis-runtime/runtime-manifest.json")
-        val actualHash = zip.getInputStream(lib).use { sha256(it) }
-        val manifestText = zip.getInputStream(manifest).bufferedReader().use { it.readText() }
-        val declaredHash = Regex("\\\"minisdSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"")
-            .find(manifestText)?.groupValues?.get(1)
-            ?: throw GradleException("runtime manifest has no valid minisdSha256")
-        check(actualHash == declaredHash) {
-            "APK minisd SHA-256 mismatch: actual=$actualHash declared=$declaredHash"
+        val rootfs = zip.getEntry("assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz")
+            ?: throw GradleException("APK is missing packaged Ubuntu rootfs")
+        val manifestEntry = zip.getEntry("assets/minis-runtime/runtime-manifest.json")
+            ?: throw GradleException("APK is missing authoritative runtime manifest")
+        val actualMinisd = zip.getInputStream(lib).use { sha256(it) }
+        val actualRootfs = zip.getInputStream(rootfs).use { sha256(it) }
+        val manifestText = zip.getInputStream(manifestEntry).bufferedReader().use { it.readText() }
+        @Suppress("UNCHECKED_CAST")
+        val manifest = JsonSlurper().parseText(manifestText) as Map<*, *>
+        check((manifest["schemaVersion"] as? Number)?.toInt() == 2) { "runtime schemaVersion must be 2" }
+        check((manifest["protocolVersion"] as? Number)?.toInt() == 1) { "runtime protocolVersion must be 1" }
+        check((manifest["layoutVersion"] as? Number)?.toInt() == 2) { "runtime layoutVersion must be 2" }
+        check(manifest["abi"] == "arm64-v8a") { "runtime ABI must be arm64-v8a" }
+        check(manifest["minisdSha256"] == actualMinisd) { "APK minisd SHA-256 does not match manifest" }
+        check(manifest["rootfsSha256"] == actualRootfs) { "APK rootfs SHA-256 does not match manifest" }
+        val rootfsVersion = manifest["rootfsVersion"] as? String ?: error("rootfsVersion missing")
+        check(rootfsVersion.matches(Regex("^ubuntu-24\\.04-r[1-9][0-9]*-[0-9a-f]{16}$"))) {
+            "invalid packaged rootfsVersion: $rootfsVersion"
+        }
+        check(rootfsVersion.endsWith(actualRootfs.take(16))) { "rootfsVersion is not final-artifact-derived" }
+        check((manifest["provisionRevision"] as? Number)?.toInt()?.let { it > 0 } == true) {
+            "provisionRevision must be positive"
+        }
+        val commands = manifest["requiredCommands"] as? List<*>
+        check(!commands.isNullOrEmpty()) { "requiredCommands must be packaged" }
+        listOf(
+            "managed",
+            "external_staged",
+            "/data/local/tmp/minis-runtime",
+            "/data/adb/minis/bin/minisd",
+            "/data/adb/minis/run/minisd.sock",
+            "/data/adb/minis/run/minisd.pid",
+            "/data/adb/minis/policy/policy.json",
+        ).forEach { forbidden ->
+            check(forbidden !in manifestText) { "obsolete runtime contract returned in APK manifest: $forbidden" }
         }
         val forbiddenAsset = zip.entries().asSequence()
             .map { it.name }
-            .firstOrNull { it.startsWith("assets/minisd/") || it.startsWith("assets/") && it.endsWith(".so") }
-        check(forbiddenAsset == null) { "executable native payload leaked into assets: $forbiddenAsset" }
-        check("data/adb/minis/bin/" !in manifestText) {
-            "runtime manifest references the obsolete externally staged minisd"
-        }
+            .firstOrNull { it.startsWith("assets/minisd/") || (it.startsWith("assets/") && it.endsWith(".so")) }
+        check(forbiddenAsset == null) { "native executable leaked into assets: $forbiddenAsset" }
     }
 }
 
 val verifyDebugMinisdApk by tasks.registering {
-    description = "Verifies the packaged debug APK contains the exact APK-owned minisd payload."
+    description = "Verifies the debug APK contains the exact APK-owned minisd and rootfs runtime."
     group = "verification"
     dependsOn("packageDebug")
-    doLast { verifyPackagedMinisdApk(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile) }
+    doLast { verifyPackagedRuntimeApk(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile) }
 }
 
 val verifyReleaseMinisdApk by tasks.registering {
-    description = "Verifies the packaged release APK contains the exact APK-owned minisd payload."
+    description = "Verifies the release APK contains the exact APK-owned minisd and rootfs runtime."
     group = "verification"
     dependsOn("packageRelease")
-    doLast { verifyPackagedMinisdApk(layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile) }
+    doLast { verifyPackagedRuntimeApk(layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile) }
 }
 
 tasks.matching { it.name == "assembleDebug" }
@@ -304,8 +388,8 @@ tasks.matching { it.name == "assembleRelease" }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(packageMinisdNative) }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(generateMinisdRuntimeManifest) }
-tasks.named("preBuild") { dependsOn(generateMinisdRuntimeManifest) }
+    .configureEach { dependsOn(packageRuntimeAssets) }
+tasks.named("preBuild") { dependsOn(packageRuntimeAssets) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.
@@ -326,8 +410,6 @@ val stageDebugSkillAssets by tasks.registering(Exec::class) {
     val script = rootProject.file("../../scripts/gen_debug_skill_android.sh")
     val skillDir = rootProject.file("../../.claude/skills/debug-server")
     onlyIf { script.exists() }
-    // Gradle validates declared inputs before onlyIf, so declare them only when
-    // the optional local source actually exists.
     if (skillDir.isDirectory) inputs.dir(skillDir)
     if (script.isFile) inputs.file(script)
     outputs.dir(layout.projectDirectory.dir("src/debug/assets/debug-skill"))
@@ -348,7 +430,6 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") && it
     .configureEach { dependsOn(stageDebugSkillAssets) }
 
 dependencies {
-    // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2025.09.00")
     implementation(composeBom)
     implementation("androidx.compose.material3:material3")
@@ -357,77 +438,52 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // Vendored com.kyant.backdrop uses @Language("AGSL") from JetBrains annotations
     implementation("org.jetbrains:annotations:26.1.0")
 
-    // Core
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    // ProcessLifecycleOwner is used by XAIOAuthManager to detect Custom Tab dismissal.
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
-    // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
-    // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-    // Security (EncryptedSharedPreferences)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // Silero v5 VAD (ONNX Runtime + WebRTC APM).
     implementation("com.github.helloooideeeeea:RealTimeCutVADLibraryForAndroid:1.0.5@aar")
 
-    // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
-    // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-
-    // Coil (image loading)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Markdown rendering
     implementation("com.mikepenz:multiplatform-markdown-renderer-android:0.33.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3-android:0.33.0")
 
-    // Chrome Custom Tabs (in-app browser for OAuth)
     implementation("androidx.browser:browser:1.8.0")
-
-    // WebViewAssetLoader serves pinned PWA HTML under
-    // https://appassets.androidplatform.net/ without raw file:// access.
     implementation("androidx.webkit:webkit:1.12.1")
 
-    // Drag-to-reorder for LazyColumn
     implementation("sh.calvin.reorderable:reorderable:2.4.0")
 
-    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    // ACRA local crash report capture. acra-core has no HTTP sender.
     implementation("ch.acra:acra-core:5.12.0")
 
-    // Shizuku-compatible privileged Android API bridge. AXManager/Sui-compatible
-    // implementations reuse the same Shizuku protocol surface.
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
 
-    // Testing — JVM unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.json:json:20231013")
 
-    // Testing — Instrumented (on-device) tests
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
