@@ -22,6 +22,7 @@ struct Args {
     policy: Option<PathBuf>,
     policy_json: Option<String>,
     lease_pid: Option<i32>,
+    lease_starttime: Option<u64>,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -34,6 +35,7 @@ fn parse_args() -> Result<Args, String> {
     let mut policy = None;
     let mut policy_json = None;
     let mut lease_pid = None;
+    let mut lease_starttime = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -61,9 +63,17 @@ fn parse_args() -> Result<Args, String> {
                         .map_err(|_| "--lease-pid must be numeric")?,
                 );
             }
+            "--lease-starttime" => {
+                lease_starttime = Some(
+                    it.next()
+                        .ok_or("--lease-starttime needs a value")?
+                        .parse()
+                        .map_err(|_| "--lease-starttime must be numeric")?,
+                );
+            }
             "--help" | "-h" => {
                 eprintln!(
-                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket NAME] [--app-socket NAME] [--policy PATH] [--policy-json JSON] [--lease-pid PID]"
+                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket NAME] [--app-socket NAME] [--policy PATH] [--policy-json JSON] [--lease-pid PID] [--lease-starttime STARTTIME]"
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
@@ -84,6 +94,7 @@ fn parse_args() -> Result<Args, String> {
         policy,
         policy_json,
         lease_pid,
+        lease_starttime,
     })
 }
 
@@ -147,6 +158,7 @@ fn main() -> ExitCode {
             args.policy,
             args.policy_json,
             args.lease_pid,
+            args.lease_starttime,
         );
     }
     let policy = match load_policy(&args.policy, &args.policy_json) {
@@ -197,6 +209,7 @@ fn watchdog_loop(
     policy: Option<PathBuf>,
     policy_json: Option<String>,
     lease_pid: Option<i32>,
+    lease_starttime: Option<u64>,
 ) -> ExitCode {
     let exe = match std::env::current_exe() {
         Ok(p) => p,
@@ -207,7 +220,7 @@ fn watchdog_loop(
     };
     loop {
         if let Some(pid) = lease_pid {
-            if !lease_alive(pid) {
+            if !lease_alive(pid, lease_starttime) {
                 return ExitCode::SUCCESS;
             }
         }
@@ -233,7 +246,7 @@ fn watchdog_loop(
             Err(e) => eprintln!("minisd spawn: {e}"),
         }
         if let Some(pid) = lease_pid {
-            if !lease_alive(pid) {
+            if !lease_alive(pid, lease_starttime) {
                 return ExitCode::SUCCESS;
             }
         }
@@ -242,13 +255,51 @@ fn watchdog_loop(
 }
 
 #[cfg(unix)]
-fn lease_alive(pid: i32) -> bool {
-    pid > 0 && unsafe { libc::kill(pid, 0) == 0 }
+fn lease_alive(pid: i32, expected_starttime: Option<u64>) -> bool {
+    if pid <= 0 || unsafe { libc::kill(pid, 0) != 0 } {
+        return false;
+    }
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        expected_starttime.is_none_or(|expected| process_starttime(pid) == Some(expected))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        let _ = expected_starttime;
+        true
+    }
 }
 
 #[cfg(not(unix))]
-fn lease_alive(_pid: i32) -> bool {
+fn lease_alive(_pid: i32, _expected_starttime: Option<u64>) -> bool {
     false
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn process_starttime(pid: i32) -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    parse_proc_starttime(&stat)
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn parse_proc_starttime(stat: &str) -> Option<u64> {
+    let after_comm = stat.rsplit_once(')')?.1;
+    after_comm.split_whitespace().nth(19)?.parse().ok()
+}
+
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
+mod tests {
+    use super::{parse_proc_starttime, process_starttime};
+
+    #[test]
+    fn proc_starttime_reads_field_twenty_two_after_comm() {
+        let mut fields = vec!["S".to_string()];
+        fields.extend(std::iter::repeat_n("0".to_string(), 18));
+        fields.push("4242".to_string());
+        let stat = format!("123 (app with ) paren) {}", fields.join(" "));
+        assert_eq!(parse_proc_starttime(&stat), Some(4242));
+        assert!(process_starttime(std::process::id() as i32).is_some());
+    }
 }
 
 #[cfg(unix)]

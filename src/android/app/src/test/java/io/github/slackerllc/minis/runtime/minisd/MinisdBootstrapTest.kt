@@ -50,11 +50,13 @@ class MinisdBootstrapTest {
             binaryPath = "/data/app/~~hash==/lib/arm64/libminisd.so",
             socketPath = "@minis.minisd.root.12345.v1",
             leasePid = 4321,
+            leaseStartTime = 987654,
         )
 
         assertTrue(command.contains("--watchdog"))
         assertTrue(command.contains("--policy-json"))
         assertTrue(command.contains("--lease-pid \"\$LEASE_PID\""))
+        assertTrue(command.contains("--lease-starttime \"\$LEASE_STARTTIME\""))
         assertTrue(command.contains("--app-socket \"\$APP_SOCKET\""))
         assertTrue(command.contains("libminisd.so"))
         assertFalse(command.contains("--policy \"\$POLICY\""))
@@ -71,12 +73,14 @@ class MinisdBootstrapTest {
             binaryPath = "/data/app/lib/arm64/libminisd.so",
             socketPath = "@minis.minisd.root.12345.v1",
             leasePid = 4321,
+            leaseStartTime = 987654,
         )
 
         assertTrue(command.contains("for proc in /proc/[0-9]*"))
         assertTrue(command.contains("--watchdog"))
         assertTrue(command.contains("kill \"\$pid\""))
         assertTrue(command.contains("@minis.minisd.root.12345.v1"))
+        assertTrue(command.contains("LEASE_STARTTIME=987654"))
         assertFalse(command.contains("PIDFILE"))
     }
 
@@ -85,6 +89,16 @@ class MinisdBootstrapTest {
         assertEquals(0, MinisdBootstrap.parseEffectiveUid("KernelSU warning\n0\n"))
         assertEquals(10394, MinisdBootstrap.parseEffectiveUid("notice\n10394\nmore"))
         assertEquals(null, MinisdBootstrap.parseEffectiveUid("permission denied"))
+    }
+
+    @Test
+    fun `proc stat parser binds lease to process start time`() {
+        val fields = buildList {
+            add("S")
+            repeat(18) { add("0") }
+            add("4242")
+        }
+        assertEquals(4242L, MinisdBootstrap.parseProcessStatStartTime("123 (app) ${fields.joinToString(" ")}"))
     }
 
     @Test

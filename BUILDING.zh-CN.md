@@ -78,6 +78,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 APK/AAB 只作为本地或 CI 构建产物，不应提交到 Git。
 
+不要再通过 `adb push` 单独部署 `minisd`。Broker 必须是 Package Manager 安装到
+`ApplicationInfo.nativeLibraryDir` 的 `libminisd.so`；root bootstrap 只传入按 App UID
+隔离的 abstract socket、内存中的 policy，以及绑定 App PID 和 procfs 启动时间的 lease。
+
 `assembleDebug` 和 `assembleRelease` 会自动校验 APK 内的
 `lib/arm64-v8a/libminisd.so`、runtime manifest SHA-256，以及 assets 是否混入
 原生可执行文件。

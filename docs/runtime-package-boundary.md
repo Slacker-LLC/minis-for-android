@@ -54,7 +54,8 @@ The runtime preserves these values:
 - guest workspace: `/workspace`
 
 The broker policy is loaded into memory at bootstrap and the watchdog holds an
-app-process lease. No broker `.sock`, `.pid`, policy file, or executable is
+app-process lease bound to the app UID, PID, and Linux procfs process start time;
+PID reuse alone cannot keep an old broker alive. No broker `.sock`, `.pid`, policy file, or executable is
 created under `/data/adb/minis`; Package Manager owns the native executable's
 install, upgrade, and uninstall lifecycle. Persistent user data and rootfs
 remain under `/data/adb/minis` and are not deleted by ordinary APK uninstall.
