@@ -4,6 +4,21 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    resolutionStrategy {
+        eachPlugin {
+            // KSP publishes both a Gradle plugin marker and the implementation
+            // module to Maven Central. CI has observed the marker lookup fail
+            // even while the implementation module is published. Resolve the
+            // plugin id directly to that implementation so builds do not depend
+            // on the marker path; the requested Kotlin-matched KSP version is
+            // still supplied by the root plugins block.
+            if (requested.id.id == "com.google.devtools.ksp") {
+                useModule(
+                    "com.google.devtools.ksp:symbol-processing-gradle-plugin:${requested.version}",
+                )
+            }
+        }
+    }
 }
 
 dependencyResolutionManagement {
