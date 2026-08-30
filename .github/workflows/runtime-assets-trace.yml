@@ -32,6 +32,7 @@ jobs:
       - name: Trace AGP merge inputs and final APK ZIP
         working-directory: src/android
         run: |
+          chmod +x gradlew
           cat >/tmp/runtime-assets-probe.gradle <<'GRADLE'
           allprojects {
             tasks.configureEach { task ->
