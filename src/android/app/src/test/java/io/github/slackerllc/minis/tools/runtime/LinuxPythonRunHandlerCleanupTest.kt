@@ -2,6 +2,7 @@ package io.github.slackerllc.minis.tools.runtime
 
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import io.github.slackerllc.minis.runtime.ubuntu.UbuntuPaths
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -37,8 +38,12 @@ class LinuxPythonRunHandlerCleanupTest {
         }
     }
 
-    private class TestContext(private val root: File) : ContextWrapper(null) {
+    private class TestContext(private val root: File) :
+        ContextWrapper(null),
+        UbuntuPaths.SessionRootProviderForTest {
         private val preferences = EmptySharedPreferences()
+
+        override val sessionsRootForTest: File = File(root, "minis-sessions")
 
         override fun getFilesDir(): File = root
 
