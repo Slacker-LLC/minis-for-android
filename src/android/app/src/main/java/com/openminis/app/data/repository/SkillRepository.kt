@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import android.util.Log
+import com.openminis.app.runtime.ubuntu.AppPersistentPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -110,8 +111,7 @@ class SkillRepository(private val context: Context) {
         SkillDbHelper(context).writableDatabase
     }
 
-    private val skillsDir: File
-        get() = File(context.filesDir, "minis-global/skills")
+    private val skillsDir: File = AppPersistentPaths.skills
 
     init {
         // [T-android-safemode-lateinit-crash-147] Never let a bad skill take
