@@ -1,5 +1,13 @@
 package com.openminis.app.tools
 
+enum class ToolFailureKind {
+    TOOL_TIMEOUT,
+    TRANSPORT_TIMEOUT,
+    PROCESS_KILLED,
+    USER_CANCELLATION,
+    CLEANUP_FAILURE,
+}
+
 data class ToolExecutionResult(
     val output: String,
     val success: Boolean,
@@ -10,23 +18,14 @@ data class ToolExecutionResult(
     val pageURL: String? = null,
     /** Local file path to screenshot JPEG (for thumbnail/detail view). */
     val imageFilePath: String? = null,
-    /**
-     * iSH-visible linux path the image bytes were persisted to (e.g.
-     * `/var/minis/browser/<sid>/screenshot_<ts>.jpg`,
-     * `/var/minis/attachments/generated/...`). Used by request-level image
-     * budgeting to emit a re-fetchable text placeholder instead of the
-     * bytes when the cumulative payload would exceed the per-request cap.
-     * Distinct from [imageFilePath] which is a host-OS absolute path that
-     * agents cannot directly address.
-     */
+    /** Agent-visible linux path for persisted image bytes. */
     val imageLinuxPath: String? = null,
-    /**
-     * True when the tool did not return within its per-tool-category timeout.
-     * Distinct from generic `!success` so the UI can render a TIMEOUT status
-     * (clock icon) instead of a FAILED status (error icon). Mirrors a failure
-     * subclassification iOS handles inline via error-message parsing.
-     */
+    /** True only for the tool execution budget, not transport/user cancellation. */
     val timedOut: Boolean = false,
+    /** Machine-diagnosable execution failure classification. */
+    val failureKind: ToolFailureKind? = null,
+    /** Cleanup failure is reported separately so it never masks the primary result. */
+    val cleanupFailure: String? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -35,8 +34,8 @@ data class ToolExecutionResult(
             imageData.contentEquals(other.imageData) &&
             imageMimeType == other.imageMimeType && toolTitle == other.toolTitle &&
             pageURL == other.pageURL && imageFilePath == other.imageFilePath &&
-            imageLinuxPath == other.imageLinuxPath &&
-            timedOut == other.timedOut
+            imageLinuxPath == other.imageLinuxPath && timedOut == other.timedOut &&
+            failureKind == other.failureKind && cleanupFailure == other.cleanupFailure
     }
 
     override fun hashCode(): Int {
@@ -49,6 +48,8 @@ data class ToolExecutionResult(
         result = 31 * result + (imageFilePath?.hashCode() ?: 0)
         result = 31 * result + (imageLinuxPath?.hashCode() ?: 0)
         result = 31 * result + timedOut.hashCode()
+        result = 31 * result + (failureKind?.hashCode() ?: 0)
+        result = 31 * result + (cleanupFailure?.hashCode() ?: 0)
         return result
     }
 }

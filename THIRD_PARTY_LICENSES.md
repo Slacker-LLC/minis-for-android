@@ -10,7 +10,7 @@ OpenMinis is distributed under GPL-3.0. Minis for Android is a derivative work a
 
 When distributing a modified APK, provide the corresponding source and preserve applicable copyright/license notices.
 
-See also [UPSTREAM.md](UPSTREAM.md) and [LICENSE](LICENSE).
+See also [PROVENANCE.md](PROVENANCE.md) and [LICENSE](LICENSE).
 
 ## Active native/runtime components
 
