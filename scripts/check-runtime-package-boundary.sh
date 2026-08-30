@@ -126,15 +126,18 @@ for path in \
   git grep -Fq "$path" -- "$RUNTIME" "$LEGACY/RootfsManager.kt" || fail "persistent path contract missing: $path"
 done
 
-# Active Android/Gradle production code must never return to an externally
-# staged or filesystem-backed broker. Native filesystem socket/policy support is
-# tolerated only as standalone/dev compatibility and is separately guarded.
-active_hits="$(git grep -n -E 'external_staged|/data/local/tmp/minis-runtime|/data/adb/minis/bin/minisd|/data/adb/minis/run/minisd\.(sock|pid)|/data/adb/minis/policy/policy\.json' -- \
-  src/android/app/src/main "$GRADLE" 2>/dev/null || true)"
-[[ -z "$active_hits" ]] || {
-  printf '%s\n' "$active_hits" >&2
+# Active Android production sources and the Gradle producer/configuration section
+# must never return to an externally staged or filesystem-backed broker. The APK
+# verifier below intentionally contains those strings as negative assertions, so
+# it is excluded from this production scan rather than weakening the assertions.
+obsolete_pattern='external_staged|/data/local/tmp/minis-runtime|/data/adb/minis/bin/minisd|/data/adb/minis/run/minisd\.(sock|pid)|/data/adb/minis/policy/policy\.json'
+source_hits="$(git grep -n -E "$obsolete_pattern" -- src/android/app/src/main/java src/android/app/src/main/AndroidManifest.xml 2>/dev/null || true)"
+gradle_production_hits="$(awk '/^fun verifyPackagedRuntimeApk\(/ { exit } { print }' "$GRADLE" | grep -n -E "$obsolete_pattern" || true)"
+if [[ -n "$source_hits" || -n "$gradle_production_hits" ]]; then
+  [[ -z "$source_hits" ]] || printf '%s\n' "$source_hits" >&2
+  [[ -z "$gradle_production_hits" ]] || printf '%s\n' "$gradle_production_hits" >&2
   fail 'obsolete external or filesystem broker contract returned to Android production'
-}
+fi
 [[ ! -e src/android/app/src/main/assets/runtime-distribution.json ]] || \
   fail 'obsolete runtime-distribution.json asset returned'
 
