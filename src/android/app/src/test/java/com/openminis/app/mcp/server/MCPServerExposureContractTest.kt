@@ -42,14 +42,8 @@ class MCPServerExposureContractTest {
         assertTrue(first.token.matches(Regex("[0-9a-f]{64}")))
         assertTrue(first.scope.isNotEmpty())
         assertTrue(
-            first.scope.all {
-                ToolPermissionManager.levelFor("mcp:${first.id}".let { _ -> it }, "mcp:${first.id}") !=
-                    ToolPermissionManager.Level.MCP_CONFIRM
-            },
-        )
-        assertTrue(
-            first.scope.all {
-                ToolPermissionManager.levelFor(it, "mcp:${first.id}") ==
+            first.scope.all { tool ->
+                ToolPermissionManager.levelFor(tool, "mcp:${first.id}") ==
                     ToolPermissionManager.Level.MCP_ALLOWED
             },
         )
