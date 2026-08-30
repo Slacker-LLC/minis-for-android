@@ -54,6 +54,8 @@ cargo build --locked --release \
 
 脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs。
 
+可选 APK 运行时载荷：若存在 `dist/ubuntu-arm64-rootfs.tar.gz`，Gradle 会拷进 assets；若存在 `src/native/minisd/target/aarch64-linux-android/release/minisd`，会拷成 `libminisd.so`。纯源码构建不含这两项，设备上会 fail-closed。
+
 ## 5. 构建 Debug APK
 
 ```bash
