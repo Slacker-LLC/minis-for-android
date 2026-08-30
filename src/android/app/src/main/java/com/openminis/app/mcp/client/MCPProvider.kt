@@ -25,12 +25,14 @@ import kotlinx.coroutines.withTimeout
 
 /**
  * MCPProvider — Minis as an MCP **client**: connects every enabled server in
- * `mcp_servers.json` (MCPRepository), performs the 2025-06-18 initialize
+ * `servers.json` (MCPRepository), performs the 2025-06-18 initialize
  * handshake, pulls tools and registers them in ToolRegistry as
  * `mcp.<serverId>.<tool>` (policy table `mcp.*` governs them, LOCAL_ONLY).
  *
  * Reload (`reload()`) tears all sessions down and reconnects with bounded
  * concurrency so one unreachable server cannot serialize the entire reload.
+ * MCPRepository binds its global-config change callback here during [init], so
+ * UI/debug/import/disk-refresh mutations share this same reload path.
  */
 object MCPProvider {
 
@@ -72,10 +74,16 @@ object MCPProvider {
     @Volatile
     var context: Context? = null
 
-    /** Attaches the config source; call [reload] to connect. */
+    /**
+     * Attaches the config source and its hot-update callback; call [reload] once
+     * after init for the initial connection set. Re-init detaches the previous
+     * Repository so a stale object cannot trigger reloads against the new one.
+     */
     fun init(repository: MCPRepository, context: Context? = null) {
+        this.repository?.onServerConfigsChanged = null
         this.repository = repository
         this.context = context
+        repository.onServerConfigsChanged = ::reload
     }
 
     /** Reconnects all enabled servers and re-registers their tools. */
