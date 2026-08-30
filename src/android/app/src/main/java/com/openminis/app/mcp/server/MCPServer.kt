@@ -2,17 +2,7 @@ package com.openminis.app.mcp.server
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import com.openminis.app.notification.McpConfirmNotifier
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.InetAddress
@@ -20,15 +10,21 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
- * [T-android-mcp-server] On-device MCP server (07 §1/§2).
+ * On-device MCP server.
  *
- * Streamable HTTP, stateless, POST /mcp, JSON-RPC 2.0. Binds 127.0.0.1 only.
- * Bearer token required on every request (TokenStore); no token configured →
- * the manager refuses to start (fail-closed). Tools are served from
- * ToolRegistry/ToolExecutor through the D8 permission model: LOCAL_ONLY and
- * MCP_DENIED tools are invisible to `tools/list` and rejected on call.
+ * Streamable HTTP, stateless, POST /mcp, JSON-RPC 2.0. Binds loopback only.
+ * Bearer token is required on every request. Tool visibility and calls both
+ * honor the token scope in addition to the central ToolPermissionManager.
  */
 class MCPServer(private val context: Context?, private val port: Int = MCPServerManager.PORT) {
 
@@ -39,8 +35,11 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         private const val CODE_CONFIRM_REJECTED = -32002
         private const val CODE_CONFIRM_QUEUE_FULL = -32003
 
-        /** A4: connection cap — local slowloris must not exhaust the accept loop. */
         const val MAX_CONNECTIONS = 16
+
+        /** Empty scope is retained as the legacy "all MCP-visible tools" form. */
+        internal fun scopeAllows(scope: Set<String>, toolName: String): Boolean =
+            scope.isEmpty() || toolName in scope
     }
 
     @Volatile
@@ -53,28 +52,24 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val confirmQueue = ConfirmQueue()
 
-    /** DEBUG-only: approve a pending confirm (see MCPServerManager.debugApproveConfirm). */
     fun approveConfirm(confirmId: String, method: String) = confirmQueue.approve(confirmId, method)
     private val connectionSlots = Semaphore(MAX_CONNECTIONS)
 
-    /**
-     * A2/A1: binds synchronously so [isRunning] is authoritative when this
-     * returns (manager reads it right after), and the accept loop checks
-     * [isActive] + [isRunning] so [stop] terminates it instead of spinning
-     * on a closed socket.
-     */
     @Synchronized
     fun start() {
         if (acceptJob != null) return
         val ss = try {
-            ServerSocket(port, 10, InetAddress.getByName("127.0.0.1"))
+            ServerSocket(port, 10, InetAddress.getByName(MCPServerManager.HOST))
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to bind MCP server on 127.0.0.1:$port: ${e.message}")
+            Log.e(
+                TAG,
+                "Failed to bind MCP server on ${MCPServerManager.HOST}:$port: ${e.message}",
+            )
             return
         }
         serverSocket = ss
         isRunning = true
-        Log.i(TAG, "MCP server listening on 127.0.0.1:$port")
+        Log.i(TAG, "MCP server listening on ${MCPServerManager.HOST}:$port")
         acceptJob = scope.launch {
             try {
                 while (isActive && isRunning) {
@@ -104,7 +99,10 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
 
     @Synchronized
     fun stop() {
-        try { serverSocket?.close() } catch (_: Exception) {}
+        try {
+            serverSocket?.close()
+        } catch (_: Exception) {
+        }
         serverSocket = null
         acceptJob?.cancel()
         acceptJob = null
@@ -117,7 +115,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         val s = socket
         var slotAcquired = false
         try {
-            // A4: reject when all connection slots are taken
             if (!connectionSlots.tryAcquire()) {
                 runCatching {
                     val w = java.io.PrintWriter(s.getOutputStream(), true)
@@ -137,7 +134,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                 return
             }
             val path = parts[1].substringBefore('?')
-            if (path != "/mcp") {
+            if (path != MCPServerManager.PATH) {
                 sendHttp(writer, 404, "{\"error\":\"not found\"}")
                 return
             }
@@ -176,7 +173,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             }
             val raw = String(body, 0, read)
 
-            // fail-closed auth: token required on every request
             val tokenRecord = token?.let { TokenStore.find(it) }
             if (tokenRecord == null) {
                 sendHttp(writer, 401, "{\"error\":\"unauthorized\"}")
@@ -196,7 +192,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         }
     }
 
-    /** Returns the JSON-RPC response body, or null for notifications (no reply). */
     private suspend fun dispatch(req: MCPCodec.MCPRequest, tokenRecord: TokenStore.Token): String? {
         val caller = "mcp:${tokenRecord.id}"
         return try {
@@ -204,11 +199,11 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                 MCPCodec.METHOD_INITIALIZE -> MCPCodec.response(req.id, MCPCodec.initializeResult())
                 MCPCodec.METHOD_PING -> MCPCodec.response(req.id, MCPCodec.pingResult())
                 MCPCodec.METHOD_TOOLS_LIST -> {
-                    val defs = com.openminis.app.tools.runtime.ToolRegistry.definitionsForCaller(caller)
+                    val defs = com.openminis.app.tools.runtime.ToolRegistry
+                        .definitionsForCaller(caller)
+                        .filter { scopeAllows(tokenRecord.scope, it.name) }
                     val arr = JSONArray()
-                    for (d in defs) {
-                        arr.put(d.toAnthropicJson())
-                    }
+                    for (d in defs) arr.put(d.toAnthropicJson())
                     MCPCodec.response(req.id, MCPCodec.toolsListResult(arr))
                 }
                 MCPCodec.METHOD_TOOLS_CALL -> handleToolCall(req, tokenRecord, caller)
@@ -216,13 +211,16 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                     if (MCPCodec.isNotification(req.method)) {
                         null
                     } else {
-                        MCPCodec.errorResponse(req.id, MCPCodec.METHOD_NOT_FOUND, "Method not found: ${req.method}")
+                        MCPCodec.errorResponse(
+                            req.id,
+                            MCPCodec.METHOD_NOT_FOUND,
+                            "Method not found: ${req.method}",
+                        )
                     }
                 }
             }
         } catch (t: Throwable) {
             Log.w(TAG, "dispatch ${req.method} crashed: ${t.message}")
-            // A6: fixed client-facing text; details stay in the log
             MCPCodec.errorResponse(req.id, MCPCodec.INTERNAL_ERROR, "Internal error")
         }
     }
@@ -238,26 +236,27 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         if (name.isEmpty()) {
             return MCPCodec.errorResponse(req.id, MCPCodec.INVALID_PARAMS, "Missing tool name")
         }
-        // Aliases are a compatibility input surface only; policy, scope,
-        // confirmation, and execution must all operate on one canonical name.
         val canonicalName = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name) ?: name
 
-        // D8 gate: level + token scope
         if (!com.openminis.app.tools.runtime.ToolPermissionManager.tokenCanCall(
-                canonicalName, caller, tokenRecord.scope,
+                canonicalName,
+                caller,
+                tokenRecord.scope,
                 com.openminis.app.tools.runtime.ToolPermissionManager.Level.MCP_CONFIRM,
             )
         ) {
             return MCPCodec.errorResponse(
-                req.id, MCPCodec.INVALID_REQUEST,
+                req.id,
+                MCPCodec.INVALID_REQUEST,
                 "permission_denied: $canonicalName",
             )
         }
 
-        // A5: liveness first — a dead Ubuntu runtime answers immediately
-        // without burning a user confirmation (ACC-T-02 semantics). One-shot
-        // revive: when minisd is already up this is a cheap status refresh.
-        if (canonicalName.startsWith("linux.") && !canonicalName.startsWith("linux.file.") && !MCPServerManager.linuxToolsAvailable()) {
+        if (
+            canonicalName.startsWith("linux.") &&
+            !canonicalName.startsWith("linux.file.") &&
+            !MCPServerManager.linuxToolsAvailable()
+        ) {
             if (!com.openminis.app.runtime.ubuntu.UbuntuRuntime.ensureReady().running) {
                 val err = com.openminis.app.tools.ToolExecutionResult(
                     output = "Error: ubuntu_runtime_unavailable: $canonicalName",
@@ -267,24 +266,33 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             }
         }
 
-        // MCP_CONFIRM gate: one-shot confirm issued/consumed before execution (07 §6).
-        // On issue, post the phone notification with 批准/拒绝 actions so the
-        // user can answer without foregrounding the app (McpConfirmNotifier).
         var confirmConsumed = false
         if (com.openminis.app.tools.runtime.ToolPermissionManager.needsConfirm(canonicalName, caller)) {
             val confirmId = params.optString("confirm_id")
             if (confirmId.isEmpty()) {
                 val id = confirmQueue.issue(canonicalName, canonicalName)
                 if (id == null) {
-                    return errorWithData(req.id, CODE_CONFIRM_QUEUE_FULL, "confirm_queue_full", JSONObject())
+                    return errorWithData(
+                        req.id,
+                        CODE_CONFIRM_QUEUE_FULL,
+                        "confirm_queue_full",
+                        JSONObject(),
+                    )
                 }
                 Log.i(TAG, "confirm required for $canonicalName (confirm_id=$id)")
-                // context is null in unit-test paths: log only, no notification.
                 context?.let {
-                    McpConfirmNotifier.show(it, canonicalName, canonicalName, id, ConfirmQueue.DEFAULT_TTL_MILLIS)
+                    McpConfirmNotifier.show(
+                        it,
+                        canonicalName,
+                        canonicalName,
+                        id,
+                        ConfirmQueue.DEFAULT_TTL_MILLIS,
+                    )
                 }
                 return errorWithData(
-                    req.id, CODE_CONFIRM_REQUIRED, "confirm_required",
+                    req.id,
+                    CODE_CONFIRM_REQUIRED,
+                    "confirm_required",
                     JSONObject()
                         .put("confirm_id", id)
                         .put("expires_in_ms", ConfirmQueue.DEFAULT_TTL_MILLIS),
@@ -293,7 +301,9 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             val consume = confirmQueue.consume(confirmId, canonicalName)
             if (consume != ConfirmQueue.Result.OK) {
                 return errorWithData(
-                    req.id, CODE_CONFIRM_REJECTED, "confirm_rejected",
+                    req.id,
+                    CODE_CONFIRM_REJECTED,
+                    "confirm_rejected",
                     JSONObject()
                         .put("confirm_id", confirmId)
                         .put("reason", consume.name.lowercase()),
@@ -322,11 +332,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         )
     }
 
-    /**
-     * Error frame with a data payload: {"jsonrpc":"2.0","id":…,"error":
-     * {"code":…,"message":…,"data":{…}}}. Mirrors [MCPCodec.errorResponse];
-     * org.json drops null ids, so an explicit null id becomes JSONObject.NULL.
-     */
     private fun errorWithData(id: Any?, code: Int, message: String, data: JSONObject): String =
         JSONObject()
             .put("jsonrpc", "2.0")
