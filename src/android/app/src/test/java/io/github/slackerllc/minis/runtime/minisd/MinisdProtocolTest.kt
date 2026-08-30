@@ -235,31 +235,16 @@ class MinisdProtocolTest {
     }
 
     @Test
-    fun `ubuntu start carries rootfs and optional mounts`() {
-        val raw = MinisdProtocol.encodeRequest(
-            MinisdProtocol.ubuntuStart(
-                id = 7,
-                rootfs = "/data/adb/minis/rootfs",
-                workspace = "/data/adb/minis/workspace",
-                memory = "/data/adb/minis/memory",
-                skills = "/data/adb/minis/skills",
-                shared = "/data/adb/minis/shared",
-                sessionsRoot = "/data/user/0/app/files/minis-sessions",
-            ),
-        )
+    fun `ubuntu start delegates all fixed paths to server`() {
+        val raw = MinisdProtocol.encodeRequest(MinisdProtocol.ubuntuStart(id = 7))
         val obj = JSONObject(raw)
         assertEquals(7, obj.getLong("id"))
         assertEquals("ubuntu.start", obj.getString("method"))
         val params = obj.getJSONObject("params")
-        assertEquals("/data/adb/minis/rootfs", params.getString("rootfs"))
-        assertEquals("/data/adb/minis/workspace", params.getString("workspace"))
-        assertEquals("/data/adb/minis/memory", params.getString("memory"))
-        assertEquals("/data/adb/minis/skills", params.getString("skills"))
-        assertEquals("/data/adb/minis/shared", params.getString("shared"))
-        assertEquals(
-            "/data/user/0/app/files/minis-sessions",
-            params.getString("sessions_root"),
-        )
+        assertEquals(0, params.length())
+        listOf("rootfs", "workspace", "sessions_root", "memory", "skills", "shared", "home").forEach { key ->
+            assertFalse("client must not select server-owned path: $key", params.has(key))
+        }
     }
 
     @Test
