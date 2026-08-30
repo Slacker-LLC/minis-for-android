@@ -1,19 +1,17 @@
-# Minis for Android（中文说明）
+# Minis for Android
 
-> [README.md](README.md) 是英文主文档；本文件是中文说明，不单独定义不同的工程行为。
+面向 **已 Root 的 Android 设备** 的 AI Agent Runtime。原生 App + Rust `minisd` + Ubuntu 24.04 userspace（共用 Android 内核，不是虚拟机）。
 
-**Minis for Android** 是面向 Root Android 设备的 AI Agent Runtime。它由原生 Android App、Rust Root Broker `minisd`、Ubuntu 24.04 userspace、Android 原生工具、MCP、持久化 Agent 数据、任务/子 Agent、语音与设备级集成组成。
+**中文规范是行为定义。** 合同在 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)，Agent 宪法在 [`AGENTS.md`](AGENTS.md)。英文 [README.md](README.md) 只是摘要。
 
-## 当前架构
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](BUILDING.md)
+[![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
+## 目标架构
 
 ```text
 Android 原生 App
-├─ Agent / Session / Room / Repository
-├─ Provider / Model Runtime
-├─ Tool Runtime / Approval / Checkpoint / Job
-├─ Android 原生工具
-├─ MCP Client + 本地 MCP Server
-├─ Voice / Assistant / Overlay
 └─ Unix socket RPC
    ↓
 minisd Root Broker
@@ -23,81 +21,51 @@ minisd Root Broker
 Ubuntu 24.04 userspace
 ```
 
-Android App 负责应用/数据库状态、Provider/Model 配置、工具权限、审批与运行时编排。`minisd` 负责特权 Linux 运行时边界，并在 keeper 的 mount namespace 建立前准备固定的持久化数据源。Agent 命令以 App guest UID 运行，不保留无限制 root 身份。
+App 负责会话、Provider、工具权限与审批。`minisd` 负责特权 Linux 边界，并在 keeper 启动前准备 `/data/adb/minis` 下的固定持久化目录。Guest 命令以 App UID 运行。
 
-## Linux 持久化数据
+完整职责与启动顺序：[01-ARCHITECTURE.md](docs/contracts/01-ARCHITECTURE.md)。
 
-固定 host 布局位于 `/data/adb/minis/`：
+## 持久化真源（合同）
 
-| Host 路径 | Guest / 运行时用途 |
+| Host | Guest |
 |---|---|
 | `/data/adb/minis/workspace` | `/workspace` |
-| `/data/adb/minis/sessions` | 每 Session 的 workspace 数据源 |
+| `/data/adb/minis/sessions` | 每 session |
 | `/data/adb/minis/memory` | `/memory` |
 | `/data/adb/minis/skills` | `/skills` |
 | `/data/adb/minis/shared` | `/shared` |
 | `/data/adb/minis/home` | `/home/minis` |
 
-`minisd` 会在 keeper 启动前创建并验证这些数据源。持久化数据目录使用 guest UID/GID 与 `0700` 权限；非固定持久化来源以及位于 tmpfs 上的持久化来源都会被拒绝。
+非上述路径以及 tmpfs backing 必须 fail-closed。详见 [03-STORAGE-CONTRACT.md](docs/contracts/03-STORAGE-CONTRACT.md)。
+
+**现状：** master 上 App 与 minisd 对真源尚未对齐，见 [06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md)。不要把合同当成「已经在每台设备上如此运行」。
 
 ## 当前状态
 
-仓库处于持续开发阶段，目前以源码分发为主，不承诺 `versionName` 必然对应 GitHub Release。
+源码分发，不承诺生产 APK / GitHub Release。目标包名 `llc.slacker.minis` 已冻结，Gradle 尚未切换。
 
-主要文档：
+- [身份](docs/contracts/00-IDENTITY.md)
+- [硬限制](docs/contracts/02-CONSTRAINTS.md)
+- [安全合同](docs/contracts/04-SECURITY-CONTRACT.md)
+- [工程规范](docs/contracts/05-ENGINEERING.md)
+- [构建](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)
+- [法律来源](PROVENANCE.md)
 
-- [开发状态](docs/DEVELOPMENT-STATUS.md)
-- [执行环境](docs/EXECUTION-ENVIRONMENT.md)
-- [安全模型](docs/SECURITY.md)
-- [构建说明](BUILDING.md)
-- [文档索引](docs/README.md)
-- [源码来源与法律归属](PROVENANCE.md)
+## 能力（产品范围）
 
-## 主要能力
+多 Provider、流式与工具调用；Session / Memory / Skills / Job / Subagent；Android 原生工具与设备能力；MCP；语音与助手；`minisd` + Ubuntu 24.04。
 
-- 多 Provider / Model、OAuth/API Key、图片输入、流式输出与 Tool Call；
-- 持久 Session、Memory、Skills、Goal、Todo、Job、Subagent；
-- Android 原生工具、Accessibility、截图、日志、包管理和设备能力；
-- 本地 MCP Server 与外部 MCP Provider；
-- 语音识别、TTS、默认助手与 Overlay；
-- `minisd` + Ubuntu 24.04 Linux 执行环境。
-
-## Linux Runtime
-
-```text
-Android kernel
-  ↓
-minisd
-  ↓
-mount namespace + bind mount + chroot
-  ↓
-Ubuntu 24.04 userspace
-```
-
-rootfs 由 `scripts/build-ubuntu-rootfs.sh` 构建，并使用固定 SHA-256 校验来源。guest 与 Android 共用内核，不是虚拟机。
+需要 Root。chroot 不是强沙箱。
 
 ## 构建
-
-完整、权威的构建和发布说明见 [BUILDING.md](BUILDING.md)。
 
 ```bash
 cd src/android
 ./gradlew :app:assembleDebug --no-daemon
 ```
 
-## 文档规则
+权威步骤见 [BUILDING.md](BUILDING.md)。
 
-当前文档只描述 Minis for Android 的当前行为。历史架构统一放在 `docs/archive/`；源码来源、许可证和法律归属统一放在 [PROVENANCE.md](PROVENANCE.md) 与 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+## 许可证
 
-真实性优先级：
-
-```text
-源码与测试
-  > 当前架构 / 安全文档
-  > README / CHANGELOG
-  > archive 历史资料
-```
-
-## 许可证与来源
-
-Minis for Android 按 [GPL-3.0](LICENSE) 分发。源码来源、归属与历史关系见 [PROVENANCE.md](PROVENANCE.md)，第三方许可证见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+[GPL-3.0](LICENSE)。著作权与来源声明见 [PROVENANCE.md](PROVENANCE.md)，第三方见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。

@@ -1,5 +1,7 @@
 # Development Status
 
+> 行为以中文合同为准：`docs/contracts/`。实现缺口见 `docs/contracts/06-CURRENT-GAPS.md`。本文是能力备忘，不能覆盖合同，也不能把 Gaps 写成已完成。
+
 This document describes the current engineering state of Minis for Android at the architecture/capability level.
 
 ## Project state

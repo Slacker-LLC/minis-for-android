@@ -8,11 +8,10 @@ Older experimental release notes contained references to removed Web Remote, Clo
 
 ### Project identity and documentation
 
-- English is now the primary documentation language.
-- The repository is described as an independent Android project built on upstream OpenMinis rather than as an unofficial branch or release mirror.
-- Current documentation is aligned to the `minisd` + Ubuntu 24.04 chroot architecture.
-- Upstream provenance and selective synchronization policy are documented separately.
-- Contribution and issue templates are aligned to the current MCP/root/tool runtime instead of removed Web Remote/PRoot components.
+- Chinese contracts (`AGENTS.md`, `docs/contracts/`) are the behavioral authority; English README is a summary.
+- Target Android identity is frozen as `llc.slacker.minis` (Gradle not migrated yet).
+- Implementation gaps versus those contracts are listed in `docs/contracts/06-CURRENT-GAPS.md`.
+- Legal lineage stays in `PROVENANCE.md`; there is no upstream sync policy.
 
 ## Current architecture baseline — 2026-08
 
@@ -54,4 +53,4 @@ Older experimental release notes contained references to removed Web Remote, Clo
 
 ## Upstream
 
-For upstream OpenMinis provenance and synchronization rules, see [UPSTREAM.md](UPSTREAM.md).
+For legal source lineage (not a sync policy), see [PROVENANCE.md](PROVENANCE.md).

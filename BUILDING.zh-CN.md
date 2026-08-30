@@ -1,6 +1,6 @@
-# Minis for Android 构建说明（中文翻译）
+# Minis for Android 构建说明
 
-> [BUILDING.md](BUILDING.md) 是权威英文构建文档。本文件只作为中文翻译；如果版本号、命令或行为与英文文档冲突，以英文文档和实际构建脚本为准。
+> 产品行为以 [AGENTS.md](AGENTS.md) 与 [docs/contracts/](docs/contracts/00-IDENTITY.md) 为准。构建命令与工具链以本文件、[BUILDING.md](BUILDING.md) 和实际脚本为准；三者冲突时以脚本为准。
 
 ## 当前工具链
 

@@ -8,15 +8,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOP_LEVEL_ACTIVE = {
+    "AGENTS.md",
     "README.md",
     "README.zh-CN.md",
     "BUILDING.md",
     "BUILDING.zh-CN.md",
     "CONTRIBUTING.md",
+    "CONTRIBUTING.zh-CN.md",
     "CONTRIBUTORS.md",
 }
-ALLOWLIST_FILES = {"PROVENANCE.md", "THIRD_PARTY_LICENSES.md", "CHANGELOG.md", "LICENSE"}
+ALLOWLIST_FILES = {
+    "PROVENANCE.md",
+    "THIRD_PARTY_LICENSES.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs/contracts/06-CURRENT-GAPS.md",
+}
 ALLOWLIST_PREFIXES = ("docs/archive/",)
+CONTRACT_FILES = (
+    "docs/contracts/00-IDENTITY.md",
+    "docs/contracts/01-ARCHITECTURE.md",
+    "docs/contracts/02-CONSTRAINTS.md",
+    "docs/contracts/03-STORAGE-CONTRACT.md",
+    "docs/contracts/04-SECURITY-CONTRACT.md",
+    "docs/contracts/05-ENGINEERING.md",
+    "docs/contracts/06-CURRENT-GAPS.md",
+)
 BANNED_PATTERNS = {
     "OpenMinis product framing": re.compile(r"\bOpenMinis(?:Pet)?\b"),
     "PRoot runtime framing": re.compile(r"\bPRoot\b"),
@@ -31,6 +48,10 @@ BANNED_PATTERNS = {
     "stale app-private workspace framing": re.compile(r"app-private workspace", re.IGNORECASE),
     "stale single-authority persistence framing": re.compile(
         r"single source of truth[^\n]{0,180}persistence",
+        re.IGNORECASE,
+    ),
+    "English-primary documentation policy": re.compile(
+        r"English is the primary (?:documentation )?language",
         re.IGNORECASE,
     ),
 }
@@ -54,6 +75,17 @@ REQUIRED_PROVENANCE_TERMS = (
     "GPL-3.0",
     "https://github.com/OpenMinis/OpenMinis",
 )
+REQUIRED_IDENTITY_TERMS = ("llc.slacker.minis", "slacker.llc")
+REQUIRED_STORAGE_CONTRACT_TERMS = (
+    "/data/adb/minis/workspace",
+    "/data/adb/minis/sessions",
+    "/data/adb/minis/memory",
+    "/data/adb/minis/skills",
+    "/data/adb/minis/shared",
+    "/data/adb/minis/home",
+)
+REQUIRED_AGENTS_TERMS = ("llc.slacker.minis", "docs/contracts/")
+REQUIRED_ZH_README_AUTHORITY = ("中文规范是行为定义",)
 
 
 def is_allowlisted(rel: str) -> bool:
@@ -97,6 +129,10 @@ def check_tree(root: Path) -> list[str]:
             if pattern.search(text):
                 errors.append(f"{rel}: contains {label}")
 
+    for rel in CONTRACT_FILES:
+        if not (root / rel).is_file():
+            errors.append(f"{rel} is required")
+
     require_terms(
         errors,
         root / "docs/EXECUTION-ENVIRONMENT.md",
@@ -107,8 +143,20 @@ def check_tree(root: Path) -> list[str]:
     require_terms(errors, root / "README.zh-CN.md", "README.zh-CN.md", REQUIRED_README_TERMS)
     require_terms(
         errors,
+        root / "README.zh-CN.md",
+        "README.zh-CN.md",
+        REQUIRED_ZH_README_AUTHORITY,
+    )
+    require_terms(
+        errors,
         root / "CONTRIBUTING.md",
         "CONTRIBUTING.md",
+        REQUIRED_CONTRIBUTING_TERMS,
+    )
+    require_terms(
+        errors,
+        root / "CONTRIBUTING.zh-CN.md",
+        "CONTRIBUTING.zh-CN.md",
         REQUIRED_CONTRIBUTING_TERMS,
     )
     require_terms(
@@ -117,6 +165,19 @@ def check_tree(root: Path) -> list[str]:
         "docs/SECURITY.md",
         REQUIRED_SECURITY_TERMS,
     )
+    require_terms(
+        errors,
+        root / "docs/contracts/00-IDENTITY.md",
+        "docs/contracts/00-IDENTITY.md",
+        REQUIRED_IDENTITY_TERMS,
+    )
+    require_terms(
+        errors,
+        root / "docs/contracts/03-STORAGE-CONTRACT.md",
+        "docs/contracts/03-STORAGE-CONTRACT.md",
+        REQUIRED_STORAGE_CONTRACT_TERMS,
+    )
+    require_terms(errors, root / "AGENTS.md", "AGENTS.md", REQUIRED_AGENTS_TERMS)
 
     provenance = root / "PROVENANCE.md"
     if not provenance.is_file():
