@@ -46,18 +46,20 @@ object ExternalMountCoordinator {
     }
 
     /**
-     * Snapshot of bind-mount specs supplied to the Ubuntu/minisd runtime. Only entries with a
-     * resolved POSIX path are returned — entries whose URI resolution
-     * failed (e.g. cloud provider, removable volume unmounted) silently
-     * drop out of the snapshot until their state changes.
+     * Snapshot of bind-mount specs supplied to the Ubuntu/minisd runtime.
+     *
+     * The store revalidates raw-path readability when building this snapshot.
+     * A persisted SAF grant is not enough: if Android no longer permits direct
+     * access to the resolved `/storage/...` path, that entry is excluded rather
+     * than giving the guest an apparently mounted but unreadable/empty folder.
      *
      * Returns `(linuxDir, hostPath)` pairs.
      */
     fun bindMountSpecs(store: MountedFoldersStore): List<Pair<String, String>> =
-        store.entries.value
-            .mapNotNull { e ->
-                val host = e.resolvedHostPath ?: return@mapNotNull null
-                "$MOUNTS_PREFIX${e.name}" to host
+        store.runtimeBindableEntries()
+            .mapNotNull { entry ->
+                val host = entry.resolvedHostPath ?: return@mapNotNull null
+                "$MOUNTS_PREFIX${entry.name}" to host
             }
 }
 
