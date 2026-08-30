@@ -50,15 +50,7 @@ pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
 fn is_builtin_root_exec_tool(tool: &str) -> bool {
     matches!(
         tool,
-        "pm"
-            | "am"
-            | "settings"
-            | "dumpsys"
-            | "getprop"
-            | "mount"
-            | "pidof"
-            | "ps"
-            | "logcat"
+        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount" | "pidof" | "ps" | "logcat"
     )
 }
 
