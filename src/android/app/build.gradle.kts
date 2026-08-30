@@ -45,8 +45,6 @@ val minisdClangName = if (minisdNdkHost.startsWith("windows")) {
 val minisdReadelfName = "llvm-readelf" + if (minisdNdkHost.startsWith("windows")) ".exe" else ""
 val minisdSourceDir = rootProject.file("../native/minisd")
 val minisdGeneratedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
-val minisdGeneratedAssets = layout.buildDirectory.dir("generated/minisdAssets")
-val minisdRuntimeAssetsDir = layout.buildDirectory.dir("generated/minisdAssets/minis-runtime")
 val runtimeDistDir = rootProject.file("../../dist")
 val runtimeRootfsBuilder = rootProject.file("../../scripts/build-ubuntu-rootfs.sh")
 val runtimeRootfsArchive = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
@@ -266,7 +264,6 @@ val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
     description = "Packages the reproducible Ubuntu rootfs and authoritative schema-v2 runtime manifest."
     group = "build"
     dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
-    outputDirectory.set(minisdGeneratedAssets)
     val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
     inputs.file(binary)
     inputs.file(runtimeRootfsArchive)
@@ -311,7 +308,7 @@ val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
             }
         }
 
-        val runtimeDir = minisdRuntimeAssetsDir.get().asFile
+        val runtimeDir = outputDirectory.get().dir("minis-runtime").asFile
         runtimeDir.mkdirs()
         runtimeRootfsArchive.copyTo(runtimeDir.resolve("ubuntu-arm64-rootfs.tar.gz"), overwrite = true)
         val manifest = linkedMapOf<String, Any>(
