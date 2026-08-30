@@ -1,5 +1,4 @@
 {
-  "accessMode": "standard",
   "methods": {
     "system.hello": { "mode": "allow" },
     "system.ping": { "mode": "allow" },
