@@ -29,15 +29,32 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust quality components
-        run: rustup component add rustfmt clippy
+        run: |
+          rustup component add rustfmt clippy
+          rustup target add aarch64-unknown-linux-musl
       - name: Format
-        run: cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
+        working-directory: src/native/minisd
+        run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
+        working-directory: src/native/minisd
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: Test
-        run: cargo test --locked --manifest-path src/native/minisd/Cargo.toml
-      - name: Release build
-        run: cargo build --locked --release --manifest-path src/native/minisd/Cargo.toml
+        working-directory: src/native/minisd
+        run: cargo test --locked
+      - name: Release build (host)
+        working-directory: src/native/minisd
+        run: cargo build --locked --release
+      - name: Release build (Android arm64)
+        working-directory: src/native/minisd
+        run: cargo build --locked --release --target aarch64-unknown-linux-musl
+      - name: Verify Android arm64 PIE
+        working-directory: src/native/minisd
+        run: |
+          binary=target/aarch64-unknown-linux-musl/release/minisd
+          header="$(readelf -h "$binary")"
+          grep -Eq 'Class:[[:space:]]+ELF64' <<<"$header"
+          grep -Eq 'Machine:[[:space:]]+AArch64' <<<"$header"
+          grep -Eq 'Type:[[:space:]]+DYN' <<<"$header"
 
   rootfs-verification:
     name: Rootfs verification tests
