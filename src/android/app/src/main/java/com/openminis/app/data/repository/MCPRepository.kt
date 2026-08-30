@@ -17,22 +17,31 @@ import java.io.File
  * Mirrors [SkillRepository] in architecture, but the source of truth for the
  * server list is a single Claude-Desktop-compatible JSON file rather than a
  * SQLite table:
- *   - Server configs live in `/var/minis/mcp-servers/servers.json` (host:
- *     `minis-global/mcp-servers/servers.json`) in the `{ "mcpServers": { … } }`
- *     format. This is the SAME file the `minis-mcp-cli` Python tool reads/writes
- *     inside PRoot, and the file browser can edit — so all three surfaces stay
- *     in sync without an Android-side sync layer (matches Android's local-only
- *     skills/provider model; no CloudKit / whole-file sync here).
+ *   - Server configs live in `/var/minis/mcp-servers/servers.json` in the
+ *     `{ "mcpServers": { … } }` format. Android UI/debug configuration and the
+ *     in-guest `minis-mcp-cli` share this file; [reloadFromDisk] is the explicit
+ *     bridge for changes written outside this Repository.
  *   - Session enable/disable overrides live in `mcp_session_overrides` (SQLite),
  *     exactly mirroring SkillRepository's `session_skill_overrides`.
  *   - Prompt-fragment generation discloses the Top-N enabled servers, reusing
  *     the same description-truncation cap as skills.
  *
- * No usage-count / recent-use tracking is persisted server-side (the CLI owns
- * invocation); "recent" ordering falls back to recent-add (createdAt desc),
- * which is the best signal Android has locally.
+ * Global server-config mutations notify [onServerConfigsChanged]. MCPProvider
+ * binds that callback during init so every supported write surface gets the
+ * same hot-reload behavior. Session-only overrides deliberately do not reconnect
+ * global MCP transports.
  */
-class MCPRepository(private val context: Context) {
+class MCPRepository private constructor(
+    private val context: Context,
+    private val mcpDirOverride: File?,
+) {
+    constructor(context: Context) : this(context, null)
+
+    /** Test seam: keeps JVM tests away from the real app filesDir. */
+    internal constructor(context: Context, mcpDirOverride: File) : this(
+        context = context,
+        mcpDirOverride = mcpDirOverride,
+    )
 
     companion object {
         private const val TAG = "MCPRepository"
@@ -95,13 +104,16 @@ class MCPRepository(private val context: Context) {
     private val _servers = MutableStateFlow<List<MCPServerConfig>>(emptyList())
     val servers: StateFlow<List<MCPServerConfig>> = _servers.asStateFlow()
 
+    /** Bound by MCPProvider.init(); null during Repository construction/tests by default. */
+    internal var onServerConfigsChanged: (() -> Unit)? = null
+
     private val db: SQLiteDatabase by lazy {
         McpDbHelper(context).writableDatabase
     }
 
-    /** Host dir backing `/var/minis/mcp-servers` (mirrors skills' minis-global dir). */
+    /** Host dir backing `/var/minis/mcp-servers`. */
     private val mcpDir: File
-        get() = File(context.filesDir, "minis-global/mcp-servers")
+        get() = mcpDirOverride ?: File(context.filesDir, "minis-global/mcp-servers")
 
     private val serversFile: File
         get() = File(mcpDir, "servers.json")
@@ -112,13 +124,31 @@ class MCPRepository(private val context: Context) {
 
     // -- Load / Save (servers.json is the source of truth) --
 
-    /** Re-read `servers.json` from disk and re-publish [servers]. */
+    /** Initial/internal read: re-publish disk state without triggering a provider reload. */
     fun load() {
         _servers.value = readServersFile()
     }
 
-    /** Alias matching SkillRepository.reloadFromDisk() so callers read symmetrically. */
-    fun reloadFromDisk() = load()
+    /**
+     * Re-read `servers.json` after an external writer (for example
+     * `minis-mcp-cli`) may have changed it. Reconnect MCPProvider only when the
+     * effective server configuration actually changed.
+     */
+    fun reloadFromDisk() {
+        val before = _servers.value
+        val after = readServersFile()
+        _servers.value = after
+        if (after != before) notifyServerConfigsChanged("reloadFromDisk")
+    }
+
+    private fun notifyServerConfigsChanged(reason: String) {
+        val listener = onServerConfigsChanged ?: return
+        runCatching(listener).onFailure { error ->
+            // Config persistence already succeeded; a reload callback failure
+            // must not make the mutation appear rolled back when it is not.
+            Log.e(TAG, "MCP hot reload callback failed after $reason: ${error.message}")
+        }
+    }
 
     private fun readServersFile(): List<MCPServerConfig> {
         val file = serversFile
@@ -277,31 +307,42 @@ class MCPRepository(private val context: Context) {
     /** Add or overwrite a server (rename/overwrite is last-write-wins by id). */
     fun add(server: MCPServerConfig): Boolean {
         if (server.id.isBlank()) return false
+        val existing = _servers.value.firstOrNull { it.id == server.id }
+        if (existing == server) return true
         _servers.value = _servers.value.filter { it.id != server.id } + server
         save()
         Log.i(TAG, "Added MCP server: ${server.id}")
+        notifyServerConfigsChanged("add:${server.id}")
         return true
     }
 
     fun update(server: MCPServerConfig): Boolean {
-        if (_servers.value.none { it.id == server.id }) return false
+        val existing = _servers.value.firstOrNull { it.id == server.id } ?: return false
+        if (existing == server) return true
         _servers.value = _servers.value.map { if (it.id == server.id) server else it }
         save()
+        notifyServerConfigsChanged("update:${server.id}")
         return true
     }
 
     fun delete(id: String) {
+        val existed = _servers.value.any { it.id == id }
         db.execSQL("DELETE FROM mcp_session_overrides WHERE mcp_id=?", arrayOf(id))
+        if (!existed) return
         _servers.value = _servers.value.filter { it.id != id }
         save()
         Log.i(TAG, "Deleted MCP server: $id")
+        notifyServerConfigsChanged("delete:$id")
     }
 
     fun setEnabled(id: String, enabled: Boolean) {
+        val current = _servers.value.firstOrNull { it.id == id } ?: return
+        if (current.enabled == enabled) return
         _servers.value = _servers.value.map {
             if (it.id == id) it.copy(enabled = enabled) else it
         }
         save()
+        notifyServerConfigsChanged("setEnabled:$id")
     }
 
     fun toggle(id: String) {
@@ -394,6 +435,7 @@ class MCPRepository(private val context: Context) {
         _servers.value = _servers.value.sortedByDescending { it.createdAt }
         save()
         Log.i(TAG, "Imported ${parsed.size} MCP server(s)")
+        notifyServerConfigsChanged("importJSON")
         return parsed
     }
 
