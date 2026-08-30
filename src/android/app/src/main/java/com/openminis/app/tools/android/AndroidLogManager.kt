@@ -12,17 +12,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /** Cursor-based logcat capture and JobRegistry-backed bounded watches. */
 object AndroidLogManager {
     private const val MAX_LINES = 500
     private const val MAX_WATCH_BYTES = 256 * 1024
+    private const val MAX_APP_LOGCAT_CHARS = 1_048_576
     private const val WATCH_POLL_MS = 1_500L
 
     data class LogCursor(
@@ -174,6 +177,71 @@ object AndroidLogManager {
         watches.clear()
     }
 
+    /**
+     * Ordinary-app logcat fallback only. This deliberately never resolves or invokes `su`;
+     * all privileged Agent execution remains exclusively behind PrivilegedCommandRunner/minisd.
+     */
+    internal suspend fun runAppLogcat(argv: List<String>, timeoutMs: Long): AndroidCommandResult =
+        withContext(Dispatchers.IO) {
+            if (argv.firstOrNull() != "logcat") {
+                return@withContext AndroidCommandResult(
+                    PrivilegedBackend.NONE,
+                    126,
+                    "",
+                    "",
+                    unavailableReason = "app fallback only permits logcat",
+                )
+            }
+            try {
+                val process = ProcessBuilder(argv).start()
+                val stdout = BoundedText(MAX_APP_LOGCAT_CHARS)
+                val stderr = BoundedText(MAX_APP_LOGCAT_CHARS)
+                val outThread = Thread {
+                    process.inputStream.bufferedReader().useLines { lines -> lines.forEach(stdout::appendLine) }
+                }
+                val errThread = Thread {
+                    process.errorStream.bufferedReader().useLines { lines -> lines.forEach(stderr::appendLine) }
+                }
+                outThread.isDaemon = true
+                errThread.isDaemon = true
+                outThread.start()
+                errThread.start()
+                val exited = process.waitFor(timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+                if (!exited) process.destroyForcibly()
+                outThread.join(2_000L)
+                errThread.join(2_000L)
+                AndroidCommandResult(
+                    backend = PrivilegedBackend.NONE,
+                    exitCode = if (exited) process.exitValue() else 124,
+                    stdout = stdout.value(),
+                    stderr = stderr.value(),
+                    timedOut = !exited,
+                )
+            } catch (t: Throwable) {
+                AndroidCommandResult(
+                    backend = PrivilegedBackend.NONE,
+                    exitCode = -1,
+                    stdout = "",
+                    stderr = t.message.orEmpty(),
+                )
+            }
+        }
+
+    private class BoundedText(private val maxChars: Int) {
+        private val value = StringBuilder()
+
+        @Synchronized
+        fun appendLine(line: String) {
+            if (value.length >= maxChars) return
+            val remaining = maxChars - value.length
+            value.append(line.take((remaining - 1).coerceAtLeast(0)))
+            if (remaining > 0) value.append('\n')
+        }
+
+        @Synchronized
+        fun value(): String = value.toString().trimEnd()
+    }
+
     private data class CapturedLogs(
         val raw: String,
         val backend: String,
@@ -194,7 +262,7 @@ object AndroidLogManager {
             )
         } else null
         val rawResult = if (privileged?.success == true) privileged else {
-            RootCommandRunner.runProcess(args, 45_000L, PrivilegedBackend.NONE)
+            runAppLogcat(args, 45_000L)
         }
         val pids = if (packageName == null) knownPids else knownPids +
             AndroidPackageController.pids(context, sessionId, packageName).toSet()
