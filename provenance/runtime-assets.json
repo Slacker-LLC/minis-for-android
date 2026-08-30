@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "purpose": "Machine-readable provenance for build inputs and runtime artifacts whose origin can be verified from this repository.",
+  "source_lineage": {
+    "derived_from_repository": "https://github.com/OpenMinis/OpenMinis",
+    "repository_id": "OpenMinis/OpenMinis",
+    "license": "GPL-3.0",
+    "derivation_revision": null,
+    "derivation_revision_status": "not-recorded",
+    "note": "No single upstream derivation commit is claimed unless a future change adds independently verifiable evidence."
+  },
+  "assets": [
+    {
+      "id": "ubuntu-base-24.04.3-arm64",
+      "kind": "external-runtime-input",
+      "role": "Ubuntu userspace base archive used to build the Minis rootfs",
+      "source_url": "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz",
+      "checksums_url": "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS",
+      "sha256": "7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048",
+      "integrity_status": "verified-pinned-source",
+      "verification": [
+        "repository pin in scripts/build-ubuntu-rootfs.sh",
+        "matching entry from Ubuntu SHA256SUMS",
+        "local sha256sum of the downloaded archive"
+      ],
+      "evidence": [
+        "scripts/build-ubuntu-rootfs.sh",
+        "scripts/test-build-ubuntu-rootfs-verification.sh"
+      ]
+    },
+    {
+      "id": "minis-ubuntu-rootfs-arm64",
+      "kind": "generated-runtime-artifact",
+      "role": "Ubuntu rootfs tarball produced from the pinned Ubuntu Base input plus repository-defined layout",
+      "output_path": "dist/ubuntu-arm64-rootfs.tar.gz",
+      "source_asset_ids": [
+        "ubuntu-base-24.04.3-arm64"
+      ],
+      "sha256": null,
+      "integrity_status": "generated-per-build",
+      "hash_policy": "build-time-sidecar",
+      "hash_record": "dist/ubuntu-arm64-rootfs.tar.gz.sha256",
+      "manifest_record": "dist/ubuntu-arm64-rootfs.manifest.json",
+      "evidence": [
+        "scripts/build-ubuntu-rootfs.sh"
+      ],
+      "note": "The repository does not claim one fixed hash for this generated tarball. The build computes the artifact hash and manifest for that build."
+    },
+    {
+      "id": "minisd",
+      "kind": "source-built-runtime-artifact",
+      "role": "Privileged root broker installed at /data/adb/minis/bin/minisd",
+      "source_path": "src/native/minisd/",
+      "runtime_destination": "/data/adb/minis/bin/minisd",
+      "sha256": null,
+      "integrity_status": "source-built-no-fixed-artifact-hash",
+      "hash_policy": "not-fixed-in-repository",
+      "evidence": [
+        "src/native/minisd/Cargo.toml",
+        "src/native/minisd/Cargo.lock",
+        "docs/runtime-package-boundary.md"
+      ],
+      "note": "No prebuilt minisd binary or universal artifact hash is claimed by this provenance record."
+    }
+  ],
+  "verification_boundaries": {
+    "repository_ci": "Verifies source, tests, build contracts, the Ubuntu Base pin, and generated-artifact metadata rules.",
+    "root_kernelsu_device_e2e": "not-claimed",
+    "note": "Passing repository CI is not evidence that a Root/KernelSU device installation or runtime E2E was executed successfully."
+  }
+}
