@@ -44,12 +44,36 @@ class UbuntuPathsTest {
             UbuntuPaths.resolveGuest("/memory/notes.md")!!.path.replace('\\', '/'),
         )
         assertEquals(
+            "/data/adb/minis/skills/tool/SKILL.md",
+            UbuntuPaths.resolveGuest("/skills/tool/SKILL.md")!!.path.replace('\\', '/'),
+        )
+        assertEquals(
+            "/data/adb/minis/shared/export.zip",
+            UbuntuPaths.resolveGuest("/shared/export.zip")!!.path.replace('\\', '/'),
+        )
+        assertEquals(
             "/data/adb/minis/home/.profile",
             UbuntuPaths.resolveGuest("/home/minis/.profile")!!.path.replace('\\', '/'),
         )
         assertTrue(UbuntuPaths.hostHome != UbuntuPaths.hostWorkspace)
         assertEquals("/home/minis", UbuntuPaths.GUEST_HOME)
         assertEquals("/workspace", UbuntuPaths.GUEST_WORKSPACE)
+    }
+
+    @Test
+    fun `session resolver keeps global app data on fixed persistent roots`() {
+        assertEquals(
+            "/data/adb/minis/memory/global.md",
+            UbuntuPaths.resolveSessionHostPath("session-a", "/memory/global.md")!!.path.replace('\\', '/'),
+        )
+        assertEquals(
+            "/data/adb/minis/skills/demo/SKILL.md",
+            UbuntuPaths.resolveSessionHostPath("session-a", "/skills/demo/SKILL.md")!!.path.replace('\\', '/'),
+        )
+        assertEquals(
+            "/data/adb/minis/shared/result.txt",
+            UbuntuPaths.resolveSessionHostPath("session-a", "/shared/result.txt")!!.path.replace('\\', '/'),
+        )
     }
 
     @Test
