@@ -21,77 +21,74 @@ class MCPRepositoryHotReloadTest {
     }
 
     @Test
-    fun globalConfigMutationsReloadExactlyOnceAndNoOpsDoNotReload() = withRepository {
-        repository,
-        dir,
-        reloadCount,
-        ->
-        val alpha = MCPRepository.MCPServerConfig(
-            id = "alpha",
-            url = "https://alpha.example/mcp",
-            createdAt = 10L,
-        )
+    fun globalConfigMutationsReloadExactlyOnceAndNoOpsDoNotReload() =
+        withRepository { repository, dir, reloadCount ->
+            val alpha = MCPRepository.MCPServerConfig(
+                id = "alpha",
+                url = "https://alpha.example/mcp",
+                createdAt = 10L,
+            )
 
-        assertTrue(repository.add(alpha))
-        assertEquals(1, reloadCount())
+            assertTrue(repository.add(alpha))
+            assertEquals(1, reloadCount())
 
-        // Identical last-write-wins input is a no-op and must not tear down a
-        // healthy MCP session just to reconnect the same configuration.
-        assertTrue(repository.add(alpha))
-        assertEquals(1, reloadCount())
+            // Identical last-write-wins input is a no-op and must not tear down a
+            // healthy MCP session just to reconnect the same configuration.
+            assertTrue(repository.add(alpha))
+            assertEquals(1, reloadCount())
 
-        val updated = alpha.copy(note = "updated")
-        assertTrue(repository.update(updated))
-        assertEquals(2, reloadCount())
-        assertTrue(repository.update(updated))
-        assertEquals(2, reloadCount())
+            val updated = alpha.copy(note = "updated")
+            assertTrue(repository.update(updated))
+            assertEquals(2, reloadCount())
+            assertTrue(repository.update(updated))
+            assertEquals(2, reloadCount())
 
-        repository.setEnabled("alpha", true)
-        assertEquals(2, reloadCount())
-        repository.setEnabled("alpha", false)
-        assertEquals(3, reloadCount())
+            repository.setEnabled("alpha", true)
+            assertEquals(2, reloadCount())
+            repository.setEnabled("alpha", false)
+            assertEquals(3, reloadCount())
 
-        val imported = repository.importJSON(
-            """
-            {
-              "mcpServers": {
-                "beta": {
-                  "url": "https://beta.example/mcp",
-                  "enabled": true,
-                  "createdAt": 20
+            val imported = repository.importJSON(
+                """
+                {
+                  "mcpServers": {
+                    "beta": {
+                      "url": "https://beta.example/mcp",
+                      "enabled": true,
+                      "createdAt": 20
+                    }
+                  }
                 }
-              }
-            }
-            """.trimIndent(),
-        )
-        assertEquals(listOf("beta"), imported.map { it.id })
-        assertEquals(4, reloadCount())
+                """.trimIndent(),
+            )
+            assertEquals(listOf("beta"), imported.map { it.id })
+            assertEquals(4, reloadCount())
 
-        // Preview and an unchanged disk refresh are read-only/no-op paths.
-        assertEquals(1, repository.previewImport("""{"url":"https://preview.example/mcp"}"""))
-        assertEquals(4, reloadCount())
-        repository.reloadFromDisk()
-        assertEquals(4, reloadCount())
+            // Preview and an unchanged disk refresh are read-only/no-op paths.
+            assertEquals(1, repository.previewImport("""{"url":"https://preview.example/mcp"}"""))
+            assertEquals(4, reloadCount())
+            repository.reloadFromDisk()
+            assertEquals(4, reloadCount())
 
-        // Simulate minis-mcp-cli or another supported external writer. The next
-        // explicit disk refresh must publish the new state and hot-reload once.
-        File(dir, "servers.json").writeText(
-            """
-            {
-              "mcpServers": {
-                "external": {
-                  "url": "https://external.example/mcp",
-                  "enabled": true,
-                  "createdAt": 30
+            // Simulate minis-mcp-cli or another supported external writer. The next
+            // explicit disk refresh must publish the new state and hot-reload once.
+            File(dir, "servers.json").writeText(
+                """
+                {
+                  "mcpServers": {
+                    "external": {
+                      "url": "https://external.example/mcp",
+                      "enabled": true,
+                      "createdAt": 30
+                    }
+                  }
                 }
-              }
-            }
-            """.trimIndent(),
-        )
-        repository.reloadFromDisk()
-        assertEquals(5, reloadCount())
-        assertEquals(listOf("external"), repository.servers.value.map { it.id })
-    }
+                """.trimIndent(),
+            )
+            repository.reloadFromDisk()
+            assertEquals(5, reloadCount())
+            assertEquals(listOf("external"), repository.servers.value.map { it.id })
+        }
 
     @Test
     fun reloadCallbackFailureDoesNotPretendPersistedMutationRolledBack() {
