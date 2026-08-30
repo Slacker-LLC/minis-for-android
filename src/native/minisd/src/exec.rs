@@ -266,21 +266,27 @@ mod tests {
     fn t_u4_allowlist_and_deny() {
         let policy = PolicyFile::default_policy();
         let spec = policy.method("root.exec");
-        let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["list","packages"]})).unwrap();
+        let ok =
+            parse_exec(&serde_json::json!({"tool":"pm","args":["list","packages"]})).unwrap();
         assert!(validate_exec(spec, &ok).is_ok());
-        let logcat = parse_exec(&serde_json::json!({"tool":"logcat","args":["-d"]})).unwrap();
+        let logcat =
+            parse_exec(&serde_json::json!({"tool":"logcat","args":["-d"]})).unwrap();
         assert!(validate_exec(spec, &logcat).is_ok());
         let bad_tool = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
         assert_eq!(
             validate_exec(spec, &bad_tool).unwrap_err(),
             ErrorCode::PolicyDenied
         );
-        let denied = parse_exec(&serde_json::json!({"tool":"pm","args":["shell","su"]})).unwrap();
+        let denied =
+            parse_exec(&serde_json::json!({"tool":"pm","args":["shell","su"]})).unwrap();
         assert_eq!(
             validate_exec(spec, &denied).unwrap_err(),
             ErrorCode::PolicyDenied
         );
-        let destructive = parse_exec(&serde_json::json!({"tool":"pm","args":["uninstall","com.example.test"]})).unwrap();
+        let destructive = parse_exec(
+            &serde_json::json!({"tool":"pm","args":["uninstall","com.example.test"]}),
+        )
+        .unwrap();
         assert_eq!(
             validate_exec(spec, &destructive).unwrap_err(),
             ErrorCode::PolicyDenied
