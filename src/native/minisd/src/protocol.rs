@@ -348,14 +348,20 @@ mod tests {
 
     #[test]
     fn runtime_pre_exec_error_names_match_android_contract() {
-        assert_eq!(ErrorCode::KeeperNamespaceLost.as_str(), "KEEPER_NAMESPACE_LOST");
+        assert_eq!(
+            ErrorCode::KeeperNamespaceLost.as_str(),
+            "KEEPER_NAMESPACE_LOST"
+        );
         assert_eq!(ErrorCode::ChrootUnavailable.as_str(), "CHROOT_UNAVAILABLE");
         assert_eq!(
             ErrorCode::GuestPrivilegeSetupFailed.as_str(),
             "PRIVILEGE_SETUP_FAILED"
         );
         assert_eq!(ErrorCode::GuestExecveFailed.as_str(), "EXEC_UNAVAILABLE");
-        assert_eq!(ErrorCode::RuntimeLayoutMismatch.as_str(), "RUNTIME_LAYOUT_MISMATCH");
+        assert_eq!(
+            ErrorCode::RuntimeLayoutMismatch.as_str(),
+            "RUNTIME_LAYOUT_MISMATCH"
+        );
     }
 
     #[test]
@@ -368,7 +374,10 @@ mod tests {
             None
         );
         assert!(format_pre_exec_marker("not-a-token", 4).is_none());
-        assert_eq!(parse_pre_exec_marker("__MINISD_PREEXEC_V1__:bad:4", token), None);
+        assert_eq!(
+            parse_pre_exec_marker("__MINISD_PREEXEC_V1__:bad:4", token),
+            None
+        );
     }
 
     #[test]
