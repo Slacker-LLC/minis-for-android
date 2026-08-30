@@ -140,34 +140,103 @@ class MinisdClient(
         cancellationKey: String? = null,
     ): MinisdResponse = withContext(Dispatchers.IO) {
         val payload = MinisdProtocol.encodeRequest(request)
+        val requestBytes = payload.toByteArray(Charsets.UTF_8).size
+        var localAttempted = false
+
         appSocketPath?.let { path ->
             if (File(path).exists()) {
+                localAttempted = true
+                val localStarted = System.nanoTime()
                 val local = callLocal(path, payload, timeoutMs, cancellationKey)
                 if (local != null) {
-                    if (local.code != "NOT_AUTHORIZED") return@withContext local
+                    val fallback = local.code == "NOT_AUTHORIZED"
+                    observe(
+                        request = request,
+                        requestBytes = requestBytes,
+                        transport = MinisdTransportStats.Transport.LOCAL_SOCKET,
+                        startedNs = localStarted,
+                        fallback = fallback,
+                        response = local,
+                    )
+                    if (!fallback) return@withContext local
                     Log.w(TAG, "local minisd rejected app identity; retrying through su")
+                } else {
+                    MinisdTransportStats.record(
+                        method = request.method,
+                        transport = MinisdTransportStats.Transport.LOCAL_SOCKET,
+                        requestBytes = requestBytes,
+                        responseBytes = 0,
+                        durationMs = elapsedMs(localStarted),
+                        outcome = "TRANSPORT_FAILED",
+                        fallback = true,
+                    )
                 }
                 currentCoroutineContext().ensureActive()
                 if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
-                    return@withContext userCancellation("execution cancelled while waiting for local minisd")
+                    val response = userCancellation("execution cancelled while waiting for local minisd")
+                    return@withContext observe(
+                        request,
+                        requestBytes,
+                        MinisdTransportStats.Transport.NONE,
+                        System.nanoTime(),
+                        fallback = localAttempted,
+                        response,
+                    )
                 }
             }
         }
         if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
-            return@withContext userCancellation("execution cancelled before minisd fallback")
+            val response = userCancellation("execution cancelled before minisd fallback")
+            return@withContext observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.NONE,
+                System.nanoTime(),
+                fallback = localAttempted,
+                response,
+            )
         }
-        val su = resolveSu() ?: return@withContext unavailable("no executable su; minisd --call needs root")
+
+        val helperStarted = System.nanoTime()
+        val su = resolveSu()
+        if (su == null) {
+            val response = unavailable("no executable su; minisd --call needs root")
+            return@withContext observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.NONE,
+                helperStarted,
+                fallback = appSocketPath != null,
+                response,
+            )
+        }
         val cmd = "$minisdPath --call --socket $socketPath"
         val proc = try {
             ProcessBuilder(su, "-c", cmd).redirectErrorStream(false).start()
         } catch (t: Throwable) {
-            return@withContext unavailable("failed to start su: ${t.message}")
+            val response = unavailable("failed to start su: ${t.message}")
+            return@withContext observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.SU_CALL,
+                helperStarted,
+                fallback = appSocketPath != null,
+                response,
+            )
         }
         if (cancellationKey != null) activeHelpers[cancellationKey] = proc
         if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
             activeHelpers.remove(cancellationKey, proc)
             proc.destroyForcibly()
-            return@withContext userCancellation("execution cancelled before minisd helper dispatch")
+            val response = userCancellation("execution cancelled before minisd helper dispatch")
+            return@withContext observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.SU_CALL,
+                helperStarted,
+                fallback = appSocketPath != null,
+                response,
+            )
         }
 
         val stdoutRef = AtomicReference("")
@@ -200,30 +269,95 @@ class MinisdClient(
                 proc.waitFor(1_000, TimeUnit.MILLISECONDS)
                 stdoutThread.join(1_000)
                 stderrThread.join(1_000)
-                return@withContext transportTimeout("minisd --call timed out after ${timeoutMs}ms")
+                val response = transportTimeout("minisd --call timed out after ${timeoutMs}ms")
+                return@withContext observe(
+                    request,
+                    requestBytes,
+                    MinisdTransportStats.Transport.SU_CALL,
+                    helperStarted,
+                    fallback = appSocketPath != null,
+                    response,
+                )
             }
             stdoutThread.join(1_000)
             stderrThread.join(1_000)
             if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
-                return@withContext userCancellation("execution cancelled while waiting for minisd helper")
+                val response = userCancellation("execution cancelled while waiting for minisd helper")
+                return@withContext observe(
+                    request,
+                    requestBytes,
+                    MinisdTransportStats.Transport.SU_CALL,
+                    helperStarted,
+                    fallback = appSocketPath != null,
+                    response,
+                )
             }
             val stdout = stdoutRef.get()
             val stderr = stderrRef.get()
             if (stdout.isBlank()) {
-                return@withContext unavailable("empty minisd response (exit=${proc.exitValue()} stderr=${stderr.take(300)})")
+                val response = unavailable(
+                    "empty minisd response (exit=${proc.exitValue()} stderr=${stderr.take(300)})",
+                )
+                return@withContext observe(
+                    request,
+                    requestBytes,
+                    MinisdTransportStats.Transport.SU_CALL,
+                    helperStarted,
+                    fallback = appSocketPath != null,
+                    response,
+                )
             }
-            MinisdProtocol.decodeResponse(stdout)
+            val response = MinisdProtocol.decodeResponse(stdout)
+            observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.SU_CALL,
+                helperStarted,
+                fallback = appSocketPath != null,
+                response,
+            )
         } catch (cancelled: CancellationException) {
             proc.destroyForcibly()
             throw cancelled
         } catch (t: Throwable) {
             Log.w(TAG, "minisd call ${request.method} failed: ${t.message}")
-            unavailable(t.message ?: "minisd call failed")
+            val response = unavailable(t.message ?: "minisd call failed")
+            observe(
+                request,
+                requestBytes,
+                MinisdTransportStats.Transport.SU_CALL,
+                helperStarted,
+                fallback = appSocketPath != null,
+                response,
+            )
         } finally {
             if (cancellationKey != null) activeHelpers.remove(cancellationKey, proc)
             proc.destroy()
         }
     }
+
+    private fun observe(
+        request: MinisdRequest,
+        requestBytes: Int,
+        transport: MinisdTransportStats.Transport,
+        startedNs: Long,
+        fallback: Boolean,
+        response: MinisdResponse,
+    ): MinisdResponse {
+        MinisdTransportStats.record(
+            method = request.method,
+            transport = transport,
+            requestBytes = requestBytes,
+            responseBytes = response.wireBytes,
+            durationMs = elapsedMs(startedNs),
+            outcome = if (response.ok) "OK" else response.code ?: "ERROR",
+            fallback = fallback,
+        )
+        return response
+    }
+
+    private fun elapsedMs(startedNs: Long): Long =
+        TimeUnit.NANOSECONDS.toMillis((System.nanoTime() - startedNs).coerceAtLeast(0L))
 
     private fun callLocal(
         path: String,
@@ -267,7 +401,15 @@ class MinisdClient(
     }
 
     private fun resolveSu(): String? {
-        val candidates = listOf(suPath, "/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su", "/data/adb/ksu/bin/su", "/debug_ramdisk/su")
+        val candidates = listOf(
+            suPath,
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/sbin/su",
+            "/su/bin/su",
+            "/data/adb/ksu/bin/su",
+            "/debug_ramdisk/su",
+        )
         return candidates.firstOrNull { File(it).canExecute() }
             ?: System.getenv("PATH").orEmpty().split(File.pathSeparatorChar).asSequence()
                 .map { File(it, "su") }.firstOrNull { it.canExecute() }?.absolutePath
