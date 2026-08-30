@@ -3,7 +3,10 @@ import java.security.MessageDigest
 import java.util.zip.ZipFile
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
+import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.OutputDirectory
 
 plugins {
     id("com.android.application")
@@ -53,7 +56,6 @@ android {
     namespace = "io.github.slackerllc.minis"
     testNamespace = "io.github.slackerllc.minis.test"
     sourceSets.getByName("main").jniLibs.srcDir(minisdGeneratedJniLibs)
-    sourceSets.getByName("main").assets.srcDir(minisdGeneratedAssets)
     // Compile against Android 16 APIs used by the Live Updates path. targetSdk
     // remains 35; Android 16-only behavior is runtime-gated by SDK level.
     compileSdk = 36
@@ -254,16 +256,21 @@ fun requireRuntimeInt(map: Map<*, *>, key: String): Int =
     (map[key] as? Number)?.toInt()?.takeIf { it > 0 }
         ?: throw GradleException("rootfs build manifest has no positive $key")
 
-val packageRuntimeAssets by tasks.registering {
+abstract class PackageRuntimeAssetsTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+}
+
+val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
     description = "Packages the reproducible Ubuntu rootfs and authoritative schema-v2 runtime manifest."
     group = "build"
     dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
+    outputDirectory.set(minisdGeneratedAssets)
     val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
-    val outputDir = minisdGeneratedAssets.map { it.dir("minis-runtime") }
+    val outputDir = outputDirectory.map { it.dir("minis-runtime") }
     inputs.file(binary)
     inputs.file(runtimeRootfsArchive)
     inputs.file(runtimeRootfsBuildManifest)
-    outputs.dir(outputDir)
     doLast {
         val binaryFile = binary.get().asFile
         if (!runtimeRootfsArchive.isFile || !runtimeRootfsBuildManifest.isFile) {
@@ -325,6 +332,15 @@ val packageRuntimeAssets by tasks.registering {
         )
         runtimeDir.resolve("runtime-manifest.json").writeText(
             JsonOutput.prettyPrint(JsonOutput.toJson(manifest)) + "\n",
+        )
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            packageRuntimeAssets,
+            PackageRuntimeAssetsTask::outputDirectory,
         )
     }
 }
@@ -398,8 +414,6 @@ tasks.matching { it.name == "assembleRelease" }
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(packageMinisdNative) }
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(packageRuntimeAssets) }
 tasks.named("preBuild") { dependsOn(packageRuntimeAssets) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
