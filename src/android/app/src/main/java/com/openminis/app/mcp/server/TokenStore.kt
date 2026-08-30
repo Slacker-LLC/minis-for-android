@@ -17,7 +17,7 @@ object TokenStore {
     data class Token(
         val id: String,
         val token: String,
-        /** Empty = no subset restriction (all visible tools allowed). */
+        /** Empty = legacy/unrestricted subset: all MCP-visible tools. */
         val scope: Set<String> = emptySet(),
     )
 
@@ -58,6 +58,10 @@ object TokenStore {
     }
 
     fun save(tokens: List<Token>) {
+        // Keep the fallback authoritative too. Besides making the pure JVM tests
+        // realistic, this avoids stale reads if persistence is temporarily
+        // unavailable before the application Context has been wired.
+        inMemory = tokens.toList()
         val ctx = appContext ?: return
         val arr = org.json.JSONArray()
         for (t in tokens) {
@@ -74,6 +78,23 @@ object TokenStore {
     }
 
     fun find(tokenValue: String): Token? = all().firstOrNull { it.token == tokenValue }
+
+    fun findById(id: String): Token? = all().firstOrNull { it.id == id }
+
+    /** Replace only the token with the same id; unrelated credentials survive. */
+    fun upsert(token: Token) {
+        val next = all().filterNot { it.id == token.id } + token
+        save(next)
+    }
+
+    /** Revoke one credential by id. Returns true only when something changed. */
+    fun remove(id: String): Boolean {
+        val current = all()
+        val next = current.filterNot { it.id == id }
+        if (next.size == current.size) return false
+        save(next)
+        return true
+    }
 
     /** Fail-closed gate: no tokens → server must not start. */
     val isConfigured: Boolean get() = all().isNotEmpty()
