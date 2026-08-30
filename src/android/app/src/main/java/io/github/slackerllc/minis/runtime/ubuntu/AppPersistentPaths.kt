@@ -38,8 +38,8 @@ internal object AppPersistentPaths {
 
     /**
      * Compatibility for repository constructors that still receive an old
-     * `<filesDir>/minis-global/*` path. Android app-private paths are migration
-     * inputs only; arbitrary test paths remain injectable.
+     * `<filesDir>/minis-global/<leaf>` path. Android app-private paths are
+     * migration inputs only; arbitrary test paths remain injectable.
      */
     internal fun persistentForRepository(requested: File, leaf: String): File {
         val normalized = requested.absolutePath.replace('\\', '/').trimEnd('/')
