@@ -344,8 +344,13 @@ androidComponents {
         val variantName = variant.name.replaceFirstChar {
             if (it.isLowerCase()) it.titlecase() else it.toString()
         }
+        // Keep the task output and the AGP asset source root identical. Relying on
+        // AGP's implicit generated-source convention established the dependency,
+        // but the runtime payload was not retained under the expected relative root.
+        val runtimeAssetsRoot = layout.buildDirectory.dir("generated/runtimeAssets/${variant.name}/assets")
         val packageVariantRuntimeAssets =
             tasks.register<PackageRuntimeAssetsTask>("package${variantName}RuntimeAssets") {
+                outputDirectory.set(runtimeAssetsRoot)
                 configureRuntimeAssets()
             }
         variant.sources.assets?.addGeneratedSourceDirectory(
