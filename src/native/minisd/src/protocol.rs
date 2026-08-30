@@ -9,6 +9,27 @@ pub const MAX_ARG_BYTES: usize = 4096;
 pub const MAX_ARGS: usize = 32;
 pub const REQUEST_TIMEOUT_MS: u64 = 30_000;
 pub const CONFIRM_TTL_MS: u64 = 120_000;
+pub const PRE_EXEC_TOKEN_ENV: &str = "MINISD_PREEXEC_TOKEN";
+const PRE_EXEC_MARKER_PREFIX: &str = "__MINISD_PREEXEC_V1__";
+
+fn valid_pre_exec_token(token: &str) -> bool {
+    token.len() == 32 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+pub fn format_pre_exec_marker(token: &str, helper_code: u8) -> Option<String> {
+    if !valid_pre_exec_token(token) {
+        return None;
+    }
+    Some(format!("{PRE_EXEC_MARKER_PREFIX}:{token}:{helper_code}"))
+}
+
+pub fn parse_pre_exec_marker(line: &str, expected_token: &str) -> Option<u8> {
+    if !valid_pre_exec_token(expected_token) {
+        return None;
+    }
+    let prefix = format!("{PRE_EXEC_MARKER_PREFIX}:{expected_token}:");
+    line.strip_prefix(&prefix)?.parse::<u8>().ok()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -335,6 +356,19 @@ mod tests {
         );
         assert_eq!(ErrorCode::GuestExecveFailed.as_str(), "EXEC_UNAVAILABLE");
         assert_eq!(ErrorCode::RuntimeLayoutMismatch.as_str(), "RUNTIME_LAYOUT_MISMATCH");
+    }
+
+    #[test]
+    fn pre_exec_marker_requires_exact_unexposed_token() {
+        let token = "0123456789abcdef0123456789abcdef";
+        let marker = format_pre_exec_marker(token, 4).unwrap();
+        assert_eq!(parse_pre_exec_marker(&marker, token), Some(4));
+        assert_eq!(
+            parse_pre_exec_marker(&marker, "fedcba9876543210fedcba9876543210"),
+            None
+        );
+        assert!(format_pre_exec_marker("not-a-token", 4).is_none());
+        assert_eq!(parse_pre_exec_marker("__MINISD_PREEXEC_V1__:bad:4", token), None);
     }
 
     #[test]
