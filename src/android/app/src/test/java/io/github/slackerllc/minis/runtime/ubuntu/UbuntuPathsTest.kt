@@ -1,6 +1,7 @@
 package io.github.slackerllc.minis.runtime.ubuntu
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,51 +9,53 @@ import java.nio.file.Files
 
 class UbuntuPathsTest {
     @Test
-    fun `workspace and var minis aliases map to host`() {
-        assertEquals(
-            "/data/adb/minis/workspace/x.xlsx",
-            UbuntuPaths.resolveGuest("/workspace/x.xlsx")!!.path.replace('\\', '/'),
-        )
-        assertEquals(
-            "/data/adb/minis/workspace/attachments/a.png",
-            UbuntuPaths.resolveGuest("/var/minis/attachments/a.png")!!.path.replace('\\', '/'),
-        )
-        assertEquals(
-            "/data/adb/minis/memory/notes.md",
-            UbuntuPaths.resolveGuest("/memory/notes.md")!!.path.replace('\\', '/'),
-        )
+    fun `persistent host paths are fixed and never filesDir based`() {
+        assertEquals("/data/adb/minis/workspace", UbuntuPaths.hostWorkspace)
+        assertEquals("/data/adb/minis/sessions", UbuntuPaths.hostSessions)
+        assertEquals("/data/adb/minis/memory", UbuntuPaths.hostMemory)
+        assertEquals("/data/adb/minis/skills", UbuntuPaths.hostSkills)
+        assertEquals("/data/adb/minis/shared", UbuntuPaths.hostShared)
+        assertEquals("/data/adb/minis/home", UbuntuPaths.hostHome)
+        listOf(
+            UbuntuPaths.hostWorkspace, UbuntuPaths.hostSessions, UbuntuPaths.hostMemory,
+            UbuntuPaths.hostSkills, UbuntuPaths.hostShared, UbuntuPaths.hostHome,
+        ).forEach { path ->
+            assertFalse(path.contains("/data/user/"))
+            assertFalse(path.contains("/files/"))
+        }
     }
 
     @Test
-    fun `resolveHostPath uses bind mounts`() {
+    fun `workspace home and global aliases map to distinct persistent sources`() {
+        assertEquals("/data/adb/minis/workspace/x.xlsx", UbuntuPaths.resolveGuest("/workspace/x.xlsx")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/workspace/attachments/a.png", UbuntuPaths.resolveGuest("/var/minis/attachments/a.png")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/memory/notes.md", UbuntuPaths.resolveGuest("/memory/notes.md")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/skills/tool/SKILL.md", UbuntuPaths.resolveGuest("/skills/tool/SKILL.md")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/shared/export.zip", UbuntuPaths.resolveGuest("/shared/export.zip")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/home/.profile", UbuntuPaths.resolveGuest("/home/minis/.profile")!!.path.replace('\\', '/'))
+        assertEquals("/home/minis", UbuntuPaths.GUEST_HOME)
+        assertEquals("/workspace", UbuntuPaths.GUEST_WORKSPACE)
+    }
+
+    @Test
+    fun `session globals stay on persistent roots`() {
+        assertEquals("/data/adb/minis/memory/global.md", UbuntuPaths.resolveSessionHostPath("session-a", "/memory/global.md")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/skills/demo/SKILL.md", UbuntuPaths.resolveSessionHostPath("session-a", "/skills/demo/SKILL.md")!!.path.replace('\\', '/'))
+        assertEquals("/data/adb/minis/shared/result.txt", UbuntuPaths.resolveSessionHostPath("session-a", "/shared/result.txt")!!.path.replace('\\', '/'))
+    }
+
+    @Test
+    fun `resolveHostPath rejects traversal and bind symlink escape`() {
         UbuntuPaths.bindMounts["/mnt/docs"] = "/storage/emulated/0/Documents"
         try {
-            assertEquals(
-                "/storage/emulated/0/Documents/a.txt",
-                UbuntuPaths.resolveHostPath("/mnt/docs/a.txt")!!.path.replace('\\', '/'),
-            )
+            assertEquals("/storage/emulated/0/Documents/a.txt", UbuntuPaths.resolveHostPath("/mnt/docs/a.txt")!!.path.replace('\\', '/'))
         } finally {
             UbuntuPaths.bindMounts.remove("/mnt/docs")
         }
-        // relative path falls back to workspace (linux.file.* contract)
-        run {
-            val p = UbuntuPaths.resolveHostPath("e2e/ok.txt")
-            assertTrue(p != null && p!!.path.replace('\\', '/').endsWith("/workspace/e2e/ok.txt"))
-            val q = UbuntuPaths.resolveHostPath("ok.txt")
-            assertTrue(q != null && q!!.path.replace('\\', '/').endsWith("/workspace/ok.txt"))
-            assertNull(UbuntuPaths.resolveHostPath("../escape.txt"))
-        }
-    }
-
-    @Test
-    fun `rejects escape and unknown prefixes`() {
+        assertNull(UbuntuPaths.resolveHostPath("../escape.txt"))
         assertNull(UbuntuPaths.resolveGuest("/workspace/../policy"))
-        assertNull(UbuntuPaths.resolveGuest("/etc/passwd"))
         assertNull(UbuntuPaths.resolveGuest("/data/adb/minis/policy/x"))
-    }
 
-    @Test
-    fun `bind mount symlink cannot escape its host root`() {
         val root = Files.createTempDirectory("minis-path-root")
         val outside = Files.createTempDirectory("minis-path-outside")
         Files.createSymbolicLink(root.resolve("escape"), outside)
@@ -67,68 +70,33 @@ class UbuntuPathsTest {
     }
 
     @Test
-    fun `session paths isolate identical guest names and clean up independently`() {
-        val filesDir = Files.createTempDirectory("minis-session-paths").toFile()
+    fun `session paths isolate and reject unsafe ids and mounts`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-paths").toFile()
+        val outside = Files.createTempDirectory("minis-session-outside")
         try {
-            val first = UbuntuPaths.resolveSessionPath(
-                filesDir,
-                "session-a",
-                "/var/minis/workspace/report.txt",
-            )!!
-            val second = UbuntuPaths.resolveSessionPath(
-                filesDir,
-                "session-b",
-                "/var/minis/workspace/report.txt",
-            )!!
-            assertTrue(first.absolutePath.contains("minis-sessions${java.io.File.separator}session-a"))
-            assertTrue(second.absolutePath.contains("minis-sessions${java.io.File.separator}session-b"))
+            val first = UbuntuPaths.resolveSessionPathAt(sessionsRoot, "session-a", "/workspace/report.txt")!!
+            val second = UbuntuPaths.resolveSessionPathAt(sessionsRoot, "session-b", "/workspace/report.txt")!!
             assertTrue(first.absolutePath != second.absolutePath)
             first.writeText("a")
             second.writeText("b")
             assertEquals("a", first.readText())
             assertEquals("b", second.readText())
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "../escape", "/workspace/a"))
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "session", "/workspace/../a"))
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "会话", "/workspace/a"))
 
-            val attachment = UbuntuPaths.resolveSessionPath(
-                filesDir,
-                "session-a",
-                "/var/minis/attachments/photo.png",
-            )!!
-            assertTrue(attachment.path.contains("attachments"))
-            assertTrue(!attachment.path.contains("workspace${java.io.File.separator}attachments"))
-            assertEquals(
-                attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
-                    "session-a",
-                    "/workspace/attachments/photo.png",
-                )!!.canonicalFile,
-            )
-            assertEquals(
-                attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
-                    "session-a",
-                    "/var/minis/workspace/attachments/photo.png",
-                )!!.canonicalFile,
-            )
+            val session = UbuntuPaths.ensureSessionDirsAt(sessionsRoot, "symlink-session")!!
+            val workspace = session.toPath().resolve("workspace")
+            workspace.toFile().deleteRecursively()
+            Files.createSymbolicLink(workspace, outside)
+            assertNull(UbuntuPaths.resolveSessionPathAt(sessionsRoot, "symlink-session", "/workspace/secret.txt"))
 
-            assertTrue(UbuntuPaths.deleteSessionFiles(filesDir, "session-a"))
-            assertTrue(!first.exists())
-            assertTrue(second.exists())
+            assertTrue(UbuntuPaths.deleteSessionFilesAt(sessionsRoot, "session-a"))
+            assertFalse(java.io.File(sessionsRoot, "session-a").exists())
+            assertTrue(java.io.File(sessionsRoot, "session-b").exists())
         } finally {
-            filesDir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `session resolver rejects traversal and invalid ids`() {
-        val filesDir = Files.createTempDirectory("minis-session-invalid").toFile()
-        try {
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "../escape", "/workspace/a"))
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "session", "/workspace/../a"))
-            assertNull(UbuntuPaths.resolveSessionPath(filesDir, "会话", "/workspace/a"))
-        } finally {
-            filesDir.deleteRecursively()
+            sessionsRoot.deleteRecursively()
+            outside.toFile().deleteRecursively()
         }
     }
 }
