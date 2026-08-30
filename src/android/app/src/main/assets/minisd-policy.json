@@ -1,13 +1,15 @@
 {
+  "accessMode": "standard",
   "methods": {
     "system.hello": { "mode": "allow" },
     "system.ping": { "mode": "allow" },
     "root.probe": { "mode": "allow" },
     "root.exec": {
       "mode": "allow",
-      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount"],
+      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat"],
       "argRules": {
-        "pm": { "regexDeny": ["shell.*su.*"] }
+        "pm": { "regexDeny": ["shell.*su.*", "uninstall.*", "install.*", "clear.*", "disable.*", "enable.*", "grant.*", "revoke.*", "suspend.*", "unsuspend.*"] },
+        "settings": { "regexDeny": ["put.*", "delete.*", "reset.*"] }
       }
     },
     "root.shellRaw": { "mode": "deny" },
