@@ -46,6 +46,7 @@ val minisdReadelfName = "llvm-readelf" + if (minisdNdkHost.startsWith("windows")
 val minisdSourceDir = rootProject.file("../native/minisd")
 val minisdGeneratedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
 val minisdGeneratedAssets = layout.buildDirectory.dir("generated/minisdAssets")
+val minisdRuntimeAssetsDir = layout.buildDirectory.dir("generated/minisdAssets/minis-runtime")
 val runtimeDistDir = rootProject.file("../../dist")
 val runtimeRootfsBuilder = rootProject.file("../../scripts/build-ubuntu-rootfs.sh")
 val runtimeRootfsArchive = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
@@ -267,7 +268,6 @@ val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
     dependsOn(packageMinisdNative, buildPinnedUbuntuRootfs)
     outputDirectory.set(minisdGeneratedAssets)
     val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
-    val outputDir = outputDirectory.map { it.dir("minis-runtime") }
     inputs.file(binary)
     inputs.file(runtimeRootfsArchive)
     inputs.file(runtimeRootfsBuildManifest)
@@ -311,7 +311,7 @@ val packageRuntimeAssets by tasks.registering(PackageRuntimeAssetsTask::class) {
             }
         }
 
-        val runtimeDir = outputDir.get().asFile
+        val runtimeDir = minisdRuntimeAssetsDir.get().asFile
         runtimeDir.mkdirs()
         runtimeRootfsArchive.copyTo(runtimeDir.resolve("ubuntu-arm64-rootfs.tar.gz"), overwrite = true)
         val manifest = linkedMapOf<String, Any>(
