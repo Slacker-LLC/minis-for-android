@@ -2,6 +2,7 @@ package com.openminis.app.tools.runtime
 
 import android.content.ContextWrapper
 import android.content.SharedPreferences
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -15,9 +16,12 @@ class LinuxPythonRunHandlerCleanupTest {
     @Test
     fun runtimeFailureStillDeletesTemporaryPythonScript() = runBlocking {
         val filesDir = Files.createTempDirectory("minis-python-cleanup").toFile()
-        val context = TestContext(filesDir)
+        val sessionsRoot = File(filesDir, "persistent-sessions")
+        val context = TestContext(filesDir, sessionsRoot)
         val sessionId = "issue29-python-cleanup"
-        val workspace = File(filesDir, "minis-sessions/$sessionId/workspace")
+        val workspace = requireNotNull(
+            UbuntuPaths.resolveSessionPathAt(sessionsRoot, sessionId, "/workspace"),
+        )
 
         try {
             val result = LinuxPythonRunHandler().execute(
@@ -37,7 +41,10 @@ class LinuxPythonRunHandlerCleanupTest {
         }
     }
 
-    private class TestContext(private val root: File) : ContextWrapper(null) {
+    private class TestContext(
+        private val root: File,
+        override val sessionsRootForTest: File,
+    ) : ContextWrapper(null), UbuntuPaths.SessionRootProviderForTest {
         private val preferences = EmptySharedPreferences()
 
         override fun getFilesDir(): File = root

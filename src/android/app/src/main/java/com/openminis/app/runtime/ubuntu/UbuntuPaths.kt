@@ -33,6 +33,15 @@ object UbuntuPaths {
 
     val bindMounts: MutableMap<String, String> = linkedMapOf()
 
+    /**
+     * JVM-test-only session-root seam. Production Android contexts never
+     * implement this interface, so production resolution remains fixed at
+     * `/data/adb/minis/sessions`.
+     */
+    internal interface SessionRootProviderForTest {
+        val sessionsRootForTest: File
+    }
+
     private val aliases = listOf(
         "/workspace" to { hostWorkspace },
         "/var/minis/workspace" to { hostWorkspace },
@@ -167,12 +176,23 @@ object UbuntuPaths {
             resolveHostPath(linuxPath)
         }
 
-    /** Context remains in the public call shape for Android permission checks; it does not select storage. */
-    fun resolveSessionHostPath(
-        sessionId: String,
-        linuxPath: String,
-        @Suppress("UNUSED_PARAMETER") context: Context,
-    ): File? = resolveSessionHostPath(sessionId, linuxPath)
+    /**
+     * Context remains in the public call shape for Android permission checks;
+     * it never selects production storage. JVM tests may implement
+     * [SessionRootProviderForTest] to route session-scoped paths through the
+     * explicit test-only [resolveSessionPathAt] seam.
+     */
+    fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? =
+        if (isSessionScopedPath(linuxPath)) {
+            val testRoot = (context as? SessionRootProviderForTest)?.sessionsRootForTest
+            if (testRoot != null) {
+                resolveSessionPathAt(testRoot, sessionId, linuxPath)
+            } else {
+                resolveSessionPath(sessionId, linuxPath)
+            }
+        } else {
+            resolveHostPath(linuxPath)
+        }
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {
         if (!linuxPath.startsWith('/')) return true
