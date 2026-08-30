@@ -175,7 +175,45 @@ jobs:
         run: ./gradlew --stop || true
       - name: Assemble and verify debug APK runtime
         working-directory: src/android
-        run: ./gradlew :app:assembleDebug :app:verifyDebugMinisdApk --no-parallel --max-workers=2 --stacktrace
+        run: |
+          cat >/tmp/runtime-assets-probe.gradle <<'GRADLE'
+          allprojects {
+            tasks.configureEach { task ->
+              if (task.name == 'mergeDebugAssets') {
+                task.doFirst {
+                  println('RUNTIME_PROBE mergeDebugAssets runtime-like inputs:')
+                  task.inputs.files.files.toList().sort { a, b -> a.absolutePath <=> b.absolutePath }.each { file ->
+                    def path = file.absolutePath
+                    if (path.contains('runtimeAssets') || path.contains('minis-runtime') ||
+                        file.name.contains('ubuntu-arm64-rootfs') || file.name == 'runtime-manifest.json') {
+                      println("RUNTIME_PROBE input path=${path} exists=${file.exists()} dir=${file.isDirectory()} bytes=${file.isFile() ? file.length() : -1}")
+                    }
+                  }
+                }
+                task.doLast {
+                  println('RUNTIME_PROBE mergeDebugAssets outputs:')
+                  task.outputs.files.files.toList().sort { a, b -> a.absolutePath <=> b.absolutePath }.each { file ->
+                    println("RUNTIME_PROBE output path=${file.absolutePath} exists=${file.exists()} dir=${file.isDirectory()}")
+                  }
+                }
+              }
+            }
+          }
+          GRADLE
+          set +e
+          ./gradlew :app:assembleDebug :app:verifyDebugMinisdApk -I /tmp/runtime-assets-probe.gradle --no-parallel --max-workers=2 --stacktrace
+          status=$?
+          set -e
+          echo 'RUNTIME_PROBE generated/merged runtime candidates:'
+          find app/build -type f \( -name 'ubuntu-arm64-rootfs.tar.gz' -o -name 'runtime-manifest.json' \) -print | sort || true
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          if [ -f "$apk" ]; then
+            echo 'RUNTIME_PROBE final APK runtime-like entries:'
+            unzip -Z1 "$apk" | grep -E '(^assets/|minis-runtime|ubuntu-arm64-rootfs|runtime-manifest)' | sort || true
+          else
+            echo "RUNTIME_PROBE final APK missing: $apk"
+          fi
+          exit "$status"
       - name: Compile installed-layout instrumentation gate
         working-directory: src/android
         run: ./gradlew :app:assembleDebugAndroidTest --no-parallel --max-workers=2 --stacktrace
