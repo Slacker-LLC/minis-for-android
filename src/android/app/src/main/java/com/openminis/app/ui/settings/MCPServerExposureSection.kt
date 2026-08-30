@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.openminis.app.mcp.server.MCPServerManager
-import com.openminis.app.mcp.server.TokenStore
 import com.openminis.app.ui.components.MinisTextButton
 
 /** Product surface for the existing local-only on-device MCP server. */
@@ -130,8 +129,10 @@ internal fun MCPServerExposureSection() {
                 }
             },
             showChevron = false,
-            trailing = managedToken?.let {
+            trailing = if (managedToken != null) {
                 { Text("Copy", color = MaterialTheme.colorScheme.primary) }
+            } else {
+                null
             },
             showDivider = managedToken == null,
         )
