@@ -100,7 +100,7 @@ The persistent sources of truth are fixed:
 
 These directories are prepared before keeper namespace creation, with explicit owner/mode handling. Alternate persistent paths are rejected. Persistent backing must not resolve to tmpfs.
 
-Existing App-private workspace/session/global/home data is a one-time migration input. Migration is fail-closed and idempotent: copy, ownership/mode correction, SELinux relabel, and compatibility aliases must complete before the final migration marker is committed. After that, `/data/adb/minis/*` is authoritative.
+The pre-migration Android storage layout is only a one-time migration input. Migration is fail-closed and idempotent: copy, ownership/mode correction, SELinux relabel, and compatibility aliases must complete before the final migration marker is committed. After that, `/data/adb/minis/*` is authoritative.
 
 ## Guest paths and session isolation
 
