@@ -15,6 +15,7 @@ struct Args {
     once: bool,
     call: bool,
     watchdog: bool,
+    dev_filesystem_ipc: bool,
     #[cfg_attr(not(unix), allow(dead_code))]
     socket: String,
     #[cfg_attr(not(unix), allow(dead_code))]
@@ -25,12 +26,30 @@ struct Args {
     lease_starttime: Option<u64>,
 }
 
+fn validate_dev_ipc_mode(
+    socket: &str,
+    policy: &Option<PathBuf>,
+    dev_filesystem_ipc: bool,
+) -> Result<(), String> {
+    let filesystem_socket = !socket.starts_with('@');
+    if (filesystem_socket || policy.is_some()) && !dev_filesystem_ipc {
+        return Err(
+            "filesystem socket / --policy PATH are standalone-dev compatibility only; pass --dev-filesystem-ipc explicitly"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 fn parse_args() -> Result<Args, String> {
     let mut mock = false;
     let mut once = false;
     let mut call = false;
     let mut watchdog = false;
-    let mut socket = "/data/adb/minis/run/minisd.sock".to_string();
+    let mut dev_filesystem_ipc = false;
+    // Safe default: production-like standalone invocation stays in the abstract
+    // namespace. Filesystem sockets require the explicit dev-only flag below.
+    let mut socket = "@minis.minisd.root.standalone.v1".to_string();
     let mut app_socket = None;
     let mut policy = None;
     let mut policy_json = None;
@@ -43,6 +62,7 @@ fn parse_args() -> Result<Args, String> {
             "--once" => once = true,
             "--call" => call = true,
             "--watchdog" => watchdog = true,
+            "--dev-filesystem-ipc" => dev_filesystem_ipc = true,
             "--socket" => {
                 socket = it.next().ok_or("--socket needs a path")?;
             }
@@ -73,7 +93,10 @@ fn parse_args() -> Result<Args, String> {
             }
             "--help" | "-h" => {
                 eprintln!(
-                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket NAME] [--app-socket NAME] [--policy PATH] [--policy-json JSON] [--lease-pid PID] [--lease-starttime STARTTIME]"
+                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket NAME] [--app-socket NAME] [--policy-json JSON] [--lease-pid PID --lease-starttime STARTTIME]"
+                );
+                eprintln!(
+                    "standalone dev only: --dev-filesystem-ipc permits filesystem --socket PATH and --policy PATH"
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
@@ -84,11 +107,16 @@ fn parse_args() -> Result<Args, String> {
             other => return Err(format!("unknown arg: {other}")),
         }
     }
+    validate_dev_ipc_mode(&socket, &policy, dev_filesystem_ipc)?;
+    if lease_pid.is_some() != lease_starttime.is_some() {
+        return Err("--lease-pid and --lease-starttime must be supplied together".to_string());
+    }
     Ok(Args {
         mock,
         once,
         call,
         watchdog,
+        dev_filesystem_ipc,
         socket,
         app_socket,
         policy,
@@ -134,6 +162,7 @@ fn once_stdio(state: &mut AppState) -> ExitCode {
                 ExitCode::from(2)
             }
         }
+
         Err(_) => ExitCode::from(1),
     }
 }
@@ -153,6 +182,7 @@ fn main() -> ExitCode {
     if args.watchdog {
         return watchdog_loop(
             args.mock,
+            args.dev_filesystem_ipc,
             args.socket,
             args.app_socket,
             args.policy,
@@ -204,6 +234,7 @@ fn main() -> ExitCode {
 
 fn watchdog_loop(
     mock: bool,
+    dev_filesystem_ipc: bool,
     socket: String,
     app_socket: Option<String>,
     policy: Option<PathBuf>,
@@ -228,6 +259,9 @@ fn watchdog_loop(
         if mock {
             cmd.arg("--mock");
         }
+        if dev_filesystem_ipc {
+            cmd.arg("--dev-filesystem-ipc");
+        }
         cmd.arg("--socket").arg(&socket);
         if let Some(p) = &app_socket {
             cmd.arg("--app-socket").arg(p);
@@ -241,14 +275,39 @@ fn watchdog_loop(
         if let Some(pid) = lease_pid {
             cmd.arg("--lease-pid").arg(pid.to_string());
         }
-        match cmd.status() {
-            Ok(st) => eprintln!("minisd child exited {st}; restart in 1s"),
-            Err(e) => eprintln!("minisd spawn: {e}"),
+        if let Some(starttime) = lease_starttime {
+            cmd.arg("--lease-starttime").arg(starttime.to_string());
         }
-        if let Some(pid) = lease_pid {
-            if !lease_alive(pid, lease_starttime) {
-                return ExitCode::SUCCESS;
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                eprintln!("minisd spawn: {e}");
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                continue;
             }
+        };
+        loop {
+            if let Some(pid) = lease_pid {
+                if !lease_alive(pid, lease_starttime) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return ExitCode::SUCCESS;
+                }
+            }
+            match child.try_wait() {
+                Ok(Some(st)) => {
+                    eprintln!("minisd child exited {st}; restart in 1s");
+                    break;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("minisd child wait: {e}");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
@@ -289,7 +348,8 @@ fn parse_proc_starttime(stat: &str) -> Option<u64> {
 
 #[cfg(all(test, any(target_os = "linux", target_os = "android")))]
 mod tests {
-    use super::{parse_proc_starttime, process_starttime};
+    use super::{parse_proc_starttime, process_starttime, validate_dev_ipc_mode};
+    use std::path::PathBuf;
 
     #[test]
     fn proc_starttime_reads_field_twenty_two_after_comm() {
@@ -299,6 +359,24 @@ mod tests {
         let stat = format!("123 (app with ) paren) {}", fields.join(" "));
         assert_eq!(parse_proc_starttime(&stat), Some(4242));
         assert!(process_starttime(std::process::id() as i32).is_some());
+    }
+
+    #[test]
+    fn filesystem_ipc_requires_explicit_dev_guard() {
+        assert!(validate_dev_ipc_mode("@minis.test", &None, false).is_ok());
+        assert!(validate_dev_ipc_mode("/tmp/minisd.sock", &None, false).is_err());
+        assert!(validate_dev_ipc_mode(
+            "@minis.test",
+            &Some(PathBuf::from("/tmp/policy.json")),
+            false,
+        )
+        .is_err());
+        assert!(validate_dev_ipc_mode(
+            "/tmp/minisd.sock",
+            &Some(PathBuf::from("/tmp/policy.json")),
+            true,
+        )
+        .is_ok());
     }
 }
 
@@ -380,10 +458,8 @@ fn running_as_root() -> bool {
 }
 
 #[cfg(unix)]
-/// Try to take the instance lock on `<socket>.pid`.
-/// Returns the held File on success; the flock is released automatically when
-/// the fd is closed (i.e. when minisd exits). None means another instance is
-/// running (EWOULDBLOCK/EAGAIN) or the lock could not be taken at all.
+/// Standalone/dev compatibility only. Production Android uses abstract sockets,
+/// so this filesystem lock path is reachable only after --dev-filesystem-ipc.
 fn acquire_pidfile_lock(socket: &std::path::Path) -> Option<std::fs::File> {
     use std::io::Write;
     use std::os::fd::AsRawFd;
@@ -928,9 +1004,6 @@ fn helper_keep(
 }
 
 #[cfg(unix)]
-// This is the direct CLI-to-syscall helper boundary; keeping the security-
-// relevant uid/gid/rootfs/cwd/env inputs explicit is clearer than hiding them
-// in a loosely reusable options bag.
 #[allow(clippy::too_many_arguments)]
 fn helper_exec(
     pid: i32,
@@ -956,9 +1029,6 @@ fn helper_exec(
     ns::set_process_name("minisd-exec");
     ns::setns_mnt(pid).map_err(|e| (4u8, e))?;
     if !session_root.is_empty() {
-        // Each command receives a private copy of the keeper mount namespace.
-        // Session bind mounts therefore cannot race with another chat or
-        // mutate the long-lived keeper namespace.
         ns::unshare_mount().map_err(|e| (4u8, e))?;
         ns::make_rprivate_root().map_err(|e| (4u8, e))?;
         ns::setup_session_mounts(rootfs, session_root).map_err(|e| (4u8, e))?;
