@@ -17,7 +17,8 @@ class LinuxPythonRunHandlerCleanupTest {
         val filesDir = Files.createTempDirectory("minis-python-cleanup").toFile()
         val context = TestContext(filesDir)
         val sessionId = "issue29-python-cleanup"
-        val workspace = File(filesDir, "minis-sessions/$sessionId/workspace")
+        com.openminis.app.runtime.ubuntu.UbuntuPaths.useLayoutForTest(filesDir)
+        val workspace = File(filesDir, "sessions/$sessionId/workspace")
 
         try {
             val result = LinuxPythonRunHandler().execute(
@@ -33,6 +34,7 @@ class LinuxPythonRunHandlerCleanupTest {
             assertNotNull(leftovers)
             assertTrue("temporary python script was not deleted", leftovers!!.isEmpty())
         } finally {
+            com.openminis.app.runtime.ubuntu.UbuntuPaths.resetLayoutForTest()
             filesDir.deleteRecursively()
         }
     }

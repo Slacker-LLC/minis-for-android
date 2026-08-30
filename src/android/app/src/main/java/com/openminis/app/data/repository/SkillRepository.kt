@@ -111,7 +111,7 @@ class SkillRepository(private val context: Context) {
     }
 
     private val skillsDir: File
-        get() = File(context.filesDir, "minis-global/skills")
+        get() = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills)
 
     init {
         // [T-android-safemode-lateinit-crash-147] Never let a bad skill take

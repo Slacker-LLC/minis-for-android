@@ -1,45 +1,37 @@
-## Summary
+## 摘要
 
-<!-- What changed and why? -->
+<!-- 改了什么、为什么。对照哪条 docs/contracts。 -->
 
-## Scope
+## 范围
 
+- [ ] 仅文档 / 合同
 - [ ] Android app/runtime
-- [ ] Provider/model behavior
-- [ ] Android-native tools
-- [ ] MCP client/server
-- [ ] `minisd` / Ubuntu execution runtime
-- [ ] Voice / assistant / overlay
-- [ ] Build / CI / release engineering
-- [ ] Documentation only
+- [ ] Provider / 模型
+- [ ] Android 原生工具
+- [ ] MCP
+- [ ] `minisd` / Ubuntu
+- [ ] 语音 / 助手 / overlay
+- [ ] 构建 / CI / 发布
 
-## Verification
+## 合同
 
-<!-- List the exact commands or manual checks that were actually run. -->
+- [ ] 已读 `AGENTS.md` 与相关 `docs/contracts/*`
+- [ ] 未把 `06-CURRENT-GAPS.md` 里的未完成项写成已实现
+- [ ] 未在本 PR 平行改存储真源以外的 runtime 重构（除非本 PR 就是在修 G1）
 
-- [ ] Relevant Android unit tests
-- [ ] `:app:lintDebug` when Android source/resources changed
-- [ ] `:app:lintRelease` when release behavior changed
-- [ ] `:app:assembleDebug` when production source/assets changed
-- [ ] release build/signing checks when release configuration changed
-- [ ] Rust fmt / Clippy / tests when `src/native/minisd/` changed
-- [ ] rootfs verification tests when rootfs scripts changed
-- [ ] documentation provenance guard when active docs change
+## 验证
 
-## Security and compatibility
+<!-- 实际跑过的命令 -->
 
-- [ ] No API key, OAuth token, MCP token, signing material, or private fixture is committed
-- [ ] New tools use the canonical Tool Registry / permission/runtime gates
-- [ ] Root operations do not introduce raw model-controlled `su` execution
-- [ ] Side-effecting operations preserve approval/checkpoint/recovery semantics
-- [ ] Path, IPC, output, and timeout limits remain fail-closed
-- [ ] Network changes do not allow credential downgrade from HTTPS to public cleartext HTTP
-- [ ] Release builds do not fall back to debug signing
-- [ ] Current English documentation is updated when behavior changes
-- [ ] Source/third-party attribution remains intact
+- [ ] `python3 scripts/test_docs_provenance.py` 与 `check_docs_provenance.py`（改文档时）
+- [ ] 相关 Android unit tests
+- [ ] `:app:lintDebug`（改了 Android 源/资源）
+- [ ] Rust fmt / Clippy / tests（改了 `src/native/minisd/`）
 
-## Provenance
+## 安全
 
-If this change imports or adapts code from another project, include the source PR/commit/release and describe any adaptation required by the current Minis for Android architecture.
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) and [PROVENANCE.md](../PROVENANCE.md).
+- [ ] 无密钥 / token / 签名材料进仓库
+- [ ] 未新增模型可控的 `su -c` 通道
+- [ ] 路径 / IPC / 输出仍然 fail-closed
+- [ ] 中文合同已随行为更新
+- [ ] GPL 与第三方声明仍在

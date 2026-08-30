@@ -531,7 +531,11 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
         // RuntimePathRegistry.resolveSessionHostPath, which use the same layout.
         val sandboxVisible = sessionId != null
         val outDir = if (sandboxVisible) {
-            File(context.filesDir, "minis-sessions/$sessionId/offloads").also { it.mkdirs() }
+            File(
+                com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
+                    ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId),
+                "offloads",
+            ).also { it.mkdirs() }
         } else {
             File(context.filesDir, "photos-export").also { it.mkdirs() }
         }

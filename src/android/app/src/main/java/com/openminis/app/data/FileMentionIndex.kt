@@ -124,8 +124,8 @@ class FileMentionIndex(
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(filesDir, "minis-sessions/$sessionId/workspace") to Scope.WORKSPACE,
-                    File(filesDir, "minis-sessions/$sessionId/attachments") to Scope.ATTACHMENTS,
+                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sessionId/workspace") to Scope.WORKSPACE,
+                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sessionId/attachments") to Scope.ATTACHMENTS,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->
@@ -137,9 +137,9 @@ class FileMentionIndex(
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(filesDir, "minis-global/shared") to Scope.SHARED,
-                    File(filesDir, "minis-global/skills") to Scope.SKILLS,
-                    File(filesDir, "minis-global/memory") to Scope.MEMORY,
+                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared) to Scope.SHARED,
+                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills) to Scope.SKILLS,
+                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory) to Scope.MEMORY,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->

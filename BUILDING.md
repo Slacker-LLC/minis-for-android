@@ -1,5 +1,7 @@
 # Building Minis for Android
 
+Behavioral contracts are Chinese: [AGENTS.md](AGENTS.md) and [docs/contracts/](docs/contracts/00-IDENTITY.md). This file is the build and toolchain guide only.
+
 This is the primary build guide for the current `master` branch. The public repository currently distributes source code rather than production APK releases.
 
 Chinese translation: [BUILDING.zh-CN.md](BUILDING.zh-CN.md)

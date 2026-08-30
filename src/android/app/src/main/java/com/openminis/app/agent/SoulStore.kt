@@ -174,10 +174,8 @@ object SoulStore {
 
     private const val TAG = "SoulStore"
     private const val FILE_NAME = "SOUL.md"
-    private const val MEMORY_SUBDIR = "minis-global/memory"
-
     fun fileLocation(context: Context): File =
-        File(File(context.filesDir, MEMORY_SUBDIR), FILE_NAME)
+        File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory, FILE_NAME)
 
     /**
      * Compatibility constants kept so older source/tests continue to compile.

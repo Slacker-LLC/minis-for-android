@@ -69,14 +69,15 @@ class UbuntuPathsTest {
     @Test
     fun `session paths isolate identical guest names and clean up independently`() {
         val filesDir = Files.createTempDirectory("minis-session-paths").toFile()
+        val sessionsRoot = java.io.File(filesDir, "minis-sessions")
         try {
             val first = UbuntuPaths.resolveSessionPath(
-                filesDir,
+                sessionsRoot,
                 "session-a",
                 "/var/minis/workspace/report.txt",
             )!!
             val second = UbuntuPaths.resolveSessionPath(
-                filesDir,
+                sessionsRoot,
                 "session-b",
                 "/var/minis/workspace/report.txt",
             )!!
@@ -89,7 +90,7 @@ class UbuntuPathsTest {
             assertEquals("b", second.readText())
 
             val attachment = UbuntuPaths.resolveSessionPath(
-                filesDir,
+                sessionsRoot,
                 "session-a",
                 "/var/minis/attachments/photo.png",
             )!!
@@ -97,22 +98,22 @@ class UbuntuPathsTest {
             assertTrue(!attachment.path.contains("workspace${java.io.File.separator}attachments"))
             assertEquals(
                 attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
+                    UbuntuPaths.resolveSessionPath(
+                    sessionsRoot,
                     "session-a",
                     "/workspace/attachments/photo.png",
                 )!!.canonicalFile,
             )
             assertEquals(
                 attachment.canonicalFile,
-                UbuntuPaths.resolveSessionPath(
-                    filesDir,
+                    UbuntuPaths.resolveSessionPath(
+                    sessionsRoot,
                     "session-a",
                     "/var/minis/workspace/attachments/photo.png",
                 )!!.canonicalFile,
             )
 
-            assertTrue(UbuntuPaths.deleteSessionFiles(filesDir, "session-a"))
+            assertTrue(UbuntuPaths.deleteSessionFiles(sessionsRoot, "session-a"))
             assertTrue(!first.exists())
             assertTrue(second.exists())
         } finally {

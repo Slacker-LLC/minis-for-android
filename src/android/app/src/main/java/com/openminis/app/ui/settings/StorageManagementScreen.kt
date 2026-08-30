@@ -83,7 +83,7 @@ fun StorageManagementScreen(
                 dbSize = databaseSize(context)
 
                 val allSessions = chatDao.listSessions()
-                val sessionsDir = File(context.filesDir, "minis-sessions")
+                val sessionsDir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
                 val mediaDir = File(context.filesDir, "media")
 
                 val mediaSizes = mediaSizesBySession(mediaDir, allSessions.map { it.id }.toSet())
@@ -177,7 +177,7 @@ fun SessionStorageDetailScreen(
     var isClearing by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
-    val sessionsDir = File(context.filesDir, "minis-sessions")
+    val sessionsDir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
     val mediaDir = File(context.filesDir, "media")
 
     fun reload() {
