@@ -27,13 +27,20 @@ internal object MinisdBootstrap {
         appSocket: String,
         policyJson: String,
         forceRestart: Boolean,
+        packagedBroker: String = "",
     ): String {
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(MinisdProtocol.DEFAULT_BIN)}"
         commands += "POLICY=${shellQuote(POLICY_PATH)}"
         commands += "APP_SOCKET=${shellQuote(appSocket)}"
         commands += "PIDFILE=${shellQuote(PID_FILE)}"
-        commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
+        if (packagedBroker.isNotBlank()) {
+            commands += com.openminis.app.runtime.ubuntu.RuntimeProvision.installBrokerCommand(
+                packagedBroker,
+            )
+        } else {
+            commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
+        }
         commands += "mkdir -p ${shellQuote(POLICY_DIR)} || { echo \"cannot create minisd policy directory\" >&2; exit 43; }"
         commands += "umask 077"
         commands += "printf '%s' ${shellQuote(policyJson)} > \"\$POLICY.tmp\" || { echo \"cannot write minisd policy\" >&2; exit 44; }"

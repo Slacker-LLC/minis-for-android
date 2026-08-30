@@ -71,6 +71,8 @@ cargo build --locked --release \
 
 The script downloads the pinned Ubuntu 24.04 arm64 base archive and verifies its SHA-256 digest before packaging the project rootfs layout.
 
+Optional APK runtime payload: if `dist/ubuntu-arm64-rootfs.tar.gz` exists, Gradle copies it into `assets/minis-runtime/`. If `src/native/minisd/target/aarch64-linux-android/release/minisd` exists, Gradle copies it to `jniLibs/arm64-v8a/libminisd.so`. Source-only builds omit both; the device then fail-closes until those artifacts are packaged.
+
 ## 5. Build a debug APK
 
 ```bash

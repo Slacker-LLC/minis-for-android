@@ -115,9 +115,30 @@ val copyBashismRules by tasks.registering(Copy::class) {
     }
     into(layout.projectDirectory.dir("src/main/assets/bashism"))
 }
+val packagedRootfs = rootProject.file("../../dist/ubuntu-arm64-rootfs.tar.gz")
+val packagedMinisdAndroid = rootProject.file(
+    "../../src/native/minisd/target/aarch64-linux-android/release/minisd",
+)
+val packageRuntimeRootfs by tasks.registering(Copy::class) {
+    onlyIf { packagedRootfs.isFile }
+    from(packagedRootfs)
+    into(layout.projectDirectory.dir("src/main/assets/minis-runtime"))
+    rename { "ubuntu-arm64-rootfs.tar.gz" }
+}
+val packageMinisdJniLib by tasks.registering(Copy::class) {
+    onlyIf { packagedMinisdAndroid.isFile }
+    from(packagedMinisdAndroid)
+    into(layout.projectDirectory.dir("src/main/jniLibs/arm64-v8a"))
+    rename { "libminisd.so" }
+}
+
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyBashismRules) }
-tasks.named("preBuild") { dependsOn(copyBashismRules) }
+    .configureEach { dependsOn(copyBashismRules); dependsOn(packageRuntimeRootfs) }
+tasks.named("preBuild") {
+    dependsOn(copyBashismRules)
+    dependsOn(packageRuntimeRootfs)
+    dependsOn(packageMinisdJniLib)
+}
 
 // Stage optional debug-server skill assets only for debug builds. Local
 // development checkouts may provide the generator and .claude skill source;

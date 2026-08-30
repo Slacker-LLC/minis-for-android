@@ -13,6 +13,7 @@ Older experimental release notes contained references to removed Web Remote, Clo
 - Implementation gaps versus those contracts are listed in `docs/contracts/06-CURRENT-GAPS.md`.
 - Legal lineage stays in `PROVENANCE.md`; there is no upstream sync policy.
 - Android persistent Linux data uses `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`; legacy filesDir trees migrate once.
+- APK can install packaged `libminisd.so` and extract a packaged Ubuntu rootfs asset; missing payload fail-closes instead of using `/data/local/tmp`.
 
 ## Current architecture baseline — 2026-08
 

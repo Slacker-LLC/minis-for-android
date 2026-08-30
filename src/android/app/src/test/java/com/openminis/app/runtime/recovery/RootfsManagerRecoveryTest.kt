@@ -94,7 +94,7 @@ class RootfsManagerRecoveryTest {
         val extractAt = command.indexOf("tar -xzf")
         val metadataAt = command.indexOf("etc/minis/rootfs.json")
         val swapAt = command.indexOf("mv \"\$ROOTFS\" \"\$OLD\"")
-        assertTrue(command.contains("/data/local/tmp/ubuntu-arm64-rootfs.tar.gz"))
+        assertTrue(command.contains("/data/adb/minis/runtime/staging/ubuntu-arm64-rootfs.tar.gz"))
         assertTrue(extractAt >= 0)
         assertTrue(metadataAt > extractAt)
         assertTrue(swapAt > metadataAt)

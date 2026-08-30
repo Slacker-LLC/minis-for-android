@@ -366,10 +366,15 @@ object UbuntuRuntime {
             } catch (t: Throwable) {
                 return@withContext BrokerStartResult(false, "invalid minisd policy template: ${t.message}")
             }
+            val packagedBroker = java.io.File(
+                ctx.applicationInfo.nativeLibraryDir,
+                com.openminis.app.runtime.ubuntu.RuntimeProvision.PACKAGED_BROKER_NAME,
+            ).absolutePath
             val cmd = MinisdBootstrap.watchdogCommand(
                 appSocket = appSock,
                 policyJson = policy,
                 forceRestart = forceRestart,
+                packagedBroker = packagedBroker,
             )
 
             val proc = try {

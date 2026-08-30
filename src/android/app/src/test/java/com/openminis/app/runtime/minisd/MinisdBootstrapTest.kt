@@ -94,4 +94,21 @@ class MinisdBootstrapTest {
     fun `shellQuote protects apostrophes`() {
         assertEquals("'a'\"'\"'b'", MinisdBootstrap.shellQuote("a'b"))
     }
+
+    @Test
+    fun `packaged broker is installed before watchdog spawn`() {
+        val command = MinisdBootstrap.watchdogCommand(
+            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
+            forceRestart = false,
+            packagedBroker = "/data/app/pkg/lib/arm64/libminisd.so",
+        )
+
+        assertTrue(command.contains("libminisd.so"))
+        assertTrue(command.contains("cp \"\$SRC\" \"\$BIN.tmp\""))
+        val copyAt = command.indexOf("cp \"\$SRC\"")
+        val spawnAt = command.indexOf("--watchdog --policy")
+        assertTrue(copyAt >= 0)
+        assertTrue(spawnAt > copyAt)
+    }
 }

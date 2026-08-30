@@ -81,6 +81,19 @@ class RootfsManager private constructor(private val context: Context) {
         }
 
         _installState.value = RootfsInstallState.Extracting(0f)
+        val staged = runSu(
+            su,
+            com.openminis.app.runtime.ubuntu.RuntimeProvision.stageRootfsFromApkCommand(
+                context.packageName,
+            ),
+            REPAIR_TIMEOUT_MS,
+        )
+        if (!staged.completed || staged.exitCode != 0) {
+            val detail = staged.error
+                ?: staged.output.ifBlank { "rootfs staging exited ${staged.exitCode}" }
+            _installState.value = RootfsInstallState.Failed(detail)
+            return@withContext
+        }
         val repaired = runSu(su, repairCommand(), REPAIR_TIMEOUT_MS)
         if (!repaired.completed || repaired.exitCode != 0) {
             val detail = repaired.error
@@ -292,7 +305,8 @@ class RootfsManager private constructor(private val context: Context) {
         private const val TAG = "RootfsManager"
         private const val HEALTH_TIMEOUT_MS = 15_000L
         private const val REPAIR_TIMEOUT_MS = 180_000L
-        internal const val STAGED_ROOTFS_ARCHIVE = "/data/local/tmp/ubuntu-arm64-rootfs.tar.gz"
+        internal const val STAGED_ROOTFS_ARCHIVE =
+            com.openminis.app.runtime.ubuntu.RuntimeProvision.STAGED_ROOTFS_ARCHIVE
         private val SU_CANDIDATES = listOf(
             "/system/bin/su",
             "/system/xbin/su",
