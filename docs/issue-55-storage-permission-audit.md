@@ -2,6 +2,8 @@
 
 This file records the current classification of the storage permissions and legacy flags named by Issue #55. It complements `issue-55-external-storage-access.md`, which defines runtime behavior.
 
+This is current-state documentation, not an archive/provenance record, so it intentionally remains subject to the documentation provenance guard rather than being added to the historical allowlist.
+
 | Manifest surface | Classification | Current reason / exit condition |
 | --- | --- | --- |
 | `MANAGE_EXTERNAL_STORAGE` | Current and required by the existing raw-path mount design | Android 11+ mounted folders are converted from SAF tree URIs to arbitrary `/storage/...` POSIX paths before minisd bind-mounts them. Remove only after the guest mount design stops depending on arbitrary raw shared-storage paths. |
@@ -11,11 +13,11 @@ This file records the current classification of the storage permissions and lega
 | `preserveLegacyExternalStorage=true` | Migration-only compatibility | Not required by minisd. Retained until the legacy application-identity migration/retirement decision is complete; the repository has no device evidence proving that every upgraded legacy install can safely discard the preserved view. |
 | persisted SAF tree grant | Current and required, but insufficient for raw bind access | Remembers the user's selected tree and survives process death/reboot. It does not replace raw `/storage/...` access when minisd consumes a POSIX bind source. |
 
-## Removed rationale
+## Retired rationale
 
-The active implementation must not justify these permissions with PRoot. PRoot is not the authority that consumes the resolved host path. The current authority chain is Android SAF/path resolution -> minisd mount namespace -> Ubuntu chroot.
+The active implementation must not justify these permissions using the removed userspace sandbox backend. That backend is not the authority that consumes the resolved host path. The current authority chain is Android SAF/path resolution -> minisd mount namespace -> Ubuntu chroot.
 
-The production logic changed in this branch follows that model. Historical comments elsewhere in the repository are cleanup targets for Issue #44 if they are not part of the storage contract itself; they must not be treated as implementation evidence.
+The production logic changed in this branch follows that model. Historical runtime explanations elsewhere in the repository are cleanup targets for Issue #44 if they are not part of the storage contract itself; they must not be treated as implementation evidence.
 
 ## Security constraint
 
