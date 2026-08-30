@@ -45,6 +45,8 @@ import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
+import com.openminis.app.tools.android.PrivilegedAccessMode
+import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,6 +80,8 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var repairing by remember { mutableStateOf(false) }
     var repairFailed by remember { mutableStateOf(false) }
+    var privilegedMode by remember { mutableStateOf(PrivilegedAccessModeStore.get(context)) }
+    var showFullAccessConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -116,6 +120,71 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SettingsSection(
+                header = "Root 权限模式",
+                footer = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) {
+                    "⚠ 完全访问模式已开启，Agent 当前拥有设备完整 Root 控制权。所有命令仍经过 minisd 并保留超时、输出限制与审计。"
+                } else {
+                    "标准模式为默认值。常用白名单命令自动执行，超出范围时只允许对完整请求授权一次。"
+                },
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.Build,
+                    iconColor = if (privilegedMode == PrivilegedAccessMode.STANDARD) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = "标准模式（推荐）",
+                    subtitle = if (privilegedMode == PrivilegedAccessMode.STANDARD) {
+                        "当前模式 · 白名单自动执行，越权请求逐次确认"
+                    } else {
+                        "切换回标准模式"
+                    },
+                    onClick = {
+                        PrivilegedAccessModeStore.setFromUserSettings(context, PrivilegedAccessMode.STANDARD)
+                        privilegedMode = PrivilegedAccessMode.STANDARD
+                    },
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Build,
+                    iconColor = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = "完全访问模式",
+                    subtitle = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) {
+                        "⚠ 当前已开启 · Agent 可直接使用完整 Root 能力"
+                    } else {
+                        "不逐条确认，可使用 sh -c、cmd、debuggerd、chroot、unshare 等 Root 能力"
+                    },
+                    titleColor = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    onClick = {
+                        if (privilegedMode != PrivilegedAccessMode.FULL_ACCESS) {
+                            showFullAccessConfirm = true
+                        }
+                    },
+                    showDivider = false,
+                )
+            }
+
+            if (showFullAccessConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showFullAccessConfirm = false },
+                    title = { Text("开启完全访问模式？") },
+                    text = {
+                        Text("开启后，Agent 可以通过 minisd 直接执行完整 Root 命令，不再逐条弹窗确认。该模式可能修改系统、应用数据和挂载状态。")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            PrivilegedAccessModeStore.setFromUserSettings(context, PrivilegedAccessMode.FULL_ACCESS)
+                            privilegedMode = PrivilegedAccessMode.FULL_ACCESS
+                            showFullAccessConfirm = false
+                        }) {
+                            Text("确认开启", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showFullAccessConfirm = false }) {
+                            Text("取消")
+                        }
+                    },
+                )
+            }
+
             SettingsSection(
                 header = stringResource(R.string.system_permissions_section_a11y),
                 footer = stringResource(R.string.system_permissions_a11y_footer),
