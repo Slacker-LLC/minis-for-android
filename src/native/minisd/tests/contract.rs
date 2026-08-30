@@ -38,6 +38,7 @@ fn t_i1_every_known_method_has_shaped_response() {
             "ubuntu.exec" => json!({"argv":["/usr/bin/id"]}),
             "ubuntu.adminExec" => json!({"argv":["/usr/bin/apt-get","update"]}),
             "ubuntu.provision" => json!({}),
+            "exec.cancel" => json!({"execution_id":"contract-missing-execution"}),
             "proc.killTree" => json!({"session":"s-contract"}),
             "workspace.setQuota" => json!({"quota_bytes": 1024}),
             "policy.reload" => json!({"json": minisd::policy::DEFAULT_POLICY_JSON}),

@@ -1,7 +1,7 @@
 package com.openminis.app.offload
 
-import com.openminis.app.sandbox.NativeOffloadRequest
-import com.openminis.app.sandbox.offload.ConfigOffloadHandler
+import com.openminis.app.runtime.guest.NativeOffloadRequest
+import com.openminis.app.runtime.guest.ConfigOffloadHandler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

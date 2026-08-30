@@ -53,6 +53,27 @@ class KimiDeviceFlowTest {
         assertNull(KimiDeviceFlow.parseDeviceAuthorization(JSONObject("""{"device_code":"d","user_code":"X"}""")))
     }
 
+    @Test
+    fun `parse rejects cleartext verification URLs`() {
+        assertNull(
+            KimiDeviceFlow.parseDeviceAuthorization(
+                JSONObject(
+                    """{"device_code":"dc1","user_code":"XY",
+                        "verification_uri":"http://auth.kimi.com/device"}""",
+                ),
+            ),
+        )
+        assertNull(
+            KimiDeviceFlow.parseDeviceAuthorization(
+                JSONObject(
+                    """{"device_code":"dc1","user_code":"XY",
+                        "verification_uri":"https://auth.kimi.com/device",
+                        "verification_uri_complete":"http://auth.kimi.com/device?code=XY"}""",
+                ),
+            ),
+        )
+    }
+
     // ── classifyPoll ────────────────────────────────────────────────────
 
     @Test

@@ -1,6 +1,6 @@
 package com.openminis.app.offload
 
-import com.openminis.app.sandbox.offload.OffloadArgs
+import com.openminis.app.runtime.guest.OffloadArgs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

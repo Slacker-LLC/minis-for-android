@@ -1,7 +1,7 @@
 package com.openminis.app.ui.sandbox
 
-import com.openminis.app.sandbox.distribution.RuntimeDistributionCode
-import com.openminis.app.sandbox.distribution.RuntimeDistributionSnapshot
+import com.openminis.app.runtime.distribution.RuntimeDistributionCode
+import com.openminis.app.runtime.distribution.RuntimeDistributionSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -5,9 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
-import com.openminis.app.sandbox.distribution.RuntimeDistributionCode
-import com.openminis.app.sandbox.distribution.RuntimeDistributionManager
-import com.openminis.app.sandbox.distribution.RuntimeDistributionSnapshot
+import com.openminis.app.runtime.distribution.RuntimeDistributionCode
+import com.openminis.app.runtime.distribution.RuntimeDistributionManager
+import com.openminis.app.runtime.distribution.RuntimeDistributionSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

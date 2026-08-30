@@ -116,7 +116,7 @@ class FileMentionIndex(
         _isScanning.value = true
         val collected = mutableListOf<Entry>()
         try {
-            if (!com.openminis.app.sandbox.ubuntu.UbuntuPaths.isSafeSessionId(sessionId)) {
+            if (!com.openminis.app.runtime.ubuntu.UbuntuPaths.isSafeSessionId(sessionId)) {
                 publish(token, collected)
                 return
             }

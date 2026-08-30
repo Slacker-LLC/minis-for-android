@@ -24,6 +24,7 @@
 - [ ] release build/signing checks when release configuration changed
 - [ ] Rust fmt / Clippy / tests when `src/native/minisd/` changed
 - [ ] rootfs verification tests when rootfs scripts changed
+- [ ] documentation provenance guard when active docs change
 
 ## Security and compatibility
 
@@ -35,10 +36,10 @@
 - [ ] Network changes do not allow credential downgrade from HTTPS to public cleartext HTTP
 - [ ] Release builds do not fall back to debug signing
 - [ ] Current English documentation is updated when behavior changes
-- [ ] Upstream/third-party attribution remains intact
+- [ ] Source/third-party attribution remains intact
 
-## Upstream
+## Provenance
 
-If this ports a change from OpenMinis, include the upstream PR/commit and describe any adaptation required by the local `minisd` + Ubuntu architecture.
+If this change imports or adapts code from another project, include the source PR/commit/release and describe any adaptation required by the current Minis for Android architecture.
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) and [UPSTREAM.md](../UPSTREAM.md).
+See [CONTRIBUTING.md](../CONTRIBUTING.md) and [PROVENANCE.md](../PROVENANCE.md).

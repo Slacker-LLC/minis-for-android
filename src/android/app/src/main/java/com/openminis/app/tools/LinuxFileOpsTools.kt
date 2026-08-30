@@ -3,8 +3,8 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.sandbox.MinisKernel
-import com.openminis.app.sandbox.ubuntu.UbuntuPaths
+import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.tools.internal.FileMutationQueue
 import com.openminis.app.tools.runtime.ToolHandler
 import org.json.JSONArray
@@ -41,7 +41,7 @@ object LinuxFileOps {
         if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
             return ToolExecutionResult("Error: session permission denies writing $path", false)
         }
-        if (MinisKernel.isLinuxPathUnderReadOnlyMount(path)) {
+        if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
             return ToolExecutionResult("Error: $path is inside a read-only mounted folder", false)
         }
         return null

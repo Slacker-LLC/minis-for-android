@@ -1,13 +1,14 @@
 package com.openminis.app.data.repository
 
 import android.util.Log
+import com.openminis.app.runtime.ubuntu.AppPersistentPaths
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * Manages the memory directory (`minis-global/memory/`).
+ * Manages the persistent memory directory.
  * Mirrors iOS memory system:
  *   - GLOBAL.md: read-only for agent, user-maintained via Settings
  *   - YYYY-MM-DD.md: daily logs with timestamped entries, agent writes via memory_write
@@ -15,7 +16,9 @@ import java.util.Locale
  *   - loadGlobalMemoryFragment() / loadRecentDailyMemoryFragment(): emit
  *     two separate text blocks for the system prompt (mirrors iOS exactly)
  */
-class MemoryRepository(private val memoryDir: File) {
+class MemoryRepository(memoryDir: File) {
+
+    private val memoryDir: File = AppPersistentPaths.memoryForRepository(memoryDir)
 
     companion object {
         private const val TAG = "MemoryRepository"

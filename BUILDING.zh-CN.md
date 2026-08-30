@@ -52,7 +52,7 @@ cargo build --locked --release \
 ./scripts/build-ubuntu-rootfs.sh
 ```
 
-脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs。当前项目主执行路径不使用上游 Alpine + PRoot Runtime。
+脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs。
 
 ## 5. 构建 Debug APK
 
@@ -93,6 +93,19 @@ cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets
 cargo test --locked --manifest-path src/native/minisd/Cargo.toml
 ```
 
+Rootfs 校验：
+
+```bash
+bash scripts/test-build-ubuntu-rootfs-verification.sh
+```
+
+文档来源隔离检查：
+
+```bash
+python3 scripts/test_docs_provenance.py
+python3 scripts/check_docs_provenance.py
+```
+
 ## 7. Release 签名
 
 Release 构建必须显式提供正式签名配置：
@@ -120,17 +133,28 @@ Android kernel
   ↓
 minisd Root Broker
   ↓
-unshare + mount + chroot
+mount namespace + bind mount + chroot
   ↓
 Ubuntu 24.04 userspace
 ```
 
-guest 复用 Android 内核，并以 App guest UID 运行。workspace / memory / skills / shared 的 host 目录位于 App 私有 files 目录，再由 `minisd` bind mount 到 chroot。
+guest 复用 Android 内核，并以 App guest UID 运行。`minisd` 会在 keeper 启动前准备固定的 host 持久化数据源：
+
+```text
+/data/adb/minis/workspace
+/data/adb/minis/sessions
+/data/adb/minis/memory
+/data/adb/minis/skills
+/data/adb/minis/shared
+/data/adb/minis/home
+```
+
+这些路径是固定运行时输入。启动时会拒绝其他持久化路径，并拒绝位于 tmpfs 上的持久化数据源。
 
 更多内容：
 
 - [README.md](README.md)
 - [README.zh-CN.md](README.zh-CN.md)
-- [UPSTREAM.md](UPSTREAM.md)
+- [PROVENANCE.md](PROVENANCE.md)
 - [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)
 - [docs/SECURITY.md](docs/SECURITY.md)

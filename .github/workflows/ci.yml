@@ -13,6 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs-provenance:
+    name: Documentation provenance guard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guard unit tests
+        run: python3 scripts/test_docs_provenance.py
+      - name: Check current docs and provenance allowlist
+        run: python3 scripts/check_docs_provenance.py
+
   minisd:
     name: minisd quality
     runs-on: ubuntu-24.04
@@ -43,10 +53,13 @@ jobs:
           scripts/stage-runtime-distribution.sh
           scripts/test-runtime-distribution-packaging.sh
           scripts/verify-android-release.sh
+          scripts/check-runtime-package-boundary.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
       - name: Runtime distribution packaging tests
         run: bash scripts/test-runtime-distribution-packaging.sh
+      - name: Runtime package boundary contract
+        run: bash scripts/check-runtime-package-boundary.sh
 
   android:
     name: Android build, test and release checks
