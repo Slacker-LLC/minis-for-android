@@ -354,6 +354,12 @@ object UbuntuRuntime {
             val appUid = ctx.applicationInfo.uid
             val appSock = MinisdBootstrap.appSocketName(appUid)
             val brokerSock = MinisdBootstrap.brokerSocketName(appUid)
+            val leasePid = android.os.Process.myPid()
+            val leaseStartTime = MinisdBootstrap.processStartTime(leasePid)
+                ?: return@withContext BrokerStartResult(
+                    false,
+                    "cannot establish app process lease identity: /proc/$leasePid/stat unavailable",
+                )
             val binary = MinisdBootstrap.nativeBinaryPath(ctx)
             if (!binary.isFile || !binary.canExecute()) {
                 return@withContext BrokerStartResult(
@@ -382,7 +388,8 @@ object UbuntuRuntime {
                 forceRestart = forceRestart,
                 binaryPath = binary.absolutePath,
                 socketPath = brokerSock,
-                leasePid = android.os.Process.myPid(),
+                leasePid = leasePid,
+                leaseStartTime = leaseStartTime,
             )
 
             val proc = try {

@@ -31,6 +31,20 @@ internal object MinisdBootstrap {
         return json.toString()
     }
 
+    /** Reads Linux procfs starttime so a recycled PID cannot keep the broker alive. */
+    fun processStartTime(pid: Int): Long? = if (pid <= 0) {
+        null
+    } else {
+        runCatching { parseProcessStatStartTime(File("/proc/$pid/stat").readText()) }.getOrNull()
+    }
+
+    internal fun parseProcessStatStartTime(stat: String): Long? =
+        stat.substringAfterLast(')', missingDelimiterValue = "")
+            .trim()
+            .split(Regex("\\s+"))
+            .getOrNull(19)
+            ?.toLongOrNull()
+
     /**
      * Starts a broker watchdog with all volatile state in memory. The broker
      * exits when the app lease pid disappears, so an APK uninstall/force-stop
@@ -43,13 +57,16 @@ internal object MinisdBootstrap {
         binaryPath: String,
         socketPath: String,
         leasePid: Int,
+        leaseStartTime: Long,
     ): String {
         require(leasePid > 0) { "leasePid must be > 0" }
+        require(leaseStartTime > 0) { "leaseStartTime must be > 0" }
         val commands = mutableListOf<String>()
         commands += "BIN=${shellQuote(binaryPath)}"
         commands += "SOCKET=${shellQuote(socketPath)}"
         commands += "APP_SOCKET=${shellQuote(appSocket)}"
         commands += "LEASE_PID=$leasePid"
+        commands += "LEASE_STARTTIME=$leaseStartTime"
         commands += "POLICY_JSON=${shellQuote(policyJson)}"
         commands += "if [ ! -x \"\$BIN\" ]; then echo \"minisd missing or not executable: \$BIN\" >&2; exit 40; fi"
 
@@ -60,7 +77,7 @@ internal object MinisdBootstrap {
             commands += "sleep 1"
         }
 
-        commands += "(\"\$BIN\" --watchdog --socket \"\$SOCKET\" --policy-json \"\$POLICY_JSON\" --app-socket \"\$APP_SOCKET\" --lease-pid \"\$LEASE_PID\" >/dev/null 2>&1 &)"
+        commands += "(\"\$BIN\" --watchdog --socket \"\$SOCKET\" --policy-json \"\$POLICY_JSON\" --app-socket \"\$APP_SOCKET\" --lease-pid \"\$LEASE_PID\" --lease-starttime \"\$LEASE_STARTTIME\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""
         return commands.joinToString("\n")
     }

@@ -99,6 +99,11 @@ or:
 
 APKs and AABs are build artifacts and must not be committed to Git.
 
+Do not `adb push` a separate `minisd` executable. The broker is the
+`libminisd.so` installed by Package Manager in `ApplicationInfo.nativeLibraryDir`;
+the root bootstrap passes an app UID-scoped abstract socket, an in-memory policy,
+and an app PID plus procfs start-time lease.
+
 `assembleDebug` and `assembleRelease` also run the corresponding packaged APK
 check. It verifies that the APK contains `lib/arm64-v8a/libminisd.so`, that its
 SHA-256 equals `assets/minis-runtime/runtime-manifest.json`, and that no native
