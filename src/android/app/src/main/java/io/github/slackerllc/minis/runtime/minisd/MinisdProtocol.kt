@@ -35,9 +35,6 @@ object MinisdProtocol {
     const val PROTOCOL_V = 1
     const val MAX_REQUEST_BYTES = 64 * 1024
     const val MAX_RESPONSE_BYTES = 1024 * 1024
-    // Production clients receive the ABI-specific APK nativeLibraryDir path
-    // and app-UID-scoped abstract socket from UbuntuRuntime. These defaults
-    // are only compatibility values for standalone protocol helpers.
     const val DEFAULT_SOCKET = "@minis.minisd.root.legacy.v1"
     const val DEFAULT_BIN = "libminisd.so"
     const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"
@@ -111,10 +108,7 @@ object MinisdProtocol {
             ERROR_RUNTIME_LAYOUT_MISMATCH,
             ERROR_PRIVILEGE_SETUP_FAILED,
             ERROR_EXEC_UNAVAILABLE,
-            -> MinisdError(
-                explicit,
-                result.optString("pre_exec_detail").ifBlank { explicit },
-            )
+            -> MinisdError(explicit, result.optString("pre_exec_detail").ifBlank { explicit })
             else -> if (userCommandStarted == false) classifyLegacyPreExec(result) else null
         }
         return if (error == null) response else MinisdResponse(
@@ -134,29 +128,14 @@ object MinisdProtocol {
                     (stderr.contains("open /proc/") && stderr.contains("/ns/mnt")) ||
                         stderr.contains("setns CLONE_NEWNS")
                 if (keeperLost) {
-                    MinisdError(
-                        ERROR_KEEPER_NAMESPACE_LOST,
-                        stderr.ifBlank { "keeper mount namespace is no longer available" },
-                    )
+                    MinisdError(ERROR_KEEPER_NAMESPACE_LOST, stderr.ifBlank { "keeper mount namespace is no longer available" })
                 } else {
-                    MinisdError(
-                        ERROR_RUNTIME_LAYOUT_MISMATCH,
-                        stderr.ifBlank { "runtime namespace or session mount setup failed" },
-                    )
+                    MinisdError(ERROR_RUNTIME_LAYOUT_MISMATCH, stderr.ifBlank { "runtime namespace or session mount setup failed" })
                 }
             }
-            HELPER_CHROOT_FAILED -> MinisdError(
-                ERROR_CHROOT_UNAVAILABLE,
-                stderr.ifBlank { "Ubuntu chroot is unavailable" },
-            )
-            HELPER_PRIVILEGE_FAILED -> MinisdError(
-                ERROR_PRIVILEGE_SETUP_FAILED,
-                stderr.ifBlank { "runtime privilege setup failed before execve" },
-            )
-            HELPER_EXECVE_FAILED -> MinisdError(
-                ERROR_EXEC_UNAVAILABLE,
-                stderr.ifBlank { "guest executable could not be started" },
-            )
+            HELPER_CHROOT_FAILED -> MinisdError(ERROR_CHROOT_UNAVAILABLE, stderr.ifBlank { "Ubuntu chroot is unavailable" })
+            HELPER_PRIVILEGE_FAILED -> MinisdError(ERROR_PRIVILEGE_SETUP_FAILED, stderr.ifBlank { "runtime privilege setup failed before execve" })
+            HELPER_EXECVE_FAILED -> MinisdError(ERROR_EXEC_UNAVAILABLE, stderr.ifBlank { "guest executable could not be started" })
             else -> null
         }
     }
@@ -169,39 +148,34 @@ object MinisdProtocol {
         ?.code == ERROR_KEEPER_NAMESPACE_LOST
 
     fun runtimeError(code: String, detail: String, id: Long = 0): MinisdResponse =
-        MinisdResponse(
-            v = PROTOCOL_V,
-            id = id,
-            ok = false,
-            result = null,
-            error = MinisdError(code = code, detail = detail),
-        )
+        MinisdResponse(PROTOCOL_V, id, false, null, MinisdError(code = code, detail = detail))
 
     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
 
-    fun ubuntuStatus(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.status")
+    fun ubuntuStatus(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.status")
 
+    /** Persistent/rootfs paths are server-owned and never selected by Android. */
+    fun ubuntuStart(id: Long = 1): MinisdRequest =
+        MinisdRequest(id = id, method = "ubuntu.start", params = JSONObject())
+
+    /**
+     * Source-compatibility overload for callers being migrated from #50. Every
+     * path argument is deliberately ignored so the wire request has no storage
+     * authority; native minisd resolves the fixed persistent and active rootfs
+     * contract itself.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun ubuntuStart(
         id: Long = 1,
-        rootfs: String = DEFAULT_ROOTFS,
+        rootfs: String,
         workspace: String = "",
         memory: String = "",
         skills: String = "",
         shared: String = "",
         sessionsRoot: String = "",
-    ): MinisdRequest {
-        val params = JSONObject().put("rootfs", rootfs)
-        if (workspace.isNotEmpty()) params.put("workspace", workspace)
-        if (memory.isNotEmpty()) params.put("memory", memory)
-        if (skills.isNotEmpty()) params.put("skills", skills)
-        if (shared.isNotEmpty()) params.put("shared", shared)
-        if (sessionsRoot.isNotEmpty()) params.put("sessions_root", sessionsRoot)
-        return MinisdRequest(id = id, method = "ubuntu.start", params = params)
-    }
+    ): MinisdRequest = ubuntuStart(id)
 
-    fun ubuntuStop(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.stop")
+    fun ubuntuStop(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.stop")
 
     fun ubuntuExec(
         argv: List<String>,
@@ -234,8 +208,7 @@ object MinisdProtocol {
         params = JSONObject().put("execution_id", executionId),
     )
 
-    fun ubuntuProvision(id: Long = 1): MinisdRequest =
-        MinisdRequest(id = id, method = "ubuntu.provision")
+    fun ubuntuProvision(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.provision")
 
     fun rootExec(
         tool: String,
