@@ -46,7 +46,9 @@ The root-managed Minis area is `/data/adb/minis`.
 
 | Host path | Purpose / guest mapping |
 |---|---|
-| `/data/adb/minis/rootfs` | Ubuntu rootfs |
+| `/data/adb/minis/runtime/rootfs/current` | Active versioned Ubuntu rootfs (legacy fallback: `/data/adb/minis/rootfs`) |
+| `/data/adb/minis/runtime/rootfs/versions` | Validated rootfs revisions |
+| `/data/adb/minis/runtime/rootfs/staging` | Temporary rootfs extraction area |
 | `/data/adb/minis/workspace` | global `/workspace` backing |
 | `/data/adb/minis/sessions` | per-session workspace backing |
 | `/data/adb/minis/memory` | `/memory` backing |

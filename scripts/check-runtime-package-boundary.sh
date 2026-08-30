@@ -92,14 +92,24 @@ grep -Fq 'fun initialize(context: Context)' "$RUNTIME/RuntimePathRegistry.kt" ||
 grep -Fq 'object ExternalMountCoordinator' "$RUNTIME/ExternalMountCoordinator.kt" || \
   fail 'ExternalMountCoordinator declaration missing'
 
-# Package-boundary refactors must not silently mutate the privileged runtime
-# wire/path contract owned by minisd and Ubuntu.
+# The active runtime deliberately owns the APK/native-library boundary. Keep
+# the wire protocol, persistent host paths and guest paths stable while
+# forbidding externally staged broker executables.
 protocol="$RUNTIME/minisd/MinisdProtocol.kt"
 grep -Fq 'const val PROTOCOL_V = 1' "$protocol" || fail 'minisd protocol version changed'
-grep -Fq 'const val DEFAULT_SOCKET = "/data/adb/minis/run/minisd.sock"' "$protocol" || fail 'minisd socket contract changed'
-grep -Fq 'const val DEFAULT_BIN = "/data/adb/minis/bin/minisd"' "$protocol" || fail 'minisd binary contract changed'
+grep -Fq 'const val DEFAULT_SOCKET = "@minis.minisd.root.legacy.v1"' "$protocol" || fail 'minisd compatibility socket contract changed'
+grep -Fq 'const val DEFAULT_BIN = "libminisd.so"' "$protocol" || fail 'minisd native-library contract changed'
 grep -Fq 'const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"' "$protocol" || fail 'rootfs contract changed'
 grep -Fq 'const val HOST_WORKSPACE = "/data/adb/minis/workspace"' "$protocol" || fail 'workspace contract changed'
 grep -Fq 'const val GUEST_WORKSPACE = "/workspace"' "$protocol" || fail 'guest workspace contract changed'
+
+bootstrap="$MAIN/runtime/minisd/MinisdBootstrap.kt"
+grep -Fq 'const val MINISD_NATIVE_NAME = "libminisd.so"' "$bootstrap" || fail 'APK minisd name missing'
+grep -Fq 'context.applicationInfo.nativeLibraryDir' "$bootstrap" || fail 'nativeLibraryDir lookup missing'
+grep -Fq -- '--policy-json' "$bootstrap" || fail 'in-memory policy bootstrap missing'
+grep -Fq -- '--lease-pid' "$bootstrap" || fail 'app lease bootstrap missing'
+if git grep -n -E 'filesDir[^[:space:]]*/minisd|cacheDir[^[:space:]]*/minisd|/data/adb/minis/bin/minisd' -- src/android/app/src/main src/android/app/build.gradle.kts >/dev/null 2>&1; then
+  fail 'obsolete externally staged or app-writable minisd path returned'
+fi
 
 echo 'runtime package boundary contract: OK'

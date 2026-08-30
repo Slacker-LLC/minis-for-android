@@ -93,13 +93,31 @@ class RootfsManagerRecoveryTest {
 
         val extractAt = command.indexOf("tar -xzf")
         val metadataAt = command.indexOf("etc/minis/rootfs.json")
-        val swapAt = command.indexOf("mv \"\$ROOTFS\" \"\$OLD\"")
+        val swapAt = command.indexOf("mv -f \"\$CURRENT_NEXT\" \"\$CURRENT\"")
         assertTrue(command.contains("/data/local/tmp/ubuntu-arm64-rootfs.tar.gz"))
+        assertTrue(command.contains("RUNTIME_ROOT='/data/adb/minis/runtime/rootfs'"))
+        assertTrue(command.contains("VERSIONS=\"\$RUNTIME_ROOT/versions\""))
+        assertTrue(command.contains("STAGING=\"\$RUNTIME_ROOT/staging\""))
+        assertTrue(command.contains("CURRENT=\"\$RUNTIME_ROOT/current\""))
+        assertTrue(command.contains("PREVIOUS=\"\$RUNTIME_ROOT/previous\""))
+        assertTrue(!command.contains("rm -rf \"\$VERSION\""))
+        val probe = RootfsManager.buildProbeCommand("/data/adb/minis/rootfs")
+        assertTrue(probe.contains("MINIS_ROOTFS:CORRUPT:current"))
+        assertTrue(probe.contains("ubuntu-24\\.04-[0-9A-Fa-f]{16}"))
         assertTrue(extractAt >= 0)
         assertTrue(metadataAt > extractAt)
         assertTrue(swapAt > metadataAt)
-        assertTrue(command.contains("mv \"\$NEW\" \"\$ROOTFS\""))
-        assertTrue(command.contains("mv \"\$OLD\" \"\$ROOTFS\""))
-        assertTrue(command.contains("MINIS_ROOTFS:REPAIRED"))
+        assertTrue(command.contains("REVISION=\"ubuntu-24.04-\$(printf"))
+        assertTrue(command.contains("ln -s \"\$VERSION\" \"\$CURRENT_NEXT\""))
+        assertTrue(command.contains("MINIS_ROOTFS:REPAIRED:\$REVISION"))
+    }
+
+    @Test
+    fun `rollback only accepts a versioned previous pointer`() {
+        val command = RootfsManager.buildRollbackCommand()
+
+        assertTrue(command.contains("PREVIOUS=\"\$RUNTIME_ROOT/previous\""))
+        assertTrue(command.contains("ubuntu-24\\.04-[0-9A-Fa-f]{16}"))
+        assertTrue(command.contains("MINIS_ROOTFS:ROLLED_BACK"))
     }
 }

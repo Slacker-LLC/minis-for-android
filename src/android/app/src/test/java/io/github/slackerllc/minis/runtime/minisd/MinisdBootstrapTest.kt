@@ -36,51 +36,48 @@ class MinisdBootstrapTest {
     }
 
     @Test
-    fun `watchdog bootstrap is independent of rootfs health`() {
-        val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/legacy.app/files/minis/minisd.sock",
-            policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
-            forceRestart = false,
-        )
-
-        assertTrue(command.contains("minisd missing or not executable"))
-        assertTrue(command.contains("--watchdog --policy"))
-        assertTrue(command.contains("--app-socket"))
-        assertFalse(command.contains("ubuntu rootfs missing"))
-        assertFalse(command.contains("ROOTFS="))
+    fun `socket names are uid scoped and abstract`() {
+        assertEquals("@minis.minisd.app.12345.v1", MinisdBootstrap.appSocketName(12345))
+        assertEquals("@minis.minisd.root.12345.v1", MinisdBootstrap.brokerSocketName(12345))
     }
 
     @Test
-    fun `stale pidfile is cleaned without killing unverified process`() {
+    fun `watchdog uses apk binary and in-memory policy`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/legacy.app/files/minis/minisd.sock",
+            appSocket = "@minis.minisd.app.12345.v1",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = false,
+            binaryPath = "/data/app/~~hash==/lib/arm64/libminisd.so",
+            socketPath = "@minis.minisd.root.12345.v1",
+            leasePid = 4321,
         )
 
-        assertTrue(command.contains("PIDFILE='/data/adb/minis/run/minisd.pid'"))
-        assertTrue(command.contains("*[!0-9]*"))
-        assertTrue(command.contains("[ -d \"/proc/\$pid\" ] ||"))
-        assertTrue(command.contains("rm -f \"\$PIDFILE\""))
-        assertFalse(command.contains("kill \"\$pid\""))
+        assertTrue(command.contains("--watchdog"))
+        assertTrue(command.contains("--policy-json"))
+        assertTrue(command.contains("--lease-pid \"\$LEASE_PID\""))
+        assertTrue(command.contains("--app-socket \"\$APP_SOCKET\""))
+        assertTrue(command.contains("libminisd.so"))
+        assertFalse(command.contains("--policy \"\$POLICY\""))
+        assertFalse(command.contains("PIDFILE"))
+        assertFalse(command.contains("/data/adb/minis/bin/minisd"))
     }
 
     @Test
-    fun `force restart only kills verified watchdog lineage`() {
+    fun `force restart scans only exact broker lineage without pidfile`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/legacy.app/files/minis/minisd.sock",
-            policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
+            appSocket = "@minis.minisd.app.12345.v1",
+            policyJson = "{}",
             forceRestart = true,
+            binaryPath = "/data/app/lib/arm64/libminisd.so",
+            socketPath = "@minis.minisd.root.12345.v1",
+            leasePid = 4321,
         )
 
-        assertTrue(command.contains("child_cmd"))
-        assertTrue(command.contains("--socket*/data/adb/minis/run/minisd.sock"))
-        assertTrue(command.contains("PPid:"))
-        assertTrue(command.contains("parent_cmd"))
-        assertTrue(command.contains("*minisd*--watchdog*"))
-        assertTrue(command.contains("kill \"\$ppid\""))
+        assertTrue(command.contains("for proc in /proc/[0-9]*"))
+        assertTrue(command.contains("--watchdog"))
         assertTrue(command.contains("kill \"\$pid\""))
-        assertTrue(command.contains("rm -f \"\$PIDFILE\""))
+        assertTrue(command.contains("@minis.minisd.root.12345.v1"))
+        assertFalse(command.contains("PIDFILE"))
     }
 
     @Test

@@ -28,8 +28,8 @@ class RuntimePackageBoundaryTest {
     @Test
     fun privilegedRuntimePathsAndWireVersionRemainStable() {
         assertEquals(1, MinisdProtocol.PROTOCOL_V)
-        assertEquals("/data/adb/minis/run/minisd.sock", MinisdProtocol.DEFAULT_SOCKET)
-        assertEquals("/data/adb/minis/bin/minisd", MinisdProtocol.DEFAULT_BIN)
+        assertEquals("@minis.minisd.root.legacy.v1", MinisdProtocol.DEFAULT_SOCKET)
+        assertEquals("libminisd.so", MinisdProtocol.DEFAULT_BIN)
         assertEquals("/data/adb/minis/rootfs", MinisdProtocol.DEFAULT_ROOTFS)
         assertEquals("/data/adb/minis/workspace", MinisdProtocol.HOST_WORKSPACE)
         assertEquals("/workspace", MinisdProtocol.GUEST_WORKSPACE)

@@ -35,8 +35,11 @@ object MinisdProtocol {
     const val PROTOCOL_V = 1
     const val MAX_REQUEST_BYTES = 64 * 1024
     const val MAX_RESPONSE_BYTES = 1024 * 1024
-    const val DEFAULT_SOCKET = "/data/adb/minis/run/minisd.sock"
-    const val DEFAULT_BIN = "/data/adb/minis/bin/minisd"
+    // Production clients receive the ABI-specific APK nativeLibraryDir path
+    // and app-UID-scoped abstract socket from UbuntuRuntime. These defaults
+    // are only compatibility values for standalone protocol helpers.
+    const val DEFAULT_SOCKET = "@minis.minisd.root.legacy.v1"
+    const val DEFAULT_BIN = "libminisd.so"
     const val DEFAULT_ROOTFS = "/data/adb/minis/rootfs"
     const val HOST_WORKSPACE = "/data/adb/minis/workspace"
     const val GUEST_WORKSPACE = "/workspace"

@@ -10,9 +10,9 @@
 - Android Gradle Plugin 8.10.1；
 - Kotlin 2.1.0；
 - compileSdk 36 / targetSdk 35 / minSdk 26；
-- Android NDK r28+；
+- Android NDK 27.0.12077973（Android 构建脚本固定版本）；
 - CMake 3.22.1；
-- Rust stable + `aarch64-unknown-linux-musl`。
+- Rust stable + `aarch64-linux-android`。
 
 ## 1. 克隆
 
@@ -28,7 +28,7 @@ cd minis-for-android
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
@@ -39,11 +39,14 @@ cp src/android/app/provider-customization.properties.example \
 
 ## 3. 构建 `minisd`
 
+Android Gradle 构建会自动用 `aarch64-linux-android` 编译 broker，校验
+Android PIE / 16 KB ELF，并把产物放入 `lib/arm64-v8a/libminisd.so`。可执行
+文件不会从 `assets` 解包，也不会复制到 `/data/adb/minis/bin`。
+
 ```bash
-rustup target add aarch64-unknown-linux-musl
-cargo build --locked --release \
-  --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
+rustup target add aarch64-linux-android
+cd src/android
+./gradlew :app:verifyMinisdElf --no-daemon
 ```
 
 ## 4. 构建 Ubuntu rootfs
@@ -74,6 +77,15 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 APK/AAB 只作为本地或 CI 构建产物，不应提交到 Git。
+
+`assembleDebug` 和 `assembleRelease` 会自动校验 APK 内的
+`lib/arm64-v8a/libminisd.so`、runtime manifest SHA-256，以及 assets 是否混入
+原生可执行文件。
+
+rootfs 恢复会把已校验归档登记到 `/data/adb/minis/runtime/rootfs/versions`，
+并通过 `current` 指针作为 native 运行时入口；`/data/adb/minis/rootfs` 只保留
+为旧安装兼容回退。升级失败会尝试恢复旧 rootfs，且不会删除
+`workspace`、`memory`、`skills`、`shared` 和 `home` 等持久数据。
 
 ## 6. 测试
 

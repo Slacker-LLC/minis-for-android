@@ -81,12 +81,17 @@ object UbuntuRuntime {
         val ctx = context.applicationContext
         appContext = ctx
         UbuntuPaths.init(ctx)
-        val dir = java.io.File(ctx.filesDir, "minis")
-        dir.mkdirs()
-        client = MinisdClient(appSocketPath = java.io.File(dir, "minisd.sock").absolutePath)
+        val appUid = ctx.applicationInfo.uid
+        val appSocket = MinisdBootstrap.appSocketName(appUid)
+        val brokerSocket = MinisdBootstrap.brokerSocketName(appUid)
+        client = MinisdClient(
+            minisdPath = MinisdBootstrap.nativeBinaryPath(ctx).absolutePath,
+            socketPath = brokerSocket,
+            appSocketPath = appSocket,
+        )
         isInitialized = true
         redirectPaths = true
-        Log.i(TAG, "initialized (lazy) appSocket=${dir}/minisd.sock uid=${ctx.applicationInfo.uid}")
+        Log.i(TAG, "initialized (lazy) appSocket=$appSocket uid=$appUid")
     }
 
     suspend fun refresh(): Snapshot = apply(client.ubuntuStatus())
@@ -346,7 +351,16 @@ object UbuntuRuntime {
                 )
             }
 
-            val appSock = java.io.File(ctx.filesDir, "minis/minisd.sock").absolutePath
+            val appUid = ctx.applicationInfo.uid
+            val appSock = MinisdBootstrap.appSocketName(appUid)
+            val brokerSock = MinisdBootstrap.brokerSocketName(appUid)
+            val binary = MinisdBootstrap.nativeBinaryPath(ctx)
+            if (!binary.isFile || !binary.canExecute()) {
+                return@withContext BrokerStartResult(
+                    false,
+                    "APK native minisd is missing or not executable: ${binary.absolutePath}",
+                )
+            }
             val template = try {
                 ctx.assets.open(MinisdBootstrap.POLICY_ASSET)
                     .bufferedReader()
@@ -366,6 +380,9 @@ object UbuntuRuntime {
                 appSocket = appSock,
                 policyJson = policy,
                 forceRestart = forceRestart,
+                binaryPath = binary.absolutePath,
+                socketPath = brokerSock,
+                leasePid = android.os.Process.myPid(),
             )
 
             val proc = try {
@@ -569,7 +586,11 @@ object UbuntuRuntime {
         .put("hostSessions", UbuntuPaths.hostSessions)
         .put("guestWorkspace", MinisdProtocol.GUEST_WORKSPACE)
         .put("rootfs", MinisdProtocol.DEFAULT_ROOTFS)
-        .put("socket", MinisdProtocol.DEFAULT_SOCKET)
+        .put(
+            "socket",
+            appContext?.let { MinisdBootstrap.brokerSocketName(it.applicationInfo.uid) }
+                ?: MinisdProtocol.DEFAULT_SOCKET,
+        )
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
 
     private fun failStructured(code: String, detail: String): Snapshot = fail("$code: $detail")

@@ -1,4 +1,7 @@
 import java.util.Properties
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
@@ -17,12 +20,33 @@ val appCustomization = Properties().apply {
     val f = rootProject.file("app/provider-customization.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
+val appVersionName = "1.01-beta.2"
+val appVersionCode = 39
 fun customizationValue(key: String): String =
     (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
+
+val minisdNdkVersion = "27.0.12077973"
+val androidSdkDir = System.getenv("ANDROID_SDK_ROOT")?.takeIf { it.isNotBlank() }?.let(::file)
+    ?: System.getenv("ANDROID_HOME")?.takeIf { it.isNotBlank() }?.let(::file)
+    ?: file(System.getProperty("user.home")).resolve("AppData/Local/Android/Sdk")
+val minisdNdkDir = androidSdkDir.resolve("ndk/$minisdNdkVersion")
+val minisdHostIsWindows = System.getProperty("os.name").lowercase().contains("windows")
+val minisdNdkHost = if (minisdHostIsWindows) "windows-x86_64" else "linux-x86_64"
+val minisdClangName = if (minisdNdkHost.startsWith("windows")) {
+    "aarch64-linux-android26-clang.cmd"
+} else {
+    "aarch64-linux-android26-clang"
+}
+val minisdReadelfName = "llvm-readelf" + if (minisdNdkHost.startsWith("windows")) ".exe" else ""
+val minisdSourceDir = rootProject.file("../native/minisd")
+val minisdGeneratedJniLibs = layout.buildDirectory.dir("generated/jniLibs")
+val minisdGeneratedAssets = layout.buildDirectory.dir("generated/minisdAssets")
 
 android {
     namespace = "io.github.slackerllc.minis"
     testNamespace = "io.github.slackerllc.minis.test"
+    sourceSets.getByName("main").jniLibs.srcDir(minisdGeneratedJniLibs)
+    sourceSets.getByName("main").assets.srcDir(minisdGeneratedAssets)
     // Compile against Android 16 APIs used by the Live Updates path. targetSdk
     // remains 35; Android 16-only behavior is runtime-gated by SDK level.
     compileSdk = 36
@@ -31,8 +55,8 @@ android {
         applicationId = "io.github.slackerllc.minis"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.01-beta.2"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -97,6 +121,15 @@ android {
         noCompress += "tar.gz"
     }
 
+    packaging {
+        jniLibs {
+            // Cargo already emits a stripped, verified executable. Keeping its
+            // bytes stable is required because runtime-manifest.json records
+            // the exact SHA-256 shipped in the APK.
+            keepDebugSymbols += "**/libminisd.so"
+        }
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -107,6 +140,172 @@ android {
         baseline = file("lint-baseline.xml")
     }
 }
+
+val buildArm64Minisd by tasks.registering(Exec::class) {
+    description = "Builds the APK-owned minisd for Android arm64-v8a."
+    group = "build"
+    workingDir(minisdSourceDir)
+    val output = minisdSourceDir.resolve("target/aarch64-linux-android/release/minisd")
+    inputs.dir(minisdSourceDir)
+    outputs.file(output)
+    doFirst {
+        val clang = minisdNdkDir.resolve(
+            "toolchains/llvm/prebuilt/$minisdNdkHost/bin/$minisdClangName",
+        )
+        if (!clang.isFile) {
+            throw GradleException("Android NDK $minisdNdkVersion is missing: $clang")
+        }
+        environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", clang.absolutePath)
+        environment(
+            "RUSTFLAGS",
+            "-C relocation-model=pic -C link-arg=-pie -C link-arg=-Wl,-z,max-page-size=16384",
+        )
+    }
+    commandLine("cargo", "build", "--locked", "--release", "--target", "aarch64-linux-android")
+}
+
+val verifyMinisdElf by tasks.registering {
+    description = "Verifies the Android minisd ELF is an arm64 PIE executable."
+    group = "verification"
+    dependsOn(buildArm64Minisd)
+    val binary = minisdSourceDir.resolve("target/aarch64-linux-android/release/minisd")
+    inputs.file(binary)
+    doLast {
+        val readelf = minisdNdkDir.resolve(
+            "toolchains/llvm/prebuilt/$minisdNdkHost/bin/$minisdReadelfName",
+        )
+        if (!readelf.isFile) throw GradleException("llvm-readelf is missing: $readelf")
+        val process = ProcessBuilder(readelf.absolutePath, "-h", "-l", "-d", binary.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        if (process.waitFor() != 0) throw GradleException("llvm-readelf failed:\n$output")
+        check("ELF64" in output) { "minisd is not ELF64:\n$output" }
+        check("AArch64" in output) { "minisd is not AArch64:\n$output" }
+        check("Type:                              DYN" in output || "Elf file type is DYN" in output) {
+            "minisd is not a PIE/ET_DYN executable:\n$output"
+        }
+        check("/system/bin/linker64" in output) { "minisd is not an Android executable:\n$output" }
+        val loadSegments = output.lineSequence()
+            .map(String::trim)
+            .filter { it.startsWith("LOAD ") }
+            .toList()
+        check(loadSegments.isNotEmpty() && loadSegments.all { it.endsWith("0x4000") }) {
+            "minisd LOAD segments are not 16 KB aligned:\n$output"
+        }
+        check("libc.so" in output && "libdl.so" in output) {
+            "minisd does not expose the expected Android runtime dependencies:\n$output"
+        }
+        check("libglibc" !in output && "ld-linux" !in output) {
+            "minisd unexpectedly depends on glibc:\n$output"
+        }
+    }
+}
+
+val packageMinisdNative by tasks.registering(Copy::class) {
+    description = "Stages the verified minisd into the APK arm64 native library directory."
+    group = "build"
+    dependsOn(verifyMinisdElf)
+    from(minisdSourceDir.resolve("target/aarch64-linux-android/release")) {
+        include("minisd")
+        rename { "libminisd.so" }
+    }
+    into(minisdGeneratedJniLibs.map { it.dir("arm64-v8a") })
+}
+
+fun sha256(file: java.io.File): String {
+    return file.inputStream().use(::sha256)
+}
+
+fun sha256(input: java.io.InputStream): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        digest.update(buffer, 0, count)
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+val generateMinisdRuntimeManifest by tasks.registering {
+    description = "Generates the APK runtime identity manifest for minisd."
+    group = "build"
+    dependsOn(packageMinisdNative)
+    val binary = minisdGeneratedJniLibs.map { it.file("arm64-v8a/libminisd.so") }
+    val manifest = minisdGeneratedAssets.map { it.file("minis-runtime/runtime-manifest.json") }
+    inputs.file(binary)
+    outputs.file(manifest)
+    doLast {
+        val binaryFile = binary.get().asFile
+        val manifestFile = manifest.get().asFile
+        manifestFile.parentFile.mkdirs()
+        manifestFile.writeText(
+            """{
+              "runtimeVersion": "$appVersionName",
+              "minisdVersion": "$appVersionName",
+              "minisdSha256": "${sha256(binaryFile)}",
+              "protocolVersion": 1,
+              "layoutVersion": 1,
+              "rootfsVersion": "managed",
+              "rootfsSha256": "managed",
+              "provisionRevision": "managed",
+              "abi": "arm64-v8a"
+            }
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
+fun verifyPackagedMinisdApk(apk: java.io.File) {
+    if (!apk.isFile) throw GradleException("APK was not produced: $apk")
+    ZipFile(apk).use { zip ->
+        val lib = zip.getEntry("lib/arm64-v8a/libminisd.so")
+            ?: throw GradleException("APK is missing lib/arm64-v8a/libminisd.so")
+        val manifest = zip.getEntry("assets/minis-runtime/runtime-manifest.json")
+            ?: throw GradleException("APK is missing assets/minis-runtime/runtime-manifest.json")
+        val actualHash = zip.getInputStream(lib).use { sha256(it) }
+        val manifestText = zip.getInputStream(manifest).bufferedReader().use { it.readText() }
+        val declaredHash = Regex("\\\"minisdSha256\\\"\\s*:\\s*\\\"([0-9a-f]{64})\\\"")
+            .find(manifestText)?.groupValues?.get(1)
+            ?: throw GradleException("runtime manifest has no valid minisdSha256")
+        check(actualHash == declaredHash) {
+            "APK minisd SHA-256 mismatch: actual=$actualHash declared=$declaredHash"
+        }
+        val forbiddenAsset = zip.entries().asSequence()
+            .map { it.name }
+            .firstOrNull { it.startsWith("assets/minisd/") || it.startsWith("assets/") && it.endsWith(".so") }
+        check(forbiddenAsset == null) { "executable native payload leaked into assets: $forbiddenAsset" }
+        check("data/adb/minis/bin/" !in manifestText) {
+            "runtime manifest references the obsolete externally staged minisd"
+        }
+    }
+}
+
+val verifyDebugMinisdApk by tasks.registering {
+    description = "Verifies the packaged debug APK contains the exact APK-owned minisd payload."
+    group = "verification"
+    dependsOn("packageDebug")
+    doLast { verifyPackagedMinisdApk(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile) }
+}
+
+val verifyReleaseMinisdApk by tasks.registering {
+    description = "Verifies the packaged release APK contains the exact APK-owned minisd payload."
+    group = "verification"
+    dependsOn("packageRelease")
+    doLast { verifyPackagedMinisdApk(layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile) }
+}
+
+tasks.matching { it.name == "assembleDebug" }
+    .configureEach { finalizedBy(verifyDebugMinisdApk) }
+tasks.matching { it.name == "assembleRelease" }
+    .configureEach { finalizedBy(verifyReleaseMinisdApk) }
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
+    .configureEach { dependsOn(packageMinisdNative) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(generateMinisdRuntimeManifest) }
+tasks.named("preBuild") { dependsOn(generateMinisdRuntimeManifest) }
 
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.

@@ -18,9 +18,9 @@ The build files are authoritative. At the time of writing the repository uses:
 | compileSdk | 36 |
 | targetSdk | 35 |
 | minSdk | 26 |
-| Android NDK | r28+ |
+| Android NDK | 27.0.12077973 (pinned by the Android build) |
 | CMake | 3.22.1 |
-| Rust | stable + `aarch64-unknown-linux-musl` target |
+| Rust | stable + `aarch64-linux-android` target |
 
 The Android module currently includes `arm64-v8a` and `x86_64` in its ABI filters. Rooted-device runtime work primarily targets arm64 Android devices.
 
@@ -51,12 +51,15 @@ Some integrations require build-time provider customization that is intentionall
 
 ## 3. Build `minisd`
 
-```bash
-rustup target add aarch64-unknown-linux-musl
+The Android Gradle build is the authoritative producer of the broker. It
+builds `aarch64-linux-android`, verifies the Android PIE/16 KB ELF contract,
+and stages the result as `lib/arm64-v8a/libminisd.so`; the executable is never
+copied from `assets` or into `/data/adb/minis/bin`.
 
-cargo build --locked --release \
-  --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
+```bash
+rustup target add aarch64-linux-android
+cd src/android
+./gradlew :app:verifyMinisdElf --no-daemon
 ```
 
 `minisd` is the Rust root broker used by the rooted-device execution path.
@@ -95,6 +98,19 @@ or:
 ```
 
 APKs and AABs are build artifacts and must not be committed to Git.
+
+`assembleDebug` and `assembleRelease` also run the corresponding packaged APK
+check. It verifies that the APK contains `lib/arm64-v8a/libminisd.so`, that its
+SHA-256 equals `assets/minis-runtime/runtime-manifest.json`, and that no native
+executable leaked into `assets`.
+
+Rootfs recovery registers a validated archive under
+`/data/adb/minis/runtime/rootfs/versions` and records the selected revision via
+the `current` pointer. Native runtime activation uses that pointer, with
+`/data/adb/minis/rootfs` retained only as a legacy fallback. Failed pointer
+updates leave the previous rootfs active, and failed post-switch health checks
+attempt to restore the `previous` pointer; persistent `workspace`, `memory`,
+`skills`, `shared`, and `home` data are not removed.
 
 ## 6. Run tests and lint
 
@@ -205,12 +221,15 @@ These sources are fixed runtime inputs. Startup rejects alternate persistent pat
 ### Rust target missing
 
 ```bash
-rustup target add aarch64-unknown-linux-musl
+rustup target add aarch64-linux-android
 ```
 
 ### Android NDK missing
 
-Set `ANDROID_NDK_HOME` to an installed r28+ directory containing `toolchains/llvm/prebuilt`.
+Install NDK `27.0.12077973` for the current host and set `ANDROID_SDK_ROOT` (or
+`ANDROID_HOME`) to the SDK directory. The build requires
+`toolchains/llvm/prebuilt/<host>/bin` and fails closed when the pinned NDK is
+missing.
 
 ### Ubuntu runtime is unavailable on device
 

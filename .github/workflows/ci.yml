@@ -44,10 +44,10 @@ jobs:
       - name: Release build (host)
         working-directory: src/native/minisd
         run: cargo build --locked --release
-      - name: Release build (Android arm64)
+      - name: Release build (Linux arm64 musl compatibility)
         working-directory: src/native/minisd
         run: cargo build --locked --release --target aarch64-unknown-linux-musl
-      - name: Verify Android arm64 PIE
+      - name: Verify Linux arm64 PIE compatibility
         working-directory: src/native/minisd
         run: |
           binary=target/aarch64-unknown-linux-musl/release/minisd
@@ -85,6 +85,12 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android build components
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+          rustup target add aarch64-linux-android
       - name: Warm Gradle plugin resolution
         working-directory: src/android
         run: |

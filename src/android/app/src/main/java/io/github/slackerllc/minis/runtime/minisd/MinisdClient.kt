@@ -141,23 +141,23 @@ class MinisdClient(
     ): MinisdResponse = withContext(Dispatchers.IO) {
         val payload = MinisdProtocol.encodeRequest(request)
         appSocketPath?.let { path ->
-            if (File(path).exists()) {
-                val local = callLocal(path, payload, timeoutMs, cancellationKey)
-                if (local != null) {
-                    if (local.code != "NOT_AUTHORIZED") return@withContext local
-                    Log.w(TAG, "local minisd rejected app identity; retrying through su")
-                }
-                currentCoroutineContext().ensureActive()
-                if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
-                    return@withContext userCancellation("execution cancelled while waiting for local minisd")
-                }
+            // Abstract Unix sockets have no filesystem entry. Always attempt
+            // the app-scoped endpoint; transport failure falls back through su.
+            val local = callLocal(path, payload, timeoutMs, cancellationKey)
+            if (local != null) {
+                if (local.code != "NOT_AUTHORIZED") return@withContext local
+                Log.w(TAG, "local minisd rejected app identity; retrying through su")
+            }
+            currentCoroutineContext().ensureActive()
+            if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
+                return@withContext userCancellation("execution cancelled while waiting for local minisd")
             }
         }
         if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
             return@withContext userCancellation("execution cancelled before minisd fallback")
         }
         val su = resolveSu() ?: return@withContext unavailable("no executable su; minisd --call needs root")
-        val cmd = "$minisdPath --call --socket $socketPath"
+        val cmd = "${shellQuote(minisdPath)} --call --socket ${shellQuote(socketPath)}"
         val proc = try {
             ProcessBuilder(su, "-c", cmd).redirectErrorStream(false).start()
         } catch (t: Throwable) {
@@ -239,7 +239,7 @@ class MinisdClient(
             }
             val bytes = payload.toByteArray(Charsets.UTF_8)
             if (bytes.isEmpty() || bytes.size > MinisdProtocol.MAX_REQUEST_BYTES) return null
-            sock.connect(LocalSocketAddress(path, LocalSocketAddress.Namespace.FILESYSTEM))
+            sock.connect(localSocketAddress(path))
             if (cancellationKey != null && cancellations.isCancellationRequested(cancellationKey)) {
                 return userCancellation("execution cancelled before local minisd write")
             }
@@ -272,6 +272,17 @@ class MinisdClient(
             ?: System.getenv("PATH").orEmpty().split(File.pathSeparatorChar).asSequence()
                 .map { File(it, "su") }.firstOrNull { it.canExecute() }?.absolutePath
     }
+
+    private fun localSocketAddress(name: String): LocalSocketAddress {
+        return if (name.startsWith("@")) {
+            LocalSocketAddress(name.removePrefix("@"), LocalSocketAddress.Namespace.ABSTRACT)
+        } else {
+            LocalSocketAddress(name, LocalSocketAddress.Namespace.FILESYSTEM)
+        }
+    }
+
+    private fun shellQuote(value: String): String =
+        "'" + value.replace("'", "'\"'\"'") + "'"
 
     private fun unavailable(detail: String) = errorResponse("RUNTIME_UNAVAILABLE", detail)
     private fun transportTimeout(detail: String) = errorResponse("TRANSPORT_TIMEOUT", detail)

@@ -1,6 +1,7 @@
 use crate::layout::{
-    ensure_data_directory, ensure_host_layout_for, validate_persistent_backing, DEFAULT_GUEST_CWD,
-    GUEST_UID, HOST_HOME, HOST_MEMORY, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
+    active_rootfs_path, ensure_data_directory, ensure_host_layout_for, validate_persistent_backing,
+    DEFAULT_GUEST_CWD, GUEST_UID, HOST_HOME, HOST_MEMORY, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS,
+    HOST_WORKSPACE,
 };
 use crate::protocol::ErrorCode;
 use crate::state::{AppState, UbuntuState};
@@ -264,12 +265,11 @@ impl Drop for StagedHomeBind {
 }
 
 #[cfg(unix)]
-fn stage_home_bind(params: &Value) -> Result<StagedHomeBind, (ErrorCode, String)> {
-    let rootfs = params
-        .get("rootfs")
-        .and_then(Value::as_str)
-        .unwrap_or(crate::layout::HOST_ROOTFS);
-    let target = Path::new(rootfs).join("home/minis");
+fn stage_home_bind(_params: &Value) -> Result<StagedHomeBind, (ErrorCode, String)> {
+    // The wire-level rootfs field is a legacy fixed-path compatibility value;
+    // the active version is selected centrally and cannot be caller-chosen.
+    let rootfs = active_rootfs_path();
+    let target = Path::new(&rootfs).join("home/minis");
     std::fs::create_dir_all(&target).map_err(|e| {
         (
             ErrorCode::RuntimeUnavailable,

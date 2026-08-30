@@ -3,7 +3,6 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
-const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
 const GUEST_CONFIG_BIN: &str = "/opt/minis/bin/minis-config";
 const MAX_ARGC: usize = 128;
 const MAX_ARG_BYTES: usize = 64 * 1024;
@@ -279,9 +278,10 @@ fn connect_abstract(name: &str) -> Result<std::os::unix::net::UnixStream, String
 }
 
 fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
-    let root = std::path::Path::new(HOST_ROOTFS);
+    let rootfs = crate::layout::active_rootfs_path();
+    let root = std::path::Path::new(&rootfs);
     if !root.join("etc/os-release").is_file() {
-        return Err(format!("Ubuntu rootfs missing at {HOST_ROOTFS}"));
+        return Err(format!("Ubuntu rootfs missing at {rootfs}"));
     }
     let bin_dir = root.join("opt/minis/bin");
     let etc_dir = root.join("etc/minis");
