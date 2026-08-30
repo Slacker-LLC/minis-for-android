@@ -88,4 +88,13 @@ class MinisdTransportStatsTest {
         assertEquals(0L, row.totalDurationMs)
         assertEquals(0L, row.maxDurationMs)
     }
+
+    @Test
+    fun `decoded response retains utf8 payload byte count without retaining raw payload`() {
+        val raw = """{"v":1,"id":7,"ok":true,"result":{"message":"测试"}}"""
+        val response = MinisdProtocol.decodeResponse(raw)
+
+        assertEquals(raw.toByteArray(Charsets.UTF_8).size, response.wireBytes)
+        assertEquals("测试", response.result!!.getString("message"))
+    }
 }
