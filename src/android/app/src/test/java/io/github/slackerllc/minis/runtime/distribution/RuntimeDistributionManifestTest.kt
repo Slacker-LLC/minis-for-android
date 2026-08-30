@@ -1,7 +1,7 @@
 package io.github.slackerllc.minis.runtime.distribution
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFailsWith
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class RuntimeDistributionManifestTest {
@@ -47,26 +47,24 @@ class RuntimeDistributionManifestTest {
 
     @Test
     fun `rejects managed and non numeric provision placeholders`() {
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             RuntimeDistributionManifest.parse(manifest(rootfsVersion = "managed"))
         }
-        assertFailsWith<Exception> {
+        assertThrows(Exception::class.java) {
             RuntimeDistributionManifest.parse(manifest(provisionRevision = "\"managed\""))
         }
     }
 
     @Test
     fun `rejects layout abi and rootfs sha identity mismatch`() {
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             RuntimeDistributionManifest.parse(manifest(layoutVersion = 1))
         }
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             RuntimeDistributionManifest.parse(manifest(abi = "arm64"))
         }
-        assertFailsWith<IllegalArgumentException> {
-            RuntimeDistributionManifest.parse(
-                manifest(rootfsVersion = "ubuntu-24.04-r1-deadbeefdeadbeef"),
-            )
+        assertThrows(IllegalArgumentException::class.java) {
+            RuntimeDistributionManifest.parse(manifest(rootfsVersion = "ubuntu-24.04-r1-deadbeefdeadbeef"))
         }
     }
 
