@@ -3,58 +3,49 @@ package com.openminis.app.mcp.server
 import android.content.Context
 import android.util.Log
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.tools.runtime.ToolPermissionManager
+import java.security.SecureRandom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * [T-android-mcp-server] Lifecycle gatekeeper for the on-device MCP server.
+ * Lifecycle gatekeeper for the on-device MCP server.
  *
- * - Fail-closed: starts only when [TokenStore] is configured; otherwise
- *   [start] refuses with a log line and no user-visible notification.
- * - No auto-start: [MinisApp.onCreate] calls [init] only. Boot / settings
- *   explicitly opt in via the `mcp_server_enabled` pref (default false).
- * - Liveness signal: [linuxToolsAvailable] is the single gate W2's linux.*
- *   dispatch consults; false ⇒ tool answers `ubuntu_runtime_unavailable`.
- *
- * WIRING-PENDING (W3): [TokenStore] (W1) and [MCPServer] (W2) were not yet in
- * the tree when this landed, so their references below are commented inside
- * clearly marked blocks. Uncomment when both exist — every commented line also
- * appears in this file's own diff, nothing else changes.
+ * Production exposure is deliberately local-only: Streamable HTTP on
+ * 127.0.0.1. Network/LAN exposure is a separate security contract and must not
+ * be enabled by changing a UI preference alone.
  */
 object MCPServerManager {
 
     private const val TAG = "MCPServerManager"
 
-    /** Port the MCP server binds. Matches W2's MCPServer(context, port). */
+    const val HOST = "127.0.0.1"
     const val PORT = 18789
+    const val PATH = "/mcp"
+    internal const val MANAGED_TOKEN_ID = "android-settings"
 
     private const val PREFS = "minis_mcp_prefs"
     private const val KEY_ENABLED = "mcp_server_enabled"
-
-    /** Supervisor liveness poll (07 §7): checks server health every 3 s. */
     private const val SUPERVISOR_POLL_MS = 3_000L
-
-    /** Delay between crash detection and the restart attempt. */
     private const val RESTART_DELAY_MS = 1_000L
-
-    /** Max consecutive restarts before giving up (restart-storm guard). */
     internal const val MAX_CONSECUTIVE_RESTARTS = 5
 
     @Volatile
     var running: Boolean = false
         private set
 
-    /** Refreshed by [init] from TokenStore.isConfigured (see WIRING-PENDING). */
     @Volatile
     var configured: Boolean = false
         private set
+
+    @Volatile
+    private var lastError: String? = null
 
     @Volatile
     private var appContext: Context? = null
@@ -62,24 +53,16 @@ object MCPServerManager {
     @Volatile
     private var server: MCPServer? = null
 
-    /** True between [stop] and the next [start]: the supervisor must never
-     * resurrect the server after a user stop. */
     @Volatile
     private var stopRequested: Boolean = false
 
-    /** Supervisor coroutine that watches [server] and restarts it on crash. */
     @Volatile
     private var supervisorJob: Job? = null
 
-    /**
-     * Application-context wiring. Reads the token-configured flag and, when
-     * the user opted in at boot (`mcp_server_enabled=true`), starts the
-     * server. Never auto-starts otherwise.
-     */
     fun init(context: Context) {
         appContext = context.applicationContext
         TokenStore.init(context)
-        configured = TokenStore.isConfigured
+        refreshConfigured()
         if (isEnabled()) {
             Log.i(TAG, "mcp_server_enabled=true — auto-starting")
             start()
@@ -88,24 +71,31 @@ object MCPServerManager {
         }
     }
 
-    /**
-     * Fail-closed: no token ⇒ refuse (logged, no notification). Idempotent
-     * when already running.
-     */
+    /** Re-read TokenStore so credentials created after app startup are live. */
+    fun refreshConfigured(): Boolean {
+        configured = TokenStore.isConfigured
+        return configured
+    }
+
+    /** Fail closed on every start attempt, not only at application init. */
     fun start(): Boolean {
-        if (!configured) {
+        if (!refreshConfigured()) {
+            lastError = "Access token required"
             Log.w(TAG, "start() refused: MCP token not configured (fail-closed)")
             return false
         }
-        if (running) return true
+        if (running) {
+            lastError = null
+            return true
+        }
         stopRequested = false
         val ok = startServerInstance()
         if (ok) {
+            lastError = null
             startSupervisor()
-            // Keep-alive: MCP must survive lock-screen app freezing (HyperOS
-            // freezes loopback sockets of background apps). The dedicated
-            // foreground service keeps the process exempt from that.
             appContext?.let { MCPKeepAliveService.start(it) }
+        } else if (lastError == null) {
+            lastError = "Unable to bind ${endpointUrl()}"
         }
         return ok
     }
@@ -121,16 +111,120 @@ object MCPServerManager {
         Log.i(TAG, "MCP server stopped")
     }
 
-    /** DEBUG-only approve path used by [DebugRPCHandler] for E2E on devices
-     *  whose notification actions are collapsed by the OEM (e.g. HyperOS).
-     *  Returns the ConfirmQueue Result name, or null when no server is up. */
+    /**
+     * Settings/boot preference and runtime state are changed together. Enabling
+     * with no credential fails closed and leaves boot auto-start disabled.
+     */
+    fun setEnabled(enabled: Boolean): Boolean {
+        val ctx = appContext
+        if (enabled && !refreshConfigured()) {
+            ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                ?.edit()?.putBoolean(KEY_ENABLED, false)?.apply()
+            lastError = "Access token required"
+            return false
+        }
+        ctx?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            ?.edit()?.putBoolean(KEY_ENABLED, enabled)?.apply()
+        Log.i(TAG, "mcp_server_enabled=$enabled")
+        return if (enabled) start() else {
+            stop()
+            lastError = null
+            true
+        }
+    }
+
+    fun isEnabled(): Boolean =
+        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            ?.getBoolean(KEY_ENABLED, false) ?: false
+
+    fun endpointUrl(): String = "http://$HOST:$PORT$PATH"
+
+    /**
+     * The Android settings-created credential is intentionally narrow by
+     * default: only tools classified MCP_ALLOWED (no human-confirm tools).
+     * The explicit scope is frozen into the token so newly added tools do not
+     * become remotely callable without a later user scope edit.
+     */
+    fun createOrRotateManagedToken(): TokenStore.Token? {
+        val caller = "mcp:$MANAGED_TOKEN_ID"
+        val safeScope = ToolPermissionManager.mcpVisibleTools()
+            .asSequence()
+            .filterNot { '*' in it }
+            .filter { ToolPermissionManager.levelFor(it, caller) == ToolPermissionManager.Level.MCP_ALLOWED }
+            .toSortedSet()
+        if (safeScope.isEmpty()) {
+            lastError = "No safe MCP tools are currently available"
+            return null
+        }
+        val token = TokenStore.Token(
+            id = MANAGED_TOKEN_ID,
+            token = generateTokenValue(),
+            scope = safeScope,
+        )
+        TokenStore.upsert(token)
+        refreshConfigured()
+        lastError = null
+        if (isEnabled() && !running) start()
+        return token
+    }
+
+    fun managedToken(): TokenStore.Token? = TokenStore.findById(MANAGED_TOKEN_ID)
+
+    fun availableToolsForManagedToken(): List<String> =
+        ToolPermissionManager.mcpVisibleTools()
+            .filterNot { '*' in it }
+            .sorted()
+
+    /** Empty scope has legacy "all visible" semantics, so UI never writes it. */
+    fun updateManagedTokenScope(scope: Set<String>): Boolean {
+        if (scope.isEmpty()) return false
+        val token = managedToken() ?: return false
+        val allowedNames = availableToolsForManagedToken().toSet()
+        val normalized = scope.intersect(allowedNames)
+        if (normalized.isEmpty()) return false
+        TokenStore.upsert(token.copy(scope = normalized))
+        refreshConfigured()
+        return true
+    }
+
+    /** Revokes only the credential managed by Android Settings. */
+    fun revokeManagedToken(): Boolean {
+        val changed = TokenStore.remove(MANAGED_TOKEN_ID)
+        refreshConfigured()
+        if (!configured) setEnabled(false)
+        return changed
+    }
+
+    fun connectionConfig(token: TokenStore.Token): String =
+        org.json.JSONObject()
+            .put(
+                "mcpServers",
+                org.json.JSONObject().put(
+                    "minis-android",
+                    org.json.JSONObject()
+                        .put("url", endpointUrl())
+                        .put(
+                            "headers",
+                            org.json.JSONObject().put("Authorization", "Bearer ${token.token}"),
+                        ),
+                ),
+            )
+            .toString(2)
+
+    internal fun generateTokenValue(): String {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** DEBUG-only approve path used by DebugRPCHandler for E2E. */
     fun debugApproveConfirm(confirmId: String, method: String): String? =
         server?.approveConfirm(confirmId, method)?.name
 
-    /** Starts a fresh [MCPServer] on [PORT]; updates [server]/[running]. */
     private fun startServerInstance(): Boolean {
         val ctx = appContext
         if (ctx == null) {
+            lastError = "MCP server is not initialized"
             Log.e(TAG, "start() before init()")
             return false
         }
@@ -138,17 +232,11 @@ object MCPServerManager {
         s.start()
         server = s
         running = s.isRunning
-        Log.i(TAG, "MCP server started: running=$running port=$PORT")
+        if (!running) lastError = "Unable to bind ${endpointUrl()}"
+        Log.i(TAG, "MCP server started: running=$running endpoint=${endpointUrl()}")
         return running
     }
 
-    /**
-     * Crash supervisor (07 §7): every [SUPERVISOR_POLL_MS] checks that
-     * [server] is alive while [running] says it should be. On crash it swaps
-     * in a fresh instance, at most [MAX_CONSECUTIVE_RESTARTS] times in a row;
-     * beyond that it gives up ([running] = false) to avoid a restart storm.
-     * [stop] cancels this job, so a user stop is never resurrected.
-     */
     private fun startSupervisor() {
         supervisorJob?.cancel()
         supervisorJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -157,52 +245,50 @@ object MCPServerManager {
                 delay(SUPERVISOR_POLL_MS)
                 val s = server ?: continue
                 if (s.isRunning) {
-                    consecutiveRestarts = 0 // healthy observation resets the storm counter
+                    consecutiveRestarts = 0
                     continue
                 }
-                if (!running) continue // expected-down (start refused) ⇒ no restart
+                if (!running) continue
                 if (!shouldRestart(consecutiveRestarts)) {
                     running = false
-                    Log.e(TAG, "MCP server crashed $MAX_CONSECUTIVE_RESTARTS times in a row; giving up (restart-storm guard)")
+                    lastError = "Server stopped after repeated crashes"
+                    Log.e(TAG, "MCP server crashed $MAX_CONSECUTIVE_RESTARTS times in a row; giving up")
                     break
                 }
                 consecutiveRestarts++
                 Log.w(TAG, "MCP server died; restarting ($consecutiveRestarts/$MAX_CONSECUTIVE_RESTARTS)")
                 delay(RESTART_DELAY_MS)
-                // stale loop after a stop()/start() in the meantime ⇒ bail out
                 if (stopRequested || supervisorJob !== currentCoroutineContext()[Job]) break
                 startServerInstance()
             }
         }
     }
 
-    /** Pure restart gate: true while [consecutiveRestarts] is under the storm
-     * guard. Extracted from the supervisor for JVM-testable counting logic. */
     internal fun shouldRestart(consecutiveRestarts: Int): Boolean =
         consecutiveRestarts in 0 until MAX_CONSECUTIVE_RESTARTS
 
-    data class Status(val running: Boolean, val configured: Boolean, val port: Int)
+    data class Status(
+        val running: Boolean,
+        val configured: Boolean,
+        val port: Int,
+        val enabled: Boolean,
+        val endpoint: String,
+        val tokenCount: Int,
+        val lastError: String?,
+    )
 
-    fun status(): Status = Status(running, configured, PORT)
-
-    // -- boot opt-in pref -----------------------------------------------------
-
-    fun isEnabled(): Boolean =
-        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            ?.getBoolean(KEY_ENABLED, false) ?: false
-
-    /** Settings page hook; also the only way boot auto-start turns on. */
-    fun setEnabled(enabled: Boolean) {
-        appContext?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            ?.edit()?.putBoolean(KEY_ENABLED, enabled)?.apply()
-        Log.i(TAG, "mcp_server_enabled=$enabled")
+    fun status(): Status {
+        refreshConfigured()
+        return Status(
+            running = running,
+            configured = configured,
+            port = PORT,
+            enabled = isEnabled(),
+            endpoint = endpointUrl(),
+            tokenCount = TokenStore.all().size,
+            lastError = lastError,
+        )
     }
 
-    /**
-     * 存活语义 (liveness): linux.* tools may only be dispatched while the
-     * Ubuntu Runtime is actually running. W2 calls this before dispatch;
-     * when it returns false the tool answers `ubuntu_runtime_unavailable`.
-     * Dispatch lives in W2's tool layer — this file only exposes the signal.
-     */
     fun linuxToolsAvailable(): Boolean = UbuntuRuntime.snapshot.value.running
 }
