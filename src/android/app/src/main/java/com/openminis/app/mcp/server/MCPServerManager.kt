@@ -71,13 +71,11 @@ object MCPServerManager {
         }
     }
 
-    /** Re-read TokenStore so credentials created after app startup are live. */
     fun refreshConfigured(): Boolean {
         configured = TokenStore.isConfigured
         return configured
     }
 
-    /** Fail closed on every start attempt, not only at application init. */
     fun start(): Boolean {
         if (!refreshConfigured()) {
             lastError = "Access token required"
@@ -111,10 +109,6 @@ object MCPServerManager {
         Log.i(TAG, "MCP server stopped")
     }
 
-    /**
-     * Settings/boot preference and runtime state are changed together. Enabling
-     * with no credential fails closed and leaves boot auto-start disabled.
-     */
     fun setEnabled(enabled: Boolean): Boolean {
         val ctx = appContext
         if (enabled && !refreshConfigured()) {
@@ -139,12 +133,6 @@ object MCPServerManager {
 
     fun endpointUrl(): String = "http://$HOST:$PORT$PATH"
 
-    /**
-     * The Android settings-created credential is intentionally narrow by
-     * default: only tools classified MCP_ALLOWED (no human-confirm tools).
-     * The explicit scope is frozen into the token so newly added tools do not
-     * become remotely callable without a later user scope edit.
-     */
     fun createOrRotateManagedToken(): TokenStore.Token? {
         val caller = "mcp:$MANAGED_TOKEN_ID"
         val safeScope = ToolPermissionManager.mcpVisibleTools()
@@ -187,7 +175,6 @@ object MCPServerManager {
         return true
     }
 
-    /** Revokes only the credential managed by Android Settings. */
     fun revokeManagedToken(): Boolean {
         val changed = TokenStore.remove(MANAGED_TOKEN_ID)
         refreshConfigured()
@@ -214,10 +201,9 @@ object MCPServerManager {
     internal fun generateTokenValue(): String {
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
+        return bytes.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     }
 
-    /** DEBUG-only approve path used by DebugRPCHandler for E2E. */
     fun debugApproveConfirm(confirmId: String, method: String): String? =
         server?.approveConfirm(confirmId, method)?.name
 
