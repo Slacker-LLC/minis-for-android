@@ -1,5 +1,6 @@
 import groovy.json.JsonSlurper
 import java.security.MessageDigest
+import java.nio.file.Files
 import java.util.Properties
 import org.gradle.api.GradleException
 
@@ -29,6 +30,8 @@ val packagedRuntimeManifest = runtimeDistDir.resolve("runtime-manifest.json")
 val packagedMinisdAndroid = runtimeDistDir.resolve("minisd-arm64-v8a")
 val generatedRuntimeAssets = layout.buildDirectory.dir("generated/runtimePayload/assets")
 val generatedRuntimeJniLibs = layout.buildDirectory.dir("generated/runtimePayload/jniLibs")
+val runtimeRootfsAsset = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
+val protectedRuntimeRootfsAsset = "$runtimeRootfsAsset.aapt-preserve"
 
 fun sha256(file: File): String {
     val digest = MessageDigest.getInstance("SHA-256")
@@ -197,7 +200,10 @@ val stageRuntimePayload by tasks.registering {
         }
 
         copy {
-            from(packagedRootfs, packagedRuntimeManifest)
+            from(packagedRootfs) {
+                rename { "ubuntu-arm64-rootfs.tar.gz.aapt-preserve" }
+            }
+            from(packagedRuntimeManifest)
             into(generatedRuntimeAssets.get().dir("minis-runtime"))
         }
         copy {
@@ -210,6 +216,29 @@ val stageRuntimePayload by tasks.registering {
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
     .configureEach { dependsOn(copyBashismRules); dependsOn(stageRuntimePayload) }
+tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets" }
+    .configureEach {
+        // AAPT strips a terminal .gz suffix even when noCompress is set. Keep
+        // an internal suffix through merge, then restore the runtime contract
+        // path in the build output before APK packaging consumes it.
+        doLast {
+            val protected = outputs.files.files.asSequence()
+                .filter { it.isDirectory }
+                .map { it.resolve(protectedRuntimeRootfsAsset) }
+                .filter { it.isFile }
+                .toList()
+            if (protected.size > 1) {
+                throw GradleException("Multiple merged runtime rootfs assets found: $protected")
+            }
+            protected.singleOrNull()?.let { source ->
+                val target = source.parentFile.resolve("ubuntu-arm64-rootfs.tar.gz")
+                if (target.exists()) {
+                    throw GradleException("Merged runtime rootfs target already exists: $target")
+                }
+                Files.move(source.toPath(), target.toPath())
+            }
+        }
+    }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(stageRuntimePayload) }
 tasks.named("preBuild") {
