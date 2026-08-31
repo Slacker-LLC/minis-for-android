@@ -176,7 +176,7 @@ class ThinkingWireGoldenSnapshotTest {
     private fun render(): String = buildString {
         for (c in matrix()) {
             for (lv in levels) {
-                append("${c.label}/${lv.name} -> ${emit(c.model, lv, server.url(c.path).toString().trimEnd('/'), c.maxTokens)}")
+                append("${c.label}/${lv.name} -> ${emit(c.model, lv, server.loopbackUrl(c.path).toString().trimEnd('/'), c.maxTokens)}")
                 append('\n')
             }
         }

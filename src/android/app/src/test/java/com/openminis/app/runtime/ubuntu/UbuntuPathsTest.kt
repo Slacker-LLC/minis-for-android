@@ -1,9 +1,12 @@
 package com.openminis.app.runtime.ubuntu
 
+import org.junit.Assume.assumeNoException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 
 class UbuntuPathsTest {
@@ -11,15 +14,15 @@ class UbuntuPathsTest {
     fun `workspace and var minis aliases map to host`() {
         assertEquals(
             "/data/adb/minis/workspace/x.xlsx",
-            UbuntuPaths.resolveGuest("/workspace/x.xlsx")!!.path.replace('\\', '/'),
+            UbuntuPaths.resolveGuest("/workspace/x.xlsx")!!.androidPath(),
         )
         assertEquals(
             "/data/adb/minis/workspace/attachments/a.png",
-            UbuntuPaths.resolveGuest("/var/minis/attachments/a.png")!!.path.replace('\\', '/'),
+            UbuntuPaths.resolveGuest("/var/minis/attachments/a.png")!!.androidPath(),
         )
         assertEquals(
             "/data/adb/minis/memory/notes.md",
-            UbuntuPaths.resolveGuest("/memory/notes.md")!!.path.replace('\\', '/'),
+            UbuntuPaths.resolveGuest("/memory/notes.md")!!.androidPath(),
         )
     }
 
@@ -29,7 +32,7 @@ class UbuntuPathsTest {
         try {
             assertEquals(
                 "/storage/emulated/0/Documents/a.txt",
-                UbuntuPaths.resolveHostPath("/mnt/docs/a.txt")!!.path.replace('\\', '/'),
+                UbuntuPaths.resolveHostPath("/mnt/docs/a.txt")!!.androidPath(),
             )
         } finally {
             UbuntuPaths.bindMounts.remove("/mnt/docs")
@@ -55,9 +58,14 @@ class UbuntuPathsTest {
     fun `bind mount symlink cannot escape its host root`() {
         val root = Files.createTempDirectory("minis-path-root")
         val outside = Files.createTempDirectory("minis-path-outside")
-        Files.createSymbolicLink(root.resolve("escape"), outside)
-        UbuntuPaths.bindMounts["/mnt/test"] = root.toString()
         try {
+            try {
+                Files.createSymbolicLink(root.resolve("escape"), outside)
+            } catch (error: Exception) {
+                if (!symlinksUnavailable(error)) throw error
+                assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            UbuntuPaths.bindMounts["/mnt/test"] = root.toString()
             assertNull(UbuntuPaths.resolveHostPath("/mnt/test/escape/secret.txt"))
         } finally {
             UbuntuPaths.bindMounts.remove("/mnt/test")
@@ -132,4 +140,12 @@ class UbuntuPathsTest {
             filesDir.deleteRecursively()
         }
     }
+
+    private fun File.androidPath(): String =
+        path.replace('\\', '/').replace(Regex("^[A-Za-z]:(?=/)"), "")
+
+    private fun symlinksUnavailable(error: Throwable): Boolean =
+        error is UnsupportedOperationException ||
+            error is SecurityException ||
+            (System.getProperty("os.name").orEmpty().startsWith("Windows") && error is FileSystemException)
 }

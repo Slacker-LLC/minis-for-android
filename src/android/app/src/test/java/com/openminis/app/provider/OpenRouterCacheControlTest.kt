@@ -76,7 +76,7 @@ class OpenRouterCacheControlTest {
         return JSONObject(server.takeRequest().body.readUtf8())
     }
 
-    private fun openRouter() = server.url("/openrouter.ai/api/v1").toString().trimEnd('/')
+    private fun openRouter() = server.loopbackUrl("/openrouter.ai/api/v1").toString().trimEnd('/')
 
     // -- The fix ---------------------------------------------------------------
 
@@ -115,7 +115,7 @@ class OpenRouterCacheControlTest {
         // and an OpenAI-compatible relay that is not OpenRouter has not been
         // verified to pass the field through. Fails safe: unchanged request.
         val body = capture(
-            server.url("/api.example-relay.com/v1").toString().trimEnd('/'),
+            server.loopbackUrl("/api.example-relay.com/v1").toString().trimEnd('/'),
             model("anthropic/claude-sonnet-4.5"),
         )
         assertFalse(
@@ -132,7 +132,7 @@ class OpenRouterCacheControlTest {
         // the field into Mistral requests. Android's gate is host-matched, and
         // this pins that it stays that way.
         val body = capture(
-            server.url("/mistral.ai/v1").toString().trimEnd('/'),
+            server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'),
             model("mistral-large-latest"),
         )
         assertFalse("Mistral must never receive cache_control: $body", body.has("cache_control"))

@@ -30,7 +30,7 @@ class OpenAIProviderTest {
         provider = OpenAIProvider(
             apiKey = "test-key",
             model = LLMModel.gpt4oMini,
-            basePath = server.url("/").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
 

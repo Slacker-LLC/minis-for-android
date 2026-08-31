@@ -48,7 +48,7 @@ class ResponsesApiFinishedTest {
         val provider = OpenAIProvider(
             apiKey = "test-key",
             model = LLMModel.gpt4oMini,
-            basePath = server.url("/v1").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/v1").toString().trimEnd('/'),
             useResponsesAPI = true,
         )
         return runBlocking {

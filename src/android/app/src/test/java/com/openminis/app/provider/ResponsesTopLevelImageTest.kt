@@ -71,7 +71,7 @@ class ResponsesTopLevelImageTest {
     private fun responsesProvider(model: LLMModel) = OpenAIProvider(
         apiKey = "test-key",
         model = model,
-        basePath = server.url("/").toString().trimEnd('/'),
+        basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         useResponsesAPI = true,
     )
 
