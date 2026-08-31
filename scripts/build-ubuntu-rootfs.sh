@@ -2,14 +2,20 @@
 # Build Ubuntu 24.04 LTS arm64 base rootfs.
 # Produces dist/ubuntu-arm64-rootfs.tar.gz (+ .sha256, manifest).
 set -euo pipefail
+umask 022
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
 WORK="${WORK:-/tmp/minis-ubuntu-rootfs}"
 REL="${REL:-24.04.3}"
+ROOTFS_REVISION="${ROOTFS_REVISION:-1}"
+PROVISION_REVISION="${PROVISION_REVISION:-1}"
 BASE_NAME="ubuntu-base-${REL}-base-arm64.tar.gz"
 BASE_URL="${BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/${BASE_NAME}}"
 SUMS_URL="${SUMS_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS}"
+
+[[ "$ROOTFS_REVISION" =~ ^[1-9][0-9]*$ ]] || { echo "error: ROOTFS_REVISION must be positive" >&2; exit 1; }
+[[ "$PROVISION_REVISION" =~ ^[1-9][0-9]*$ ]] || { echo "error: PROVISION_REVISION must be positive" >&2; exit 1; }
 
 # Supply-chain ceiling: the default release is pinned in-repo. A non-default
 # release must provide EXPECTED_BASE_SHA256 explicitly rather than trusting a
@@ -145,34 +151,48 @@ cat > "$STAGE/etc/minis/rootfs.json" <<EOF
   "release": "${REL}",
   "arch": "arm64",
   "profile": "base",
+  "revision": ${ROOTFS_REVISION},
   "preinstalled": "base-only",
   "source_url": "${BASE_URL}",
   "upstream_sha256": "${EXPECTED_BASE_SHA256}",
-  "note": "python3/git/curl installed on device via ubuntu.adminExec"
+  "note": "python3/git/curl installed on device via ubuntu.provision"
 }
 EOF
 
-echo "==> pack"
+echo "==> deterministic pack"
 OUT="$DIST/ubuntu-arm64-rootfs.tar.gz"
-tar -czf "$OUT" -C "$STAGE" .
-SHA="$(sha256sum "$OUT" | awk '{print $1}')"
+TMP_TAR="$DIST/ubuntu-arm64-rootfs.tar"
+find "$STAGE" -exec touch -h -d '@0' {} +
+rm -f "$OUT" "$TMP_TAR"
+tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+  --pax-option=delete=atime,delete=ctime -cf "$TMP_TAR" -C "$STAGE" .
+gzip -n -9 -c "$TMP_TAR" > "$OUT"
+rm -f "$TMP_TAR"
+SHA="$(sha256sum "$OUT" | awk '{print tolower($1)}')"
+VERSION="ubuntu-24.04-r${ROOTFS_REVISION}-${SHA:0:16}"
 printf '%s  %s\n' "$SHA" "$(basename "$OUT")" > "$OUT.sha256"
 SIZE="$(wc -c < "$OUT" | tr -d ' ')"
 cat > "$DIST/ubuntu-arm64-rootfs.manifest.json" <<EOF
 {
+  "schemaVersion": 1,
   "file": "ubuntu-arm64-rootfs.tar.gz",
   "sha256": "$SHA",
   "bytes": $SIZE,
+  "version": "$VERSION",
   "ubuntu": "$VERSION_ID",
   "release": "$REL",
-  "arch": "arm64",
+  "arch": "arm64-v8a",
   "profile": "base",
+  "rootfsRevision": $ROOTFS_REVISION,
+  "provisionRevision": $PROVISION_REVISION,
   "source_url": "$BASE_URL",
   "checksums_url": "$SUMS_URL",
-  "upstream_sha256": "$EXPECTED_BASE_SHA256"
+  "upstream_sha256": "$EXPECTED_BASE_SHA256",
+  "requiredCommands": ["python3", "git", "curl"]
 }
 EOF
 echo "==> $OUT"
+echo "    version $VERSION"
 echo "    sha256 $SHA"
 echo "    bytes  $SIZE"
 echo "    upstream $EXPECTED_BASE_SHA256"

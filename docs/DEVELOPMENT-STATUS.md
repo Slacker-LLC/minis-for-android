@@ -46,7 +46,7 @@ Ubuntu 24.04 userspace
 
 ## CI and release engineering
 
-Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs checksum failure paths, Android unit tests, Debug/Release lint, Debug packaging, Release Kotlin compilation and packaging, fail-closed release signing, and release APK verification.
+Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs checksum and reproducibility, Android arm64 minisd cross-compilation, bound runtime-manifest generation, Android unit tests, Debug/Release lint, verified Debug/Release runtime packaging, fail-closed release signing, and release APK verification.
 
 ## Current risk areas
 

@@ -8,11 +8,11 @@ App 与 minisd 均以 `/data/adb/minis/{workspace,sessions,memory,skills,shared,
 
 仍待真机验收：SELinux 标签、`df` 非 tmpfs、强停后文件仍在。IPC 仍可能走 filesDir 上的 app-socket（非本条范围）。
 
-## G2 发行自举 — 代码已接 APK 载荷，载荷本身仍可选
+## G2 发行自举 — CI APK 已强制携带绑定载荷，运行时升级语义未完成
 
 安装路径：从 `nativeLibraryDir/libminisd.so` 安装 `/data/adb/minis/bin/minisd`；从 APK `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz` 解到 `/data/adb/minis/runtime/staging/` 再原子替换 rootfs。无 root / 无载荷 fail-closed，不报假 Installed。
 
-仍待：把 Android NDK 版 minisd 与 rootfs tar 稳定打进 CI APK；真机验收首装/升级。
+CI 使用固定 NDK 构建 arm64 PIE `minisd`，并把它与可复现 rootfs、schema-v2 摘要 manifest 一起打入 Debug/Release APK；缺失、部分载荷或 APK 内摘要不匹配均失败关闭。仍待：App 在安装/启动时消费 manifest 并按版本执行原子升级/回滚；真机验收首装、升级与中断恢复。
 
 ## G3 身份未迁
 

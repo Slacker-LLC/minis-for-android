@@ -20,9 +20,9 @@ The build files are authoritative. At the time of writing the repository uses:
 | compileSdk | 36 |
 | targetSdk | 35 |
 | minSdk | 26 |
-| Android NDK | r28+ |
+| Android NDK | 27.0.12077973 |
 | CMake | 3.22.1 |
-| Rust | stable + `aarch64-unknown-linux-musl` target |
+| Rust | stable + `aarch64-linux-android` target |
 
 The Android module currently includes `arm64-v8a` and `x86_64` in its ABI filters. Rooted-device runtime work primarily targets arm64 Android devices.
 
@@ -40,7 +40,7 @@ No Git submodule initialization is required for the current runtime.
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"  # adjust to your installation
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
@@ -54,11 +54,8 @@ Some integrations require build-time provider customization that is intentionall
 ## 3. Build `minisd`
 
 ```bash
-rustup target add aarch64-unknown-linux-musl
-
-cargo build --locked --release \
-  --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
+rustup target add aarch64-linux-android
+bash scripts/build-minisd-android.sh
 ```
 
 `minisd` is the Rust root broker used by the rooted-device execution path.
@@ -69,9 +66,15 @@ cargo build --locked --release \
 ./scripts/build-ubuntu-rootfs.sh
 ```
 
-The script downloads the pinned Ubuntu 24.04 arm64 base archive and verifies its SHA-256 digest before packaging the project rootfs layout.
+The script downloads the pinned Ubuntu 24.04 arm64 base archive, verifies its SHA-256 digest, and creates a reproducible rootfs archive.
 
-Optional APK runtime payload: if `dist/ubuntu-arm64-rootfs.tar.gz` exists, Gradle copies it into `assets/minis-runtime/`. If `src/native/minisd/target/aarch64-linux-android/release/minisd` exists, Gradle copies it to `jniLibs/arm64-v8a/libminisd.so`. Source-only builds omit both; the device then fail-closes until those artifacts are packaged.
+To produce the complete verified APK payload in one command, run:
+
+```bash
+bash scripts/build-runtime-payload.sh
+```
+
+This writes `dist/minisd-arm64-v8a`, `dist/ubuntu-arm64-rootfs.tar.gz`, and `dist/runtime-manifest.json`. Gradle packages the three files together; partial payloads are rejected. Source-only local builds may omit all three and fail closed on the device, while CI requires and verifies the complete payload in every assembled APK.
 
 ## 5. Build a debug APK
 
@@ -136,6 +139,7 @@ Rootfs verification:
 
 ```bash
 bash scripts/test-build-ubuntu-rootfs-verification.sh
+bash scripts/test-runtime-payload-verification.sh
 ```
 
 Documentation provenance checks:
@@ -209,12 +213,12 @@ These sources are fixed runtime inputs. Startup rejects alternate persistent pat
 ### Rust target missing
 
 ```bash
-rustup target add aarch64-unknown-linux-musl
+rustup target add aarch64-linux-android
 ```
 
 ### Android NDK missing
 
-Set `ANDROID_NDK_HOME` to an installed r28+ directory containing `toolchains/llvm/prebuilt`.
+Set `ANDROID_NDK_HOME` to the pinned NDK `27.0.12077973` directory containing `toolchains/llvm/prebuilt`.
 
 ### Ubuntu runtime is unavailable on device
 

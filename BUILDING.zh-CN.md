@@ -10,9 +10,9 @@
 - Android Gradle Plugin 8.10.1；
 - Kotlin 2.1.0；
 - compileSdk 36 / targetSdk 35 / minSdk 26；
-- Android NDK r28+；
+- Android NDK 27.0.12077973；
 - CMake 3.22.1；
-- Rust stable + `aarch64-unknown-linux-musl`。
+- Rust stable + `aarch64-linux-android`。
 
 ## 1. 克隆
 
@@ -28,7 +28,7 @@ cd minis-for-android
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
@@ -40,10 +40,8 @@ cp src/android/app/provider-customization.properties.example \
 ## 3. 构建 `minisd`
 
 ```bash
-rustup target add aarch64-unknown-linux-musl
-cargo build --locked --release \
-  --target aarch64-unknown-linux-musl \
-  --manifest-path src/native/minisd/Cargo.toml
+rustup target add aarch64-linux-android
+bash scripts/build-minisd-android.sh
 ```
 
 ## 4. 构建 Ubuntu rootfs
@@ -52,9 +50,15 @@ cargo build --locked --release \
 ./scripts/build-ubuntu-rootfs.sh
 ```
 
-脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs。
+脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs，并生成可复现的 rootfs 归档。
 
-可选 APK 运行时载荷：若存在 `dist/ubuntu-arm64-rootfs.tar.gz`，Gradle 会拷进 assets；若存在 `src/native/minisd/target/aarch64-linux-android/release/minisd`，会拷成 `libminisd.so`。纯源码构建不含这两项，设备上会 fail-closed。
+一次生成完整且经过验证的 APK 运行时载荷：
+
+```bash
+bash scripts/build-runtime-payload.sh
+```
+
+脚本输出 `dist/minisd-arm64-v8a`、`dist/ubuntu-arm64-rootfs.tar.gz` 和 `dist/runtime-manifest.json`。Gradle 只允许三项一起打包，拒绝部分载荷。纯源码本地构建可以全部省略并在设备上 fail-closed；CI 组装的每个 APK 则强制包含并验证完整载荷。
 
 ## 5. 构建 Debug APK
 
@@ -99,6 +103,7 @@ Rootfs 校验：
 
 ```bash
 bash scripts/test-build-ubuntu-rootfs-verification.sh
+bash scripts/test-runtime-payload-verification.sh
 ```
 
 文档来源隔离检查：
