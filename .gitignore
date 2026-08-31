@@ -11,10 +11,12 @@ output-metadata.json
 # Android distributable artifacts — never commit binaries
 *.apk
 *.aab
+dist/
 
 # Logs / profiling / OS files
 *.log
 *.hprof
+__pycache__/
 .DS_Store
 
 # Android Studio / IntelliJ

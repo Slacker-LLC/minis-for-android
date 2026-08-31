@@ -57,15 +57,16 @@ jobs:
             case "$path" in
               src/native/minisd/*)
                 minisd=true
+                android=true
                 ;;
             esac
             case "$path" in
-              scripts/build-ubuntu-rootfs.sh|scripts/test-build-ubuntu-rootfs-verification.sh|scripts/verify-android-release.sh|scripts/check-runtime-package-boundary.sh|src/android/*)
+              scripts/build-ubuntu-rootfs.sh|scripts/build-minisd-android.sh|scripts/build-runtime-payload.sh|scripts/test-build-ubuntu-rootfs-verification.sh|scripts/test-runtime-payload-verification.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh|scripts/check-runtime-package-boundary.sh|src/android/*)
                 rootfs=true
                 ;;
             esac
             case "$path" in
-              src/android/*|src/shared/bashism/*|scripts/gen_debug_skill_android.sh|scripts/verify-android-release.sh)
+              src/android/*|src/shared/bashism/*|scripts/build-ubuntu-rootfs.sh|scripts/build-minisd-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh)
                 android=true
                 ;;
             esac
@@ -122,15 +123,44 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/build-minisd-android.sh scripts/build-runtime-payload.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/test-runtime-payload-verification.sh scripts/verify-runtime-payload.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
+      - name: Runtime payload verification tests
+        run: bash scripts/test-runtime-payload-verification.sh
       - name: Runtime package boundary contract
         run: bash scripts/check-runtime-package-boundary.sh
 
+  runtime-payload:
+    name: Build verified Android runtime payload
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned Android NDK and Rust target
+        run: |
+          sdkmanager "ndk;27.0.12077973"
+          rustup target add aarch64-linux-android
+      - name: Build and verify runtime payload
+        run: bash scripts/build-runtime-payload.sh
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-runtime-payload
+          path: |
+            dist/minisd-arm64-v8a
+            dist/minisd-arm64-v8a.sha256
+            dist/ubuntu-arm64-rootfs.tar.gz
+            dist/ubuntu-arm64-rootfs.tar.gz.sha256
+            dist/ubuntu-arm64-rootfs.manifest.json
+            dist/runtime-manifest.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   android-checks:
     name: Android ${{ matrix.name }}
-    needs: changes
+    needs: [changes, runtime-payload]
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     strategy:
@@ -139,12 +169,16 @@ jobs:
         include:
           - name: unit tests
             task: :app:testDebugUnitTest
+            payload: false
           - name: debug lint
             task: :app:lintDebug
+            payload: false
           - name: release lint
             task: :app:lintRelease
+            payload: false
           - name: debug build
             task: :app:assembleDebug
+            payload: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -154,15 +188,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5.0.2
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
+        if: matrix.payload
+        with:
+          name: android-runtime-payload
+          path: dist
       - name: Prepare Gradle wrapper
         run: chmod +x src/android/gradlew
       - name: Run ${{ matrix.name }}
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: ${{ matrix.payload && '1' || '0' }}
         working-directory: src/android
         run: ./gradlew ${{ matrix.task }} --max-workers=4 --stacktrace
+      - name: Verify debug APK runtime payload
+        if: matrix.payload
+        run: bash scripts/verify-runtime-payload.sh src/android/app/build/outputs/apk/debug/app-debug.apk
 
   android-release:
     name: Android release build and verification
-    needs: changes
+    needs: [changes, runtime-payload]
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     env:
@@ -179,6 +223,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5.0.2
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-runtime-payload
+          path: dist
       - name: Prepare Gradle wrapper
         run: chmod +x src/android/gradlew
       - name: Verify missing release credentials fail closed
@@ -208,6 +256,8 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 2 \
             -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
       - name: Assemble release
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '1'
         working-directory: src/android
         run: ./gradlew :app:assembleRelease --max-workers=4 --stacktrace
       - name: Verify release APK
@@ -216,13 +266,14 @@ jobs:
   android:
     name: Android build, test and release checks
     if: always()
-    needs: [changes, android-checks, android-release]
+    needs: [changes, runtime-payload, android-checks, android-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify Android check results
         env:
           ANDROID_CHANGED: ${{ needs.changes.outputs.android }}
           CHANGES_RESULT: ${{ needs.changes.result }}
+          PAYLOAD_RESULT: ${{ needs.runtime-payload.result }}
           CHECKS_RESULT: ${{ needs.android-checks.result }}
           RELEASE_RESULT: ${{ needs.android-release.result }}
         run: |
@@ -234,8 +285,8 @@ jobs:
             echo "No Android-related files changed; Android checks were skipped."
             exit 0
           fi
-          if [[ "$CHECKS_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
-            echo "Android checks failed: checks=$CHECKS_RESULT release=$RELEASE_RESULT" >&2
+          if [[ "$PAYLOAD_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
+            echo "Android checks failed: payload=$PAYLOAD_RESULT checks=$CHECKS_RESULT release=$RELEASE_RESULT" >&2
             exit 1
           fi
           echo "All Android checks passed."

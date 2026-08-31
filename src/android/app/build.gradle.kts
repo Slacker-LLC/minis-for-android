@@ -1,4 +1,7 @@
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
 import java.util.Properties
+import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
@@ -19,6 +22,26 @@ val appCustomization = Properties().apply {
 }
 fun customizationValue(key: String): String =
     (appCustomization.getProperty(key) ?: "").replace("\"", "\\\"")
+
+val runtimeDistDir = rootProject.file("../../dist")
+val packagedRootfs = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
+val packagedRuntimeManifest = runtimeDistDir.resolve("runtime-manifest.json")
+val packagedMinisdAndroid = runtimeDistDir.resolve("minisd-arm64-v8a")
+val generatedRuntimeAssets = layout.buildDirectory.dir("generated/runtimePayload/assets")
+val generatedRuntimeJniLibs = layout.buildDirectory.dir("generated/runtimePayload/jniLibs")
+
+fun sha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
 
 android {
     namespace = "com.openminis.app"
@@ -96,6 +119,20 @@ android {
         noCompress += "tar.gz"
     }
 
+    sourceSets.getByName("main") {
+        assets.srcDir(generatedRuntimeAssets)
+        jniLibs.srcDir(generatedRuntimeJniLibs)
+    }
+
+    packaging {
+        jniLibs {
+            // minisd is executed from ApplicationInfo.nativeLibraryDir. Force
+            // Package Manager to materialize the APK-owned ELF on disk.
+            useLegacyPackaging = true
+            keepDebugSymbols += "**/libminisd.so"
+        }
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -115,29 +152,69 @@ val copyBashismRules by tasks.registering(Copy::class) {
     }
     into(layout.projectDirectory.dir("src/main/assets/bashism"))
 }
-val packagedRootfs = rootProject.file("../../dist/ubuntu-arm64-rootfs.tar.gz")
-val packagedMinisdAndroid = rootProject.file(
-    "../../src/native/minisd/target/aarch64-linux-android/release/minisd",
-)
-val packageRuntimeRootfs by tasks.registering(Copy::class) {
-    onlyIf { packagedRootfs.isFile }
-    from(packagedRootfs)
-    into(layout.projectDirectory.dir("src/main/assets/minis-runtime"))
-    rename { "ubuntu-arm64-rootfs.tar.gz" }
-}
-val packageMinisdJniLib by tasks.registering(Copy::class) {
-    onlyIf { packagedMinisdAndroid.isFile }
-    from(packagedMinisdAndroid)
-    into(layout.projectDirectory.dir("src/main/jniLibs/arm64-v8a"))
-    rename { "libminisd.so" }
+val stageRuntimePayload by tasks.registering {
+    group = "build"
+    description = "Stages an optional verified runtime payload from dist into generated Android sources."
+    inputs.files(packagedRootfs, packagedRuntimeManifest, packagedMinisdAndroid)
+    outputs.dirs(generatedRuntimeAssets, generatedRuntimeJniLibs)
+    outputs.upToDateWhen { false }
+    doLast {
+        val inputs = listOf(packagedRootfs, packagedRuntimeManifest, packagedMinisdAndroid)
+        val missing = inputs.filterNot { it.isFile }
+        val required = System.getenv("MINIS_REQUIRE_RUNTIME_PAYLOAD") == "1"
+        if ((missing.isNotEmpty() && missing.size != inputs.size) || required) {
+            if (missing.isNotEmpty()) {
+                throw GradleException(
+                    "Runtime payload is incomplete; missing: ${missing.joinToString { it.path }}",
+                )
+            }
+        }
+
+        delete(generatedRuntimeAssets, generatedRuntimeJniLibs)
+        if (missing.isNotEmpty()) return@doLast
+
+        val manifest = JsonSlurper().parse(packagedRuntimeManifest) as? Map<*, *>
+            ?: throw GradleException("Runtime manifest is not a JSON object")
+        val expected = mapOf(
+            "schemaVersion" to 2,
+            "protocolVersion" to 1,
+            "layoutVersion" to 2,
+            "abi" to "arm64-v8a",
+        )
+        expected.forEach { (key, value) ->
+            if (manifest[key] != value) {
+                throw GradleException("Runtime manifest $key must be $value")
+            }
+        }
+        if (manifest["minisdSha256"] != sha256(packagedMinisdAndroid)) {
+            throw GradleException("Runtime manifest minisd SHA-256 mismatch")
+        }
+        if (manifest["rootfsSha256"] != sha256(packagedRootfs)) {
+            throw GradleException("Runtime manifest rootfs SHA-256 mismatch")
+        }
+        if (manifest["requiredCommands"] != listOf("python3", "git", "curl")) {
+            throw GradleException("Runtime manifest requiredCommands mismatch")
+        }
+
+        copy {
+            from(packagedRootfs, packagedRuntimeManifest)
+            into(generatedRuntimeAssets.get().dir("minis-runtime"))
+        }
+        copy {
+            from(packagedMinisdAndroid)
+            into(generatedRuntimeJniLibs.get().dir("arm64-v8a"))
+            rename { "libminisd.so" }
+        }
+    }
 }
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
-    .configureEach { dependsOn(copyBashismRules); dependsOn(packageRuntimeRootfs) }
+    .configureEach { dependsOn(copyBashismRules); dependsOn(stageRuntimePayload) }
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
+    .configureEach { dependsOn(stageRuntimePayload) }
 tasks.named("preBuild") {
     dependsOn(copyBashismRules)
-    dependsOn(packageRuntimeRootfs)
-    dependsOn(packageMinisdJniLib)
+    dependsOn(stageRuntimePayload)
 }
 
 // Stage optional debug-server skill assets only for debug builds. Local
