@@ -34,6 +34,7 @@ fn t_i1_every_known_method_has_shaped_response() {
     for method in KNOWN_METHODS {
         let params = match *method {
             "root.exec" => json!({"tool":"getprop","args":["ro.build.version.release"]}),
+            "root.fullExec" => json!({"tool":"sh","args":["-c","id"]}),
             "root.shellRaw" => json!({"cmd":"id"}),
             "ubuntu.exec" => json!({"argv":["/usr/bin/id"]}),
             "ubuntu.adminExec" => json!({"argv":["/usr/bin/apt-get","update"]}),
@@ -55,7 +56,7 @@ fn t_i1_every_known_method_has_shaped_response() {
         if *method == "ubuntu.exec" || *method == "ubuntu.adminExec" {
             let _ = call(&mut state, "ubuntu.start", json!({}));
         }
-        if *method == "ubuntu.adminExec" {
+        if *method == "ubuntu.adminExec" || *method == "root.fullExec" {
             let pending = handle(&mut state, req.clone(), None);
             req.confirm_id = pending.error.and_then(|e| e.confirm_id);
         }

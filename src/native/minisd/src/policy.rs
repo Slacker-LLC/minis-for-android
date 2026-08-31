@@ -50,7 +50,7 @@ pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
 fn is_builtin_root_exec_tool(tool: &str) -> bool {
     matches!(
         tool,
-        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount"
+        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount" | "pidof" | "ps" | "logcat"
     )
 }
 
@@ -165,6 +165,7 @@ mod tests {
         let p = PolicyFile::default_policy();
         assert_eq!(p.implicit_mode("root.shellRaw"), Mode::Deny);
         assert_eq!(p.method("root.exec").unwrap().mode, Mode::Allow);
+        assert_eq!(p.method("root.fullExec").unwrap().mode, Mode::Confirm);
     }
 
     #[test]

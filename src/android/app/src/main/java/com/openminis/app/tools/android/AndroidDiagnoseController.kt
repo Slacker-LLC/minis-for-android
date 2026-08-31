@@ -140,7 +140,7 @@ object AndroidDiagnoseController {
             context, sessionId, args, "读取 crash log buffer", CommandRisk.READ_ONLY, 30_000L,
         )
         val result = if (privileged.success) privileged else {
-            RootCommandRunner.runProcess(args, 30_000L, PrivilegedBackend.NONE)
+            AppCommandRunner.run(args, 30_000L)
         }
         val related = result.stdout.lineSequence().filter { line ->
             line.contains(packageName) || line.contains("AndroidRuntime") || line.contains("FATAL EXCEPTION") ||

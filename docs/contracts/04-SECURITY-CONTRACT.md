@@ -11,16 +11,20 @@
 ## Root
 
 - `minisd` 是目标上的唯一 Root 执行出口。
-- `root.exec` 使用编译期工具白名单；策略只能再收窄。
-- Confirm 必须绑定**完整 argv/请求内容**，一次性，用后作废；改参数必须重新批准。
-- Agent 不得自行切换到「完全访问」。该模式若存在，只能由用户在设置里打开，并持续显示警告。
-- 现状仍存在绕过 minisd 的 `su -c` 通道，见 `06-CURRENT-GAPS.md`。新代码禁止再加一条。
+- `root.exec` 是标准模式入口，使用编译期工具白名单；策略只能再收窄。`pidof`、`ps`、`logcat` 仅按受控只读参数直通，`pm`、`settings` 与 `logcat` 的修改型参数必须被拒绝并转入确认流程。
+- `root.fullExec` 与 `root.exec` 使用相同的结构化 `{tool,args,timeout_ms,execution_id}`；不得接收原始 `command`。工具只能从可信 Android 系统目录解析，minisd 策略固定为 `confirm`。
+- Confirm 必须保存并绑定**完整 method + params**，一次性，用后作废；参数不匹配、过期或重复使用均立即消耗确认票。
+- 标准模式先尝试 `root.exec`；白名单或参数规则拒绝后，由 App 获取 `root.fullExec` 确认票、显示一次性用户确认，再以完全相同的请求重放。
+- 完全访问只能由用户在 App 设置里打开。App 可为 `root.fullExec` 自动完成内部确认重放，但聊天页必须持续显示红色警告。
+- Agent 工具参数不得包含 `access_mode` 或其它模式切换入口；`root.shell` 保持 `LOCAL_ONLY`，Agent 不能自行切换模式。
+- 为安装、启动、探测或修复 minisd/rootfs 而保留的受控 bootstrap/recovery `su -c` 只能执行静态 App-owned 命令；不得承载 Agent 提供的命令或 argv。剩余范围见 `06-CURRENT-GAPS.md`。
 
 ## minisd IPC
 
 - 私有 Unix socket；生产路径不要用 world-writable 模式。
 - Peer 身份校验；`--once` / skip-peer 不得进入生产启动路径。
 - 有界帧、有界输出、超时杀进程树。
+- `root.exec` 与 `root.fullExec` 的 socket 请求都必须在阻塞 worker 中执行，避免长命令阻塞 broker 接收循环。
 - `uid=0` 的 peer 仍须受方法白名单约束。
 
 ## MCP

@@ -167,6 +167,11 @@ val stageDebugSkillAssets by tasks.registering(Exec::class) {
 }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") && it.name.contains("Debug") }
     .configureEach { dependsOn(stageDebugSkillAssets) }
+// Debug lint models read the generated source-set assets directly rather than
+// going through mergeDebugAssets, so declare the producer explicitly. Without
+// this edge, Gradle 8 rejects combined lint + assemble invocations as unsafe.
+tasks.matching { it.name.contains("Debug") && it.name.contains("lint", ignoreCase = true) }
+    .configureEach { dependsOn(stageDebugSkillAssets) }
 
 dependencies {
     // Compose BOM

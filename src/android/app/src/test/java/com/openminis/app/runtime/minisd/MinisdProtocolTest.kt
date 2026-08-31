@@ -225,6 +225,37 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `root full exec uses the same structured request and carries confirm id`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.rootFullExec(
+                tool = "sh",
+                args = listOf("-c", "id; getenforce"),
+                timeoutMs = 18_000,
+                confirmId = "confirm-1",
+                id = 13,
+                executionId = "root:13",
+            ),
+        )
+        val obj = JSONObject(raw)
+        assertEquals("root.fullExec", obj.getString("method"))
+        assertEquals("confirm-1", obj.getString("confirm_id"))
+        val params = obj.getJSONObject("params")
+        assertEquals("sh", params.getString("tool"))
+        assertEquals("-c", params.getJSONArray("args").getString(0))
+        assertEquals("id; getenforce", params.getJSONArray("args").getString(1))
+        assertEquals("root:13", params.getString("execution_id"))
+        assertFalse(params.has("command"))
+        assertFalse(params.has("access_mode"))
+    }
+
+    @Test
+    fun `root probe has a dedicated broker method`() {
+        val obj = JSONObject(MinisdProtocol.encodeRequest(MinisdProtocol.rootProbe(14)))
+        assertEquals("root.probe", obj.getString("method"))
+        assertFalse(obj.getJSONObject("params").has("command"))
+    }
+
+    @Test
     fun `admin exec carries confirm_id`() {
         val raw = MinisdProtocol.encodeRequest(
             MinisdProtocol.ubuntuAdminExec(listOf("/usr/bin/apt-get", "update"), confirmId = "c-1"),

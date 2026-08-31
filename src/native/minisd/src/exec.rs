@@ -5,7 +5,9 @@ use std::io::Read;
 use std::time::{Duration, Instant};
 
 /// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
-pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
+pub const DEFAULT_TOOLS: &[&str] = &[
+    "pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat",
+];
 pub const MAX_CAPTURE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone)]
@@ -93,6 +95,20 @@ pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode
     if !allow.contains(&tool) {
         return Err(ErrorCode::PolicyDenied);
     }
+    resolve_trusted_tool_path(tool)
+}
+
+/// Full Access can select any executable exposed from trusted Android system
+/// directories. Shell parsing exists only when the caller explicitly requests
+/// `sh -c` as structured argv.
+pub fn resolve_unrestricted_tool_path(tool: &str) -> Result<String, ErrorCode> {
+    resolve_trusted_tool_path(tool)
+}
+
+fn resolve_trusted_tool_path(tool: &str) -> Result<String, ErrorCode> {
+    if tool.is_empty() || tool.contains('/') || tool.contains('\0') {
+        return Err(ErrorCode::BadParams);
+    }
     for prefix in ["/system/bin/", "/system/xbin/", "/vendor/bin/"] {
         let p = format!("{prefix}{tool}");
         if std::path::Path::new(&p).exists() {
@@ -100,6 +116,12 @@ pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode
         }
     }
     Err(ErrorCode::BadParams)
+}
+
+/// Full Access intentionally uses the same structured tool + argv contract as
+/// Standard Mode. It never accepts a raw `command` string.
+pub fn parse_full_exec(params: &serde_json::Value) -> Result<ExecRequest, ErrorCode> {
+    parse_exec(params)
 }
 
 #[derive(Debug)]
@@ -151,9 +173,33 @@ fn kill_process_tree(pid: i32) {
 
 pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCode> {
     let path = resolve_tool_path(&req.tool, allow)?;
-    let guard = ExecGuard::begin(req.execution_id.as_deref())?;
-    let mut cmd = std::process::Command::new(&path);
-    cmd.args(&req.args)
+    run_argv(
+        &path,
+        &req.args,
+        req.timeout_ms,
+        req.execution_id.as_deref(),
+    )
+}
+
+pub fn run_full_exec(req: &ExecRequest) -> Result<ExecOutput, ErrorCode> {
+    let path = resolve_unrestricted_tool_path(&req.tool)?;
+    run_argv(
+        &path,
+        &req.args,
+        req.timeout_ms,
+        req.execution_id.as_deref(),
+    )
+}
+
+fn run_argv(
+    path: &str,
+    args: &[String],
+    timeout_ms: u64,
+    execution_id: Option<&str>,
+) -> Result<ExecOutput, ErrorCode> {
+    let guard = ExecGuard::begin(execution_id)?;
+    let mut cmd = std::process::Command::new(path);
+    cmd.args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -212,7 +258,7 @@ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCo
                 stderr_truncated: stderr.truncated,
             });
         }
-        if start.elapsed() >= Duration::from_millis(req.timeout_ms) {
+        if start.elapsed() >= Duration::from_millis(timeout_ms) {
             #[cfg(unix)]
             kill_process_tree(pid);
             for _ in 0..50 {
@@ -252,9 +298,35 @@ mod tests {
             validate_exec(spec, &denied).unwrap_err(),
             ErrorCode::PolicyDenied
         );
+        let logcat = parse_exec(&serde_json::json!({"tool":"logcat","args":["-d"]})).unwrap();
+        assert!(validate_exec(spec, &logcat).is_ok());
+        let clear_logcat = parse_exec(&serde_json::json!({"tool":"logcat","args":["-c"]})).unwrap();
+        assert_eq!(
+            validate_exec(spec, &clear_logcat).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
+        let uninstall =
+            parse_exec(&serde_json::json!({"tool":"pm","args":["uninstall","a.b"]})).unwrap();
+        assert_eq!(
+            validate_exec(spec, &uninstall).unwrap_err(),
+            ErrorCode::PolicyDenied
+        );
         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
+    }
+
+    #[test]
+    fn full_exec_remains_structured() {
+        let parsed = parse_full_exec(&serde_json::json!({
+            "tool":"sh",
+            "args":["-c","id; getenforce"]
+        }))
+        .unwrap();
+        assert_eq!(parsed.tool, "sh");
+        assert_eq!(parsed.args, vec!["-c", "id; getenforce"]);
+        assert!(parse_full_exec(&serde_json::json!({"tool":"/system/bin/id"})).is_err());
+        assert!(parse_full_exec(&serde_json::json!({"command":"id"})).is_err());
     }
 
     #[test]

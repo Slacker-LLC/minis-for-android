@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +47,8 @@ import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
+import com.openminis.app.tools.android.PrivilegedAccessMode
+import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,6 +82,8 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var repairing by remember { mutableStateOf(false) }
     var repairFailed by remember { mutableStateOf(false) }
+    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
+    var showFullAccessConfirm by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -116,6 +122,49 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SettingsSection(
+                header = "Root 权限模式",
+                footer = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                    "完全访问已开启：Agent 的 Root 请求不再逐条弹窗，请仅在明确需要时使用。"
+                } else {
+                    "标准模式仅自动执行受控的只读命令；超出白名单或参数规则时，每次都需要你的确认。"
+                },
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.Security,
+                    iconColor = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) {
+                        Color(0xFF34C759)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    title = "标准模式",
+                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "白名单直通，越权逐次确认",
+                    onClick = {
+                        PrivilegedAccessModeStore.setFromUserSettings(
+                            context,
+                            PrivilegedAccessMode.STANDARD,
+                        )
+                    },
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Security,
+                    iconColor = MaterialTheme.colorScheme.error,
+                    title = "完全访问",
+                    titleColor = MaterialTheme.colorScheme.error,
+                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                        "当前模式；Agent Root 请求自动完成内部确认"
+                    } else {
+                        "高风险：开启前需要确认"
+                    },
+                    onClick = {
+                        if (privilegedAccessMode != PrivilegedAccessMode.FULL_ACCESS) {
+                            showFullAccessConfirm = true
+                        }
+                    },
+                    showDivider = false,
+                )
+            }
+
             SettingsSection(
                 header = stringResource(R.string.system_permissions_section_a11y),
                 footer = stringResource(R.string.system_permissions_a11y_footer),
@@ -309,6 +358,37 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     dismissButton = {
                         TextButton(onClick = { showClearCorrectionConfirm = false }) {
                             Text(stringResource(R.string.voice_correction_consent_not_now))
+                        }
+                    },
+                )
+            }
+
+            if (showFullAccessConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showFullAccessConfirm = false },
+                    title = { Text("开启 Root 完全访问？") },
+                    text = {
+                        Text(
+                            "开启后，Agent 发起的结构化 Root 命令将不再逐条询问。" +
+                                "这可能修改系统设置、应用与设备数据；Agent 本身不能切换此模式。",
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                PrivilegedAccessModeStore.setFromUserSettings(
+                                    context,
+                                    PrivilegedAccessMode.FULL_ACCESS,
+                                )
+                                showFullAccessConfirm = false
+                            },
+                        ) {
+                            Text("确认开启", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showFullAccessConfirm = false }) {
+                            Text("取消")
                         }
                     },
                 )

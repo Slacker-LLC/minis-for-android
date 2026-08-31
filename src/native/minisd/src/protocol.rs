@@ -236,6 +236,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "system.ping",
     "root.probe",
     "root.exec",
+    "root.fullExec",
     "root.shellRaw",
     "ubuntu.start",
     "ubuntu.stop",

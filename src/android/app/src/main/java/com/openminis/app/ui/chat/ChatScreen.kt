@@ -143,6 +143,8 @@ import com.openminis.app.BuildConfig
 import com.openminis.app.R
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.tools.android.PrivilegedAccessMode
+import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisMenuDivider
@@ -430,6 +432,7 @@ fun ChatScreen(
     onModelGroupsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     // Scoped to a process-level per-session ViewModelStore (ChatViewModelStore)
@@ -2918,6 +2921,19 @@ fun ChatScreen(
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 }
+            }
+
+            if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                Text(
+                    text = "⚠ Root 完全访问已开启：Agent 命令不会逐条询问",
+                    color = Color(0xFFB00020),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFE5E5))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
 
             // Messages + scroll-to-bottom button

@@ -91,54 +91,29 @@ object UbuntuRuntime {
 
     suspend fun refresh(): Snapshot = apply(client.ubuntuStatus())
 
+    /** Ensure only the Root broker is reachable; Ubuntu/rootfs health is not required. */
+    suspend fun ensureBrokerReady(): MinisdResponse = startLock.withLock {
+        val ctx = appContext ?: return@withLock MinisdProtocol.runtimeError(
+            MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+            "UbuntuRuntime.init(context) has not been called",
+        )
+        ensureBrokerReadyLocked(ctx).also { if (it.ok) apply(it) }
+    }
+
     suspend fun ensureReady(): Snapshot = startLock.withLock {
         val ctx = appContext
             ?: return@withLock fail(
                 "${MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: UbuntuRuntime.init(context) has not been called",
             )
         val expectedUid = ctx.applicationInfo.uid
-        var cur = refresh()
-
-        // Broker recovery is deliberately before rootfs health. A broken or
-        // missing rootfs must never prevent the privileged broker from starting.
-        if (cur.guestUid != null && cur.guestUid != expectedUid) {
-            Log.w(TAG, "stale minisd identity brokerUid=${cur.guestUid} appUid=$expectedUid")
-            val restarted = ensureMinisdUp(forceRestart = true)
-            if (!restarted.ok) {
-                return@withLock failStructured(
-                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
-                    "minisd identity restart failed: ${restarted.error ?: "unknown error"}",
-                )
-            }
-            cur = awaitBroker(expectedUid)
-        } else if (cur.guestUid == null) {
-            val spawned = ensureMinisdUp(forceRestart = false)
-            if (!spawned.ok) {
-                return@withLock failStructured(
-                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
-                    spawned.error ?: cur.lastError ?: "failed to start minisd",
-                )
-            }
-            cur = awaitBroker(expectedUid)
-        }
-
-        // One forced broker restart covers stale pidfile / old installation UID.
-        if (cur.guestUid != expectedUid) {
-            val restarted = ensureMinisdUp(forceRestart = true)
-            if (!restarted.ok) {
-                return@withLock failStructured(
-                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
-                    "minisd recovery failed: ${restarted.error ?: "unknown error"}",
-                )
-            }
-            cur = awaitBroker(expectedUid)
-        }
-        if (!brokerIdentityMatches(cur, expectedUid)) {
+        val broker = ensureBrokerReadyLocked(ctx)
+        if (!broker.ok) {
             return@withLock failStructured(
-                MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
-                "minisd app identity mismatch: expected uid=$expectedUid, broker uid=${cur.guestUid ?: "unknown"}",
+                broker.error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                broker.error?.detail ?: "failed to start minisd",
             )
         }
+        var cur = apply(broker)
 
         // Rootfs health is authoritative and metadata/layout based. If a keeper
         // is still alive on a damaged tree, stop it before an atomic replacement.
@@ -281,14 +256,66 @@ object UbuntuRuntime {
             .filterNot { it.trimEnd('\r') == marker }
             .joinToString("\n")
 
-    private suspend fun awaitBroker(expectedUid: Int): Snapshot {
-        var cur = _snapshot.value
+    private suspend fun ensureBrokerReadyLocked(ctx: Context): MinisdResponse {
+        val expectedUid = ctx.applicationInfo.uid
+        var response = client.ubuntuStatus()
+        var uid = response.brokerUid()
+        if (response.ok && uid == expectedUid) return response
+
+        val forcedRestart = uid != null
+        if (uid != null) {
+            Log.w(TAG, "stale minisd identity brokerUid=$uid appUid=$expectedUid")
+        }
+        var started = ensureMinisdUp(forceRestart = forcedRestart)
+        if (!started.ok) {
+            return MinisdProtocol.runtimeError(
+                if (forcedRestart) {
+                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH
+                } else {
+                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE
+                },
+                started.error ?: "failed to start minisd",
+            )
+        }
+        response = awaitBrokerResponse(expectedUid)
+        uid = response.brokerUid()
+
+        // A normal spawn may have found a stale pidfile/server. Retry once with
+        // verified broker replacement; never loop indefinitely.
+        if (uid != expectedUid && !forcedRestart) {
+            started = ensureMinisdUp(forceRestart = true)
+            if (!started.ok) {
+                return MinisdProtocol.runtimeError(
+                    MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                    started.error ?: "minisd recovery failed",
+                )
+            }
+            response = awaitBrokerResponse(expectedUid)
+            uid = response.brokerUid()
+        }
+        return if (response.ok && uid == expectedUid) {
+            response
+        } else {
+            MinisdProtocol.runtimeError(
+                MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
+                "minisd app identity mismatch: expected uid=$expectedUid, broker uid=${uid ?: "unknown"}",
+            )
+        }
+    }
+
+    private suspend fun awaitBrokerResponse(expectedUid: Int): MinisdResponse {
+        var response = client.ubuntuStatus()
         repeat(10) {
             delay(300)
-            cur = refresh()
-            if (cur.guestUid == expectedUid) return cur
+            response = client.ubuntuStatus()
+            if (response.ok && response.brokerUid() == expectedUid) return response
         }
-        return cur
+        return response
+    }
+
+    private fun MinisdResponse.brokerUid(): Int? {
+        val result = result ?: return null
+        return if (ok && result.has("uid") && !result.isNull("uid")) result.optInt("uid") else null
     }
 
     private suspend fun ensureMinisdUp(forceRestart: Boolean): BrokerStartResult =
