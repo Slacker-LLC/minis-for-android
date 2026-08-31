@@ -8,11 +8,13 @@ App 与 minisd 均以 `/data/adb/minis/{workspace,sessions,memory,skills,shared,
 
 仍待真机验收：SELinux 标签、`df` 非 tmpfs、强停后文件仍在。IPC 仍可能走 filesDir 上的 app-socket（非本条范围）。
 
-## G2 发行自举 — CI APK 已强制携带绑定载荷，运行时升级语义未完成
+## G2 发行自举 — App 已消费 manifest 并按版本执行原子 rootfs 事务
 
-安装路径：从 `nativeLibraryDir/libminisd.so` 安装 `/data/adb/minis/bin/minisd`；从 APK `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz` 解到 `/data/adb/minis/runtime/staging/` 再原子替换 rootfs。无 root / 无载荷 fail-closed，不报假 Installed。
+CI 使用固定 NDK 构建 arm64 PIE `minisd`，并把它与可复现 rootfs、schema-v2 摘要 manifest 一起打入 Debug/Release APK；缺失、部分载荷或 APK 内摘要不匹配均失败关闭。
 
-CI 使用固定 NDK 构建 arm64 PIE `minisd`，并把它与可复现 rootfs、schema-v2 摘要 manifest 一起打入 Debug/Release APK；缺失、部分载荷或 APK 内摘要不匹配均失败关闭。仍待：App 在安装/启动时消费 manifest 并按版本执行原子升级/回滚；真机验收首装、升级与中断恢复。
+App 启动时读取并严格校验 APK 内 `runtime-manifest.json`，验证 `nativeLibraryDir/libminisd.so` 与 rootfs 载荷的 SHA-256 和 rootfs 布局。首次安装、版本变化或 rootfs 损坏时，经 `/data/adb/minis/runtime/`（`staging/`、`previous/`、`pending.json`、`deployed.json`）执行唯一运行时分发事务：停 keeper → 解压到 staging 并校验 → 原子切换 canonical `/data/adb/minis/rootfs` → 失败回滚 previous → 成功后写入 deployed identity 并清除 pending。App 被杀可从 pending 恢复或回滚；用户数据目录不参与任何替换。
+
+仍待：把 provision（python3/git/curl）与 requiredCommands 健康检查绑定到升级回滚语义；真机验收首装、升级、中断恢复、SELinux enforcing 与持久化非 tmpfs。
 
 ## G3 身份未迁
 

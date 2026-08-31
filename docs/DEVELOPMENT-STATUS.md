@@ -48,6 +48,8 @@ Ubuntu 24.04 userspace
 
 Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs checksum and reproducibility, Android arm64 minisd cross-compilation, bound runtime-manifest generation, Android unit tests, Debug/Release lint, verified Debug/Release runtime packaging, fail-closed release signing, and release APK verification.
 
+Runtime distribution on device consumes the APK schema-v2 manifest, verifies the packaged minisd/rootfs digests, and runs a single atomic rootfs transaction (`staging`/`previous`/`pending.json`/`deployed.json`) with interrupted-upgrade recovery and rollback, while the canonical guest rootfs stays at `/data/adb/minis/rootfs`.
+
 ## Current risk areas
 
 Priorities include provider/network transport boundaries, foreground-service lifecycle correctness, explicit capability state, process-death recovery, root/SELinux/device-specific compatibility, and reduction of historical lint debt.
