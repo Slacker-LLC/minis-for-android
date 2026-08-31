@@ -250,6 +250,8 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         context: Context,
         runner: RootRunner,
         stopKeeper: suspend () -> Boolean,
+        startKeeper: suspend () -> Boolean,
+        provision: suspend () -> Boolean,
     ): DeploymentResult {
         val manifest = try {
             context.assets.open(RuntimePayloadVerifier.MANIFEST_ASSET)
@@ -265,7 +267,7 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         if (!payload.ok) {
             return DeploymentResult(DeploymentOutcome.PAYLOAD_INVALID, payload.error.orEmpty())
         }
-        return ensureDeployedCore(manifest, context.packageName, runner, stopKeeper)
+        return ensureDeployedCore(manifest, context.packageName, runner, stopKeeper, startKeeper, provision)
     }
 
     internal suspend fun ensureDeployedCore(
@@ -273,6 +275,8 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         packageName: String,
         runner: RootRunner,
         stopKeeper: suspend () -> Boolean,
+        startKeeper: suspend () -> Boolean = { true },
+        provision: suspend () -> Boolean = { true },
     ): DeploymentResult {
         val rootCheck = runner.run("id -u")
         if (!rootCheck.completed || rootCheck.exitCode != 0) {
@@ -304,13 +308,12 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
                 previousHealthy = probeRootfs(runner, PREVIOUS_ROOTFS).healthy,
             )) {
                 RecoveryDecision.COMPLETE -> {
-                    if (!writeDeployed(runner, manifest)) {
+                    if (!completeInterruptedUpgrade(runner, manifest, startKeeper, provision)) {
                         return DeploymentResult(
                             DeploymentOutcome.FAILED,
-                            "cannot record deployed identity after interrupted upgrade",
+                            "interrupted upgrade could not be provisioned; retry or inspect pending state",
                         )
                     }
-                    runner.run(clearStateFileCommand(PENDING_FILE))
                     DeploymentResult(
                         DeploymentOutcome.RECOVERED,
                         "completed interrupted upgrade to ${pending.targetRootfsVersion}",
@@ -332,7 +335,7 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
                 }
                 RecoveryDecision.REDEPLOY -> {
                     runner.run(clearStateFileCommand(PENDING_FILE))
-                    deployNew(manifest, packageName, runner, stopKeeper)
+                    deployNew(manifest, packageName, runner, stopKeeper, startKeeper, provision)
                 }
             }
         }
@@ -347,7 +350,7 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
                 )
             }
         }
-        return deployNew(manifest, packageName, runner, stopKeeper)
+        return deployNew(manifest, packageName, runner, stopKeeper, startKeeper, provision)
     }
 
     private suspend fun deployNew(
@@ -355,6 +358,8 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         packageName: String,
         runner: RootRunner,
         stopKeeper: suspend () -> Boolean,
+        startKeeper: suspend () -> Boolean,
+        provision: suspend () -> Boolean,
     ): DeploymentResult {
         val transactionId = "tx-${System.currentTimeMillis()}-${(0..0xFFFFFF).random()}"
         val pending = PendingTransaction(
@@ -397,6 +402,16 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
             runner.run(rollbackRootfsCommand())
             return fail("deployed rootfs does not match manifest: ${health.detail}")
         }
+        if (!startKeeper()) {
+            stopKeeper()
+            rollbackAfterFailedProvision(runner)
+            return fail("cannot start keeper after rootfs switch")
+        }
+        if (!provision()) {
+            stopKeeper()
+            rollbackAfterFailedProvision(runner)
+            return fail("provision failed on deployed rootfs; rolled back to previous")
+        }
         if (!writeDeployed(runner, manifest)) {
             return DeploymentResult(
                 DeploymentOutcome.FAILED,
@@ -408,6 +423,33 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
             DeploymentOutcome.DEPLOYED,
             "deployed ${manifest.rootfsVersion}",
         )
+    }
+
+    private suspend fun completeInterruptedUpgrade(
+        runner: RootRunner,
+        manifest: RuntimeDistributionManifest,
+        startKeeper: suspend () -> Boolean,
+        provision: suspend () -> Boolean,
+    ): Boolean {
+        if (!startKeeper()) {
+            rollbackAfterFailedProvision(runner)
+            return false
+        }
+        if (!provision()) {
+            rollbackAfterFailedProvision(runner)
+            return false
+        }
+        if (!writeDeployed(runner, manifest)) {
+            rollbackAfterFailedProvision(runner)
+            return false
+        }
+        runner.run(clearStateFileCommand(PENDING_FILE))
+        return true
+    }
+
+    private fun rollbackAfterFailedProvision(runner: RootRunner) {
+        runner.run(rollbackRootfsCommand())
+        runner.run(clearStateFileCommand(PENDING_FILE))
     }
 
     private fun readPending(runner: RootRunner): PendingTransaction? =

@@ -544,6 +544,110 @@ class RuntimeDistributionManagerTest {
         assertTrue(stageAt in 0 until deployAt)
         assertTrue(stopRan)
     }
+
+    @Test
+    fun `provision failure on fresh deploy rolls back and clears pending`() = runBlocking {
+        val runner = FakeRunner(
+            canonicalMetadata = null,
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+        var started = false
+        var stopped = false
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { stopped = true; true },
+            startKeeper = { started = true; true },
+            provision = { false },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("provision failed"))
+        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
+        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+        assertFalse(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
+        assertTrue(started)
+        assertTrue(stopped)
+    }
+
+    @Test
+    fun `start keeper failure on fresh deploy rolls back and clears pending`() = runBlocking {
+        val runner = FakeRunner(
+            canonicalMetadata = null,
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { true },
+            startKeeper = { false },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
+        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+    }
+
+    @Test
+    fun `interrupted upgrade completes only after provision succeeds`() = runBlocking {
+        val manifest = manifest()
+        val runner = FakeRunner(
+            canonicalMetadata = healthyMetadataJson(),
+            pendingContent = PendingTransaction(
+                transactionId = "tx-9",
+                targetRootfsVersion = manifest.rootfsVersion,
+                targetRootfsSha256 = rootfsSha,
+                targetMinisdSha256 = minisdSha,
+            ).toJson(),
+        )
+        var provisionCalls = 0
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest,
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { provisionCalls += 1; true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.RECOVERED, result.outcome)
+        assertEquals(1, provisionCalls)
+        assertTrue(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
+        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+    }
+
+    @Test
+    fun `interrupted upgrade rolls back when provision fails`() = runBlocking {
+        val manifest = manifest()
+        val runner = FakeRunner(
+            canonicalMetadata = healthyMetadataJson(),
+            pendingContent = PendingTransaction(
+                transactionId = "tx-9",
+                targetRootfsVersion = manifest.rootfsVersion,
+                targetRootfsSha256 = rootfsSha,
+                targetMinisdSha256 = minisdSha,
+            ).toJson(),
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest,
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
+        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+        assertFalse(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
+    }
 }
 
 private val upstream = RuntimeDistributionManifest.PINNED_UPSTREAM_SHA256
