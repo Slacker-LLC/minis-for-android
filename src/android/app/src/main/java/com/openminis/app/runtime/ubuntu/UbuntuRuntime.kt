@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -115,31 +116,41 @@ object UbuntuRuntime {
         }
         var cur = apply(broker)
 
-        // Rootfs health is authoritative and metadata/layout based. If a keeper
-        // is still alive on a damaged tree, stop it before an atomic replacement.
-        val rootfs = RootfsManager.getInstance(ctx)
-        var health = rootfs.checkHealth()
-        if (!health.healthy) {
-            if (cur.running) {
-                cur = apply(client.ubuntuStop())
-                if (cur.running) {
-                    return@withLock failStructured(
-                        MinisdProtocol.ERROR_ROOTFS_INVALID,
-                        "cannot stop keeper before rootfs recovery",
-                    )
-                }
-            }
-            rootfs.installIfNeeded()
-            health = rootfs.checkHealth()
-            if (!health.healthy) {
-                val code = if (health.code == RootfsHealthCode.ROOT_UNAVAILABLE) {
-                    MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE
-                } else {
-                    MinisdProtocol.ERROR_ROOTFS_INVALID
-                }
-                return@withLock failStructured(code, health.detail)
-            }
-            cur = refresh()
+        // RuntimeDistributionManager is the single owner of runtime deployment,
+        // upgrade, and rollback. It consumes the APK manifest, recovers an
+        // interrupted switch from pending.json, and never touches user data.
+        val deployment = com.openminis.app.runtime.distribution.RuntimeDistributionManager
+            .ensureDeployed(
+                context = ctx,
+                runner = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootRunner {
+                        command ->
+                    runBlocking { runRoot(command) }
+                },
+                stopKeeper = {
+                    if (cur.running) {
+                        val stopped = apply(client.ubuntuStop())
+                        !stopped.running
+                    } else {
+                        true
+                    }
+                },
+            )
+        when (deployment.outcome) {
+            com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome
+                .ROOT_UNAVAILABLE,
+            com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome
+                .PAYLOAD_INVALID,
+            -> return@withLock failStructured(
+                MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                deployment.detail,
+            )
+            com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome
+                .FAILED,
+            -> return@withLock failStructured(
+                MinisdProtocol.ERROR_ROOTFS_INVALID,
+                deployment.detail,
+            )
+            else -> Unit
         }
 
         if (cur.running && runtimeLayoutMatches(cur)) {
@@ -318,6 +329,63 @@ object UbuntuRuntime {
         return if (ok && result.has("uid") && !result.isNull("uid")) result.optInt("uid") else null
     }
 
+    private fun findSu(): String? = listOf(
+        "/system/bin/su",
+        "/system/xbin/su",
+        "/sbin/su",
+        "/su/bin/su",
+        "/data/adb/ksu/bin/su",
+        "/debug_ramdisk/su",
+    ).firstOrNull { java.io.File(it).canExecute() }
+        ?: System.getenv("PATH").orEmpty()
+            .split(java.io.File.pathSeparatorChar)
+            .asSequence()
+            .map { java.io.File(it, "su") }
+            .firstOrNull { it.canExecute() }
+            ?.absolutePath
+
+    private suspend fun runRoot(
+        command: String,
+        timeoutMs: Long = 30_000,
+    ): com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootCommandResult =
+        withContext(Dispatchers.IO) {
+            val su = findSu()
+                ?: return@withContext com.openminis.app.runtime.distribution
+                    .RuntimeDistributionManager.RootCommandResult(
+                        completed = false,
+                        exitCode = -1,
+                        output = "",
+                        error = "no executable su found",
+                    )
+            var process: Process? = null
+            try {
+                process = ProcessBuilder(su, "-c", command)
+                    .redirectErrorStream(true)
+                    .start()
+                if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+                    process.destroyForcibly()
+                    process.waitFor(1, TimeUnit.SECONDS)
+                    return@withContext com.openminis.app.runtime.distribution
+                        .RuntimeDistributionManager.RootCommandResult(
+                            completed = false,
+                            exitCode = -1,
+                            output = "",
+                            error = "root command timed out",
+                        )
+                }
+                val output = runCatching {
+                    process.inputStream.bufferedReader().use { it.readText().trim() }
+                }.getOrDefault("")
+                com.openminis.app.runtime.distribution.RuntimeDistributionManager
+                    .RootCommandResult(true, process.exitValue(), output)
+            } catch (t: Throwable) {
+                com.openminis.app.runtime.distribution.RuntimeDistributionManager
+                    .RootCommandResult(false, -1, "", t.message)
+            } finally {
+                process?.destroy()
+            }
+        }
+
     private suspend fun ensureMinisdUp(forceRestart: Boolean): BrokerStartResult =
         withContext(Dispatchers.IO) {
             val ctx = appContext
@@ -325,20 +393,7 @@ object UbuntuRuntime {
             if (forceRestart) {
                 runCatching { client.ubuntuStop() }
             }
-            val su = listOf(
-                "/system/bin/su",
-                "/system/xbin/su",
-                "/sbin/su",
-                "/su/bin/su",
-                "/data/adb/ksu/bin/su",
-                "/debug_ramdisk/su",
-            ).firstOrNull { java.io.File(it).canExecute() }
-                ?: System.getenv("PATH").orEmpty()
-                    .split(java.io.File.pathSeparatorChar)
-                    .asSequence()
-                    .map { java.io.File(it, "su") }
-                    .firstOrNull { it.canExecute() }
-                    ?.absolutePath
+            val su = findSu()
                 ?: return@withContext BrokerStartResult(
                     false,
                     "Root unavailable: no executable su found; grant this app access in KernelSU/Magisk",
