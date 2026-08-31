@@ -33,7 +33,7 @@ expect_failure checksum_unavailable \
       BASE_URL="file://$TMP/unavailable-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/does-not-exist/SHA256SUMS" \
       WORK="$TMP/work-unavailable" DIST="$TMP/dist-unavailable" \
-      "$BUILD"
+      bash "$BUILD"
 
 # 2) The exact requested archive must exist in SHA256SUMS.
 mkdir -p "$TMP/missing-src"
@@ -44,7 +44,7 @@ expect_failure checksum_entry_missing \
       BASE_URL="file://$TMP/missing-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/missing-src/SHA256SUMS" \
       WORK="$TMP/work-missing" DIST="$TMP/dist-missing" \
-      "$BUILD"
+      bash "$BUILD"
 
 # 3) A downloaded archive whose bytes do not match the pinned/upstream digest
 # must fail before extraction.
@@ -56,7 +56,7 @@ expect_failure checksum_mismatch \
       BASE_URL="file://$TMP/mismatch-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/mismatch-src/SHA256SUMS" \
       WORK="$TMP/work-mismatch" DIST="$TMP/dist-mismatch" \
-      "$BUILD"
+      bash "$BUILD"
 
 # 4) Identical valid inputs must produce the same final privileged rootfs.
 mkdir -p "$TMP/valid-rootfs/etc" "$TMP/valid-rootfs/bin"
@@ -74,7 +74,7 @@ for run in one two; do
       BASE_URL="file://$TMP/valid-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/valid-src/SHA256SUMS" \
       WORK="$TMP/work-$run" DIST="$TMP/dist-$run" \
-      "$BUILD" >"$TMP/reproducible-$run.log"
+      bash "$BUILD" >"$TMP/reproducible-$run.log"
 done
 cmp "$TMP/dist-one/ubuntu-arm64-rootfs.tar.gz" "$TMP/dist-two/ubuntu-arm64-rootfs.tar.gz"
 cmp "$TMP/dist-one/ubuntu-arm64-rootfs.manifest.json" "$TMP/dist-two/ubuntu-arm64-rootfs.manifest.json"

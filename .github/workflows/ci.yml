@@ -140,7 +140,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install pinned Android NDK and Rust target
         run: |
-          sdkmanager "ndk;27.0.12077973"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973"
           rustup target add aarch64-linux-android
       - name: Build and verify runtime payload
         run: bash scripts/build-runtime-payload.sh

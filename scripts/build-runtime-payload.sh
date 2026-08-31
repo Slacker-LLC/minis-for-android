@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
 export DIST
 
-"$ROOT/scripts/build-minisd-android.sh"
-"$ROOT/scripts/build-ubuntu-rootfs.sh"
+bash "$ROOT/scripts/build-minisd-android.sh"
+bash "$ROOT/scripts/build-ubuntu-rootfs.sh"
 
 python3 - "$ROOT" "$DIST" <<'PY'
 import hashlib
@@ -64,4 +64,4 @@ manifest = {
 )
 PY
 
-"$ROOT/scripts/verify-runtime-payload.sh" "$DIST"
+bash "$ROOT/scripts/verify-runtime-payload.sh" "$DIST"
