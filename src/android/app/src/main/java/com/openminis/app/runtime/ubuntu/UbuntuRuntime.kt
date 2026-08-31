@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
     private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
+    private const val PROVISION_TIMEOUT_MS = 600_000L
 
     data class Snapshot(
         val running: Boolean = false,
@@ -134,6 +135,29 @@ object UbuntuRuntime {
                         true
                     }
                 },
+                startKeeper = {
+                    val started = apply(
+                        client.ubuntuStart(
+                            workspace = UbuntuPaths.hostWorkspace,
+                            memory = UbuntuPaths.hostMemory,
+                            skills = UbuntuPaths.hostSkills,
+                            shared = UbuntuPaths.hostShared,
+                            sessionsRoot = UbuntuPaths.hostSessions,
+                        ),
+                    )
+                    started.running
+                },
+                provision = {
+                    val response = runCatching {
+                        client.ubuntuProvision(PROVISION_TIMEOUT_MS)
+                    }.getOrElse {
+                        MinisdProtocol.runtimeError(
+                            MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                            "provision transport failed: ${it.message}",
+                        )
+                    }
+                    response.ok
+                },
             )
         when (deployment.outcome) {
             com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome
@@ -153,6 +177,7 @@ object UbuntuRuntime {
             else -> Unit
         }
 
+        cur = refresh()
         if (cur.running && runtimeLayoutMatches(cur)) {
             redirectPaths = true
             return@withLock cur
