@@ -151,7 +151,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5.0.2
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Prepare Gradle wrapper
@@ -176,7 +176,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5.0.2
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Prepare Gradle wrapper
