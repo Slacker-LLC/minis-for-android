@@ -31,6 +31,7 @@ class MinisdClient(
     private val cancellations = ExecutionCancellationRegistry()
 
     suspend fun ping(): MinisdResponse = call(MinisdProtocol.ping(nextId()))
+    suspend fun rootProbe(): MinisdResponse = call(MinisdProtocol.rootProbe(nextId()))
     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
 
     suspend fun ubuntuStart(
@@ -88,6 +89,29 @@ class MinisdClient(
     ): MinisdResponse = try {
         call(
             MinisdProtocol.rootExec(tool, args, timeoutMs, nextId(), executionId),
+            timeoutMs + 5_000,
+            cancellationKey = executionId,
+        )
+    } finally {
+        cancellations.clearExecution(executionId)
+    }
+
+    suspend fun rootFullExec(
+        tool: String,
+        args: List<String> = emptyList(),
+        timeoutMs: Long = 30_000,
+        confirmId: String? = null,
+        executionId: String = newExecutionId("root-full"),
+    ): MinisdResponse = try {
+        call(
+            MinisdProtocol.rootFullExec(
+                tool = tool,
+                args = args,
+                timeoutMs = timeoutMs,
+                confirmId = confirmId,
+                id = nextId(),
+                executionId = executionId,
+            ),
             timeoutMs + 5_000,
             cancellationKey = executionId,
         )

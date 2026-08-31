@@ -1,9 +1,15 @@
 package com.openminis.app.tools.android
 
 import android.content.Context
-import android.os.SystemClock
+import android.util.Log
+import com.openminis.app.runtime.minisd.MinisdClient
+import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.runtime.minisd.MinisdResponse
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.ApprovalSeam
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -91,16 +97,14 @@ object LinuxCapabilityParser {
     }
 }
 
-/** Direct `su` backend. Passive detection never starts `su`. */
+/** Passive Root discovery and the last broker-backed probe result. */
 object RootCommandRunner {
-    private const val MAX_CAPTURE_CHARS = 1_048_576
     private val knownPaths = listOf(
         "/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su",
         "/data/adb/ksu/bin/su", "/debug_ramdisk/su",
     )
 
     @Volatile private var lastProbe: RootProbeResult? = null
-    @Volatile private var lastProbeElapsed: Long = 0L
 
     fun passiveSuPath(): String? {
         knownPaths.firstOrNull { File(it).canExecute() }?.let { return it }
@@ -111,55 +115,30 @@ object RootCommandRunner {
 
     fun cachedProbe(): RootProbeResult? = lastProbe
 
-    suspend fun activeProbe(): RootProbeResult = withContext(Dispatchers.IO) {
-        val command = """
-            printf '__ID__\n'; id
-            printf '__CAPS__\n'; grep '^CapEff:' /proc/self/status 2>/dev/null || true
-            printf '__CONTEXT__\n'; (id -Z 2>/dev/null || cat /proc/self/attr/current 2>/dev/null || echo unknown)
-            printf '__MODE__\n'; (getenforce 2>/dev/null || echo unknown)
-        """.trimIndent()
-        val result = runSu(command, 15_000L)
-        RootProbeParser.parse(result.stdout, result.exitCode, result.stderr).also {
-            lastProbe = it
-            lastProbeElapsed = SystemClock.elapsedRealtime()
-        }
+    internal fun updateProbe(probe: RootProbeResult) {
+        lastProbe = probe
     }
+}
+
+/** App-UID process fallback for public commands such as logcat; never invokes `su`. */
+internal object AppCommandRunner {
+    private const val MAX_CAPTURE_CHARS = 1_048_576
 
     suspend fun run(argv: List<String>, timeoutMs: Long): AndroidCommandResult = withContext(Dispatchers.IO) {
-        if (cachedProbe()?.authorized != true) {
-            return@withContext AndroidCommandResult(
-                backend = PrivilegedBackend.NONE,
-                exitCode = 126,
-                stdout = "",
-                stderr = "",
-                unavailableReason = "root authorization has not been actively granted",
-            )
-        }
-        runSu(shellJoin(argv), timeoutMs)
-    }
-
-    private fun runSu(command: String, timeoutMs: Long): AndroidCommandResult {
-        val su = passiveSuPath() ?: return AndroidCommandResult(
-            PrivilegedBackend.NONE, 127, "", "", unavailableReason = "su executable not found",
-        )
-        return runProcess(listOf(su, "-c", command), timeoutMs, PrivilegedBackend.ROOT)
-    }
-
-    internal fun shellJoin(argv: List<String>): String = argv.joinToString(" ") { value ->
-        "'" + value.replace("'", "'\\''") + "'"
-    }
-
-    internal fun runProcess(
-        argv: List<String>,
-        timeoutMs: Long,
-        backend: PrivilegedBackend,
-    ): AndroidCommandResult {
-        return try {
+        try {
             val process = ProcessBuilder(argv).start()
             val stdout = BoundedText(MAX_CAPTURE_CHARS)
             val stderr = BoundedText(MAX_CAPTURE_CHARS)
-            val outThread = Thread { process.inputStream.bufferedReader().useLines { lines -> lines.forEach { stdout.appendLine(it) } } }
-            val errThread = Thread { process.errorStream.bufferedReader().useLines { lines -> lines.forEach { stderr.appendLine(it) } } }
+            val outThread = Thread {
+                process.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { stdout.appendLine(it) }
+                }
+            }
+            val errThread = Thread {
+                process.errorStream.bufferedReader().useLines { lines ->
+                    lines.forEach { stderr.appendLine(it) }
+                }
+            }
             outThread.isDaemon = true
             errThread.isDaemon = true
             outThread.start()
@@ -169,31 +148,37 @@ object RootCommandRunner {
             outThread.join(2_000L)
             errThread.join(2_000L)
             AndroidCommandResult(
-                backend = backend,
+                backend = PrivilegedBackend.NONE,
                 exitCode = if (exited) process.exitValue() else 124,
                 stdout = stdout.value(),
                 stderr = stderr.value(),
                 timedOut = !exited,
             )
         } catch (t: Throwable) {
-            AndroidCommandResult(backend, -1, "", t.message.orEmpty())
+            AndroidCommandResult(PrivilegedBackend.NONE, -1, "", t.message.orEmpty())
         }
     }
 
     private class BoundedText(private val maxChars: Int) {
         private val value = StringBuilder()
-        @Synchronized fun appendLine(line: String) {
+
+        @Synchronized
+        fun appendLine(line: String) {
             if (value.length >= maxChars) return
             val remaining = maxChars - value.length
             value.append(line.take((remaining - 1).coerceAtLeast(0)))
             if (remaining > 0) value.append('\n')
         }
-        @Synchronized fun value(): String = value.toString().trimEnd()
+
+        @Synchronized
+        fun value(): String = value.toString().trimEnd()
     }
 }
 
 /** Unified seam only for operations that genuinely need shell privilege. */
 object PrivilegedCommandRunner {
+    private const val TAG = "PrivilegedCommand"
+
     suspend fun run(
         context: Context,
         sessionId: String,
@@ -204,36 +189,61 @@ object PrivilegedCommandRunner {
         rootOnly: Boolean = false,
     ): AndroidCommandResult {
         require(argv.isNotEmpty()) { "privileged command argv must not be empty" }
-        if (risk == CommandRisk.MUTATING || risk == CommandRisk.ROOT_SETUP) {
-            val decision = ApprovalSeam.request(
-                context,
-                sessionId,
-                "android_privileged",
-                "$operation\n\n${argv.joinToString(" ")}",
-            )
-            if (decision.decision != "allowed-once") {
-                return AndroidCommandResult(
-                    PrivilegedBackend.NONE, 126, "", "",
-                    unavailableReason = "operation was not approved (${decision.decision})",
+        val mode = PrivilegedAccessModeStore.get(context)
+        val tool = argv.first()
+        val commandArgs = argv.drop(1)
+        val executionId = MinisdClient.newExecutionId("root")
+        Log.i(TAG, "dispatch mode=${mode.wireValue} operation=$operation tool=$tool executionId=$executionId")
+
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        val broker = UbuntuRuntime.ensureBrokerReady()
+        if (!broker.ok) return broker.toCommandResult(rootOnly)
+
+        return try {
+            when (mode) {
+                PrivilegedAccessMode.STANDARD -> {
+                    val standard = UbuntuRuntime.client.rootExec(
+                        tool = tool,
+                        args = commandArgs,
+                        timeoutMs = timeoutMs,
+                        executionId = executionId,
+                    )
+                    if (standard.code != MinisdProtocol.ERROR_POLICY_DENIED) {
+                        standard.toCommandResult(rootOnly)
+                    } else {
+                        executeFull(
+                            context = context,
+                            sessionId = sessionId,
+                            tool = tool,
+                            args = commandArgs,
+                            operation = operation,
+                            risk = risk,
+                            timeoutMs = timeoutMs,
+                            executionId = executionId,
+                            requireUserApproval = true,
+                            rootOnly = rootOnly,
+                        )
+                    }
+                }
+                PrivilegedAccessMode.FULL_ACCESS -> executeFull(
+                    context = context,
+                    sessionId = sessionId,
+                    tool = tool,
+                    args = commandArgs,
+                    operation = operation,
+                    risk = risk,
+                    timeoutMs = timeoutMs,
+                    executionId = executionId,
+                    requireUserApproval = false,
+                    rootOnly = rootOnly,
                 )
             }
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) {
+                runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
+            }
+            throw cancelled
         }
-
-        if (RootCommandRunner.cachedProbe()?.authorized == true) {
-            return RootCommandRunner.run(argv, timeoutMs)
-        }
-        // Shizuku backend removed (P3 Root-only): never fall back to Shizuku.
-        return AndroidCommandResult(
-            PrivilegedBackend.NONE,
-            126,
-            "",
-            "",
-            unavailableReason = if (rootOnly) {
-                "authorized root with the required capability is unavailable"
-            } else {
-                "authorized root is unavailable"
-            },
-        )
     }
 
     /** Explicit root authorization probe. Never called by passive capability reads. */
@@ -250,6 +260,128 @@ object PrivilegedCommandRunner {
         if (decision.decision != "allowed-once") {
             return RootProbeResult(false, error = "root probe was not approved (${decision.decision})")
         }
-        return RootCommandRunner.activeProbe()
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        val broker = UbuntuRuntime.ensureBrokerReady()
+        val probe = if (broker.ok) {
+            UbuntuRuntime.client.rootProbe().toRootProbe()
+        } else {
+            RootProbeResult(
+                authorized = false,
+                error = "${broker.error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: " +
+                    (broker.error?.detail ?: "minisd broker unavailable"),
+            )
+        }
+        RootCommandRunner.updateProbe(probe)
+        return probe
+    }
+
+    private suspend fun executeFull(
+        context: Context,
+        sessionId: String,
+        tool: String,
+        args: List<String>,
+        operation: String,
+        risk: CommandRisk,
+        timeoutMs: Long,
+        executionId: String,
+        requireUserApproval: Boolean,
+        rootOnly: Boolean,
+    ): AndroidCommandResult {
+        val challenged = UbuntuRuntime.client.rootFullExec(
+            tool = tool,
+            args = args,
+            timeoutMs = timeoutMs,
+            executionId = executionId,
+        )
+        if (challenged.code != MinisdProtocol.ERROR_CONFIRM_REQUIRED) {
+            return challenged.toCommandResult(rootOnly)
+        }
+        val confirmId = challenged.error?.confirmId
+            ?: return AndroidCommandResult(
+                PrivilegedBackend.NONE,
+                126,
+                "",
+                "",
+                unavailableReason = "CONFIRM_REQUIRED response omitted confirm_id",
+            )
+        if (requireUserApproval) {
+            val decision = ApprovalSeam.request(
+                context,
+                sessionId,
+                "android_privileged",
+                "$operation (${risk.name.lowercase()})\n\ntool=$tool\nargs=${args.joinToString(prefix = "[", postfix = "]")}",
+            )
+            if (decision.decision != "allowed-once") {
+                return AndroidCommandResult(
+                    PrivilegedBackend.NONE,
+                    126,
+                    "",
+                    "",
+                    unavailableReason = "operation was not approved (${decision.decision})",
+                )
+            }
+        }
+        return UbuntuRuntime.client.rootFullExec(
+            tool = tool,
+            args = args,
+            timeoutMs = timeoutMs,
+            confirmId = confirmId,
+            executionId = executionId,
+        ).toCommandResult(rootOnly)
+    }
+
+    private fun MinisdResponse.toCommandResult(rootOnly: Boolean): AndroidCommandResult {
+        if (!ok) {
+            val code = error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE
+            return AndroidCommandResult(
+                backend = PrivilegedBackend.NONE,
+                exitCode = 126,
+                stdout = "",
+                stderr = "",
+                timedOut = code == "TOOL_TIMEOUT" || code == "TIMEOUT",
+                unavailableReason = "$code: ${error?.detail ?: if (rootOnly) "required Root capability is unavailable" else "Root execution failed"}",
+            )
+        }
+        val payload = result
+            ?: return AndroidCommandResult(
+                PrivilegedBackend.NONE,
+                126,
+                "",
+                "",
+                unavailableReason = "malformed minisd Root response",
+            )
+        return AndroidCommandResult(
+            backend = PrivilegedBackend.ROOT,
+            exitCode = payload.optInt("exit_code", 1),
+            stdout = payload.optString("stdout"),
+            stderr = payload.optString("stderr"),
+        )
+    }
+
+    private fun MinisdResponse.toRootProbe(): RootProbeResult {
+        if (!ok) {
+            return RootProbeResult(
+                authorized = false,
+                error = "${error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: ${error?.detail ?: "Root probe failed"}",
+            )
+        }
+        val payload = result ?: return RootProbeResult(false, error = "malformed minisd root.probe response")
+        val groupsJson = payload.optJSONArray("groups")
+        val groups = buildList {
+            if (groupsJson != null) {
+                for (index in 0 until groupsJson.length()) add(groupsJson.optInt(index).toString())
+            }
+        }
+        val uid = payload.optInt("uid", -1).takeIf { it >= 0 }
+        return RootProbeResult(
+            authorized = uid == 0,
+            effectiveUid = uid,
+            effectiveGid = payload.optInt("gid", -1).takeIf { it >= 0 },
+            groups = groups,
+            effectiveCapabilitiesHex = payload.optString("capEff").ifBlank { null },
+            selinuxContext = payload.optString("selinux").ifBlank { null },
+            selinuxMode = if (payload.optBoolean("enforcing")) "Enforcing" else "Permissive",
+            error = if (uid == 0) null else "minisd broker is not running as uid 0",
+        )
     }
 }

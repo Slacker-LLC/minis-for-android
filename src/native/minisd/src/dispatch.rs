@@ -1,5 +1,5 @@
 use crate::auth::{check_hello, check_peer, PeerCred};
-use crate::exec::{parse_exec, run_exec, validate_exec};
+use crate::exec::{parse_exec, parse_full_exec, run_exec, run_full_exec, validate_exec};
 use crate::path_guard::resolve_workspace;
 use crate::policy::{decide_method, MethodPolicy, Mode};
 use crate::probe::{live_probe, mock_probe};
@@ -45,14 +45,19 @@ pub fn authorize_request(
         Ok(d) => d,
         Err(code) => return Err(Response::err(req.id, code, "policy denied")),
     };
+    if req.method == "root.fullExec" {
+        if let Err(code) = parse_full_exec(&req.params) {
+            return Err(Response::err(req.id, code, "bad full exec params"));
+        }
+    }
     if decision.mode == Mode::Confirm {
         match req.confirm_id.as_deref() {
             None => {
-                let cid = state.issue_confirm(&req.method);
+                let cid = state.issue_confirm(&req.method, &req.params);
                 return Err(Response::confirm(req.id, cid));
             }
             Some(cid) => {
-                if let Err(code) = state.consume_confirm(cid, &req.method) {
+                if let Err(code) = state.consume_confirm(cid, &req.method, &req.params) {
                     return Err(Response::err(req.id, code, "invalid or reused confirm_id"));
                 }
             }
@@ -200,6 +205,7 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
         "root.exec" => {
             execute_root_authorized(state.mock, state.policy.method("root.exec").cloned(), req)
         }
+        "root.fullExec" => execute_full_root_authorized(state.mock, req),
         "root.shellRaw" => {
             Response::err(req.id, ErrorCode::PolicyDenied, "root.shellRaw is INTERNAL")
         }
@@ -342,6 +348,44 @@ pub fn execute_root_authorized(mock: bool, spec: Option<MethodPolicy>, req: &Req
             }),
         ),
         Err(code) => Response::err(req.id, code, "exec failed"),
+    }
+}
+
+/// Execute an already-confirmed root.fullExec without holding AppState.
+pub fn execute_full_root_authorized(mock: bool, req: &Request) -> Response {
+    let parsed = match parse_full_exec(&req.params) {
+        Ok(p) => p,
+        Err(code) => return Response::err(req.id, code, "bad full exec params"),
+    };
+    if mock {
+        let stdout = format!("{} {}", parsed.tool, parsed.args.join(" "));
+        return Response::ok(
+            req.id,
+            json!({
+                "exit_code": 0,
+                "stdout_bytes": stdout.len(),
+                "stderr_bytes": 0,
+                "stdout_truncated": false,
+                "stderr_truncated": false,
+                "stdout": stdout,
+                "stderr": ""
+            }),
+        );
+    }
+    match run_full_exec(&parsed) {
+        Ok(out) => Response::ok(
+            req.id,
+            json!({
+                "exit_code": out.exit_code,
+                "stdout": out.stdout,
+                "stderr": out.stderr,
+                "stdout_bytes": out.stdout_bytes,
+                "stderr_bytes": out.stderr_bytes,
+                "stdout_truncated": out.stdout_truncated,
+                "stderr_truncated": out.stderr_truncated
+            }),
+        ),
+        Err(code) => Response::err(req.id, code, "full exec failed"),
     }
 }
 
@@ -502,6 +546,51 @@ mod tests {
         third.confirm_id = Some(cid);
         let reuse = handle(&mut state, third, None);
         assert_eq!(reuse.error.unwrap().code, "POLICY_DENIED");
+    }
+
+    #[test]
+    fn standard_root_exec_allowlist_needs_no_confirmation() {
+        let mut state = AppState::new(true, PolicyFile::default_policy());
+        let response = handle(
+            &mut state,
+            req(
+                "root.exec",
+                json!({"tool":"getprop","args":["ro.product.model"]}),
+            ),
+            None,
+        );
+        assert!(response.ok);
+        assert!(state.confirms.is_empty());
+    }
+
+    #[test]
+    fn full_exec_confirmation_is_exact_and_one_shot() {
+        let mut state = AppState::new(true, PolicyFile::default_policy());
+        let params = json!({"tool":"sh","args":["-c","id"]});
+        let first = handle(&mut state, req("root.fullExec", params.clone()), None);
+        let cid = first.error.unwrap().confirm_id.unwrap();
+
+        let mut changed = req("root.fullExec", json!({"tool":"sh","args":["-c","reboot"]}));
+        changed.confirm_id = Some(cid.clone());
+        let mismatch = handle(&mut state, changed, None);
+        assert_eq!(mismatch.error.unwrap().code, "POLICY_DENIED");
+
+        let mut original = req("root.fullExec", params);
+        original.confirm_id = Some(cid);
+        let consumed = handle(&mut state, original, None);
+        assert_eq!(consumed.error.unwrap().code, "POLICY_DENIED");
+    }
+
+    #[test]
+    fn invalid_full_exec_never_issues_confirmation() {
+        let mut state = AppState::new(true, PolicyFile::default_policy());
+        let response = handle(
+            &mut state,
+            req("root.fullExec", json!({"command":"id"})),
+            None,
+        );
+        assert_eq!(response.error.unwrap().code, "BAD_PARAMS");
+        assert!(state.confirms.is_empty());
     }
 
     #[test]

@@ -22,9 +22,11 @@ App 与 minisd 均以 `/data/adb/minis/{workspace,sessions,memory,skills,shared,
 
 本轮文档框架不改 Gradle。
 
-## G4 Root 旁路
+## G4 Root 模式 — Agent 执行路径已对齐合同，剩余 bootstrap/recovery 缺口
 
-`PrivilegedCommandRunner` → `RootCommandRunner.run()` → `su -c`，不经过 `minisd root.exec` 白名单。`RootfsManager` 同样直接 `su -c`。Confirm 在 minisd 侧主要绑方法名，不绑完整 argv。
+Agent 发起的 Root 命令、`root.shell` 与主动 Root 探针已统一通过 `MinisdClient`；标准模式使用 `root.exec` 白名单，越权请求通过完整 `method + params` 绑定的一次性 `root.fullExec` 确认票重放。完全访问由 App 设置持有，Agent 请求不能切换，并在聊天页持续警告。
+
+仍保留的直接 `su -c` 仅位于可信 bootstrap/recovery 路径：安装/启动/探测 minisd、minisd `--call` 传输回退，以及安装或修复 rootfs。这些路径执行 App-owned 静态命令，不承载 Agent 提供的命令；后续 G2/G5 重构应继续缩小并审计该范围。
 
 ## G5 恢复语义
 

@@ -3,25 +3,23 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.minisd.MinisdClient
-import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.tools.android.CommandRisk
+import com.openminis.app.tools.android.PrivilegedCommandRunner
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-/** Structured Android-root execution; arbitrary root shell strings stay denied. */
+/** Structured Android Root execution governed by the user-owned access mode. */
 class RootShellHandler : ToolHandler {
 
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "root.shell",
-        description = "Run one allowlisted Android root tool through minisd root.exec. " +
-            "Use structured args only; arbitrary shell commands are not supported.",
+        description = "Run one Android Root tool through minisd using structured tool and args. " +
+            "Standard mode auto-runs read-only allowlisted requests and asks the user once for other exact requests. " +
+            "Only the user can enable Full Access in App settings.",
         parameters = mapOf(
-            "tool" to AgentToolParam("string", "Allowlisted executable", listOf("pm", "am", "settings", "dumpsys", "getprop", "mount")),
+            "tool" to AgentToolParam("string", "Executable name resolved only from trusted Android system directories"),
             "args" to AgentToolParam("array", "Arguments passed without shell parsing", items = AgentToolParam("string", "One argument")),
             "timeout_ms" to AgentToolParam("integer", "Timeout in ms (default 30000, max 120000)"),
         ),
@@ -52,40 +50,39 @@ class RootShellHandler : ToolHandler {
         val requestedMs = if (json.has("timeout_ms")) json.optLong("timeout_ms") else null
         val timeout = ToolTimeoutPolicy.resolve("root.shell", callerOverrideMs = requestedMs).timeoutMs
             ?: 30_000L
-        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
-        val executionId = MinisdClient.newExecutionId("root")
-        val response = try {
-            UbuntuRuntime.client.rootExec(tool, argv, timeout, executionId)
-        } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) {
-                runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
-            }
-            throw cancelled
-        }
-        if (!response.ok) {
-            val code = response.error?.code ?: "RUNTIME_UNAVAILABLE"
-            if (code == "USER_CANCELLATION") {
-                throw CancellationException(response.error?.detail ?: "root execution cancelled by user")
-            }
-            val kind = when (code) {
+        val response = PrivilegedCommandRunner.run(
+            context = context,
+            sessionId = sessionId,
+            argv = listOf(tool) + argv,
+            operation = "执行 Android Root 命令",
+            risk = CommandRisk.READ_ONLY,
+            timeoutMs = timeout,
+            rootOnly = true,
+        )
+        if (!response.success) {
+            val detail = response.unavailableReason ?: response.stderr.ifBlank { "Root execution failed" }
+            val code = detail.substringBefore(':')
+            val kind = when {
+                response.timedOut -> ToolFailureKind.TOOL_TIMEOUT
+                else -> when (code) {
                 "TOOL_TIMEOUT", "TIMEOUT" -> ToolFailureKind.TOOL_TIMEOUT
                 "TRANSPORT_TIMEOUT" -> ToolFailureKind.TRANSPORT_TIMEOUT
                 "PROCESS_KILLED" -> ToolFailureKind.PROCESS_KILLED
                 "CLEANUP_FAILURE" -> ToolFailureKind.CLEANUP_FAILURE
                 else -> null
+                }
             }
             return ToolExecutionResult(
-                output = "Error: $code: ${response.error?.detail ?: "minisd root.exec failed"}",
+                output = "Error: $detail",
                 success = false,
                 timedOut = kind == ToolFailureKind.TOOL_TIMEOUT,
                 failureKind = kind,
             )
         }
-        val result = response.result ?: return ToolExecutionResult("Error: malformed minisd root.exec result", false)
-        val stdout = result.optString("stdout")
-        val stderr = result.optString("stderr")
-        val exitCode = result.optInt("exit_code", 1)
-        val output = listOf(stdout, stderr).filter { it.isNotBlank() }.joinToString("\n")
-        return ToolExecutionResult(if (output.isBlank()) "(exit code: $exitCode)" else output, exitCode == 0)
+        val output = listOf(response.stdout, response.stderr).filter { it.isNotBlank() }.joinToString("\n")
+        return ToolExecutionResult(
+            if (output.isBlank()) "(exit code: ${response.exitCode})" else output,
+            response.exitCode == 0,
+        )
     }
 }

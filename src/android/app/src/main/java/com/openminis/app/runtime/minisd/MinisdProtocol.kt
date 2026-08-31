@@ -49,6 +49,8 @@ object MinisdProtocol {
     const val ERROR_PRIVILEGE_SETUP_FAILED = "PRIVILEGE_SETUP_FAILED"
     const val ERROR_EXEC_UNAVAILABLE = "EXEC_UNAVAILABLE"
     const val ERROR_RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
+    const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
+    const val ERROR_POLICY_DENIED = "POLICY_DENIED"
 
     private const val HELPER_NAMESPACE_FAILED = 4
     private const val HELPER_CHROOT_FAILED = 5
@@ -176,6 +178,9 @@ object MinisdProtocol {
 
     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
 
+    fun rootProbe(id: Long = 1): MinisdRequest =
+        MinisdRequest(id = id, method = "root.probe")
+
     fun ubuntuStatus(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.status")
 
@@ -247,6 +252,27 @@ object MinisdProtocol {
             .put("timeout_ms", timeoutMs)
         executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
         return MinisdRequest(id = id, method = "root.exec", params = params)
+    }
+
+    fun rootFullExec(
+        tool: String,
+        args: List<String> = emptyList(),
+        timeoutMs: Long = 30_000,
+        confirmId: String? = null,
+        id: Long = 1,
+        executionId: String? = null,
+    ): MinisdRequest {
+        val params = JSONObject()
+            .put("tool", tool)
+            .put("args", JSONArray(args))
+            .put("timeout_ms", timeoutMs)
+        executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+        return MinisdRequest(
+            id = id,
+            method = "root.fullExec",
+            params = params,
+            confirmId = confirmId,
+        )
     }
 
     fun ubuntuAdminExec(

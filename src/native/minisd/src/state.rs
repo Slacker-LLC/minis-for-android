@@ -7,6 +7,9 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 pub struct PendingConfirm {
     pub method: String,
+    /// A one-time approval is valid only for the exact structured request.
+    /// `serde_json::Value` object equality is independent of key order.
+    pub params: serde_json::Value,
     pub expires: Instant,
 }
 
@@ -118,12 +121,13 @@ impl AppState {
         self.clock += d;
     }
 
-    pub fn issue_confirm(&mut self, method: &str) -> String {
+    pub fn issue_confirm(&mut self, method: &str, params: &serde_json::Value) -> String {
         let id = format!("c-{}", self.confirms.len() + self.used_confirms.len() + 1);
         self.confirms.insert(
             id.clone(),
             PendingConfirm {
                 method: method.to_string(),
+                params: params.clone(),
                 expires: self.now() + Duration::from_secs(120),
             },
         );
@@ -134,22 +138,23 @@ impl AppState {
         &mut self,
         id: &str,
         method: &str,
+        params: &serde_json::Value,
     ) -> Result<(), crate::protocol::ErrorCode> {
         if self.used_confirms.contains_key(id) {
             return Err(crate::protocol::ErrorCode::PolicyDenied);
         }
-        let Some(p) = self.confirms.get(id) else {
+        let Some(p) = self.confirms.remove(id) else {
             return Err(crate::protocol::ErrorCode::PolicyDenied);
         };
-        if p.method != method {
-            return Err(crate::protocol::ErrorCode::PolicyDenied);
-        }
-        if p.expires <= self.now() {
-            self.confirms.remove(id);
-            return Err(crate::protocol::ErrorCode::PolicyDenied);
-        }
-        self.confirms.remove(id);
+        // Consume before validation. A mismatch, expiry, or replay can never
+        // leave the ticket usable for a later request.
         self.used_confirms.insert(id.to_string(), ());
+        if p.expires <= self.now() {
+            return Err(crate::protocol::ErrorCode::PolicyDenied);
+        }
+        if p.method != method || p.params != *params {
+            return Err(crate::protocol::ErrorCode::PolicyDenied);
+        }
         Ok(())
     }
 }
@@ -212,30 +217,66 @@ mod tests {
     use crate::protocol::ErrorCode;
 
     #[test]
-    fn t_u16_wrong_method_keeps_entry() {
+    fn wrong_method_consumes_confirmation() {
         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
-        let id = state.issue_confirm("root.exec");
+        let params = serde_json::json!({"argv":["/system/bin/id"]});
+        let id = state.issue_confirm("root.exec", &params);
         assert_eq!(
-            state.consume_confirm(&id, "other.method"),
+            state.consume_confirm(&id, "other.method", &params),
             Err(ErrorCode::PolicyDenied)
         );
-        assert!(state.confirms.contains_key(&id));
-        assert_eq!(state.consume_confirm(&id, "root.exec"), Ok(()));
         assert!(!state.confirms.contains_key(&id));
         assert!(state.used_confirms.contains_key(&id));
+        assert_eq!(
+            state.consume_confirm(&id, "root.exec", &params),
+            Err(ErrorCode::PolicyDenied)
+        );
+    }
+
+    #[test]
+    fn confirm_is_bound_to_exact_argv() {
+        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+        let params = serde_json::json!({"argv":["/system/bin/id"]});
+        let id = state.issue_confirm("root.fullExec", &params);
+        // Same confirm id, different argv -> denied.
+        assert_eq!(
+            state.consume_confirm(
+                &id,
+                "root.fullExec",
+                &serde_json::json!({"argv":["/system/bin/reboot"]}),
+            ),
+            Err(ErrorCode::PolicyDenied)
+        );
+        assert!(!state.confirms.contains_key(&id));
+        // The mismatched attempt consumed the ticket, including for the
+        // originally approved request.
+        assert_eq!(
+            state.consume_confirm(&id, "root.fullExec", &params),
+            Err(ErrorCode::PolicyDenied)
+        );
+    }
+
+    #[test]
+    fn confirm_params_are_order_independent() {
+        let a = serde_json::json!({"argv":["x"],"timeout_ms":1000});
+        let b = serde_json::json!({"timeout_ms":1000,"argv":["x"]});
+        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+        let id = state.issue_confirm("root.fullExec", &a);
+        assert_eq!(state.consume_confirm(&id, "root.fullExec", &b), Ok(()));
     }
 
     #[test]
     fn t_u16_expired_removed() {
         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
-        let id = state.issue_confirm("root.exec");
+        let params = serde_json::json!({});
+        let id = state.issue_confirm("root.exec", &params);
         state.advance(Duration::from_secs(121));
         assert_eq!(
-            state.consume_confirm(&id, "root.exec"),
+            state.consume_confirm(&id, "root.exec", &params),
             Err(ErrorCode::PolicyDenied)
         );
         assert!(!state.confirms.contains_key(&id));
-        assert!(!state.used_confirms.contains_key(&id));
+        assert!(state.used_confirms.contains_key(&id));
     }
 
     #[test]

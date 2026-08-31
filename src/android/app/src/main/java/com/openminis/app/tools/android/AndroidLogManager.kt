@@ -188,13 +188,11 @@ object AndroidLogManager {
         packageName: String?,
         knownPids: Set<Int>,
     ): CapturedLogs {
-        val privileged = if (RootCommandRunner.cachedProbe()?.authorized == true || ShizukuManagerReady.value()) {
-            PrivilegedCommandRunner.run(
-                context, sessionId, args, "读取 logcat", CommandRisk.READ_ONLY, 45_000L,
-            )
-        } else null
-        val rawResult = if (privileged?.success == true) privileged else {
-            RootCommandRunner.runProcess(args, 45_000L, PrivilegedBackend.NONE)
+        val privileged = PrivilegedCommandRunner.run(
+            context, sessionId, args, "读取 logcat", CommandRisk.READ_ONLY, 45_000L,
+        )
+        val rawResult = if (privileged.success) privileged else {
+            AppCommandRunner.run(args, 45_000L)
         }
         val pids = if (packageName == null) knownPids else knownPids +
             AndroidPackageController.pids(context, sessionId, packageName).toSet()
@@ -204,14 +202,14 @@ object AndroidLogManager {
             filterForPackage(rawResult.stdout, packageName, pids)
         }
         val status = when {
-            privileged?.success == true -> CapabilityStatus.AVAILABLE
+            privileged.success -> CapabilityStatus.AVAILABLE
             rawResult.success -> CapabilityStatus.PARTIAL
             else -> CapabilityStatus.UNAVAILABLE
         }
         return CapturedLogs(
             raw = filtered,
             backend = when {
-                privileged?.success == true -> privileged.backend.name.lowercase()
+                privileged.success -> privileged.backend.name.lowercase()
                 else -> "app"
             },
             status = status,
@@ -281,9 +279,4 @@ object AndroidLogManager {
     }
 
     private fun epoch(millis: Long): String = String.format(Locale.US, "%.3f", millis / 1000.0)
-
-    /** Avoid a hard dependency on Shizuku details in tests. */
-    private object ShizukuManagerReady {
-        fun value(): Boolean = runCatching { com.openminis.app.offload.ShizukuManager.isReady() }.getOrDefault(false)
-    }
 }

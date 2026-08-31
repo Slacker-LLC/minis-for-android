@@ -436,7 +436,7 @@ async fn dispatch_socket_request(
 ) -> Response {
     let id = req.id;
     match req.method.as_str() {
-        "root.exec" => {
+        "root.exec" | "root.fullExec" => {
             let (mock, spec) = {
                 let mut st = poisoned_lock(&state);
                 if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
@@ -444,13 +444,18 @@ async fn dispatch_socket_request(
                 }
                 (st.mock, st.policy.method("root.exec").cloned())
             };
+            let method = req.method.clone();
             match tokio::task::spawn_blocking(move || {
-                minisd::dispatch::execute_root_authorized(mock, spec, &req)
+                if method == "root.fullExec" {
+                    minisd::dispatch::execute_full_root_authorized(mock, &req)
+                } else {
+                    minisd::dispatch::execute_root_authorized(mock, spec, &req)
+                }
             })
             .await
             {
                 Ok(resp) => resp,
-                Err(_) => Response::err(id, ErrorCode::Internal, "root.exec worker failed"),
+                Err(_) => Response::err(id, ErrorCode::Internal, "root exec worker failed"),
             }
         }
         "ubuntu.exec" | "ubuntu.adminExec" => {

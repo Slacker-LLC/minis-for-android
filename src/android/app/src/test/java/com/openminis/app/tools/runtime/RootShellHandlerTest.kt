@@ -18,6 +18,8 @@ class RootShellHandlerTest {
         assertTrue(def.parameters.containsKey("tool"))
         assertTrue(def.parameters.containsKey("args"))
         assertFalse(def.parameters.containsKey("command"))
+        assertFalse(def.parameters.containsKey("access_mode"))
+        assertEquals(null, def.parameters.getValue("tool").enumValues)
         assertEquals(listOf("tool"), def.required)
         assertTrue(def.description.contains("minisd"))
     }

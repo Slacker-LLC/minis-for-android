@@ -41,6 +41,7 @@ Ubuntu 24.04 userspace
 - Compose UI, Room-backed application state, Accessibility and Android-native system tools;
 - voice, assistant, overlay, ASR/TTS integrations;
 - Rust `minisd`, verified Ubuntu 24.04 rootfs, private mount namespace, explicit bind mounts, chroot entry, and guest execution under the app UID;
+- user-owned Standard/Full Root access modes, structured `root.exec`/`root.fullExec`, exact one-shot confirmation binding, and a persistent Full Access warning;
 - fixed Linux guest-data sources under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`, prepared before keeper startup and rejected if non-canonical or tmpfs-backed.
 
 ## CI and release engineering
