@@ -31,7 +31,7 @@ class AnthropicProviderTest {
         provider = AnthropicProvider(
             apiKey = "test-key",
             model = LLMModel.claudeHaiku45,
-            basePath = server.url("/").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
 
@@ -605,7 +605,7 @@ class AnthropicProviderTest {
         val oauthProvider = AnthropicProvider(
             apiKey = "test-oauth-token",
             model = LLMModel.claudeSonnet5,
-            basePath = server.url("/").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/").toString().trimEnd('/'),
             isOAuth = true,
             oauthIdentifierPromptOverride = "test-claude-code-prefix",
         )

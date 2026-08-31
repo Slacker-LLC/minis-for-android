@@ -28,7 +28,7 @@ class GeminiProviderTest {
         provider = GeminiProvider(
             apiKey = "test-key",
             model = LLMModel.gemini25Flash,
-            basePath = server.url("/").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
 

@@ -91,7 +91,7 @@ class ThinkingRulesRegressionTest {
     private fun capture(
         model: LLMModel,
         level: ThinkingLevel,
-        basePath: String = server.url("/v1").toString().trimEnd('/'),
+        basePath: String = server.loopbackUrl("/v1").toString().trimEnd('/'),
         history: List<LLMMessage> = plainHistory(),
         maxTokens: Int = 4096,
     ): JSONObject {
@@ -150,7 +150,7 @@ class ThinkingRulesRegressionTest {
             val body = capture(
                 model = model("mistral-large-latest", reasoningEffortValues = listOf("low", "high")),
                 level = level,
-                basePath = server.url("/mistral.ai/v1").toString().trimEnd('/'),
+                basePath = server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'),
             )
             assertEquals(
                 "Mistral must carry zero thinking control keys at level=$level (422 extra_forbidden): $body",
@@ -170,7 +170,7 @@ class ThinkingRulesRegressionTest {
         val body = capture(
             model = model("mistral-large-latest", reasoningEffortValues = listOf("low", "high")),
             level = ThinkingLevel.OFF,
-            basePath = server.url("/mistral.ai/v1").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'),
         )
         assertEquals(
             "Mistral must carry zero thinking control keys at OFF: $body",
@@ -202,7 +202,7 @@ class ThinkingRulesRegressionTest {
             val provider = OpenAIProvider(
                 apiKey = "test-key",
                 model = model("mistral-large-latest", reasoningEffortValues = listOf("low", "high")),
-                basePath = server.url("/mistral.ai/v1").toString().trimEnd('/'),
+                basePath = server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'),
                 useResponsesAPI = true,
             )
             runCatching {
@@ -243,7 +243,7 @@ class ThinkingRulesRegressionTest {
         val provider = OpenAIProvider(
             apiKey = "test-key",
             model = model("gpt-5.3", reasoningEffortValues = listOf("low", "medium", "high")),
-            basePath = server.url("/v1").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/v1").toString().trimEnd('/'),
             useResponsesAPI = true,
         )
         runCatching {
@@ -276,7 +276,7 @@ class ThinkingRulesRegressionTest {
         val body = capture(
             model = model("mistral-large-latest"),
             level = ThinkingLevel.MEDIUM,
-            basePath = server.url("/mistral.ai/v1").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'),
             history = historyWithReasoning(),
         )
         assertFalse(
@@ -301,7 +301,7 @@ class ThinkingRulesRegressionTest {
                 // branch would otherwise select the vendor-native thinking:{} object.
                 model = model("deepseek-v4-flash", reasoningEffortValues = listOf("low", "high", "max")),
                 level = level,
-                basePath = server.url("/api.venice.ai/api/v1").toString().trimEnd('/'),
+                basePath = server.loopbackUrl("/api.venice.ai/api/v1").toString().trimEnd('/'),
             )
             assertFalse(
                 "root `thinking` must never be sent to Venice at level=$level (400 unrecognized_keys): $body",
@@ -429,7 +429,7 @@ class ThinkingRulesRegressionTest {
         val body = capture(
             model = model("doubao-pro"),
             level = ThinkingLevel.OFF,
-            basePath = server.url("/ark.volces.com/api/v3").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/ark.volces.com/api/v3").toString().trimEnd('/'),
         )
         assertEquals(
             "Ark's documented off tier is 'minimal' so the vendor default can't silently reason: $body",
@@ -492,7 +492,7 @@ class ThinkingRulesRegressionTest {
         val body = capture(
             model = model("deepseek-v4-flash", reasoningEffortValues = listOf("low", "high", "max")),
             level = ThinkingLevel.HIGH,
-            basePath = server.url("/ark.volces.com/api/v3").toString().trimEnd('/'),
+            basePath = server.loopbackUrl("/ark.volces.com/api/v3").toString().trimEnd('/'),
         )
         assertFalse(
             "on Ark the vendor-native thinking:{} must NOT be sent: $body",

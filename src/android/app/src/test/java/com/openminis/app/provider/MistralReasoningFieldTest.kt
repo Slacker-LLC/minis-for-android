@@ -105,7 +105,7 @@ class MistralReasoningFieldTest {
 
     @Test
     fun `mistral endpoint never sends reasoning_content`() {
-        val body = capture(server.url("/mistral.ai/v1").toString().trimEnd('/'))
+        val body = capture(server.loopbackUrl("/mistral.ai/v1").toString().trimEnd('/'))
         assertFalse(
             "reasoning_content must not be sent to Mistral (422 extra_forbidden): $body",
             anyMessageHasReasoning(body),
@@ -116,7 +116,7 @@ class MistralReasoningFieldTest {
     fun `mistral detection is case-insensitive`() {
         // Hosts are case-insensitive and iOS lowercases before the same
         // contains() test; an uppercased URL must not slip past the guard.
-        val body = capture(server.url("/API.MISTRAL.AI/v1").toString().trimEnd('/'))
+        val body = capture(server.loopbackUrl("/API.MISTRAL.AI/v1").toString().trimEnd('/'))
         assertFalse(
             "uppercase mistral.ai must still suppress reasoning_content: $body",
             anyMessageHasReasoning(body),
@@ -128,7 +128,7 @@ class MistralReasoningFieldTest {
         // Negative control: the suppression must be scoped to Mistral only.
         // MiMo / DeepSeek return 400 when multi-turn history LACKS this field,
         // so over-broad suppression would break them.
-        val body = capture(server.url("/v1").toString().trimEnd('/'))
+        val body = capture(server.loopbackUrl("/v1").toString().trimEnd('/'))
         assertTrue(
             "reasoning_content should still be echoed for non-Mistral vendors: $body",
             anyMessageHasReasoning(body),
