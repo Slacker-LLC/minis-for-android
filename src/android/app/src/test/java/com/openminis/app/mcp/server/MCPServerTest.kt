@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.net.Socket
 
 /**
  * [T-android-mcp-server] End-to-end JVM coverage for [MCPServer]: real
@@ -59,6 +60,37 @@ class MCPServerTest {
         val text = resp.body!!.string()
         assertTrue(text.contains("\"protocolVersion\":\"2025-06-18\""))
         assertTrue(text.contains("\"serverInfo\""))
+    }
+
+    @Test
+    fun `UTF-8 request body is framed in bytes`() {
+        val body = """{"jsonrpc":"2.0","id":18,"method":"initialize","params":{"instructions":"你好"}}"""
+
+        val resp = post(body, token = "secret-token")
+
+        assertEquals(200, resp.code)
+        assertTrue(resp.body!!.string().contains("\"serverInfo\""))
+    }
+
+    @Test
+    fun `truncated request body is rejected without dispatch`() {
+        val body = """{"jsonrpc":"2.0","id":19,"method":"ping"}""".toByteArray(Charsets.UTF_8)
+        val requestHead = "POST /mcp HTTP/1.1\r\n" +
+            "Authorization: Bearer secret-token\r\n" +
+            "Content-Length: ${body.size + 1}\r\n\r\n"
+
+        val response = Socket("127.0.0.1", port).use { socket ->
+            socket.soTimeout = 2_000
+            val output = socket.getOutputStream()
+            output.write(requestHead.toByteArray(Charsets.US_ASCII))
+            output.write(body)
+            output.flush()
+            socket.shutdownOutput()
+            socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+        }
+
+        assertTrue(response.startsWith("HTTP/1.1 400 Bad Request"))
+        assertTrue(response.contains("\"error\":\"bad request\""))
     }
 
     @Test
