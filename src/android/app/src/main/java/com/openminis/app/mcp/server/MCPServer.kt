@@ -2,6 +2,9 @@ package com.openminis.app.mcp.server
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.network.BoundedHttp
+import com.openminis.app.network.BoundedHttpException
+import com.openminis.app.network.BoundedHttpRequestReader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,8 +16,7 @@ import kotlinx.coroutines.runBlocking
 import com.openminis.app.notification.McpConfirmNotifier
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -34,7 +36,6 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
 
     companion object {
         private const val TAG = "MCPServer"
-        private const val MAX_BODY_BYTES = 4 * 1024 * 1024
         private const val CODE_CONFIRM_REQUIRED = -32001
         private const val CODE_CONFIRM_REJECTED = -32002
         private const val CODE_CONFIRM_QUEUE_FULL = -32003
@@ -120,76 +121,62 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             // A4: reject when all connection slots are taken
             if (!connectionSlots.tryAcquire()) {
                 runCatching {
-                    val w = java.io.PrintWriter(s.getOutputStream(), true)
-                    sendHttp(w, 503, "{\"error\":\"server busy\"}")
+                    sendHttp(s.getOutputStream(), 503, "{\"error\":\"server busy\"}")
                 }
                 return
             }
             slotAcquired = true
             s.soTimeout = 30_000
-            val reader = BufferedReader(InputStreamReader(s.getInputStream()))
-            val writer = java.io.PrintWriter(s.getOutputStream(), true)
+            val output = s.getOutputStream()
+            val reader = BoundedHttpRequestReader(s.getInputStream())
 
-            val requestLine = reader.readLine() ?: return
-            val parts = requestLine.split(" ", limit = 3)
-            if (parts.size < 2 || parts[0] != "POST") {
-                sendHttp(writer, 405, "{\"error\":\"method not allowed\"}")
+            val head = reader.readHead() ?: return
+            if (head.method != "POST") {
+                sendHttp(output, 405, "{\"error\":\"method not allowed\"}")
                 return
             }
-            val path = parts[1].substringBefore('?')
+            val path = head.target.substringBefore('?')
             if (path != "/mcp") {
-                sendHttp(writer, 404, "{\"error\":\"not found\"}")
+                sendHttp(output, 404, "{\"error\":\"not found\"}")
                 return
             }
 
-            var contentLength = 0
-            var token: String? = null
-            var headerCount = 0
-            while (true) {
-                val line = reader.readLine() ?: break
-                if (line.isEmpty()) break
-                headerCount++
-                if (headerCount > 100) {
-                    sendHttp(writer, 400, "{\"error\":\"too many headers\"}")
-                    return
-                }
-                val lower = line.lowercase()
-                if (lower.startsWith("content-length:")) {
-                    contentLength = line.substringAfter(":").trim().toIntOrNull() ?: 0
-                }
-                if (lower.startsWith("authorization:")) {
-                    val v = line.substringAfter(":").trim()
-                    if (v.lowercase().startsWith("bearer ")) token = v.substring(7).trim()
-                }
-            }
-
-            if (contentLength <= 0 || contentLength > MAX_BODY_BYTES) {
-                sendHttp(writer, 400, "{\"error\":\"bad content length\"}")
-                return
-            }
-            val body = CharArray(contentLength)
-            var read = 0
-            while (read < contentLength) {
-                val n = reader.read(body, read, contentLength - read)
-                if (n < 0) break
-                read += n
-            }
-            val raw = String(body, 0, read)
+            val authorization = head.header("authorization").orEmpty()
+            val token = authorization
+                .takeIf { it.lowercase().startsWith("bearer ") }
+                ?.substring(7)
+                ?.trim()
 
             // fail-closed auth: token required on every request
             val tokenRecord = token?.let { TokenStore.find(it) }
             if (tokenRecord == null) {
-                sendHttp(writer, 401, "{\"error\":\"unauthorized\"}")
+                sendHttp(output, 401, "{\"error\":\"unauthorized\"}")
                 return
             }
 
+            if (head.contentLength <= 0) {
+                sendHttp(output, 400, "{\"error\":\"bad content length\"}")
+                return
+            }
+
+            // Content-Length is a byte count. Decode only after exactly
+            // that many bytes have arrived, using strict UTF-8.
+            val raw = BoundedHttp.decodeUtf8(reader.readBody(head.contentLength))
             val request = MCPCodec.parseRequest(raw)
             if (request == null) {
-                sendHttp(writer, 200, MCPCodec.errorResponse(null, MCPCodec.PARSE_ERROR, "Parse error"))
+                sendHttp(output, 200, MCPCodec.errorResponse(null, MCPCodec.PARSE_ERROR, "Parse error"))
                 return
             }
             val response = dispatch(request, tokenRecord)
-            sendHttp(writer, 200, response ?: "")
+            sendHttp(output, 200, response ?: "")
+        } catch (e: BoundedHttpException) {
+            runCatching {
+                sendHttp(
+                    s.getOutputStream(),
+                    e.statusCode,
+                    "{\"error\":\"bad request\"}",
+                )
+            }
         } finally {
             if (slotAcquired) connectionSlots.release()
             runCatching { s.close() }
@@ -337,12 +324,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
             )
             .toString()
 
-    private fun sendHttp(writer: java.io.PrintWriter, code: Int, body: String) {
-        writer.print("HTTP/1.1 $code ${if (code == 200) "OK" else "Error"}\r\n")
-        writer.print("Content-Type: application/json\r\n")
-        writer.print("Content-Length: ${body.toByteArray().size}\r\n")
-        writer.print("Connection: close\r\n\r\n")
-        writer.print(body)
-        writer.flush()
+    private fun sendHttp(output: OutputStream, code: Int, body: String) {
+        BoundedHttp.writeResponse(output, code, body)
     }
 }
