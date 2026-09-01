@@ -4,6 +4,7 @@ import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.tools.internal.FileMutationQueue
 import com.openminis.app.tools.internal.FileRevision
 import org.json.JSONObject
@@ -26,13 +27,12 @@ object FileWriteTool {
         timeoutMs = 30_000L,
     )
 
-    fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
             val path = args.optString("path", "")
             val content = args.optString("content", "")
             val append = args.optBoolean("append", false)
-            val createDirs = args.optBoolean("create_dirs", false)
             // Transport-only optimistic-concurrency guard used by Web Remote.
             // It is intentionally not advertised in the LLM tool schema.
             val expectedSha256 = args.optString("expected_sha256", "").trim().lowercase()
@@ -67,71 +67,68 @@ object FileWriteTool {
                 )
             }
 
-            // T123: per-session resolver so /var/minis/workspace/...,
-            // /var/minis/attachments/..., /var/minis/offloads/...,
-            // /var/minis/browser/... land in this session's host dir
-            // rather than the global bind-mount map (which is overwritten
-            // every time another session boots its shell, last-writer-wins).
-            val file = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
-                ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
-
             // Validate UTF-8
-            try {
+            val contentBytes = try {
                 content.toByteArray(Charsets.UTF_8)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return ToolExecutionResult("Error: Content is not valid UTF-8", false, toolTitle = toolTitle)
             }
 
             // Pi-style per-file mutation queue: concurrent writes/edits against
-            // the same canonical target are serialized in request order.
-            FileMutationQueue.withFile(file) {
+            // the same guest target are serialized in request order. The actual
+            // file remains behind minisd because App cannot cross the SELinux
+            // boundary to /data/adb/minis directly.
+            FileMutationQueue.withKey("$sessionId\u0000$path") {
+                val externalMountFile = if (path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")) {
+                    RuntimePathRegistry.resolveHostPath(path)
+                        ?: return@withKey ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
+                } else {
+                    null
+                }
                 if (expectedSha256.isNotEmpty()) {
-                    if (!file.exists()) {
-                        return@withFile ToolExecutionResult(
-                            "Error: File changed since it was opened (it no longer exists): $path",
-                            false, toolTitle = toolTitle,
-                        )
+                    val current = try {
+                        if (externalMountFile != null) {
+                            if (!externalMountFile.exists() || !externalMountFile.isFile) {
+                                return@withKey ToolExecutionResult(
+                                    "Error: File changed since it was opened (it no longer exists): $path",
+                                    false, toolTitle = toolTitle,
+                                )
+                            }
+                            externalMountFile.readBytes()
+                        } else {
+                            WorkspaceFileClient.readAll(sessionId, path)
+                        }
+                    } catch (error: WorkspaceFileClient.Failure) {
+                        if (error.code == "RUNTIME_UNAVAILABLE") {
+                            return@withKey ToolExecutionResult(
+                                "Error: File changed since it was opened (it no longer exists): $path",
+                                false, toolTitle = toolTitle,
+                            )
+                        }
+                        throw error
                     }
-                    val currentSha256 = FileRevision.sha256(file)
-                    if (!currentSha256.equals(expectedSha256, ignoreCase = true)) {
-                        return@withFile ToolExecutionResult(
+                    if (!FileRevision.sha256(current).equals(expectedSha256, ignoreCase = true)) {
+                        return@withKey ToolExecutionResult(
                             "Error: File changed since it was opened; reload before saving: $path",
                             false, toolTitle = toolTitle,
                         )
                     }
                 }
 
-                // T123: mirror iOS AIChatViewModel L8339 — auto-create the
-                // parent dir whenever it doesn't exist, regardless of the
-                // create_dirs flag. Per-session subdirs (workspace, etc.) are
-                // materialized lazily.
-                val parent = file.parentFile
-                if (parent != null && (createDirs || !parent.exists())) {
-                    parent.mkdirs()
+                val bytes = if (externalMountFile != null) {
+                    ExternalMountAccess.write(path, contentBytes, append)
+                } else if (append) {
+                    WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
+                } else {
+                    WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)
                 }
 
-                // Snapshot the pre-write size so a mount write can be verified
-                // afterwards: the old file.length() == bytes comparison was a
-                // tautology (both sides were read AFTER the write).
-                val oldBytes = if (file.exists()) file.length() else -1L
-                if (append) file.appendText(content) else file.writeText(content)
-
-                val bytes = file.length()
-                if (path.startsWith("/var/minis/mounts/")) {
-                    val landed = file.exists() && file.length() != oldBytes
+                if (externalMountFile != null) {
                     com.openminis.app.logging.AppLogger.info(
                         "FileWrite",
-                        "mount write path=$path host=${file.absolutePath} bytes=$bytes " +
-                            "oldBytes=$oldBytes exists=${file.exists()} landedOk=$landed",
+                        "mount write path=$path host=${externalMountFile.absolutePath} bytes=$bytes " +
+                            "landedOk=${externalMountFile.exists()} via=android-mount",
                     )
-                    if (!landed) {
-                        com.openminis.app.logging.AppLogger.warning(
-                            "FileWrite",
-                            "mount write to $path reported success but did NOT persist to " +
-                                "${file.absolutePath} — likely missing WRITE_EXTERNAL_STORAGE / " +
-                                "shadowed FUSE view on this device",
-                        )
-                    }
                 }
                 ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)
             }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.tools.internal.FileEditEngine
 import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONArray
@@ -41,7 +42,7 @@ object FileEditTool {
         )
     }
 
-    fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
             val path = args.optString("path", "")
@@ -67,16 +68,35 @@ object FileEditTool {
                 )
             }
 
-            val file = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
-                ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
-            if (!file.exists()) return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
-            if (!file.isFile) return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
+            val externalMountFile = if (path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")) {
+                ExternalMountAccess.resolve(path)
+                    ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
+            } else {
+                null
+            }
+            if (externalMountFile != null) {
+                if (!externalMountFile.exists()) {
+                    return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
+                }
+                if (!externalMountFile.isFile) {
+                    return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
+                }
+            } else {
+                val metadata = WorkspaceFileClient.info(sessionId, path)
+                if (metadata.optString("type") != "file") {
+                    return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
+                }
+            }
 
-            FileMutationQueue.withFile(file) {
-                val content = file.readText()
+            FileMutationQueue.withKey("$sessionId\u0000$path") {
+                val content = if (externalMountFile != null) {
+                    externalMountFile.readText()
+                } else {
+                    WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
+                }
                 val edits = parseEdits(args)
                 if (edits.isEmpty()) {
-                    return@withFile ToolExecutionResult(
+                    return@withKey ToolExecutionResult(
                         "Error: provide a non-empty 'edits' array (or legacy old_string/new_string)",
                         false, toolTitle = toolTitle,
                     )
@@ -87,28 +107,36 @@ object FileEditTool {
                 if (!args.has("edits") && args.optBoolean("replace_all", false)) {
                     val old = args.optString("old_string", "")
                     val new = args.optString("new_string", "")
-                    if (old.isEmpty()) return@withFile ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
+                    if (old.isEmpty()) return@withKey ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
                     // CRLF files: match on the LF-normalized text so old_string
                     // written with \n still finds lines in a \r\n file, then
                     // restore the original line-ending style afterwards.
                     val normalized = FileEditEngine.normalizeLf(content)
                     val normalizedOld = FileEditEngine.normalizeLf(old)
                     val count = Regex.escape(normalizedOld).toRegex().findAll(normalized).count()
-                    if (count == 0) return@withFile ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
+                    if (count == 0) return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
                     val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
                     val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
-                    file.writeText(restored)
-                    return@withFile ToolExecutionResult("Edited $path ($count replacements, ${file.length()} bytes)", true, toolTitle = toolTitle)
+                    val bytes = if (externalMountFile != null) {
+                        ExternalMountAccess.write(path, restored.toByteArray(Charsets.UTF_8), append = false)
+                    } else {
+                        WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
+                    }
+                    return@withKey ToolExecutionResult("Edited $path ($count replacements, $bytes bytes)", true, toolTitle = toolTitle)
                 }
 
                 val result = FileEditEngine.apply(content, edits, path)
-                file.writeText(result.newContent)
+                val bytes = if (externalMountFile != null) {
+                    ExternalMountAccess.write(path, result.newContent.toByteArray(Charsets.UTF_8), append = false)
+                } else {
+                    WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
+                }
                 val fuzzyNote = if (result.fuzzyMatchCount > 0) ", ${result.fuzzyMatchCount} fuzzy match(es)" else ""
                 val lineNote = result.firstChangedLine?.let { ", first changed line $it" }.orEmpty()
                 val diff = takeCodePoints(result.diff, MAX_DIFF_CHARS)
                 val diffNote = if (result.diff.length > MAX_DIFF_CHARS) "\n[diff truncated to $MAX_DIFF_CHARS chars]" else ""
                 ToolExecutionResult(
-                    "Edited $path (${result.replacementCount} block(s)$fuzzyNote$lineNote, ${file.length()} bytes)" +
+                    "Edited $path (${result.replacementCount} block(s)$fuzzyNote$lineNote, $bytes bytes)" +
                         if (diff.isNotBlank()) "\n\n$diff$diffNote" else "",
                     true,
                     toolTitle = toolTitle,

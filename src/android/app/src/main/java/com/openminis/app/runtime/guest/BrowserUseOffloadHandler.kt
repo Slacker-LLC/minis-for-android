@@ -5,16 +5,16 @@ import com.openminis.app.MinisApp
 import com.openminis.app.browser.BrowserAction
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserActionResult
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -171,13 +171,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         // dropping the array (which used to reach set_cookies as empty).
         val cookiesFile = args.get("cookies-file", "cookies_file")
         val cookiesRaw: String? = if (cookiesFile != null) {
-            val host = if (sessionId != null) {
-                RuntimePathRegistry.resolveSessionHostPath(sessionId, cookiesFile, app.applicationContext)
-            } else {
-                RuntimePathRegistry.resolveHostPath(cookiesFile)
-            }
-                ?: throw IllegalArgumentException("--cookies-file: cannot resolve path '$cookiesFile'")
-            runCatching { host.readText() }.getOrNull()
+            readGuestText(cookiesFile, sessionId)
                 ?: throw IllegalArgumentException("--cookies-file: could not read '$cookiesFile'")
         } else {
             args.get("cookies")
@@ -250,37 +244,22 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         out.put("success", r.success)
         r.pageURL?.takeIf { it.isNotEmpty() }?.let { out.put("page_url", it) }
 
-        // Persist screenshot bytes under /var/minis/browser/ so shells can
-        // reference the JPEG via image_path + minis_url instead of piping
-        // base64 through stdout.
-        val browserHostDir: File? = if (sessionId != null) {
-            RuntimePathRegistry.resolveSessionHostPath(sessionId, VAR_MINIS_BROWSER, app.applicationContext)
-        } else {
-            RuntimePathRegistry.resolveHostPath(VAR_MINIS_BROWSER)
-        }
-        browserHostDir?.also {
-            try { it.mkdirs() } catch (_: Throwable) { /* non-fatal — write will fail below */ }
-        }
-
         var persistedImagePath: String? = null
         val base64 = r.base64Image
-        if (!base64.isNullOrEmpty() && browserHostDir != null) {
+        if (!base64.isNullOrEmpty()) {
             val bytes = try { android.util.Base64.decode(base64, android.util.Base64.DEFAULT) }
                 catch (_: Exception) { null }
             if (bytes != null) {
-                val filename = "screenshot_${System.currentTimeMillis()}.jpg"
-                val dest = File(browserHostDir, filename)
-                if (runCatching { dest.writeBytes(bytes) }.isSuccess) {
-                    val linuxPath = "$VAR_MINIS_BROWSER/$filename"
+                val filename = safeGuestName("screenshot_${System.currentTimeMillis()}.jpg")
+                val linuxPath = persistGuestBytes(sessionId, VAR_MINIS_BROWSER, filename, bytes)
+                if (linuxPath != null) {
                     persistedImagePath = linuxPath
                     out.put("image_path", linuxPath)
-                    out.put("minis_url", "minis://browser/$filename")
+                    out.put("minis_url", "minis://browser/${linuxPath.substringAfterLast('/')}")
                 } else {
-                    Log.w(TAG, "Failed to persist screenshot to ${dest.absolutePath}")
+                    Log.w(TAG, "Failed to persist screenshot through minisd")
                 }
             }
-        } else if (!base64.isNullOrEmpty()) {
-            Log.w(TAG, "No /var/minis/browser mount — falling back to base64-only output")
         }
 
         // Fall back to the in-memory host path only when we couldn't persist.
@@ -299,20 +278,48 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
             val data = r.fetchedFileData
             if (data != null) {
                 out.put("fetched_bytes", data.size)
-                if (browserHostDir != null) {
-                    val dest = File(browserHostDir, fname)
-                    if (runCatching { dest.writeBytes(data) }.isSuccess) {
-                        out.put("fetched_path", "$VAR_MINIS_BROWSER/$fname")
-                        out.put("fetched_minis_url", "minis://browser/$fname")
-                    } else {
-                        Log.w(TAG, "Failed to persist fetched file to ${dest.absolutePath}")
-                    }
+                val path = persistGuestBytes(sessionId, VAR_MINIS_BROWSER, safeGuestName(fname), data)
+                if (path != null) {
+                    out.put("fetched_path", path)
+                    out.put("fetched_minis_url", "minis://browser/${path.substringAfterLast('/')}")
                 }
             }
         }
 
         return out
     }
+
+    private fun safeGuestName(name: String): String =
+        name.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .ifBlank { "browser-artifact.bin" }
+
+    private fun persistGuestBytes(
+        sessionId: String?,
+        directory: String,
+        filename: String,
+        bytes: ByteArray,
+    ): String? = runCatching {
+        runBlocking {
+            val path = WorkspaceFileClient.uniqueChildPath(sessionId.orEmpty(), directory, filename)
+            WorkspaceFileClient.writeBytes(sessionId.orEmpty(), path, bytes)
+            path
+        }
+    }.getOrNull()
+
+    private fun readGuestText(path: String, sessionId: String?): String? = runCatching {
+        val guestPath = path.removePrefix("file://")
+        if (guestPath == "/var/minis/mounts" || guestPath.startsWith("/var/minis/mounts/")) {
+            return@runCatching RuntimePathRegistry.resolveHostPath(guestPath)?.readText()
+        }
+        String(
+            WorkspaceFileClient.readAllBlocking(
+                sessionId.orEmpty(),
+                guestPath,
+            ),
+            Charsets.UTF_8,
+        )
+    }.getOrNull()
 
     // ── JSON envelope helpers (mirror NativeOffloadUtils.m) ──────────────
 

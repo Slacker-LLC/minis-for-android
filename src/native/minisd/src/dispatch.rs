@@ -268,6 +268,10 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
                 "quota_bytes": state.workspace_quota_bytes
             }),
         ),
+        "workspace.file" => match crate::workspace_file::handle(state, &req.params) {
+            Ok(value) => Response::ok(req.id, value),
+            Err((code, detail)) => Response::err(req.id, code, detail),
+        },
         "workspace.setQuota" => {
             let n = req.params.get("quota_bytes").and_then(|v| v.as_u64());
             let Some(n) = n else {

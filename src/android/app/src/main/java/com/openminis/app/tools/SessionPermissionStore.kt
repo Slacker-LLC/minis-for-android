@@ -58,15 +58,21 @@ object SessionPermissionStore {
     fun allowsFileWrite(context: Context, sessionId: String, linuxPath: String): Boolean {
         val preset = preset(context, sessionId) ?: return true
         if (preset == DANGER_FULL_ACCESS) return true
+        if (linuxPath.contains('\u0000') || linuxPath.split('/').any { it == ".." }) return false
         // workspace-write: only the per-session virtual /var/minis tree.
-        return linuxPath.startsWith("/var/minis/workspace/") ||
-            linuxPath == "/var/minis/workspace" ||
-            linuxPath.startsWith("/var/minis/attachments/") ||
-            linuxPath.startsWith("/var/minis/offloads/") ||
-            linuxPath.startsWith("/var/minis/browser/") ||
-            linuxPath.startsWith("/var/minis/shared/") ||
-            linuxPath.startsWith("/var/minis/skills/") ||
-            linuxPath.startsWith("/var/minis/memory/") ||
-            linuxPath.startsWith("/var/minis/mounts/")
+        val normalized = if (linuxPath.startsWith('/')) {
+            linuxPath
+        } else {
+            "/var/minis/workspace/${linuxPath.trimStart('/')}"
+        }
+        return normalized.startsWith("/var/minis/workspace/") ||
+            normalized == "/var/minis/workspace" ||
+            normalized.startsWith("/var/minis/attachments/") ||
+            normalized.startsWith("/var/minis/offloads/") ||
+            normalized.startsWith("/var/minis/browser/") ||
+            normalized.startsWith("/var/minis/shared/") ||
+            normalized.startsWith("/var/minis/skills/") ||
+            normalized.startsWith("/var/minis/memory/") ||
+            normalized.startsWith("/var/minis/mounts/")
     }
 }

@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -677,7 +678,7 @@ private fun parseInline(
  * missing. Mirrors MinisImageFetcher's resolution logic so inline media
  * tracks the same rules as inline images.
  */
-private fun resolveMediaFile(url: String): File? {
+private suspend fun resolveMediaFile(context: Context, url: String): File? {
     if (url.isBlank()) return null
     // Strip a real query string, but NOT `#`: attachment filenames can
     // contain '#' (e.g. `foo #China.mp4`). `minis://` URLs don't use
@@ -686,15 +687,33 @@ private fun resolveMediaFile(url: String): File? {
     val hostFile: File? = when {
         stripped.startsWith("minis://") -> {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-            RuntimePathRegistry.resolveHostPath("/var/minis/$decoded")
+            val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
+            if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+                RuntimePathRegistry.resolveHostPath(linuxPath)
+            } else {
+                stageGuestMedia(context, linuxPath)
+            }
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
+        stripped.startsWith("/var/minis/") -> stageGuestMedia(context, stripped)
         stripped.startsWith("/") -> File(stripped)
         else -> null
     }
     val ok = hostFile?.let { it.exists() && it.isFile } == true
     android.util.Log.d("MdMedia", "resolveMediaFile url=$url -> host=${hostFile?.absolutePath} exists=$ok")
     return hostFile?.takeIf { ok }
+}
+
+private suspend fun stageGuestMedia(context: Context, linuxPath: String): File? {
+    val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(linuxPath.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+    val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
+    return runCatching {
+        WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
+        cacheFile.takeIf { it.isFile }
+    }.getOrNull()
 }
 
 private fun filenameFromUrl(url: String): String {
@@ -755,7 +774,9 @@ private fun MinisImageBlock(block: MarkdownParser.Block.Image) {
 private fun MinisVideoBlock(block: MarkdownParser.Block.Video) {
     android.util.Log.d("MdMedia", "MinisVideoBlock url=${block.url} alt=${block.alt}")
     val context = LocalContext.current
-    val file = remember(block.url) { resolveMediaFile(block.url) }
+    val file by produceState<File?>(initialValue = null, key1 = block.url) {
+        value = withContext(Dispatchers.IO) { resolveMediaFile(context, block.url) }
+    }
     val filename = remember(block.url) { filenameFromUrl(block.url) }
     val surfaceBg = MaterialTheme.colorScheme.surfaceVariant
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
@@ -844,14 +865,18 @@ private fun MinisVideoBlock(block: MarkdownParser.Block.Video) {
 
 @Composable
 private fun MinisAudioBlock(block: MarkdownParser.Block.Audio) {
-    val file = remember(block.url) { resolveMediaFile(block.url) }
+    val context = LocalContext.current
+    val file by produceState<File?>(initialValue = null, key1 = block.url) {
+        value = withContext(Dispatchers.IO) { resolveMediaFile(context, block.url) }
+    }
     val filename = remember(block.url) { filenameFromUrl(block.url) }
 
     // Dedicated MediaPlayer per card. Released on DisposableEffect dispose.
     val player = remember(file?.absolutePath) {
-        if (file == null) null else try {
-            MediaPlayer().apply { setDataSource(file.absolutePath); prepare() }
+        file?.let { source -> try {
+            MediaPlayer().apply { setDataSource(source.absolutePath); prepare() }
         } catch (_: Throwable) { null }
+        }
     }
     DisposableEffect(player) {
         onDispose { try { player?.release() } catch (_: Throwable) {} }
@@ -883,8 +908,6 @@ private fun MinisAudioBlock(block: MarkdownParser.Block.Audio) {
     val subtle = MaterialTheme.colorScheme.onSurfaceVariant
     val cardBg = MaterialTheme.colorScheme.surfaceVariant
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-    val context = LocalContext.current
-
     Row(
         modifier = Modifier
             .fillMaxWidth()

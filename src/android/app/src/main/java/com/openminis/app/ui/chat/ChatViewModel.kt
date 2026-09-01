@@ -53,6 +53,7 @@ import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
 import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.ContextPressure
@@ -1177,7 +1178,6 @@ class ChatViewModel(
         // launch by MinisApp); reading via a closure means the index sees
         // an up-to-date snapshot on every rescan without a manual refresh.
         FileMentionIndex(
-            filesDir = context.applicationContext.filesDir,
             mountsProvider = {
                 com.openminis.app.runtime.RuntimePathRegistry
                     .mountEntriesForIndex(context.applicationContext)
@@ -2199,7 +2199,7 @@ class ChatViewModel(
      * Emits a one-shot [requestBudgetEvent] for the UI Snackbar so the
      * user knows older images were compacted into placeholders.
      */
-    private fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
+    private suspend fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
         // Collect every image in chronological order so the planner can
         // walk in reverse and protect the most recent images.
         data class ImageRef(val msgIdx: Int, val partIdx: Int, val image: ImageBudget.BudgetImage)
@@ -2239,11 +2239,8 @@ class ChatViewModel(
         val plan = ImageBudget.planRequestBudget(images.map { it.image })
         if (!plan.mutated) return messages
 
-        // For dropped images without a linuxPath, lazily spill to disk so
-        // the placeholder still gives the model an addressable reference.
-        val attachmentsRoot = activeSessionId?.let { sid ->
-            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sid/attachments")
-        }
+        // For dropped images without a linuxPath, lazily spill through minisd
+        // so the placeholder still gives the model an addressable reference.
         val resolvedPaths = HashMap<ImageBudget.ImagePartId, String?>()
         for (ref in images) {
             val id = ImageBudget.ImagePartId.of(ref.image.data)
@@ -2251,12 +2248,19 @@ class ChatViewModel(
             val existing = ref.image.linuxPath
             if (existing != null) {
                 resolvedPaths[id] = existing
-            } else if (attachmentsRoot != null) {
-                resolvedPaths[id] = ImageBudget.ensureSpillover(
-                    attachmentsRoot, ref.image.data, ref.image.mimeType,
-                )
             } else {
-                resolvedPaths[id] = null
+                val spilloverPath = ImageBudget.spilloverPath(ref.image.data, ref.image.mimeType)
+                resolvedPaths[id] = if (spilloverPath == null) {
+                    null
+                } else {
+                    runCatching {
+                        val existing = WorkspaceFileClient.info(activeSessionId, spilloverPath)
+                        if (existing.optString("type") != "file") {
+                            WorkspaceFileClient.writeBytes(activeSessionId, spilloverPath, ref.image.data)
+                        }
+                        spilloverPath
+                    }.getOrNull()
+                }
             }
         }
 
@@ -3717,34 +3721,46 @@ class ChatViewModel(
      * observed with the Chinese-named TikTok download that appeared to
      * "disappear" after `yt-dlp` reported success.
      */
-    private fun migrateDraftResources(fromDraft: String, toReal: String) {
+    private suspend fun migrateDraftResources(fromDraft: String, toReal: String) {
         // Stop any shell that was already spun up against the draft id; its
         // -b mount arguments were frozen to the draft directory at launch, so
         // we can't reuse it after the migration.
         runCatching { ExecutionCoordinator.sessionDidTerminate(fromDraft) }
 
-        val base = java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
-        val draftBase = java.io.File(base, fromDraft)
-        if (!draftBase.isDirectory) return
-        val realBase = java.io.File(base, toReal).apply { mkdirs() }
-
         listOf("attachments", "offloads", "workspace", "browser").forEach { subdir ->
-            val src = java.io.File(draftBase, subdir)
-            if (!src.isDirectory) return@forEach
-            val dst = java.io.File(realBase, subdir).apply { mkdirs() }
-            src.listFiles()?.forEach { child ->
-                val target = java.io.File(dst, child.name)
-                runCatching {
-                    if (!target.exists() && !child.renameTo(target)) {
-                        copyRecursive(child, target)
+            val root = "/var/minis/$subdir"
+            runCatching {
+                WorkspaceFileClient.listAll(fromDraft, root).forEach { entry ->
+                    val name = entry.optString("name")
+                    if (name.isBlank() || name == "." || name == ".." ||
+                        name.contains('/') || name.contains('\\') || name.contains('\u0000')) {
+                        return@forEach
                     }
-                }.onFailure {
-                    android.util.Log.w("ChatViewModel",
-                        "migrateDraftResources: failed to move ${child.absolutePath} -> ${target.absolutePath}: ${it.message}")
+                    val path = "$root/$name"
+                    val destinationExists = runCatching {
+                        WorkspaceFileClient.info(toReal, path)
+                    }.isSuccess
+                    if (destinationExists) {
+                        // Preserve an already-materialized real-session file;
+                        // remove only the stale draft copy.
+                        WorkspaceFileClient.delete(fromDraft, path)
+                    } else {
+                        WorkspaceFileClient.move(
+                            sessionId = "",
+                            source = path,
+                            destination = path,
+                            sourceSessionId = fromDraft,
+                            destinationSessionId = toReal,
+                        )
+                    }
                 }
+            }.onFailure {
+                android.util.Log.w(
+                    "ChatViewModel",
+                    "migrateDraftResources: failed for $root: ${it.message}",
+                )
             }
         }
-        runCatching { draftBase.deleteRecursively() }
 
         // Also rename the BrowserTabPool saved-state file (filesDir/browser_tabs/<sid>.json).
         // Otherwise the pool will load empty state on the next re-entry and the
@@ -3763,17 +3779,6 @@ class ChatViewModel(
             }
         }
     }
-
-    private fun copyRecursive(src: java.io.File, dst: java.io.File): Boolean = runCatching {
-        if (src.isDirectory) {
-            dst.mkdirs()
-            src.listFiles()?.all { copyRecursive(it, java.io.File(dst, it.name)) } ?: true
-        } else {
-            src.copyTo(dst, overwrite = false)
-            src.delete()
-            true
-        }
-    }.getOrDefault(false)
 
     private fun loadSession() {
         // T-android-crash-detected-halt: when CrashFrequencyDetector
@@ -6560,7 +6565,7 @@ class ChatViewModel(
      * candidates are offloaded regardless of remaining headroom — used by
      * post-compact code paths to slim down the kept-tail aggressively.
      */
-    private fun offloadContextIfNeeded(
+    private suspend fun offloadContextIfNeeded(
         contextWindow: Int,
         lastContextTokens: Int,
         force: Boolean = false,
@@ -8643,9 +8648,12 @@ class ChatViewModel(
                     val filename = "screenshot_${System.currentTimeMillis() / 1000}.jpg"
                     val persistPath = persistBrowserArtifact(filename, raw)
                     if (persistPath != null) {
-                        persistentImagePath = persistPath
-                        linuxImagePath = "/var/minis/browser/$filename"
-                        linuxPathToMinisURL(linuxImagePath)?.let {
+                        // The source is behind minisd; keep only the guest path
+                        // in persisted tool state and use inline bytes for the
+                        // immediate Android preview.
+                        persistentImagePath = null
+                        linuxImagePath = persistPath
+                        linuxPathToMinisURL(persistPath)?.let {
                             output = "$output\nminis_url: $it"
                         }
                     }
@@ -8656,9 +8664,11 @@ class ChatViewModel(
             val fetchData = result.fetchedFileData
             val fetchName = result.fetchedFileName
             if (fetchData != null && fetchName != null) {
-                persistBrowserArtifact(fetchName, fetchData)
-                linuxPathToMinisURL("/var/minis/browser/$fetchName")?.let {
-                    output = "$output\nminis_url: $it"
+                val persistPath = persistBrowserArtifact(fetchName, fetchData)
+                persistPath?.let { path ->
+                    linuxPathToMinisURL(path)?.let {
+                        output = "$output\nminis_url: $it"
+                    }
                 }
             }
 
@@ -8683,15 +8693,17 @@ class ChatViewModel(
      * read it back via file_read / file_write / minis:// URLs.
      * Returns the host absolute path on success, null otherwise.
      */
-    private fun persistBrowserArtifact(filename: String, data: ByteArray): String? {
+    private suspend fun persistBrowserArtifact(filename: String, data: ByteArray): String? {
         val sid = activeSessionId.takeIf { it.isNotEmpty() } ?: return null
         return try {
-            val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sid)
-                ?: java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sid)
-            val dir = java.io.File(session, "browser").apply { mkdirs() }
-            val file = java.io.File(dir, filename)
-            file.writeBytes(data)
-            file.absolutePath
+            val safeName = filename
+                .substringAfterLast('/')
+                .substringAfterLast('\\')
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                .ifBlank { "browser-artifact.bin" }
+            val path = WorkspaceFileClient.uniqueChildPath(sid, "/var/minis/browser", safeName)
+            WorkspaceFileClient.writeBytes(sid, path, data)
+            path
         } catch (e: Exception) {
             android.util.Log.w("ChatViewModel", "persistBrowserArtifact failed: ${e.message}")
             null
@@ -9547,7 +9559,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
     /**
      * Resize each image attachment, copy the bytes into MediaStore (private
-     * filesDir/media/<date>/<sessionId>/<id>.<ext>), and return both the
+     * filesDir/media/<date>/<sessionId>/<id>.<ext>), and write the guest-visible
+     * upload through minisd before returning both the
      * in-memory bytes (for the LLM) and a stable file:// URI + mediaRef JSON
      * part (for persistence + reload). T150: non-image attachments take the
      * same persistence + uploadsHostDir path so they survive session reload
@@ -9555,7 +9568,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * NOT inlined into the LLM payload (parity with iOS processAttachments,
      * AIChatViewModel.swift L1552-1645).
      */
-    private fun prepareUserAttachments(
+    private suspend fun prepareUserAttachments(
         attachments: List<InputAttachment>,
         sessionId: String,
     ): PreparedAttachments {
@@ -9574,16 +9587,10 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         val imageMediaRefPartsJson = mutableListOf<String>()
         val nonImageMediaRefPartsJson = mutableListOf<String>()
         val imageUploadPaths = mutableListOf<String>()
-        // T132: also write the resized bytes into the session's iSH-bound
-        // attachments dir (filesDir/minis-sessions/<sid>/attachments/uploads/),
-        // which is mounted at /var/minis/attachments/ inside iSH. This makes
-        // the same image accessible to the agent via shell tools (read_image
-        // / cat / file) and matches the iOS uploads-directory convention.
-        val uploadsHostDir = java.io.File(
-            com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
-                ?: java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId),
-            "attachments/uploads",
-        ).apply { mkdirs() }
+        // T132: write the original bytes through minisd into the session's
+        // persistent uploads directory, which is mounted at
+        // /var/minis/attachments/ inside the guest.
+        val uploadsLinuxDir = "/var/minis/attachments/uploads"
         // Metadata captured per attachment for the <user-attached-files> XML.
         data class UploadMeta(val linuxPath: String, val size: Long, val modifiedIso: String)
         val metas = mutableListOf<UploadMeta>()
@@ -9639,9 +9646,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 // attached to the part — request-level image budgeting
                 // uses it to emit a re-fetchable text placeholder when
                 // the cumulative payload would exceed the per-request cap.
-                val safeName = uniqueUploadFileName(uploadsHostDir, attachment.fileName)
-                val dest = java.io.File(uploadsHostDir, safeName)
-                val uploadOk = try { dest.writeBytes(rawBytes); true } catch (e: Exception) {
+                val safeName = uniqueUploadFileName(sessionId, uploadsLinuxDir, attachment.fileName)
+                val uploadPath = "$uploadsLinuxDir/$safeName"
+                val uploadOk = try {
+                    WorkspaceFileClient.writeBytes(sessionId, uploadPath, rawBytes)
+                    true
+                } catch (e: Exception) {
                     Log.w(TAG, "uploads write failed for ${attachment.fileName}: ${e.message}")
                     false
                 }
@@ -9676,21 +9686,21 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             // file to MediaStore.saveMediaStreamed so a second
             // streaming pass produces the durable mediaRef.
             nonImageNames.add(attachment.fileName)
-            val safeName = uniqueUploadFileName(uploadsHostDir, attachment.fileName)
-            val dest = java.io.File(uploadsHostDir, safeName)
+            val safeName = uniqueUploadFileName(sessionId, uploadsLinuxDir, attachment.fileName)
+            val uploadPath = "$uploadsLinuxDir/$safeName"
+            var uploadedBytes = 0L
             val uploadOk = try {
                 context.contentResolver.openInputStream(attachment.uri)?.use { input ->
-                    dest.outputStream().use { output -> input.copyTo(output) }
+                    uploadedBytes = WorkspaceFileClient.writeStream(sessionId, uploadPath, input)
                 } != null
             } catch (e: Exception) {
                 Log.w(TAG, "non-image upload write failed for ${attachment.fileName}: ${e.message}")
-                runCatching { dest.delete() }
                 false
             }
             if (!uploadOk) continue
 
             val ref = try {
-                dest.inputStream().use { input ->
+                context.contentResolver.openInputStream(attachment.uri)?.use { input ->
                     mediaStore.saveMediaStreamed(
                         source = input,
                         mimeType = attachment.mimeType,
@@ -9707,8 +9717,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 nonImageUris.add(Uri.fromFile(java.io.File(mediaStore.mediaBaseDir, ref.relativePath)))
             }
 
-            val linuxPath = "/var/minis/attachments/uploads/$safeName"
-            metas.add(UploadMeta(linuxPath = linuxPath, size = dest.length(), modifiedIso = nowStr))
+            metas.add(UploadMeta(linuxPath = uploadPath, size = uploadedBytes, modifiedIso = nowStr))
         }
 
         // T-imgsize: byte-level budget enforcement. The resizeImageBytes pass
@@ -9786,21 +9795,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * path separators, falls back to "image.jpg" if the input is empty, and
      * appends `_N` before the extension when the target already exists.
      */
-    private fun uniqueUploadFileName(dir: java.io.File, original: String): String {
+    private suspend fun uniqueUploadFileName(sessionId: String, directory: String, original: String): String {
         val raw = original.substringAfterLast('/').substringAfterLast('\\').ifBlank { "image.jpg" }
         // Sanitize control / path-hostile chars without going overboard;
         // safe POSIX path chars are kept.
         val sanitized = raw.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        if (!java.io.File(dir, sanitized).exists()) return sanitized
-        val dot = sanitized.lastIndexOf('.')
-        val base = if (dot > 0) sanitized.substring(0, dot) else sanitized
-        val ext = if (dot > 0) sanitized.substring(dot) else ""
-        var n = 1
-        while (true) {
-            val candidate = "${base}_$n$ext"
-            if (!java.io.File(dir, candidate).exists()) return candidate
-            n++
-        }
+        return WorkspaceFileClient.uniqueChildPath(sessionId, directory, sanitized).substringAfterLast('/')
     }
 
     private fun buildMediaRefPartJson(

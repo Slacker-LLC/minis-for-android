@@ -4,7 +4,6 @@ import android.content.Context
 import com.openminis.app.BuildConfig
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.tools.JobRegistry
-import com.openminis.app.tools.internal.SpillPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +148,7 @@ object AndroidLogManager {
             .put("durationSeconds", durationMs / 1_000L)
     }
 
-    fun readJob(context: Context, sessionId: String, jobId: String): JSONObject {
+    suspend fun readJob(context: Context, sessionId: String, jobId: String): JSONObject {
         val job = JobRegistry.get(jobId)
             ?: return JSONObject().put("status", "JOB_NOT_FOUND").put("jobId", jobId)
         val raw = JobRegistry.output(jobId).orEmpty()
@@ -236,7 +235,7 @@ object AndroidLogManager {
         }.joinToString("\n")
     }
 
-    private fun resultJson(
+    private suspend fun resultJson(
         context: Context,
         sessionId: String,
         captured: CapturedLogs,
@@ -246,9 +245,9 @@ object AndroidLogManager {
         val summary = AndroidDebugParsers.summarizeLogs(captured.raw)
         val bytes = captured.raw.toByteArray().size
         val spill = runCatching {
-            SpillPolicy.spillIfOversized(
+            ContextOffload.spillIfOversized(
+                sessionId = sessionId,
                 text = captured.raw,
-                spillDir = ContextOffload.toolsDir(context, sessionId),
                 baseName = "android_logs",
             )
         }.getOrNull()
@@ -259,8 +258,8 @@ object AndroidLogManager {
             put("package", packageName ?: JSONObject.NULL)
             put("bytes", bytes)
             cursor?.let { put("cursor", cursorJson(it)) }
-            if (spill?.spilled == true && spill.fullPath != null) {
-                put("spillFile", "${ContextOffload.LINUX_OFFLOADS_DIR}/tools/${File(spill.fullPath).name}")
+            if (spill?.spilled == true && spill.linuxPath != null) {
+                put("spillFile", spill.linuxPath)
             }
             put("bufferWrap", "UNKNOWN")
         }

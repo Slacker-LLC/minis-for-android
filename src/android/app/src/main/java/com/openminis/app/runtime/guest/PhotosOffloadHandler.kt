@@ -16,6 +16,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -527,18 +528,9 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
 
         // [GH#139] Session-scoped when we know the caller's chat, so the export
         // lands in the dir PRoot bind-mounts at /var/minis/offloads for THIS
-        // session. Mirrors ModelUseOffloadHandler.sessionScopedHostFile and
-        // RuntimePathRegistry.resolveSessionHostPath, which use the same layout.
+        // session. Canonical guest bytes are written through minisd.
         val sandboxVisible = sessionId != null
-        val outDir = if (sandboxVisible) {
-            File(
-                com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
-                    ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId),
-                "offloads",
-            ).also { it.mkdirs() }
-        } else {
-            File(context.filesDir, "photos-export").also { it.mkdirs() }
-        }
+        val outDir = File(context.cacheDir, "photos-export").also { it.mkdirs() }
         val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(64)
         val ext = displayName.substringAfterLast('.', "")
             .ifEmpty { if (mediaType == "video") "mp4" else "jpg" }
@@ -553,10 +545,20 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 val maxEdge = if (size == "thumb") 256 else 1024
                 copyResized(src, outFile, maxEdge)
             }
-            AppLogger.info(TAG, "export: id=$id size=$size bytes=$bytesWritten path=${outFile.absolutePath}")
+            val linuxPath = if (sandboxVisible) {
+                val guestPath = "/var/minis/offloads/${outFile.name}"
+                runBlocking {
+                    outFile.inputStream().use { input ->
+                        WorkspaceFileClient.writeStream(sessionId!!, guestPath, input)
+                    }
+                }
+                guestPath
+            } else {
+                null
+            }
+            AppLogger.info(TAG, "export: id=$id size=$size bytes=$bytesWritten path=${linuxPath ?: outFile.absolutePath}")
             val data = JSONObject()
                 .put("id", id)
-                .put("host_path", outFile.absolutePath)
                 .put("size_bytes", bytesWritten)
                 .put("media_type", mediaType)
                 .put("format", if (size == "original") "original" else "jpeg")
@@ -565,7 +567,7 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             // sandbox path for shell tools, and the minis:// URL that
             // `minis-open` accepts for in-chat preview / model rendering.
             if (sandboxVisible) {
-                data.put("linux_path", "/var/minis/offloads/${outFile.name}")
+                data.put("linux_path", linuxPath)
                     .put("minis_url", "minis://offloads/${outFile.name}")
                     .put(
                         "note",
@@ -573,6 +575,7 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                             "tools, or `minis_url` with minis-open to preview it in chat.",
                     )
             } else {
+                data.put("host_path", outFile.absolutePath)
                 data.put(
                     "note",
                     "No chat session for this offload (interactive terminal), so the export " +
@@ -583,8 +586,11 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             }
             if (width > 0) data.put("width", width)
             if (height > 0) data.put("height", height)
-            NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+            val result = NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
+            if (sandboxVisible) runCatching { outFile.delete() }
+            result
         } catch (e: Throwable) {
+            if (sandboxVisible) runCatching { outFile.delete() }
             val body = JSONObject().put("error", "export_failed").put("id", id)
                 .put("message", e.message ?: "Failed to copy asset bytes")
                 .toString()

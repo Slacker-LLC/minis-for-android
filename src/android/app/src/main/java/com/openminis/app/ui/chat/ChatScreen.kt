@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import java.io.File
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -2151,8 +2152,19 @@ fun ChatScreen(
         if (pending.sessionId != sessionId) return@LaunchedEffect
         com.openminis.app.deeplink.DeepLinkCoordinator.consumePendingHtmlPreview()
         val absPath = "/var/minis" + pending.resourcePath
-        val file = java.io.File(absPath)
-        if (!file.exists()) {
+        val file = withContext(Dispatchers.IO) {
+            val name = pending.resourcePath.substringAfterLast('/')
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest("${pending.sessionId}:$absPath".toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+            val staged = File(File(context.cacheDir, "pinned-html"), "$digest-$name")
+            runCatching {
+                WorkspaceFileClient.readToFile(pending.sessionId, absPath, staged)
+                staged.takeIf { it.isFile }
+            }.getOrNull()
+        }
+        if (file == null) {
             com.openminis.app.logging.AppLogger.warning(
                 "ChatScreen",
                 "pinned HTML preview path missing: $absPath",

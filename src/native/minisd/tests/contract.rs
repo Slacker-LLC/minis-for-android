@@ -41,6 +41,7 @@ fn t_i1_every_known_method_has_shaped_response() {
             "ubuntu.provision" => json!({}),
             "exec.cancel" => json!({"execution_id":"contract-missing-execution"}),
             "proc.killTree" => json!({"session":"s-contract"}),
+            "workspace.file" => json!({"operation":"info","session_id":"s-contract","path":"."}),
             "workspace.setQuota" => json!({"quota_bytes": 1024}),
             "policy.reload" => json!({"json": minisd::policy::DEFAULT_POLICY_JSON}),
             _ => json!({}),

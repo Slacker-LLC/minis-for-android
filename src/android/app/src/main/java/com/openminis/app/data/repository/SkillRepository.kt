@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import android.util.Log
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,10 +22,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.URLEncoder
+import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
@@ -54,6 +56,7 @@ class SkillRepository(private val context: Context) {
          *  before the next export sweeps it. 24h matches iOS — long enough that
          *  any Save-to-Files / AirDrop / upload consumer has finished. */
         private const val EXPORT_TTL_MS = 24L * 3600 * 1000
+        private const val SKILLS_ROOT = "/var/minis/skills"
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -109,9 +112,6 @@ class SkillRepository(private val context: Context) {
     private val db: SQLiteDatabase by lazy {
         SkillDbHelper(context).writableDatabase
     }
-
-    private val skillsDir: File
-        get() = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills)
 
     init {
         // [T-android-safemode-lateinit-crash-147] Never let a bad skill take
@@ -183,8 +183,11 @@ class SkillRepository(private val context: Context) {
     fun delete(id: String) {
         db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
         db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
-        val dir = File(skillsDir, id)
-        dir.deleteRecursively()
+        runCatching {
+            runBlocking(Dispatchers.IO) {
+                WorkspaceFileClient.delete("", skillGuestPath(id))
+            }
+        }.onFailure { Log.w(TAG, "Failed to delete skill files for $id: ${it.message}") }
         _skills.value = _skills.value.filter { it.id != id }
         Log.i(TAG, "Deleted skill: $id")
     }
@@ -437,7 +440,7 @@ class SkillRepository(private val context: Context) {
      * Import a skill from a .zip archive (mirrors iOS `SkillStore.importFromArchive`).
      * The archive must contain a `SKILL.md` at the root or one directory deep;
      * bundled sibling files (scripts/, references/, assets/, etc.) are extracted
-     * alongside it into `skillsDir/<id>/`.
+     * alongside it into `/var/minis/skills/<id>/`.
      */
     fun importFromArchive(input: InputStream): Skill? {
         val entries = try { readZipEntries(input) } catch (e: Exception) {
@@ -458,8 +461,6 @@ class SkillRepository(private val context: Context) {
         val skill = importFromContent(skillContent, ImportSource.FILE) ?: return null
 
         val prefix = if (skillMdEntry.name == "SKILL.md") "" else skillMdEntry.name.dropLast("SKILL.md".length)
-        val skillDir = File(skillsDir, skill.id)
-        skillDir.mkdirs()
 
         for (entry in entries) {
             if (entry.isDirectory) continue
@@ -468,12 +469,17 @@ class SkillRepository(private val context: Context) {
                 relativePath = relativePath.drop(prefix.length)
             }
             if (relativePath == "SKILL.md" || relativePath.startsWith(".") || relativePath.isEmpty()) continue
-            // Guard against zip-slip: reject path traversal.
-            if (relativePath.contains("..")) continue
+            if (!isSafeRelativePath(relativePath)) continue
 
-            val destFile = File(skillDir, relativePath)
-            destFile.parentFile?.mkdirs()
-            try { destFile.writeBytes(entry.data) } catch (e: Exception) {
+            try {
+                runBlocking(Dispatchers.IO) {
+                    WorkspaceFileClient.writeBytes(
+                        sessionId = "",
+                        path = skillGuestPath(skill.id, relativePath),
+                        bytes = entry.data,
+                    )
+                }
+            } catch (e: Exception) {
                 Log.w(TAG, "Failed to write $relativePath: ${e.message}")
             }
         }
@@ -526,14 +532,13 @@ class SkillRepository(private val context: Context) {
         val skill = importFromContent(content, ImportSource.URL, sourceURL = urlString) ?: return@withContext null
 
         val ghInfo = parseGitHubURL(urlString) ?: return@withContext skill
-        val skillDir = File(skillsDir, skill.id)
         // Detach the sibling-file download from the caller's coroutine scope.
         // The previous design ran the recursion inline, so any navigation
         // away from the import screen — or a ViewModel finishing its initial
         // composition — would cancel the recursion mid-flight and leave the
         // skill with only SKILL.md (T152 root cause).
         backgroundScope.launch {
-            val outcome = downloadSiblingFiles(ghInfo, skillDir, skill)
+            val outcome = downloadSiblingFiles(ghInfo, skill.id, skill)
             val bumped = skill.copy(updatedAt = System.currentTimeMillis())
             db.execSQL(
                 "UPDATE skills SET updated_at=? WHERE id=?",
@@ -625,9 +630,8 @@ class SkillRepository(private val context: Context) {
         val ghInfo = parseGitHubURL(urlString)
         var siblingOutcome: SiblingDownloadOutcome? = null
         if (ghInfo != null) {
-            val skillDir = File(skillsDir, skillId)
             val current = _skills.value.first { it.id == skillId }
-            siblingOutcome = downloadSiblingFiles(ghInfo, skillDir, current)
+            siblingOutcome = downloadSiblingFiles(ghInfo, skillId, current)
         }
 
         val fresh = _skills.value.find { it.id == skillId }
@@ -643,7 +647,7 @@ class SkillRepository(private val context: Context) {
     // -- Export to Zip Archive --
 
     /**
-     * [T-android-skill-export] Zip the whole `skillsDir/<id>/` directory for
+     * [T-android-skill-export] Zip the whole `/var/minis/skills/<id>/` directory for
      * sharing. Android port of iOS `SkillDetailView.shareSkill`; the round-trip
      * partner of [importFromArchive], which already accepts exactly this shape
      * (SKILL.md at the archive root plus any sibling files).
@@ -671,11 +675,6 @@ class SkillRepository(private val context: Context) {
      */
     fun exportSkillToZip(skillId: String): File? {
         val skill = _skills.value.find { it.id == skillId }
-        val dir = File(skillsDir, skillId)
-        if (!dir.isDirectory) {
-            Log.w(TAG, "exportSkillToZip: no directory for $skillId")
-            return null
-        }
         val relPaths = listSkillFiles(skillId)
         if (relPaths.isEmpty()) {
             Log.w(TAG, "exportSkillToZip: $skillId has no files to export")
@@ -701,12 +700,11 @@ class SkillRepository(private val context: Context) {
         return try {
             ZipOutputStream(FileOutputStream(zipFile).buffered()).use { zos ->
                 for (rel in relPaths) {
-                    val src = File(dir, rel)
-                    if (!src.isFile) continue
+                    val bytes = readSkillBytes(skillId, rel) ?: continue
                     // Store entries with forward slashes — the portable
                     // separator every unzip tool (and importFromArchive) expects.
                     zos.putNextEntry(ZipEntry(rel.replace(File.separatorChar, '/')))
-                    FileInputStream(src).buffered().use { it.copyTo(zos) }
+                    zos.write(bytes)
                     zos.closeEntry()
                 }
             }
@@ -744,27 +742,21 @@ class SkillRepository(private val context: Context) {
     }
 
     /**
-     * List every file inside `skillsDir/<id>/` (recursive). Returns relative
+     * List every file inside `/var/minis/skills/<id>/` (recursive). Returns relative
      * paths from the skill root, with SKILL.md first and the rest sorted by
      * name. Used by the Skill detail UI to enumerate bundled scripts.
      */
     fun listSkillFiles(skillId: String): List<String> {
-        val dir = File(skillsDir, skillId)
-        if (!dir.isDirectory) return emptyList()
-        val rootLen = dir.absolutePath.length + 1
-        val files = dir.walkTopDown()
-            .filter { it.isFile && !it.name.startsWith(".") }
-            .map { it.absolutePath.substring(rootLen) }
-            .toList()
+        val files = listSkillGuestFiles(skillId)
         return files.sortedWith(compareBy(
             { if (it.equals("SKILL.md", ignoreCase = true)) 0 else 1 },
             { it },
         ))
     }
 
-    /** Absolute host path for a file inside a skill's directory. */
+    /** Guest path for a file inside a skill's directory. */
     fun skillFileHostPath(skillId: String, relativePath: String): String =
-        File(File(skillsDir, skillId), relativePath).absolutePath
+        skillGuestPath(skillId, relativePath)
 
     /**
      * Re-read SKILL.md from disk and push any frontmatter changes back into the
@@ -774,8 +766,8 @@ class SkillRepository(private val context: Context) {
      */
     fun rescanFromDisk(skillId: String): Skill? {
         val current = _skills.value.find { it.id == skillId } ?: return null
-        val file = File(File(skillsDir, skillId), "SKILL.md")
-        if (!file.exists()) {
+        val content = readSkillFile(skillId, "SKILL.md")
+        if (content == null) {
             // [T-android-skill-orphan-db-row] A rescan that finds nothing on
             // disk used to only paint "SKILL.md missing or invalid" and leave
             // the record in place, so the one action explicitly meant to
@@ -788,7 +780,7 @@ class SkillRepository(private val context: Context) {
             }
             return null
         }
-        val parsed = parseSkillMd(file.readText()) ?: return null
+        val parsed = parseSkillMd(content) ?: return null
         val refreshed = current.copy(
             name = parsed.name,
             description = parsed.description,
@@ -813,11 +805,10 @@ class SkillRepository(private val context: Context) {
         val current = _skills.value.find { it.id == skillId } ?: return false
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return false
-        val file = File(File(skillsDir, skillId), "SKILL.md")
-        if (file.exists()) {
-            val original = file.readText()
+        val original = readSkillFile(skillId, "SKILL.md")
+        if (original != null) {
             val updated = original.replaceFirst(Regex("(?m)^name:\\s*.*$"), "name: $trimmed")
-            if (updated != original) file.writeText(updated)
+            if (updated != original) writeSkillFileRaw(skillId, "SKILL.md", updated)
         }
         val refreshed = current.copy(name = trimmed, updatedAt = System.currentTimeMillis())
         db.execSQL(
@@ -830,26 +821,20 @@ class SkillRepository(private val context: Context) {
 
     /** Read an arbitrary file inside a skill's directory (e.g. scripts/foo.py). */
     fun readSkillFile(skillId: String, relativePath: String): String? {
-        if (relativePath.contains("..")) return null
-        val file = File(File(skillsDir, skillId), relativePath)
-        if (!file.isFile) return null
-        return try { file.readText() } catch (_: Exception) { null }
+        return readSkillBytes(skillId, relativePath)?.toString(Charsets.UTF_8)
     }
 
     /** Write an arbitrary file inside a skill's directory. Creates parents. */
     fun writeSkillFile(skillId: String, relativePath: String, content: String): Boolean {
-        if (relativePath.contains("..")) return false
-        val file = File(File(skillsDir, skillId), relativePath)
-        file.parentFile?.mkdirs()
         return try {
-            file.writeText(content)
+            writeSkillFileRaw(skillId, relativePath, content)
             // SKILL.md edits must flow back to DB metadata.
             if (relativePath.equals("SKILL.md", ignoreCase = true)) rescanFromDisk(skillId)
             true
         } catch (_: Exception) { false }
     }
 
-    private suspend fun downloadSiblingFiles(ghInfo: GitHubInfo, destDir: File, skill: Skill): SiblingDownloadOutcome {
+    private suspend fun downloadSiblingFiles(ghInfo: GitHubInfo, skillId: String, skill: Skill): SiblingDownloadOutcome {
         Log.i(TAG, "[siblings] start skill=${skill.id} dir=${ghInfo.dirPath} repo=${ghInfo.user}/${ghInfo.repo}@${ghInfo.branch}")
         val agg = AggregateOutcome()
         downloadGitHubDirectory(
@@ -857,7 +842,7 @@ class SkillRepository(private val context: Context) {
             repo = ghInfo.repo,
             branch = ghInfo.branch,
             remotePath = ghInfo.dirPath,
-            localDir = destDir,
+            skillId = skillId,
             relativeTo = "",
             skill = skill,
             depth = 0,
@@ -892,7 +877,7 @@ class SkillRepository(private val context: Context) {
         repo: String,
         branch: String,
         remotePath: String,
-        localDir: File,
+        skillId: String,
         relativeTo: String,
         skill: Skill,
         depth: Int,
@@ -936,7 +921,7 @@ class SkillRepository(private val context: Context) {
                 val subRemote = if (remotePath.isEmpty()) name else "$remotePath/$name"
                 downloadGitHubDirectory(
                     user = user, repo = repo, branch = branch,
-                    remotePath = subRemote, localDir = localDir, relativeTo = relPath,
+                    remotePath = subRemote, skillId = skillId, relativeTo = relPath,
                     skill = skill, depth = depth + 1, outcome = outcome,
                 )
                 continue
@@ -959,11 +944,13 @@ class SkillRepository(private val context: Context) {
                 outcome.recordFailure(msg)
                 continue
             }
-            val destFile = File(localDir, relPath)
-            destFile.parentFile?.mkdirs()
-            val existing = if (destFile.exists()) destFile.readBytes() else null
+            if (!isSafeRelativePath(relPath)) {
+                outcome.recordFailure("Unsafe skill file path: $relPath")
+                continue
+            }
+            val existing = readSkillBytes(skillId, relPath)
             if (existing == null || !existing.contentEquals(fileData)) {
-                destFile.writeBytes(fileData)
+                writeSkillBytesRaw(skillId, relPath, fileData)
                 Log.i(TAG, "[siblings] wrote $relPath (${fileData.size}B)")
             } else {
                 Log.i(TAG, "[siblings] kept $relPath (unchanged, ${fileData.size}B)")
@@ -1174,7 +1161,7 @@ class SkillRepository(private val context: Context) {
     // -- Reload --
 
     /**
-     * Re-scan `skillsDir` and the SQLite registry, re-publishing the
+     * Re-scan `/var/minis/skills` and the SQLite registry, re-publishing the
      * resulting list via the [skills] StateFlow. Mirrors iOS
      * `SkillStore.reload()` (Agent/Session/SkillStore.swift). Use this after
      * an out-of-band install (agent shell `git clone`, agent file_write of a
@@ -1193,6 +1180,11 @@ class SkillRepository(private val context: Context) {
     // -- Internal --
 
     private fun loadAll() {
+        // A broker failure must not look like an empty guest tree. Keep the
+        // nullable result so a transient runtime outage cannot prune valid DB
+        // rows before the broker becomes ready again.
+        val onDisk = listSkillDirectories()
+
         // Load from DB
         val dbSkills = mutableListOf<Skill>()
         // [T-android-safemode-lateinit-crash-147] `use` so the cursor is closed
@@ -1226,12 +1218,12 @@ class SkillRepository(private val context: Context) {
             // disk yet. Pruning it here would discard its use_count moments
             // before the installer re-materializes the file.
             //
-            // Only one location to check, unlike iOS's Library+rootfs pair:
-            // RuntimePathRegistry.registerGlobalBindMounts binds /var/minis/skills
-            // straight to this same filesDir/minis-global/skills.
-            if (importSource != ImportSource.BUNDLED &&
-                !File(skillsDir, "$id/SKILL.md").exists()
-            ) {
+             // Only one location to check, unlike iOS's Library+rootfs pair:
+             // the broker owns the canonical `/var/minis/skills` tree.
+             if (importSource != ImportSource.BUNDLED &&
+                 onDisk != null &&
+                 (id !in onDisk || readSkillFile(id, "SKILL.md") == null)
+             ) {
                 db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
                 db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
                 Log.i(TAG, "Pruned orphan skill row (no SKILL.md on disk): $id")
@@ -1263,9 +1255,9 @@ class SkillRepository(private val context: Context) {
             // to heal it — only renaming the skill works, because that mints a
             // new row id.
             if (description == ">" || description == "|" || description.isBlank()) {
-                val skillMd = File(skillsDir, "$id/SKILL.md")
-                if (skillMd.exists()) {
-                    val reparsed = parseSkillMd(runCatching { skillMd.readText() }.getOrNull() ?: "")
+                val skillMd = readSkillFile(id, "SKILL.md")
+                if (skillMd != null) {
+                    val reparsed = parseSkillMd(skillMd)
                     // Only ever REPLACE an empty/placeholder value with a real
                     // one, never the reverse. A mid-edit or malformed SKILL.md
                     // parses to null or yields an empty description, and
@@ -1306,15 +1298,14 @@ class SkillRepository(private val context: Context) {
         }
         }
 
-        // Auto-discover skills on disk without DB entries
-        val onDisk = skillsDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
-        for (dir in onDisk) {
-            val skillMd = File(dir, "SKILL.md")
-            if (skillMd.exists() && dbSkills.none { it.id == dir.name }) {
-                val parsed = parseSkillMd(skillMd.readText())
+        // Auto-discover skills in the canonical guest tree without DB entries.
+        for (id in onDisk.orEmpty()) {
+            val skillMd = readSkillFile(id, "SKILL.md")
+            if (skillMd != null && dbSkills.none { it.id == id }) {
+                val parsed = parseSkillMd(skillMd)
                 if (parsed != null) {
                     val skill = Skill(
-                        id = dir.name,
+                        id = id,
                         name = parsed.name,
                         description = parsed.description,
                         importSource = ImportSource.SESSION,
@@ -1322,7 +1313,7 @@ class SkillRepository(private val context: Context) {
                     )
                     insertDb(skill)
                     dbSkills.add(skill)
-                    Log.i(TAG, "Auto-discovered skill: ${dir.name}")
+                    Log.i(TAG, "Auto-discovered skill: $id")
                 }
             }
         }
@@ -1344,8 +1335,6 @@ class SkillRepository(private val context: Context) {
     }
 
     private fun writeSkillMd(skill: Skill) {
-        val dir = File(skillsDir, skill.id)
-        dir.mkdirs()
         val content = buildString {
             appendLine("---")
             appendLine("name: ${skill.name}")
@@ -1354,15 +1343,100 @@ class SkillRepository(private val context: Context) {
             appendLine("---")
             append(skill.body)
         }
-        File(dir, "SKILL.md").writeText(content)
+        writeSkillFileRaw(skill.id, "SKILL.md", content)
     }
 
     private fun readSkillMdBody(id: String): String {
-        val file = File(skillsDir, "$id/SKILL.md")
-        if (!file.exists()) return ""
-        val parsed = parseSkillMd(file.readText())
+        val parsed = readSkillFile(id, "SKILL.md")?.let(::parseSkillMd)
         return parsed?.body ?: ""
     }
+
+    private fun listSkillDirectories(): List<String>? = runCatching {
+        runBlocking(Dispatchers.IO) {
+            WorkspaceFileClient.listAll("", SKILLS_ROOT)
+                .filter { it.optString("type") == "dir" }
+                .mapNotNull { entry ->
+                    val id = entry.optString("name")
+                    id.takeIf(::isSafeSkillId)
+                }
+        }
+    }.getOrElse { error ->
+        Log.w(TAG, "Failed to list guest skill directories: ${error.message}")
+        null
+    }
+
+    private fun listSkillGuestFiles(skillId: String): List<String> = runCatching {
+        val found = mutableListOf<String>()
+        runBlocking(Dispatchers.IO) {
+            val queue = ArrayDeque<Pair<String, String>>()
+            queue.add(skillGuestPath(skillId) to "")
+            while (queue.isNotEmpty()) {
+                val (directory, relativeDirectory) = queue.removeFirst()
+                for (entry in WorkspaceFileClient.listAll("", directory)) {
+                    val name = entry.optString("name")
+                    if (!isSafeRelativePath(name) || name.startsWith(".")) continue
+                    val relative = if (relativeDirectory.isEmpty()) name else "$relativeDirectory/$name"
+                    when (entry.optString("type")) {
+                        "file" -> found += relative
+                        "dir" -> queue.add(childGuestPath(directory, name) to relative)
+                    }
+                }
+            }
+        }
+        found
+    }.getOrElse { error ->
+        Log.w(TAG, "Failed to list guest files for skill $skillId: ${error.message}")
+        emptyList()
+    }
+
+    private fun readSkillBytes(skillId: String, relativePath: String): ByteArray? {
+        if (!isSafeSkillId(skillId) || !isSafeRelativePath(relativePath)) return null
+        return runCatching {
+            WorkspaceFileClient.readAllBlocking("", skillGuestPath(skillId, relativePath))
+        }.getOrNull()
+    }
+
+    private fun writeSkillFileRaw(skillId: String, relativePath: String, content: String) {
+        writeSkillBytesRaw(skillId, relativePath, content.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun writeSkillBytesRaw(skillId: String, relativePath: String, bytes: ByteArray) {
+        require(isSafeSkillId(skillId) && isSafeRelativePath(relativePath)) {
+            "invalid skill file path"
+        }
+        runBlocking(Dispatchers.IO) {
+            WorkspaceFileClient.writeBytes(
+                sessionId = "",
+                path = skillGuestPath(skillId, relativePath),
+                bytes = bytes,
+            )
+        }
+    }
+
+    private fun childGuestPath(directory: String, name: String): String {
+        require(isSafeRelativePath(name)) { "invalid skill directory entry" }
+        return "${directory.trimEnd('/')}/$name"
+    }
+
+    private fun skillGuestPath(skillId: String, relativePath: String = ""): String {
+        require(isSafeSkillId(skillId)) { "invalid skill id" }
+        require(relativePath.isEmpty() || isSafeRelativePath(relativePath)) {
+            "invalid skill file path"
+        }
+        return if (relativePath.isEmpty()) "$SKILLS_ROOT/$skillId"
+        else "$SKILLS_ROOT/$skillId/$relativePath"
+    }
+
+    private fun isSafeSkillId(id: String): Boolean =
+        id.isNotEmpty() && id != "." && id != ".." && id.all {
+            it.code < 128 && (it.isLetterOrDigit() || it == '-' || it == '_' || it == '.')
+        }
+
+    private fun isSafeRelativePath(path: String): Boolean =
+        path.isNotEmpty() && path.split('/').all { component ->
+            component.isNotEmpty() && component != "." && component != ".." &&
+                !component.contains('\\') && !component.contains('\u0000')
+        }
 
     data class ParsedSkill(
         val name: String,

@@ -611,8 +611,6 @@ fun AppNavigation(
                 folderId = folderId,
                 onBack = { navController.safePopBackStack() },
                 onBrowseFiles = {
-                    val rootfs = RootfsManager.getInstance(ctx.applicationContext)
-                    val hostPath = java.io.File(rootfs.rootfsDir, "var/minis/$folderId")
                     val label = when (folderId) {
                         "shared" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_shared)
                         "skills" -> ctx.getString(com.openminis.app.R.string.shared_folder_name_skills)
@@ -620,13 +618,10 @@ fun AppNavigation(
                         else -> folderId
                     }
                     FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                        rootPath = hostPath,
+                        rootPath = java.io.File(ctx.cacheDir, "guest-file-browser"),
                         rootLabel = label,
-                        // Route reads through PRoot bind mounts so the host
-                        // dirs that back /var/minis/{shared,skills,memory}
-                        // resolve, matching how chat-files browse works.
-                        linuxRootPath = "/var/minis/$folderId",
                         appContext = ctx.applicationContext,
+                        guestRootPath = "/var/minis/$folderId",
                     )
                     navController.safeNavigate(Routes.FILE_BROWSER)
                 },
@@ -859,25 +854,18 @@ fun AppNavigation(
             arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+            val context = androidx.compose.ui.platform.LocalContext.current
             SessionStorageDetailScreen(
                 sessionId = sessionId,
                 chatDao = chatRepository.dao,
                 onBack = { navController.safePopBackStack() },
-                onBrowseFiles = { rootPath ->
-                    // [T-android-copy-abs-path-fullpath] This browser is rooted at
-                    // the per-session host dir (filesDir/minis-sessions/<sid>),
-                    // whose immediate children (workspace/ attachments/ offloads/
-                    // browser/) are exactly the PRoot /var/minis/* subdirs. The
-                    // host listing already resolves correctly so we keep rootPath
-                    // host-based (no linuxRootPath re-routing — that would redirect
-                    // /var/minis to the global/empty placeholder dir). We only pass
-                    // displayLinuxPrefix = "/var/minis" so "Copy Absolute Path"
-                    // emits the agent-visible /var/minis/workspace/foo.py instead of
-                    // the opaque /data/user/0/.../minis-sessions/<sid>/... host path.
+                onBrowseFiles = {
                     FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                        rootPath = java.io.File(rootPath),
+                        rootPath = java.io.File(context.cacheDir, "guest-file-browser"),
                         rootLabel = "Session Files",
-                        displayLinuxPrefix = "/var/minis",
+                        appContext = context.applicationContext,
+                        guestRootPath = "/var/minis",
+                        guestSessionId = sessionId,
                     )
                     navController.safeNavigate(Routes.FILE_BROWSER)
                 },

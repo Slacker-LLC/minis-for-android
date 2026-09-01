@@ -104,6 +104,7 @@ import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2257,10 +2258,11 @@ private fun BrokenImagePlaceholder(alt: String?) {
 
 /**
  * Resolve a markdown media URL (`minis://attachments/foo.mp4`, file://, or
- * plain absolute path) to a host File.
+ * plain absolute path) to a local File. Canonical guest files are staged from
+ * minisd; SAF mounts and rootfs files retain their Android-side File mapping.
  *
  * A caller with a session id resolves only within that session. Sessionless
- * legacy callers retain the old compatibility search across draft folders.
+ * callers can resolve global guest roots but never search another session.
  */
 internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String? = null): File? {
     if (url.isBlank()) return null
@@ -2272,16 +2274,25 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
     val primary: File? = when {
         stripped.startsWith("minis://") -> {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-            val linuxPath = "/var/minis/$decoded"
+            val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             // Prefer the session-scoped resolver when the caller supplied a
             // sessionId: the global `bindMounts` map is overwritten every time
             // another session boots its shell, so without sessionId we'd route
             // this chat's attachment lookup to whichever session happened to
             // boot last.
-            if (sessionId != null) RuntimePathRegistry.resolveSessionHostPath(sessionId, linuxPath, context)
-            else RuntimePathRegistry.resolveHostPath(linuxPath)
+            if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+                RuntimePathRegistry.resolveHostPath(linuxPath)
+            } else {
+                stageGuestMedia(context, linuxPath, sessionId)
+            }
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
+        stripped == "/var/minis/mounts" || stripped.startsWith("/var/minis/mounts/") ->
+            RuntimePathRegistry.resolveHostPath(stripped)
+        stripped.startsWith("/var/minis") || stripped.startsWith("/workspace") ||
+            stripped.startsWith("/memory") || stripped.startsWith("/skills") ||
+            stripped.startsWith("/shared") || stripped.startsWith("/home/minis") ->
+            stageGuestMedia(context, stripped, sessionId)
         stripped.startsWith("/") -> File(stripped)
         else -> null
     }
@@ -2290,40 +2301,20 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
         return primary
     }
 
-    // With an owning session, a miss must stay a miss. Searching every chat
-    // would make a known filename from another session readable and would
-    // make historical links resolve nondeterministically.
-    if (sessionId != null) return null
-
-    // Fallback: search every minis-sessions/<id>/{attachments,workspace,offloads,browser}
-    // subtree for a file whose basename matches. Handles leftover files from a
-    // draft session whose bind mount has already switched over, and the case
-    // where `resolveHostPath`'s global bindMounts map points at a different
-    // session than the one owning this message.
-    if (!stripped.startsWith("minis://")) {
-        android.util.Log.d("MdStream", "resolveMdMediaFile primary miss url=$url (non-minis scheme, no fallback)")
-        return null
-    }
-    val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-    val basename = decoded.substringAfterLast('/')
-    val subdir = decoded.substringBefore('/', missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: "attachments"
-    val root = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
-    if (root.isDirectory) {
-        root.listFiles()?.forEach { sessionDir ->
-            val candidate = File(sessionDir, "$subdir/$basename")
-            if (candidate.exists() && candidate.isFile) {
-                android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> fallback=${candidate.absolutePath}")
-                return candidate
-            }
-        }
-    }
-    val globalCandidate = File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_MINIS, subdir), basename)
-    if (globalCandidate.exists() && globalCandidate.isFile) {
-        android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> global=${globalCandidate.absolutePath}")
-        return globalCandidate
-    }
     android.util.Log.w("MdStream", "resolveMdMediaFile url=$url -> NOT FOUND (primary=${primary?.absolutePath})")
     return null
+}
+
+private fun stageGuestMedia(context: Context, linuxPath: String, sessionId: String?): File? {
+    val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest("${sessionId.orEmpty()}:$linuxPath".toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+    val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
+    return runCatching {
+        WorkspaceFileClient.readToFileBlocking(sessionId.orEmpty(), linuxPath, cacheFile)
+        cacheFile.takeIf { it.isFile }
+    }.getOrNull()
 }
 
 private fun filenameFromMdUrl(url: String): String {

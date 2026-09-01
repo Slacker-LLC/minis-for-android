@@ -81,7 +81,7 @@ object AndroidUiController {
         return UiToolResult(result.put("status", CapabilityStatus.AVAILABLE.name), true)
     }
 
-    private fun screenshot(
+    private suspend fun screenshot(
         context: Context,
         service: MinisAccessibilityService,
         sessionId: String,
@@ -117,9 +117,6 @@ object AndroidUiController {
         bitmap.recycle()
         val bytes = output.toByteArray()
         val linuxPath = ContextOffload.offloadImage(context, sessionId, bytes, toolId, "image/png")
-        val host = linuxPath.takeIf(String::isNotEmpty)?.let {
-            com.openminis.app.runtime.RuntimePathRegistry.resolveSessionHostPath(sessionId, it, context)?.absolutePath
-        }
         val json = JSONObject()
             .put("status", CapabilityStatus.AVAILABLE.name)
             .put("displayId", displayId)
@@ -131,7 +128,7 @@ object AndroidUiController {
             .put("sizeBytes", bytes.size)
             .put("path", linuxPath.ifEmpty { JSONObject.NULL })
             .put("note", "Screenshot may still be absent for FLAG_SECURE windows or OEM throttling")
-        return UiToolResult(json, true, bytes, linuxPath.takeIf(String::isNotEmpty), host)
+        return UiToolResult(json, true, bytes, linuxPath.takeIf(String::isNotEmpty), null)
     }
 
     private suspend fun click(service: MinisAccessibilityService, args: JSONObject, longPress: Boolean): UiToolResult {

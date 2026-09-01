@@ -1,18 +1,29 @@
 package com.openminis.app.offload
 
+import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Manages multiple concurrent MediaPlayer sessions keyed by session ID.
  * Supports audio playback with play/pause/resume/seek/stop/status operations.
- * Paths are resolved through RuntimePathRegistry.resolveHostPath().
+ * SAF mount paths are resolved through RuntimePathRegistry. Canonical guest
+ * files are staged through minisd into app cache before playback.
  */
 object MediaPlayerManager {
 
     private const val TAG = "MediaPlayerManager"
+
+    @Volatile
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
 
     private data class Session(
         val player: MediaPlayer,
@@ -42,8 +53,28 @@ object MediaPlayerManager {
             releaseSession(existing)
         }
 
-        val hostFile = RuntimePathRegistry.resolveHostPath(filePath)
-            ?: return "Error: cannot resolve path '$filePath'"
+        val hostFile = when {
+            isExternalMountPath(filePath) -> RuntimePathRegistry.resolveHostPath(filePath)
+                ?: return "Error: cannot resolve mounted path '$filePath'"
+            isCanonicalGuestPath(filePath) -> {
+                val context = appContext
+                    ?: return "Error: media player is not initialized"
+                val digest = MessageDigest.getInstance("SHA-256")
+                    .digest("$sessionId:$filePath".toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it) }
+                val safeName = filePath.substringAfterLast('/')
+                    .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    .ifBlank { "audio" }
+                val staged = File(File(context.cacheDir, "media-player"), "$digest-$safeName")
+                try {
+                    WorkspaceFileClient.readToFileBlocking(sessionId, filePath, staged)
+                    staged
+                } catch (error: Throwable) {
+                    return "Error: cannot read guest media '$filePath': ${error.message}"
+                }
+            }
+            else -> return "Error: unsupported media path '$filePath'"
+        }
 
         if (!hostFile.exists()) {
             return "Error: file not found at '$filePath' (resolved: ${hostFile.absolutePath})"
@@ -210,5 +241,21 @@ object MediaPlayerManager {
         val min = totalSec / 60
         val sec = totalSec % 60
         return "%d:%02d".format(min, sec)
+    }
+
+    private fun isExternalMountPath(path: String): Boolean =
+        path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")
+
+    private fun isCanonicalGuestPath(path: String): Boolean {
+        val roots = listOf(
+            "/var/minis",
+            "/workspace",
+            "/memory",
+            "/skills",
+            "/shared",
+            "/home/minis",
+        )
+        return roots.any { path == it || path.startsWith("$it/") } &&
+            !isExternalMountPath(path)
     }
 }

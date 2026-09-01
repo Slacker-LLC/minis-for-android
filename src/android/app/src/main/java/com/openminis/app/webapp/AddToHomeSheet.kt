@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.data.repository.WebAppShortcutRepository
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,8 +123,8 @@ fun AddToHomeSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    // shortcutId is decided up-front so the copied attachment lives at
-    // <attachmentsDir>/<shortcutId>/<fileName> — stable for the life of
+    // shortcutId is decided up-front so the uploaded attachment lives at
+    // guest attachments/<shortcutId>/<fileName> — stable for the life of
     // the shortcut even if the user later removes the chip. (Only used
     // by the ChatAttachment branch; the HostFile branch links in place.)
     val shortcutId = remember { UUID.randomUUID().toString() }
@@ -133,9 +134,8 @@ fun AddToHomeSheet(
         is WebAppSource.HostFile -> source.fileName
     }
 
-    // For ChatAttachment we copy the source URI into a stable host path
-    // before the user commits; for HostFile the file already exists so
-    // we just point [copiedFile] at it.
+    // For ChatAttachment we stage the source URI in app cache for parsing,
+    // then upload it to the session guest tree; HostFile already exists.
     var copiedFile by remember { mutableStateOf<File?>(null) }
     var copyFailed by remember { mutableStateOf(false) }
     var parsedTitle by remember { mutableStateOf<String?>(null) }
@@ -145,17 +145,25 @@ fun AddToHomeSheet(
         withContext(Dispatchers.IO) {
             when (source) {
                 is WebAppSource.ChatAttachment -> {
-                    val attachmentsDir = File(
-                        context.filesDir,
-                        "sessions/${source.sessionId}/attachments/$shortcutId",
+                    val safeName = source.fileName
+                        .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                        .ifBlank { "page.html" }
+                    val target = File(
+                        File(context.cacheDir, "webapp-source/$shortcutId"),
+                        safeName,
                     )
-                    attachmentsDir.mkdirs()
-                    val safeName = source.fileName.ifBlank { "page.html" }
-                    val target = File(attachmentsDir, safeName)
+                    target.parentFile?.mkdirs()
                     runCatching {
                         context.contentResolver.openInputStream(source.uri)?.use { input ->
                             target.outputStream().use { out -> input.copyTo(out) }
                         } ?: error("openInputStream returned null")
+                        target.inputStream().use { input ->
+                            WorkspaceFileClient.writeStream(
+                                sessionId = source.sessionId,
+                                path = "/var/minis/attachments/$shortcutId/$safeName",
+                                input = input,
+                            )
+                        }
                     }.onSuccess {
                         copiedFile = target
                         parsedTitle = parseHtmlTitle(target)
@@ -373,9 +381,7 @@ fun AddToHomeSheet(
                             val entity = when (source) {
                                 is WebAppSource.ChatAttachment -> {
                                     // htmlPath stays relative under the
-                                    // session attachments dir — WebAppPathResolver's
-                                    // "relative path" branch resolves it back to
-                                    // <filesDir>/sessions/<sid>/attachments/<htmlPath>.
+                                    // canonical session attachments dir.
                                     val htmlPath = "$shortcutId/${target.name}"
                                     app.webAppShortcutRepository.create(
                                         htmlPath = htmlPath,
@@ -390,7 +396,7 @@ fun AddToHomeSheet(
                                 is WebAppSource.HostFile -> {
                                     // T-pwa-3: link in place — htmlPath is the
                                     // /var/minis/... linux path; WebAppPathResolver
-                                    // routes through RuntimePathRegistry.resolveHostPath.
+                                    // stages canonical guest files through minisd.
                                     app.webAppShortcutRepository.create(
                                         htmlPath = source.linuxPath,
                                         pathScope = source.pathScope,

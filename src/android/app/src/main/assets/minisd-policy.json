@@ -25,6 +25,7 @@
     "mount.list": { "mode": "allow" },
     "mount.prepare": { "mode": "allow" },
     "workspace.info": { "mode": "allow" },
+    "workspace.file": { "mode": "allow" },
     "workspace.setQuota": { "mode": "allow" },
     "policy.get": { "mode": "allow" },
     "health.get": { "mode": "allow" }

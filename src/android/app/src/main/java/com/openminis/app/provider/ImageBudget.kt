@@ -307,25 +307,14 @@ object ImageBudget {
         }
     }
 
-    /**
-     * Lazily persist [data] to a session-scoped spillover dir under
-     * `attachments/spillover/<sha1>.<ext>` so an elided image without a
-     * pre-existing linux path can still be referenced from the text
-     * placeholder. The spillover dir is bind-mounted to
-     * `/var/minis/attachments/spillover/` inside iSH (same mount as
-     * `attachments/uploads/`). Returns the iSH-visible linux path on
-     * success, or null if the write failed (in which case the placeholder
-     * falls back to the no-path variant).
-     *
-     * Idempotent: if the same bytes already exist on disk under the
-     * sha1 prefix, returns the existing path without re-writing.
-     */
-    fun ensureSpillover(
-        sessionAttachmentsDir: java.io.File,
-        data: ByteArray,
-        mimeType: String,
-    ): String? {
+    /** Return the canonical guest path for an elided image payload. */
+    fun spilloverPath(data: ByteArray, mimeType: String): String? {
         if (data.isEmpty()) return null
+        val (sha, ext) = spilloverName(data, mimeType)
+        return "/var/minis/attachments/spillover/$sha.$ext"
+    }
+
+    private fun spilloverName(data: ByteArray, mimeType: String): Pair<String, String> {
         val ext = when (mimeType.lowercase()) {
             "image/jpeg", "image/jpg" -> "jpg"
             "image/png" -> "png"
@@ -343,25 +332,6 @@ object ImageBudget {
             // identity hash — collisions are tolerable here.
             System.identityHashCode(data).toString(16)
         }
-        val spilloverDir = java.io.File(sessionAttachmentsDir, "spillover")
-        if (!spilloverDir.exists()) {
-            try {
-                spilloverDir.mkdirs()
-            } catch (e: Exception) {
-                AppLogger.warning(TAG, "ensureSpillover mkdirs failed: ${e.message}")
-                return null
-            }
-        }
-        val file = java.io.File(spilloverDir, "$sha.$ext")
-        if (!file.exists()) {
-            try {
-                file.writeBytes(data)
-            } catch (e: Exception) {
-                AppLogger.warning(TAG, "ensureSpillover write failed: ${e.message}")
-                return null
-            }
-        }
-        // Mirrors uploads mount (see ChatViewModel.prepareUserAttachments).
-        return "/var/minis/attachments/spillover/$sha.$ext"
+        return sha to ext
     }
 }

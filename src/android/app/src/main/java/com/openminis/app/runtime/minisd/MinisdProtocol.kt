@@ -51,6 +51,7 @@ object MinisdProtocol {
     const val ERROR_RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
     const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
     const val ERROR_POLICY_DENIED = "POLICY_DENIED"
+    const val ERROR_BAD_PARAMS = "BAD_PARAMS"
 
     private const val HELPER_NAMESPACE_FAILED = 4
     private const val HELPER_CHROOT_FAILED = 5
@@ -238,6 +239,36 @@ object MinisdProtocol {
 
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
+
+    fun workspaceFile(
+        operation: String,
+        sessionId: String? = null,
+        sourceSessionId: String? = null,
+        destinationSessionId: String? = null,
+        path: String? = null,
+        source: String? = null,
+        destination: String? = null,
+        dataBase64: String? = null,
+        offset: Long? = null,
+        length: Int? = null,
+        limit: Int? = null,
+        createDirs: Boolean? = null,
+        id: Long = 1,
+    ): MinisdRequest {
+        val params = JSONObject().put("operation", operation)
+        sessionId?.takeIf { it.isNotEmpty() }?.let { params.put("session_id", it) }
+        sourceSessionId?.takeIf { it.isNotEmpty() }?.let { params.put("source_session_id", it) }
+        destinationSessionId?.takeIf { it.isNotEmpty() }?.let { params.put("destination_session_id", it) }
+        path?.let { params.put("path", it) }
+        source?.let { params.put("source", it) }
+        destination?.let { params.put("destination", it) }
+        dataBase64?.let { params.put("data_base64", it) }
+        offset?.let { params.put("offset", it) }
+        length?.let { params.put("length", it) }
+        limit?.let { params.put("limit", it) }
+        createDirs?.let { params.put("create_dirs", it) }
+        return MinisdRequest(id = id, method = "workspace.file", params = params)
+    }
 
     fun rootExec(
         tool: String,

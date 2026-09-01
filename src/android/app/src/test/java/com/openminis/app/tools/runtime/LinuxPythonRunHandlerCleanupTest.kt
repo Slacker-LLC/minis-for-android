@@ -4,8 +4,6 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
@@ -13,7 +11,7 @@ import java.nio.file.Files
 class LinuxPythonRunHandlerCleanupTest {
 
     @Test
-    fun runtimeFailureStillDeletesTemporaryPythonScript() = runBlocking {
+    fun runtimeUnavailableFailsClosedWithoutCreatingTemporaryPythonScript() = runBlocking {
         val filesDir = Files.createTempDirectory("minis-python-cleanup").toFile()
         val context = TestContext(filesDir)
         val sessionId = "issue29-python-cleanup"
@@ -29,10 +27,7 @@ class LinuxPythonRunHandlerCleanupTest {
             )
 
             assertFalse(result.success)
-            assertTrue(workspace.isDirectory)
-            val leftovers = workspace.listFiles { file -> file.name.startsWith("python_run_") }
-            assertNotNull(leftovers)
-            assertTrue("temporary python script was not deleted", leftovers!!.isEmpty())
+            assertFalse("runtime-unavailable execution must not touch canonical storage", workspace.exists())
         } finally {
             com.openminis.app.runtime.ubuntu.UbuntuPaths.resetLayoutForTest()
             filesDir.deleteRecursively()

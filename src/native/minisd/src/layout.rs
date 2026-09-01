@@ -333,7 +333,9 @@ fn ensure_non_tmpfs_directory(label: &str, path: &Path) -> Result<(), String> {
             std::io::Error::last_os_error()
         ));
     }
-    reject_tmpfs_type(label, &canonical, stat.f_type as u64)
+    #[allow(clippy::unnecessary_cast)]
+    let fs_type = stat.f_type as u64;
+    reject_tmpfs_type(label, &canonical, fs_type)
 }
 
 #[cfg(not(unix))]

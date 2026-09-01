@@ -170,15 +170,10 @@ class LinuxPythonRunHandler : ToolHandler {
         } catch (c: CancellationException) {
             cancelled = c
         } finally {
-            val host = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(
-                sessionId,
-                scriptPath,
-                context,
-            )
             cleanupFailure = when {
-                host == null -> "CLEANUP_FAILURE: unable to resolve temporary script $scriptPath"
-                !host.exists() -> null
-                host.delete() -> null
+                runCatching {
+                    com.openminis.app.runtime.minisd.WorkspaceFileClient.delete(sessionId, scriptPath)
+                }.isSuccess -> null
                 else -> "CLEANUP_FAILURE: unable to delete temporary script $scriptPath"
             }
         }
