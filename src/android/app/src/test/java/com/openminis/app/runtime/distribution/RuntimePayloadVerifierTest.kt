@@ -333,7 +333,7 @@ class RuntimePayloadVerifierTest {
     fun `rootfs metadata release mismatch is rejected`() {
         val archive = gzip(rootfsTar(metadata = JSONObject()
             .put("distro", "ubuntu")
-            .put("version", "22.04")
+            .put("version", "24.04")
             .put("release", "22.04")
             .put("arch", "arm64")
             .put("profile", "base")
