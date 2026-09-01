@@ -141,6 +141,9 @@ fn start_ubuntu_with_layout(state: &mut AppState, req: &Request) -> Response {
                 state.ubuntu.memory = memory;
                 state.ubuntu.skills = skills;
                 state.ubuntu.shared = shared;
+                if !state.mock {
+                    crate::config_proxy::ensure_started(state.policy.caller.app_uid);
+                }
             }
             Response::ok(req.id, v)
         }
@@ -279,6 +282,12 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
             };
             state.workspace_quota_bytes = n;
             Response::ok(req.id, json!({"quota_bytes": n}))
+        }
+        "runtime.maintenance" => {
+            match crate::runtime_maintenance::handle(state.mock, &req.params) {
+                Ok(value) => Response::ok(req.id, value),
+                Err((code, detail)) => Response::err(req.id, code, detail),
+            }
         }
         "policy.get" => Response::ok(
             req.id,

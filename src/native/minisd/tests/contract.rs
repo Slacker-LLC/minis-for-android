@@ -39,6 +39,7 @@ fn t_i1_every_known_method_has_shaped_response() {
             "ubuntu.exec" => json!({"argv":["/usr/bin/id"]}),
             "ubuntu.adminExec" => json!({"argv":["/usr/bin/apt-get","update"]}),
             "ubuntu.provision" => json!({}),
+            "runtime.maintenance" => json!({"operation":"probe","target":"canonical"}),
             "exec.cancel" => json!({"execution_id":"contract-missing-execution"}),
             "proc.killTree" => json!({"session":"s-contract"}),
             "workspace.file" => json!({"operation":"info","session_id":"s-contract","path":"."}),

@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import org.json.JSONObject
 
 /** App-side client for the already-installed minisd. */
 class MinisdClient(
@@ -71,6 +72,15 @@ class MinisdClient(
 
     suspend fun ubuntuProvision(timeoutMs: Long = 600_000): MinisdResponse =
         call(MinisdProtocol.ubuntuProvision(nextId()), timeoutMs + 5_000)
+
+    suspend fun runtimeMaintenance(
+        operation: String,
+        params: JSONObject = JSONObject(),
+        timeoutMs: Long = MinisdProtocol.RUNTIME_MAINTENANCE_TIMEOUT_MS,
+    ): MinisdResponse = call(
+        MinisdProtocol.runtimeMaintenance(operation, params, nextId()),
+        timeoutMs + 5_000,
+    )
 
     suspend fun workspaceFile(
         operation: String,
@@ -199,7 +209,7 @@ class MinisdClient(
         val payload = MinisdProtocol.encodeRequest(request)
         appSocketPath?.let { path ->
             if (File(path).exists()) {
-                val local = callLocal(path, payload, timeoutMs, cancellationKey)
+                val local = callLocal(path, payload, request, timeoutMs, cancellationKey)
                 if (local != null) {
                     if (local.code != "NOT_AUTHORIZED") return@withContext local
                     Log.w(TAG, "local minisd rejected app identity; retrying through su")
@@ -269,7 +279,7 @@ class MinisdClient(
             if (stdout.isBlank()) {
                 return@withContext unavailable("empty minisd response (exit=${proc.exitValue()} stderr=${stderr.take(300)})")
             }
-            MinisdProtocol.decodeResponse(stdout)
+            MinisdProtocol.validateResponse(MinisdProtocol.decodeResponse(stdout), request)
         } catch (cancelled: CancellationException) {
             proc.destroyForcibly()
             throw cancelled
@@ -285,6 +295,7 @@ class MinisdClient(
     private fun callLocal(
         path: String,
         payload: String,
+        request: MinisdRequest,
         timeoutMs: Long,
         cancellationKey: String?,
     ): MinisdResponse? {
@@ -311,7 +322,10 @@ class MinisdClient(
             }
             val response = ByteArray(responseSize)
             input.readFully(response)
-            MinisdProtocol.decodeResponse(response.toString(Charsets.UTF_8))
+            MinisdProtocol.validateResponse(
+                MinisdProtocol.decodeResponse(response.toString(Charsets.UTF_8)),
+                request,
+            )
         } catch (_: SocketTimeoutException) {
             transportTimeout("local minisd transport timed out after ${timeoutMs}ms")
         } catch (t: Throwable) {

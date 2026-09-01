@@ -14,7 +14,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -61,6 +60,13 @@ object UbuntuRuntime {
 
     private data class BrokerStartResult(
         val ok: Boolean,
+        val error: String? = null,
+    )
+
+    private data class RootCommandResult(
+        val completed: Boolean,
+        val exitCode: Int,
+        val output: String,
         val error: String? = null,
     )
 
@@ -131,9 +137,9 @@ object UbuntuRuntime {
         val deployment = com.openminis.app.runtime.distribution.RuntimeDistributionManager
             .ensureDeployed(
                 context = ctx,
-                runner = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootRunner {
-                        command ->
-                    runBlocking { runRoot(command) }
+                maintainer = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RuntimeMaintainer {
+                        operation, params ->
+                    client.runtimeMaintenance(operation, params)
                 },
                 stopKeeper = {
                     stopForDeployment()
@@ -426,11 +432,10 @@ object UbuntuRuntime {
     private suspend fun runRoot(
         command: String,
         timeoutMs: Long = 30_000,
-    ): com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootCommandResult =
+    ): RootCommandResult =
         withContext(Dispatchers.IO) {
             val su = findSu()
-                ?: return@withContext com.openminis.app.runtime.distribution
-                    .RuntimeDistributionManager.RootCommandResult(
+                ?: return@withContext RootCommandResult(
                         completed = false,
                         exitCode = -1,
                         output = "",
@@ -444,8 +449,7 @@ object UbuntuRuntime {
                 if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
                     process.destroyForcibly()
                     process.waitFor(1, TimeUnit.SECONDS)
-                    return@withContext com.openminis.app.runtime.distribution
-                        .RuntimeDistributionManager.RootCommandResult(
+                    return@withContext RootCommandResult(
                             completed = false,
                             exitCode = -1,
                             output = "",
@@ -455,11 +459,9 @@ object UbuntuRuntime {
                 val output = runCatching {
                     process.inputStream.bufferedReader().use { it.readText().trim() }
                 }.getOrDefault("")
-                com.openminis.app.runtime.distribution.RuntimeDistributionManager
-                    .RootCommandResult(true, process.exitValue(), output)
+                RootCommandResult(true, process.exitValue(), output)
             } catch (t: Throwable) {
-                com.openminis.app.runtime.distribution.RuntimeDistributionManager
-                    .RootCommandResult(false, -1, "", t.message)
+                RootCommandResult(false, -1, "", t.message)
             } finally {
                 process?.destroy()
             }
@@ -598,9 +600,9 @@ object UbuntuRuntime {
                 )
             }
             val result = com.openminis.app.runtime.distribution.RuntimeDistributionManager.resetRootfs(
-                runner = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootRunner {
-                        command ->
-                    runBlocking { runRoot(command) }
+                maintainer = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RuntimeMaintainer {
+                        operation, params ->
+                    client.runtimeMaintenance(operation, params)
                 },
                 stopKeeper = { stopForDeployment() },
             )

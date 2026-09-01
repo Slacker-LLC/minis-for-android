@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class MinisdProtocolTest {
@@ -33,6 +34,22 @@ class MinisdProtocolTest {
         assertFalse(err.ok)
         assertEquals("RUNTIME_UNAVAILABLE", err.code)
         assertEquals("rootfs missing", err.error!!.detail)
+    }
+
+    @Test
+    fun `response identity must match its request`() {
+        val request = MinisdProtocol.ping(9)
+        val response = MinisdProtocol.decodeResponse(
+            """{"v":1,"id":9,"ok":true,"result":{"pong":true}}""",
+        )
+
+        assertEquals(response, MinisdProtocol.validateResponse(response, request))
+        assertThrows(IllegalArgumentException::class.java) {
+            MinisdProtocol.validateResponse(response.copy(id = 10), request)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            MinisdProtocol.validateResponse(response.copy(v = 2), request)
+        }
     }
 
     @Test
@@ -209,6 +226,27 @@ class MinisdProtocolTest {
         val obj = JSONObject(raw)
         assertEquals("ubuntu.provision", obj.getString("method"))
         assertFalse(obj.getJSONObject("params").has("cmd"))
+    }
+
+    @Test
+    fun `runtime maintenance carries only structured operation fields`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.runtimeMaintenance(
+                operation = MinisdProtocol.RUNTIME_OP_SWITCH,
+                params = JSONObject()
+                    .put("transaction_id", "tx-1")
+                    .put("expected_sha256", "ab".repeat(32)),
+                id = 4,
+            ),
+        )
+        val obj = JSONObject(raw)
+        assertEquals("runtime.maintenance", obj.getString("method"))
+        val params = obj.getJSONObject("params")
+        assertEquals("switch", params.getString("operation"))
+        assertEquals("tx-1", params.getString("transaction_id"))
+        assertFalse(params.has("command"))
+        assertFalse(params.has("cmd"))
+        assertFalse(params.has("host_path"))
     }
 
     @Test

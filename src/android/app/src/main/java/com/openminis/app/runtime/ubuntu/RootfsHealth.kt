@@ -8,12 +8,14 @@ enum class RootfsHealthCode {
     CORRUPT,
     INCOMPATIBLE,
     ROOT_UNAVAILABLE,
+    UNKNOWN,
 }
 
 data class RootfsHealth(
     val code: RootfsHealthCode,
     val detail: String,
     val metadata: JSONObject? = null,
+    val provisioned: Boolean = false,
 ) {
     val healthy: Boolean get() = code == RootfsHealthCode.HEALTHY
 }

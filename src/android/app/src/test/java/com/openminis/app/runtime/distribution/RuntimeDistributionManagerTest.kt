@@ -3,10 +3,12 @@ package com.openminis.app.runtime.distribution
 import com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeployedIdentity
 import com.openminis.app.runtime.distribution.RuntimeDistributionManager.PendingTransaction
 import com.openminis.app.runtime.distribution.RuntimeDistributionManager.RecoveryDecision
-import com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootCommandResult
-import com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootRunner
+import com.openminis.app.runtime.distribution.RuntimeDistributionManager.RuntimeMaintainer
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
+import com.openminis.app.runtime.minisd.MinisdError
+import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.runtime.minisd.MinisdResponse
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -40,166 +42,119 @@ class RuntimeDistributionManagerTest {
         return RuntimeDistributionManifest.parse(text)
     }
 
-    private class FakeRunner(
+    private class FakeMaintainer(
         var canonicalMetadata: String? = healthyMetadataJson(),
         var previousMetadata: String? = null,
         var deployedContent: String? = null,
         var pendingContent: String? = null,
-        var deploySucceeds: Boolean = true,
         var stageSucceeds: Boolean = true,
         var verifySucceeds: Boolean = true,
-        var rootOutput: String = "0",
+        var deploySucceeds: Boolean = true,
+        var deployErrorCode: String = MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
         var canonicalBecomesHealthyAfterDeploy: Boolean = false,
+        var canonicalProvisioned: Boolean = true,
+        var previousProvisioned: Boolean = true,
+        var malformedProbe: Boolean = false,
         var rollbackSucceeds: Boolean = true,
-    ) : RootRunner {
-        val commands = mutableListOf<String>()
+        var stateReadSucceeds: Boolean = true,
+        var stateWriteSucceeds: Boolean = true,
+    ) : RuntimeMaintainer {
+        val operations = mutableListOf<Pair<String, JSONObject>>()
 
-        override fun run(command: String): RootCommandResult {
-            commands += command
-            return when {
-                command == "id -u" -> RootCommandResult(true, 0, rootOutput)
-                command == "cat '${RuntimeDistributionManager.DEPLOYED_FILE}'" ->
-                    if (deployedContent == null) RootCommandResult(true, 1, "") else RootCommandResult(true, 0, deployedContent!!)
-                command == "cat '${RuntimeDistributionManager.PENDING_FILE}'" ->
-                    if (pendingContent == null) RootCommandResult(true, 1, "") else RootCommandResult(true, 0, pendingContent!!)
-                command.startsWith("ROOTFS='/data/adb/minis/rootfs'") && command.contains("MINIS_ROOTFS:MISSING") ->
-                    if (canonicalMetadata == null) RootCommandResult(true, 0, "MINIS_ROOTFS:MISSING")
-                    else RootCommandResult(true, 0, "MINIS_ROOTFS:METADATA\n$canonicalMetadata")
-                command.startsWith("ROOTFS='/data/adb/minis/runtime/previous/rootfs'") && command.contains("MINIS_ROOTFS:MISSING") ->
-                    if (previousMetadata == null) RootCommandResult(true, 0, "MINIS_ROOTFS:MISSING")
-                    else RootCommandResult(true, 0, "MINIS_ROOTFS:METADATA\n$previousMetadata")
-                command.contains("pm path") ->
-                    if (stageSucceeds) RootCommandResult(true, 0, "staged") else RootCommandResult(false, -1, "", "stage failed")
-                command.contains("STAGED_ARCHIVE_OK") ->
-                    if (verifySucceeds) RootCommandResult(true, 0, "STAGED_ARCHIVE_OK: $rootfsSha") else RootCommandResult(true, 141, "STAGED_ARCHIVE_MISMATCH")
-                command.contains("MINIS_ROOTFS:DEPLOYED") ->
-                    if (deploySucceeds) {
-                        if (canonicalBecomesHealthyAfterDeploy) canonicalMetadata = healthyMetadataJson()
-                        RootCommandResult(true, 0, "MINIS_ROOTFS:DEPLOYED")
-                    } else {
-                        RootCommandResult(true, 91, "tar failed")
+        override suspend fun call(operation: String, params: JSONObject): MinisdResponse {
+            operations += operation to JSONObject(params.toString())
+            val id = operations.size.toLong()
+            return when (operation) {
+                MinisdProtocol.RUNTIME_OP_READ_STATE -> {
+                    if (!stateReadSucceeds) return error(id, "state read failed")
+                    val name = params.optString("name")
+                    val content = if (name == "pending") pendingContent else deployedContent
+                    ok(id, JSONObject().put("name", name).put("present", content != null).apply {
+                        content?.let { put("content", it) }
+                    })
+                }
+                MinisdProtocol.RUNTIME_OP_WRITE_STATE -> {
+                    if (!stateWriteSucceeds) return error(id, "state write failed")
+                    val name = params.optString("name")
+                    if (name == "pending") pendingContent = params.getString("content")
+                    if (name == "deployed") deployedContent = params.getString("content")
+                    ok(id)
+                }
+                MinisdProtocol.RUNTIME_OP_CLEAR_STATE -> {
+                    if (params.optString("name") == "pending") pendingContent = null
+                    if (params.optString("name") == "deployed") deployedContent = null
+                    ok(id)
+                }
+                MinisdProtocol.RUNTIME_OP_PROBE -> {
+                    if (malformedProbe) {
+                        return ok(id, JSONObject().put("code", "HEALTHY").put("healthy", true))
                     }
-                command.contains("MINIS_ROOTFS:ROLLED_BACK") ->
-                    if (rollbackSucceeds) {
-                        RootCommandResult(true, 0, "MINIS_ROOTFS:ROLLED_BACK")
+                    val metadata = if (params.optString("target") == "previous") {
+                        previousMetadata
                     } else {
-                        RootCommandResult(true, 121, "rollback failed")
+                        canonicalMetadata
                     }
-                command.startsWith("DIR=") -> RootCommandResult(true, 0, "state written")
-                command.startsWith("rm -f ") -> RootCommandResult(true, 0, "")
-                else -> RootCommandResult(true, 0, "")
+                    if (metadata == null) {
+                        ok(id, JSONObject()
+                            .put("code", "MISSING")
+                            .put("healthy", false)
+                            .put("detail", "missing"))
+                    } else {
+                        ok(id, JSONObject()
+                            .put("code", "HEALTHY")
+                            .put("healthy", true)
+                            .put("detail", "healthy")
+                            .put("metadata", JSONObject(metadata))
+                            .put(
+                                "provisioned",
+                                if (params.optString("target") == "previous") {
+                                    previousProvisioned
+                                } else {
+                                    canonicalProvisioned
+                                },
+                            ))
+                    }
+                }
+                MinisdProtocol.RUNTIME_OP_STAGE ->
+                    if (stageSucceeds) ok(id) else error(id, "stage failed")
+                MinisdProtocol.RUNTIME_OP_VERIFY ->
+                    if (verifySucceeds) ok(id, JSONObject().put("verified", true))
+                    else error(id, "digest mismatch")
+                MinisdProtocol.RUNTIME_OP_SWITCH -> {
+                    if (!deploySucceeds) return error(id, "switch failed", deployErrorCode)
+                    if (canonicalBecomesHealthyAfterDeploy) canonicalMetadata = healthyMetadataJson()
+                    ok(id, JSONObject().put("switched", true))
+                }
+                MinisdProtocol.RUNTIME_OP_ROLLBACK ->
+                    if (rollbackSucceeds) ok(id) else error(id, "rollback failed")
+                MinisdProtocol.RUNTIME_OP_RESET -> ok(id, JSONObject().put("reset", true))
+                else -> error(id, "unknown operation")
             }
         }
-    }
 
-    @Test
-    fun `deploy command extracts then validates then swaps atomically`() {
-        val command = RuntimeDistributionManager.deployRootfsCommand("tx-1")
-
-        val extractAt = command.indexOf("tar -xzf")
-        val layoutAt = command.indexOf("etc/minis/rootfs.json")
-        val metadataAt = command.indexOf("grep -Eq '\"profile\"")
-        val moveCurrent = command.indexOf("mv \"\$ROOTFS\" \"\$PREV\"")
-        val moveStage = command.indexOf("mv \"\$STAGE\" \"\$ROOTFS\"")
-        val rollbackGuard = command.indexOf("mv \"\$PREV\" \"\$ROOTFS\"")
-
-        assertTrue(extractAt >= 0)
-        assertTrue(layoutAt > extractAt)
-        assertTrue(metadataAt > layoutAt)
-        assertTrue(moveCurrent > metadataAt)
-        assertTrue(moveStage > moveCurrent)
-        assertTrue(rollbackGuard > moveStage)
-        assertTrue(command.contains("MINIS_ROOTFS:DEPLOYED"))
-    }
-
-    @Test
-    fun `deploy command never names user data directories`() {
-        val command = RuntimeDistributionManager.deployRootfsCommand("tx-1")
-
-        for (userPath in listOf(
-            "/data/adb/minis/workspace",
-            "/data/adb/minis/sessions",
-            "/data/adb/minis/memory",
-            "/data/adb/minis/skills",
-            "/data/adb/minis/shared",
-            "/data/adb/minis/home",
-        )) {
-            assertFalse("deploy command must not touch $userPath", command.contains(userPath))
-        }
-    }
-
-    @Test
-    fun `rollback command moves previous into canonical and never names user data`() {
-        val command = RuntimeDistributionManager.rollbackRootfsCommand()
-
-        assertTrue(command.contains("mv \"\$PREV\" \"\$ROOTFS\""))
-        assertTrue(command.contains("MINIS_ROOTFS:ROLLED_BACK"))
-        for (userPath in listOf(
-            "/data/adb/minis/workspace",
-            "/data/adb/minis/sessions",
-            "/data/adb/minis/memory",
-            "/data/adb/minis/skills",
-            "/data/adb/minis/shared",
-            "/data/adb/minis/home",
-        )) {
-            assertFalse("rollback command must not touch $userPath", command.contains(userPath))
-        }
-    }
-
-    @Test
-    fun `reset command only removes runtime-owned paths`() {
-        val command = RuntimeDistributionManager.resetRootfsCommand()
-
-        assertTrue(command.contains("/data/adb/minis/rootfs"))
-        assertTrue(command.contains("RUNTIME='/data/adb/minis/runtime'"))
-        assertTrue(command.contains("\"\$RUNTIME/staging\""))
-        assertTrue(command.contains("\"\$RUNTIME/previous\""))
-        assertTrue(command.contains("MINIS_ROOTFS:RESET"))
-        for (userPath in listOf(
-            "/data/adb/minis/workspace",
-            "/data/adb/minis/sessions",
-            "/data/adb/minis/memory",
-            "/data/adb/minis/skills",
-            "/data/adb/minis/shared",
-            "/data/adb/minis/home",
-        )) {
-            assertFalse("reset command must not touch $userPath", command.contains(userPath))
-        }
-    }
-
-    @Test
-    fun `state file write is atomic and quoted`() {
-        val command = RuntimeDistributionManager.writeStateFileCommand(
-            "/data/adb/minis/runtime/pending.json",
-            """{"a":"it's"}""",
+        private fun ok(id: Long, result: JSONObject = JSONObject()) = MinisdResponse(
+            v = 1,
+            id = id,
+            ok = true,
+            result = result,
+            error = null,
         )
 
-        assertTrue(command.contains("mkdir -p"))
-        assertTrue(command.contains(".tmp."))
-        assertTrue(command.contains("mv -f"))
-        assertTrue(command.contains("it'\"'\"'s"))
+        private fun error(
+            id: Long,
+            detail: String,
+            code: String = MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+        ) = MinisdResponse(
+            v = 1,
+            id = id,
+            ok = false,
+            result = null,
+            error = MinisdError(code, detail),
+        )
     }
 
     @Test
-    fun `verify staged archive compares exact digest`() {
-        val command = RuntimeDistributionManager.verifyStagedArchiveCommand(rootfsSha)
-
-        assertTrue(command.contains(rootfsSha))
-        assertTrue(command.contains("sha256sum"))
-        assertTrue(command.contains("STAGED_ARCHIVE_MISMATCH"))
-        assertTrue(command.contains("STAGED_ARCHIVE_OK"))
-    }
-
-    @Test
-    fun `stage command passes the app package name`() {
-        val command = RuntimeDistributionManager.stageArchiveCommand("dev.openminispet.android")
-
-        assertTrue(command.contains("dev.openminispet.android"))
-        assertTrue(command.contains("pm path"))
-    }
-
-    @Test
-    fun `deployed identity round trips and matches manifest`() {
+    fun deployedIdentityRoundTripsAndMatchesManifest() {
         val json = JSONObject()
             .put("schemaVersion", 2)
             .put("rootfsVersion", manifest().rootfsVersion)
@@ -214,7 +169,7 @@ class RuntimeDistributionManagerTest {
     }
 
     @Test
-    fun `deployed identity rejects invalid fields`() {
+    fun deployedIdentityRejectsInvalidFields() {
         val bad = JSONObject()
             .put("schemaVersion", 2)
             .put("rootfsVersion", "x")
@@ -226,7 +181,7 @@ class RuntimeDistributionManagerTest {
     }
 
     @Test
-    fun `pending transaction round trips and matches manifest`() {
+    fun pendingTransactionRoundTripsAndMatchesManifest() {
         val manifest = manifest()
         val pending = PendingTransaction(
             transactionId = "tx-1",
@@ -234,483 +189,177 @@ class RuntimeDistributionManagerTest {
             targetRootfsSha256 = rootfsSha,
             targetMinisdSha256 = minisdSha,
             targetProvisionRevision = manifest.provisionRevision,
-            previousRootfsVersion = "ubuntu-24.04-r0-0000000000000000",
+            previousIdentity = DeployedIdentity(
+                rootfsVersion = "ubuntu-24.04-r1-0000000000000000",
+                rootfsSha256 = "0".repeat(64),
+                minisdSha256 = minisdSha,
+                provisionRevision = 1,
+            ),
         )
 
         val parsed = PendingTransaction.parse(pending.toJson())
         assertTrue(parsed.matches(manifest))
         assertEquals("tx-1", parsed.transactionId)
-        assertEquals("ubuntu-24.04-r0-0000000000000000", parsed.previousRootfsVersion)
+        assertEquals("ubuntu-24.04-r1-0000000000000000", parsed.previousIdentity?.rootfsVersion)
+        assertEquals(RuntimeDistributionManager.PendingPhase.PREPARED, parsed.phase)
     }
 
     @Test
-    fun `pending transaction rejects corrupt schema`() {
+    fun pendingTransactionRejectsCorruptSchema() {
         val bad = JSONObject().put("schemaVersion", 1).put("transactionId", "x").toString()
         assertThrows(IllegalArgumentException::class.java) { PendingTransaction.parse(bad) }
     }
 
     @Test
-    fun `pending transaction with a different target fails closed`() = runBlocking {
+    fun recoveryDecisionsAreFailClosed() {
+        assertEquals(
+            RecoveryDecision.COMPLETE,
+            RuntimeDistributionManager.decideRecovery(
+                RuntimeDistributionManager.PendingPhase.SWITCHING,
+                canonicalMatchesTarget = true,
+                previousMatchesExpected = false,
+            ),
+        )
+        assertEquals(
+            RecoveryDecision.ROLLBACK,
+            RuntimeDistributionManager.decideRecovery(
+                RuntimeDistributionManager.PendingPhase.SWITCHING,
+                canonicalMatchesTarget = false,
+                previousMatchesExpected = true,
+            ),
+        )
+        assertEquals(
+            RecoveryDecision.REDEPLOY,
+            RuntimeDistributionManager.decideRecovery(
+                RuntimeDistributionManager.PendingPhase.PREPARED,
+                canonicalMatchesTarget = false,
+                previousMatchesExpected = true,
+            ),
+        )
+        assertEquals(
+            RecoveryDecision.REFUSE,
+            RuntimeDistributionManager.decideRecovery(
+                RuntimeDistributionManager.PendingPhase.SWITCHING,
+                canonicalMatchesTarget = false,
+                previousMatchesExpected = false,
+            ),
+        )
+    }
+
+    @Test
+    fun rootfsMatchesManifestOnlyOnFullIdentity() {
+        val manifest = manifest()
+        assertTrue(RuntimeDistributionManager.rootfsMatchesManifest(healthyRootfsHealth(), manifest))
+        assertFalse(
+            RuntimeDistributionManager.rootfsMatchesManifest(
+                RootfsHealth(
+                    RootfsHealthCode.HEALTHY,
+                    "wrong release",
+                    JSONObject(healthyMetadataJson()).put("release", "22.04"),
+                ),
+                manifest,
+            ),
+        )
+        assertFalse(RuntimeDistributionManager.rootfsMatchesManifest(
+            RootfsHealth(RootfsHealthCode.CORRUPT, "corrupt"),
+            manifest,
+        ))
+    }
+
+    @Test
+    fun freshInstallUsesOnlyStructuredMaintenanceOperations() = runBlocking {
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
+        val names = maintainer.operations.map { it.first }
+        assertTrue(names.containsAll(listOf(
+            MinisdProtocol.RUNTIME_OP_STAGE,
+            MinisdProtocol.RUNTIME_OP_VERIFY,
+            MinisdProtocol.RUNTIME_OP_SWITCH,
+            MinisdProtocol.RUNTIME_OP_WRITE_STATE,
+            MinisdProtocol.RUNTIME_OP_CLEAR_STATE,
+        )))
+        assertFalse(maintainer.operations.any { it.second.has("command") || it.second.has("cmd") })
+        assertFalse(maintainer.operations.any { it.second.toString().contains("/data/user/0") })
+    }
+
+    @Test
+    fun matchingHealthyDeploymentDoesNotSwitch() = runBlocking {
         val current = manifest()
-        val pendingManifest = manifest(rootfsSha256 = "0".repeat(64))
-        val runner = FakeRunner(
+        val maintainer = FakeMaintainer(
+            deployedContent = JSONObject()
+                .put("schemaVersion", 2)
+                .put("rootfsVersion", current.rootfsVersion)
+                .put("rootfsSha256", rootfsSha)
+                .put("minisdSha256", minisdSha)
+                .put("provisionRevision", 1)
+                .toString(),
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            current,
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.MATCHED, result.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_SWITCH })
+    }
+
+    @Test
+    fun pendingDifferentTargetRefusesRecovery() = runBlocking {
+        val current = manifest()
+        val old = manifest(rootfsSha256 = "0".repeat(64))
+        val maintainer = FakeMaintainer(
             pendingContent = PendingTransaction(
                 transactionId = "tx-old",
-                targetRootfsVersion = pendingManifest.rootfsVersion,
-                targetRootfsSha256 = pendingManifest.rootfsSha256,
-                targetMinisdSha256 = pendingManifest.minisdSha256,
-                targetProvisionRevision = pendingManifest.provisionRevision,
+                targetRootfsVersion = old.rootfsVersion,
+                targetRootfsSha256 = old.rootfsSha256,
+                targetMinisdSha256 = old.minisdSha256,
+                targetProvisionRevision = old.provisionRevision,
             ).toJson(),
         )
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
             "dev.openminispet.android",
-            runner,
+            maintainer,
             stopKeeper = { true },
         )
 
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertTrue(result.detail.contains("different runtime"))
-        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_SWITCH })
     }
 
     @Test
-    fun `recovery decides complete when canonical matches target`() {
-        assertEquals(
-            RecoveryDecision.COMPLETE,
-            RuntimeDistributionManager.decideRecovery(true, true, false),
-        )
-        assertEquals(
-            RecoveryDecision.COMPLETE,
-            RuntimeDistributionManager.decideRecovery(true, true, true),
-        )
-    }
-
-    @Test
-    fun `recovery rolls back when canonical is broken and previous exists`() {
-        assertEquals(
-            RecoveryDecision.ROLLBACK,
-            RuntimeDistributionManager.decideRecovery(false, false, true),
-        )
-        assertEquals(
-            RecoveryDecision.ROLLBACK,
-            RuntimeDistributionManager.decideRecovery(true, false, true),
-        )
-    }
-
-    @Test
-    fun `recovery redeploys when neither canonical nor previous is valid`() {
-        assertEquals(
-            RecoveryDecision.REDEPLOY,
-            RuntimeDistributionManager.decideRecovery(false, false, false),
-        )
-    }
-
-    @Test
-    fun `rootfs matches manifest only on full identity`() {
-        val manifest = manifest()
-        assertTrue(RuntimeDistributionManager.rootfsMatchesManifest(healthyRootfsHealth(), manifest))
-        assertFalse(
-            RuntimeDistributionManager.rootfsMatchesManifest(
-                RootfsHealth(RootfsHealthCode.HEALTHY, "ok", JSONObject(
-                    JSONObject(healthyMetadataJson()).put("release", "22.04"),
-                )),
-                manifest,
-            ),
-        )
-        assertFalse(
-            RuntimeDistributionManager.rootfsMatchesManifest(
-                RootfsHealth(RootfsHealthCode.CORRUPT, "corrupt"),
-                manifest,
-            ),
-        )
-        assertFalse(
-            RuntimeDistributionManager.rootfsMatchesManifest(
-                RootfsHealth(
-                    RootfsHealthCode.HEALTHY,
-                    "wrong revision",
-                    JSONObject(healthyMetadataJson()).put("revision", 2),
-                ),
-                manifest,
-            ),
-        )
-    }
-
-    @Test
-    fun `fresh install deploys and commits`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-        )
-        val stopCalls = mutableListOf<Boolean>()
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { stopCalls += true; true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
-        val joined = runner.commands.joinToString("\n")
-        assertTrue(joined.contains("FILE='/data/adb/minis/runtime/pending.json'"))
-        assertTrue(joined.contains("dev.openminispet.android"))
-        assertTrue(joined.contains("STAGED_ARCHIVE_OK"))
-        assertTrue(joined.contains("MINIS_ROOTFS:DEPLOYED"))
-        assertTrue(joined.contains("FILE='/data/adb/minis/runtime/deployed.json'"))
-        assertTrue(joined.contains("rm -f '/data/adb/minis/runtime/pending.json'"))
-        assertEquals(1, stopCalls.size)
-        val deployAt = joined.indexOf("MINIS_ROOTFS:DEPLOYED")
-        assertTrue(deployAt >= 0)
-    }
-
-    @Test
-    fun `deployed matching manifest with healthy canonical is matched`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = healthyMetadataJson(),
-            deployedContent = JSONObject()
-                .put("schemaVersion", 2)
-                .put("rootfsVersion", manifest.rootfsVersion)
-                .put("rootfsSha256", rootfsSha)
-                .put("minisdSha256", minisdSha)
-                .put("provisionRevision", 1)
-                .toString(),
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.MATCHED, result.outcome)
-        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
-    }
-
-    @Test
-    fun `deployed matching manifest with corrupt canonical redeploys`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-            deployedContent = JSONObject()
-                .put("schemaVersion", 2)
-                .put("rootfsVersion", manifest.rootfsVersion)
-                .put("rootfsSha256", rootfsSha)
-                .put("minisdSha256", minisdSha)
-                .put("provisionRevision", 1)
-                .toString(),
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
-    }
-
-    @Test
-    fun `interrupted upgrade with healthy canonical target completes and commits`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = healthyMetadataJson(),
+    fun interruptedHealthyUpgradeCompletesAfterProvision() = runBlocking {
+        val current = manifest()
+        val maintainer = FakeMaintainer(
             pendingContent = PendingTransaction(
                 transactionId = "tx-9",
-                targetRootfsVersion = manifest.rootfsVersion,
-                targetRootfsSha256 = rootfsSha,
-                targetMinisdSha256 = minisdSha,
-                targetProvisionRevision = manifest.provisionRevision,
-            ).toJson(),
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.RECOVERED, result.outcome)
-        val joined = runner.commands.joinToString("\n")
-        assertTrue(joined.contains("FILE='/data/adb/minis/runtime/deployed.json'"))
-        assertTrue(joined.contains("rm -f '/data/adb/minis/runtime/pending.json'"))
-        assertFalse(joined.contains("MINIS_ROOTFS:DEPLOYED"))
-    }
-
-    @Test
-    fun `interrupted upgrade with broken canonical and valid previous rolls back`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            previousMetadata = healthyMetadataJson(),
-            pendingContent = PendingTransaction(
-                transactionId = "tx-9",
-                targetRootfsVersion = manifest.rootfsVersion,
-                targetRootfsSha256 = rootfsSha,
-                targetMinisdSha256 = minisdSha,
-                targetProvisionRevision = manifest.provisionRevision,
-            ).toJson(),
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.ROLLED_BACK, result.outcome)
-        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `interrupted upgrade with no usable rootfs redeploys`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-            pendingContent = PendingTransaction(
-                transactionId = "tx-9",
-                targetRootfsVersion = manifest.rootfsVersion,
-                targetRootfsSha256 = rootfsSha,
-                targetMinisdSha256 = minisdSha,
-                targetProvisionRevision = manifest.provisionRevision,
-            ).toJson(),
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
-        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
-    }
-
-    @Test
-    fun `corrupt pending transaction fails closed`() = runBlocking {
-        val runner = FakeRunner(pendingContent = """{"broken": true}""")
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(result.detail.contains("pending transaction"))
-        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
-    }
-
-    @Test
-    fun `missing root fails closed`() = runBlocking {
-        val runner = FakeRunner(rootOutput = "1")
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.ROOT_UNAVAILABLE, result.outcome)
-    }
-
-    @Test
-    fun `staging failure aborts and clears pending`() = runBlocking {
-        val runner = FakeRunner(canonicalMetadata = null, stageSucceeds = false)
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `deploy failure aborts and clears pending`() = runBlocking {
-        val runner = FakeRunner(canonicalMetadata = null, deploySucceeds = false)
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `keeper stop failure aborts and clears pending`() = runBlocking {
-        val runner = FakeRunner(canonicalMetadata = null)
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { false },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `rootfs reset refuses to run when keeper cannot stop`() = runBlocking {
-        val runner = FakeRunner()
-
-        val result = RuntimeDistributionManager.resetRootfs(runner) { false }
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(result.detail.contains("stop keeper"))
-        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:RESET") })
-    }
-
-    @Test
-    fun `canonical mismatch after deploy rolls back and fails`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            previousMetadata = healthyMetadataJson(),
-        )
-        runner.canonicalMetadata = null
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-    }
-
-    @Test
-    fun `deployment order stages before stopping keeper before switching`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-        )
-        var stopRan = false
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { stopRan = true; true },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
-        val stageAt = runner.commands.indexOfFirst { it.contains("pm path") }
-        val deployAt = runner.commands.indexOfFirst { it.contains("MINIS_ROOTFS:DEPLOYED") }
-        assertTrue(stageAt in 0 until deployAt)
-        assertTrue(stopRan)
-    }
-
-    @Test
-    fun `provision failure on fresh deploy rolls back and clears pending`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-        )
-        var started = false
-        var stopped = false
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { stopped = true; true },
-            startKeeper = { started = true; true },
-            provision = { false },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(result.detail.contains("provision failed"))
-        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-        assertFalse(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
-        assertTrue(started)
-        assertTrue(stopped)
-    }
-
-    @Test
-    fun `rollback failure retains pending transaction`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-            rollbackSucceeds = false,
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-            startKeeper = { true },
-            provision = { false },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(result.detail.contains("rollback not confirmed"))
-        assertFalse(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `start keeper failure on fresh deploy rolls back and clears pending`() = runBlocking {
-        val runner = FakeRunner(
-            canonicalMetadata = null,
-            canonicalBecomesHealthyAfterDeploy = true,
-        )
-
-        val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(),
-            "dev.openminispet.android",
-            runner,
-            stopKeeper = { true },
-            startKeeper = { false },
-        )
-
-        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-    }
-
-    @Test
-    fun `interrupted upgrade completes only after provision succeeds`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = healthyMetadataJson(),
-            pendingContent = PendingTransaction(
-                transactionId = "tx-9",
-                targetRootfsVersion = manifest.rootfsVersion,
-                targetRootfsSha256 = rootfsSha,
-                targetMinisdSha256 = minisdSha,
-                targetProvisionRevision = manifest.provisionRevision,
+                targetRootfsVersion = current.rootfsVersion,
+                targetRootfsSha256 = current.rootfsSha256,
+                targetMinisdSha256 = current.minisdSha256,
+                targetProvisionRevision = current.provisionRevision,
             ).toJson(),
         )
         var provisionCalls = 0
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
+            current,
             "dev.openminispet.android",
-            runner,
+            maintainer,
             stopKeeper = { true },
             startKeeper = { true },
             provision = { provisionCalls += 1; true },
@@ -718,37 +367,296 @@ class RuntimeDistributionManagerTest {
 
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.RECOVERED, result.outcome)
         assertEquals(1, provisionCalls)
-        assertTrue(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
     }
 
     @Test
-    fun `interrupted upgrade rolls back when provision fails`() = runBlocking {
-        val manifest = manifest()
-        val runner = FakeRunner(
-            canonicalMetadata = healthyMetadataJson(),
+    fun interruptedTargetProvisionFailureWithoutPreviousIdentityRetainsPending() = runBlocking {
+        val current = manifest()
+        val maintainer = FakeMaintainer(
             pendingContent = PendingTransaction(
-                transactionId = "tx-9",
-                targetRootfsVersion = manifest.rootfsVersion,
-                targetRootfsSha256 = rootfsSha,
-                targetMinisdSha256 = minisdSha,
-                targetProvisionRevision = manifest.provisionRevision,
+                transactionId = "tx-no-previous",
+                targetRootfsVersion = current.rootfsVersion,
+                targetRootfsSha256 = current.rootfsSha256,
+                targetMinisdSha256 = current.minisdSha256,
+                targetProvisionRevision = current.provisionRevision,
+                phase = RuntimeDistributionManager.PendingPhase.SWITCHING,
             ).toJson(),
         )
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest,
+            current,
             "dev.openminispet.android",
-            runner,
+            maintainer,
             stopKeeper = { true },
             startKeeper = { true },
             provision = { false },
         )
 
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
-        assertTrue(runner.commands.any { it.contains("MINIS_ROOTFS:ROLLED_BACK") })
-        assertTrue(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
-        assertFalse(runner.commands.any { it.contains("FILE='/data/adb/minis/runtime/deployed.json'") })
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+        assertFalse(maintainer.operations.any {
+            it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE && it.second.optString("name") == "pending"
+        })
+    }
+
+    @Test
+    fun interruptedBrokenUpgradeRollsBackAndClearsPending() = runBlocking {
+        val current = manifest()
+        val previous = manifest(rootfsSha256 = "0".repeat(64))
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            previousMetadata = healthyMetadataJson(archiveSha256 = previous.rootfsSha256),
+            pendingContent = PendingTransaction(
+                transactionId = "tx-9",
+                targetRootfsVersion = current.rootfsVersion,
+                targetRootfsSha256 = current.rootfsSha256,
+                targetMinisdSha256 = current.minisdSha256,
+                targetProvisionRevision = current.provisionRevision,
+                previousIdentity = DeployedIdentity(
+                    rootfsVersion = previous.rootfsVersion,
+                    rootfsSha256 = previous.rootfsSha256,
+                    minisdSha256 = previous.minisdSha256,
+                    provisionRevision = previous.provisionRevision,
+                ),
+                phase = RuntimeDistributionManager.PendingPhase.SWITCHING,
+            ).toJson(),
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            current,
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.ROLLED_BACK, result.outcome)
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
+    }
+
+    @Test
+    fun preparedUpgradeNeverRollsBackAnUnrelatedPreviousSlot() = runBlocking {
+        val current = manifest()
+        val old = manifest(rootfsSha256 = "0".repeat(64))
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = healthyMetadataJson(archiveSha256 = old.rootfsSha256),
+            previousMetadata = healthyMetadataJson(archiveSha256 = "1".repeat(64)),
+            canonicalBecomesHealthyAfterDeploy = true,
+            pendingContent = PendingTransaction(
+                transactionId = "tx-prepared",
+                targetRootfsVersion = current.rootfsVersion,
+                targetRootfsSha256 = current.rootfsSha256,
+                targetMinisdSha256 = current.minisdSha256,
+                targetProvisionRevision = current.provisionRevision,
+                previousIdentity = DeployedIdentity(
+                    rootfsVersion = old.rootfsVersion,
+                    rootfsSha256 = old.rootfsSha256,
+                    minisdSha256 = old.minisdSha256,
+                    provisionRevision = old.provisionRevision,
+                ),
+            ).toJson(),
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            current,
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+    }
+
+    @Test
+    fun stagingFailureClearsPending() = runBlocking {
+        val maintainer = FakeMaintainer(canonicalMetadata = null, stageSucceeds = false)
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
+    }
+
+    @Test
+    fun switchFailureBeforeExchangeClearsPending() = runBlocking {
+        val maintainer = FakeMaintainer(canonicalMetadata = null, deploySucceeds = false)
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
+    }
+
+    @Test
+    fun unknownSwitchOutcomeRetainsPendingForRecovery() = runBlocking {
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            deploySucceeds = false,
+            deployErrorCode = MinisdProtocol.ERROR_RUNTIME_SWITCH_UNKNOWN,
+        )
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("pending transaction retained"))
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
+    }
+
+    @Test
+    fun keeperStopFailureClearsPendingBeforeSwitch() = runBlocking {
+        val maintainer = FakeMaintainer(canonicalMetadata = null)
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { false },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_SWITCH })
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
+    }
+
+    @Test
+    fun provisionFailureRollsBackAndKeepsDeployedIdentityUnchanged() = runBlocking {
+        val previous = manifest(rootfsSha256 = "0".repeat(64))
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            previousMetadata = healthyMetadataJson(archiveSha256 = previous.rootfsSha256),
+            deployedContent = JSONObject()
+                .put("schemaVersion", 2)
+                .put("rootfsVersion", previous.rootfsVersion)
+                .put("rootfsSha256", previous.rootfsSha256)
+                .put("minisdSha256", previous.minisdSha256)
+                .put("provisionRevision", previous.provisionRevision)
+                .toString(),
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+        assertFalse(maintainer.operations.any {
+            it.first == MinisdProtocol.RUNTIME_OP_WRITE_STATE && it.second.optString("name") == "deployed"
+        })
+    }
+
+    @Test
+    fun provisionFailureWithoutPreviousIdentityRetainsPendingTransaction() = runBlocking {
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("no matching previous identity"))
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+        assertFalse(maintainer.operations.any {
+            it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE && it.second.optString("name") == "pending"
+        })
+    }
+
+    @Test
+    fun rollbackFailureRetainsPendingTransaction() = runBlocking {
+        val previous = manifest(rootfsSha256 = "0".repeat(64))
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            previousMetadata = healthyMetadataJson(archiveSha256 = previous.rootfsSha256),
+            deployedContent = JSONObject()
+                .put("schemaVersion", 2)
+                .put("rootfsVersion", previous.rootfsVersion)
+                .put("rootfsSha256", previous.rootfsSha256)
+                .put("minisdSha256", previous.minisdSha256)
+                .put("provisionRevision", previous.provisionRevision)
+                .toString(),
+            canonicalBecomesHealthyAfterDeploy = true,
+            rollbackSucceeds = false,
+        )
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("rollback not confirmed"))
+        assertFalse(maintainer.operations.any {
+            it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE && it.second.optString("name") == "pending"
+        })
+    }
+
+    @Test
+    fun stateReadFailureDoesNotRedeploy() = runBlocking {
+        val maintainer = FakeMaintainer(stateReadSucceeds = false)
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_STAGE })
+    }
+
+    @Test
+    fun malformedProbeDoesNotRedeploy() = runBlocking {
+        val maintainer = FakeMaintainer(malformedProbe = true)
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+        )
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_STAGE })
+    }
+
+    @Test
+    fun matchingUnprovisionedRootfsRunsProvisionWithoutSwitching() = runBlocking {
+        val current = manifest()
+        val maintainer = FakeMaintainer(
+            deployedContent = JSONObject()
+                .put("schemaVersion", 2)
+                .put("rootfsVersion", current.rootfsVersion)
+                .put("rootfsSha256", rootfsSha)
+                .put("minisdSha256", minisdSha)
+                .put("provisionRevision", 1)
+                .toString(),
+            canonicalProvisioned = false,
+        )
+        var provisionCalls = 0
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            current,
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { provisionCalls += 1; true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.DEPLOYED, result.outcome)
+        assertEquals(1, provisionCalls)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_SWITCH })
+    }
+
+    @Test
+    fun rootfsResetRequiresStoppedKeeperAndUsesBrokerOperation() = runBlocking {
+        val maintainer = FakeMaintainer()
+        val blocked = RuntimeDistributionManager.resetRootfs(maintainer) { false }
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, blocked.outcome)
+        assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_RESET })
+
+        val reset = RuntimeDistributionManager.resetRootfs(maintainer) { true }
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.RESET, reset.outcome)
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_RESET })
     }
 }
 
@@ -756,7 +664,10 @@ private val upstream = RuntimeDistributionManifest.PINNED_UPSTREAM_SHA256
 private val rootfsSha = "c0e6a145b3c8eb401f5e55eb7545f431c599290541fe61739985fb5fd1b464d7"
 private val minisdSha = "ab".repeat(32)
 
-private fun healthyMetadataJson(release: String = "24.04.3"): String = JSONObject()
+private fun healthyMetadataJson(
+    release: String = "24.04.3",
+    archiveSha256: String = rootfsSha,
+): String = JSONObject()
     .put("distro", "ubuntu")
     .put("version", "24.04")
     .put("release", release)
@@ -764,7 +675,8 @@ private fun healthyMetadataJson(release: String = "24.04.3"): String = JSONObjec
     .put("profile", "base")
     .put("revision", 1)
     .put("upstream_sha256", upstream)
+    .put("archive_sha256", archiveSha256)
     .toString()
 
 private fun healthyRootfsHealth(): RootfsHealth =
-    RootfsHealth(RootfsHealthCode.HEALTHY, "ok", JSONObject(healthyMetadataJson()))
+    RootfsHealth(RootfsHealthCode.HEALTHY, "ok", JSONObject(healthyMetadataJson()), provisioned = true)

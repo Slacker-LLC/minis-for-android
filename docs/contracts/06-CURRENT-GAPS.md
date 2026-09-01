@@ -21,9 +21,9 @@ canonical workspace RPC。
 
 CI 使用固定 NDK 构建 arm64 PIE `minisd`，并把它与可复现 rootfs、schema-v2 摘要 manifest 一起打入 Debug/Release APK；缺失、部分载荷或 APK 内摘要不匹配均失败关闭。
 
-App 启动时读取并严格校验 APK 内 `runtime-manifest.json`，验证 `nativeLibraryDir/libminisd.so` 与 rootfs 载荷的 SHA-256 和 rootfs 布局。首次安装、版本变化或 rootfs 损坏时，经 `/data/adb/minis/runtime/`（`staging/`、`previous/`、`pending.json`、`deployed.json`）执行唯一运行时分发事务：停 keeper → 解压到 staging 并校验 → 原子切换 canonical `/data/adb/minis/rootfs` → 启动 keeper 并执行 provision → 失败回滚 previous → 全部成功后写入 deployed identity 并清除 pending。App 被杀可从 pending 恢复或回滚；用户数据目录不参与任何替换。
+App 启动时读取并严格校验 APK 内 `runtime-manifest.json`，验证 `nativeLibraryDir/libminisd.so` 与 rootfs 载荷的 SHA-256 和 rootfs 布局。首次安装、版本变化或 rootfs 损坏时，App 只负责事务决策，经 `minisd` 的结构化 `runtime.maintenance` 操作访问 `/data/adb/minis/runtime/`（`staging/`、`previous/`、`pending.json`、`deployed.json`）：写入 `PREPARED` pending → broker 从已安装 APK stage 并校验 → keeper 停止后写入 `SWITCHING` pending → broker 通过原子目录交换切换 canonical `/data/adb/minis/rootfs`，并保存 archive identity → 启动 keeper 并执行 provision → 失败仅在 previous identity 与 pending 匹配时回滚 → 全部成功后写入 deployed identity 并清除 pending。App 被杀可从 pending 恢复；切换前中断不会回退到无关的 previous 槽位，探测未知时保持 pending 并拒绝副作用；用户数据目录不参与任何替换。
 
-仍待：真机验收首装、升级、中断恢复、provision（python3/git/curl）、SELinux enforcing 与持久化非 tmpfs。
+仍待：真机验收首装、升级、中断恢复、provision（python3/git/curl）、SELinux enforcing、持久化非 tmpfs，以及目标内核 `renameat2(RENAME_EXCHANGE)` 和固定 tar 工具行为。
 
 ## G3 身份未迁
 
@@ -37,7 +37,7 @@ App 启动时读取并严格校验 APK 内 `runtime-manifest.json`，验证 `nat
 
 Agent 发起的 Root 命令、`root.shell` 与主动 Root 探针已统一通过 `MinisdClient`；标准模式使用 `root.exec` 白名单，越权请求通过完整 `method + params` 绑定的一次性 `root.fullExec` 确认票重放。完全访问由 App 设置持有，Agent 请求不能切换，并在聊天页持续警告。
 
-仍保留的直接 `su -c` 仅位于可信 bootstrap/recovery 路径：安装/启动/探测 minisd、minisd `--call` 传输回退，以及安装或修复 rootfs。这些路径执行 App-owned 静态命令，不承载 Agent 提供的命令；后续 G2/G5 重构应继续缩小并审计该范围。
+仍保留的直接 `su -c` 仅位于可信 bootstrap/recovery 路径：安装/启动/探测 minisd、minisd `--call` 传输回退，以及旧 `RootfsManager` 的固定路径 health/size/repair 辅助路径。运行时分发的 APK stage、checksum、probe、state、atomic switch、rollback、reset 已改为 `minisd` 的结构化 `runtime.maintenance`；这些保留路径仍只执行 App-owned 静态命令，不承载 Agent 提供的命令，且待真机验证后继续收缩。
 
 ## G5 恢复语义
 
