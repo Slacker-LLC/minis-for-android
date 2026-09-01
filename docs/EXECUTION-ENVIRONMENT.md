@@ -1,15 +1,13 @@
 # Execution Environment
 
-This document defines the current Minis for Android rooted-device execution model.
+This document defines the current rooted-device execution and runtime-distribution model.
 
-## Overview
+## Runtime authority chain
 
 ```text
-Android kernel
-  ↓
 Android app
-  ↓ Unix socket RPC
-minisd (root broker)
+  ↓ app-UID-scoped abstract Unix socket RPC
+Package Manager-owned libminisd.so
   ↓
 private mount namespace
   ↓ explicit bind mounts
@@ -18,103 +16,139 @@ chroot
 Ubuntu 24.04 userspace
 ```
 
-The Ubuntu environment reuses the Android kernel. It is not a VM and does not boot a second kernel.
+The Ubuntu guest reuses the Android kernel. It is not a separate kernel or VM.
 
-## Roles
+## Android app responsibilities
 
-### Android app
+The app owns application/database state, provider/model configuration, tool permissions, user approvals, execution checkpoints, and runtime readiness/recovery orchestration.
 
-The app owns application/database state, provider/model state, tool registration and permissions, user approvals, execution checkpoints, and runtime readiness/recovery orchestration.
+For the privileged runtime, Android consumes one authoritative schema-v2 manifest packaged in the APK. It refuses mixed minisd/rootfs/layout/provision identities instead of treating file existence as readiness.
 
-### `minisd`
+## `minisd` responsibilities
 
-`minisd` is the privileged root broker and part of the trusted computing base. It exposes a bounded structured RPC surface for preparing and operating the Ubuntu environment.
+`minisd` is the privileged root broker and part of the trusted computing base. Production Android executes the broker directly from `ApplicationInfo.nativeLibraryDir/libminisd.so`; there is no production broker executable copied into `/data/adb/minis` or an App-writable directory.
 
-The broker uses a private Unix socket, peer identity checks, framed messages, bounded request/response sizes, a compile-time capability ceiling, and runtime policy that may restrict but not expand that ceiling.
+Production IPC uses Linux abstract sockets scoped by the current App UID:
 
-`minisd` also owns the canonical host-side persistent filesystem layout used by the Linux guest. It prepares and validates those persistent sources before keeper mount-namespace creation.
+```text
+@minis.minisd.root.<uid>.v1
+@minis.minisd.app.<uid>.v1
+```
 
-### Ubuntu guest
+The policy is passed as inline JSON. The Android supervisor binds the broker lifetime to App UID, PID, and `/proc/<pid>/stat` start time, so PID reuse alone cannot keep an old broker alive. Production does not require broker `.sock`, `.pid`, or policy files on disk.
 
-The guest is Ubuntu 24.04 userspace entered through a chroot inside the mount namespace prepared by `minisd`.
+The Rust standalone compatibility CLI may use filesystem sockets or `--policy PATH` only when `--dev-filesystem-ipc` is explicitly supplied. That path is development-only and is not used by the Android production chain.
 
-Root establishes the namespace, mounts, and chroot. Agent commands run under the app guest UID rather than retaining unrestricted root identity.
+`minisd` also owns keeper lifecycle, mount-namespace setup, chroot entry, fixed persistent bind-source validation, and root-side execution boundaries.
+
+## APK runtime identity
+
+The APK contains:
+
+```text
+lib/arm64-v8a/libminisd.so
+assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz
+assets/minis-runtime/runtime-manifest.json
+```
+
+`runtime-manifest.json` uses schema version 2 and binds the package to:
+
+- protocol version `1`;
+- layout version `2`;
+- ABI `arm64-v8a`;
+- exact minisd SHA-256;
+- exact final rootfs tar SHA-256;
+- rootfs identity `ubuntu-24.04-rN-<final SHA first 16>`;
+- Ubuntu release, profile, and pinned upstream SHA-256;
+- a positive provision revision;
+- required guest commands, currently `python3`, `git`, and `curl`.
+
+Debug and Release use the same runtime-asset producer and verifier.
+
+## Rootfs build and install
+
+`scripts/build-ubuntu-rootfs.sh` downloads the pinned Ubuntu Base 24.04.3 arm64 archive, verifies repository and upstream SHA-256 metadata, overlays the Minis guest layout, and produces a deterministic final tar. Sorted entries, fixed tar metadata, and timestamp-free gzip make the final SHA reproducible for identical inputs.
+
+The Android Gradle `packageRuntimeAssets` task depends directly on the rootfs producer, so runtime asset packaging cannot legally run before the rootfs archive and build manifest exist.
+
+Installed system revisions live under:
+
+```text
+/data/adb/minis/runtime/rootfs/versions/
+/data/adb/minis/runtime/rootfs/staging/
+/data/adb/minis/runtime/rootfs/current
+/data/adb/minis/runtime/rootfs/previous
+/data/adb/minis/runtime/rootfs/pending
+```
+
+A new revision is extracted into staging, its required layout and manifest identity are checked, and only then is it registered and switched into `current`. `pending` records an in-flight switch. A failed post-switch health/provision check attempts to restore `previous`.
+
+The rootfs is replaceable system state. Persistent Agent data is not stored inside a replaceable rootfs revision.
 
 ## Canonical persistent host layout
 
-The root-managed Minis area is `/data/adb/minis`.
+The persistent sources of truth are fixed:
 
-| Host path | Purpose / guest mapping |
+| Host path | Guest purpose |
 |---|---|
-| `/data/adb/minis/rootfs` | Ubuntu rootfs |
 | `/data/adb/minis/workspace` | global `/workspace` backing |
-| `/data/adb/minis/sessions` | per-session workspace backing |
+| `/data/adb/minis/sessions` | per-session backing |
 | `/data/adb/minis/memory` | `/memory` backing |
 | `/data/adb/minis/skills` | `/skills` backing |
 | `/data/adb/minis/shared` | `/shared` backing |
 | `/data/adb/minis/home` | `/home/minis` backing |
-| `/data/adb/minis/run` | broker/runtime state |
-| `/data/adb/minis/log` | broker/runtime logs |
 
-Persistent data directories (`workspace`, `sessions`, `memory`, `skills`, `shared`, and `home`) are prepared for the guest UID/GID with mode `0700`. The rootfs, run, and log directories use separate root/runtime modes defined by `src/native/minisd/src/layout.rs`.
+These directories are prepared before keeper namespace creation, with explicit owner/mode handling. Alternate persistent paths are rejected. Persistent backing must not resolve to tmpfs.
 
-The persistent start parameters are fixed. `ubuntu.start` rejects alternate values for rootfs, workspace, sessions, memory, skills, shared data, or HOME rather than silently changing persistence backing.
+The pre-migration Android storage layout is only a one-time migration input. Migration is fail-closed and idempotent: copy, ownership/mode correction, SELinux relabel, and compatibility aliases must complete before the final migration marker is committed. After that, `/data/adb/minis/*` is authoritative.
 
-Persistent sources are validated before keeper startup and must not be tmpfs-backed. A layout that cannot be prepared or validated causes runtime startup to fail closed.
-
-## Guest paths
-
-The current canonical guest data paths are:
+## Guest paths and session isolation
 
 | Guest path | Backing |
 |---|---|
-| `/workspace` | `/data/adb/minis/workspace` or the selected session workspace |
+| `/workspace` | global workspace or selected session workspace |
 | `/memory` | `/data/adb/minis/memory` |
 | `/skills` | `/data/adb/minis/skills` |
 | `/shared` | `/data/adb/minis/shared` |
 | `/home/minis` | `/data/adb/minis/home` |
 
-When a valid `session_id` is supplied, `minisd` creates that session below `/data/adb/minis/sessions/<session_id>/` and prepares its `workspace`, `attachments`, `offloads`, and `browser` directories under the same containment and ownership checks.
+A valid session is contained below `/data/adb/minis/sessions/<session_id>/`. Session handling rejects traversal, NUL input, symlink escape, and paths outside the fixed sessions root.
 
-Path handling must reject traversal, NUL input, symlink escapes, and any session path that escapes the configured sessions root.
+Each command receives the keeper namespace state required by the active runtime. Persistent bind sources are established before chroot and Agent commands drop to the configured guest identity rather than retaining unrestricted root identity.
 
-## Startup order
+## Startup and upgrade order
 
-The rooted Ubuntu startup path is ordered so persistent bind sources exist before the keeper establishes its private mount namespace:
+The production order is fail-closed:
 
-1. validate fixed persistent start parameters;
-2. retire stale keeper state when needed;
-3. create/repair the `/data/adb/minis` host layout with the required ownership and modes;
-4. validate persistent backing, including the tmpfs rejection;
-5. validate and prepare the Ubuntu rootfs;
-6. spawn the keeper;
-7. establish the private mount namespace, bind mounts, and chroot;
-8. mark the runtime ready only after keeper readiness is reported.
+1. parse and validate the APK schema-v2 runtime manifest;
+2. verify the Package Manager-owned minisd SHA and supported ABI;
+3. obtain/verify root capability;
+4. detect missing, mismatched, corrupt, or interrupted rootfs state;
+5. materialize the APK-packaged rootfs and verify its exact SHA;
+6. prepare/register a concrete rootfs revision without modifying persistent user data;
+7. atomically switch `current`, retaining rollback metadata;
+8. start the APK-owned broker and keeper;
+9. prepare the fixed persistent sources and private mount namespace;
+10. enter Ubuntu and run provision/required-command health checks;
+11. commit the provision revision only after those checks pass;
+12. report READY only when minisd, rootfs, layout, and provision identity agree.
+
+No-root, unsupported ABI, corrupt package payload, mixed version, invalid persistence backing, or failed provision remains a structured unavailable/failure state rather than a false installed state.
 
 ## Shell behavior
 
-The agent shell targets Ubuntu and executes through Bash. Public tool contracts should expose guest paths such as `/workspace`, not hard-coded host paths.
+Agent shell commands target Ubuntu through the structured minisd RPC surface. Public tool contracts expose guest paths such as `/workspace`, not host implementation paths.
 
-Shell execution is governed by timeout, dangerous-command policy, output limits/spill, persisted job state, approvals, and checkpoints where applicable.
+Execution remains subject to timeout/cancellation, dangerous-command policy, output limits/spill, approvals, and persisted checkpoints where applicable.
 
-## Rootfs
+## SELinux and capability model
 
-`scripts/build-ubuntu-rootfs.sh` downloads a pinned Ubuntu Base archive and verifies its SHA-256 digest before producing the rootfs artifact. Rootfs verification is part of CI and fails closed on checksum mismatch.
+The project does not disable SELinux globally. Persistent App access and privileged runtime setup must work under enforcing mode or report failure.
 
-## Capability model
+Root-provider identity alone does not prove every operation is available. Runtime capability depends on actual `su` behavior, Linux capabilities, SELinux policy, mount namespace support, Android version, and device policy.
 
-Root-provider identity does not prove that every privileged operation is available. Capability checks may depend on actual `su` behavior, Linux capabilities, SELinux context, mount namespace support, OEM policy, and Android version.
+## Validation boundary
 
-Shizuku-compatible bridges, ordinary Android APIs, Accessibility, and root are separate capability paths. Use the narrowest appropriate backend and probe support before execution.
+CI verifies deterministic rootfs construction, schema-v2 packaging, minisd/rootfs hashes, Rust quality, Android unit/lint/build paths, Debug/Release runtime packaging, release package/signing checks, and compilation of the installed-layout instrumentation gate.
 
-## SELinux
-
-The project does not disable SELinux globally for compatibility. Runtime setup must work under enforcing mode or report a structured unavailable/partial state.
-
-## Failure and recovery
-
-Android may kill the app or foreground services. Long-running work must rely on persisted jobs/checkpoints rather than assuming one process remains alive indefinitely.
-
-A recovered keeper whose persistent bind provenance cannot be proven is not accepted as a known-good canonical layout; the runtime requires an explicit stop/start before Agent execution continues.
-
-After uncertain termination of a side-effecting operation, recovery logic must not blindly repeat it. Unknown outcome remains distinct from clean failure.
+Physical-device acceptance remains separate. A rooted arm64 device must still prove Package Manager-installed broker execution, SELinux-enforcing access to persistent paths, non-tmpfs persistence, fresh install/upgrade/rollback behavior, force-stop lease cleanup, App/guest bidirectional visibility, and installed-layout instrumentation execution.

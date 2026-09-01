@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 
 pub const HOST_MINIS: &str = "/data/adb/minis";
 pub const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
+pub const HOST_ROOTFS_RUNTIME: &str = "/data/adb/minis/runtime/rootfs";
+pub const HOST_ROOTFS_VERSIONS: &str = "/data/adb/minis/runtime/rootfs/versions";
+pub const HOST_ROOTFS_CURRENT: &str = "/data/adb/minis/runtime/rootfs/current";
 pub const HOST_SESSIONS: &str = "/data/adb/minis/sessions";
 pub const HOST_MEMORY: &str = "/data/adb/minis/memory";
 pub const HOST_SKILLS: &str = "/data/adb/minis/skills";
@@ -211,6 +214,49 @@ pub fn ensure_host_layout() -> Result<(), String> {
     let layout = PersistentLayout::system();
     let (uid, gid) = existing_data_owner(&layout.workspace()).unwrap_or((GUEST_UID, GUEST_GID));
     layout.initialize(uid, gid)
+}
+
+/// Resolve the versioned rootfs pointer without trusting arbitrary symlinks.
+/// The returned version directory is intentional: mount/chroot operations and
+/// keeper identity remain pinned to one revision, while a missing or invalid
+/// pointer falls back to the legacy path for migration and recovery.
+pub fn active_rootfs_path() -> String {
+    resolve_active_rootfs(
+        Path::new(HOST_ROOTFS_CURRENT),
+        HOST_ROOTFS,
+        Path::new(HOST_ROOTFS_VERSIONS),
+    )
+}
+
+fn resolve_active_rootfs(current: &Path, legacy: &str, versions: &Path) -> String {
+    let Ok(meta) = std::fs::symlink_metadata(current) else {
+        return legacy.to_string();
+    };
+    if !meta.file_type().is_symlink() {
+        return legacy.to_string();
+    }
+    let Ok(target) = std::fs::read_link(current) else {
+        return legacy.to_string();
+    };
+    let Some(parent) = target.parent() else {
+        return legacy.to_string();
+    };
+    let Some(name) = target.file_name().and_then(|value| value.to_str()) else {
+        return legacy.to_string();
+    };
+    let valid_revision = name
+        .strip_prefix("ubuntu-24.04-")
+        .is_some_and(|suffix| suffix.len() == 16 && suffix.bytes().all(|b| b.is_ascii_hexdigit()));
+    if target.is_absolute()
+        && parent == versions
+        && valid_revision
+        && target.is_dir()
+        && target.join(ROOTFS_MARKER).is_file()
+    {
+        target.to_string_lossy().into_owned()
+    } else {
+        legacy.to_string()
+    }
 }
 
 pub fn ensure_data_directory(path: &Path, uid: u32, gid: u32) -> Result<(), String> {
@@ -463,7 +509,10 @@ fn upsert_named_line(path: impl AsRef<Path>, prefix: &str, line: &str) -> Result
 pub fn host_paths() -> serde_json::Value {
     serde_json::json!({
         "host_minis": HOST_MINIS,
-        "rootfs": HOST_ROOTFS,
+        "rootfs": active_rootfs_path(),
+        "legacy_rootfs": HOST_ROOTFS,
+        "rootfs_current": HOST_ROOTFS_CURRENT,
+        "rootfs_versions": HOST_ROOTFS_VERSIONS,
         "workspace": HOST_WORKSPACE,
         "sessions": HOST_SESSIONS,
         "memory": HOST_MEMORY,
@@ -480,6 +529,38 @@ pub fn host_paths() -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn active_rootfs_accepts_only_valid_version_pointer() {
+        let base = std::env::temp_dir().join(format!(
+            "minisd-active-rootfs-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let versions = base.join("versions");
+        let version = versions.join("ubuntu-24.04-0123456789abcdef");
+        let current = base.join("current");
+        std::fs::create_dir_all(version.join("etc/minis")).unwrap();
+        std::fs::write(version.join(ROOTFS_MARKER), "{}\n").unwrap();
+        std::os::unix::fs::symlink(&version, &current).unwrap();
+
+        assert_eq!(
+            resolve_active_rootfs(&current, "/legacy", &versions),
+            version.to_string_lossy()
+        );
+
+        std::fs::remove_file(&current).unwrap();
+        std::os::unix::fs::symlink("/tmp/not-a-minis-rootfs", &current).unwrap();
+        assert_eq!(
+            resolve_active_rootfs(&current, "/legacy", &versions),
+            "/legacy"
+        );
+        let _ = std::fs::remove_dir_all(base);
+    }
 
     fn temp_layout(name: &str) -> PersistentLayout {
         let unique = format!(

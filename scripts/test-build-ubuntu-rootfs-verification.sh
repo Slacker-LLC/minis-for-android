@@ -25,6 +25,16 @@ expect_failure() {
   echo "PASS: $name"
 }
 
+# Invalid runtime revision metadata must fail before any network/extraction work.
+expect_failure rootfs_revision_zero \
+  env REL="$REL" ROOTFS_REVISION=0 EXPECTED_BASE_SHA256="$EXPECTED" \
+      BASE_URL="file://$TRUSTED" SUMS_URL="file://$TMP/missing" \
+      WORK="$TMP/work-rev" DIST="$TMP/dist-rev" bash "$BUILD"
+expect_failure provision_revision_placeholder \
+  env REL="$REL" PROVISION_REVISION=managed EXPECTED_BASE_SHA256="$EXPECTED" \
+      BASE_URL="file://$TRUSTED" SUMS_URL="file://$TMP/missing" \
+      WORK="$TMP/work-prov" DIST="$TMP/dist-prov" bash "$BUILD"
+
 # 1) Checksum metadata unavailable must be fatal.
 mkdir -p "$TMP/unavailable-src"
 cp "$TRUSTED" "$TMP/unavailable-src/$BASE_NAME"
@@ -32,8 +42,7 @@ expect_failure checksum_unavailable \
   env REL="$REL" EXPECTED_BASE_SHA256="$EXPECTED" \
       BASE_URL="file://$TMP/unavailable-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/does-not-exist/SHA256SUMS" \
-      WORK="$TMP/work-unavailable" DIST="$TMP/dist-unavailable" \
-      "$BUILD"
+      WORK="$TMP/work-unavailable" DIST="$TMP/dist-unavailable" bash "$BUILD"
 
 # 2) The exact requested archive must exist in SHA256SUMS.
 mkdir -p "$TMP/missing-src"
@@ -43,11 +52,9 @@ expect_failure checksum_entry_missing \
   env REL="$REL" EXPECTED_BASE_SHA256="$EXPECTED" \
       BASE_URL="file://$TMP/missing-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/missing-src/SHA256SUMS" \
-      WORK="$TMP/work-missing" DIST="$TMP/dist-missing" \
-      "$BUILD"
+      WORK="$TMP/work-missing" DIST="$TMP/dist-missing" bash "$BUILD"
 
-# 3) A downloaded archive whose bytes do not match the pinned/upstream digest
-# must fail before extraction.
+# 3) Corrupt downloaded bytes must fail before extraction.
 mkdir -p "$TMP/mismatch-src"
 cp "$CORRUPT" "$TMP/mismatch-src/$BASE_NAME"
 printf '%s *%s\n' "$EXPECTED" "$BASE_NAME" > "$TMP/mismatch-src/SHA256SUMS"
@@ -55,7 +62,34 @@ expect_failure checksum_mismatch \
   env REL="$REL" EXPECTED_BASE_SHA256="$EXPECTED" \
       BASE_URL="file://$TMP/mismatch-src/$BASE_NAME" \
       SUMS_URL="file://$TMP/mismatch-src/SHA256SUMS" \
-      WORK="$TMP/work-mismatch" DIST="$TMP/dist-mismatch" \
-      "$BUILD"
+      WORK="$TMP/work-mismatch" DIST="$TMP/dist-mismatch" bash "$BUILD"
 
-echo "All rootfs verification failure-mode tests passed."
+# 4) A minimal trusted Ubuntu-like base exercises the successful packaging path
+# twice. Deterministic tar/gzip settings must yield an identical final artifact.
+FIXTURE="$TMP/fixture-root"
+mkdir -p "$FIXTURE/etc"
+printf 'root:x:0:0:root:/root:/bin/sh\n' > "$FIXTURE/etc/passwd"
+printf 'root:x:0:\n' > "$FIXTURE/etc/group"
+printf 'VERSION_ID="24.04"\n' > "$FIXTURE/etc/os-release"
+mkdir -p "$TMP/fixture-src"
+tar -czf "$TMP/fixture-src/$BASE_NAME" -C "$FIXTURE" .
+FIXTURE_SHA="$(sha256sum "$TMP/fixture-src/$BASE_NAME" | awk '{print $1}')"
+printf '%s *%s\n' "$FIXTURE_SHA" "$BASE_NAME" > "$TMP/fixture-src/SHA256SUMS"
+
+for run in a b; do
+  env REL="$REL" ROOTFS_REVISION=7 PROVISION_REVISION=3 \
+      EXPECTED_BASE_SHA256="$FIXTURE_SHA" \
+      BASE_URL="file://$TMP/fixture-src/$BASE_NAME" \
+      SUMS_URL="file://$TMP/fixture-src/SHA256SUMS" \
+      WORK="$TMP/work-$run" DIST="$TMP/dist-$run" bash "$BUILD" >/dev/null
+  (cd "$TMP/dist-$run" && sha256sum -c ubuntu-arm64-rootfs.tar.gz.sha256) >/dev/null
+  grep -Eq '"version": "ubuntu-24.04-r7-[0-9a-f]{16}"' "$TMP/dist-$run/ubuntu-arm64-rootfs.manifest.json"
+  grep -Fq '"arch": "arm64-v8a"' "$TMP/dist-$run/ubuntu-arm64-rootfs.manifest.json"
+  grep -Fq '"provisionRevision": 3' "$TMP/dist-$run/ubuntu-arm64-rootfs.manifest.json"
+  grep -Fq '"requiredCommands": ["python3", "git", "curl"]' "$TMP/dist-$run/ubuntu-arm64-rootfs.manifest.json"
+done
+cmp "$TMP/dist-a/ubuntu-arm64-rootfs.tar.gz" "$TMP/dist-b/ubuntu-arm64-rootfs.tar.gz"
+cmp "$TMP/dist-a/ubuntu-arm64-rootfs.manifest.json" "$TMP/dist-b/ubuntu-arm64-rootfs.manifest.json"
+echo "PASS: reproducible_final_rootfs"
+
+echo "All rootfs verification and reproducibility tests passed."

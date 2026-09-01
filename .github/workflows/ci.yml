@@ -29,15 +29,32 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust quality components
-        run: rustup component add rustfmt clippy
+        run: |
+          rustup component add rustfmt clippy
+          rustup target add aarch64-unknown-linux-musl
       - name: Format
-        run: cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
+        working-directory: src/native/minisd
+        run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
+        working-directory: src/native/minisd
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: Test
-        run: cargo test --locked --manifest-path src/native/minisd/Cargo.toml
-      - name: Release build
-        run: cargo build --locked --release --manifest-path src/native/minisd/Cargo.toml
+        working-directory: src/native/minisd
+        run: cargo test --locked
+      - name: Release build (host)
+        working-directory: src/native/minisd
+        run: cargo build --locked --release
+      - name: Release build (Linux arm64 musl compatibility)
+        working-directory: src/native/minisd
+        run: cargo build --locked --release --target aarch64-unknown-linux-musl
+      - name: Verify Linux arm64 PIE compatibility
+        working-directory: src/native/minisd
+        run: |
+          binary=target/aarch64-unknown-linux-musl/release/minisd
+          header="$(readelf -h "$binary")"
+          grep -Eq 'Class:[[:space:]]+ELF64' <<<"$header"
+          grep -Eq 'Machine:[[:space:]]+AArch64' <<<"$header"
+          grep -Eq 'Type:[[:space:]]+DYN' <<<"$header"
 
   rootfs-verification:
     name: Rootfs verification tests
@@ -45,11 +62,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
-      - name: Fail-closed checksum tests
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh scripts/test-android-identity.sh
+      - name: Rootfs fail-closed and reproducibility tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
       - name: Runtime package boundary contract
         run: bash scripts/check-runtime-package-boundary.sh
+      - name: Android identity regression tests
+        run: bash scripts/test-android-identity.sh
+      - name: Diff hygiene
+        run: git diff --check
 
   android:
     name: Android build, test and release checks
@@ -66,6 +87,12 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android build components
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+          rustup target add aarch64-linux-android
       - name: Warm Gradle plugin resolution
         working-directory: src/android
         run: |
@@ -107,6 +134,24 @@ jobs:
             -alias "$RELEASE_KEY_ALIAS" \
             -keyalg RSA -keysize 2048 -validity 2 \
             -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
+      - name: Build pinned Ubuntu arm64 runtime artifact
+        run: bash scripts/build-ubuntu-rootfs.sh
+      - name: Verify rootfs build identity
+        run: |
+          (cd dist && sha256sum -c ubuntu-arm64-rootfs.tar.gz.sha256)
+          python3 - <<'PY'
+          import hashlib, json, pathlib, re
+          root = pathlib.Path('dist')
+          archive = root / 'ubuntu-arm64-rootfs.tar.gz'
+          meta = json.loads((root / 'ubuntu-arm64-rootfs.manifest.json').read_text())
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert meta['sha256'] == digest
+          assert meta['version'].endswith(digest[:16])
+          assert re.fullmatch(r'ubuntu-24\.04-r[1-9][0-9]*-[0-9a-f]{16}', meta['version'])
+          assert meta['arch'] == 'arm64-v8a'
+          assert isinstance(meta['provisionRevision'], int) and meta['provisionRevision'] > 0
+          assert meta['requiredCommands'] == ['python3', 'git', 'curl']
+          PY
       - name: Android unit tests
         working-directory: src/android
         run: ./gradlew :app:testDebugUnitTest --no-parallel --max-workers=2 --stacktrace
@@ -128,9 +173,12 @@ jobs:
         if: always()
         working-directory: src/android
         run: ./gradlew --stop || true
-      - name: Assemble debug
+      - name: Assemble and verify debug APK runtime
         working-directory: src/android
-        run: ./gradlew :app:assembleDebug --no-parallel --max-workers=2 --stacktrace
+        run: ./gradlew :app:assembleDebug :app:verifyDebugMinisdApk --no-parallel --max-workers=2 --stacktrace
+      - name: Compile installed-layout instrumentation gate
+        working-directory: src/android
+        run: ./gradlew :app:assembleDebugAndroidTest --no-parallel --max-workers=2 --stacktrace
       - name: Stop Gradle after debug packaging
         if: always()
         working-directory: src/android
@@ -142,8 +190,10 @@ jobs:
         if: always()
         working-directory: src/android
         run: ./gradlew --stop || true
-      - name: Assemble release
+      - name: Assemble and verify release APK runtime
         working-directory: src/android
-        run: ./gradlew :app:assembleRelease --no-parallel --max-workers=2 --stacktrace
-      - name: Verify release APK
+        run: ./gradlew :app:assembleRelease :app:verifyReleaseMinisdApk --no-parallel --max-workers=2 --stacktrace
+      - name: Verify release APK signing/package contract
         run: bash scripts/verify-android-release.sh src/android/app/build/outputs/apk/release/app-release.apk
+      - name: Final diff hygiene
+        run: git diff --check

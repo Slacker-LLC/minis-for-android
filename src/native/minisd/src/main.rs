@@ -15,11 +15,30 @@ struct Args {
     once: bool,
     call: bool,
     watchdog: bool,
+    dev_filesystem_ipc: bool,
     #[cfg_attr(not(unix), allow(dead_code))]
-    socket: PathBuf,
+    socket: String,
     #[cfg_attr(not(unix), allow(dead_code))]
-    app_socket: Option<PathBuf>,
+    app_socket: Option<String>,
     policy: Option<PathBuf>,
+    policy_json: Option<String>,
+    lease_pid: Option<i32>,
+    lease_starttime: Option<u64>,
+}
+
+fn validate_dev_ipc_mode(
+    socket: &str,
+    policy: &Option<PathBuf>,
+    dev_filesystem_ipc: bool,
+) -> Result<(), String> {
+    let filesystem_socket = !socket.starts_with('@');
+    if (filesystem_socket || policy.is_some()) && !dev_filesystem_ipc {
+        return Err(
+            "filesystem socket / --policy PATH are standalone-dev compatibility only; pass --dev-filesystem-ipc explicitly"
+                .to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -27,9 +46,15 @@ fn parse_args() -> Result<Args, String> {
     let mut once = false;
     let mut call = false;
     let mut watchdog = false;
-    let mut socket = PathBuf::from("/data/adb/minis/run/minisd.sock");
+    let mut dev_filesystem_ipc = false;
+    // Safe default: production-like standalone invocation stays in the abstract
+    // namespace. Filesystem sockets require the explicit dev-only flag below.
+    let mut socket = "@minis.minisd.root.standalone.v1".to_string();
     let mut app_socket = None;
     let mut policy = None;
+    let mut policy_json = None;
+    let mut lease_pid = None;
+    let mut lease_starttime = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -37,18 +62,41 @@ fn parse_args() -> Result<Args, String> {
             "--once" => once = true,
             "--call" => call = true,
             "--watchdog" => watchdog = true,
+            "--dev-filesystem-ipc" => dev_filesystem_ipc = true,
             "--socket" => {
-                socket = PathBuf::from(it.next().ok_or("--socket needs a path")?);
+                socket = it.next().ok_or("--socket needs a path")?;
             }
             "--app-socket" => {
-                app_socket = Some(PathBuf::from(it.next().ok_or("--app-socket needs a path")?));
+                app_socket = Some(it.next().ok_or("--app-socket needs a path")?);
             }
             "--policy" => {
                 policy = Some(PathBuf::from(it.next().ok_or("--policy needs a path")?));
             }
+            "--policy-json" => {
+                policy_json = Some(it.next().ok_or("--policy-json needs JSON")?);
+            }
+            "--lease-pid" => {
+                lease_pid = Some(
+                    it.next()
+                        .ok_or("--lease-pid needs a pid")?
+                        .parse()
+                        .map_err(|_| "--lease-pid must be numeric")?,
+                );
+            }
+            "--lease-starttime" => {
+                lease_starttime = Some(
+                    it.next()
+                        .ok_or("--lease-starttime needs a value")?
+                        .parse()
+                        .map_err(|_| "--lease-starttime must be numeric")?,
+                );
+            }
             "--help" | "-h" => {
                 eprintln!(
-                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket PATH] [--app-socket PATH] [--policy PATH]"
+                    "minisd [--mock] [--once] [--call] [--watchdog] [--socket NAME] [--app-socket NAME] [--policy-json JSON] [--lease-pid PID --lease-starttime STARTTIME]"
+                );
+                eprintln!(
+                    "standalone dev only: --dev-filesystem-ipc permits filesystem --socket PATH and --policy PATH"
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
@@ -59,18 +107,29 @@ fn parse_args() -> Result<Args, String> {
             other => return Err(format!("unknown arg: {other}")),
         }
     }
+    validate_dev_ipc_mode(&socket, &policy, dev_filesystem_ipc)?;
+    if lease_pid.is_some() != lease_starttime.is_some() {
+        return Err("--lease-pid and --lease-starttime must be supplied together".to_string());
+    }
     Ok(Args {
         mock,
         once,
         call,
         watchdog,
+        dev_filesystem_ipc,
         socket,
         app_socket,
         policy,
+        policy_json,
+        lease_pid,
+        lease_starttime,
     })
 }
 
-fn load_policy(path: &Option<PathBuf>) -> Result<PolicyFile, String> {
+fn load_policy(path: &Option<PathBuf>, inline: &Option<String>) -> Result<PolicyFile, String> {
+    if let Some(raw) = inline {
+        return PolicyFile::parse(raw);
+    }
     match path {
         Some(p) => {
             let raw = fs::read_to_string(p).map_err(|e| format!("read policy: {e}"))?;
@@ -103,6 +162,7 @@ fn once_stdio(state: &mut AppState) -> ExitCode {
                 ExitCode::from(2)
             }
         }
+
         Err(_) => ExitCode::from(1),
     }
 }
@@ -119,7 +179,10 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let policy = match load_policy(&args.policy) {
+    if args.watchdog {
+        return watchdog_loop(args);
+    }
+    let policy = match load_policy(&args.policy, &args.policy_json) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("{e}");
@@ -146,9 +209,6 @@ fn main() -> ExitCode {
         eprintln!("root required (KernelSU); or pass --mock");
         return ExitCode::from(3);
     }
-    if args.watchdog {
-        return watchdog_loop(args.mock, args.socket, args.app_socket, args.policy);
-    }
     if args.once {
         return once_stdio(&mut state);
     }
@@ -163,12 +223,18 @@ fn main() -> ExitCode {
     }
 }
 
-fn watchdog_loop(
-    mock: bool,
-    socket: PathBuf,
-    app_socket: Option<PathBuf>,
-    policy: Option<PathBuf>,
-) -> ExitCode {
+fn watchdog_loop(args: Args) -> ExitCode {
+    let Args {
+        mock,
+        dev_filesystem_ipc,
+        socket,
+        app_socket,
+        policy,
+        policy_json,
+        lease_pid,
+        lease_starttime,
+        ..
+    } = args;
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
@@ -177,9 +243,17 @@ fn watchdog_loop(
         }
     };
     loop {
+        if let Some(pid) = lease_pid {
+            if !lease_alive(pid, lease_starttime) {
+                return ExitCode::SUCCESS;
+            }
+        }
         let mut cmd = std::process::Command::new(&exe);
         if mock {
             cmd.arg("--mock");
+        }
+        if dev_filesystem_ipc {
+            cmd.arg("--dev-filesystem-ipc");
         }
         cmd.arg("--socket").arg(&socket);
         if let Some(p) = &app_socket {
@@ -188,11 +262,114 @@ fn watchdog_loop(
         if let Some(p) = &policy {
             cmd.arg("--policy").arg(p);
         }
-        match cmd.status() {
-            Ok(st) => eprintln!("minisd child exited {st}; restart in 1s"),
-            Err(e) => eprintln!("minisd spawn: {e}"),
+        if let Some(raw) = &policy_json {
+            cmd.arg("--policy-json").arg(raw);
+        }
+        if let Some(pid) = lease_pid {
+            cmd.arg("--lease-pid").arg(pid.to_string());
+        }
+        if let Some(starttime) = lease_starttime {
+            cmd.arg("--lease-starttime").arg(starttime.to_string());
+        }
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                eprintln!("minisd spawn: {e}");
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                continue;
+            }
+        };
+        loop {
+            if let Some(pid) = lease_pid {
+                if !lease_alive(pid, lease_starttime) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return ExitCode::SUCCESS;
+                }
+            }
+            match child.try_wait() {
+                Ok(Some(st)) => {
+                    eprintln!("minisd child exited {st}; restart in 1s");
+                    break;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("minisd child wait: {e}");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
+#[cfg(unix)]
+fn lease_alive(pid: i32, expected_starttime: Option<u64>) -> bool {
+    if pid <= 0 || unsafe { libc::kill(pid, 0) != 0 } {
+        return false;
+    }
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        expected_starttime.is_none_or(|expected| process_starttime(pid) == Some(expected))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        let _ = expected_starttime;
+        true
+    }
+}
+
+#[cfg(not(unix))]
+fn lease_alive(_pid: i32, _expected_starttime: Option<u64>) -> bool {
+    false
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn process_starttime(pid: i32) -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    parse_proc_starttime(&stat)
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn parse_proc_starttime(stat: &str) -> Option<u64> {
+    let after_comm = stat.rsplit_once(')')?.1;
+    after_comm.split_whitespace().nth(19)?.parse().ok()
+}
+
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
+mod tests {
+    use super::{parse_proc_starttime, process_starttime, validate_dev_ipc_mode};
+    use std::path::PathBuf;
+
+    #[test]
+    fn proc_starttime_reads_field_twenty_two_after_comm() {
+        let mut fields = vec!["S".to_string()];
+        fields.extend(std::iter::repeat_n("0".to_string(), 18));
+        fields.push("4242".to_string());
+        let stat = format!("123 (app with ) paren) {}", fields.join(" "));
+        assert_eq!(parse_proc_starttime(&stat), Some(4242));
+        assert!(process_starttime(std::process::id() as i32).is_some());
+    }
+
+    #[test]
+    fn filesystem_ipc_requires_explicit_dev_guard() {
+        assert!(validate_dev_ipc_mode("@minis.test", &None, false).is_ok());
+        assert!(validate_dev_ipc_mode("/tmp/minisd.sock", &None, false).is_err());
+        assert!(validate_dev_ipc_mode(
+            "@minis.test",
+            &Some(PathBuf::from("/tmp/policy.json")),
+            false,
+        )
+        .is_err());
+        assert!(validate_dev_ipc_mode(
+            "/tmp/minisd.sock",
+            &Some(PathBuf::from("/tmp/policy.json")),
+            true,
+        )
+        .is_ok());
     }
 }
 
@@ -217,8 +394,7 @@ fn read_frame_sync<R: Read>(reader: &mut R, max: usize) -> Result<Vec<u8>, Strin
 }
 
 #[cfg(unix)]
-fn unix_call(socket: &PathBuf) -> ExitCode {
-    use std::os::unix::net::UnixStream;
+fn unix_call(socket: &str) -> ExitCode {
     let mut buf = Vec::new();
     if let Err(e) = std::io::stdin().read_to_end(&mut buf) {
         eprintln!("stdin: {e}");
@@ -227,10 +403,10 @@ fn unix_call(socket: &PathBuf) -> ExitCode {
     if buf.is_empty() || buf.len() > MAX_REQUEST_BYTES {
         return ExitCode::from(1);
     }
-    let mut stream = match UnixStream::connect(socket) {
+    let mut stream = match connect_sock(socket) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("connect {}: {e}", socket.display());
+            eprintln!("connect {socket}: {e}");
             return ExitCode::from(1);
         }
     };
@@ -275,10 +451,8 @@ fn running_as_root() -> bool {
 }
 
 #[cfg(unix)]
-/// Try to take the instance lock on `<socket>.pid`.
-/// Returns the held File on success; the flock is released automatically when
-/// the fd is closed (i.e. when minisd exits). None means another instance is
-/// running (EWOULDBLOCK/EAGAIN) or the lock could not be taken at all.
+/// Standalone/dev compatibility only. Production Android uses abstract sockets,
+/// so this filesystem lock path is reachable only after --dev-filesystem-ipc.
 fn acquire_pidfile_lock(socket: &std::path::Path) -> Option<std::fs::File> {
     use std::io::Write;
     use std::os::fd::AsRawFd;
@@ -305,22 +479,28 @@ fn acquire_pidfile_lock(socket: &std::path::Path) -> Option<std::fs::File> {
 }
 
 #[cfg(unix)]
-fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) -> ExitCode {
+fn unix_server(state: AppState, socket: String, app_socket: Option<String>) -> ExitCode {
     use std::sync::{Arc, Mutex};
 
-    if let Some(parent) = socket.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
     enable_subreaper();
-    let lock = match acquire_pidfile_lock(&socket) {
-        Some(f) => f,
-        None => {
-            eprintln!("minisd already running (pidfile locked)");
-            return ExitCode::from(4);
+    let _lock = if is_abstract_socket(&socket) {
+        None
+    } else {
+        let path = std::path::Path::new(&socket);
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        match acquire_pidfile_lock(path) {
+            Some(f) => Some(f),
+            None => {
+                eprintln!("minisd already running (pidfile locked)");
+                return ExitCode::from(4);
+            }
         }
     };
-    let _ = lock;
-    let _ = fs::remove_file(&socket);
+    if !is_abstract_socket(&socket) {
+        let _ = fs::remove_file(&socket);
+    }
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(4)
         .enable_all()
@@ -343,7 +523,7 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
         let app_listener = match app_socket.as_ref() {
             Some(p) => match bind_sock(p, 0o666) {
                 Ok(l) => {
-                    eprintln!("minisd app-socket {}", p.display());
+                    eprintln!("minisd app-socket {p}");
                     Some(l)
                 }
                 Err(e) => {
@@ -354,7 +534,7 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
             None => None,
         };
         let state = Arc::new(Mutex::new(state));
-        eprintln!("minisd listen {}", socket.display());
+        eprintln!("minisd listen {socket}");
         loop {
             let accepted = if let Some(app) = app_listener.as_ref() {
                 tokio::select! {
@@ -377,7 +557,11 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
 }
 
 #[cfg(unix)]
-fn bind_sock(path: &PathBuf, mode: u32) -> Result<tokio::net::UnixListener, String> {
+fn bind_sock(path: &str, mode: u32) -> Result<tokio::net::UnixListener, String> {
+    if is_abstract_socket(path) {
+        return bind_abstract_sock(path);
+    }
+    let path = std::path::Path::new(path);
     use std::os::unix::fs::PermissionsExt;
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
@@ -387,6 +571,88 @@ fn bind_sock(path: &PathBuf, mode: u32) -> Result<tokio::net::UnixListener, Stri
         .map_err(|e| format!("bind {}: {e}", path.display()))?;
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
     Ok(listener)
+}
+
+#[cfg(unix)]
+fn is_abstract_socket(name: &str) -> bool {
+    name.starts_with('@')
+}
+
+#[cfg(unix)]
+fn abstract_sockaddr(name: &str) -> Result<(libc::sockaddr_un, libc::socklen_t), String> {
+    use std::mem::{size_of, zeroed};
+    let name = name.strip_prefix('@').unwrap_or(name).as_bytes();
+    if name.is_empty() {
+        return Err("abstract socket name is empty".to_string());
+    }
+    let capacity = size_of::<libc::sockaddr_un>() - size_of::<libc::sa_family_t>();
+    if name.len() >= capacity {
+        return Err("abstract socket name is too long".to_string());
+    }
+    let mut addr: libc::sockaddr_un = unsafe { zeroed() };
+    addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    let path = addr.sun_path.as_mut_ptr() as *mut u8;
+    unsafe { std::ptr::copy_nonoverlapping(name.as_ptr(), path.add(1), name.len()) };
+    let len = (size_of::<libc::sa_family_t>() + 1 + name.len()) as libc::socklen_t;
+    Ok((addr, len))
+}
+
+#[cfg(unix)]
+fn connect_sock(name: &str) -> Result<std::os::unix::net::UnixStream, String> {
+    use std::os::fd::FromRawFd;
+    if !is_abstract_socket(name) {
+        return std::os::unix::net::UnixStream::connect(name).map_err(|e| e.to_string());
+    }
+    let (addr, len) = abstract_sockaddr(name)?;
+    let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    let rc = unsafe {
+        libc::connect(
+            fd,
+            &addr as *const libc::sockaddr_un as *const libc::sockaddr,
+            len,
+        )
+    };
+    if rc != 0 {
+        let error = std::io::Error::last_os_error();
+        unsafe { libc::close(fd) };
+        return Err(error.to_string());
+    }
+    Ok(unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) })
+}
+
+#[cfg(unix)]
+fn bind_abstract_sock(name: &str) -> Result<tokio::net::UnixListener, String> {
+    use std::os::fd::FromRawFd;
+    let (addr, len) = abstract_sockaddr(name)?;
+    let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    let bound = unsafe {
+        libc::bind(
+            fd,
+            &addr as *const libc::sockaddr_un as *const libc::sockaddr,
+            len,
+        ) == 0
+    };
+    if !bound {
+        let error = std::io::Error::last_os_error();
+        unsafe { libc::close(fd) };
+        return Err(format!("bind {name}: {error}"));
+    }
+    if unsafe { libc::listen(fd, 128) } != 0 {
+        let error = std::io::Error::last_os_error();
+        unsafe { libc::close(fd) };
+        return Err(format!("listen {name}: {error}"));
+    }
+    let listener = unsafe { std::os::unix::net::UnixListener::from_raw_fd(fd) };
+    listener
+        .set_nonblocking(true)
+        .map_err(|e| format!("nonblocking {name}: {e}"))?;
+    tokio::net::UnixListener::from_std(listener).map_err(|e| format!("listener {name}: {e}"))
 }
 
 #[cfg(unix)]
@@ -731,9 +997,6 @@ fn helper_keep(
 }
 
 #[cfg(unix)]
-// This is the direct CLI-to-syscall helper boundary; keeping the security-
-// relevant uid/gid/rootfs/cwd/env inputs explicit is clearer than hiding them
-// in a loosely reusable options bag.
 #[allow(clippy::too_many_arguments)]
 fn helper_exec(
     pid: i32,
@@ -759,9 +1022,6 @@ fn helper_exec(
     ns::set_process_name("minisd-exec");
     ns::setns_mnt(pid).map_err(|e| (4u8, e))?;
     if !session_root.is_empty() {
-        // Each command receives a private copy of the keeper mount namespace.
-        // Session bind mounts therefore cannot race with another chat or
-        // mutate the long-lived keeper namespace.
         ns::unshare_mount().map_err(|e| (4u8, e))?;
         ns::make_rprivate_root().map_err(|e| (4u8, e))?;
         ns::setup_session_mounts(rootfs, session_root).map_err(|e| (4u8, e))?;

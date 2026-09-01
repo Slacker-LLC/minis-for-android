@@ -559,7 +559,7 @@ mod tests {
             HOST_MEMORY
         );
         assert!(fixed_bind_source(
-            "/data/user/0/dev.openminispet.android/files/minis/workspace",
+            "/data/user/0/legacy.app/files/minis/workspace",
             HOST_WORKSPACE,
             "workspace"
         )
