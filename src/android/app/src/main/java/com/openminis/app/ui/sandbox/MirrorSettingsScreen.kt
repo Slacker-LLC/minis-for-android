@@ -385,7 +385,7 @@ object MirrorSpeedTestViewModel {
     /**
      * On the first boot after a fresh rootfs install, auto-detect the fastest
      * mirror for each category and apply it. The `rootfs.freshInstall` flag is
-     * set by RootfsManager.installIfNeeded() and cleared here.
+     * consumed here when present.
      */
     fun autoDetectOnceIfNeeded(context: Context) {
         ensureLoaded(context)
@@ -820,4 +820,3 @@ private fun MirrorRow(
         }
     }
 }
-

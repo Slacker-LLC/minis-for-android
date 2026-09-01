@@ -151,9 +151,10 @@ object RuntimePayloadVerifier {
                     parsePaxPath(out.toString(Charsets.UTF_8.name()))?.let { pendingName = it }
                 }
                 else -> {
-                    val name = pendingName
+                    val raw = pendingName
                         ?: if (prefix.isNotEmpty()) "$prefix/$rawName" else rawName
                     pendingName = null
+                    val name = raw.removePrefix("./").removeSuffix("/")
                     if (name == "etc/minis/rootfs.json" && type in listOf('0', '\u0000')) {
                         val out = ByteArrayOutputStream()
                         readEntryData(tar, size) { out.write(it) }

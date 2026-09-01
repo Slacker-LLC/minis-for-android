@@ -257,7 +257,7 @@ pub fn exec(
     }
     #[cfg(unix)]
     {
-        exec_live(state, &parsed, admin)
+        exec_live(state, &parsed, admin, false)
     }
 }
 
@@ -601,7 +601,12 @@ fn read_ready_line(child: &mut std::process::Child, timeout: Duration) -> Result
 fn stop_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     refresh_live(state);
     if let Some(pid) = state.ubuntu.pid {
-        terminate_keeper(pid);
+        if !terminate_keeper(pid) {
+            return Err((
+                ErrorCode::Internal,
+                format!("keeper process {pid} did not exit after stop"),
+            ));
+        }
     }
     let _ = std::fs::remove_file(UBUNTU_PID_FILE);
     if let Some(ppid) = read_proxy_pid().filter(|p| is_netproxy(*p)) {
@@ -617,13 +622,16 @@ fn stop_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
 }
 
 #[cfg(unix)]
-fn terminate_keeper(pid: i32) {
+fn terminate_keeper(pid: i32) -> bool {
+    if !pid_alive(pid) {
+        return true;
+    }
     unsafe {
         libc::kill(pid, libc::SIGTERM);
     }
     for _ in 0..20 {
         if !pid_alive(pid) {
-            return;
+            return true;
         }
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -633,6 +641,13 @@ fn terminate_keeper(pid: i32) {
             libc::kill(-pid, libc::SIGKILL);
         }
     }
+    for _ in 0..20 {
+        if !pid_alive(pid) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    false
 }
 
 #[cfg(unix)]
@@ -775,19 +790,28 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
         state.ubuntu.provisioned = true;
         return Ok(json!({"provisioned": true, "already": true, "packages": BASE_PACKAGES}));
     }
+    // Android's root namespace does not permit apt's _apt user transition;
+    // provisioning is already isolated to the deployed Ubuntu rootfs.
     let update = UbuntuExec {
-        argv: vec!["/usr/bin/apt-get".into(), "update".into()],
+        argv: vec![
+            "/usr/bin/apt-get".into(),
+            "-o".into(),
+            "APT::Sandbox::User=root".into(),
+            "update".into(),
+        ],
         timeout_ms: 180_000,
         cwd: "/".into(),
         env: apt_env(),
         session_id: None,
     };
-    let upd = exec_live(state, &update, true)?;
+    let upd = exec_live(state, &update, true, true)?;
     if upd.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
         return Err((ErrorCode::Internal, format!("apt-get update failed: {upd}")));
     }
     let mut argv = vec![
         "/usr/bin/apt-get".into(),
+        "-o".into(),
+        "APT::Sandbox::User=root".into(),
         "install".into(),
         "-y".into(),
         "--no-install-recommends".into(),
@@ -800,7 +824,7 @@ fn provision_live(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
         env: apt_env(),
         session_id: None,
     };
-    let ins = exec_live(state, &install, true)?;
+    let ins = exec_live(state, &install, true, true)?;
     if ins.get("exit_code").and_then(|v| v.as_i64()) != Some(0) {
         return Err((
             ErrorCode::Internal,
@@ -835,6 +859,7 @@ fn exec_live(
     state: &mut AppState,
     req: &UbuntuExec,
     admin: bool,
+    retain_root_capabilities: bool,
 ) -> Result<Value, (ErrorCode, String)> {
     refresh_live(state);
     if !state.ubuntu.running {
@@ -886,6 +911,11 @@ fn exec_live(
     if !session_root.is_empty() {
         cmd.arg("--session-root").arg(&session_root);
     }
+    if retain_root_capabilities {
+        // Only the broker-owned provision path needs apt's _apt sandbox user.
+        // Agent/admin commands continue through the capability-drop boundary.
+        cmd.arg("--retain-root-capabilities");
+    }
     for (k, v) in &req.env {
         cmd.arg("--env").arg(format!("{k}={v}"));
     }
@@ -898,7 +928,7 @@ fn exec_live(
         "stdout": truncate(&output.1),
         "stderr": truncate(&output.2),
         "uid": uid,
-        "admin": admin
+        "admin": admin,
     }))
 }
 

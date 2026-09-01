@@ -3,14 +3,13 @@ package com.openminis.app.ui.sandbox
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
-import kotlinx.coroutines.Job
+import com.openminis.app.runtime.distribution.RuntimeDistributionManager
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.File
 
 data class RootfsManagementUiState(
     val isInstalled: Boolean = false,
@@ -30,59 +29,25 @@ class RootfsManagementViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(RootfsManagementUiState())
     val uiState: StateFlow<RootfsManagementUiState> = _uiState.asStateFlow()
 
-    private var backupDir: File? = null
-    private var progressJob: Job? = null
-
-    /**
-     * Subscribe to the manager's installState and mirror progress + status
-     * text into [_uiState]. Cancelled on completion so we don't leak a job
-     * across multiple install() calls.
-     */
-    private fun observeInstallProgress(manager: RootfsManager) {
-        progressJob?.cancel()
-        progressJob = viewModelScope.launch {
-            manager.installState.collect { state ->
-                when (state) {
-                    is RootfsInstallState.Idle -> Unit
-                    is RootfsInstallState.Preparing ->
-                        _uiState.value = _uiState.value.copy(
-                            statusMessage = "Preparing rootfs…",
-                            installProgress = 0f,
-                        )
-                    is RootfsInstallState.Extracting ->
-                        _uiState.value = _uiState.value.copy(
-                            statusMessage = "Extracting rootfs… ${(state.progress * 100).toInt()}%",
-                            installProgress = state.progress,
-                        )
-                    is RootfsInstallState.Finalizing ->
-                        _uiState.value = _uiState.value.copy(
-                            statusMessage = "Finalizing…",
-                            installProgress = 1f,
-                        )
-                    is RootfsInstallState.Installed,
-                    is RootfsInstallState.Failed -> {
-                        _uiState.value = _uiState.value.copy(installProgress = null)
-                        progressJob?.cancel()
-                    }
-                }
-            }
-        }
-    }
-
     fun refresh(context: Context) {
         val manager = RootfsManager.getInstance(context)
 
         _uiState.value = _uiState.value.copy(
-            isInstalled = manager.isInstalled,
+            isInstalled = false,
             rootfsPath = manager.rootfsDir.absolutePath,
         )
 
-        if (manager.isInstalled) {
-            viewModelScope.launch {
-                try {
-                    val size = manager.getRootfsSize()
-                    _uiState.value = _uiState.value.copy(rootfsSize = size)
-                } catch (_: Exception) { }
+        viewModelScope.launch {
+            runCatching { manager.checkHealth() }.onSuccess { health ->
+                val size = if (health.healthy) {
+                    runCatching { manager.getRootfsSize() }.getOrDefault(0L)
+                } else {
+                    0L
+                }
+                _uiState.value = _uiState.value.copy(
+                    isInstalled = health.healthy,
+                    rootfsSize = size,
+                )
             }
         }
     }
@@ -95,11 +60,12 @@ class RootfsManagementViewModel : ViewModel() {
             installProgress = 0f,
         )
 
-        val manager = RootfsManager.getInstance(context)
-        observeInstallProgress(manager)
         viewModelScope.launch {
             try {
-                manager.installIfNeeded()
+                val snapshot = UbuntuRuntime.ensureReady()
+                check(snapshot.running && snapshot.provisioned) {
+                    snapshot.lastError ?: "runtime did not become ready"
+                }
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = true,
@@ -121,24 +87,23 @@ class RootfsManagementViewModel : ViewModel() {
     fun resetRootfs(context: Context, keepUserData: Boolean) {
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = if (keepUserData) "Backing up and resetting..." else "Resetting rootfs...",
+            statusMessage = "Resetting rootfs...",
             resultMessage = null,
             installProgress = 0f,
         )
 
-        val manager = RootfsManager.getInstance(context)
-        observeInstallProgress(manager)
         viewModelScope.launch {
             try {
-                val backup = manager.reset(keepUserData)
-
-                backupDir = backup
+                val result = UbuntuRuntime.resetRootfs()
+                check(result.outcome == RuntimeDistributionManager.DeploymentOutcome.RESET) {
+                    result.detail
+                }
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = true,
-                    hasBackup = backup != null && backup.exists(),
+                    hasBackup = false,
                     resultMessage = if (keepUserData) {
-                        "Rootfs reset with backup created"
+                        "Rootfs reset; persistent user data was preserved"
                     } else {
                         "Rootfs reset complete"
                     },
@@ -157,41 +122,9 @@ class RootfsManagementViewModel : ViewModel() {
     }
 
     fun restoreBackup(context: Context) {
-        val backup = backupDir
-        if (backup == null || !backup.exists()) {
-            _uiState.value = _uiState.value.copy(
-                resultMessage = "No backup available",
-                lastOperationSuccess = false,
-            )
-            return
-        }
-
         _uiState.value = _uiState.value.copy(
-            isProcessing = true,
-            statusMessage = "Restoring user data...",
-            resultMessage = null,
+            resultMessage = "Persistent user data is stored outside the rootfs; no backup is required",
+            lastOperationSuccess = true,
         )
-
-        val manager = RootfsManager.getInstance(context)
-        viewModelScope.launch {
-            try {
-                manager.restoreUserData(backup)
-
-                backupDir = null
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    lastOperationSuccess = true,
-                    hasBackup = false,
-                    resultMessage = "User data restored successfully",
-                )
-                refresh(context)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isProcessing = false,
-                    lastOperationSuccess = false,
-                    resultMessage = "Restore failed: ${e.message}",
-                )
-            }
-        }
     }
 }

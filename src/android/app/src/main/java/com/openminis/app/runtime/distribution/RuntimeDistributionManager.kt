@@ -30,12 +30,14 @@ object RuntimeDistributionManager {
     const val PENDING_FILE = "$RUNTIME_DIR/pending.json"
     const val DEPLOYED_FILE = "$RUNTIME_DIR/deployed.json"
     const val STATE_SCHEMA_VERSION = 2
+    private const val PENDING_SCHEMA_VERSION = 3
 
     enum class DeploymentOutcome {
         MATCHED,
         DEPLOYED,
         RECOVERED,
         ROLLED_BACK,
+        RESET,
         FAILED,
         ROOT_UNAVAILABLE,
         PAYLOAD_INVALID,
@@ -95,19 +97,22 @@ object RuntimeDistributionManager {
         val targetRootfsVersion: String,
         val targetRootfsSha256: String,
         val targetMinisdSha256: String,
+        val targetProvisionRevision: Int,
         val previousRootfsVersion: String? = null,
     ) {
         fun matches(manifest: RuntimeDistributionManifest): Boolean =
             targetRootfsVersion == manifest.rootfsVersion &&
                 targetRootfsSha256 == manifest.rootfsSha256 &&
-                targetMinisdSha256 == manifest.minisdSha256
+                targetMinisdSha256 == manifest.minisdSha256 &&
+                targetProvisionRevision == manifest.provisionRevision
 
         fun toJson(): String = JSONObject()
-            .put("schemaVersion", STATE_SCHEMA_VERSION)
+            .put("schemaVersion", PENDING_SCHEMA_VERSION)
             .put("transactionId", transactionId)
             .put("targetRootfsVersion", targetRootfsVersion)
             .put("targetRootfsSha256", targetRootfsSha256)
             .put("targetMinisdSha256", targetMinisdSha256)
+            .put("targetProvisionRevision", targetProvisionRevision)
             .put("previousRootfsVersion", previousRootfsVersion ?: JSONObject.NULL)
             .toString()
 
@@ -119,23 +124,30 @@ object RuntimeDistributionManager {
                     throw IllegalArgumentException("pending transaction is not valid JSON: ${t.message}")
                 }
                 val schema = root.optInt("schemaVersion", -1)
-                require(schema == STATE_SCHEMA_VERSION) { "pending transaction schemaVersion mismatch" }
+                require(schema == PENDING_SCHEMA_VERSION) { "pending transaction schemaVersion mismatch" }
                 val transactionId = root.optString("transactionId")
                 val targetRootfsVersion = root.optString("targetRootfsVersion")
                 val targetRootfsSha256 = root.optString("targetRootfsSha256")
                 val targetMinisdSha256 = root.optString("targetMinisdSha256")
+                val targetProvisionRevision = root.optInt("targetProvisionRevision", 0)
                 require(
                     transactionId.isNotEmpty() &&
                         targetRootfsVersion.isNotEmpty() &&
                         targetRootfsSha256.matches(Regex("^[0-9a-f]{64}$")) &&
-                        targetMinisdSha256.matches(Regex("^[0-9a-f]{64}$")),
+                        targetMinisdSha256.matches(Regex("^[0-9a-f]{64}$")) &&
+                        targetProvisionRevision > 0,
                 ) { "pending transaction has invalid fields" }
-                val previous = root.optString("previousRootfsVersion").takeIf { it.isNotEmpty() }
+                val previous = if (root.isNull("previousRootfsVersion")) {
+                    null
+                } else {
+                    root.optString("previousRootfsVersion").takeIf { it.isNotEmpty() }
+                }
                 return PendingTransaction(
                     transactionId = transactionId,
                     targetRootfsVersion = targetRootfsVersion,
                     targetRootfsSha256 = targetRootfsSha256,
                     targetMinisdSha256 = targetMinisdSha256,
+                    targetProvisionRevision = targetProvisionRevision,
                     previousRootfsVersion = previous,
                 )
             }
@@ -160,9 +172,15 @@ object RuntimeDistributionManager {
     ): Boolean {
         if (!health.healthy) return false
         val metadata = health.metadata ?: return false
+        val revision = manifest.rootfsVersion
+            .substringAfter("-r")
+            .substringBefore("-")
+            .toIntOrNull()
+            ?: return false
         return metadata.optString("release") == manifest.rootfsRelease &&
             metadata.optString("profile") == manifest.rootfsProfile &&
-            metadata.optString("upstream_sha256").lowercase() == manifest.rootfsUpstreamSha256
+            metadata.optString("upstream_sha256").lowercase() == manifest.rootfsUpstreamSha256 &&
+            metadata.optInt("revision", -1) == revision
     }
 
     internal fun stageArchiveCommand(packageName: String): String =
@@ -186,6 +204,7 @@ echo "STAGED_ARCHIVE_OK: ${'$'}ACTUAL"
         commands += "ARCHIVE=$archive"
         commands += "STAGE=$stage"
         commands += "PREV=$previous"
+        commands += "PREV_PARENT='${RUNTIME_DIR}/previous'"
         commands += "rm -rf \"\$STAGE\""
         commands += "mkdir -p \"\$STAGE\" || { rm -rf \"\$STAGE\"; exit 90; }"
         commands += "tar -xzf \"\$ARCHIVE\" -C \"\$STAGE\" || { rm -rf \"\$STAGE\"; exit 91; }"
@@ -198,9 +217,10 @@ echo "STAGED_ARCHIVE_OK: ${'$'}ACTUAL"
         commands += "grep -Eq '\"release\"[[:space:]]*:[[:space:]]*\"24\\.04' \"\$META\" || { rm -rf \"\$STAGE\"; exit 108; }"
         commands += "grep -Eq '\"arch\"[[:space:]]*:[[:space:]]*\"arm64\"' \"\$META\" || { rm -rf \"\$STAGE\"; exit 109; }"
         commands += "grep -Eq '\"profile\"[[:space:]]*:[[:space:]]*\"base\"' \"\$META\" || { rm -rf \"\$STAGE\"; exit 110; }"
+        commands += "mkdir -p \"\$PREV_PARENT\" || { rm -rf \"\$STAGE\"; exit 111; }"
         commands += "rm -rf \"\$PREV\""
-        commands += "if [ -e \"\$ROOTFS\" ]; then mv \"\$ROOTFS\" \"\$PREV\" || { rm -rf \"\$STAGE\"; exit 111; }; fi"
-        commands += "if ! mv \"\$STAGE\" \"\$ROOTFS\"; then [ -e \"\$PREV\" ] && mv \"\$PREV\" \"\$ROOTFS\" 2>/dev/null || true; rm -rf \"\$STAGE\" 2>/dev/null || true; exit 112; fi"
+        commands += "if [ -e \"\$ROOTFS\" ]; then mv \"\$ROOTFS\" \"\$PREV\" || { rm -rf \"\$STAGE\"; exit 112; }; fi"
+        commands += "if ! mv \"\$STAGE\" \"\$ROOTFS\"; then [ -e \"\$PREV\" ] && mv \"\$PREV\" \"\$ROOTFS\" 2>/dev/null || true; rm -rf \"\$STAGE\" 2>/dev/null || true; exit 113; fi"
         commands += "echo 'MINIS_ROOTFS:DEPLOYED'"
         return commands.joinToString("\n")
     }
@@ -213,7 +233,15 @@ OLD="${'$'}PREV.trash.${'$'}${'$'}"
 [ -e "${'$'}ROOTFS" ] && mv "${'$'}ROOTFS" "${'$'}OLD" 2>/dev/null || true
 mv "${'$'}PREV" "${'$'}ROOTFS" || { [ -e "${'$'}OLD" ] && mv "${'$'}OLD" "${'$'}ROOTFS" 2>/dev/null || true; exit 121; }
 rm -rf "${'$'}OLD"
-echo 'MINIS_ROOTFS:ROLLED_BACK'
+    echo 'MINIS_ROOTFS:ROLLED_BACK'
+    """.trimIndent()
+
+    internal fun resetRootfsCommand(): String = """
+ROOTFS='${MinisdProtocol.DEFAULT_ROOTFS}'
+RUNTIME='$RUNTIME_DIR'
+rm -rf "${'$'}ROOTFS" "${'$'}RUNTIME/staging" "${'$'}RUNTIME/previous" || exit 150
+rm -f "${'$'}RUNTIME/pending.json" "${'$'}RUNTIME/deployed.json" || exit 151
+echo 'MINIS_ROOTFS:RESET'
     """.trimIndent()
 
     internal fun writeStateFileCommand(path: String, content: String): String {
@@ -270,6 +298,26 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         return ensureDeployedCore(manifest, context.packageName, runner, stopKeeper, startKeeper, provision)
     }
 
+    suspend fun resetRootfs(
+        runner: RootRunner,
+        stopKeeper: suspend () -> Boolean,
+    ): DeploymentResult {
+        if (!stopKeeper()) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "cannot stop keeper before rootfs reset",
+            )
+        }
+        val reset = runner.run(resetRootfsCommand())
+        if (!reset.completed || reset.exitCode != 0) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "rootfs reset failed: ${reset.error ?: reset.output}",
+            )
+        }
+        return DeploymentResult(DeploymentOutcome.RESET, "rootfs reset; persistent user data preserved")
+    }
+
     internal suspend fun ensureDeployedCore(
         manifest: RuntimeDistributionManifest,
         packageName: String,
@@ -301,6 +349,12 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
             )
         }
         if (pending != null) {
+            if (!pending.matches(manifest)) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "pending transaction targets a different runtime; refusing recovery",
+                )
+            }
             return when (decideRecovery(
                 canonicalHealthy = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS).healthy,
                 canonicalMatchesTarget = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS)
@@ -308,7 +362,7 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
                 previousHealthy = probeRootfs(runner, PREVIOUS_ROOTFS).healthy,
             )) {
                 RecoveryDecision.COMPLETE -> {
-                    if (!completeInterruptedUpgrade(runner, manifest, startKeeper, provision)) {
+                    if (!completeInterruptedUpgrade(runner, manifest, stopKeeper, startKeeper, provision)) {
                         return DeploymentResult(
                             DeploymentOutcome.FAILED,
                             "interrupted upgrade could not be provisioned; retry or inspect pending state",
@@ -320,6 +374,12 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
                     )
                 }
                 RecoveryDecision.ROLLBACK -> {
+                    if (!stopKeeper()) {
+                        return DeploymentResult(
+                            DeploymentOutcome.FAILED,
+                            "cannot stop keeper before interrupted-upgrade rollback",
+                        )
+                    }
                     val rollback = runner.run(rollbackRootfsCommand())
                     if (!rollback.completed || rollback.exitCode != 0) {
                         return DeploymentResult(
@@ -367,6 +427,7 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
             targetRootfsVersion = manifest.rootfsVersion,
             targetRootfsSha256 = manifest.rootfsSha256,
             targetMinisdSha256 = manifest.minisdSha256,
+            targetProvisionRevision = manifest.provisionRevision,
             previousRootfsVersion = readDeployed(runner)?.rootfsVersion,
         )
         val pendingWrite = runner.run(writeStateFileCommand(PENDING_FILE, pending.toJson()))
@@ -399,18 +460,31 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         }
         val health = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS)
         if (!rootfsMatchesManifest(health, manifest)) {
-            runner.run(rollbackRootfsCommand())
-            return fail("deployed rootfs does not match manifest: ${health.detail}")
+            return rollbackAfterSwitch(
+                runner,
+                "deployed rootfs does not match manifest: ${health.detail}",
+            )
         }
         if (!startKeeper()) {
-            stopKeeper()
-            rollbackAfterFailedProvision(runner)
-            return fail("cannot start keeper after rootfs switch")
+            if (!stopKeeper()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "cannot stop keeper after failed start; pending transaction retained",
+                )
+            }
+            return rollbackAfterSwitch(runner, "cannot start keeper after rootfs switch")
         }
         if (!provision()) {
-            stopKeeper()
-            rollbackAfterFailedProvision(runner)
-            return fail("provision failed on deployed rootfs; rolled back to previous")
+            if (!stopKeeper()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "provision failed on deployed rootfs; cannot stop keeper; pending transaction retained",
+                )
+            }
+            return rollbackAfterSwitch(
+                runner,
+                "provision failed on deployed rootfs",
+            )
         }
         if (!writeDeployed(runner, manifest)) {
             return DeploymentResult(
@@ -428,28 +502,56 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
     private suspend fun completeInterruptedUpgrade(
         runner: RootRunner,
         manifest: RuntimeDistributionManifest,
+        stopKeeper: suspend () -> Boolean,
         startKeeper: suspend () -> Boolean,
         provision: suspend () -> Boolean,
     ): Boolean {
+        if (!stopKeeper()) {
+            return false
+        }
         if (!startKeeper()) {
-            rollbackAfterFailedProvision(runner)
+            if (!stopKeeper()) return false
+            rollbackAndClearPending(runner)
             return false
         }
         if (!provision()) {
-            rollbackAfterFailedProvision(runner)
+            if (!stopKeeper()) {
+                return false
+            }
+            rollbackAndClearPending(runner)
             return false
         }
         if (!writeDeployed(runner, manifest)) {
-            rollbackAfterFailedProvision(runner)
+            // Keep the pending transaction: the rootfs is already provisioned,
+            // so the next launch can retry this durable commit safely.
             return false
         }
         runner.run(clearStateFileCommand(PENDING_FILE))
         return true
     }
 
-    private fun rollbackAfterFailedProvision(runner: RootRunner) {
-        runner.run(rollbackRootfsCommand())
-        runner.run(clearStateFileCommand(PENDING_FILE))
+    private fun rollbackAfterSwitch(
+        runner: RootRunner,
+        detail: String,
+    ): DeploymentResult {
+        return if (rollbackAndClearPending(runner)) {
+            DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "$detail; rolled back to previous",
+            )
+        } else {
+            DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "$detail; rollback not confirmed; pending transaction retained",
+            )
+        }
+    }
+
+    private fun rollbackAndClearPending(runner: RootRunner): Boolean {
+        val rollback = runner.run(rollbackRootfsCommand())
+        if (!rollback.completed || rollback.exitCode != 0) return false
+        val clear = runner.run(clearStateFileCommand(PENDING_FILE))
+        return clear.completed && clear.exitCode == 0
     }
 
     private fun readPending(runner: RootRunner): PendingTransaction? =

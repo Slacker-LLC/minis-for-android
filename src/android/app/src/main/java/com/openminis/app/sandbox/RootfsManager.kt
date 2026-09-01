@@ -6,9 +6,6 @@ import com.openminis.app.runtime.minisd.MinisdProtocol
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -16,29 +13,14 @@ import java.io.InputStream
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
-sealed class RootfsInstallState {
-    object Idle : RootfsInstallState()
-    object Preparing : RootfsInstallState()
-    data class Extracting(val progress: Float) : RootfsInstallState()
-    object Finalizing : RootfsInstallState()
-    object Installed : RootfsInstallState()
-    data class Failed(val error: String) : RootfsInstallState()
-}
-
 /**
  * Authoritative health/recovery manager for the privileged Ubuntu rootfs.
  * Persistent Agent data lives outside the rootfs; replacing the rootfs never
  * migrates workspace/memory/skills/shared data here.
  */
-class RootfsManager private constructor(private val context: Context) {
+class RootfsManager private constructor() {
 
     val rootfsDir: File = File(MinisdProtocol.DEFAULT_ROOTFS)
-
-    val isInstalled: Boolean
-        get() = _installState.value is RootfsInstallState.Installed
-
-    private val _installState = MutableStateFlow<RootfsInstallState>(RootfsInstallState.Idle)
-    val installState: StateFlow<RootfsInstallState> = _installState.asStateFlow()
 
     suspend fun checkHealth(): RootfsHealth = withContext(Dispatchers.IO) {
         val su = findSu()
@@ -62,80 +44,6 @@ class RootfsManager private constructor(private val context: Context) {
         evaluateProbeOutput(result.output)
     }
 
-    suspend fun installIfNeeded() = withContext(Dispatchers.IO) {
-        _installState.value = RootfsInstallState.Preparing
-        val before = checkHealth()
-        if (before.healthy) {
-            _installState.value = RootfsInstallState.Installed
-            return@withContext
-        }
-        if (before.code == RootfsHealthCode.ROOT_UNAVAILABLE) {
-            _installState.value = RootfsInstallState.Failed(before.detail)
-            return@withContext
-        }
-
-        val su = findSu()
-        if (su == null) {
-            _installState.value = RootfsInstallState.Failed("Root unavailable: no executable su found")
-            return@withContext
-        }
-
-        _installState.value = RootfsInstallState.Extracting(0f)
-        val staged = runSu(
-            su,
-            com.openminis.app.runtime.ubuntu.RuntimeProvision.stageRootfsFromApkCommand(
-                context.packageName,
-            ),
-            REPAIR_TIMEOUT_MS,
-        )
-        if (!staged.completed || staged.exitCode != 0) {
-            val detail = staged.error
-                ?: staged.output.ifBlank { "rootfs staging exited ${staged.exitCode}" }
-            _installState.value = RootfsInstallState.Failed(detail)
-            return@withContext
-        }
-        val repaired = runSu(su, repairCommand(), REPAIR_TIMEOUT_MS)
-        if (!repaired.completed || repaired.exitCode != 0) {
-            val detail = repaired.error
-                ?: repaired.output.ifBlank { "rootfs recovery exited ${repaired.exitCode}" }
-            _installState.value = RootfsInstallState.Failed(detail)
-            return@withContext
-        }
-
-        _installState.value = RootfsInstallState.Finalizing
-        val after = checkHealth()
-        if (after.healthy) {
-            _installState.value = RootfsInstallState.Installed
-        } else {
-            _installState.value = RootfsInstallState.Failed(
-                "rootfs recovery completed but validation failed: ${after.detail}",
-            )
-        }
-    }
-
-    suspend fun installProotIfNeeded() = withContext(Dispatchers.IO) { Unit }
-
-    suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
-        if (keepUserData) Log.i(TAG, "reset: persistent user data is external to rootfs and will be preserved")
-        val su = findSu() ?: run {
-            _installState.value = RootfsInstallState.Failed("Root unavailable: no executable su found")
-            return@withContext null
-        }
-        val result = runSu(
-            su,
-            "rm -rf ${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}",
-            HEALTH_TIMEOUT_MS,
-        )
-        if (result.completed && result.exitCode == 0) {
-            _installState.value = RootfsInstallState.Idle
-        } else {
-            _installState.value = RootfsInstallState.Failed(
-                result.error ?: result.output.ifBlank { "rootfs reset failed" },
-            )
-        }
-        null
-    }
-
     suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
         val su = findSu() ?: return@withContext 0L
         val command = "du -sk ${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)} 2>/dev/null | awk '{print \$1}'"
@@ -143,10 +51,6 @@ class RootfsManager private constructor(private val context: Context) {
         if (!result.completed || result.exitCode != 0) return@withContext 0L
         val kib = result.output.lineSequence().mapNotNull { it.trim().toLongOrNull() }.firstOrNull() ?: 0L
         kib * 1024L
-    }
-
-    suspend fun restoreUserData(backupDir: File) = withContext(Dispatchers.IO) {
-        Log.i(TAG, "restoreUserData ignored for ${backupDir.path}: persistent data is not stored in rootfs")
     }
 
     fun ensureSessionDirs(sessionId: String) {
@@ -200,11 +104,6 @@ class RootfsManager private constructor(private val context: Context) {
     }
 
     private fun probeCommand(): String = buildProbeCommand(MinisdProtocol.DEFAULT_ROOTFS)
-
-    private fun repairCommand(): String = buildRepairCommand(
-        rootfs = MinisdProtocol.DEFAULT_ROOTFS,
-        archive = STAGED_ROOTFS_ARCHIVE,
-    )
 
     // --- POSIX tar extraction (kept for TarExtractionTest) ---
 
@@ -304,7 +203,6 @@ class RootfsManager private constructor(private val context: Context) {
     companion object {
         private const val TAG = "RootfsManager"
         private const val HEALTH_TIMEOUT_MS = 15_000L
-        private const val REPAIR_TIMEOUT_MS = 180_000L
         internal const val STAGED_ROOTFS_ARCHIVE =
             com.openminis.app.runtime.ubuntu.RuntimeProvision.STAGED_ROOTFS_ARCHIVE
         private val SU_CANDIDATES = listOf(
@@ -335,7 +233,7 @@ class RootfsManager private constructor(private val context: Context) {
         private var instance: RootfsManager? = null
 
         fun getInstance(context: Context): RootfsManager =
-            instance ?: RootfsManager(context.applicationContext).also { instance = it }
+            instance ?: RootfsManager().also { instance = it }
 
         internal fun buildProbeCommand(rootfs: String): String {
             val commands = mutableListOf<String>()

@@ -50,6 +50,7 @@ class RuntimeDistributionManagerTest {
         var verifySucceeds: Boolean = true,
         var rootOutput: String = "0",
         var canonicalBecomesHealthyAfterDeploy: Boolean = false,
+        var rollbackSucceeds: Boolean = true,
     ) : RootRunner {
         val commands = mutableListOf<String>()
 
@@ -78,7 +79,12 @@ class RuntimeDistributionManagerTest {
                     } else {
                         RootCommandResult(true, 91, "tar failed")
                     }
-                command.contains("MINIS_ROOTFS:ROLLED_BACK") -> RootCommandResult(true, 0, "MINIS_ROOTFS:ROLLED_BACK")
+                command.contains("MINIS_ROOTFS:ROLLED_BACK") ->
+                    if (rollbackSucceeds) {
+                        RootCommandResult(true, 0, "MINIS_ROOTFS:ROLLED_BACK")
+                    } else {
+                        RootCommandResult(true, 121, "rollback failed")
+                    }
                 command.startsWith("DIR=") -> RootCommandResult(true, 0, "state written")
                 command.startsWith("rm -f ") -> RootCommandResult(true, 0, "")
                 else -> RootCommandResult(true, 0, "")
@@ -137,6 +143,27 @@ class RuntimeDistributionManagerTest {
             "/data/adb/minis/home",
         )) {
             assertFalse("rollback command must not touch $userPath", command.contains(userPath))
+        }
+    }
+
+    @Test
+    fun `reset command only removes runtime-owned paths`() {
+        val command = RuntimeDistributionManager.resetRootfsCommand()
+
+        assertTrue(command.contains("/data/adb/minis/rootfs"))
+        assertTrue(command.contains("RUNTIME='/data/adb/minis/runtime'"))
+        assertTrue(command.contains("\"\$RUNTIME/staging\""))
+        assertTrue(command.contains("\"\$RUNTIME/previous\""))
+        assertTrue(command.contains("MINIS_ROOTFS:RESET"))
+        for (userPath in listOf(
+            "/data/adb/minis/workspace",
+            "/data/adb/minis/sessions",
+            "/data/adb/minis/memory",
+            "/data/adb/minis/skills",
+            "/data/adb/minis/shared",
+            "/data/adb/minis/home",
+        )) {
+            assertFalse("reset command must not touch $userPath", command.contains(userPath))
         }
     }
 
@@ -206,6 +233,7 @@ class RuntimeDistributionManagerTest {
             targetRootfsVersion = manifest.rootfsVersion,
             targetRootfsSha256 = rootfsSha,
             targetMinisdSha256 = minisdSha,
+            targetProvisionRevision = manifest.provisionRevision,
             previousRootfsVersion = "ubuntu-24.04-r0-0000000000000000",
         )
 
@@ -219,6 +247,32 @@ class RuntimeDistributionManagerTest {
     fun `pending transaction rejects corrupt schema`() {
         val bad = JSONObject().put("schemaVersion", 1).put("transactionId", "x").toString()
         assertThrows(IllegalArgumentException::class.java) { PendingTransaction.parse(bad) }
+    }
+
+    @Test
+    fun `pending transaction with a different target fails closed`() = runBlocking {
+        val current = manifest()
+        val pendingManifest = manifest(rootfsSha256 = "0".repeat(64))
+        val runner = FakeRunner(
+            pendingContent = PendingTransaction(
+                transactionId = "tx-old",
+                targetRootfsVersion = pendingManifest.rootfsVersion,
+                targetRootfsSha256 = pendingManifest.rootfsSha256,
+                targetMinisdSha256 = pendingManifest.minisdSha256,
+                targetProvisionRevision = pendingManifest.provisionRevision,
+            ).toJson(),
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            current,
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { true },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("different runtime"))
+        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:DEPLOYED") })
     }
 
     @Test
@@ -268,6 +322,16 @@ class RuntimeDistributionManagerTest {
         assertFalse(
             RuntimeDistributionManager.rootfsMatchesManifest(
                 RootfsHealth(RootfsHealthCode.CORRUPT, "corrupt"),
+                manifest,
+            ),
+        )
+        assertFalse(
+            RuntimeDistributionManager.rootfsMatchesManifest(
+                RootfsHealth(
+                    RootfsHealthCode.HEALTHY,
+                    "wrong revision",
+                    JSONObject(healthyMetadataJson()).put("revision", 2),
+                ),
                 manifest,
             ),
         )
@@ -361,6 +425,7 @@ class RuntimeDistributionManagerTest {
                 targetRootfsVersion = manifest.rootfsVersion,
                 targetRootfsSha256 = rootfsSha,
                 targetMinisdSha256 = minisdSha,
+                targetProvisionRevision = manifest.provisionRevision,
             ).toJson(),
         )
 
@@ -389,6 +454,7 @@ class RuntimeDistributionManagerTest {
                 targetRootfsVersion = manifest.rootfsVersion,
                 targetRootfsSha256 = rootfsSha,
                 targetMinisdSha256 = minisdSha,
+                targetProvisionRevision = manifest.provisionRevision,
             ).toJson(),
         )
 
@@ -415,6 +481,7 @@ class RuntimeDistributionManagerTest {
                 targetRootfsVersion = manifest.rootfsVersion,
                 targetRootfsSha256 = rootfsSha,
                 targetMinisdSha256 = minisdSha,
+                targetProvisionRevision = manifest.provisionRevision,
             ).toJson(),
         )
 
@@ -506,6 +573,17 @@ class RuntimeDistributionManagerTest {
     }
 
     @Test
+    fun `rootfs reset refuses to run when keeper cannot stop`() = runBlocking {
+        val runner = FakeRunner()
+
+        val result = RuntimeDistributionManager.resetRootfs(runner) { false }
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("stop keeper"))
+        assertFalse(runner.commands.any { it.contains("MINIS_ROOTFS:RESET") })
+    }
+
+    @Test
     fun `canonical mismatch after deploy rolls back and fails`() = runBlocking {
         val runner = FakeRunner(
             canonicalMetadata = null,
@@ -573,6 +651,28 @@ class RuntimeDistributionManagerTest {
     }
 
     @Test
+    fun `rollback failure retains pending transaction`() = runBlocking {
+        val runner = FakeRunner(
+            canonicalMetadata = null,
+            canonicalBecomesHealthyAfterDeploy = true,
+            rollbackSucceeds = false,
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            runner,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("rollback not confirmed"))
+        assertFalse(runner.commands.any { it == "rm -f '${RuntimeDistributionManager.PENDING_FILE}'" })
+    }
+
+    @Test
     fun `start keeper failure on fresh deploy rolls back and clears pending`() = runBlocking {
         val runner = FakeRunner(
             canonicalMetadata = null,
@@ -602,6 +702,7 @@ class RuntimeDistributionManagerTest {
                 targetRootfsVersion = manifest.rootfsVersion,
                 targetRootfsSha256 = rootfsSha,
                 targetMinisdSha256 = minisdSha,
+                targetProvisionRevision = manifest.provisionRevision,
             ).toJson(),
         )
         var provisionCalls = 0
@@ -631,6 +732,7 @@ class RuntimeDistributionManagerTest {
                 targetRootfsVersion = manifest.rootfsVersion,
                 targetRootfsSha256 = rootfsSha,
                 targetMinisdSha256 = minisdSha,
+                targetProvisionRevision = manifest.provisionRevision,
             ).toJson(),
         )
 
@@ -660,6 +762,7 @@ private fun healthyMetadataJson(release: String = "24.04.3"): String = JSONObjec
     .put("release", release)
     .put("arch", "arm64")
     .put("profile", "base")
+    .put("revision", 1)
     .put("upstream_sha256", upstream)
     .toString()
 

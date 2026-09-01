@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.util.Log
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.runtime.distribution.RuntimePayloadVerifier
 import com.openminis.app.runtime.minisd.MinisdBootstrap
 import com.openminis.app.runtime.minisd.MinisdClient
 import com.openminis.app.runtime.minisd.MinisdError
@@ -18,6 +19,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -28,6 +30,8 @@ object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
     private const val ROOT_AUTH_TIMEOUT_MS = 15_000L
     private const val PROVISION_TIMEOUT_MS = 600_000L
+    private val WHITESPACE = Regex("\\s+")
+    private val SHA256_TOKEN = Regex("^[0-9a-fA-F]{64}$")
 
     data class Snapshot(
         val running: Boolean = false,
@@ -72,6 +76,9 @@ object UbuntuRuntime {
     private var appContext: Context? = null
 
     @Volatile
+    private var verifiedPackagedBrokerSha256: String? = null
+
+    @Volatile
     var client: MinisdClient = MinisdClient()
         private set
 
@@ -82,6 +89,7 @@ object UbuntuRuntime {
     fun init(context: Context) {
         val ctx = context.applicationContext
         appContext = ctx
+        verifiedPackagedBrokerSha256 = null
         UbuntuPaths.init(ctx)
         val dir = java.io.File(ctx.filesDir, "minis")
         dir.mkdirs()
@@ -128,12 +136,7 @@ object UbuntuRuntime {
                     runBlocking { runRoot(command) }
                 },
                 stopKeeper = {
-                    if (cur.running) {
-                        val stopped = apply(client.ubuntuStop())
-                        !stopped.running
-                    } else {
-                        true
-                    }
+                    stopForDeployment()
                 },
                 startKeeper = {
                     val started = apply(
@@ -154,6 +157,12 @@ object UbuntuRuntime {
                         MinisdProtocol.runtimeError(
                             MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
                             "provision transport failed: ${it.message}",
+                        )
+                    }
+                    if (!response.ok) {
+                        Log.w(
+                            TAG,
+                            "ubuntu.provision failed code=${response.error?.code} detail=${response.error?.detail}",
                         )
                     }
                     response.ok
@@ -271,6 +280,15 @@ object UbuntuRuntime {
     internal fun brokerIdentityMatches(snapshot: Snapshot, expectedUid: Int): Boolean =
         snapshot.guestUid == expectedUid
 
+    internal fun parseSha256sum(output: String): String? = output
+        .lineSequence()
+        .map { it.trim().split(WHITESPACE, limit = 2).firstOrNull().orEmpty() }
+        .firstOrNull { it.matches(SHA256_TOKEN) }
+        ?.lowercase()
+
+    internal fun brokerBinaryMatches(expectedSha256: String, sha256sumOutput: String): Boolean =
+        parseSha256sum(sha256sumOutput) == expectedSha256.lowercase()
+
     internal fun shouldRetryAfterPreExecFailure(error: MinisdError?, attempt: Int): Boolean =
         attempt == 0 && error?.code == MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST
 
@@ -296,7 +314,15 @@ object UbuntuRuntime {
         val expectedUid = ctx.applicationInfo.uid
         var response = client.ubuntuStatus()
         var uid = response.brokerUid()
-        if (response.ok && uid == expectedUid) return response
+        val packagedBinaryMatches = if (response.ok && uid == expectedUid) {
+            packagedBrokerMatchesInstalled(ctx)
+        } else {
+            null
+        }
+        if (response.ok && uid == expectedUid && packagedBinaryMatches != false) return response
+        if (packagedBinaryMatches == false) {
+            Log.w(TAG, "running minisd broker binary differs from packaged APK; restarting")
+        }
 
         val forcedRestart = uid != null
         if (uid != null) {
@@ -337,6 +363,34 @@ object UbuntuRuntime {
                 "minisd app identity mismatch: expected uid=$expectedUid, broker uid=${uid ?: "unknown"}",
             )
         }
+    }
+
+    private suspend fun packagedBrokerMatchesInstalled(ctx: Context): Boolean? {
+        val expected = packagedBrokerSha256(ctx) ?: return null
+        if (verifiedPackagedBrokerSha256 == expected) return true
+
+        val installed = runRoot(
+            "sha256sum ${MinisdBootstrap.shellQuote(MinisdProtocol.DEFAULT_BIN)}",
+        )
+        if (!installed.completed || installed.exitCode != 0) return null
+        val actual = parseSha256sum(installed.output) ?: return null
+        return (actual == expected).also { if (it) verifiedPackagedBrokerSha256 = expected }
+    }
+
+    private suspend fun packagedBrokerSha256(ctx: Context): String? {
+        val packaged = File(
+            ctx.applicationInfo.nativeLibraryDir,
+            RuntimeProvision.PACKAGED_BROKER_NAME,
+        )
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                if (!packaged.isFile) {
+                    null
+                } else {
+                    packaged.inputStream().use { RuntimePayloadVerifier.sha256(it) }
+                }
+            }
+        }.getOrNull()
     }
 
     private suspend fun awaitBrokerResponse(expectedUid: Int): MinisdResponse {
@@ -514,6 +568,7 @@ object UbuntuRuntime {
                     TAG,
                     "ensureMinisdUp forceRestart=$forceRestart uid=${ctx.applicationInfo.uid} ${output.take(200)}",
                 )
+                packagedBrokerSha256(ctx)?.let { verifiedPackagedBrokerSha256 = it }
                 BrokerStartResult(true)
             } finally {
                 proc.destroy()
@@ -527,6 +582,33 @@ object UbuntuRuntime {
         redirectPaths = false
         return apply(resp)
     }
+
+    suspend fun resetRootfs(): com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentResult =
+        startLock.withLock {
+            val ctx = appContext
+                ?: return@withLock com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentResult(
+                    com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome.ROOT_UNAVAILABLE,
+                    "UbuntuRuntime.init(context) has not been called",
+                )
+            val broker = ensureBrokerReadyLocked(ctx)
+            if (!broker.ok) {
+                return@withLock com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentResult(
+                    com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome.ROOT_UNAVAILABLE,
+                    broker.error?.detail ?: "failed to start minisd",
+                )
+            }
+            val result = com.openminis.app.runtime.distribution.RuntimeDistributionManager.resetRootfs(
+                runner = com.openminis.app.runtime.distribution.RuntimeDistributionManager.RootRunner {
+                        command ->
+                    runBlocking { runRoot(command) }
+                },
+                stopKeeper = { stopForDeployment() },
+            )
+            if (result.outcome == com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome.RESET) {
+                redirectPaths = false
+            }
+            result
+        }
 
     suspend fun exec(
         argv: List<String>,
@@ -689,6 +771,23 @@ object UbuntuRuntime {
         .put("guestUid", appContext?.applicationInfo?.uid ?: MinisdProtocol.GUEST_UID)
 
     private fun failStructured(code: String, detail: String): Snapshot = fail("$code: $detail")
+
+    private suspend fun stopForDeployment(): Boolean {
+        val response = runCatching { client.ubuntuStop() }.getOrElse {
+            Log.w(TAG, "ubuntu.stop transport failed before rootfs switch: ${it.message}")
+            return false
+        }
+        if (!response.ok) {
+            Log.w(
+                TAG,
+                "ubuntu.stop failed before rootfs switch code=${response.error?.code} detail=${response.error?.detail}",
+            )
+            apply(response)
+            return false
+        }
+        val stopped = apply(response)
+        return response.result?.optBoolean("running", true) == false && !stopped.running
+    }
 
     private fun fail(detail: String): Snapshot {
         val next = Snapshot(lastError = detail)

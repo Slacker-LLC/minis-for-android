@@ -65,6 +65,8 @@ class RuntimePayloadVerifierTest {
             "var", "var/minis", "etc", "etc/minis", "bin",
         ),
         shell: String? = "bin/bash",
+        memberPrefix: String = "",
+        directorySuffix: String = "",
         metadata: JSONObject = JSONObject()
             .put("distro", "ubuntu")
             .put("version", "24.04")
@@ -74,12 +76,12 @@ class RuntimePayloadVerifierTest {
             .put("upstream_sha256", upstream),
     ): ByteArray {
         val out = ByteArrayOutputStream()
-        dirs.forEach { out.write(tarEntry(it, null, '5')) }
-        out.write(tarEntry("etc/os-release", "VERSION_ID=\"24.04\"\n".toByteArray()))
-        out.write(tarEntry("etc/passwd", "root:x:0:0:root:/root:/bin/bash\n".toByteArray()))
-        out.write(tarEntry("etc/group", "root:x:0:\n".toByteArray()))
-        out.write(tarEntry("etc/minis/rootfs.json", metadata.toString().toByteArray()))
-        if (shell != null) out.write(tarEntry(shell, "#!/bin/sh\n".toByteArray()))
+        dirs.forEach { out.write(tarEntry("$memberPrefix$it$directorySuffix", null, '5')) }
+        out.write(tarEntry("${memberPrefix}etc/os-release", "VERSION_ID=\"24.04\"\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/passwd", "root:x:0:0:root:/root:/bin/bash\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/group", "root:x:0:\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/minis/rootfs.json", metadata.toString().toByteArray()))
+        if (shell != null) out.write(tarEntry("$memberPrefix$shell", "#!/bin/sh\n".toByteArray()))
         out.write(ByteArray(1024))
         return out.toByteArray()
     }
@@ -99,7 +101,19 @@ class RuntimePayloadVerifierTest {
             manifest(digest),
         )
 
-        assertTrue(result.ok)
+        assertTrue(result.error.orEmpty(), result.ok)
+    }
+
+    @Test
+    fun `rootfs archive normalizes dot slash and directory suffixes`() {
+        val archive = gzip(rootfsTar(memberPrefix = "./", directorySuffix = "/"))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertTrue(result.error.orEmpty(), result.ok)
     }
 
     @Test

@@ -572,6 +572,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut listen = minisd::proxy::PROXY_LISTEN.to_string();
     let mut tz = "LCL-8".to_string();
     let mut proxy = String::new();
+    let mut retain_root_capabilities = false;
     let mut extra_env: std::collections::BTreeMap<String, String> =
         std::collections::BTreeMap::new();
     let mut guest_argv: Vec<String> = Vec::new();
@@ -673,6 +674,10 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 proxy = args.get(i + 1).cloned().unwrap_or_default();
                 i += 2;
             }
+            "--retain-root-capabilities" => {
+                retain_root_capabilities = true;
+                i += 1;
+            }
             "--env" => {
                 let kv = args.get(i + 1).ok_or((8u8, "--env needs KEY=VAL".into()))?;
                 let (k, v) = kv
@@ -701,6 +706,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
             &proxy,
             &extra_env,
             &guest_argv,
+            retain_root_capabilities,
         ),
         "netproxy" => minisd::proxy::run_forever(&listen).map_err(|e| (1u8, e)),
         _ => Err((8, "helper kind must be keep|exec|netproxy".into())),
@@ -751,6 +757,7 @@ fn helper_exec(
     proxy: &str,
     extra_env: &std::collections::BTreeMap<String, String>,
     argv: &[String],
+    retain_root_capabilities: bool,
 ) -> Result<(), (u8, String)> {
     use minisd::env::guest_env;
     use minisd::ns;
@@ -775,7 +782,7 @@ fn helper_exec(
     if std::env::set_current_dir(cwd).is_err() {
         let _ = std::env::set_current_dir("/");
     }
-    if uid == 0 {
+    if uid == 0 && !retain_root_capabilities {
         ns::lockdown_no_privs().map_err(|e| (6u8, e))?;
     } else {
         ns::drop_privs(uid, gid).map_err(|e| (6u8, e))?;
