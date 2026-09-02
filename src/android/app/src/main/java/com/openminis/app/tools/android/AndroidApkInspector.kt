@@ -5,9 +5,13 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.openminis.app.BuildConfig
-import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.FileOutputStream
 import java.io.File
 import java.security.MessageDigest
 import java.util.ArrayDeque
@@ -46,24 +50,22 @@ object AndroidApkInspector {
     private const val MAX_DISCOVERY_DIRECTORIES = 4_000
     private const val MAX_DISCOVERY_DEPTH = 10
 
-    fun inspect(
+    suspend fun inspect(
         context: Context,
         sessionId: String,
         artifactPath: String? = null,
         searchRoot: String? = null,
     ): ApkArtifact {
         val explicit = artifactPath?.trim().orEmpty()
-        val file = if (explicit.isNotEmpty()) {
-            resolvePath(context, sessionId, explicit)
+        val resolved = if (explicit.isNotEmpty()) {
+            resolveArtifact(context, sessionId, explicit)
                 ?: throw IllegalArgumentException("APK path is not visible from this session: $explicit")
         } else {
             val root = searchRoot?.trim().orEmpty().takeIf(String::isNotEmpty)
                 ?: throw IllegalArgumentException("artifactPath or searchRoot is required; APK paths are never guessed")
-            val hostRoot = resolvePath(context, sessionId, root)
-                ?: throw IllegalArgumentException("searchRoot is not visible from this session: $root")
-            discover(hostRoot).firstOrNull()
-                ?: throw IllegalArgumentException("no APK under real Gradle build/outputs/apk directories below $root")
+            resolveSearchRoot(context, sessionId, root)
         }
+        val file = resolved.file
         if (!file.isFile || !file.name.endsWith(".apk", true)) {
             throw IllegalArgumentException("artifact is not a readable APK file: ${file.absolutePath}")
         }
@@ -84,10 +86,9 @@ object AndroidApkInspector {
             MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
                 .joinToString("") { "%02x".format(it) }
         }
-        val linuxPath = linuxPathFor(context, sessionId, file)
         return ApkArtifact(
             hostPath = file.canonicalPath,
-            linuxPath = linuxPath,
+            linuxPath = resolved.linuxPath,
             packageName = archive.packageName,
             versionName = archive.versionName,
             versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) archive.longVersionCode else {
@@ -134,15 +135,6 @@ object AndroidApkInspector {
             .sortedWith(compareByDescending<File> { it.lastModified() }.thenBy { it.absolutePath })
     }
 
-    fun resolvePath(context: Context, sessionId: String, path: String): File? {
-        if (!path.startsWith('/')) return null
-        val candidate = when {
-            path.startsWith("/var/minis/") -> RuntimePathRegistry.resolveSessionHostPath(sessionId, path, context)
-            else -> RuntimePathRegistry.resolveHostPath(path)?.takeIf(File::exists) ?: File(path)
-        } ?: return null
-        return runCatching { candidate.canonicalFile }.getOrNull()
-    }
-
     fun stageForInstaller(context: Context, artifact: ApkArtifact): File {
         if (artifact.packageName == BuildConfig.APPLICATION_ID) {
             throw UnsupportedOperationException(
@@ -170,13 +162,167 @@ object AndroidApkInspector {
         }.getOrDefault("apk-archive")
     }
 
-    private fun linuxPathFor(context: Context, sessionId: String, file: File): String? {
-        val bases = listOf("workspace", "attachments", "offloads", "browser")
-        for (base in bases) {
-            val host = File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId), base)
-            val relative = runCatching { file.canonicalFile.relativeTo(host.canonicalFile).path }.getOrNull() ?: continue
-            if (!relative.startsWith("..")) return "/var/minis/$base/${relative.replace(File.separatorChar, '/')}"
+    private data class ResolvedArtifact(
+        val file: File,
+        val linuxPath: String?,
+    )
+
+    private suspend fun resolveArtifact(
+        context: Context,
+        sessionId: String,
+        path: String,
+    ): ResolvedArtifact? {
+        if (!path.startsWith('/')) return null
+        if (ExternalMountAccess.isPath(path)) {
+            val file = ExternalMountAccess.resolve(path)?.takeIf { it.isFile }
+                ?: return null
+            return ResolvedArtifact(file.canonicalFile, path)
+        }
+        if (path == "/var/minis" || path.startsWith("/var/minis/") ||
+            path == "/workspace" || path.startsWith("/workspace/")) {
+            return stageGuestArtifact(context, sessionId, path)
         }
         return null
+    }
+
+    private suspend fun resolveSearchRoot(
+        context: Context,
+        sessionId: String,
+        root: String,
+    ): ResolvedArtifact {
+        if (!root.startsWith('/')) {
+            throw IllegalArgumentException("searchRoot must be an absolute Linux path: $root")
+        }
+        if (ExternalMountAccess.isPath(root)) {
+            val hostRoot = ExternalMountAccess.resolve(root)
+                ?: throw IllegalArgumentException("searchRoot is not visible from this mount: $root")
+            val file = discover(hostRoot).firstOrNull()
+                ?: throw IllegalArgumentException("no APK under real Gradle build/outputs/apk directories below $root")
+            return ResolvedArtifact(file.canonicalFile, rootForDiscoveredFile(root, hostRoot, file))
+        }
+        if (root != "/var/minis" && !root.startsWith("/var/minis/") &&
+            root != "/workspace" && !root.startsWith("/workspace/")) {
+            throw IllegalArgumentException("searchRoot is outside the guest persistent layout: $root")
+        }
+        val guestPath = discoverGuest(sessionId, root).firstOrNull()
+            ?: throw IllegalArgumentException("no APK under real Gradle build/outputs/apk directories below $root")
+        return stageGuestArtifact(context, sessionId, guestPath)
+    }
+
+    private suspend fun stageGuestArtifact(
+        context: Context,
+        sessionId: String,
+        linuxPath: String,
+    ): ResolvedArtifact {
+        val info = WorkspaceFileClient.info(sessionId, linuxPath)
+        if (info.optString("type") != "file") {
+            throw IllegalArgumentException("APK artifact is not a regular file: $linuxPath")
+        }
+        val size = info.optLong("size", -1L)
+        if (size < 0L || size > WorkspaceFileClient.MAX_FILE_BYTES) {
+            throw IllegalArgumentException("APK artifact is too large or has no size: $linuxPath")
+        }
+        val modified = info.optLong("modified", 0L)
+        val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("$linuxPath\u0000$size\u0000$modified".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val target = File(context.cacheDir, "android-deploy/guest/$digest-$name")
+        target.parentFile?.mkdirs()
+        if (!target.isFile || target.length() != size) {
+            withContext(Dispatchers.IO) {
+                FileOutputStream(target).use { output ->
+                    var offset = 0L
+                    while (true) {
+                        val chunk = WorkspaceFileClient.readChunk(sessionId, linuxPath, offset)
+                        output.write(chunk.bytes)
+                        offset += chunk.bytes.size
+                        if (chunk.eof) break
+                        if (chunk.bytes.isEmpty()) {
+                            throw IllegalStateException("workspace.file read made no progress: $linuxPath")
+                        }
+                    }
+                    output.fd.sync()
+                }
+            }
+        }
+        if (!target.isFile || target.length() != size) {
+            throw IllegalStateException("staged APK size mismatch: $linuxPath")
+        }
+        target.setReadable(true, false)
+        return ResolvedArtifact(target, linuxPath)
+    }
+
+    private suspend fun discoverGuest(sessionId: String, root: String): List<String> {
+        data class Pending(val path: String, val depth: Int)
+        val outputRoots = mutableListOf<String>()
+        val queue = ArrayDeque<Pending>()
+        queue.add(Pending(root.trimEnd('/').ifEmpty { "/" }, 0))
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_DISCOVERY_DIRECTORIES) {
+            val (directory, depth) = queue.removeFirst()
+            visited += 1
+            if (directory.trimEnd('/').endsWith("/build/outputs/apk")) {
+                outputRoots += directory
+                continue
+            }
+            if (depth >= MAX_DISCOVERY_DEPTH) continue
+            for (entry in listGuestEntries(sessionId, directory)) {
+                if (entry.optString("type") != "dir") continue
+                val child = "$directory/${entry.optString("name")}".replace("//", "/")
+                queue.add(Pending(child, depth + 1))
+            }
+        }
+        return outputRoots
+            .flatMap { walkGuestApks(sessionId, it, 5) }
+            .sortedByDescending { it.second }
+            .map { it.first }
+    }
+
+    private suspend fun walkGuestApks(
+        sessionId: String,
+        root: String,
+        maxDepth: Int,
+    ): List<Pair<String, Long>> {
+        data class Pending(val path: String, val depth: Int)
+        val found = mutableListOf<Pair<String, Long>>()
+        val queue = ArrayDeque<Pending>()
+        queue.add(Pending(root, 0))
+        while (queue.isNotEmpty()) {
+            val (directory, depth) = queue.removeFirst()
+            for (entry in listGuestEntries(sessionId, directory)) {
+                val name = entry.optString("name")
+                val child = "$directory/$name".replace("//", "/")
+                when {
+                    entry.optString("type") == "file" && name.endsWith(".apk", true) ->
+                        found += child to entry.optLong("modified", 0L)
+                    entry.optString("type") == "dir" && depth < maxDepth ->
+                        queue.add(Pending(child, depth + 1))
+                }
+            }
+        }
+        return found
+    }
+
+    private suspend fun listGuestEntries(sessionId: String, path: String): List<JSONObject> {
+        val entries = mutableListOf<JSONObject>()
+        var offset = 0
+        while (true) {
+            val page = WorkspaceFileClient.list(sessionId, path, 500, offset)
+            val array = page.optJSONArray("entries") ?: JSONArray()
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)?.let(entries::add)
+            }
+            val next = page.optInt("next_offset", -1)
+            if (next < 0) return entries
+            offset = next
+        }
+    }
+
+    private fun rootForDiscoveredFile(root: String, hostRoot: File, file: File): String? {
+        val relative = runCatching { file.canonicalFile.relativeTo(hostRoot.canonicalFile).path }
+            .getOrNull() ?: return null
+        return "${root.trimEnd('/')}/${relative.replace(File.separatorChar, '/')}"
+            .replace("//", "/")
     }
 }

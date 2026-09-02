@@ -296,7 +296,7 @@ object AndroidAgentTools {
         return jsonResult(result, success, title)
     }
 
-    private fun inspectArtifact(context: Context, sid: String, args: JSONObject): ApkArtifact {
+    private suspend fun inspectArtifact(context: Context, sid: String, args: JSONObject): ApkArtifact {
         val artifact = AndroidApkInspector.inspect(
             context,
             sid,
