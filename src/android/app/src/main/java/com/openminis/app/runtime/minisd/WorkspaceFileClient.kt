@@ -34,19 +34,30 @@ internal object WorkspaceFileClient {
         detail: String,
     ) : IllegalStateException("$code: $detail")
 
-    suspend fun readChunk(sessionId: String, path: String, offset: Long = 0): ReadChunk {
+    suspend fun readChunk(
+        sessionId: String?,
+        path: String,
+        offset: Long = 0,
+        length: Int = MAX_READ_CHUNK,
+    ): ReadChunk {
+        require(length in 1..MAX_READ_CHUNK) { "length must be between 1 and $MAX_READ_CHUNK" }
         ensureBrokerReady()
-        return readChunkUnchecked(sessionId, path, offset)
+        return readChunkUnchecked(sessionId, path, offset, length)
     }
 
-    private suspend fun readChunkUnchecked(sessionId: String, path: String, offset: Long): ReadChunk {
+    private suspend fun readChunkUnchecked(
+        sessionId: String?,
+        path: String,
+        offset: Long,
+        length: Int = MAX_READ_CHUNK,
+    ): ReadChunk {
         val result = requireResult(
             UbuntuRuntime.client.workspaceFile(
                 operation = "read",
                 sessionId = sessionId,
                 path = path,
                 offset = offset,
-                length = MAX_READ_CHUNK,
+                length = length,
             ),
         )
         val encoded = result.optString("data_base64", "")
@@ -64,7 +75,7 @@ internal object WorkspaceFileClient {
     }
 
     suspend fun readAll(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         maxBytes: Long = MAX_FILE_BYTES,
     ): ByteArray {
@@ -94,13 +105,13 @@ internal object WorkspaceFileClient {
 
     /** For Android callbacks such as WebView resource interception. */
     fun readAllBlocking(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         maxBytes: Long = MAX_FILE_BYTES,
     ): ByteArray = runBlocking(Dispatchers.IO) { readAll(sessionId, path, maxBytes) }
 
     suspend fun readToFile(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         destination: File,
         maxBytes: Long = MAX_FILE_BYTES,
@@ -149,7 +160,7 @@ internal object WorkspaceFileClient {
     }
 
     fun readToFileBlocking(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         destination: File,
         maxBytes: Long = MAX_FILE_BYTES,
@@ -158,7 +169,7 @@ internal object WorkspaceFileClient {
     }
 
     suspend fun writeBytes(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         bytes: ByteArray,
     ): Long {
@@ -190,7 +201,7 @@ internal object WorkspaceFileClient {
         }
     }
 
-    suspend fun appendBytes(sessionId: String, path: String, bytes: ByteArray): Long {
+    suspend fun appendBytes(sessionId: String?, path: String, bytes: ByteArray): Long {
         ensureBrokerReady()
         if (bytes.isEmpty()) {
             return requireResult(
@@ -228,7 +239,7 @@ internal object WorkspaceFileClient {
      * local cache without loading the whole file into memory.
      */
     suspend fun writeStream(
-        sessionId: String,
+        sessionId: String?,
         path: String,
         input: InputStream,
         maxBytes: Long = MAX_FILE_BYTES,
@@ -297,7 +308,7 @@ internal object WorkspaceFileClient {
     }
 
     /** Pick a non-conflicting child name using the broker's directory view. */
-    suspend fun uniqueChildPath(sessionId: String, directory: String, filename: String): String {
+    suspend fun uniqueChildPath(sessionId: String?, directory: String, filename: String): String {
         require(filename.isNotEmpty() && !filename.contains('/') && !filename.contains('\\')) {
             "filename must be a single path component"
         }
@@ -321,7 +332,7 @@ internal object WorkspaceFileClient {
     }
 
     suspend fun copy(
-        sessionId: String,
+        sessionId: String?,
         source: String,
         destination: String,
         sourceSessionId: String? = null,
@@ -341,7 +352,7 @@ internal object WorkspaceFileClient {
     }
 
     suspend fun move(
-        sessionId: String,
+        sessionId: String?,
         source: String,
         destination: String,
         sourceSessionId: String? = null,
@@ -360,7 +371,18 @@ internal object WorkspaceFileClient {
         )
     }
 
-    suspend fun delete(sessionId: String, path: String): JSONObject {
+    suspend fun mkdir(sessionId: String?, path: String): JSONObject {
+        ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(
+                operation = "mkdir",
+                sessionId = sessionId,
+                path = path,
+            ),
+        )
+    }
+
+    suspend fun delete(sessionId: String?, path: String): JSONObject {
         ensureBrokerReady()
         return requireResult(
             UbuntuRuntime.client.workspaceFile(
@@ -371,7 +393,7 @@ internal object WorkspaceFileClient {
         )
     }
 
-    suspend fun list(sessionId: String, path: String, limit: Int, offset: Int): JSONObject {
+    suspend fun list(sessionId: String?, path: String, limit: Int, offset: Int): JSONObject {
         ensureBrokerReady()
         return requireResult(
             UbuntuRuntime.client.workspaceFile(
@@ -384,7 +406,7 @@ internal object WorkspaceFileClient {
         )
     }
 
-    suspend fun info(sessionId: String, path: String): JSONObject {
+    suspend fun info(sessionId: String?, path: String): JSONObject {
         ensureBrokerReady()
         return requireResult(
             UbuntuRuntime.client.workspaceFile(
@@ -395,7 +417,7 @@ internal object WorkspaceFileClient {
         )
     }
 
-    suspend fun listAll(sessionId: String, path: String): List<JSONObject> {
+    suspend fun listAll(sessionId: String?, path: String): List<JSONObject> {
         val entries = mutableListOf<JSONObject>()
         var offset = 0
         while (true) {
@@ -412,7 +434,7 @@ internal object WorkspaceFileClient {
         }
     }
 
-    suspend fun treeSize(sessionId: String, root: String): Long {
+    suspend fun treeSize(sessionId: String?, root: String): Long {
         val rootInfo = info(sessionId, root)
         return when (rootInfo.optString("type")) {
             "file" -> rootInfo.optLong("size", 0L)
@@ -434,7 +456,7 @@ internal object WorkspaceFileClient {
         }
     }
 
-    suspend fun deleteChildren(sessionId: String, root: String) {
+    suspend fun deleteChildren(sessionId: String?, root: String) {
         val directories = ArrayDeque<String>().apply { add(root) }
         val children = mutableListOf<Pair<String, String>>()
         while (directories.isNotEmpty()) {
@@ -452,7 +474,7 @@ internal object WorkspaceFileClient {
         children.asReversed().forEach { (path, _) -> delete(sessionId, path) }
     }
 
-    private suspend fun writeChunks(sessionId: String, path: String, bytes: ByteArray) {
+    private suspend fun writeChunks(sessionId: String?, path: String, bytes: ByteArray) {
         if (bytes.isEmpty()) {
             requireResult(
                 UbuntuRuntime.client.workspaceFile(

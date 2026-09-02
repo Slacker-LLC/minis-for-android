@@ -560,6 +560,17 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+        <provider
+            android:name=".providers.MinisDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
         <!-- T323: AccessibilityService backing `android-a11y-cli`. The user
              must enable this manually under Settings → Accessibility; we
              never start it programmatically (Android forbids that). -->

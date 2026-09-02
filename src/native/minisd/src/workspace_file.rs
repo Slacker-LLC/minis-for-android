@@ -63,6 +63,7 @@ mod unix_impl {
         match operation {
             "read" => read(params, uid, gid),
             "write" | "append" => write(params, uid, gid, operation == "append"),
+            "mkdir" => mkdir(params, uid, gid),
             "copy" => copy(params, uid, gid),
             "move" => move_path(params, uid, gid),
             "delete" => delete(params, uid, gid),
@@ -205,6 +206,59 @@ mod unix_impl {
             "bytes": bytes.len(),
             "size": size,
             "append": append,
+        }))
+    }
+
+    fn mkdir(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
+        let resolved = resolve_param_path(params, "path", uid, gid)?;
+        if resolved.path == resolved.root {
+            return Err((
+                ErrorCode::PolicyDenied,
+                "cannot create a persistent root".into(),
+            ));
+        }
+        match fs::symlink_metadata(&resolved.path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!(
+                        "directory must not be a symlink: {}",
+                        resolved.path.display()
+                    ),
+                ));
+            }
+            Ok(metadata) if metadata.is_dir() => {
+                return Ok(serde_json::json!({
+                    "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
+                    "created": false,
+                }));
+            }
+            Ok(_) => {
+                return Err((
+                    ErrorCode::BadParams,
+                    format!("path is not a directory: {}", resolved.path.display()),
+                ));
+            }
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                return Err(io_error("stat directory", error));
+            }
+            Err(_) => {}
+        }
+        let parent = resolved
+            .path
+            .parent()
+            .ok_or((ErrorCode::PolicyDenied, "directory has no parent".into()))?;
+        if !parent.is_dir() {
+            return Err((
+                ErrorCode::RuntimeUnavailable,
+                format!("parent directory is missing: {}", parent.display()),
+            ));
+        }
+        fs::create_dir(&resolved.path).map_err(|e| io_error("create directory", e))?;
+        set_owner_mode(&resolved.path, uid, gid, PERSISTENT_DATA_MODE)?;
+        Ok(serde_json::json!({
+            "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
+            "created": true,
         }))
     }
 
