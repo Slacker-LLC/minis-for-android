@@ -8,7 +8,6 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -103,8 +103,13 @@ object KaTeXRendererCache {
         )
     }
 
-    fun cacheKey(latex: String, displayMode: Boolean): String =
-        (if (displayMode) "D:" else "I:") + latex
+    /**
+     * The cached value is a bitmap whose glyph colours are baked for a theme.
+     * Keep the theme in the key so flipping the in-app theme cannot reuse the
+     * previous theme's pixels.
+     */
+    fun cacheKey(latex: String, displayMode: Boolean, isDark: Boolean): String =
+        (if (displayMode) "D:" else "I:") + (if (isDark) "k:" else "l:") + latex
 }
 
 /**
@@ -138,10 +143,10 @@ fun KaTeXRenderView(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val isDark = isSystemInDarkTheme()
+    val isDark = ChatColors.isDark
     val fontSize = 16f
-    val cacheKey = remember(latex, displayMode) {
-        KaTeXRendererCache.cacheKey(latex, displayMode)
+    val cacheKey = remember(latex, displayMode, isDark) {
+        KaTeXRendererCache.cacheKey(latex, displayMode, isDark)
     }
 
     // Check cache first
