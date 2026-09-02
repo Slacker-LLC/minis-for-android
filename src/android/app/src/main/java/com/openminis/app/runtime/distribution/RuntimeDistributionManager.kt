@@ -722,6 +722,12 @@ object RuntimeDistributionManager {
         )
     }
 
+    /** Read-only rootfs inspection through the authenticated broker channel. */
+    suspend fun inspectRootfs(
+        maintainer: RuntimeMaintainer,
+        target: String = TARGET_CANONICAL,
+    ): RootfsHealth = probeRootfs(maintainer, target)
+
     private fun RootfsHealth.isKnown(): Boolean = code != RootfsHealthCode.ROOT_UNAVAILABLE &&
         code != RootfsHealthCode.UNKNOWN
 

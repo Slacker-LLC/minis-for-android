@@ -8,7 +8,9 @@ pub struct ProbeResult {
     #[serde(rename = "capEff")]
     pub cap_eff: String,
     pub selinux: String,
-    pub enforcing: bool,
+    /// `None` means the SELinux enforcement status could not be read. It must
+    /// not be represented as permissive or enforcing by default.
+    pub enforcing: Option<bool>,
     pub kernelsu: KernelSuInfo,
     pub mock: bool,
 }
@@ -26,7 +28,7 @@ pub fn mock_probe() -> ProbeResult {
         groups: vec![0],
         cap_eff: "000001ffffffffff".into(),
         selinux: "u:r:su:s0".into(),
-        enforcing: true,
+        enforcing: Some(true),
         kernelsu: KernelSuInfo {
             present: true,
             version: "mock".into(),
@@ -60,9 +62,7 @@ pub fn live_probe() -> ProbeResult {
         .to_string();
     let enforcing = std::fs::read_to_string("/sys/fs/selinux/enforce")
         .ok()
-        .and_then(|s| s.trim().parse::<u8>().ok())
-        .unwrap_or(1)
-        == 1;
+        .and_then(|s| parse_enforcing(&s));
     ProbeResult {
         uid,
         gid,
@@ -72,6 +72,28 @@ pub fn live_probe() -> ProbeResult {
         enforcing,
         kernelsu: kernelsu_info(uid == 0),
         mock: false,
+    }
+}
+
+fn parse_enforcing(raw: &str) -> Option<bool> {
+    match raw.trim().parse::<u8>().ok()? {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_enforcing;
+
+    #[test]
+    fn selinux_enforcement_parser_preserves_unknown() {
+        assert_eq!(parse_enforcing("0\n"), Some(false));
+        assert_eq!(parse_enforcing("1\n"), Some(true));
+        assert_eq!(parse_enforcing(""), None);
+        assert_eq!(parse_enforcing("not available"), None);
+        assert_eq!(parse_enforcing("2"), None);
     }
 }
 

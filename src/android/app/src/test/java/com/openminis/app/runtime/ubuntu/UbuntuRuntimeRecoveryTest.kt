@@ -178,4 +178,36 @@ class UbuntuRuntimeRecoveryTest {
             ),
         )
     }
+
+    @Test
+    fun `failed status response preserves last known snapshot and marks it stale`() {
+        val previous = UbuntuRuntime.Snapshot(
+            running = true,
+            available = true,
+            pid = 8123,
+            version = "24.04",
+            provisioned = true,
+            guestUid = 10422,
+            sessionsRoot = "/data/adb/minis/sessions",
+            layoutKnown = true,
+            hostWorkspace = "/data/adb/minis/workspace",
+            statusFresh = true,
+        )
+        val response = MinisdResponse(
+            v = 1,
+            id = 3,
+            ok = false,
+            result = null,
+            error = MinisdError("TRANSPORT_TIMEOUT", "status request timed out"),
+        )
+
+        val next = UbuntuRuntime.mergeSnapshot(previous, response)
+
+        assertEquals(previous.running, next.running)
+        assertEquals(previous.pid, next.pid)
+        assertEquals(previous.version, next.version)
+        assertEquals(previous.hostWorkspace, next.hostWorkspace)
+        assertFalse(next.statusFresh)
+        assertEquals("TRANSPORT_TIMEOUT: status request timed out", next.lastError)
+    }
 }

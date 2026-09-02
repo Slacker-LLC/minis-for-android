@@ -373,6 +373,11 @@ object PrivilegedCommandRunner {
             }
         }
         val uid = payload.optInt("uid", -1).takeIf { it >= 0 }
+        val selinuxEnforcing = if (payload.has("enforcing") && !payload.isNull("enforcing")) {
+            payload.optBoolean("enforcing")
+        } else {
+            null
+        }
         return RootProbeResult(
             authorized = uid == 0,
             effectiveUid = uid,
@@ -380,7 +385,7 @@ object PrivilegedCommandRunner {
             groups = groups,
             effectiveCapabilitiesHex = payload.optString("capEff").ifBlank { null },
             selinuxContext = payload.optString("selinux").ifBlank { null },
-            selinuxMode = if (payload.optBoolean("enforcing")) "Enforcing" else "Permissive",
+            selinuxMode = selinuxEnforcing?.let { if (it) "Enforcing" else "Permissive" },
             error = if (uid == 0) null else "minisd broker is not running as uid 0",
         )
     }
