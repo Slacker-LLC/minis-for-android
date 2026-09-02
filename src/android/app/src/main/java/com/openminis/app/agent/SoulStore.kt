@@ -2,6 +2,9 @@ package com.openminis.app.agent
 
 import android.content.Context
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * SoulStore (`src/ios/Agent/Session/SoulStore.swift`, commit 6370d5a).
  *
  * SOUL.md lives next to GLOBAL.md and the daily memory logs under
- * `<filesDir>/minis-global/memory/`. Format: YAML frontmatter delimited
+ * `/var/minis/memory/`. Format: YAML frontmatter delimited
  * by `---` followed by a Markdown body. The body becomes Layer 1 of the
  * system prompt; `name` + `emoji` drive the chat assistant bubble header.
  *
@@ -174,8 +177,12 @@ object SoulStore {
 
     private const val TAG = "SoulStore"
     private const val FILE_NAME = "SOUL.md"
+    private const val GUEST_PATH = "/var/minis/memory/$FILE_NAME"
+
     fun fileLocation(context: Context): File =
-        File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory, FILE_NAME)
+        // Kept as a diagnostic location for legacy callers. Actual I/O must
+        // use [GUEST_PATH] through minisd; this File is never opened.
+        File(GUEST_PATH)
 
     /**
      * Compatibility constants kept so older source/tests continue to compile.
@@ -227,12 +234,15 @@ lang: "auto"
      * Safe to call on every launch — never overwrites existing user edits.
      */
     fun ensureExists(context: Context) {
-        val file = fileLocation(context)
-        if (file.exists()) return
         try {
-            file.parentFile?.mkdirs()
-            file.writeText(DEFAULT_CONTENT)
-            AppLogger.info(TAG, "seeded SOUL.md at ${file.absolutePath}")
+            val existing = runBlocking(Dispatchers.IO) {
+                runCatching { WorkspaceFileClient.info("", GUEST_PATH) }.getOrNull()
+            }
+            if (existing?.optString("type") == "file") return
+            runBlocking(Dispatchers.IO) {
+                WorkspaceFileClient.writeBytes("", GUEST_PATH, DEFAULT_CONTENT.toByteArray(Charsets.UTF_8))
+            }
+            AppLogger.info(TAG, "seeded SOUL.md at $GUEST_PATH")
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "ensureExists failed: ${t.message}")
         }
@@ -244,10 +254,9 @@ lang: "auto"
      * empty body and callers may treat that as "fall back to default".
      */
     fun load(context: Context): SoulFile? {
-        val file = fileLocation(context)
-        if (!file.exists()) return null
         return try {
-            SoulMDParser.parse(file.readText())
+            val bytes = WorkspaceFileClient.readAllBlocking("", GUEST_PATH)
+            SoulMDParser.parse(bytes.toString(Charsets.UTF_8))
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "SOUL.md load failed: ${t.message}")
             null
@@ -256,17 +265,9 @@ lang: "auto"
 
     /** Atomic write through a `.tmp` sibling, then rename. */
     fun save(context: Context, file: SoulFile) {
-        val target = fileLocation(context)
-        target.parentFile?.mkdirs()
         val text = SoulMDParser.serialize(file)
-        val tmp = File(target.parentFile, "${target.name}.tmp")
-        tmp.writeText(text)
-        if (!tmp.renameTo(target)) {
-            // Fallback: copy + delete tmp on filesystems that reject
-            // cross-inode rename (shouldn't apply inside filesDir, but
-            // defensive — keeps us from leaving a stale .tmp behind).
-            target.writeText(text)
-            tmp.delete()
+        runBlocking(Dispatchers.IO) {
+            WorkspaceFileClient.writeBytes("", GUEST_PATH, text.toByteArray(Charsets.UTF_8))
         }
         _cachedMetadata.value = file.metadata
     }

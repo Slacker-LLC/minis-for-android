@@ -386,6 +386,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         // launch, but it FAILS VISIBLY AND RECOVERABLY instead of dying on the
         // first Compose frame forever.
         try {
+        // Repositories that read canonical guest files must have a configured
+        // broker client before their constructors run.
+        UbuntuRuntime.init(this)
         database = AppDatabase.getInstance(this)
         chatRepository = ChatRepository(database.chatDao()) { sessionId ->
             com.openminis.app.runtime.ubuntu.UbuntuPaths.deleteSession(
@@ -411,9 +414,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // register their tools as mcp.<server>.<tool> (hot-reloadable).
         com.openminis.app.mcp.client.MCPProvider.init(mcpRepository, this)
         com.openminis.app.mcp.client.MCPProvider.reload()
-        memoryRepository = MemoryRepository(
-            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory),
-        )
+        memoryRepository = MemoryRepository()
         webAppShortcutRepository = WebAppShortcutRepository(database.webAppShortcutDao())
 
         // T-android-safemode-lateinit-crash: every repository the UI layer
@@ -459,9 +460,6 @@ class MinisApp : Application(), ImageLoaderFactory {
         RootfsManager.getInstance(this)
         ExecutionCoordinator.init(this)
         ExecutionCoordinator.envVarRepository = envVarRepository
-        // P2: Ubuntu Runtime handle. Lazy — no su / no ubuntu.start here.
-        // PRoot remains the default shell until P2 exit deletes it.
-        UbuntuRuntime.init(this)
         // P3: register Tool Runtime handlers (linux.* + old aliases).
         // root.shell: Android Root domain shell, LOCAL_ONLY by policy.
         com.openminis.app.tools.runtime.ToolRegistry.register(
