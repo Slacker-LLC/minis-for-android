@@ -1,0 +1,1445 @@
+diff --git a/docs/PRIVILEGED-ACCESS-MODES.md b/docs/PRIVILEGED-ACCESS-MODES.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..40ca1997cda26245e389e933efa638e3ed68aed7
+--- /dev/null
++++ b/docs/PRIVILEGED-ACCESS-MODES.md
+@@ -0,0 +1,81 @@
++# Privileged Android access modes
++
++Issue #45 reduces Agent-triggered Android Root execution to two user-visible modes while keeping `minisd` as the single execution and audit boundary.
++
++## Authority model
++
++```text
++Android Agent tool
++  -> PrivilegedCommandRunner
++  -> user-owned PrivilegedAccessModeStore
++  -> MinisdClient
++  -> minisd root.exec policy
++  -> Android Root executable
++```
++
++`PrivilegedCommandRunner` no longer executes Agent argv through `su -c`. The App may still use `su` to bootstrap or reach the fixed `minisd --call` helper when the App socket is unavailable; that transport path does not contain Agent-controlled argv and is not a second Root command executor.
++
++## Standard mode
++
++Standard mode is the default. Missing, invalid, or old preference values resolve to `standard`.
++
++`minisd` first applies the existing `root.exec` built-in tool allowlist and argument policy. Requests that pass the standard policy execute without a confirmation. Requests outside that policy return `CONFIRM_REQUIRED` with a short-lived `confirm_id`.
++
++The Android policy seam shows the complete argv to the user. An approved request is retried once with the issued `confirm_id`.
++
++### Confirmation binding
++
++A confirmation is bound to the canonical JSON value containing:
++
++- the method name;
++- every authority-bearing request parameter, including tool, complete argv, timeout and access mode.
++
++`execution_id` is deliberately excluded because it is cancellation/transport metadata and does not change requested Root authority.
++
++A confirmation is consumed before validation. Therefore all of these permanently invalidate the ticket:
++
++- successful use;
++- reuse;
++- expiry;
++- changed argv or any other bound parameter.
++
++A changed request must obtain a new confirmation.
++
++## Full Access mode
++
++Full Access is stored only by the App settings UI. Agent tool schemas do not expose a mode-switch operation.
++
++When the user explicitly enables Full Access, `PrivilegedCommandRunner` marks Root requests as `full`. `minisd` then skips the standard tool allowlist for that request, but still enforces structured argv parsing, executable resolution, command timeout, cancellation, bounded stdout/stderr capture and the normal broker audit boundary. This permits operations such as `sh -c`, `cmd`, `debuggerd`, `chroot`, `unshare` and specialized `mount` invocations when those executables exist on the device.
++
++The settings screen displays a persistent warning while Full Access is selected:
++
++> ⚠ 完全访问模式已开启，Agent 当前拥有设备完整 Root 控制权
++
++Returning to Standard mode is immediate and does not require a confirmation.
++
++## Root probe
++
++The explicit Root capability probe still requires user approval, but the probe itself is now executed by `minisd root.probe`. `RootCommandRunner` is retained only as a passive `su` detector and last-probe cache; it has no command execution method.
++
++## Regression contract
++
++Automated tests cover:
++
++- Standard mode as the fail-closed preference default;
++- standard allowlisted execution without confirmation;
++- non-allowlisted Standard requests returning a confirmation;
++- confirmation binding to the complete request;
++- mismatch invalidation and replay rejection;
++- Full Access bypassing the standard allowlist while remaining inside `minisd`;
++- Android wire requests carrying explicit access mode and confirmation IDs.
++
++## Concurrent PR boundary
++
++This work was branched from `master` at `6cd51ad69c760e929605f6557737b6890898f475`.
++
++At implementation time:
++
++- PR #63 (`fix/issue-50-android-persistent-paths`) was an open Draft based on that same `master`. Its persistent-path work overlaps `MinisdProtocol.kt` but does not define Issue #45 authority semantics.
++- PR #66 (`feat/issue-51-runtime-distribution`) was an open Draft stacked on PR #63 and included a broad package/runtime distribution migration that touches the logical Android/minisd files changed here.
++
++This branch does not modify, rebase, force-push, or rewrite either PR branch. If #63 or #66 lands first, Issue #45 behavior must be reconciled against their then-current GitHub heads rather than overwriting their persistent-layout or runtime-distribution changes.
+diff --git a/src/android/app/src/main/assets/minisd-policy.json b/src/android/app/src/main/assets/minisd-policy.json
+index c81a7011f317dd5bacd6cc1c1e2b9cd168f8d181..38c64c570c45cb33d209c08d70216a809a71341a 100644
+--- a/src/android/app/src/main/assets/minisd-policy.json
++++ b/src/android/app/src/main/assets/minisd-policy.json
+@@ -5,9 +5,10 @@
+     "root.probe": { "mode": "allow" },
+     "root.exec": {
+       "mode": "allow",
+-      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount"],
++      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat"],
+       "argRules": {
+-        "pm": { "regexDeny": ["shell.*su.*"] }
++        "pm": { "regexDeny": ["shell.*su.*", "uninstall.*", "install.*", "clear.*", "disable.*", "enable.*", "grant.*", "revoke.*", "suspend.*", "unsuspend.*"] },
++        "settings": { "regexDeny": ["put.*", "delete.*", "reset.*"] }
+       }
+     },
+     "root.shellRaw": { "mode": "deny" },
+diff --git a/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdClient.kt b/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdClient.kt
+index 9357cb7b19fbaf3d3119a99b5fedf715daed36c7..e3df461f340c0b18324ec09c39988ed2e357278e 100644
+--- a/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdClient.kt
++++ b/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdClient.kt
+@@ -31,6 +31,7 @@ class MinisdClient(
+     private val cancellations = ExecutionCancellationRegistry()
+ 
+     suspend fun ping(): MinisdResponse = call(MinisdProtocol.ping(nextId()))
++    suspend fun rootProbe(): MinisdResponse = call(MinisdProtocol.rootProbe(nextId()))
+     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
+ 
+     suspend fun ubuntuStart(
+@@ -84,10 +85,20 @@ class MinisdClient(
+         tool: String,
+         args: List<String> = emptyList(),
+         timeoutMs: Long = 30_000,
++        accessMode: String = MinisdProtocol.ACCESS_STANDARD,
++        confirmId: String? = null,
+         executionId: String = newExecutionId("root"),
+     ): MinisdResponse = try {
+         call(
+-            MinisdProtocol.rootExec(tool, args, timeoutMs, nextId(), executionId),
++            MinisdProtocol.rootExec(
++                tool = tool,
++                args = args,
++                timeoutMs = timeoutMs,
++                accessMode = accessMode,
++                confirmId = confirmId,
++                id = nextId(),
++                executionId = executionId,
++            ),
+             timeoutMs + 5_000,
+             cancellationKey = executionId,
+         )
+diff --git a/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdProtocol.kt b/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdProtocol.kt
+index c4b8f3d7a4a4bbbe26fdcf08fdc9bab2d7de6c0a..2808167ebb2164f3c8bdfde425293f0021572cd4 100644
+--- a/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdProtocol.kt
++++ b/src/android/app/src/main/java/com/openminis/app/runtime/minisd/MinisdProtocol.kt
+@@ -41,6 +41,9 @@ object MinisdProtocol {
+     const val HOST_WORKSPACE = "/data/adb/minis/workspace"
+     const val GUEST_WORKSPACE = "/workspace"
+     const val GUEST_UID = 10000
++    const val ACCESS_STANDARD = "standard"
++    const val ACCESS_FULL = "full"
++    const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
+ 
+     const val ERROR_ROOTFS_INVALID = "ROOTFS_INVALID"
+     const val ERROR_KEEPER_NAMESPACE_LOST = "KEEPER_NAMESPACE_LOST"
+@@ -108,10 +111,7 @@ object MinisdProtocol {
+             ERROR_RUNTIME_LAYOUT_MISMATCH,
+             ERROR_PRIVILEGE_SETUP_FAILED,
+             ERROR_EXEC_UNAVAILABLE,
+-            -> MinisdError(
+-                explicit,
+-                result.optString("pre_exec_detail").ifBlank { explicit },
+-            )
++            -> MinisdError(explicit, result.optString("pre_exec_detail").ifBlank { explicit })
+             else -> if (userCommandStarted == false) classifyLegacyPreExec(result) else null
+         }
+         return if (error == null) response else MinisdResponse(
+@@ -131,29 +131,14 @@ object MinisdProtocol {
+                     (stderr.contains("open /proc/") && stderr.contains("/ns/mnt")) ||
+                         stderr.contains("setns CLONE_NEWNS")
+                 if (keeperLost) {
+-                    MinisdError(
+-                        ERROR_KEEPER_NAMESPACE_LOST,
+-                        stderr.ifBlank { "keeper mount namespace is no longer available" },
+-                    )
++                    MinisdError(ERROR_KEEPER_NAMESPACE_LOST, stderr.ifBlank { "keeper mount namespace is no longer available" })
+                 } else {
+-                    MinisdError(
+-                        ERROR_RUNTIME_LAYOUT_MISMATCH,
+-                        stderr.ifBlank { "runtime namespace or session mount setup failed" },
+-                    )
++                    MinisdError(ERROR_RUNTIME_LAYOUT_MISMATCH, stderr.ifBlank { "runtime namespace or session mount setup failed" })
+                 }
+             }
+-            HELPER_CHROOT_FAILED -> MinisdError(
+-                ERROR_CHROOT_UNAVAILABLE,
+-                stderr.ifBlank { "Ubuntu chroot is unavailable" },
+-            )
+-            HELPER_PRIVILEGE_FAILED -> MinisdError(
+-                ERROR_PRIVILEGE_SETUP_FAILED,
+-                stderr.ifBlank { "runtime privilege setup failed before execve" },
+-            )
+-            HELPER_EXECVE_FAILED -> MinisdError(
+-                ERROR_EXEC_UNAVAILABLE,
+-                stderr.ifBlank { "guest executable could not be started" },
+-            )
++            HELPER_CHROOT_FAILED -> MinisdError(ERROR_CHROOT_UNAVAILABLE, stderr.ifBlank { "Ubuntu chroot is unavailable" })
++            HELPER_PRIVILEGE_FAILED -> MinisdError(ERROR_PRIVILEGE_SETUP_FAILED, stderr.ifBlank { "runtime privilege setup failed before execve" })
++            HELPER_EXECVE_FAILED -> MinisdError(ERROR_EXEC_UNAVAILABLE, stderr.ifBlank { "guest executable could not be started" })
+             else -> null
+         }
+     }
+@@ -162,22 +147,14 @@ object MinisdProtocol {
+         response: MinisdResponse,
+         userCommandStarted: Boolean? = null,
+     ): Boolean = promoteExecInfrastructureFailure(response, userCommandStarted)
+-        .error
+-        ?.code == ERROR_KEEPER_NAMESPACE_LOST
++        .error?.code == ERROR_KEEPER_NAMESPACE_LOST
+ 
+     fun runtimeError(code: String, detail: String, id: Long = 0): MinisdResponse =
+-        MinisdResponse(
+-            v = PROTOCOL_V,
+-            id = id,
+-            ok = false,
+-            result = null,
+-            error = MinisdError(code = code, detail = detail),
+-        )
++        MinisdResponse(PROTOCOL_V, id, false, null, MinisdError(code = code, detail = detail))
+ 
+     fun ping(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "system.ping")
+-
+-    fun ubuntuStatus(id: Long = 1): MinisdRequest =
+-        MinisdRequest(id = id, method = "ubuntu.status")
++    fun rootProbe(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "root.probe")
++    fun ubuntuStatus(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.status")
+ 
+     fun ubuntuStart(
+         id: Long = 1,
+@@ -197,8 +174,7 @@ object MinisdProtocol {
+         return MinisdRequest(id = id, method = "ubuntu.start", params = params)
+     }
+ 
+-    fun ubuntuStop(id: Long = 1): MinisdRequest =
+-        MinisdRequest(id = id, method = "ubuntu.stop")
++    fun ubuntuStop(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.stop")
+ 
+     fun ubuntuExec(
+         argv: List<String>,
+@@ -211,10 +187,7 @@ object MinisdProtocol {
+     ): MinisdRequest {
+         val arr = JSONArray()
+         argv.forEach { arr.put(it) }
+-        val params = JSONObject()
+-            .put("argv", arr)
+-            .put("timeout_ms", timeoutMs)
+-            .put("cwd", cwd)
++        val params = JSONObject().put("argv", arr).put("timeout_ms", timeoutMs).put("cwd", cwd)
+         if (env.isNotEmpty()) {
+             val obj = JSONObject()
+             env.forEach { (k, v) -> obj.put(k, v) }
+@@ -231,22 +204,25 @@ object MinisdProtocol {
+         params = JSONObject().put("execution_id", executionId),
+     )
+ 
+-    fun ubuntuProvision(id: Long = 1): MinisdRequest =
+-        MinisdRequest(id = id, method = "ubuntu.provision")
++    fun ubuntuProvision(id: Long = 1): MinisdRequest = MinisdRequest(id = id, method = "ubuntu.provision")
+ 
+     fun rootExec(
+         tool: String,
+         args: List<String> = emptyList(),
+         timeoutMs: Long = 30_000,
++        accessMode: String = ACCESS_STANDARD,
++        confirmId: String? = null,
+         id: Long = 1,
+         executionId: String? = null,
+     ): MinisdRequest {
++        require(accessMode == ACCESS_STANDARD || accessMode == ACCESS_FULL) { "invalid access mode" }
+         val params = JSONObject()
+             .put("tool", tool)
+             .put("args", JSONArray(args))
+             .put("timeout_ms", timeoutMs)
++            .put("access_mode", accessMode)
+         executionId?.takeIf { it.isNotEmpty() }?.let { params.put("execution_id", it) }
+-        return MinisdRequest(id = id, method = "root.exec", params = params)
++        return MinisdRequest(id = id, method = "root.exec", params = params, confirmId = confirmId)
+     }
+ 
+     fun ubuntuAdminExec(
+diff --git a/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidDiagnoseController.kt b/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidDiagnoseController.kt
+index 72f73a9ceb6e1ba1883fb6a57a4f6c1866884eeb..7db305d9ef1cbe219eb038e986ff604b4b3ec5f6 100644
+--- a/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidDiagnoseController.kt
++++ b/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidDiagnoseController.kt
+@@ -140,7 +140,7 @@ object AndroidDiagnoseController {
+             context, sessionId, args, "读取 crash log buffer", CommandRisk.READ_ONLY, 30_000L,
+         )
+         val result = if (privileged.success) privileged else {
+-            RootCommandRunner.runProcess(args, 30_000L, PrivilegedBackend.NONE)
++            AndroidLogManager.runAppLogcat(args, 30_000L)
+         }
+         val related = result.stdout.lineSequence().filter { line ->
+             line.contains(packageName) || line.contains("AndroidRuntime") || line.contains("FATAL EXCEPTION") ||
+diff --git a/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidLogManager.kt b/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidLogManager.kt
+index 6f64847618e814b8bb7b457594e1ac992fa7150d..1980fae011cc4414f265aaadaa898b7d0351d110 100644
+--- a/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidLogManager.kt
++++ b/src/android/app/src/main/java/com/openminis/app/tools/android/AndroidLogManager.kt
+@@ -12,17 +12,20 @@ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.SupervisorJob
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
+ import org.json.JSONArray
+ import org.json.JSONObject
+ import java.io.File
+ import java.util.Locale
+ import java.util.UUID
+ import java.util.concurrent.ConcurrentHashMap
++import java.util.concurrent.TimeUnit
+ 
+ /** Cursor-based logcat capture and JobRegistry-backed bounded watches. */
+ object AndroidLogManager {
+     private const val MAX_LINES = 500
+     private const val MAX_WATCH_BYTES = 256 * 1024
++    private const val MAX_APP_LOGCAT_CHARS = 1_048_576
+     private const val WATCH_POLL_MS = 1_500L
+ 
+     data class LogCursor(
+@@ -174,6 +177,71 @@ object AndroidLogManager {
+         watches.clear()
+     }
+ 
++    /**
++     * Ordinary-app logcat fallback only. This deliberately never resolves or invokes `su`;
++     * all privileged Agent execution remains exclusively behind PrivilegedCommandRunner/minisd.
++     */
++    internal suspend fun runAppLogcat(argv: List<String>, timeoutMs: Long): AndroidCommandResult =
++        withContext(Dispatchers.IO) {
++            if (argv.firstOrNull() != "logcat") {
++                return@withContext AndroidCommandResult(
++                    PrivilegedBackend.NONE,
++                    126,
++                    "",
++                    "",
++                    unavailableReason = "app fallback only permits logcat",
++                )
++            }
++            try {
++                val process = ProcessBuilder(argv).start()
++                val stdout = BoundedText(MAX_APP_LOGCAT_CHARS)
++                val stderr = BoundedText(MAX_APP_LOGCAT_CHARS)
++                val outThread = Thread {
++                    process.inputStream.bufferedReader().useLines { lines -> lines.forEach(stdout::appendLine) }
++                }
++                val errThread = Thread {
++                    process.errorStream.bufferedReader().useLines { lines -> lines.forEach(stderr::appendLine) }
++                }
++                outThread.isDaemon = true
++                errThread.isDaemon = true
++                outThread.start()
++                errThread.start()
++                val exited = process.waitFor(timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
++                if (!exited) process.destroyForcibly()
++                outThread.join(2_000L)
++                errThread.join(2_000L)
++                AndroidCommandResult(
++                    backend = PrivilegedBackend.NONE,
++                    exitCode = if (exited) process.exitValue() else 124,
++                    stdout = stdout.value(),
++                    stderr = stderr.value(),
++                    timedOut = !exited,
++                )
++            } catch (t: Throwable) {
++                AndroidCommandResult(
++                    backend = PrivilegedBackend.NONE,
++                    exitCode = -1,
++                    stdout = "",
++                    stderr = t.message.orEmpty(),
++                )
++            }
++        }
++
++    private class BoundedText(private val maxChars: Int) {
++        private val value = StringBuilder()
++
++        @Synchronized
++        fun appendLine(line: String) {
++            if (value.length >= maxChars) return
++            val remaining = maxChars - value.length
++            value.append(line.take((remaining - 1).coerceAtLeast(0)))
++            if (remaining > 0) value.append('\n')
++        }
++
++        @Synchronized
++        fun value(): String = value.toString().trimEnd()
++    }
++
+     private data class CapturedLogs(
+         val raw: String,
+         val backend: String,
+@@ -194,7 +262,7 @@ object AndroidLogManager {
+             )
+         } else null
+         val rawResult = if (privileged?.success == true) privileged else {
+-            RootCommandRunner.runProcess(args, 45_000L, PrivilegedBackend.NONE)
++            runAppLogcat(args, 45_000L)
+         }
+         val pids = if (packageName == null) knownPids else knownPids +
+             AndroidPackageController.pids(context, sessionId, packageName).toSet()
+diff --git a/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedAccessMode.kt b/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedAccessMode.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..2e830d6216786e98398128be013bb1de126d89a8
+--- /dev/null
++++ b/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedAccessMode.kt
+@@ -0,0 +1,34 @@
++package com.openminis.app.tools.android
++
++import android.content.Context
++
++/** User-owned Root authority level. Agent tool arguments never select this value. */
++enum class PrivilegedAccessMode(val wireValue: String) {
++    STANDARD("standard"),
++    FULL_ACCESS("full"),
++}
++
++object PrivilegedAccessModeStore {
++    private const val PREFS = "privileged_access_mode"
++    private const val KEY_MODE = "mode"
++
++    fun get(context: Context): PrivilegedAccessMode = parse(
++        context.applicationContext
++            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++            .getString(KEY_MODE, null),
++    )
++
++    /** UI-only mutation seam. This function is intentionally not exposed as an Agent tool. */
++    fun setFromUserSettings(context: Context, mode: PrivilegedAccessMode) {
++        context.applicationContext
++            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++            .edit()
++            .putString(KEY_MODE, mode.wireValue)
++            .apply()
++    }
++
++    internal fun parse(raw: String?): PrivilegedAccessMode = when (raw) {
++        PrivilegedAccessMode.FULL_ACCESS.wireValue -> PrivilegedAccessMode.FULL_ACCESS
++        else -> PrivilegedAccessMode.STANDARD
++    }
++}
+diff --git a/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedCommandRunner.kt b/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedCommandRunner.kt
+index e2ac527546ce88f327923c045b9060efacb6fafc..5b1a7a00b1a8d6571758f2075502d264cdb5d8a2 100644
+--- a/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedCommandRunner.kt
++++ b/src/android/app/src/main/java/com/openminis/app/tools/android/PrivilegedCommandRunner.kt
+@@ -1,17 +1,17 @@
+ package com.openminis.app.tools.android
+ 
+ import android.content.Context
+-import android.os.SystemClock
++import com.openminis.app.runtime.minisd.MinisdProtocol
++import com.openminis.app.runtime.minisd.MinisdResponse
++import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+ import com.openminis.app.tools.ApprovalSeam
+-import kotlinx.coroutines.Dispatchers
+-import kotlinx.coroutines.withContext
++import org.json.JSONArray
+ import java.io.File
+-import java.util.concurrent.TimeUnit
+ 
+ /** Backend selected for one privileged Android command. */
+ enum class PrivilegedBackend { ROOT, SHIZUKU, NONE }
+ 
+-/** Risk of one privileged command, used to keep mutation approval explicit. */
++/** Risk of one privileged command, retained in the approval/audit description. */
+ enum class CommandRisk { READ_ONLY, USER_VISIBLE, MUTATING, ROOT_SETUP }
+ 
+ /** Result of one argv-based Android command. */
+@@ -26,7 +26,7 @@ data class AndroidCommandResult(
+     val success: Boolean get() = exitCode == 0 && unavailableReason == null
+ }
+ 
+-/** Actual identity and kernel-policy facts returned by an active `su` probe. */
++/** Actual identity and kernel-policy facts returned by minisd's Root probe. */
+ data class RootProbeResult(
+     val authorized: Boolean,
+     val effectiveUid: Int? = null,
+@@ -40,7 +40,7 @@ data class RootProbeResult(
+     fun hasCapability(bit: Int): Boolean = LinuxCapabilityParser.hasBit(effectiveCapabilitiesHex, bit)
+ }
+ 
+-/** Pure parsers for `id`, `/proc/self/status`, and SELinux probe output. */
++/** Pure parser retained for compatibility tests and legacy probe diagnostics. */
+ object RootProbeParser {
+     private val uidRegex = Regex("""uid=(\d+)(?:\(([^)]*)\))?""")
+     private val gidRegex = Regex("""gid=(\d+)(?:\(([^)]*)\))?""")
+@@ -63,8 +63,8 @@ object RootProbeParser {
+         val error = when {
+             authorized -> null
+             stderr.isNotBlank() -> stderr.trim().take(500)
+-            exitCode != 0 -> "su probe exited with code $exitCode"
+-            uid != 0 -> "su returned effective uid=${uid ?: "unknown"}, not uid 0"
++            exitCode != 0 -> "root probe exited with code $exitCode"
++            uid != 0 -> "root probe returned effective uid=${uid ?: "unknown"}, not uid 0"
+             else -> "root authorization was not established"
+         }
+         return RootProbeResult(
+@@ -91,108 +91,34 @@ object LinuxCapabilityParser {
+     }
+ }
+ 
+-/** Direct `su` backend. Passive detection never starts `su`. */
++/**
++ * Passive Root discovery/cache only. There is intentionally no command runner
++ * here: all privileged execution goes through minisd.
++ */
+ object RootCommandRunner {
+-    private const val MAX_CAPTURE_CHARS = 1_048_576
+     private val knownPaths = listOf(
+         "/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su",
+         "/data/adb/ksu/bin/su", "/debug_ramdisk/su",
+     )
+ 
+     @Volatile private var lastProbe: RootProbeResult? = null
+-    @Volatile private var lastProbeElapsed: Long = 0L
+ 
+     fun passiveSuPath(): String? {
+         knownPaths.firstOrNull { File(it).canExecute() }?.let { return it }
+-        val path = System.getenv("PATH").orEmpty().split(File.pathSeparatorChar)
+-            .map { File(it, "su") }.firstOrNull { it.canExecute() }
+-        return path?.absolutePath
++        return System.getenv("PATH").orEmpty().split(File.pathSeparatorChar)
++            .map { File(it, "su") }
++            .firstOrNull { it.canExecute() }
++            ?.absolutePath
+     }
+ 
+     fun cachedProbe(): RootProbeResult? = lastProbe
+ 
+-    suspend fun activeProbe(): RootProbeResult = withContext(Dispatchers.IO) {
+-        val command = """
+-            printf '__ID__\n'; id
+-            printf '__CAPS__\n'; grep '^CapEff:' /proc/self/status 2>/dev/null || true
+-            printf '__CONTEXT__\n'; (id -Z 2>/dev/null || cat /proc/self/attr/current 2>/dev/null || echo unknown)
+-            printf '__MODE__\n'; (getenforce 2>/dev/null || echo unknown)
+-        """.trimIndent()
+-        val result = runSu(command, 15_000L)
+-        RootProbeParser.parse(result.stdout, result.exitCode, result.stderr).also {
+-            lastProbe = it
+-            lastProbeElapsed = SystemClock.elapsedRealtime()
+-        }
+-    }
+-
+-    suspend fun run(argv: List<String>, timeoutMs: Long): AndroidCommandResult = withContext(Dispatchers.IO) {
+-        if (cachedProbe()?.authorized != true) {
+-            return@withContext AndroidCommandResult(
+-                backend = PrivilegedBackend.NONE,
+-                exitCode = 126,
+-                stdout = "",
+-                stderr = "",
+-                unavailableReason = "root authorization has not been actively granted",
+-            )
+-        }
+-        runSu(shellJoin(argv), timeoutMs)
+-    }
+-
+-    private fun runSu(command: String, timeoutMs: Long): AndroidCommandResult {
+-        val su = passiveSuPath() ?: return AndroidCommandResult(
+-            PrivilegedBackend.NONE, 127, "", "", unavailableReason = "su executable not found",
+-        )
+-        return runProcess(listOf(su, "-c", command), timeoutMs, PrivilegedBackend.ROOT)
+-    }
+-
+-    internal fun shellJoin(argv: List<String>): String = argv.joinToString(" ") { value ->
+-        "'" + value.replace("'", "'\\''") + "'"
+-    }
+-
+-    internal fun runProcess(
+-        argv: List<String>,
+-        timeoutMs: Long,
+-        backend: PrivilegedBackend,
+-    ): AndroidCommandResult {
+-        return try {
+-            val process = ProcessBuilder(argv).start()
+-            val stdout = BoundedText(MAX_CAPTURE_CHARS)
+-            val stderr = BoundedText(MAX_CAPTURE_CHARS)
+-            val outThread = Thread { process.inputStream.bufferedReader().useLines { lines -> lines.forEach { stdout.appendLine(it) } } }
+-            val errThread = Thread { process.errorStream.bufferedReader().useLines { lines -> lines.forEach { stderr.appendLine(it) } } }
+-            outThread.isDaemon = true
+-            errThread.isDaemon = true
+-            outThread.start()
+-            errThread.start()
+-            val exited = process.waitFor(timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+-            if (!exited) process.destroyForcibly()
+-            outThread.join(2_000L)
+-            errThread.join(2_000L)
+-            AndroidCommandResult(
+-                backend = backend,
+-                exitCode = if (exited) process.exitValue() else 124,
+-                stdout = stdout.value(),
+-                stderr = stderr.value(),
+-                timedOut = !exited,
+-            )
+-        } catch (t: Throwable) {
+-            AndroidCommandResult(backend, -1, "", t.message.orEmpty())
+-        }
+-    }
+-
+-    private class BoundedText(private val maxChars: Int) {
+-        private val value = StringBuilder()
+-        @Synchronized fun appendLine(line: String) {
+-            if (value.length >= maxChars) return
+-            val remaining = maxChars - value.length
+-            value.append(line.take((remaining - 1).coerceAtLeast(0)))
+-            if (remaining > 0) value.append('\n')
+-        }
+-        @Synchronized fun value(): String = value.toString().trimEnd()
++    internal fun updateProbe(result: RootProbeResult) {
++        lastProbe = result
+     }
+ }
+ 
+-/** Unified seam only for operations that genuinely need shell privilege. */
++/** Unified policy seam for every Agent-triggered privileged Android command. */
+ object PrivilegedCommandRunner {
+     suspend fun run(
+         context: Context,
+@@ -204,39 +130,59 @@ object PrivilegedCommandRunner {
+         rootOnly: Boolean = false,
+     ): AndroidCommandResult {
+         require(argv.isNotEmpty()) { "privileged command argv must not be empty" }
+-        if (risk == CommandRisk.MUTATING || risk == CommandRisk.ROOT_SETUP) {
++
++        val mode = PrivilegedAccessModeStore.get(context)
++        val wireMode = mode.wireValue
++        val tool = argv.first()
++        val args = argv.drop(1)
++
++        var response = UbuntuRuntime.client.rootExec(
++            tool = tool,
++            args = args,
++            timeoutMs = timeoutMs,
++            accessMode = wireMode,
++        )
++
++        if (
++            mode == PrivilegedAccessMode.STANDARD &&
++            response.code == MinisdProtocol.ERROR_CONFIRM_REQUIRED
++        ) {
++            val confirmId = response.error?.confirmId
++                ?: return unavailable("minisd requested confirmation without confirm_id", rootOnly)
+             val decision = ApprovalSeam.request(
+-                context,
+-                sessionId,
+-                "android_privileged",
+-                "$operation\n\n${argv.joinToString(" ")}",
++                context = context,
++                sessionId = sessionId,
++                toolName = "android_privileged",
++                summary = buildString {
++                    append(operation)
++                    append("\nrisk=")
++                    append(risk.name)
++                    append("\nargv=")
++                    append(JSONArray(argv).toString())
++                },
+             )
+             if (decision.decision != "allowed-once") {
+                 return AndroidCommandResult(
+-                    PrivilegedBackend.NONE, 126, "", "",
++                    backend = PrivilegedBackend.NONE,
++                    exitCode = 126,
++                    stdout = "",
++                    stderr = "",
+                     unavailableReason = "operation was not approved (${decision.decision})",
+                 )
+             }
++            response = UbuntuRuntime.client.rootExec(
++                tool = tool,
++                args = args,
++                timeoutMs = timeoutMs,
++                accessMode = wireMode,
++                confirmId = confirmId,
++            )
+         }
+ 
+-        if (RootCommandRunner.cachedProbe()?.authorized == true) {
+-            return RootCommandRunner.run(argv, timeoutMs)
+-        }
+-        // Shizuku backend removed (P3 Root-only): never fall back to Shizuku.
+-        return AndroidCommandResult(
+-            PrivilegedBackend.NONE,
+-            126,
+-            "",
+-            "",
+-            unavailableReason = if (rootOnly) {
+-                "authorized root with the required capability is unavailable"
+-            } else {
+-                "authorized root is unavailable"
+-            },
+-        )
++        return response.toAndroidCommandResult(rootOnly)
+     }
+ 
+-    /** Explicit root authorization probe. Never called by passive capability reads. */
++    /** Explicit user-approved Root authorization probe, executed by minisd only. */
+     suspend fun requestActiveRootProbe(context: Context, sessionId: String): RootProbeResult {
+         if (RootCommandRunner.passiveSuPath() == null) {
+             return RootProbeResult(false, error = "su executable not found")
+@@ -245,11 +191,84 @@ object PrivilegedCommandRunner {
+             context,
+             sessionId,
+             "android_capabilities",
+-            "主动请求 Root 授权并读取 uid/gid/capabilities/SELinux 状态",
++            "主动请求 Root 授权并由 minisd 读取 uid/gid/capabilities/SELinux 状态",
+         )
+         if (decision.decision != "allowed-once") {
+             return RootProbeResult(false, error = "root probe was not approved (${decision.decision})")
+         }
+-        return RootCommandRunner.activeProbe()
++        val response = UbuntuRuntime.client.rootProbe()
++        val result = response.toRootProbeResult()
++        RootCommandRunner.updateProbe(result)
++        return result
++    }
++
++    private fun unavailable(detail: String, rootOnly: Boolean) = AndroidCommandResult(
++        backend = PrivilegedBackend.NONE,
++        exitCode = 126,
++        stdout = "",
++        stderr = "",
++        unavailableReason = if (rootOnly) {
++            "authorized root with the required capability is unavailable: $detail"
++        } else {
++            detail
++        },
++    )
++
++    private fun MinisdResponse.toAndroidCommandResult(rootOnly: Boolean): AndroidCommandResult {
++        if (!ok) {
++            val code = error?.code.orEmpty()
++            val detail = error?.detail?.ifBlank { code } ?: "minisd root.exec failed"
++            return AndroidCommandResult(
++                backend = PrivilegedBackend.NONE,
++                exitCode = if (code == "TOOL_TIMEOUT" || code == "TRANSPORT_TIMEOUT") 124 else 126,
++                stdout = "",
++                stderr = "",
++                timedOut = code == "TOOL_TIMEOUT" || code == "TRANSPORT_TIMEOUT",
++                unavailableReason = if (rootOnly) {
++                    "authorized root with the required capability is unavailable: $detail"
++                } else {
++                    detail
++                },
++            )
++        }
++        val body = result
++            ?: return AndroidCommandResult(
++                PrivilegedBackend.NONE,
++                126,
++                "",
++                "",
++                unavailableReason = "minisd root.exec returned no result",
++            )
++        return AndroidCommandResult(
++            backend = PrivilegedBackend.ROOT,
++            exitCode = body.optInt("exit_code", -1),
++            stdout = body.optString("stdout"),
++            stderr = body.optString("stderr"),
++        )
++    }
++
++    private fun MinisdResponse.toRootProbeResult(): RootProbeResult {
++        if (!ok) {
++            return RootProbeResult(
++                authorized = false,
++                error = error?.detail?.ifBlank { error?.code.orEmpty() } ?: "minisd root.probe failed",
++            )
++        }
++        val body = result ?: return RootProbeResult(false, error = "minisd root.probe returned no result")
++        val uid = body.optInt("uid", -1).takeIf { it >= 0 }
++        val gid = body.optInt("gid", -1).takeIf { it >= 0 }
++        val groupsJson = body.optJSONArray("groups")
++        val groups = if (groupsJson == null) emptyList() else
++            (0 until groupsJson.length()).map { groupsJson.optInt(it).toString() }
++        return RootProbeResult(
++            authorized = uid == 0,
++            effectiveUid = uid,
++            effectiveGid = gid,
++            groups = groups,
++            effectiveCapabilitiesHex = body.optString("capEff").ifBlank { null },
++            selinuxContext = body.optString("selinux").ifBlank { null },
++            selinuxMode = if (body.optBoolean("enforcing", true)) "Enforcing" else "Permissive",
++            error = if (uid == 0) null else "minisd root.probe returned effective uid=${uid ?: "unknown"}, not uid 0",
++        )
+     }
+ }
+diff --git a/src/android/app/src/main/java/com/openminis/app/ui/settings/SystemPermissionsScreen.kt b/src/android/app/src/main/java/com/openminis/app/ui/settings/SystemPermissionsScreen.kt
+index e34dd87f032948a7eb7b669e63f0c057b41fd998..2f7cd76e5ff3d4204c4bb8f758ad5deccbc12397 100644
+--- a/src/android/app/src/main/java/com/openminis/app/ui/settings/SystemPermissionsScreen.kt
++++ b/src/android/app/src/main/java/com/openminis/app/ui/settings/SystemPermissionsScreen.kt
+@@ -45,6 +45,8 @@ import com.openminis.app.accessibility.AccessibilityRecoveryManager
+ import com.openminis.app.accessibility.MinisAccessibilityService
+ import com.openminis.app.offload.ShizukuManager
+ import com.openminis.app.power.PowerOptimizationManager
++import com.openminis.app.tools.android.PrivilegedAccessMode
++import com.openminis.app.tools.android.PrivilegedAccessModeStore
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
+ 
+@@ -78,6 +80,8 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
+     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+     var repairing by remember { mutableStateOf(false) }
+     var repairFailed by remember { mutableStateOf(false) }
++    var privilegedMode by remember { mutableStateOf(PrivilegedAccessModeStore.get(context)) }
++    var showFullAccessConfirm by remember { mutableStateOf(false) }
+     val scope = rememberCoroutineScope()
+ 
+     LaunchedEffect(Unit) {
+@@ -116,6 +120,71 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
+                 .padding(padding)
+                 .verticalScroll(rememberScrollState()),
+         ) {
++            SettingsSection(
++                header = "Root 权限模式",
++                footer = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) {
++                    "⚠ 完全访问模式已开启，Agent 当前拥有设备完整 Root 控制权。所有命令仍经过 minisd 并保留超时、输出限制与审计。"
++                } else {
++                    "标准模式为默认值。常用白名单命令自动执行，超出范围时只允许对完整请求授权一次。"
++                },
++            ) {
++                SettingsRow(
++                    icon = Icons.Outlined.Build,
++                    iconColor = if (privilegedMode == PrivilegedAccessMode.STANDARD) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
++                    title = "标准模式（推荐）",
++                    subtitle = if (privilegedMode == PrivilegedAccessMode.STANDARD) {
++                        "当前模式 · 白名单自动执行，越权请求逐次确认"
++                    } else {
++                        "切换回标准模式"
++                    },
++                    onClick = {
++                        PrivilegedAccessModeStore.setFromUserSettings(context, PrivilegedAccessMode.STANDARD)
++                        privilegedMode = PrivilegedAccessMode.STANDARD
++                    },
++                )
++                SettingsRow(
++                    icon = Icons.Outlined.Build,
++                    iconColor = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
++                    title = "完全访问模式",
++                    subtitle = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) {
++                        "⚠ 当前已开启 · Agent 可直接使用完整 Root 能力"
++                    } else {
++                        "不逐条确认，可使用 sh -c、cmd、debuggerd、chroot、unshare 等 Root 能力"
++                    },
++                    titleColor = if (privilegedMode == PrivilegedAccessMode.FULL_ACCESS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
++                    onClick = {
++                        if (privilegedMode != PrivilegedAccessMode.FULL_ACCESS) {
++                            showFullAccessConfirm = true
++                        }
++                    },
++                    showDivider = false,
++                )
++            }
++
++            if (showFullAccessConfirm) {
++                AlertDialog(
++                    onDismissRequest = { showFullAccessConfirm = false },
++                    title = { Text("开启完全访问模式？") },
++                    text = {
++                        Text("开启后，Agent 可以通过 minisd 直接执行完整 Root 命令，不再逐条弹窗确认。该模式可能修改系统、应用数据和挂载状态。")
++                    },
++                    confirmButton = {
++                        TextButton(onClick = {
++                            PrivilegedAccessModeStore.setFromUserSettings(context, PrivilegedAccessMode.FULL_ACCESS)
++                            privilegedMode = PrivilegedAccessMode.FULL_ACCESS
++                            showFullAccessConfirm = false
++                        }) {
++                            Text("确认开启", color = MaterialTheme.colorScheme.error)
++                        }
++                    },
++                    dismissButton = {
++                        TextButton(onClick = { showFullAccessConfirm = false }) {
++                            Text("取消")
++                        }
++                    },
++                )
++            }
++
+             SettingsSection(
+                 header = stringResource(R.string.system_permissions_section_a11y),
+                 footer = stringResource(R.string.system_permissions_a11y_footer),
+diff --git a/src/android/app/src/test/java/com/openminis/app/tools/android/PrivilegedAccessModeContractTest.kt b/src/android/app/src/test/java/com/openminis/app/tools/android/PrivilegedAccessModeContractTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..f622fa56b94b39ca74aa65471124cd04bd1839a6
+--- /dev/null
++++ b/src/android/app/src/test/java/com/openminis/app/tools/android/PrivilegedAccessModeContractTest.kt
+@@ -0,0 +1,57 @@
++package com.openminis.app.tools.android
++
++import com.openminis.app.runtime.minisd.MinisdProtocol
++import org.json.JSONObject
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Test
++
++class PrivilegedAccessModeContractTest {
++    @Test
++    fun `missing or invalid preference fails closed to standard mode`() {
++        assertEquals(PrivilegedAccessMode.STANDARD, PrivilegedAccessModeStore.parse(null))
++        assertEquals(PrivilegedAccessMode.STANDARD, PrivilegedAccessModeStore.parse(""))
++        assertEquals(PrivilegedAccessMode.STANDARD, PrivilegedAccessModeStore.parse("unexpected"))
++        assertEquals(PrivilegedAccessMode.FULL_ACCESS, PrivilegedAccessModeStore.parse("full"))
++    }
++
++    @Test
++    fun `standard root exec carries full structured request and confirm id`() {
++        val raw = MinisdProtocol.encodeRequest(
++            MinisdProtocol.rootExec(
++                tool = "cmd",
++                args = listOf("package", "list", "packages"),
++                timeoutMs = 12_345,
++                accessMode = MinisdProtocol.ACCESS_STANDARD,
++                confirmId = "c-7",
++                id = 9,
++            ),
++        )
++        val obj = JSONObject(raw)
++        val params = obj.getJSONObject("params")
++        assertEquals("root.exec", obj.getString("method"))
++        assertEquals("c-7", obj.getString("confirm_id"))
++        assertEquals("cmd", params.getString("tool"))
++        assertEquals("package", params.getJSONArray("args").getString(0))
++        assertEquals("list", params.getJSONArray("args").getString(1))
++        assertEquals("packages", params.getJSONArray("args").getString(2))
++        assertEquals(12_345L, params.getLong("timeout_ms"))
++        assertEquals("standard", params.getString("access_mode"))
++        assertFalse(params.has("command"))
++    }
++
++    @Test
++    fun `full access is an explicit wire value rather than a shell flag`() {
++        val raw = MinisdProtocol.encodeRequest(
++            MinisdProtocol.rootExec(
++                tool = "sh",
++                args = listOf("-c", "id"),
++                accessMode = PrivilegedAccessMode.FULL_ACCESS.wireValue,
++            ),
++        )
++        val params = JSONObject(raw).getJSONObject("params")
++        assertEquals("full", params.getString("access_mode"))
++        assertEquals("sh", params.getString("tool"))
++        assertFalse(params.has("command"))
++    }
++}
+diff --git a/src/native/minisd/policy.default.json b/src/native/minisd/policy.default.json
+index c81a7011f317dd5bacd6cc1c1e2b9cd168f8d181..38c64c570c45cb33d209c08d70216a809a71341a 100644
+--- a/src/native/minisd/policy.default.json
++++ b/src/native/minisd/policy.default.json
+@@ -5,9 +5,10 @@
+     "root.probe": { "mode": "allow" },
+     "root.exec": {
+       "mode": "allow",
+-      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount"],
++      "toolAllowlist": ["pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat"],
+       "argRules": {
+-        "pm": { "regexDeny": ["shell.*su.*"] }
++        "pm": { "regexDeny": ["shell.*su.*", "uninstall.*", "install.*", "clear.*", "disable.*", "enable.*", "grant.*", "revoke.*", "suspend.*", "unsuspend.*"] },
++        "settings": { "regexDeny": ["put.*", "delete.*", "reset.*"] }
+       }
+     },
+     "root.shellRaw": { "mode": "deny" },
+diff --git a/src/native/minisd/src/dispatch.rs b/src/native/minisd/src/dispatch.rs
+index eb70639f37141ea9c79754abb9643389330eca6f..b5810b50e3a9fe57245328c82d48489c13206ef6 100644
+--- a/src/native/minisd/src/dispatch.rs
++++ b/src/native/minisd/src/dispatch.rs
+@@ -8,6 +8,31 @@ use crate::session::{RecordingKiller, Session};
+ use crate::state::AppState;
+ use serde_json::{json, Value};
+ 
++fn root_access_mode(req: &Request) -> Result<&str, ErrorCode> {
++    match req
++        .params
++        .get("access_mode")
++        .and_then(Value::as_str)
++        .unwrap_or("standard")
++    {
++        "standard" => Ok("standard"),
++        "full" => Ok("full"),
++        _ => Err(ErrorCode::BadParams),
++    }
++}
++
++/// Confirmation identity deliberately excludes execution_id: it is transport/
++/// cancellation metadata, not requested authority. Method + every other param,
++/// including the complete argv, timeout and access mode, stays bound.
++fn confirmation_key(req: &Request) -> String {
++    let mut params = req.params.clone();
++    if let Value::Object(map) = &mut params {
++        map.remove("execution_id");
++    }
++    serde_json::to_string(&json!({"method": req.method, "params": params}))
++        .expect("confirmation key is JSON")
++}
++
+ /// Performs all mutable request-gate work (peer auth, hello/capability checks,
+ /// confirmation consumption and rate limiting) without executing the method.
+ /// Socket serving can therefore snapshot execution inputs under a short state
+@@ -45,15 +70,40 @@ pub fn authorize_request(
+         Ok(d) => d,
+         Err(code) => return Err(Response::err(req.id, code, "policy denied")),
+     };
+-    if decision.mode == Mode::Confirm {
++
++    let mut needs_confirm = decision.mode == Mode::Confirm;
++    if req.method == "root.exec" {
++        let access_mode = root_access_mode(req)
++            .map_err(|code| Response::err(req.id, code, "invalid root access mode"))?;
++        if access_mode == "standard" {
++            let parsed = parse_exec(&req.params)
++                .map_err(|code| Response::err(req.id, code, "bad exec params"))?;
++            match validate_exec(state.policy.method("root.exec"), &parsed) {
++                Ok(()) => needs_confirm = false,
++                Err(ErrorCode::PolicyDenied) => needs_confirm = true,
++                Err(code) => return Err(Response::err(req.id, code, "exec policy")),
++            }
++        } else {
++            // Full Access is selected only by the Android user preference layer.
++            // minisd remains the sole root executor and retains timeout/output audit.
++            needs_confirm = false;
++        }
++    }
++
++    if needs_confirm {
++        let key = confirmation_key(req);
+         match req.confirm_id.as_deref() {
+             None => {
+-                let cid = state.issue_confirm(&req.method);
++                let cid = state.issue_confirm(&key);
+                 return Err(Response::confirm(req.id, cid));
+             }
+             Some(cid) => {
+-                if let Err(code) = state.consume_confirm(cid, &req.method) {
+-                    return Err(Response::err(req.id, code, "invalid or reused confirm_id"));
++                if let Err(code) = state.consume_confirm(cid, &key) {
++                    return Err(Response::err(
++                        req.id,
++                        code,
++                        "invalid, mismatched or reused confirm_id",
++                    ));
+                 }
+             }
+         }
+@@ -308,10 +358,16 @@ pub fn execute_root_authorized(mock: bool, spec: Option<MethodPolicy>, req: &Req
+         Ok(p) => p,
+         Err(code) => return Response::err(req.id, code, "bad exec params"),
+     };
++    let access_mode = match root_access_mode(req) {
++        Ok(mode) => mode,
++        Err(code) => return Response::err(req.id, code, "invalid root access mode"),
++    };
+     let spec_ref = spec.as_ref();
+-    let allow = crate::exec::effective_allowlist(spec_ref);
+-    if let Err(code) = validate_exec(spec_ref, &parsed) {
+-        return Response::err(req.id, code, "exec policy");
++    let restricted = validate_exec(spec_ref, &parsed).is_ok();
++    let one_time_override = access_mode == "standard" && !restricted && req.confirm_id.is_some();
++    let unrestricted = access_mode == "full" || one_time_override;
++    if !restricted && !unrestricted {
++        return Response::err(req.id, ErrorCode::PolicyDenied, "exec policy");
+     }
+     if mock {
+         let stdout = format!("{} {}", parsed.tool, parsed.args.join(" "));
+@@ -324,10 +380,18 @@ pub fn execute_root_authorized(mock: bool, spec: Option<MethodPolicy>, req: &Req
+                 "stdout_truncated": false,
+                 "stderr_truncated": false,
+                 "stdout": stdout,
+-                "stderr": ""
++                "stderr": "",
++                "access_mode": access_mode
+             }),
+         );
+     }
++    let dynamic_allow;
++    let allow: Vec<&str> = if unrestricted {
++        dynamic_allow = vec![parsed.tool.as_str()];
++        dynamic_allow
++    } else {
++        crate::exec::effective_allowlist(spec_ref)
++    };
+     match run_exec(&parsed, &allow) {
+         Ok(out) => Response::ok(
+             req.id,
+@@ -338,7 +402,8 @@ pub fn execute_root_authorized(mock: bool, spec: Option<MethodPolicy>, req: &Req
+                 "stdout_bytes": out.stdout_bytes,
+                 "stderr_bytes": out.stderr_bytes,
+                 "stdout_truncated": out.stdout_truncated,
+-                "stderr_truncated": out.stderr_truncated
++                "stderr_truncated": out.stderr_truncated,
++                "access_mode": access_mode
+             }),
+         ),
+         Err(code) => Response::err(req.id, code, "exec failed"),
+@@ -474,6 +539,88 @@ mod tests {
+         assert_eq!(resp.error.unwrap().code, "BAD_PARAMS");
+     }
+ 
++    #[test]
++    fn standard_allowlisted_root_exec_runs_without_confirmation() {
++        let mut state = AppState::new(true, PolicyFile::default_policy());
++        let request = req(
++            "root.exec",
++            json!({"tool":"getprop","args":[],"access_mode":"standard"}),
++        );
++        assert!(authorize_request(&mut state, &request, None).is_ok());
++        assert!(dispatch_authorized(&mut state, &request).ok);
++    }
++
++    #[test]
++    fn standard_outside_allowlist_requires_full_request_bound_confirmation() {
++        let mut state = AppState::new(true, PolicyFile::default_policy());
++        let first = req(
++            "root.exec",
++            json!({"tool":"debuggerd","args":["123"],"access_mode":"standard"}),
++        );
++        let cid = authorize_request(&mut state, &first, None)
++            .unwrap_err()
++            .error
++            .unwrap()
++            .confirm_id
++            .unwrap();
++
++        let mut changed = req(
++            "root.exec",
++            json!({"tool":"debuggerd","args":["456"],"access_mode":"standard"}),
++        );
++        changed.confirm_id = Some(cid.clone());
++        let mismatch = authorize_request(&mut state, &changed, None).unwrap_err();
++        assert_eq!(mismatch.error.unwrap().code, "POLICY_DENIED");
++
++        let mut original = first;
++        original.confirm_id = Some(cid);
++        let replay = authorize_request(&mut state, &original, None).unwrap_err();
++        assert_eq!(replay.error.unwrap().code, "POLICY_DENIED");
++    }
++
++    #[test]
++    fn standard_confirmation_is_one_shot_and_executes_exact_request() {
++        let mut state = AppState::new(true, PolicyFile::default_policy());
++        let mut request = req(
++            "root.exec",
++            json!({"tool":"cmd","args":["package","list","packages"],"access_mode":"standard"}),
++        );
++        let cid = authorize_request(&mut state, &request, None)
++            .unwrap_err()
++            .error
++            .unwrap()
++            .confirm_id
++            .unwrap();
++        request.confirm_id = Some(cid.clone());
++        assert!(authorize_request(&mut state, &request, None).is_ok());
++        assert!(
++            execute_root_authorized(true, state.policy.method("root.exec").cloned(), &request).ok
++        );
++        let mut replay = request.clone();
++        replay.confirm_id = Some(cid);
++        assert_eq!(
++            authorize_request(&mut state, &replay, None)
++                .unwrap_err()
++                .error
++                .unwrap()
++                .code,
++            "POLICY_DENIED"
++        );
++    }
++
++    #[test]
++    fn full_access_bypasses_standard_allowlist_without_confirmation() {
++        let mut state = AppState::new(true, PolicyFile::default_policy());
++        let request = req(
++            "root.exec",
++            json!({"tool":"sh","args":["-c","id"],"access_mode":"full"}),
++        );
++        assert!(authorize_request(&mut state, &request, None).is_ok());
++        assert!(
++            execute_root_authorized(true, state.policy.method("root.exec").cloned(), &request).ok
++        );
++    }
++
+     #[test]
+     fn confirm_once_and_reuse_rejected() {
+         let mut state = AppState::new(true, PolicyFile::default_policy());
+diff --git a/src/native/minisd/src/exec.rs b/src/native/minisd/src/exec.rs
+index 2f90b5f7c7bb44683c2384a64e94c14f6df8e9e7..59a373c62e42063f258e52c4384e8e9346f70dac 100644
+--- a/src/native/minisd/src/exec.rs
++++ b/src/native/minisd/src/exec.rs
+@@ -4,8 +4,10 @@ use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
+ use std::io::Read;
+ use std::time::{Duration, Instant};
+ 
+-/// Compile-time maximum authority for root.exec. Runtime policy may only narrow this set.
+-pub const DEFAULT_TOOLS: &[&str] = &["pm", "am", "settings", "dumpsys", "getprop", "mount"];
++/// Compile-time Standard Mode capability set. Runtime policy may only narrow it.
++pub const DEFAULT_TOOLS: &[&str] = &[
++    "pm", "am", "settings", "dumpsys", "getprop", "mount", "pidof", "ps", "logcat",
++];
+ pub const MAX_CAPTURE_BYTES: usize = 256 * 1024;
+ 
+ #[derive(Debug, Clone)]
+@@ -93,6 +95,21 @@ pub fn resolve_tool_path(tool: &str, allow: &[&str]) -> Result<String, ErrorCode
+     if !allow.contains(&tool) {
+         return Err(ErrorCode::PolicyDenied);
+     }
++    resolve_trusted_tool_path(tool)
++}
++
++/// Full Access Mode can select any executable exposed from trusted Android
++/// system/vendor binary directories. The request still uses structured argv;
++/// shell parsing exists only when the user has explicitly enabled Full Access
++/// and the requested tool itself is `sh` with `-c` in argv.
++pub fn resolve_unrestricted_tool_path(tool: &str) -> Result<String, ErrorCode> {
++    resolve_trusted_tool_path(tool)
++}
++
++fn resolve_trusted_tool_path(tool: &str) -> Result<String, ErrorCode> {
++    if tool.is_empty() || tool.contains('/') || tool.contains('\0') {
++        return Err(ErrorCode::BadParams);
++    }
+     for prefix in ["/system/bin/", "/system/xbin/", "/vendor/bin/"] {
+         let p = format!("{prefix}{tool}");
+         if std::path::Path::new(&p).exists() {
+@@ -151,8 +168,17 @@ fn kill_process_tree(pid: i32) {
+ 
+ pub fn run_exec(req: &ExecRequest, allow: &[&str]) -> Result<ExecOutput, ErrorCode> {
+     let path = resolve_tool_path(&req.tool, allow)?;
++    run_exec_path(req, &path)
++}
++
++pub fn run_exec_unrestricted(req: &ExecRequest) -> Result<ExecOutput, ErrorCode> {
++    let path = resolve_unrestricted_tool_path(&req.tool)?;
++    run_exec_path(req, &path)
++}
++
++fn run_exec_path(req: &ExecRequest, path: &str) -> Result<ExecOutput, ErrorCode> {
+     let guard = ExecGuard::begin(req.execution_id.as_deref())?;
+-    let mut cmd = std::process::Command::new(&path);
++    let mut cmd = std::process::Command::new(path);
+     cmd.args(&req.args)
+         .stdin(std::process::Stdio::null())
+         .stdout(std::process::Stdio::piped())
+@@ -240,8 +266,10 @@ mod tests {
+     fn t_u4_allowlist_and_deny() {
+         let policy = PolicyFile::default_policy();
+         let spec = policy.method("root.exec");
+-        let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["force-stop","a.b"]})).unwrap();
++        let ok = parse_exec(&serde_json::json!({"tool":"pm","args":["list","packages"]})).unwrap();
+         assert!(validate_exec(spec, &ok).is_ok());
++        let logcat = parse_exec(&serde_json::json!({"tool":"logcat","args":["-d"]})).unwrap();
++        assert!(validate_exec(spec, &logcat).is_ok());
+         let bad_tool = parse_exec(&serde_json::json!({"tool":"reboot","args":[]})).unwrap();
+         assert_eq!(
+             validate_exec(spec, &bad_tool).unwrap_err(),
+@@ -252,11 +280,31 @@ mod tests {
+             validate_exec(spec, &denied).unwrap_err(),
+             ErrorCode::PolicyDenied
+         );
++        let destructive =
++            parse_exec(&serde_json::json!({"tool":"pm","args":["uninstall","com.example.test"]}))
++                .unwrap();
++        assert_eq!(
++            validate_exec(spec, &destructive).unwrap_err(),
++            ErrorCode::PolicyDenied
++        );
+         let long = "x".repeat(crate::protocol::MAX_ARG_BYTES + 1);
+         assert!(parse_exec(&serde_json::json!({"tool":"pm","args":[long]})).is_err());
+         assert!(parse_exec(&serde_json::json!({"tool":"pm","command":"pm shell"})).is_err());
+     }
+ 
++    #[test]
++    fn full_access_request_is_still_structured_argv() {
++        let parsed = parse_exec(&serde_json::json!({
++            "tool":"sh",
++            "args":["-c","id; getenforce"],
++            "execution_id":"root:s1:42"
++        }))
++        .unwrap();
++        assert_eq!(parsed.tool, "sh");
++        assert_eq!(parsed.args, vec!["-c", "id; getenforce"]);
++        assert_eq!(parsed.execution_id.as_deref(), Some("root:s1:42"));
++    }
++
+     #[test]
+     fn execution_id_is_carried_for_targeted_cancel() {
+         let parsed =
+diff --git a/src/native/minisd/src/policy.rs b/src/native/minisd/src/policy.rs
+index 08fce710297c67178791d802b042dccb9d1ab11a..c0990943b3d84a18e26c111d23832a4309184cef 100644
+--- a/src/native/minisd/src/policy.rs
++++ b/src/native/minisd/src/policy.rs
+@@ -50,7 +50,7 @@ pub const DEFAULT_POLICY_JSON: &str = include_str!("../policy.default.json");
+ fn is_builtin_root_exec_tool(tool: &str) -> bool {
+     matches!(
+         tool,
+-        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount"
++        "pm" | "am" | "settings" | "dumpsys" | "getprop" | "mount" | "pidof" | "ps" | "logcat"
+     )
+ }
+ 
+@@ -58,11 +58,6 @@ impl PolicyFile {
+     pub fn parse(json: &str) -> Result<Self, String> {
+         let mut policy: PolicyFile =
+             serde_json::from_str(json).map_err(|e| format!("policy json: {e}"))?;
+-        // In-place upgrades keep the previous installation's policy file until
+-        // the app materializes a fresh one. Methods that were intentionally
+-        // removed are dropped instead of fatal: dispatch never consults them,
+-        // so retaining them could only block startup. Unknown methods remain a
+-        // hard error so a malformed or future policy still fails closed.
+         policy
+             .methods
+             .retain(|name, _| !LEGACY_REMOVED_METHODS.contains(&name.as_str()));
+@@ -191,7 +186,7 @@ mod tests {
+     #[test]
+     fn root_exec_policy_cannot_expand_builtin_capabilities() {
+         assert!(PolicyFile::parse(
+-            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm"]}}}"#
++            r#"{"methods":{"root.exec":{"mode":"allow","toolAllowlist":["pm","logcat"]}}}"#
+         )
+         .is_ok());
+         assert!(PolicyFile::parse(
+diff --git a/src/native/minisd/src/state.rs b/src/native/minisd/src/state.rs
+index f98298bee2c657794ad3e4e17dcb135be4cea8cb..d45664efa72d353449f6bdac41efe6b34b5f4058 100644
+--- a/src/native/minisd/src/state.rs
++++ b/src/native/minisd/src/state.rs
+@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
+ 
+ #[derive(Debug, Clone)]
+ pub struct PendingConfirm {
+-    pub method: String,
++    pub request_key: String,
+     pub expires: Instant,
+ }
+ 
+@@ -87,9 +87,6 @@ impl AppState {
+         let mut sessions = SessionTable::default();
+         sessions.enable_subreaper();
+         if should_start_config_proxy(mock, policy.caller.app_uid) {
+-            // `main` constructs AppState before branching into watchdog mode.
+-            // The guard above keeps the watchdog parent out: only the actual
+-            // root socket-server child owns the guest-facing minis-config proxy.
+             crate::config_proxy::ensure_started(policy.caller.app_uid);
+         }
+         Self {
+@@ -118,38 +115,35 @@ impl AppState {
+         self.clock += d;
+     }
+ 
+-    pub fn issue_confirm(&mut self, method: &str) -> String {
++    pub fn issue_confirm(&mut self, request_key: &str) -> String {
+         let id = format!("c-{}", self.confirms.len() + self.used_confirms.len() + 1);
+         self.confirms.insert(
+             id.clone(),
+             PendingConfirm {
+-                method: method.to_string(),
++                request_key: request_key.to_string(),
+                 expires: self.now() + Duration::from_secs(120),
+             },
+         );
+         id
+     }
+ 
++    /// Consume first, then validate. A replay, an expired ticket, or a request
++    /// mismatch can never leave the ticket usable for a later attempt.
+     pub fn consume_confirm(
+         &mut self,
+         id: &str,
+-        method: &str,
++        request_key: &str,
+     ) -> Result<(), crate::protocol::ErrorCode> {
+         if self.used_confirms.contains_key(id) {
+             return Err(crate::protocol::ErrorCode::PolicyDenied);
+         }
+-        let Some(p) = self.confirms.get(id) else {
++        let Some(p) = self.confirms.remove(id) else {
+             return Err(crate::protocol::ErrorCode::PolicyDenied);
+         };
+-        if p.method != method {
+-            return Err(crate::protocol::ErrorCode::PolicyDenied);
+-        }
+-        if p.expires <= self.now() {
+-            self.confirms.remove(id);
++        self.used_confirms.insert(id.to_string(), ());
++        if p.expires <= self.now() || p.request_key != request_key {
+             return Err(crate::protocol::ErrorCode::PolicyDenied);
+         }
+-        self.confirms.remove(id);
+-        self.used_confirms.insert(id.to_string(), ());
+         Ok(())
+     }
+ }
+@@ -195,9 +189,6 @@ fn should_start_config_proxy(mock: bool, app_uid: u32) -> bool {
+     }
+     #[cfg(unix)]
+     {
+-        // The production socket server is root-owned; refusing to initialize
+-        // the proxy before that privilege check avoids writing runtime state
+-        // from accidental non-root direct invocations.
+         unsafe { libc::geteuid() == 0 }
+     }
+     #[cfg(not(unix))]
+@@ -212,30 +203,44 @@ mod tests {
+     use crate::protocol::ErrorCode;
+ 
+     #[test]
+-    fn t_u16_wrong_method_keeps_entry() {
++    fn confirmation_is_bound_to_request_and_mismatch_invalidates_it() {
+         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+-        let id = state.issue_confirm("root.exec");
++        let id = state.issue_confirm("root.exec|pm|uninstall|com.example.test");
+         assert_eq!(
+-            state.consume_confirm(&id, "other.method"),
++            state.consume_confirm(&id, "root.exec|pm|uninstall|com.android.systemui"),
+             Err(ErrorCode::PolicyDenied)
+         );
+-        assert!(state.confirms.contains_key(&id));
+-        assert_eq!(state.consume_confirm(&id, "root.exec"), Ok(()));
+         assert!(!state.confirms.contains_key(&id));
+         assert!(state.used_confirms.contains_key(&id));
++        assert_eq!(
++            state.consume_confirm(&id, "root.exec|pm|uninstall|com.example.test"),
++            Err(ErrorCode::PolicyDenied)
++        );
+     }
+ 
+     #[test]
+-    fn t_u16_expired_removed() {
++    fn confirmation_is_one_shot() {
+         let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+-        let id = state.issue_confirm("root.exec");
++        let key = "ubuntu.adminExec|argv";
++        let id = state.issue_confirm(key);
++        assert_eq!(state.consume_confirm(&id, key), Ok(()));
++        assert_eq!(
++            state.consume_confirm(&id, key),
++            Err(ErrorCode::PolicyDenied)
++        );
++    }
++
++    #[test]
++    fn expired_confirmation_is_consumed() {
++        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
++        let id = state.issue_confirm("root.exec|pm");
+         state.advance(Duration::from_secs(121));
+         assert_eq!(
+-            state.consume_confirm(&id, "root.exec"),
++            state.consume_confirm(&id, "root.exec|pm"),
+             Err(ErrorCode::PolicyDenied)
+         );
+         assert!(!state.confirms.contains_key(&id));
+-        assert!(!state.used_confirms.contains_key(&id));
++        assert!(state.used_confirms.contains_key(&id));
+     }
+ 
+     #[test]
