@@ -4,17 +4,20 @@ import android.text.format.Formatter
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.io.File
 import java.nio.file.Files
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.security.MessageDigest
 
 /** Mirrors iOS FileSortKey. */
 enum class FileSortKey { NAME, MODIFIED, SIZE, KIND }
@@ -31,6 +34,10 @@ data class FileItem(
     val size: Long,
     /** lastModified() in epoch ms, 0 when unavailable. */
     val modifiedMs: Long = 0L,
+    /** Canonical guest path when this item came from the workspace broker. */
+    val guestPath: String? = null,
+    /** Session context for [guestPath]; null means the global guest tree. */
+    val guestSessionId: String? = null,
 ) {
     val iconRes: String
         get() {
@@ -217,6 +224,9 @@ class FileBrowserViewModel(
     // the opaque /data/user/0/.../minis-sessions/<sid>/workspace/foo.py host
     // path. When null, [linuxRootPath] (if any) drives the copy path as before.
     private val displayLinuxPrefix: String? = null,
+    /** When set, list and delete operations use the workspace broker. */
+    private val guestRootPath: String? = null,
+    private val guestSessionId: String? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileBrowserUiState())
@@ -247,6 +257,7 @@ class FileBrowserViewModel(
         get() = resolveCurrentHostPath()
 
     private fun resolveCurrentHostPath(): File {
+        if (guestRootPath != null) return rootPath
         val linuxRoot = linuxRootPath
         if (linuxRoot != null) {
             val linuxPath = if (relativePath.isEmpty()) linuxRoot
@@ -360,7 +371,9 @@ class FileBrowserViewModel(
     fun deleteItem(item: FileItem) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (item.isDirectory) {
+                if (item.guestPath != null) {
+                    WorkspaceFileClient.delete(guestSessionId.orEmpty(), item.guestPath)
+                } else if (item.isDirectory) {
                     item.file.deleteRecursively()
                 } else {
                     item.file.delete()
@@ -432,6 +445,10 @@ class FileBrowserViewModel(
 
     private fun loadItems() {
         _uiState.value = _uiState.value.copy(isLoading = true)
+        if (guestRootPath != null) {
+            loadGuestItems()
+            return
+        }
         val hostPath = currentHostPath
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -470,6 +487,72 @@ class FileBrowserViewModel(
         }
     }
 
+    private fun loadGuestItems() {
+        val directory = currentGuestPath()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val showHidden = _uiState.value.showHidden
+                val entries = WorkspaceFileClient.listAll(guestSessionId.orEmpty(), directory)
+                val files = entries.mapNotNull { entry ->
+                    guestItem(directory, entry, showHidden)
+                }
+                rawItems = files
+                val sorted = applySort(files, _uiState.value)
+                _uiState.value = _uiState.value.copy(
+                    items = sorted,
+                    isLoading = false,
+                    isEmpty = sorted.isEmpty(),
+                    errorMessage = null,
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    items = emptyList(),
+                    isLoading = false,
+                    isEmpty = true,
+                    errorMessage = e.message,
+                )
+            }
+        }
+    }
+
+    private fun currentGuestPath(): String {
+        val root = guestRootPath ?: error("guest root is not configured")
+        return if (relativePath.isEmpty()) root.trimEnd('/')
+        else "${root.trimEnd('/')}/$relativePath"
+    }
+
+    private fun guestItem(
+        directory: String,
+        entry: JSONObject,
+        showHidden: Boolean,
+    ): FileItem? {
+        val name = entry.optString("name").takeIf { it.isNotEmpty() } ?: return null
+        if (!showHidden && name.startsWith('.')) return null
+        if (name == "." || name == ".." || name.contains('/') || name.contains('\u0000')) return null
+        val type = entry.optString("type")
+        if (type !in setOf("dir", "file", "link")) return null
+        val path = "$directory/$name"
+        return FileItem(
+            file = guestCacheFile(path, name),
+            name = name,
+            isDirectory = type == "dir",
+            isSymlink = type == "link",
+            size = entry.optLong("size", 0L).coerceAtLeast(0L),
+            modifiedMs = entry.optLong("modified", 0L).coerceAtLeast(0L),
+            guestPath = path,
+            guestSessionId = guestSessionId,
+        )
+    }
+
+    private fun guestCacheFile(path: String, name: String): File {
+        val cacheRoot = appContext?.cacheDir ?: rootPath
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("${guestSessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(Locale.US, it) }
+        val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        return File(File(cacheRoot, "guest-file-browser"), "$digest-$safeName")
+    }
+
     private fun updatePathComponents() {
         val components = mutableListOf(rootLabel)
         if (relativePath.isNotEmpty()) {
@@ -483,7 +566,7 @@ class FileBrowserViewModel(
             // exit the screen instead of trying to ascend into the
             // wrapping rootfs.
             canGoBack = relativePath != initialRelativePath,
-            currentPath = currentHostPath.absolutePath,
+            currentPath = if (guestRootPath != null) currentGuestPath() else currentHostPath.absolutePath,
             // [T-android-file-context-copy-abs-path] Linux dir path for the
             // "Copy Absolute Path" menu item — derived from the VM's own
             // linuxRootPath + relativePath (the same mapping directory
@@ -491,9 +574,11 @@ class FileBrowserViewModel(
             // [T-android-copy-abs-path-fullpath] Prefer the dedicated
             // displayLinuxPrefix when supplied (session storage browser), else
             // fall back to linuxRootPath (Chat Files / shared folders).
-            currentLinuxPath = (displayLinuxPrefix ?: linuxRootPath)?.let { root ->
-                if (relativePath.isEmpty()) root.trimEnd('/')
-                else "${root.trimEnd('/')}/$relativePath"
+            currentLinuxPath = if (guestRootPath != null) currentGuestPath() else {
+                (displayLinuxPrefix ?: linuxRootPath)?.let { root ->
+                    if (relativePath.isEmpty()) root.trimEnd('/')
+                    else "${root.trimEnd('/')}/$relativePath"
+                }
             },
         )
     }

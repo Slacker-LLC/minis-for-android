@@ -182,7 +182,7 @@ fun FileBrowserScreen(
                                 onClick = {
                                     if (item.isDirectory) {
                                         viewModel.navigateTo(item)
-                                    } else {
+                                    } else if (!item.isSymlink) {
                                         onPreviewFile(item)
                                     }
                                 },

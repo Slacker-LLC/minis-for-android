@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.db.ChatDao
 import com.openminis.app.data.db.ChatSessionEntity
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,6 +59,13 @@ private data class SessionStorageInfo(
 ) {
     val totalSize: Long get() = minisSize + mediaSize
 }
+
+private val SESSION_GUEST_ROOTS = listOf(
+    "/var/minis/workspace",
+    "/var/minis/attachments",
+    "/var/minis/offloads",
+    "/var/minis/browser",
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,17 +91,21 @@ fun StorageManagementScreen(
                 dbSize = databaseSize(context)
 
                 val allSessions = chatDao.listSessions()
-                val sessionsDir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
                 val mediaDir = File(context.filesDir, "media")
 
                 val mediaSizes = mediaSizesBySession(mediaDir, allSessions.map { it.id }.toSet())
 
                 sessions = allSessions.map { session ->
-                    val minisDir = File(sessionsDir, session.id)
+                    var minisSize = 0L
+                    for (root in SESSION_GUEST_ROOTS) {
+                        minisSize += runCatching {
+                            WorkspaceFileClient.treeSize(session.id, root)
+                        }.getOrDefault(0L)
+                    }
                     SessionStorageInfo(
                         id = session.id,
                         title = session.title,
-                        minisSize = directorySize(minisDir),
+                        minisSize = minisSize,
                         mediaSize = mediaSizes[session.id] ?: 0L,
                     )
                 }.sortedByDescending { it.totalSize }
@@ -166,7 +178,7 @@ fun SessionStorageDetailScreen(
     sessionId: String,
     chatDao: ChatDao,
     onBack: () -> Unit,
-    onBrowseFiles: (rootPath: String) -> Unit = {},
+    onBrowseFiles: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -177,14 +189,18 @@ fun SessionStorageDetailScreen(
     var isClearing by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
 
-    val sessionsDir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
     val mediaDir = File(context.filesDir, "media")
 
     fun reload() {
         scope.launch {
             withContext(Dispatchers.IO) {
                 session = chatDao.getSession(sessionId)
-                minisSize = directorySize(File(sessionsDir, sessionId))
+                minisSize = 0L
+                for (root in SESSION_GUEST_ROOTS) {
+                    minisSize += runCatching {
+                        WorkspaceFileClient.treeSize(sessionId, root)
+                    }.getOrDefault(0L)
+                }
                 val mediaSizes = mediaSizesBySession(mediaDir, setOf(sessionId))
                 mediaSize = mediaSizes[sessionId] ?: 0L
             }
@@ -202,9 +218,7 @@ fun SessionStorageDetailScreen(
                 SettingsValueRow(
                     title = stringResource(R.string.storage_browse_files),
                     value = Formatter.formatFileSize(context, minisSize),
-                    onClick = {
-                        onBrowseFiles(File(sessionsDir, sessionId).absolutePath)
-                    },
+                    onClick = onBrowseFiles,
                     valueColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     showDivider = false,
                 )
@@ -287,12 +301,19 @@ fun SessionStorageDetailScreen(
                     showClearDialog = false
                     isClearing = true
                     scope.launch {
-                        withContext(Dispatchers.IO) {
-                            File(sessionsDir, sessionId).deleteRecursively()
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                SESSION_GUEST_ROOTS.forEach { root ->
+                                    WorkspaceFileClient.deleteChildren(sessionId, root)
+                                }
+                            }
                             deleteSessionMedia(mediaDir, sessionId)
+                        }.onSuccess {
+                            minisSize = 0L
+                            mediaSize = 0L
+                        }.onFailure {
+                            reload()
                         }
-                        minisSize = 0L
-                        mediaSize = 0L
                         isClearing = false
                     }
                 }) {

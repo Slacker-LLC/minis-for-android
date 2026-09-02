@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.components.rememberIosBounceOverscrollEffect
 import com.openminis.app.ui.markdown.MarkdownText
 import com.openminis.app.ui.chat.StreamingMarkdownText
@@ -100,6 +101,38 @@ fun FilePreviewScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var guestFileReady by remember(item.file.absolutePath, item.guestPath) {
+        mutableStateOf(item.guestPath == null)
+    }
+    var guestFileError by remember(item.file.absolutePath, item.guestPath) {
+        mutableStateOf<String?>(null)
+    }
+    LaunchedEffect(item.file.absolutePath, item.guestPath, item.guestSessionId) {
+        val guestPath = item.guestPath ?: return@LaunchedEffect
+        try {
+            withContext(Dispatchers.IO) {
+                WorkspaceFileClient.readToFile(
+                    sessionId = item.guestSessionId.orEmpty(),
+                    path = guestPath,
+                    destination = item.file,
+                )
+            }
+            guestFileReady = true
+        } catch (error: Exception) {
+            guestFileError = error.message ?: "Failed to read guest file"
+        }
+    }
+    if (item.guestPath != null && !guestFileReady) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (guestFileError == null) {
+                Text(stringResource(R.string.filepreview_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(guestFileError!!, color = MaterialTheme.colorScheme.error)
+            }
+        }
+        return
+    }
 
     // T-android-preview-title-toggle-path: tap the title to swap between
     // file name and absolute path. Mirrors the iOS preview's tap-to-toggle
@@ -167,7 +200,7 @@ fun FilePreviewScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (showFullPath) item.file.absolutePath else item.name,
+                        text = if (showFullPath) (item.guestPath ?: item.file.absolutePath) else item.name,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,
@@ -1196,4 +1229,3 @@ private fun collectImageGallery(
     }
     return items to startIdx
 }
-
