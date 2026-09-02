@@ -9,10 +9,9 @@ import android.os.StatFs
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
-import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 /** Four-state capability result used by every Android debug tool. */
 enum class CapabilityStatus { AVAILABLE, PARTIAL, UNAVAILABLE, REQUIRES_USER_GRANT }
@@ -141,36 +140,62 @@ object AndroidCapabilityResolver {
     }
 
     private fun executionFacts(context: Context, root: RootProbeResult?): JSONObject {
-        val rootfs = File(context.filesDir, "alpine-rootfs")
-        val java = listOf("usr/bin/java", "usr/local/bin/java", "opt/java/bin/java")
-            .any { File(rootfs, it).canExecute() }
-        val sdkCandidates = listOf(
-            File(rootfs, "opt/android-sdk"),
-            File(rootfs, "root/android-sdk"),
-            File(context.filesDir, "android-sdk"),
-        )
-        val sdk = sdkCandidates.firstOrNull { it.isDirectory }
-        val platforms = sdk?.let { File(it, "platforms").listFiles()?.filter(File::isDirectory)?.map(File::getName).orEmpty() }.orEmpty()
-        val buildTools = sdk?.let { File(it, "build-tools").listFiles()?.filter(File::isDirectory)?.map(File::getName).orEmpty() }.orEmpty()
-        val ndk = sdk?.let { File(it, "ndk").listFiles()?.any(File::isDirectory) == true } ?: false
-        val cmake = sdk?.let { File(it, "cmake").listFiles()?.any(File::isDirectory) == true } ?: false
+        val runtime = UbuntuRuntime.snapshot.value
         val stat = StatFs(context.filesDir.absolutePath)
         val chrootBit = root?.authorized == true && root.hasCapability(CAP_SYS_CHROOT)
         val adminBit = root?.authorized == true && root.hasCapability(CAP_SYS_ADMIN)
+        val ubuntuStatus = when {
+            runtime.running && runtime.provisioned -> CapabilityStatus.AVAILABLE
+            runtime.running -> CapabilityStatus.PARTIAL
+            runtime.available -> CapabilityStatus.PARTIAL
+            else -> CapabilityStatus.UNAVAILABLE
+        }
+        val ubuntuDetail = when {
+            runtime.running && runtime.provisioned ->
+                "Ubuntu 24.04 is running through minisd; per-session workspace is prepared on first exec"
+            runtime.running -> "Ubuntu runtime is running but provisioning is not confirmed"
+            runtime.lastError != null -> "Ubuntu runtime unavailable: ${runtime.lastError}"
+            else -> "Ubuntu runtime is not started; capability probes require minisd"
+        }
         return JSONObject().apply {
-            put("defaultEnvironment", "proot")
-            put("proot", CapabilityFact(
-                if (RuntimePathRegistry.isInitialized || rootfs.isDirectory) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE,
-                if (RuntimePathRegistry.isInitialized) "PRoot is booted" else "Alpine rootfs ${if (rootfs.isDirectory) "is installed" else "is missing"}",
-                "proot",
+            put("defaultEnvironment", "ubuntu")
+            put("ubuntu", CapabilityFact(ubuntuStatus, ubuntuDetail, "minisd").toJson())
+            put("sessionWorkspace", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                if (runtime.running) {
+                    "Created and bound by minisd for each session; App does not access /data/adb/minis directly"
+                } else {
+                    "Requires a running Ubuntu/minisd runtime"
+                },
+                "minisd",
             ).toJson())
-            put("java", CapabilityFact(if (java) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE, "Java executable inside the Alpine rootfs").toJson())
-            put("gradle", CapabilityFact(CapabilityStatus.PARTIAL, "Gradle wrapper is project-specific; use shell_execute to verify ./gradlew").toJson())
-            put("androidSdk", CapabilityFact(if (sdk != null) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE, sdk?.absolutePath ?: "Android SDK not found in known sandbox locations").toJson())
-            put("platforms", JSONArray(platforms))
-            put("buildTools", JSONArray(buildTools))
-            put("ndk", CapabilityFact(if (ndk) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE, "NDK under Android SDK").toJson())
-            put("cmake", CapabilityFact(if (cmake) CapabilityStatus.AVAILABLE else CapabilityStatus.UNAVAILABLE, "CMake under Android SDK").toJson())
+            put("java", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                if (runtime.running) "Requires a guest probe for /usr/bin/java" else "Ubuntu runtime is unavailable",
+                "ubuntu",
+            ).toJson())
+            put("gradle", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                if (runtime.running) "Gradle wrapper is project-specific; verify it with shell_execute in Ubuntu" else "Ubuntu runtime is unavailable",
+                "ubuntu",
+            ).toJson())
+            put("androidSdk", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                if (runtime.running) "Requires a guest probe; SDK is not read from App-private paths" else "Ubuntu runtime is unavailable",
+                "ubuntu",
+            ).toJson())
+            put("platforms", JSONArray())
+            put("buildTools", JSONArray())
+            put("ndk", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                "Requires a guest probe inside Ubuntu",
+                "ubuntu",
+            ).toJson())
+            put("cmake", CapabilityFact(
+                if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
+                "Requires a guest probe inside Ubuntu",
+                "ubuntu",
+            ).toJson())
             put("disk", JSONObject().put("availableBytes", stat.availableBytes).put("totalBytes", stat.totalBytes))
             put("chroot", CapabilityFact(
                 when {
