@@ -19,7 +19,7 @@ import org.junit.Test
  *
  * NOT ROW-COMPARABLE WITH THE iOS SNAPSHOT. Android's Gemini rules genuinely differ from
  * iOS's in two places, and those differences are PRE-EXISTING, not introduced here:
- *   • 3.x at MAX/ULTRA — Android's `when` falls to `else -> "low"`, iOS maps to "high".
+ *   • 3.x at MAX/ULTRA — all high-or-above tiers map to Gemini's "high" wire tier.
  *   • Unknown/latest ids (e.g. `gemini-flash-latest`) — Android returns null (no
  *     thinkingConfig at all), iOS has a conservative 128-floor fallback table.
  * Phase 2 §1 is a pure refactor, so each platform keeps its own behaviour and each
@@ -122,15 +122,15 @@ gemini/gemini-3-pro-preview/LOW -> {includeThoughts:true,thinkingLevel:"low"}
 gemini/gemini-3-pro-preview/MEDIUM -> {includeThoughts:true,thinkingLevel:"medium"}
 gemini/gemini-3-pro-preview/HIGH -> {includeThoughts:true,thinkingLevel:"high"}
 gemini/gemini-3-pro-preview/XHIGH -> {includeThoughts:true,thinkingLevel:"high"}
-gemini/gemini-3-pro-preview/MAX -> {includeThoughts:true,thinkingLevel:"low"}
-gemini/gemini-3-pro-preview/ULTRA -> {includeThoughts:true,thinkingLevel:"low"}
+gemini/gemini-3-pro-preview/MAX -> {includeThoughts:true,thinkingLevel:"high"}
+gemini/gemini-3-pro-preview/ULTRA -> {includeThoughts:true,thinkingLevel:"high"}
 gemini/gemini-3-flash-preview/OFF -> {thinkingLevel:"minimal"}
 gemini/gemini-3-flash-preview/LOW -> {includeThoughts:true,thinkingLevel:"low"}
 gemini/gemini-3-flash-preview/MEDIUM -> {includeThoughts:true,thinkingLevel:"medium"}
 gemini/gemini-3-flash-preview/HIGH -> {includeThoughts:true,thinkingLevel:"high"}
 gemini/gemini-3-flash-preview/XHIGH -> {includeThoughts:true,thinkingLevel:"high"}
-gemini/gemini-3-flash-preview/MAX -> {includeThoughts:true,thinkingLevel:"low"}
-gemini/gemini-3-flash-preview/ULTRA -> {includeThoughts:true,thinkingLevel:"low"}
+gemini/gemini-3-flash-preview/MAX -> {includeThoughts:true,thinkingLevel:"high"}
+gemini/gemini-3-flash-preview/ULTRA -> {includeThoughts:true,thinkingLevel:"high"}
 gemini/gemini-flash-latest/OFF -> null
 gemini/gemini-flash-latest/LOW -> null
 gemini/gemini-flash-latest/MEDIUM -> null

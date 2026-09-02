@@ -424,6 +424,9 @@
     <string name="usage_detail_cache_hit_rate">Cache-Trefferquote</string>
     <string name="usage_detail_daily_avg">Tagesdurchschnitt</string>
     <string name="usage_detail_session_avg">Durchschnitt pro Sitzung</string>
+    <string name="usage_detail_attribution">Zuordnung</string>
+    <string name="usage_detail_attribution_measured">Snapshot pro Nachricht</string>
+    <string name="usage_detail_attribution_estimated">Geschätzt für %1$d ältere Zeilen</string>
     <string name="usage_detail_sessions">Sitzungen</string>
     <string name="usage_detail_active_days">Aktive Tage</string>
     <string name="mirror_back">Zurück</string>

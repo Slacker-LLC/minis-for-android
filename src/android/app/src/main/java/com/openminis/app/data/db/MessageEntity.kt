@@ -34,4 +34,13 @@ data class MessageEntity(
     // (mirrors iOS messages.error_info / ChatMessage.error). Null for normal
     // rows; device-local, never synced to iCloud.
     @ColumnInfo(name = "error_info") val errorInfo: String? = null,
+    /**
+     * Model/provider snapshot captured when this message was produced.
+     * Nullable so rows written before schema v14 remain readable and can be
+     * explicitly marked as estimated by the usage screen.
+     */
+    @ColumnInfo(name = "model_id") val modelId: String? = null,
+    @ColumnInfo(name = "model_display_name") val modelDisplayName: String? = null,
+    @ColumnInfo(name = "provider_type") val providerType: String? = null,
+    @ColumnInfo(name = "provider_instance_id") val providerInstanceId: String? = null,
 )

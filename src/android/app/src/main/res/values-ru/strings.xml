@@ -700,6 +700,9 @@
     <string name="usage_detail_cache_hit_rate">Частота попаданий в кэш</string>
     <string name="usage_detail_daily_avg">Среднее за день</string>
     <string name="usage_detail_session_avg">Среднее за сессию</string>
+    <string name="usage_detail_attribution">Атрибуция</string>
+    <string name="usage_detail_attribution_measured">Снимок для каждого сообщения</string>
+    <string name="usage_detail_attribution_estimated">Оценка для устаревших строк: %1$d</string>
     <string name="usage_detail_sessions">Сессии</string>
     <string name="usage_detail_active_days">Активных дней</string>
     <string name="mirror_back">Назад</string>

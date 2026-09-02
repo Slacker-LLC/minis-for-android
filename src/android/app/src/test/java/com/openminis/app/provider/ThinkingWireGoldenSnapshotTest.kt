@@ -32,9 +32,11 @@ import org.junit.Test
  *
  * HOW TO USE DURING THE REFACTOR
  *  1. Committed BEFORE the refactor, generated against the OLD code.
- *  2. After the refactor it must still pass unchanged. A diff here is a behaviour
+ *  2. After the refactor it should still pass unchanged. A diff here is a behaviour
  *     change — either an unintended regression, or an intended fix that must be called
- *     out explicitly in the commit message and updated deliberately.
+ *     out explicitly in the commit message and updated deliberately. Issue #121 is the
+ *     latter: live model metadata now clamps requests to its declared effort ceiling,
+ *     so rows with an explicit `max` or `high` declaration intentionally changed.
  *  3. Do NOT regenerate expectations to turn a red test green without first explaining,
  *     in words, why the wire format legitimately changed.
  *
@@ -48,7 +50,10 @@ import org.junit.Test
  * drives the real `sendMessageClamped`, which means the rows also include two upstream
  * effects: (a) the `catalogMaxThinkingLevel` ceiling — `gpt-5.3` matches no catalog rule
  * so it defaults to XHIGH, which is why MAX/ULTRA render as `"xhigh"` here and `"max"` on
- * iOS; and (b) `explicitOffEffort`, which requires a literal `https://api.openai.com`
+ * iOS. Models with `reasoningEffortValues` are now clamped to that live declaration,
+ * which is why the OpenRouter `high` case and the DeepSeek/GLM `max` cases below differ
+ * from the pre-#121 snapshot; and (b) `explicitOffEffort`, which requires a literal
+ * `https://api.openai.com`
  * base, so a MockWebServer URL never qualifies and OFF renders `{}` rather than
  * `{"reasoning_effort":"none"}`. Both are correct for their layer. Each snapshot is an
  * oracle for ITS OWN platform across the refactor; cross-platform parity is what
@@ -228,9 +233,9 @@ openrouter/OFF -> {}
 openrouter/LOW -> {reasoning:{effort:"low"}}
 openrouter/MEDIUM -> {reasoning:{effort:"medium"}}
 openrouter/HIGH -> {reasoning:{effort:"high"}}
-openrouter/XHIGH -> {reasoning:{effort:"xhigh"}}
-openrouter/MAX -> {reasoning:{effort:"xhigh"}}
-openrouter/ULTRA -> {reasoning:{effort:"xhigh"}}
+openrouter/XHIGH -> {reasoning:{effort:"high"}}
+openrouter/MAX -> {reasoning:{effort:"high"}}
+openrouter/ULTRA -> {reasoning:{effort:"high"}}
 qwen/OFF -> {}
 qwen/LOW -> {enable_thinking:true,extra_body:{enable_thinking:true,thinking_budget:4096},thinking_budget:4096}
 qwen/MEDIUM -> {enable_thinking:true,extra_body:{enable_thinking:true,thinking_budget:14336},thinking_budget:14336}
@@ -250,22 +255,22 @@ deepseek-v4/LOW -> {reasoning_effort:"high",thinking:{type:"enabled"}}
 deepseek-v4/MEDIUM -> {reasoning_effort:"high",thinking:{type:"enabled"}}
 deepseek-v4/HIGH -> {reasoning_effort:"high",thinking:{type:"enabled"}}
 deepseek-v4/XHIGH -> {reasoning_effort:"high",thinking:{type:"enabled"}}
-deepseek-v4/MAX -> {reasoning_effort:"high",thinking:{type:"enabled"}}
-deepseek-v4/ULTRA -> {reasoning_effort:"high",thinking:{type:"enabled"}}
+deepseek-v4/MAX -> {reasoning_effort:"max",thinking:{type:"enabled"}}
+deepseek-v4/ULTRA -> {reasoning_effort:"max",thinking:{type:"enabled"}}
 deepseek-v4-unified/OFF -> {reasoning_effort:"minimal"}
 deepseek-v4-unified/LOW -> {reasoning_effort:"high"}
 deepseek-v4-unified/MEDIUM -> {reasoning_effort:"high"}
 deepseek-v4-unified/HIGH -> {reasoning_effort:"high"}
 deepseek-v4-unified/XHIGH -> {reasoning_effort:"high"}
-deepseek-v4-unified/MAX -> {reasoning_effort:"high"}
-deepseek-v4-unified/ULTRA -> {reasoning_effort:"high"}
+deepseek-v4-unified/MAX -> {reasoning_effort:"max"}
+deepseek-v4-unified/ULTRA -> {reasoning_effort:"max"}
 glm-declared/OFF -> {}
 glm-declared/LOW -> {reasoning_effort:"high"}
 glm-declared/MEDIUM -> {reasoning_effort:"high"}
 glm-declared/HIGH -> {reasoning_effort:"high"}
 glm-declared/XHIGH -> {reasoning_effort:"high"}
-glm-declared/MAX -> {reasoning_effort:"high"}
-glm-declared/ULTRA -> {reasoning_effort:"high"}
+glm-declared/MAX -> {reasoning_effort:"max"}
+glm-declared/ULTRA -> {reasoning_effort:"max"}
 glm-undeclared/OFF -> {}
 glm-undeclared/LOW -> {}
 glm-undeclared/MEDIUM -> {}
@@ -306,8 +311,8 @@ sparse-high-max/LOW -> {reasoning_effort:"high"}
 sparse-high-max/MEDIUM -> {reasoning_effort:"high"}
 sparse-high-max/HIGH -> {reasoning_effort:"high"}
 sparse-high-max/XHIGH -> {reasoning_effort:"high"}
-sparse-high-max/MAX -> {reasoning_effort:"high"}
-sparse-high-max/ULTRA -> {reasoning_effort:"high"}
+sparse-high-max/MAX -> {reasoning_effort:"max"}
+sparse-high-max/ULTRA -> {reasoning_effort:"max"}
 mistral/OFF -> {}
 mistral/LOW -> {}
 mistral/MEDIUM -> {}
@@ -320,8 +325,8 @@ venice-deepseek/LOW -> {reasoning_effort:"low"}
 venice-deepseek/MEDIUM -> {reasoning_effort:"low"}
 venice-deepseek/HIGH -> {reasoning_effort:"high"}
 venice-deepseek/XHIGH -> {reasoning_effort:"high"}
-venice-deepseek/MAX -> {reasoning_effort:"high"}
-venice-deepseek/ULTRA -> {reasoning_effort:"high"}
+venice-deepseek/MAX -> {reasoning_effort:"max"}
+venice-deepseek/ULTRA -> {reasoning_effort:"max"}
 qwen-on-unified/OFF -> {}
 qwen-on-unified/LOW -> {enable_thinking:true,extra_body:{enable_thinking:true,thinking_budget:4096},thinking_budget:4096}
 qwen-on-unified/MEDIUM -> {enable_thinking:true,extra_body:{enable_thinking:true,thinking_budget:6144},thinking_budget:6144}
@@ -333,9 +338,9 @@ gpt5-on-dashscope/OFF -> {}
 gpt5-on-dashscope/LOW -> {reasoning_effort:"low"}
 gpt5-on-dashscope/MEDIUM -> {reasoning_effort:"medium"}
 gpt5-on-dashscope/HIGH -> {reasoning_effort:"high"}
-gpt5-on-dashscope/XHIGH -> {reasoning_effort:"xhigh"}
-gpt5-on-dashscope/MAX -> {reasoning_effort:"xhigh"}
-gpt5-on-dashscope/ULTRA -> {reasoning_effort:"xhigh"}
+gpt5-on-dashscope/XHIGH -> {reasoning_effort:"high"}
+gpt5-on-dashscope/MAX -> {reasoning_effort:"high"}
+gpt5-on-dashscope/ULTRA -> {reasoning_effort:"high"}
 mimo-on-unified/OFF -> {}
 mimo-on-unified/LOW -> {reasoning_effort:"low"}
 mimo-on-unified/MEDIUM -> {reasoning_effort:"medium"}
@@ -355,8 +360,8 @@ deepseek-v4-on-openrouter/LOW -> {reasoning:{effort:"low"}}
 deepseek-v4-on-openrouter/MEDIUM -> {reasoning:{effort:"medium"}}
 deepseek-v4-on-openrouter/HIGH -> {reasoning:{effort:"high"}}
 deepseek-v4-on-openrouter/XHIGH -> {reasoning:{effort:"xhigh"}}
-deepseek-v4-on-openrouter/MAX -> {reasoning:{effort:"xhigh"}}
-deepseek-v4-on-openrouter/ULTRA -> {reasoning:{effort:"xhigh"}}
+deepseek-v4-on-openrouter/MAX -> {reasoning:{effort:"max"}}
+deepseek-v4-on-openrouter/ULTRA -> {reasoning:{effort:"max"}}
         """.trimIndent()
     }
 }

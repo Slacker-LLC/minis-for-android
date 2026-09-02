@@ -424,6 +424,9 @@
     <string name="usage_detail_cache_hit_rate">キャッシュヒット率</string>
     <string name="usage_detail_daily_avg">日平均</string>
     <string name="usage_detail_session_avg">セッション平均</string>
+    <string name="usage_detail_attribution">帰属情報</string>
+    <string name="usage_detail_attribution_measured">メッセージ単位のスナップショット</string>
+    <string name="usage_detail_attribution_estimated">%1$d 件の旧行から推定</string>
     <string name="usage_detail_sessions">セッション</string>
     <string name="usage_detail_active_days">アクティブ日数</string>
     <string name="mirror_back">戻る</string>

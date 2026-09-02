@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.db.ChatDao
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ProviderConfig
+import com.openminis.app.data.model.ProviderType
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,6 +49,7 @@ private data class ModelStats(
     var cacheReadTokens: Long = 0,
     val distinctDays: MutableSet<String> = mutableSetOf(),
     val distinctSessions: MutableSet<String> = mutableSetOf(),
+    var estimatedRows: Int = 0,
 ) {
     val totalInput: Long get() = inputTokens + cacheReadTokens + cacheCreationTokens
 }
@@ -107,17 +109,27 @@ fun UsageStatsScreen(
             val cacheCr = usage.optLong("cacheCreationTokens", usage.optLong("cacheCreationInputTokens", 0))
             val cacheRd = usage.optLong("cacheReadTokens", usage.optLong("cacheReadInputTokens", 0))
 
-            // [T-android-usage-orphan-rows] GH#168: modelId is null for a
-            // message whose session row is gone (LEFT JOIN). Those tokens were
-            // still billed, so they are counted under a single "unknown" bucket
-            // instead of being dropped — matching iOS, where an unresolvable id
-            // falls back to the raw id and the "Other" provider group.
-            val modelKey = record.modelId ?: UNKNOWN_MODEL_KEY
-            val (displayName, provider) = modelLookup[modelKey]
-                ?: (modelKey to "Unknown")
+            // [T-token-attribution-snapshot] Prefer the immutable identity on
+            // the message. Legacy rows have no snapshot and retain the old
+            // session-model fallback, but are marked as estimated below.
+            val rawModelId = record.modelId ?: UNKNOWN_MODEL_KEY
+            val legacyInfo = modelLookup[rawModelId]
+            val displayName = record.modelDisplayName?.takeIf { it.isNotBlank() }
+                ?: legacyInfo?.first
+                ?: rawModelId
+            val provider = providerDisplayName(record.providerType)
+                ?: legacyInfo?.second
+                ?: "Unknown"
+            // Include the provider instance when present: the same model id
+            // can legitimately be served by two different endpoints.
+            val modelKey = if (record.hasSnapshot) {
+                "snapshot|${record.providerType.orEmpty()}|${record.providerInstanceId.orEmpty()}|$rawModelId"
+            } else {
+                "legacy|$rawModelId"
+            }
 
             val stats = statsMap.getOrPut(modelKey) {
-                ModelStats(modelKey, displayName, provider)
+                ModelStats(rawModelId, displayName, provider)
             }
             stats.inputTokens += input
             stats.outputTokens += output
@@ -125,9 +137,13 @@ fun UsageStatsScreen(
             stats.cacheReadTokens += cacheRd
             stats.distinctDays.add(dateFormat.format(Date(record.createdAt)))
             stats.distinctSessions.add(record.sessionId)
+            if (!record.hasSnapshot) stats.estimatedRows++
         }
 
-        val providerOrder = listOf("OpenAI", "Anthropic", "Google Gemini", "Google", "Antigravity", "Unknown")
+        val providerOrder = listOf(
+            "OpenAI", "Anthropic", "Google Gemini", "OpenRouter", "xAI (Grok)",
+            "Google", "Antigravity", "Unknown",
+        )
         val grouped = statsMap.values.groupBy { it.provider }
         val sortedGroups = grouped.entries.sortedBy { (name, _) ->
             val idx = providerOrder.indexOf(name)
@@ -236,6 +252,14 @@ private fun ExpandableModelRow(model: ModelStats, showDivider: Boolean) {
                 if (sessions > 0) {
                     DetailRow(stringResource(R.string.usage_detail_session_avg), formatCount((model.inputTokens + model.outputTokens) / sessions))
                 }
+                DetailRow(
+                    stringResource(R.string.usage_detail_attribution),
+                    if (model.estimatedRows == 0) {
+                        stringResource(R.string.usage_detail_attribution_measured)
+                    } else {
+                        stringResource(R.string.usage_detail_attribution_estimated, model.estimatedRows)
+                    },
+                )
                 DetailRow(stringResource(R.string.usage_detail_sessions), sessions.toString())
                 DetailRow(stringResource(R.string.usage_detail_active_days), days.toString())
             }
@@ -265,6 +289,11 @@ private fun DetailRow(label: String, value: String) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Default)
     }
+}
+
+private fun providerDisplayName(raw: String?): String? {
+    val value = raw?.takeIf { it.isNotBlank() } ?: return null
+    return runCatching { ProviderType.valueOf(value).displayName }.getOrDefault(value)
 }
 
 private fun formatCount(n: Long): String = when {

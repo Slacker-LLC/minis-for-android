@@ -94,6 +94,7 @@ class ThinkingRulesRegressionTest {
         basePath: String = server.loopbackUrl("/v1").toString().trimEnd('/'),
         history: List<LLMMessage> = plainHistory(),
         maxTokens: Int = 4096,
+        clampToCatalog: Boolean = false,
     ): JSONObject {
         val ok = """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""
         repeat(4) {
@@ -104,15 +105,27 @@ class ThinkingRulesRegressionTest {
         val provider = OpenAIProvider(apiKey = "test-key", model = model, basePath = basePath)
         runCatching {
             runBlocking {
-                provider.sendMessageClamped(
-                    messages = history,
-                    systemPrompt = null,
-                    maxTokens = maxTokens,
-                    temperature = null,
-                    imageParts = emptyList(),
-                    tools = emptyList(),
-                    thinkingLevel = level,
-                )
+                if (clampToCatalog) {
+                    provider.sendMessage(
+                        messages = history,
+                        systemPrompt = null,
+                        maxTokens = maxTokens,
+                        temperature = null,
+                        imageParts = emptyList(),
+                        tools = emptyList(),
+                        thinkingLevel = level,
+                    )
+                } else {
+                    provider.sendMessageClamped(
+                        messages = history,
+                        systemPrompt = null,
+                        maxTokens = maxTokens,
+                        temperature = null,
+                        imageParts = emptyList(),
+                        tools = emptyList(),
+                        thinkingLevel = level,
+                    )
+                }
             }
         }
         return JSONObject(server.takeRequest().body.readUtf8())
@@ -597,5 +610,61 @@ class ThinkingRulesRegressionTest {
                 sent == "xhigh",
             )
         }
+    }
+
+    // ============================================================ DECLARED TIERS
+
+    @Test
+    fun `declared effort tiers define the selectable ceiling`() {
+        val sparse = model("glm-5.2", reasoningEffortValues = listOf("high", "max"))
+        assertEquals(ThinkingLevel.MAX, sparse.catalogMaxThinkingLevel)
+        assertEquals(
+            listOf(ThinkingLevel.HIGH, ThinkingLevel.MAX),
+            sparse.selectableThinkingLevels,
+        )
+
+        val narrow = model("vendor-reasoner", reasoningEffortValues = listOf("low", "high"))
+        assertEquals(ThinkingLevel.HIGH, narrow.catalogMaxThinkingLevel)
+        assertEquals(listOf(ThinkingLevel.LOW, ThinkingLevel.HIGH), narrow.selectableThinkingLevels)
+    }
+
+    @Test
+    fun `public provider entry clamps a declared max tier onto the wire`() {
+        val body = capture(
+            model = model("glm-5.2", reasoningEffortValues = listOf("high", "max")),
+            level = ThinkingLevel.ULTRA,
+            clampToCatalog = true,
+        )
+        assertEquals("max", body.optString("reasoning_effort", null))
+    }
+
+    @Test
+    fun `missing declaration keeps legacy catalog fallback`() {
+        assertEquals(ThinkingLevel.XHIGH, model("unknown-reasoner").catalogMaxThinkingLevel)
+        assertEquals(ThinkingLevel.HIGH, model("mimo-v2.5").catalogMaxThinkingLevel)
+        assertEquals(
+            ThinkingLevel.OFF,
+            model(
+                "mimo-v2.5-tts",
+                supportsReasoning = false,
+                reasoningEffortValues = listOf("high", "max"),
+            ).catalogMaxThinkingLevel,
+        )
+    }
+
+    @Test
+    fun `gemini high tiers map to high and newer flash off avoids minimal`() {
+        assertEquals(
+            "high",
+            com.openminis.app.provider.thinking.ThinkingRuleResolver
+                .geminiThinkingConfig("gemini-3-flash-preview", ThinkingLevel.ULTRA)
+                ?.getString("thinkingLevel"),
+        )
+        assertEquals(
+            "low",
+            com.openminis.app.provider.thinking.ThinkingRuleResolver
+                .geminiThinkingConfig("gemini-3.7-flash-preview", ThinkingLevel.OFF)
+                ?.getString("thinkingLevel"),
+        )
     }
 }

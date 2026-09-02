@@ -516,16 +516,22 @@ object ThinkingRuleResolver {
     // verbatim from the provider-local implementations they replace and are pinned
     // byte-for-byte by ThinkingWireGeminiAnthropicSnapshotTest.
     //
-    // ⚠️ These intentionally differ from the iOS versions in two places, because the
-    // Android originals did: 3.x at MAX/ULTRA falls through to "low" here (iOS: "high"),
-    // and unknown/latest ids return null here (iOS: a 128-floor fallback table). Phase 2
-    // §1 is a pure refactor — do not "align" them without a deliberate decision.
+    // ⚠️ Unknown/latest ids still return null here (iOS has a 128-floor fallback
+    // table). Gemini 3.x tier handling follows the declared provider contract.
 
     /**
      * The `generationConfig.thinkingConfig` object for a Gemini request, or null when the
      * model takes no thinking config at all (specialized -tts/-image/-embedding/-vision
      * modalities, 2.5 Flash Lite, and any id matching none of the families).
      */
+    /** Gemini 3.7+ Flash rejects the `minimal` OFF floor with HTTP 400. */
+    private fun rejectsMinimalLevel(lowerId: String): Boolean {
+        val minor = Regex("""gemini-3\.(\d+)""").find(lowerId)
+            ?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: return false
+        return minor >= 7
+    }
+
     fun geminiThinkingConfig(modelId: String, level: ThinkingLevel): JSONObject? {
         // [T-gemini-tts-thinking-400 / OpenMinis#226] Specialized modalities take
         // precedence over EVERY family rule and over the requested level: these models
@@ -556,16 +562,20 @@ object ThinkingRuleResolver {
         return when {
             isGemini3 -> JSONObject().apply {
                 if (level == ThinkingLevel.OFF) {
-                    // 3.x Pro cannot fully disable; "minimal" for Flash, "low" for Pro.
-                    put("thinkingLevel", if (modelId.contains("flash")) "minimal" else "low")
+                    // 3.x cannot fully disable thinking; use the weakest level
+                    // accepted by the concrete model family.
+                    val acceptsMinimal = lowerId.contains("flash") && !rejectsMinimalLevel(lowerId)
+                    put("thinkingLevel", if (acceptsMinimal) "minimal" else "low")
                 } else {
                     put(
                         "thinkingLevel",
                         when (level) {
                             ThinkingLevel.LOW -> "low"
                             ThinkingLevel.MEDIUM -> "medium"
-                            ThinkingLevel.HIGH, ThinkingLevel.XHIGH -> "high"
-                            else -> "low"
+                            ThinkingLevel.HIGH, ThinkingLevel.XHIGH,
+                            ThinkingLevel.MAX, ThinkingLevel.ULTRA,
+                            -> "high"
+                            ThinkingLevel.OFF -> "low" // unreachable; handled above
                         },
                     )
                     put("includeThoughts", true)
