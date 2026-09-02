@@ -2,7 +2,10 @@ package com.openminis.app.data
 
 import android.content.Context
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.internal.TextRetainer
 import java.io.File
+import java.util.UUID
 
 /**
  * Per-session offload storage helpers — write large tool outputs to disk so
@@ -16,11 +19,9 @@ import java.io.File
  * so file_read paths round-trip across platforms when an Android-offloaded
  * session is opened on iOS (or vice versa) via cloud sync.
  *
- * Linux-visible mount: `/var/minis/offloads/tools/<file>`. The host base
- * `filesDir/minis-sessions/<sid>/offloads` is bind-mounted into the
- * sandbox by [com.openminis.app.runtime.RuntimePathRegistry.perSessionSubdirs]
- * (which already includes the "offloads" subdir — no kernel changes
- * required for this feature).
+ * Linux-visible mount: `/var/minis/offloads/tools/<file>`. The bytes are
+ * written through minisd because the App UID cannot open the canonical host
+ * backing directory under SELinux enforcing.
  */
 object ContextOffload {
     /** Linux-side mount point — keep in lock-step with iOS `minisOffloadsLinuxDir`. */
@@ -31,19 +32,15 @@ object ContextOffload {
     const val OFFLOADED_PREFIX = "[CONTEXT OFFLOADED]"
 
     /**
-     * Host-side persistent dir for [sessionId]'s tool offloads. Lazily
-     * created on first write — callers should call [ensureToolsDir] before
-     * writing.
+     * Compatibility directory for the diagnostics log spill path. The
+     * diagnostics subsystem still uses its own [com.openminis.app.tools.internal.SpillPolicy]
+     * until that subsystem is migrated; canonical context offloads below use
+     * the broker exclusively.
      */
+    @Deprecated("Use WorkspaceFileClient-backed offload methods for canonical guest files")
     fun toolsDir(context: Context, sessionId: String): File {
         val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
         return File(session ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId), "offloads/tools")
-    }
-
-    private fun ensureToolsDir(context: Context, sessionId: String): File {
-        val dir = toolsDir(context, sessionId)
-        if (!dir.exists()) dir.mkdirs()
-        return dir
     }
 
     /**
@@ -56,7 +53,7 @@ object ContextOffload {
         if (toolId.length <= 12) toolId else toolId.takeLast(12)
 
     private fun sanitize(name: String): String =
-        name.ifEmpty { "tool" }.replace('/', '_')
+        name.ifEmpty { "tool" }.replace(Regex("[^A-Za-z0-9._-]"), "_")
 
     /**
      * Write tool text content to disk and return the Linux-visible path
@@ -64,7 +61,7 @@ object ContextOffload {
      * on any I/O failure — caller should still update the in-history part
      * with a stub so the model isn't left holding the original bytes.
      */
-    fun offloadContent(
+    suspend fun offloadContent(
         context: Context,
         sessionId: String,
         content: String,
@@ -72,12 +69,11 @@ object ContextOffload {
         toolName: String,
         ext: String = "txt",
     ): String {
-        val dir = ensureToolsDir(context, sessionId)
         val fileName = "${sanitize(toolName)}_${shortToolId(toolId)}.$ext"
-        val file = File(dir, fileName)
+        val linuxPath = "$LINUX_OFFLOADS_DIR/tools/$fileName"
         return try {
-            file.writeText(content)
-            "$LINUX_OFFLOADS_DIR/tools/$fileName"
+            WorkspaceFileClient.writeBytes(sessionId, linuxPath, content.toByteArray(Charsets.UTF_8))
+            linuxPath
         } catch (e: Exception) {
             AppLogger.warning(TAG, "offloadContent failed: ${e.message}")
             ""
@@ -90,7 +86,7 @@ object ContextOffload {
      * unrecognised types so the file_read path still resolves something
      * the model can preview.
      */
-    fun offloadImage(
+    suspend fun offloadImage(
         context: Context,
         sessionId: String,
         bytes: ByteArray,
@@ -104,16 +100,46 @@ object ContextOffload {
             "image/webp" -> "webp"
             else -> "bin"
         }
-        val dir = ensureToolsDir(context, sessionId)
         val fileName = "image_${shortToolId(toolId)}.$ext"
-        val file = File(dir, fileName)
+        val linuxPath = "$LINUX_OFFLOADS_DIR/tools/$fileName"
         return try {
-            file.writeBytes(bytes)
-            "$LINUX_OFFLOADS_DIR/tools/$fileName"
+            WorkspaceFileClient.writeBytes(sessionId, linuxPath, bytes)
+            linuxPath
         } catch (e: Exception) {
             AppLogger.warning(TAG, "offloadImage failed: ${e.message}")
             ""
         }
+    }
+
+    data class SpillResult(
+        val inline: String,
+        val linuxPath: String?,
+        val spilled: Boolean,
+    )
+
+    suspend fun spillIfOversized(
+        sessionId: String,
+        text: String,
+        maxInlineBytes: Int = 50 * 1024,
+        baseName: String,
+    ): SpillResult {
+        val totalBytes = text.toByteArray(Charsets.UTF_8).size
+        if (totalBytes <= maxInlineBytes) {
+            return SpillResult(text, null, false)
+        }
+        val fileName = "${sanitize(baseName)}-${System.currentTimeMillis()}-${UUID.randomUUID()}.txt"
+        val linuxPath = "$LINUX_OFFLOADS_DIR/tools/$fileName"
+        WorkspaceFileClient.writeBytes(sessionId, linuxPath, text.toByteArray(Charsets.UTF_8))
+        val preview = TextRetainer(
+            maxChars = 3_000,
+            headChars = 2_000,
+            tailChars = 1_000,
+        ).also { it.push(text) }.finish().text
+        return SpillResult(
+            inline = "$preview\n\n(Omitted $totalBytes bytes. Full formatted result stored at: $linuxPath. Use file_read with offset/limit to search within it.)",
+            linuxPath = linuxPath,
+            spilled = true,
+        )
     }
 
     /**

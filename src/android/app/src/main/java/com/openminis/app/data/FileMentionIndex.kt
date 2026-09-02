@@ -1,6 +1,7 @@
 package com.openminis.app.data
 
 import android.content.Context
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,8 +21,9 @@ import java.util.UUID
  * roots, then (if mounts are attached) external mounts.
  *
  * ### Layers
- *   1. **Session roots** — `minis-sessions/<sid>/{workspace,attachments}`.
- *   2. **Shared roots** — `minis-global/{shared,skills,memory}`.
+ *   1. **Session roots** — broker views of `/var/minis/{workspace,attachments}`
+ *      for the active session.
+ *   2. **Shared roots** — broker views of `/var/minis/{shared,skills,memory}`.
  *   3. **Mount roots** — each entry in [mountsProvider] (e.g. SAF-attached
  *      folders). Each mount always gets a self-entry so `@<mountName>` works.
  *
@@ -38,12 +40,11 @@ import java.util.UUID
  * at [DEFAULT_MATCH_LIMIT].
  */
 class FileMentionIndex(
-    private val filesDir: File,
     private val mountsProvider: () -> List<MountEntry> = { emptyList() },
     private val cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    constructor(context: Context) : this(context.filesDir)
+    constructor(context: Context) : this()
 
     /**
      * Scope priorities — `order` doubles as the empty-query default sort key
@@ -124,8 +125,8 @@ class FileMentionIndex(
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sessionId/workspace") to Scope.WORKSPACE,
-                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sessionId/attachments") to Scope.ATTACHMENTS,
+                    "/var/minis/workspace" to Scope.WORKSPACE,
+                    "/var/minis/attachments" to Scope.ATTACHMENTS,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->
@@ -137,9 +138,9 @@ class FileMentionIndex(
             layerEntries(
                 sessionId = sessionId,
                 layers = listOf(
-                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared) to Scope.SHARED,
-                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills) to Scope.SKILLS,
-                    File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory) to Scope.MEMORY,
+                    "/var/minis/shared" to Scope.SHARED,
+                    "/var/minis/skills" to Scope.SKILLS,
+                    "/var/minis/memory" to Scope.MEMORY,
                 ),
                 linuxRootFor = { scope -> "/var/minis/${scope.displayLabel}" },
             ).let { newBatch ->
@@ -184,31 +185,95 @@ class FileMentionIndex(
         }
     }
 
-    private fun layerEntries(
+    private suspend fun layerEntries(
         sessionId: String,
-        layers: List<Pair<File, Scope>>,
+        layers: List<Pair<String, Scope>>,
         linuxRootFor: (Scope) -> String,
     ): List<Entry> {
         val out = mutableListOf<Entry>()
-        for ((dir, scope) in layers) {
-            if (!dir.isDirectory) continue
+        for ((guestRoot, scope) in layers) {
+            val info = runCatching { WorkspaceFileClient.info(sessionId, guestRoot) }
+                .getOrNull()
+            if (info?.optString("type") != "dir") continue
             val linuxRoot = linuxRootFor(scope)
             // Always include the root itself so `@workspace` / `@shared` can be referenced.
             out += Entry(
                 linuxPath = linuxRoot,
                 scope = scope,
                 mountName = null,
-                modifiedAt = dir.lastModified(),
+                modifiedAt = info.optLong("modified", 0),
                 isDirectory = true,
             )
-            out += scanDir(
-                root = dir,
+            out += scanGuestDir(
+                sessionId = sessionId,
+                guestRoot = guestRoot,
                 linuxRoot = linuxRoot,
                 scope = scope,
                 mountName = null,
                 maxDepth = Int.MAX_VALUE,
                 budget = GLOBAL_SCAN_BUDGET,
             )
+        }
+        return out
+    }
+
+    private data class GuestNode(
+        val guestPath: String,
+        val linuxPath: String,
+        val depth: Int,
+    )
+
+    private suspend fun scanGuestDir(
+        sessionId: String,
+        guestRoot: String,
+        linuxRoot: String,
+        scope: Scope,
+        mountName: String?,
+        maxDepth: Int,
+        budget: Int,
+    ): List<Entry> {
+        val out = ArrayList<Entry>()
+        val queue = ArrayDeque<GuestNode>()
+        queue.addLast(GuestNode(guestRoot, linuxRoot, 0))
+        while (queue.isNotEmpty() && out.size < budget) {
+            val node = queue.removeFirst()
+            if (node.depth > maxDepth) continue
+            var offset = 0
+            while (out.size < budget) {
+                val listing = runCatching {
+                    WorkspaceFileClient.list(
+                        sessionId,
+                        node.guestPath,
+                        500,
+                        offset,
+                    )
+                }.getOrNull() ?: break
+                val entries = listing.optJSONArray("entries") ?: break
+                for (index in 0 until entries.length()) {
+                    if (out.size >= budget) break
+                    val item = entries.optJSONObject(index) ?: continue
+                    val name = item.optString("name").takeIf { it.isNotEmpty() } ?: continue
+                    if (name.startsWith(".")) continue
+                    val type = item.optString("type")
+                    val isDirectory = type == "dir"
+                    if (isDirectory && name in SKIP_DIR_NAMES) continue
+                    val guestPath = "${node.guestPath}/$name"
+                    val linuxPath = "${node.linuxPath}/$name"
+                    out += Entry(
+                        linuxPath = linuxPath,
+                        scope = scope,
+                        mountName = mountName,
+                        modifiedAt = item.optLong("modified", 0),
+                        isDirectory = isDirectory,
+                    )
+                    if (isDirectory && node.depth + 1 <= maxDepth) {
+                        queue.addLast(GuestNode(guestPath, linuxPath, node.depth + 1))
+                    }
+                }
+                val next = listing.optLong("next_offset", -1)
+                if (next < 0 || entries.length() == 0 || next > Int.MAX_VALUE) break
+                offset = next.toInt()
+            }
         }
         return out
     }

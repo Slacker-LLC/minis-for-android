@@ -4,6 +4,9 @@ import android.content.Context
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
@@ -189,18 +192,24 @@ class SessionForkManager(
 
     /**
      * Persist a memory note (plain Markdown / text) under
-     * `<filesDir>/minis-global/memory/<fileName>`. Mirrors iOS
+     * `/var/minis/memory/<fileName>`. Mirrors iOS
      * `SessionForkManager.copyRemoteMemory` which writes under
      * `minisMemoryPersistentDir`. Overwrites if the file already exists.
      */
     fun copyMemory(fileName: String, content: String): Boolean {
-        if (fileName.contains("/") || fileName.contains("..")) {
+        if (fileName.isBlank() || fileName == "." || fileName == ".." ||
+            fileName.contains("/") || fileName.contains('\\') || fileName.contains('\u0000')) {
             AppLogger.warning(TAG, "copyMemory: rejecting unsafe fileName '$fileName'")
             return false
         }
-         val dir = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory).apply { mkdirs() }
         return try {
-            File(dir, fileName).writeText(content)
+            runBlocking(Dispatchers.IO) {
+                WorkspaceFileClient.writeBytes(
+                    sessionId = "",
+                    path = "/var/minis/memory/$fileName",
+                    bytes = content.toByteArray(Charsets.UTF_8),
+                )
+            }
             true
         } catch (e: Exception) {
             AppLogger.warning(TAG, "copyMemory: write failed: ${e.message}")

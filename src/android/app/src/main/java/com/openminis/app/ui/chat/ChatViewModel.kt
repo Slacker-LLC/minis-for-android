@@ -1177,7 +1177,6 @@ class ChatViewModel(
         // launch by MinisApp); reading via a closure means the index sees
         // an up-to-date snapshot on every rescan without a manual refresh.
         FileMentionIndex(
-            filesDir = context.applicationContext.filesDir,
             mountsProvider = {
                 com.openminis.app.runtime.RuntimePathRegistry
                     .mountEntriesForIndex(context.applicationContext)
@@ -6560,7 +6559,7 @@ class ChatViewModel(
      * candidates are offloaded regardless of remaining headroom — used by
      * post-compact code paths to slim down the kept-tail aggressively.
      */
-    private fun offloadContextIfNeeded(
+    private suspend fun offloadContextIfNeeded(
         contextWindow: Int,
         lastContextTokens: Int,
         force: Boolean = false,

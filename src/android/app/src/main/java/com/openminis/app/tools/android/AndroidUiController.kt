@@ -81,7 +81,7 @@ object AndroidUiController {
         return UiToolResult(result.put("status", CapabilityStatus.AVAILABLE.name), true)
     }
 
-    private fun screenshot(
+    private suspend fun screenshot(
         context: Context,
         service: MinisAccessibilityService,
         sessionId: String,

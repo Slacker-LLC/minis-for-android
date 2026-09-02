@@ -1,13 +1,15 @@
 package com.openminis.app.data.repository
 
 import android.util.Log
-import java.io.File
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * Manages the memory directory (`minis-global/memory/`).
+ * Manages the memory directory (`/var/minis/memory/`).
  * Mirrors iOS memory system:
  *   - GLOBAL.md: read-only for agent, user-maintained via Settings
  *   - YYYY-MM-DD.md: daily logs with timestamped entries, agent writes via memory_write
@@ -15,7 +17,7 @@ import java.util.Locale
  *   - loadGlobalMemoryFragment() / loadRecentDailyMemoryFragment(): emit
  *     two separate text blocks for the system prompt (mirrors iOS exactly)
  */
-class MemoryRepository(private val memoryDir: File) {
+class MemoryRepository {
 
     companion object {
         private const val TAG = "MemoryRepository"
@@ -40,11 +42,14 @@ class MemoryRepository(private val memoryDir: File) {
         // back into the next LLM call. Counted as UTF-8 bytes (matches
         // what the provider sees over the wire).
         private const val MAX_OUTPUT_BYTES = 30 * 1024  // 30 KB
+        private const val MEMORY_ROOT = "/var/minis/memory"
     }
 
-    init {
-        memoryDir.mkdirs()
-    }
+    private data class GuestFile(
+        val name: String,
+        val size: Long,
+        val modified: Long,
+    )
 
     // -- memory_write --
 
@@ -58,17 +63,22 @@ class MemoryRepository(private val memoryDir: File) {
 
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val fileName = "${dateFmt.format(Date())}.md"
-        val file = File(memoryDir, fileName)
-
         val timeFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val timestamp = timeFmt.format(Date())
         val entry = "<!-- $timestamp -->\n$content\n\n"
 
-        val existing = if (file.exists()) file.readText() else ""
+        val available = listGuestFiles()
+            ?: return "Error writing memory: minisd broker unavailable"
+        val existing = if (available.any { it.name == fileName }) {
+            readGuestFile(fileName)
+                ?: return "Error writing memory: failed to read $fileName"
+        } else {
+            ""
+        }
         val newContent = entry + existing
 
         return try {
-            file.writeText(newContent)
+            writeGuestFile(fileName, newContent)
             Log.i(TAG, "Memory written to $fileName (${content.length} chars)")
             "Memory saved to $fileName (${content.length} chars)"
         } catch (e: Exception) {
@@ -91,23 +101,22 @@ class MemoryRepository(private val memoryDir: File) {
             .split(Regex("\\s+"))
             .filter { it.isNotEmpty() }
 
-        val filesToSearch = mutableListOf<Pair<String, File>>() // label to file
+        val filesToSearch = mutableListOf<Pair<String, String>>() // label to guest filename
+        val available = listGuestFiles().orEmpty().associateBy { it.name }
 
         if (scope == "all") {
-            val globalFile = File(memoryDir, GLOBAL_FILE)
-            if (globalFile.exists() && globalFile.length() > 0) {
-                filesToSearch.add(GLOBAL_FILE to globalFile)
+            if ((available[GLOBAL_FILE]?.size ?: 0L) > 0L) {
+                filesToSearch.add(GLOBAL_FILE to GLOBAL_FILE)
             }
         }
 
         // Daily logs sorted descending
-        val dailyFiles = memoryDir.listFiles()
-            ?.filter { it.extension == "md" && it.name != GLOBAL_FILE }
-            ?.sortedByDescending { it.name }
-            ?: emptyList()
+        val dailyFiles = available.values
+            .filter { it.name.endsWith(".md") && it.name != GLOBAL_FILE }
+            .sortedByDescending { it.name }
 
         for (file in dailyFiles) {
-            filesToSearch.add(file.name to file)
+            filesToSearch.add(file.name to file.name)
         }
 
         if (filesToSearch.isEmpty()) {
@@ -132,9 +141,9 @@ class MemoryRepository(private val memoryDir: File) {
         // to flood agent context.
         val lineCap = if (keywordList.isEmpty()) MAX_DUMP_LINES else MAX_SEARCH_LINES
 
-        for ((label, file) in filesToSearch) {
+        for ((label, fileName) in filesToSearch) {
             if (totalLines >= lineCap || byteCapHit) break
-            val content = try { file.readText() } catch (_: Exception) { continue }
+            val content = readGuestFile(fileName) ?: continue
             if (content.isEmpty()) continue
             val budget = lineCap - totalLines
 
@@ -243,9 +252,7 @@ class MemoryRepository(private val memoryDir: File) {
      * is missing or empty.
      */
     fun loadGlobalMemoryFragment(): String? {
-        val globalFile = File(memoryDir, GLOBAL_FILE)
-        if (!globalFile.exists()) return null
-        val content = try { globalFile.readText() } catch (_: Exception) { "" }
+        val content = readGuestFile(GLOBAL_FILE) ?: return null
         // Match iOS: literal-empty check (`!content.isEmpty`), not blank.
         // A whitespace-only file is unusual in practice, but staying byte-for-
         // byte consistent with iOS keeps the cached system prompt identical
@@ -270,24 +277,20 @@ class MemoryRepository(private val memoryDir: File) {
         while (fragments.size < MAX_RECENT_FILES && dayOffset < MAX_LOOKBACK_DAYS) {
             val date = Date(now.time - dayOffset.toLong() * 86400_000L)
             val dateStr = dateFmt.format(date)
-            val file = File(memoryDir, "$dateStr.md")
-
-            if (file.exists()) {
-                val content = try { file.readText() } catch (_: Exception) { "" }
-                if (content.isNotEmpty()) {
-                    val lines = content.lines()
-                    val preview = lines.take(MAX_INJECT_LINES).joinToString("\n")
-                    val label = when (dayOffset) {
-                        0 -> "Today's"
-                        1 -> "Yesterday's"
-                        else -> dateStr
-                    }
-                    var entry = "$label daily log ($dateStr.md):\n$preview"
-                    if (lines.size > MAX_INJECT_LINES) {
-                        entry += "\n... (${lines.size - MAX_INJECT_LINES} more lines, use memory_get to search)"
-                    }
-                    fragments.add(entry)
+            val content = readGuestFile("$dateStr.md")
+            if (!content.isNullOrEmpty()) {
+                val lines = content.lines()
+                val preview = lines.take(MAX_INJECT_LINES).joinToString("\n")
+                val label = when (dayOffset) {
+                    0 -> "Today's"
+                    1 -> "Yesterday's"
+                    else -> dateStr
                 }
+                var entry = "$label daily log ($dateStr.md):\n$preview"
+                if (lines.size > MAX_INJECT_LINES) {
+                    entry += "\n... (${lines.size - MAX_INJECT_LINES} more lines, use memory_get to search)"
+                }
+                fragments.add(entry)
             }
             dayOffset++
         }
@@ -317,32 +320,32 @@ class MemoryRepository(private val memoryDir: File) {
     fun listAllFiles(): List<MemoryFileInfo> {
         val dateFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
         val items = mutableListOf<MemoryFileInfo>()
+        val files = listGuestFiles().orEmpty().associateBy { it.name }
 
         // GLOBAL.md always first
-        val globalFile = File(memoryDir, GLOBAL_FILE)
-        val globalContent = if (globalFile.exists()) try { globalFile.readText() } catch (_: Exception) { "" } else ""
-        val globalModDate = if (globalFile.exists()) dateFmt.format(Date(globalFile.lastModified())) else ""
+        val globalFile = files[GLOBAL_FILE]
+        val globalContent = readGuestFile(GLOBAL_FILE).orEmpty()
+        val globalModDate = globalFile?.let { dateFmt.format(Date(it.modified)) }.orEmpty()
         items.add(MemoryFileInfo(
             name = GLOBAL_FILE,
             isGlobal = true,
             modifiedDate = globalModDate,
-            fileSize = formatFileSize(globalFile.length()),
+            fileSize = formatFileSize(globalFile?.size ?: 0L),
             preview = firstContentLine(globalContent),
         ))
 
         // Daily logs sorted descending
-        val dailyFiles = memoryDir.listFiles()
-            ?.filter { it.extension == "md" && it.name != GLOBAL_FILE }
-            ?.sortedByDescending { it.name }
-            ?: emptyList()
+        val dailyFiles = files.values
+            .filter { it.name.endsWith(".md") && it.name != GLOBAL_FILE }
+            .sortedByDescending { it.name }
 
         for (file in dailyFiles) {
-            val content = try { file.readText() } catch (_: Exception) { "" }
+            val content = readGuestFile(file.name).orEmpty()
             items.add(MemoryFileInfo(
                 name = file.name,
                 isGlobal = false,
-                modifiedDate = dateFmt.format(Date(file.lastModified())),
-                fileSize = formatFileSize(file.length()),
+                modifiedDate = dateFmt.format(Date(file.modified)),
+                fileSize = formatFileSize(file.size),
                 preview = firstContentLine(content),
             ))
         }
@@ -351,26 +354,30 @@ class MemoryRepository(private val memoryDir: File) {
     }
 
     fun loadGlobalMd(): String {
-        val file = File(memoryDir, GLOBAL_FILE)
-        return if (file.exists()) try { file.readText() } catch (_: Exception) { "" } else ""
+        return readGuestFile(GLOBAL_FILE).orEmpty()
     }
 
     fun saveGlobalMd(content: String) {
-        File(memoryDir, GLOBAL_FILE).writeText(content)
+        writeGuestFile(GLOBAL_FILE, content)
     }
 
     fun readFile(name: String): String {
-        val file = File(memoryDir, name)
-        return if (file.exists()) try { file.readText() } catch (_: Exception) { "" } else ""
+        return readGuestFile(name).orEmpty()
     }
 
     fun saveFile(name: String, content: String) {
-        File(memoryDir, name).writeText(content)
+        writeGuestFile(name, content)
     }
 
     fun deleteFile(name: String): Boolean {
         if (name == GLOBAL_FILE) return false // Cannot delete GLOBAL.md
-        return File(memoryDir, name).delete()
+        val path = guestPath(name) ?: return false
+        return try {
+            runBlocking(Dispatchers.IO) { WorkspaceFileClient.delete("", path) }
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     // -- Entry-level operations (used by Session Memory revoke/edit) --
@@ -411,9 +418,8 @@ class MemoryRepository(private val memoryDir: File) {
         val markerRegex = Regex("""<!-- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} -->\n""")
 
         for (dateStr in candidates) {
-            val file = File(memoryDir, "$dateStr.md")
-            if (!file.exists()) continue
-            val content = try { file.readText() } catch (_: Exception) { continue }
+            val fileName = "$dateStr.md"
+            val content = readGuestFile(fileName) ?: continue
 
             val matches = markerRegex.findAll(content).toList()
             if (matches.isEmpty()) continue
@@ -426,7 +432,7 @@ class MemoryRepository(private val memoryDir: File) {
 
                 val newContent = content.removeRange(match.range.first, entryEnd)
                 return try {
-                    file.writeText(newContent)
+                    writeGuestFile(fileName, newContent)
                     Log.i(TAG, "Revoked memory entry from $dateStr.md")
                     EntryMutationResult.Success(dateStr)
                 } catch (e: Exception) {
@@ -450,9 +456,8 @@ class MemoryRepository(private val memoryDir: File) {
         val markerRegex = Regex("""<!-- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} -->\n""")
 
         for (dateStr in candidates) {
-            val file = File(memoryDir, "$dateStr.md")
-            if (!file.exists()) continue
-            val content = try { file.readText() } catch (_: Exception) { continue }
+            val fileName = "$dateStr.md"
+            val content = readGuestFile(fileName) ?: continue
 
             val matches = markerRegex.findAll(content).toList()
             if (matches.isEmpty()) continue
@@ -468,7 +473,7 @@ class MemoryRepository(private val memoryDir: File) {
                 val replacement = "$trimmedNew\n\n"
                 val newFileContent = content.replaceRange(bodyStart, entryEnd, replacement)
                 return try {
-                    file.writeText(newFileContent)
+                    writeGuestFile(fileName, newFileContent)
                     Log.i(TAG, "Replaced memory entry body in $dateStr.md")
                     EntryMutationResult.Success(dateStr)
                 } catch (e: Exception) {
@@ -487,6 +492,47 @@ class MemoryRepository(private val memoryDir: File) {
     }
 
     // -- Internal --
+
+    private fun listGuestFiles(): List<GuestFile>? = runCatching {
+        runBlocking(Dispatchers.IO) {
+            WorkspaceFileClient.listAll("", MEMORY_ROOT)
+                .filter { it.optString("type") == "file" }
+                .mapNotNull { entry ->
+                    val name = entry.optString("name")
+                    if (guestPath(name) == null) return@mapNotNull null
+                    GuestFile(
+                        name = name,
+                        size = entry.optLong("size", 0L).coerceAtLeast(0L),
+                        modified = entry.optLong("modified", 0L),
+                    )
+                }
+        }
+    }.getOrElse { error ->
+        Log.w(TAG, "Failed to list guest memory files: ${error.message}")
+        null
+    }
+
+    private fun readGuestFile(name: String): String? {
+        val path = guestPath(name) ?: return null
+        return runCatching {
+            WorkspaceFileClient.readAllBlocking("", path).toString(Charsets.UTF_8)
+        }.getOrNull()
+    }
+
+    private fun writeGuestFile(name: String, content: String) {
+        val path = guestPath(name) ?: throw IllegalArgumentException("invalid memory filename: $name")
+        runBlocking(Dispatchers.IO) {
+            WorkspaceFileClient.writeBytes("", path, content.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    private fun guestPath(name: String): String? {
+        if (name.isEmpty() || name == "." || name == ".." ||
+            name.contains('/') || name.contains('\\') || name.contains('\u0000')) {
+            return null
+        }
+        return "$MEMORY_ROOT/$name"
+    }
 
     private fun formatFileSize(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
