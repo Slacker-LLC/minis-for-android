@@ -23,6 +23,7 @@ class RuntimeDistributionManagerTest {
         rootfsSha256: String = rootfsSha,
         minisdSha256: String = minisdSha,
         provisionRevision: Int = 1,
+        rootfsRelease: String = "24.04.3",
     ): RuntimeDistributionManifest {
         val text = JSONObject()
             .put("schemaVersion", 2)
@@ -33,7 +34,7 @@ class RuntimeDistributionManagerTest {
             .put("minisdSha256", minisdSha256)
             .put("rootfsVersion", "ubuntu-24.04-r1-${rootfsSha256.take(16)}")
             .put("rootfsSha256", rootfsSha256)
-            .put("rootfsRelease", "24.04.3")
+            .put("rootfsRelease", rootfsRelease)
             .put("rootfsProfile", "base")
             .put("rootfsUpstreamSha256", upstream)
             .put("provisionRevision", provisionRevision)
@@ -58,7 +59,6 @@ class RuntimeDistributionManagerTest {
         var rollbackSucceeds: Boolean = true,
         var stateReadSucceeds: Boolean = true,
         var stateWriteSucceeds: Boolean = true,
-        var canonicalSizeBytes: Long? = 4096L,
     ) : RuntimeMaintainer {
         val operations = mutableListOf<Pair<String, JSONObject>>()
 
@@ -113,11 +113,7 @@ class RuntimeDistributionManagerTest {
                                 } else {
                                     canonicalProvisioned
                                 },
-                            ).apply {
-                                if (params.optString("target") != "previous") {
-                                    canonicalSizeBytes?.let { put("size_bytes", it) }
-                                }
-                            })
+                            ))
                     }
                 }
                 MinisdProtocol.RUNTIME_OP_STAGE ->
@@ -166,6 +162,9 @@ class RuntimeDistributionManagerTest {
             .put("rootfsSha256", rootfsSha)
             .put("minisdSha256", minisdSha)
             .put("provisionRevision", 1)
+            .put("rootfsRelease", "24.04.3")
+            .put("rootfsProfile", "base")
+            .put("rootfsUpstreamSha256", upstream)
             .toString()
 
         val identity = DeployedIdentity.parse(json)
@@ -199,6 +198,9 @@ class RuntimeDistributionManagerTest {
                 rootfsSha256 = "0".repeat(64),
                 minisdSha256 = minisdSha,
                 provisionRevision = 1,
+                rootfsRelease = "24.04.2",
+                rootfsProfile = "base",
+                rootfsUpstreamSha256 = upstream,
             ),
         )
 
@@ -269,16 +271,6 @@ class RuntimeDistributionManagerTest {
             RootfsHealth(RootfsHealthCode.CORRUPT, "corrupt"),
             manifest,
         ))
-    }
-
-    @Test
-    fun rootfsProbeCarriesOptionalSizeFromBroker() = runBlocking {
-        val health = RuntimeDistributionManager.inspectRootfs(
-            FakeMaintainer(canonicalSizeBytes = 123_456L),
-        )
-
-        assertEquals(RootfsHealthCode.HEALTHY, health.code)
-        assertEquals(123_456L, health.sizeBytes)
     }
 
     @Test
@@ -433,6 +425,9 @@ class RuntimeDistributionManagerTest {
                     rootfsSha256 = previous.rootfsSha256,
                     minisdSha256 = previous.minisdSha256,
                     provisionRevision = previous.provisionRevision,
+                    rootfsRelease = "24.04.3",
+                    rootfsProfile = "base",
+                    rootfsUpstreamSha256 = upstream,
                 ),
                 phase = RuntimeDistributionManager.PendingPhase.SWITCHING,
             ).toJson(),
@@ -469,6 +464,9 @@ class RuntimeDistributionManagerTest {
                     rootfsSha256 = old.rootfsSha256,
                     minisdSha256 = old.minisdSha256,
                     provisionRevision = old.provisionRevision,
+                    rootfsRelease = "24.04.3",
+                    rootfsProfile = "base",
+                    rootfsUpstreamSha256 = upstream,
                 ),
             ).toJson(),
         )
@@ -542,6 +540,9 @@ class RuntimeDistributionManagerTest {
                 .put("rootfsSha256", previous.rootfsSha256)
                 .put("minisdSha256", previous.minisdSha256)
                 .put("provisionRevision", previous.provisionRevision)
+                .put("rootfsRelease", "24.04.3")
+                .put("rootfsProfile", "base")
+                .put("rootfsUpstreamSha256", upstream)
                 .toString(),
             canonicalBecomesHealthyAfterDeploy = true,
         )
@@ -557,6 +558,48 @@ class RuntimeDistributionManagerTest {
         assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
         assertFalse(maintainer.operations.any {
             it.first == MinisdProtocol.RUNTIME_OP_WRITE_STATE && it.second.optString("name") == "deployed"
+        })
+    }
+
+    @Test
+    fun provisionFailureRollsBackPreviousIdentityUsingSavedRootfsMetadata() = runBlocking {
+        val previous = manifest(
+            rootfsSha256 = "0".repeat(64),
+            rootfsRelease = "24.04.2",
+        )
+        val maintainer = FakeMaintainer(
+            canonicalMetadata = null,
+            previousMetadata = healthyMetadataJson(
+                release = "24.04.2",
+                archiveSha256 = previous.rootfsSha256,
+            ),
+            deployedContent = JSONObject()
+                .put("schemaVersion", 2)
+                .put("rootfsVersion", previous.rootfsVersion)
+                .put("rootfsSha256", previous.rootfsSha256)
+                .put("minisdSha256", previous.minisdSha256)
+                .put("provisionRevision", previous.provisionRevision)
+                .put("rootfsRelease", previous.rootfsRelease)
+                .put("rootfsProfile", previous.rootfsProfile)
+                .put("rootfsUpstreamSha256", previous.rootfsUpstreamSha256)
+                .toString(),
+            canonicalBecomesHealthyAfterDeploy = true,
+        )
+
+        val result = RuntimeDistributionManager.ensureDeployedCore(
+            manifest(),
+            "dev.openminispet.android",
+            maintainer,
+            stopKeeper = { true },
+            startKeeper = { true },
+            provision = { false },
+        )
+
+        assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
+        assertTrue(result.detail.contains("rolled back"))
+        assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_ROLLBACK })
+        assertTrue(maintainer.operations.any {
+            it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE && it.second.optString("name") == "pending"
         })
     }
 
@@ -594,6 +637,9 @@ class RuntimeDistributionManagerTest {
                 .put("rootfsSha256", previous.rootfsSha256)
                 .put("minisdSha256", previous.minisdSha256)
                 .put("provisionRevision", previous.provisionRevision)
+                .put("rootfsRelease", "24.04.3")
+                .put("rootfsProfile", "base")
+                .put("rootfsUpstreamSha256", upstream)
                 .toString(),
             canonicalBecomesHealthyAfterDeploy = true,
             rollbackSucceeds = false,

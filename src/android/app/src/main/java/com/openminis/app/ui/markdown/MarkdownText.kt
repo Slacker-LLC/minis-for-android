@@ -51,8 +51,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
-import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -689,7 +689,7 @@ private suspend fun resolveMediaFile(context: Context, url: String): File? {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
             val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-                stageGuestMedia(context, linuxPath)
+                RuntimePathRegistry.resolveHostPath(linuxPath)
             } else {
                 stageGuestMedia(context, linuxPath)
             }
@@ -705,17 +705,23 @@ private suspend fun resolveMediaFile(context: Context, url: String): File? {
 }
 
 private suspend fun stageGuestMedia(context: Context, linuxPath: String): File? {
+    if (!isGlobalGuestPath(linuxPath)) return null
     val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
     val digest = java.security.MessageDigest.getInstance("SHA-256")
         .digest(linuxPath.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(java.util.Locale.US, it) }
     val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
     return runCatching {
-        val sessionId = if (ExternalMountAccess.isPath(linuxPath)) null else ""
-        WorkspaceFileClient.readToFile(sessionId, linuxPath, cacheFile)
+        WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
         cacheFile.takeIf { it.isFile }
     }.getOrNull()
 }
+
+private fun isGlobalGuestPath(linuxPath: String): Boolean =
+    linuxPath == "/var/minis/memory" || linuxPath.startsWith("/var/minis/memory/") ||
+        linuxPath == "/var/minis/skills" || linuxPath.startsWith("/var/minis/skills/") ||
+        linuxPath == "/var/minis/shared" || linuxPath.startsWith("/var/minis/shared/") ||
+        linuxPath == "/home/minis" || linuxPath.startsWith("/home/minis/")
 
 private fun filenameFromUrl(url: String): String {
     val stripped = url.substringBefore('?')

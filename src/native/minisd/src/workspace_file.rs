@@ -6,14 +6,17 @@ use serde_json::Value;
 mod unix_impl {
     use super::*;
     use crate::layout::{
-        ensure_host_layout_for, validate_persistent_backing, HOST_HOME, HOST_MEMORY, HOST_RUN,
-        HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE, PERSISTENT_DATA_MODE,
-        PERSISTENT_FILE_MODE,
+        ensure_host_layout_for, validate_persistent_backing, HOST_HOME, HOST_MEMORY, HOST_SESSIONS,
+        HOST_SHARED, HOST_SKILLS, PERSISTENT_DATA_MODE, PERSISTENT_FILE_MODE,
     };
     use std::cmp::min;
-    use std::fs::{self, File, OpenOptions};
+    use std::ffi::{CStr, CString};
+    use std::fs::{self, File};
     use std::io::{Read, Seek, SeekFrom, Write};
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
     use std::path::{Path, PathBuf};
     use std::time::UNIX_EPOCH;
 
@@ -27,6 +30,7 @@ mod unix_impl {
     struct ResolvedPath {
         path: PathBuf,
         root: PathBuf,
+        relative: PathBuf,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,9 +47,6 @@ mod unix_impl {
             .ok_or((ErrorCode::BadParams, "operation required".into()))?;
         if operation.is_empty() {
             return Err((ErrorCode::BadParams, "operation required".into()));
-        }
-        if crate::mount::request_has_external_path(params) {
-            return crate::mount::handle_file(state, params);
         }
         if state.mock {
             return Ok(serde_json::json!({
@@ -67,15 +68,6 @@ mod unix_impl {
         match operation {
             "read" => read(params, uid, gid),
             "write" | "append" => write(params, uid, gid, operation == "append"),
-            "mkdir" => mkdir(params, uid, gid),
-            "migration_status" => migration_status(),
-            "migration_info" => migration_info(params, uid, gid),
-            "migration_mkdir" => migration_mkdir(params, uid, gid),
-            "migration_write" | "migration_append" => {
-                migration_write(params, uid, gid, operation == "migration_append")
-            }
-            "migration_complete" => migration_complete(uid, gid),
-            "delete_session" => delete_session(params, uid, gid),
             "copy" => copy(params, uid, gid),
             "move" => move_path(params, uid, gid),
             "delete" => delete(params, uid, gid),
@@ -99,7 +91,8 @@ mod unix_impl {
 
     fn read(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let resolved = resolve_param_path(params, "path", uid, gid)?;
-        let metadata = fs::metadata(&resolved.path).map_err(|e| io_error("stat file", e))?;
+        let mut file = open_existing(&resolved, "open file")?;
+        let metadata = file.metadata().map_err(|e| io_error("stat file", e))?;
         if !metadata.is_file() {
             return Err((
                 ErrorCode::BadParams,
@@ -119,7 +112,6 @@ mod unix_impl {
         }
 
         let total = metadata.len();
-        let mut file = File::open(&resolved.path).map_err(|e| io_error("open file", e))?;
         file.seek(SeekFrom::Start(offset))
             .map_err(|e| io_error("seek file", e))?;
         let mut bytes = Vec::with_capacity(min(requested as usize, MAX_READ_BYTES));
@@ -155,62 +147,40 @@ mod unix_impl {
                 format!("write chunk exceeds {MAX_WRITE_BYTES} bytes"),
             ));
         }
-        if resolved.path == resolved.root {
+        if resolved.relative.as_os_str().is_empty() {
             return Err((
                 ErrorCode::PolicyDenied,
                 "cannot write a persistent directory".into(),
             ));
         }
-        let parent = resolved
-            .path
-            .parent()
-            .ok_or((ErrorCode::PolicyDenied, "file has no parent".into()))?;
-        if params
+        let create_dirs = params
             .get("create_dirs")
             .and_then(Value::as_bool)
-            .unwrap_or(false)
-        {
-            ensure_parent_dirs(parent, &resolved.root, uid, gid)?;
-        } else if !parent.is_dir() {
-            return Err((
-                ErrorCode::RuntimeUnavailable,
-                format!("parent directory is missing: {}", parent.display()),
-            ));
-        }
-        if fs::symlink_metadata(&resolved.path).is_ok_and(|meta| meta.file_type().is_symlink()) {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!("file must not be a symlink: {}", resolved.path.display()),
-            ));
-        }
-        if fs::metadata(&resolved.path)
-            .map(|meta| meta.is_dir())
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+        let (parent, name) = open_parent(&resolved, create_dirs, uid, gid)?;
+        let mut flags = libc::O_WRONLY | libc::O_CREAT | libc::O_CLOEXEC | libc::O_NOFOLLOW;
+        flags |= if append {
+            libc::O_APPEND
+        } else {
+            libc::O_TRUNC
+        };
+        let mut file = open_at_file(parent.as_raw_fd(), &name, flags, PERSISTENT_FILE_MODE)
+            .map_err(|e| io_error("open file for write", e))?;
+        let metadata = file
+            .metadata()
+            .map_err(|e| io_error("stat file for write", e))?;
+        if metadata.is_dir() {
             return Err((
                 ErrorCode::BadParams,
                 format!("path is a directory: {}", resolved.path.display()),
             ));
         }
-
-        let mut options = OpenOptions::new();
-        options
-            .write(true)
-            .create(true)
-            .custom_flags(libc::O_NOFOLLOW);
-        if append {
-            options.append(true);
-        } else {
-            options.truncate(true);
-        }
-        let mut file = options
-            .open(&resolved.path)
-            .map_err(|e| io_error("open file for write", e))?;
         file.write_all(&bytes)
             .map_err(|e| io_error("write file", e))?;
         file.sync_data().map_err(|e| io_error("sync file", e))?;
-        set_owner_mode(&resolved.path, uid, gid, PERSISTENT_FILE_MODE)?;
-        let size = fs::metadata(&resolved.path)
+        set_owner_mode_fd(&file, uid, gid, PERSISTENT_FILE_MODE)?;
+        let size = file
+            .metadata()
             .map_err(|e| io_error("stat written file", e))?
             .len();
         Ok(serde_json::json!({
@@ -221,330 +191,11 @@ mod unix_impl {
         }))
     }
 
-    fn mkdir(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
-        let resolved = resolve_param_path(params, "path", uid, gid)?;
-        if resolved.path == resolved.root {
-            return Err((
-                ErrorCode::PolicyDenied,
-                "cannot create a persistent root".into(),
-            ));
-        }
-        match fs::symlink_metadata(&resolved.path) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!(
-                        "directory must not be a symlink: {}",
-                        resolved.path.display()
-                    ),
-                ));
-            }
-            Ok(metadata) if metadata.is_dir() => {
-                return Ok(serde_json::json!({
-                    "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
-                    "created": false,
-                }));
-            }
-            Ok(_) => {
-                return Err((
-                    ErrorCode::BadParams,
-                    format!("path is not a directory: {}", resolved.path.display()),
-                ));
-            }
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                return Err(io_error("stat directory", error));
-            }
-            Err(_) => {}
-        }
-        let parent = resolved
-            .path
-            .parent()
-            .ok_or((ErrorCode::PolicyDenied, "directory has no parent".into()))?;
-        if !parent.is_dir() {
-            return Err((
-                ErrorCode::RuntimeUnavailable,
-                format!("parent directory is missing: {}", parent.display()),
-            ));
-        }
-        fs::create_dir(&resolved.path).map_err(|e| io_error("create directory", e))?;
-        set_owner_mode(&resolved.path, uid, gid, PERSISTENT_DATA_MODE)?;
-        Ok(serde_json::json!({
-            "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
-            "created": true,
-        }))
-    }
-
-    fn migration_status() -> Result<Value, (ErrorCode, String)> {
-        let marker = Path::new(HOST_RUN).join("legacy-filesdir-migrated");
-        match fs::symlink_metadata(&marker) {
-            Ok(metadata) if metadata.file_type().is_symlink() => Err((
-                ErrorCode::PolicyDenied,
-                format!(
-                    "migration marker must not be a symlink: {}",
-                    marker.display()
-                ),
-            )),
-            Ok(metadata) if metadata.is_file() => Ok(serde_json::json!({
-                "complete": true,
-                "marker": marker,
-            })),
-            Ok(_) => Err((
-                ErrorCode::PolicyDenied,
-                format!(
-                    "migration marker must be a regular file: {}",
-                    marker.display()
-                ),
-            )),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({
-                "complete": false,
-                "marker": marker,
-            })),
-            Err(error) => Err(io_error("stat migration marker", error)),
-        }
-    }
-
-    fn migration_info(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
-        let (path, _) = resolve_migration_path(params, uid, gid)?;
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(serde_json::json!({
-                    "exists": false,
-                    "type": "missing",
-                    "size": 0,
-                }));
-            }
-            Err(error) => return Err(io_error("stat migration path", error)),
-        };
-        if metadata.file_type().is_symlink() {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!("migration path must not be a symlink: {}", path.display()),
-            ));
-        }
-        Ok(serde_json::json!({
-            "exists": true,
-            "type": if metadata.is_dir() { "dir" } else if metadata.is_file() { "file" } else { "other" },
-            "size": if metadata.is_file() { metadata.len() } else { 0 },
-        }))
-    }
-
-    fn migration_mkdir(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
-        let (path, root) = resolve_migration_path(params, uid, gid)?;
-        if path == root {
-            return Err((
-                ErrorCode::PolicyDenied,
-                "cannot create a migration root".into(),
-            ));
-        }
-        match fs::symlink_metadata(&path) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!(
-                        "migration directory must not be a symlink: {}",
-                        path.display()
-                    ),
-                ));
-            }
-            Ok(metadata) if metadata.is_dir() => {
-                return Ok(serde_json::json!({"created": false}));
-            }
-            Ok(_) => {
-                return Err((
-                    ErrorCode::BadParams,
-                    format!("migration path is not a directory: {}", path.display()),
-                ));
-            }
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                return Err(io_error("stat migration directory", error));
-            }
-            Err(_) => {}
-        }
-        let parent = path.parent().ok_or((
-            ErrorCode::PolicyDenied,
-            "migration directory has no parent".into(),
-        ))?;
-        ensure_parent_dirs(parent, &root, uid, gid)?;
-        fs::create_dir(&path).map_err(|e| io_error("create migration directory", e))?;
-        set_owner_mode(&path, uid, gid, PERSISTENT_DATA_MODE)?;
-        Ok(serde_json::json!({"created": true}))
-    }
-
-    fn migration_write(
-        params: &Value,
-        uid: u32,
-        gid: u32,
-        append: bool,
-    ) -> Result<Value, (ErrorCode, String)> {
-        let (path, root) = resolve_migration_path(params, uid, gid)?;
-        if path == root {
-            return Err((
-                ErrorCode::PolicyDenied,
-                "cannot write a migration root".into(),
-            ));
-        }
-        let encoded = params
-            .get("data_base64")
-            .and_then(Value::as_str)
-            .ok_or((ErrorCode::BadParams, "data_base64 required".into()))?;
-        let bytes = decode_base64(encoded)?;
-        if bytes.len() > MAX_WRITE_BYTES {
-            return Err((
-                ErrorCode::BadParams,
-                format!("migration write chunk exceeds {MAX_WRITE_BYTES} bytes"),
-            ));
-        }
-        let parent = path.parent().ok_or((
-            ErrorCode::PolicyDenied,
-            "migration file has no parent".into(),
-        ))?;
-        ensure_parent_dirs(parent, &root, uid, gid)?;
-        if fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_symlink()) {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!("migration file must not be a symlink: {}", path.display()),
-            ));
-        }
-        if fs::metadata(&path)
-            .map(|meta| meta.is_dir())
-            .unwrap_or(false)
-        {
-            return Err((
-                ErrorCode::BadParams,
-                format!("migration path is a directory: {}", path.display()),
-            ));
-        }
-        let mut options = OpenOptions::new();
-        options
-            .write(true)
-            .create(true)
-            .custom_flags(libc::O_NOFOLLOW);
-        if append {
-            options.append(true);
-        } else {
-            options.truncate(true);
-        }
-        let mut file = options
-            .open(&path)
-            .map_err(|e| io_error("open migration file", e))?;
-        file.write_all(&bytes)
-            .map_err(|e| io_error("write migration file", e))?;
-        file.sync_data()
-            .map_err(|e| io_error("sync migration file", e))?;
-        set_owner_mode(&path, uid, gid, PERSISTENT_FILE_MODE)?;
-        let size = fs::metadata(&path)
-            .map_err(|e| io_error("stat migration file", e))?
-            .len();
-        Ok(serde_json::json!({
-            "bytes": bytes.len(),
-            "size": size,
-            "append": append,
-        }))
-    }
-
-    fn migration_complete(uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
-        let run = fixed_root(Path::new(HOST_RUN))?;
-        let marker = run.join("legacy-filesdir-migrated");
-        match fs::symlink_metadata(&marker) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!(
-                        "migration marker must not be a symlink: {}",
-                        marker.display()
-                    ),
-                ));
-            }
-            Ok(metadata) if metadata.is_file() => {
-                return Ok(serde_json::json!({"complete": true, "already": true}));
-            }
-            Ok(_) => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!(
-                        "migration marker must be a regular file: {}",
-                        marker.display()
-                    ),
-                ));
-            }
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                return Err(io_error("stat migration marker", error));
-            }
-            Err(_) => {}
-        }
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(&marker)
-            .map_err(|e| io_error("create migration marker", e))?;
-        file.write_all(b"ok\n")
-            .map_err(|e| io_error("write migration marker", e))?;
-        file.sync_all()
-            .map_err(|e| io_error("sync migration marker", e))?;
-        set_owner_mode(&marker, uid, gid, PERSISTENT_FILE_MODE)?;
-        sync_directory(&run)?;
-        Ok(serde_json::json!({"complete": true, "already": false}))
-    }
-
-    fn delete_session(params: &Value, _uid: u32, _gid: u32) -> Result<Value, (ErrorCode, String)> {
-        let session_id = params
-            .get("session_id")
-            .and_then(Value::as_str)
-            .ok_or((ErrorCode::BadParams, "session_id required".into()))?;
-        if !is_safe_session_id(session_id) {
-            return Err((ErrorCode::BadParams, "invalid session_id".into()));
-        }
-        let root = fixed_root(Path::new(HOST_SESSIONS))?;
-        delete_session_at(&root, session_id)
-    }
-
-    fn delete_session_at(root: &Path, session_id: &str) -> Result<Value, (ErrorCode, String)> {
-        let session = root.join(session_id);
-        match fs::symlink_metadata(&session) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(serde_json::json!({"deleted": true, "missing": true}));
-            }
-            Err(error) => return Err(io_error("stat session", error)),
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!("session root must not be a symlink: {}", session.display()),
-                ));
-            }
-            Ok(metadata) if !metadata.is_dir() => {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!("session root must be a directory: {}", session.display()),
-                ));
-            }
-            Ok(_) => {}
-        }
-        let canonical =
-            fs::canonicalize(&session).map_err(|e| io_error("canonicalize session", e))?;
-        if canonical == root || !canonical.starts_with(root) {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!(
-                    "session root escapes persistent sessions: {}",
-                    session.display()
-                ),
-            ));
-        }
-        fs::remove_dir_all(&canonical).map_err(|e| io_error("remove session", e))?;
-        sync_directory(root)?;
-        Ok(serde_json::json!({"deleted": true, "missing": false}))
-    }
-
     fn copy(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let source = resolve_param_path_for(params, "source", "source_session_id", uid, gid)?;
         let destination =
             resolve_param_path_for(params, "destination", "destination_session_id", uid, gid)?;
-        let source_meta =
-            fs::symlink_metadata(&source.path).map_err(|e| io_error("stat source", e))?;
-        reject_symlink(&source.path, &source_meta)?;
-        if source.path == source.root || destination.path == destination.root {
+        if source.relative.as_os_str().is_empty() || destination.relative.as_os_str().is_empty() {
             return Err((
                 ErrorCode::PolicyDenied,
                 "copying persistent roots is not allowed".into(),
@@ -553,18 +204,36 @@ mod unix_impl {
         if source.path == destination.path {
             return Err((ErrorCode::BadParams, "source == destination".into()));
         }
+        let (source_parent, source_name) = open_parent(&source, false, uid, gid)?;
+        let source_kind = entry_kind(source_parent.as_raw_fd(), &source_name)
+            .map_err(|e| io_error("stat source", e))?;
+        if source_kind == EntryKind::Symlink {
+            return Err((
+                ErrorCode::PolicyDenied,
+                format!(
+                    "persistent file must not be a symlink: {}",
+                    source.path.display()
+                ),
+            ));
+        }
+        let source_meta = open_entry(&source_parent, &source_name, source_kind, "open source")?
+            .metadata()
+            .map_err(|e| io_error("stat source", e))?;
         if source_meta.is_dir() && is_within(&source.path, &destination.path)? {
             return Err((
                 ErrorCode::PolicyDenied,
                 "destination cannot be inside source".into(),
             ));
         }
-        let parent = destination
-            .path
-            .parent()
-            .ok_or((ErrorCode::PolicyDenied, "destination has no parent".into()))?;
-        ensure_parent_dirs(parent, &destination.root, uid, gid)?;
-        copy_tree(&source.path, &destination.path, uid, gid)?;
+        let (destination_parent, destination_name) = open_parent(&destination, true, uid, gid)?;
+        copy_entry(
+            &source_parent,
+            &source_name,
+            &destination_parent,
+            &destination_name,
+            uid,
+            gid,
+        )?;
         Ok(serde_json::json!({
             "source": params.get("source").and_then(Value::as_str).unwrap_or_default(),
             "destination": params.get("destination").and_then(Value::as_str).unwrap_or_default(),
@@ -576,10 +245,7 @@ mod unix_impl {
         let source = resolve_param_path_for(params, "source", "source_session_id", uid, gid)?;
         let destination =
             resolve_param_path_for(params, "destination", "destination_session_id", uid, gid)?;
-        let source_meta =
-            fs::symlink_metadata(&source.path).map_err(|e| io_error("stat source", e))?;
-        reject_symlink(&source.path, &source_meta)?;
-        if source.path == source.root || destination.path == destination.root {
+        if source.relative.as_os_str().is_empty() || destination.relative.as_os_str().is_empty() {
             return Err((
                 ErrorCode::PolicyDenied,
                 "moving persistent roots is not allowed".into(),
@@ -588,18 +254,31 @@ mod unix_impl {
         if source.path == destination.path {
             return Err((ErrorCode::BadParams, "source == destination".into()));
         }
+        let (source_parent, source_name) = open_parent(&source, false, uid, gid)?;
+        let source_kind = entry_kind(source_parent.as_raw_fd(), &source_name)
+            .map_err(|e| io_error("stat source", e))?;
+        if source_kind == EntryKind::Symlink {
+            return Err((
+                ErrorCode::PolicyDenied,
+                format!(
+                    "persistent file must not be a symlink: {}",
+                    source.path.display()
+                ),
+            ));
+        }
+        let source_meta = open_entry(&source_parent, &source_name, source_kind, "open source")?
+            .metadata()
+            .map_err(|e| io_error("stat source", e))?;
         if source_meta.is_dir() && is_within(&source.path, &destination.path)? {
             return Err((
                 ErrorCode::PolicyDenied,
                 "destination cannot be inside source".into(),
             ));
         }
-        let parent = destination
-            .path
-            .parent()
-            .ok_or((ErrorCode::PolicyDenied, "destination has no parent".into()))?;
-        ensure_parent_dirs(parent, &destination.root, uid, gid)?;
-        if fs::symlink_metadata(&destination.path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        let (destination_parent, destination_name) = open_parent(&destination, true, uid, gid)?;
+        if entry_kind(destination_parent.as_raw_fd(), &destination_name)
+            .is_ok_and(|kind| kind == EntryKind::Symlink)
+        {
             return Err((
                 ErrorCode::PolicyDenied,
                 format!(
@@ -608,9 +287,24 @@ mod unix_impl {
                 ),
             ));
         }
-        if fs::rename(&source.path, &destination.path).is_err() {
-            copy_tree(&source.path, &destination.path, uid, gid)?;
-            remove_tree(&source.path)?;
+        if let Err(error) = rename_at(
+            source_parent.as_raw_fd(),
+            &source_name,
+            destination_parent.as_raw_fd(),
+            &destination_name,
+        ) {
+            if error.raw_os_error() != Some(libc::EXDEV) {
+                return Err(io_error("move file", error));
+            }
+            copy_entry(
+                &source_parent,
+                &source_name,
+                &destination_parent,
+                &destination_name,
+                uid,
+                gid,
+            )?;
+            remove_entry(&source_parent, &source_name)?;
         }
         Ok(serde_json::json!({
             "source": params.get("source").and_then(Value::as_str).unwrap_or_default(),
@@ -621,16 +315,14 @@ mod unix_impl {
 
     fn delete(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let resolved = resolve_param_path(params, "path", uid, gid)?;
-        if resolved.path == resolved.root {
+        if resolved.relative.as_os_str().is_empty() {
             return Err((
                 ErrorCode::PolicyDenied,
                 "cannot delete a persistent root".into(),
             ));
         }
-        let metadata =
-            fs::symlink_metadata(&resolved.path).map_err(|e| io_error("stat delete target", e))?;
-        reject_symlink(&resolved.path, &metadata)?;
-        remove_tree(&resolved.path)?;
+        let (parent, name) = open_parent(&resolved, false, uid, gid)?;
+        remove_entry(&parent, &name)?;
         let _ = (uid, gid);
         Ok(serde_json::json!({
             "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
@@ -640,7 +332,10 @@ mod unix_impl {
 
     fn list(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let resolved = resolve_param_path(params, "path", uid, gid)?;
-        let metadata = fs::metadata(&resolved.path).map_err(|e| io_error("stat directory", e))?;
+        let directory = open_existing(&resolved, "open directory")?;
+        let metadata = directory
+            .metadata()
+            .map_err(|e| io_error("stat directory", e))?;
         if !metadata.is_dir() {
             return Err((
                 ErrorCode::BadParams,
@@ -654,23 +349,34 @@ mod unix_impl {
             .unwrap_or(100)
             .clamp(1, MAX_LIST_ENTRIES as u64) as usize;
         let mut entries = Vec::new();
-        for item in fs::read_dir(&resolved.path).map_err(|e| io_error("list directory", e))? {
-            let item = item.map_err(|e| io_error("read directory entry", e))?;
-            let path = item.path();
-            let metadata =
-                fs::symlink_metadata(&path).map_err(|e| io_error("stat directory entry", e))?;
-            let kind = if metadata.file_type().is_symlink() {
-                "link"
-            } else if metadata.is_dir() {
-                "dir"
-            } else {
-                "file"
+        for name in
+            read_dir_names(directory.as_raw_fd()).map_err(|e| io_error("list directory", e))?
+        {
+            let entry = entry_kind(directory.as_raw_fd(), &name)
+                .map_err(|e| io_error("stat directory entry", e))?;
+            let (kind, size, modified) = match entry {
+                EntryKind::Symlink => ("link", 0, 0),
+                EntryKind::Directory => {
+                    let child = open_entry(&directory, &name, entry, "open directory entry")?;
+                    let metadata = child
+                        .metadata()
+                        .map_err(|e| io_error("stat directory entry", e))?;
+                    ("dir", 0, modified_millis(&metadata))
+                }
+                EntryKind::Regular => {
+                    let child = open_entry(&directory, &name, entry, "open directory entry")?;
+                    let metadata = child
+                        .metadata()
+                        .map_err(|e| io_error("stat directory entry", e))?;
+                    ("file", metadata.len(), modified_millis(&metadata))
+                }
+                EntryKind::Other => ("other", 0, 0),
             };
             entries.push(serde_json::json!({
-                "name": item.file_name().to_string_lossy(),
+                "name": name.to_string_lossy(),
                 "type": kind,
-                "size": if metadata.is_file() { metadata.len() } else { 0 },
-                "modified": modified_millis(&metadata),
+                "size": size,
+                "modified": modified,
             }));
         }
         entries.sort_by(|a, b| {
@@ -700,7 +406,8 @@ mod unix_impl {
 
     fn info(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let resolved = resolve_param_path(params, "path", uid, gid)?;
-        let metadata = fs::metadata(&resolved.path).map_err(|e| io_error("stat path", e))?;
+        let file = open_existing(&resolved, "open path")?;
+        let metadata = file.metadata().map_err(|e| io_error("stat path", e))?;
         Ok(serde_json::json!({
             "path": params.get("path").and_then(Value::as_str).unwrap_or_default(),
             "type": if metadata.is_dir() { "dir" } else if metadata.is_file() { "file" } else { "other" },
@@ -712,68 +419,6 @@ mod unix_impl {
             "gid": metadata.gid(),
             "mode": metadata.permissions().mode() & 0o777,
         }))
-    }
-
-    fn resolve_migration_path(
-        params: &Value,
-        uid: u32,
-        gid: u32,
-    ) -> Result<(PathBuf, PathBuf), (ErrorCode, String)> {
-        let target = params
-            .get("target")
-            .and_then(Value::as_str)
-            .ok_or((ErrorCode::BadParams, "migration target required".into()))?;
-        let root = match target {
-            "workspace" => PathBuf::from(HOST_WORKSPACE),
-            "memory" => PathBuf::from(HOST_MEMORY),
-            "skills" => PathBuf::from(HOST_SKILLS),
-            "shared" => PathBuf::from(HOST_SHARED),
-            "home" => PathBuf::from(HOST_HOME),
-            "session" => {
-                let session_id = params
-                    .get("session_id")
-                    .and_then(Value::as_str)
-                    .ok_or((ErrorCode::BadParams, "session_id required".into()))?;
-                PathBuf::from(
-                    crate::ubuntu::prepare_session_root(HOST_SESSIONS, session_id, uid, gid)
-                        .map_err(|(code, detail)| {
-                            (code, format!("prepare migration session: {detail}"))
-                        })?,
-                )
-            }
-            _ => {
-                return Err((
-                    ErrorCode::BadParams,
-                    format!("unknown migration target: {target}"),
-                ));
-            }
-        };
-        let root = fixed_root(&root)?;
-        let raw = params
-            .get("path")
-            .and_then(Value::as_str)
-            .ok_or((ErrorCode::BadParams, "migration path required".into()))?;
-        if raw.is_empty()
-            || raw.starts_with('/')
-            || raw.contains('\0')
-            || raw.contains('\\')
-            || raw.contains("//")
-            || raw
-                .split('/')
-                .any(|part| part.is_empty() || part == "." || part == "..")
-        {
-            return Err((ErrorCode::BadParams, "invalid migration path".into()));
-        }
-        Ok((resolve_under(&root, raw)?, root))
-    }
-
-    fn is_safe_session_id(session_id: &str) -> bool {
-        !session_id.is_empty()
-            && session_id.len() <= 128
-            && !matches!(session_id, "." | "..")
-            && session_id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
     }
 
     fn resolve_param_path(
@@ -853,7 +498,16 @@ mod unix_impl {
         };
         let root = fixed_root(&root)?;
         let path = resolve_under(&root, &rest)?;
-        Ok(ResolvedPath { path, root })
+        let relative = if rest.is_empty() {
+            PathBuf::new()
+        } else {
+            PathBuf::from(&rest)
+        };
+        Ok(ResolvedPath {
+            path,
+            root,
+            relative,
+        })
     }
 
     fn normalize_guest_path(raw: &str) -> Result<String, (ErrorCode, String)> {
@@ -955,202 +609,568 @@ mod unix_impl {
         }
         let components = rest.split('/').collect::<Vec<_>>();
         let mut result = root.to_path_buf();
-        let mut missing = false;
-        for (index, component) in components.iter().enumerate() {
+        for component in components {
             result.push(component);
-            if missing {
-                continue;
-            }
-            match fs::symlink_metadata(&result) {
-                Ok(metadata) => {
-                    if metadata.file_type().is_symlink() {
-                        return Err((
-                            ErrorCode::PolicyDenied,
-                            format!("path component must not be a symlink: {}", result.display()),
-                        ));
-                    }
-                    if index + 1 < components.len() && !metadata.is_dir() {
-                        return Err((
-                            ErrorCode::BadParams,
-                            format!("path component is not a directory: {}", result.display()),
-                        ));
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    missing = true;
-                }
-                Err(error) => return Err(io_error("stat path component", error)),
-            }
         }
         Ok(result)
-    }
-
-    fn ensure_parent_dirs(
-        parent: &Path,
-        root: &Path,
-        uid: u32,
-        gid: u32,
-    ) -> Result<(), (ErrorCode, String)> {
-        let relative = parent.strip_prefix(root).map_err(|_| {
-            (
-                ErrorCode::PolicyDenied,
-                "parent escapes persistent root".into(),
-            )
-        })?;
-        let mut current = root.to_path_buf();
-        for component in relative.components() {
-            let name = match component {
-                std::path::Component::Normal(name) => name,
-                _ => {
-                    return Err((
-                        ErrorCode::PolicyDenied,
-                        "parent contains a non-normal component".into(),
-                    ));
-                }
-            };
-            current.push(name);
-            match fs::symlink_metadata(&current) {
-                Ok(metadata) if metadata.file_type().is_symlink() => {
-                    return Err((
-                        ErrorCode::PolicyDenied,
-                        format!("parent must not be a symlink: {}", current.display()),
-                    ));
-                }
-                Ok(metadata) if !metadata.is_dir() => {
-                    return Err((
-                        ErrorCode::BadParams,
-                        format!("parent is not a directory: {}", current.display()),
-                    ));
-                }
-                Ok(_) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    fs::create_dir(&current).map_err(|e| io_error("create parent directory", e))?;
-                }
-                Err(error) => return Err(io_error("stat parent directory", error)),
-            }
-            set_owner_mode(&current, uid, gid, PERSISTENT_DATA_MODE)?;
-        }
-        if !is_within(root, parent)? {
-            return Err((
-                ErrorCode::PolicyDenied,
-                "parent escapes persistent root".into(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn copy_tree(
-        source: &Path,
-        destination: &Path,
-        uid: u32,
-        gid: u32,
-    ) -> Result<(), (ErrorCode, String)> {
-        let metadata = fs::symlink_metadata(source).map_err(|e| io_error("stat copy source", e))?;
-        reject_symlink(source, &metadata)?;
-        if metadata.is_dir() {
-            if let Ok(existing) = fs::symlink_metadata(destination) {
-                if existing.file_type().is_symlink() || !existing.is_dir() {
-                    return Err((
-                        ErrorCode::BadParams,
-                        format!("destination type conflicts: {}", destination.display()),
-                    ));
-                }
-            } else {
-                fs::create_dir(destination).map_err(|e| io_error("create copied directory", e))?;
-            }
-            set_owner_mode(destination, uid, gid, PERSISTENT_DATA_MODE)?;
-            for entry in fs::read_dir(source).map_err(|e| io_error("read copy source", e))? {
-                let entry = entry.map_err(|e| io_error("read copy entry", e))?;
-                copy_tree(
-                    &entry.path(),
-                    &destination.join(entry.file_name()),
-                    uid,
-                    gid,
-                )?;
-            }
-        } else if metadata.is_file() {
-            if fs::symlink_metadata(destination).is_ok_and(|meta| meta.file_type().is_symlink()) {
-                return Err((
-                    ErrorCode::PolicyDenied,
-                    format!(
-                        "copy destination must not be a symlink: {}",
-                        destination.display()
-                    ),
-                ));
-            }
-            if let Some(parent) = destination.parent() {
-                fs::create_dir_all(parent).map_err(|e| io_error("create copy parent", e))?;
-            }
-            fs::copy(source, destination).map_err(|e| io_error("copy file", e))?;
-            set_owner_mode(destination, uid, gid, PERSISTENT_FILE_MODE)?;
-        } else {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!("unsupported source type: {}", source.display()),
-            ));
-        }
-        Ok(())
-    }
-
-    fn remove_tree(path: &Path) -> Result<(), (ErrorCode, String)> {
-        let metadata = fs::symlink_metadata(path).map_err(|e| io_error("stat delete target", e))?;
-        if metadata.is_dir() {
-            fs::remove_dir_all(path).map_err(|e| io_error("remove directory", e))?;
-        } else {
-            fs::remove_file(path).map_err(|e| io_error("remove file", e))?;
-        }
-        Ok(())
-    }
-
-    fn sync_directory(path: &Path) -> Result<(), (ErrorCode, String)> {
-        File::open(path)
-            .and_then(|directory| directory.sync_all())
-            .map_err(|e| io_error("sync directory", e))
-    }
-
-    fn reject_symlink(path: &Path, metadata: &fs::Metadata) -> Result<(), (ErrorCode, String)> {
-        if metadata.file_type().is_symlink() {
-            return Err((
-                ErrorCode::PolicyDenied,
-                format!("persistent file must not be a symlink: {}", path.display()),
-            ));
-        }
-        Ok(())
     }
 
     fn is_within(root: &Path, candidate: &Path) -> Result<bool, (ErrorCode, String)> {
         Ok(candidate == root || candidate.starts_with(root))
     }
 
-    fn set_owner_mode(
-        path: &Path,
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum EntryKind {
+        Directory,
+        Regular,
+        Symlink,
+        Other,
+    }
+
+    const SYS_OPENAT2: libc::c_long = 437;
+    const RESOLVE_NO_MAGICLINKS: u64 = 0x02;
+    const RESOLVE_NO_SYMLINKS: u64 = 0x04;
+    const RESOLVE_BENEATH: u64 = 0x08;
+
+    #[repr(C)]
+    struct OpenHow {
+        flags: u64,
+        mode: u64,
+        resolve: u64,
+    }
+
+    fn open_existing(resolved: &ResolvedPath, action: &str) -> Result<File, (ErrorCode, String)> {
+        let root = open_root_fd(&resolved.root).map_err(|e| io_error(action, e))?;
+        open_relative(
+            root.as_raw_fd(),
+            &resolved.relative,
+            libc::O_RDONLY | libc::O_CLOEXEC,
+            0,
+        )
+        .map_err(|e| io_error(action, e))
+    }
+
+    fn open_parent(
+        resolved: &ResolvedPath,
+        create_dirs: bool,
+        uid: u32,
+        gid: u32,
+    ) -> Result<(File, CString), (ErrorCode, String)> {
+        let name = resolved
+            .relative
+            .file_name()
+            .ok_or((ErrorCode::PolicyDenied, "file has no parent".into()))?;
+        let name = CString::new(name.as_bytes())
+            .map_err(|_| (ErrorCode::BadParams, "path component contains NUL".into()))?;
+        let parent_relative = resolved.relative.parent().unwrap_or_else(|| Path::new(""));
+        let root = open_root_fd(&resolved.root).map_err(|e| io_error("open persistent root", e))?;
+        let parent = open_directory_chain(root.as_raw_fd(), parent_relative, create_dirs, uid, gid)
+            .map_err(|e| io_error("open parent directory", e))?;
+        Ok((parent, name))
+    }
+
+    fn open_root_fd(root: &Path) -> std::io::Result<File> {
+        let path = CString::new(root.as_os_str().as_bytes())
+            .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?;
+        match try_openat2(
+            libc::AT_FDCWD,
+            &path,
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
+            0,
+            RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+        ) {
+            Ok(fd) => unsafe { Ok(File::from_raw_fd(fd)) },
+            Err(error)
+                if error.raw_os_error() == Some(libc::ENOSYS)
+                    || error.raw_os_error() == Some(libc::EINVAL) =>
+            {
+                open_absolute_without_symlinks(root)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn open_absolute_without_symlinks(path: &Path) -> std::io::Result<File> {
+        let root_name = CString::new("/").expect("literal has no NUL");
+        let mut current = open_at_file(
+            libc::AT_FDCWD,
+            &root_name,
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
+            0,
+        )?;
+        for component in path.components() {
+            let std::path::Component::Normal(component) = component else {
+                continue;
+            };
+            let name = CString::new(component.as_bytes())
+                .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?;
+            let next = open_at_file(
+                current.as_raw_fd(),
+                &name,
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+                0,
+            )?;
+            current = next;
+        }
+        Ok(current)
+    }
+
+    fn open_relative(
+        root_fd: RawFd,
+        relative: &Path,
+        flags: i32,
+        mode: u32,
+    ) -> std::io::Result<File> {
+        if relative.as_os_str().is_empty() {
+            return dup_fd(root_fd).map(|fd| unsafe { File::from_raw_fd(fd) });
+        }
+        let path = CString::new(relative.as_os_str().as_bytes())
+            .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?;
+        match try_openat2(
+            root_fd,
+            &path,
+            flags | libc::O_CLOEXEC,
+            mode,
+            RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS,
+        ) {
+            Ok(fd) => unsafe { Ok(File::from_raw_fd(fd)) },
+            Err(error)
+                if error.raw_os_error() == Some(libc::ENOSYS)
+                    || error.raw_os_error() == Some(libc::EINVAL) =>
+            {
+                open_relative_without_symlinks(root_fd, relative, flags, mode)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn open_relative_without_symlinks(
+        root_fd: RawFd,
+        relative: &Path,
+        flags: i32,
+        mode: u32,
+    ) -> std::io::Result<File> {
+        let mut current = dup_fd(root_fd).map(|fd| unsafe { File::from_raw_fd(fd) })?;
+        let components = relative.components().collect::<Vec<_>>();
+        for (index, component) in components.iter().enumerate() {
+            let std::path::Component::Normal(component) = component else {
+                return Err(std::io::Error::from_raw_os_error(libc::EINVAL));
+            };
+            let name = CString::new(component.as_bytes())
+                .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?;
+            let component_flags = if index + 1 == components.len() {
+                flags
+            } else {
+                libc::O_RDONLY | libc::O_DIRECTORY
+            };
+            let next = open_at_file(
+                current.as_raw_fd(),
+                &name,
+                component_flags | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+                if index + 1 == components.len() {
+                    mode
+                } else {
+                    0
+                },
+            )?;
+            current = next;
+        }
+        Ok(current)
+    }
+
+    fn open_directory_chain(
+        root_fd: RawFd,
+        relative: &Path,
+        create: bool,
+        uid: u32,
+        gid: u32,
+    ) -> std::io::Result<File> {
+        let mut current = dup_fd(root_fd).map(|fd| unsafe { File::from_raw_fd(fd) })?;
+        for component in relative.components() {
+            let std::path::Component::Normal(component) = component else {
+                return Err(std::io::Error::from_raw_os_error(libc::EINVAL));
+            };
+            let name = CString::new(component.as_bytes())
+                .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?;
+            let next = match open_at_file(
+                current.as_raw_fd(),
+                &name,
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+                0,
+            ) {
+                Ok(file) => file,
+                Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
+                    if unsafe {
+                        libc::mkdirat(current.as_raw_fd(), name.as_ptr(), PERSISTENT_DATA_MODE)
+                    } != 0
+                    {
+                        let mkdir_error = std::io::Error::last_os_error();
+                        if mkdir_error.raw_os_error() != Some(libc::EEXIST) {
+                            return Err(mkdir_error);
+                        }
+                    }
+                    open_at_file(
+                        current.as_raw_fd(),
+                        &name,
+                        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+                        0,
+                    )?
+                }
+                Err(error) => return Err(error),
+            };
+            set_owner_mode_fd(&next, uid, gid, PERSISTENT_DATA_MODE)
+                .map_err(|(_, detail)| std::io::Error::other(detail))?;
+            current = next;
+        }
+        Ok(current)
+    }
+
+    fn open_entry(
+        parent: &File,
+        name: &CStr,
+        kind: EntryKind,
+        action: &str,
+    ) -> Result<File, (ErrorCode, String)> {
+        let flags = match kind {
+            EntryKind::Directory => libc::O_RDONLY | libc::O_DIRECTORY,
+            EntryKind::Regular => libc::O_RDONLY,
+            EntryKind::Other => libc::O_RDONLY,
+            EntryKind::Symlink => {
+                return Err((ErrorCode::PolicyDenied, "symlink is not allowed".into()))
+            }
+        };
+        open_at_file(
+            parent.as_raw_fd(),
+            name,
+            flags | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            0,
+        )
+        .map_err(|e| io_error(action, e))
+    }
+
+    fn open_at_file(dirfd: RawFd, name: &CStr, flags: i32, mode: u32) -> std::io::Result<File> {
+        open_at(dirfd, name, flags, mode).map(|fd| unsafe { File::from_raw_fd(fd) })
+    }
+
+    fn open_at(dirfd: RawFd, name: &CStr, flags: i32, mode: u32) -> std::io::Result<RawFd> {
+        let fd = unsafe { libc::openat(dirfd, name.as_ptr(), flags, mode) };
+        if fd < 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(fd)
+        }
+    }
+
+    fn try_openat2(
+        dirfd: RawFd,
+        path: &CStr,
+        flags: i32,
+        mode: u32,
+        resolve: u64,
+    ) -> std::io::Result<RawFd> {
+        #[cfg(any(target_os = "android", target_os = "linux"))]
+        {
+            let how = OpenHow {
+                flags: flags as u64,
+                mode: mode as u64,
+                resolve,
+            };
+            let fd = unsafe {
+                libc::syscall(
+                    SYS_OPENAT2,
+                    dirfd,
+                    path.as_ptr(),
+                    &how as *const OpenHow,
+                    std::mem::size_of::<OpenHow>(),
+                )
+            };
+            if fd < 0 {
+                Err(std::io::Error::last_os_error())
+            } else {
+                Ok(fd as RawFd)
+            }
+        }
+        #[cfg(not(any(target_os = "android", target_os = "linux")))]
+        {
+            let _ = (dirfd, path, flags, mode, resolve);
+            Err(std::io::Error::from_raw_os_error(libc::ENOSYS))
+        }
+    }
+
+    fn dup_fd(fd: RawFd) -> std::io::Result<RawFd> {
+        let duplicate = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0) };
+        if duplicate < 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(duplicate)
+        }
+    }
+
+    fn entry_kind(parent_fd: RawFd, name: &CStr) -> std::io::Result<EntryKind> {
+        let mut stat = unsafe { std::mem::zeroed::<libc::stat>() };
+        if unsafe {
+            libc::fstatat(
+                parent_fd,
+                name.as_ptr(),
+                &mut stat,
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        } != 0
+        {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mode = stat.st_mode as libc::mode_t;
+        Ok(if mode & libc::S_IFMT == libc::S_IFLNK {
+            EntryKind::Symlink
+        } else if mode & libc::S_IFMT == libc::S_IFDIR {
+            EntryKind::Directory
+        } else if mode & libc::S_IFMT == libc::S_IFREG {
+            EntryKind::Regular
+        } else {
+            EntryKind::Other
+        })
+    }
+
+    fn optional_entry_kind(parent_fd: RawFd, name: &CStr) -> std::io::Result<Option<EntryKind>> {
+        match entry_kind(parent_fd, name) {
+            Ok(kind) => Ok(Some(kind)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn read_dir_names(dir_fd: RawFd) -> std::io::Result<Vec<CString>> {
+        let duplicate = dup_fd(dir_fd)?;
+        let directory = unsafe { libc::fdopendir(duplicate) };
+        if directory.is_null() {
+            unsafe { libc::close(duplicate) };
+            return Err(std::io::Error::last_os_error());
+        }
+        let directory = OwnedDir(directory);
+        let mut names = Vec::new();
+        loop {
+            let entry = unsafe { libc::readdir(directory.0) };
+            if entry.is_null() {
+                let error = std::io::Error::last_os_error();
+                if error.raw_os_error().unwrap_or(0) != 0 {
+                    return Err(error);
+                }
+                break;
+            }
+            let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) };
+            if name.to_bytes() == b"." || name.to_bytes() == b".." {
+                continue;
+            }
+            names.push(
+                CString::new(name.to_bytes())
+                    .map_err(|_| std::io::Error::from_raw_os_error(libc::EINVAL))?,
+            );
+        }
+        Ok(names)
+    }
+
+    struct OwnedDir(*mut libc::DIR);
+
+    impl Drop for OwnedDir {
+        fn drop(&mut self) {
+            unsafe { libc::closedir(self.0) };
+        }
+    }
+
+    fn copy_entry(
+        source_parent: &File,
+        source_name: &CStr,
+        destination_parent: &File,
+        destination_name: &CStr,
+        uid: u32,
+        gid: u32,
+    ) -> Result<(), (ErrorCode, String)> {
+        let source_kind = entry_kind(source_parent.as_raw_fd(), source_name)
+            .map_err(|e| io_error("stat copy source", e))?;
+        if source_kind == EntryKind::Symlink {
+            return Err((
+                ErrorCode::PolicyDenied,
+                "copy source must not be a symlink".into(),
+            ));
+        }
+        match source_kind {
+            EntryKind::Directory => {
+                let source_dir = open_entry(
+                    source_parent,
+                    source_name,
+                    EntryKind::Directory,
+                    "open copy source directory",
+                )?;
+                let destination_dir =
+                    match optional_entry_kind(destination_parent.as_raw_fd(), destination_name)
+                        .map_err(|e| io_error("stat copy destination", e))?
+                    {
+                        Some(EntryKind::Symlink) => {
+                            return Err((
+                                ErrorCode::PolicyDenied,
+                                "copy destination must not be a symlink".into(),
+                            ))
+                        }
+                        Some(EntryKind::Directory) => open_entry(
+                            destination_parent,
+                            destination_name,
+                            EntryKind::Directory,
+                            "open copy destination directory",
+                        )?,
+                        Some(_) => {
+                            return Err((ErrorCode::BadParams, "destination type conflicts".into()))
+                        }
+                        None => {
+                            if unsafe {
+                                libc::mkdirat(
+                                    destination_parent.as_raw_fd(),
+                                    destination_name.as_ptr(),
+                                    PERSISTENT_DATA_MODE,
+                                )
+                            } != 0
+                            {
+                                let error = std::io::Error::last_os_error();
+                                if error.raw_os_error() != Some(libc::EEXIST) {
+                                    return Err(io_error("create copied directory", error));
+                                }
+                            }
+                            open_entry(
+                                destination_parent,
+                                destination_name,
+                                EntryKind::Directory,
+                                "open copied directory",
+                            )?
+                        }
+                    };
+                set_owner_mode_fd(&destination_dir, uid, gid, PERSISTENT_DATA_MODE)?;
+                for child in read_dir_names(source_dir.as_raw_fd())
+                    .map_err(|e| io_error("read copy source", e))?
+                {
+                    copy_entry(&source_dir, &child, &destination_dir, &child, uid, gid)?;
+                }
+            }
+            EntryKind::Regular => {
+                match optional_entry_kind(destination_parent.as_raw_fd(), destination_name)
+                    .map_err(|e| io_error("stat copy destination", e))?
+                {
+                    Some(EntryKind::Symlink) => {
+                        return Err((
+                            ErrorCode::PolicyDenied,
+                            "copy destination must not be a symlink".into(),
+                        ))
+                    }
+                    Some(EntryKind::Directory) => {
+                        return Err((ErrorCode::BadParams, "destination type conflicts".into()))
+                    }
+                    _ => {}
+                }
+                let mut source_file = open_entry(
+                    source_parent,
+                    source_name,
+                    EntryKind::Regular,
+                    "open copy source",
+                )?;
+                let mut destination_file = open_at_file(
+                    destination_parent.as_raw_fd(),
+                    destination_name,
+                    libc::O_WRONLY
+                        | libc::O_CREAT
+                        | libc::O_TRUNC
+                        | libc::O_CLOEXEC
+                        | libc::O_NOFOLLOW,
+                    PERSISTENT_FILE_MODE,
+                )
+                .map_err(|e| io_error("open copy destination", e))?;
+                std::io::copy(&mut source_file, &mut destination_file)
+                    .map_err(|e| io_error("copy file", e))?;
+                destination_file
+                    .sync_data()
+                    .map_err(|e| io_error("sync copied file", e))?;
+                set_owner_mode_fd(&destination_file, uid, gid, PERSISTENT_FILE_MODE)?;
+            }
+            EntryKind::Other => {
+                return Err((ErrorCode::PolicyDenied, "unsupported source type".into()))
+            }
+            EntryKind::Symlink => unreachable!(),
+        }
+        Ok(())
+    }
+
+    fn remove_entry(parent: &File, name: &CStr) -> Result<(), (ErrorCode, String)> {
+        let kind =
+            entry_kind(parent.as_raw_fd(), name).map_err(|e| io_error("stat delete target", e))?;
+        if kind == EntryKind::Symlink {
+            return Err((
+                ErrorCode::PolicyDenied,
+                "persistent file must not be a symlink".into(),
+            ));
+        }
+        if kind == EntryKind::Directory {
+            let directory = open_entry(parent, name, kind, "open delete directory")?;
+            for child in read_dir_names(directory.as_raw_fd())
+                .map_err(|e| io_error("read delete directory", e))?
+            {
+                remove_entry(&directory, &child)?;
+            }
+            if unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) } != 0
+            {
+                return Err(io_error(
+                    "remove directory",
+                    std::io::Error::last_os_error(),
+                ));
+            }
+        } else if unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0) } != 0 {
+            return Err(io_error("remove file", std::io::Error::last_os_error()));
+        }
+        Ok(())
+    }
+
+    fn rename_at(
+        source_parent: RawFd,
+        source_name: &CStr,
+        destination_parent: RawFd,
+        destination_name: &CStr,
+    ) -> std::io::Result<()> {
+        if unsafe {
+            libc::renameat(
+                source_parent,
+                source_name.as_ptr(),
+                destination_parent,
+                destination_name.as_ptr(),
+            )
+        } != 0
+        {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn set_owner_mode_fd(
+        file: &File,
         uid: u32,
         gid: u32,
         mode: u32,
     ) -> Result<(), (ErrorCode, String)> {
-        use std::os::unix::ffi::OsStrExt;
-        let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(|_| {
-            (
-                ErrorCode::Internal,
-                format!("NUL in persistent path: {}", path.display()),
-            )
-        })?;
-        if unsafe { libc::chown(c_path.as_ptr(), uid, gid) } != 0 {
+        if unsafe { libc::fchown(file.as_raw_fd(), uid, gid) } != 0 {
             return Err((
                 ErrorCode::Internal,
                 format!(
-                    "chown persistent path {} to {uid}:{gid}: {}",
-                    path.display(),
+                    "chown persistent fd to {uid}:{gid}: {}",
                     std::io::Error::last_os_error()
                 ),
             ));
         }
-        fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|e| {
-            (
+        if unsafe { libc::fchmod(file.as_raw_fd(), mode) } != 0 {
+            return Err((
                 ErrorCode::Internal,
-                format!("chmod {mode:o} persistent path {}: {e}", path.display()),
-            )
-        })
+                format!(
+                    "chmod {mode:o} persistent fd: {}",
+                    std::io::Error::last_os_error()
+                ),
+            ));
+        }
+        Ok(())
     }
 
     fn modified_millis(metadata: &fs::Metadata) -> u128 {
@@ -1165,6 +1185,8 @@ mod unix_impl {
     fn io_error(action: &str, error: std::io::Error) -> (ErrorCode, String) {
         let code = if error.kind() == std::io::ErrorKind::NotFound {
             ErrorCode::RuntimeUnavailable
+        } else if error.raw_os_error() == Some(libc::ELOOP) {
+            ErrorCode::PolicyDenied
         } else {
             ErrorCode::Internal
         };
@@ -1292,42 +1314,6 @@ mod unix_impl {
         }
 
         #[test]
-        fn session_ids_reject_traversal_and_control_characters() {
-            for session_id in ["", ".", "..", "../escape", "a/b", "a\\b", "a\0b"] {
-                assert!(!is_safe_session_id(session_id), "accepted {session_id:?}");
-            }
-            for session_id in ["session-1", "abc_123", "a.b"] {
-                assert!(is_safe_session_id(session_id), "rejected {session_id:?}");
-            }
-        }
-
-        #[test]
-        fn delete_session_at_removes_only_requested_session() {
-            let stamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos();
-            let root = std::env::temp_dir().join(format!(
-                "minisd-workspace-delete-{}-{stamp}",
-                std::process::id(),
-            ));
-            let _ = fs::remove_dir_all(&root);
-            fs::create_dir_all(root.join("remove-me/workspace")).unwrap();
-            fs::create_dir_all(root.join("keep-me")).unwrap();
-            fs::write(root.join("remove-me/workspace/file.txt"), b"remove").unwrap();
-            fs::write(root.join("keep-me/file.txt"), b"keep").unwrap();
-
-            let result = delete_session_at(&root, "remove-me").unwrap();
-
-            assert_eq!(result["deleted"], true);
-            assert_eq!(result["missing"], false);
-            assert!(!root.join("remove-me").exists());
-            assert_eq!(fs::read(root.join("keep-me/file.txt")).unwrap(), b"keep");
-
-            fs::remove_dir_all(&root).unwrap();
-        }
-
-        #[test]
         fn path_resolution_rejects_symlink_components() {
             let stamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1344,7 +1330,15 @@ mod unix_impl {
             fs::create_dir_all(&outside).unwrap();
             std::os::unix::fs::symlink(&outside, root.join("link")).unwrap();
 
-            assert!(resolve_under(&root, "link/file.txt").is_err());
+            let root_fd = open_root_fd(&root).unwrap();
+            let error = open_relative(
+                root_fd.as_raw_fd(),
+                Path::new("link/file.txt"),
+                libc::O_RDONLY,
+                0,
+            )
+            .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(libc::ELOOP));
 
             fs::remove_dir_all(&root).unwrap();
             fs::remove_dir_all(&outside).unwrap();
@@ -1369,8 +1363,10 @@ mod unix_impl {
             fs::write(outside.join("target.txt"), b"outside").unwrap();
             std::os::unix::fs::symlink(outside.join("target.txt"), root.join("link.txt")).unwrap();
 
-            let error =
-                copy_tree(&root.join("source.txt"), &root.join("link.txt"), 1, 1).unwrap_err();
+            let root_fd = open_root_fd(&root).unwrap();
+            let source = CString::new("source.txt").unwrap();
+            let destination = CString::new("link.txt").unwrap();
+            let error = copy_entry(&root_fd, &source, &root_fd, &destination, 1, 1).unwrap_err();
             assert_eq!(error.0, ErrorCode::PolicyDenied);
             assert_eq!(fs::read(outside.join("target.txt")).unwrap(), b"outside");
 
