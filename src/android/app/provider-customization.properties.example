@@ -3,13 +3,14 @@
 # Template for build-time customization values. Copy this file to
 # provider-customization.properties (same directory) and fill in the values.
 #
-# Leaving a value empty is allowed for building; the app fails at runtime the
-# first time that value is actually needed.
+# Public/default builds may leave a value empty or omit this file entirely; the
+# affected integration is then compiled with an explicit disabled capability
+# and the BuildConfig value NOT_AVAILABLE_IN_THIS_BUILD. Private/production
+# builds should pass -PproviderCustomizationRequired=true, which fails Gradle
+# configuration when the file, key, or non-blank value is missing.
 
 # Only needed to sign in with Claude OAuth credentials (API keys do not need
 # it). Requests authenticated with OAuth must open their system prompt with
 # the identifying line Claude Code itself sends, or the endpoint rejects them.
-# We ship no value — supply your own. Other open-source projects talking to
-# the same endpoint declare the same identifier, e.g.
-# https://github.com/Wei-Shaw/claude-relay-service
+# We ship no private value — supply your own in provider-customization.properties.
 ANTHROPIC_OAUTH_IDENTIFIER_PROMPT=

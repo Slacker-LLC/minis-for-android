@@ -529,6 +529,7 @@
     <string name="provider_detail_delete_model">Delete Model</string>
     <string name="provider_detail_sign_out">Se déconnecter</string>
     <string name="provider_detail_sign_in">Se connecter</string>
+    <string name="provider_oauth_not_available_in_this_build">Cette connexion OAuth n’est pas disponible dans cette version. Utilisez une clé API ou installez une version avec la personnalisation du fournisseur activée.</string>
     <string name="provider_detail_save_key">Enregistrer la clé</string>
     <string name="provider_detail_paste_bearer_token">Coller le jeton bearer</string>
     <string name="provider_detail_save_token">Enregistrer le jeton</string>

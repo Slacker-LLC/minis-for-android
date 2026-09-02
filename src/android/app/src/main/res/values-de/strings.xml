@@ -648,6 +648,7 @@
     <string name="provider_detail_delete_model">Delete Model</string>
     <string name="provider_detail_sign_out">Abmelden</string>
     <string name="provider_detail_sign_in">Anmelden</string>
+    <string name="provider_oauth_not_available_in_this_build">Diese OAuth-Anmeldung ist in diesem Build nicht verfügbar. Verwende einen API-Schlüssel oder installiere einen Build mit aktivierter Anbieteranpassung.</string>
     <string name="provider_detail_save_key">Schlüssel speichern</string>
     <string name="provider_detail_paste_bearer_token">Bearer-Token einfügen</string>
     <string name="provider_detail_save_token">Token speichern</string>
