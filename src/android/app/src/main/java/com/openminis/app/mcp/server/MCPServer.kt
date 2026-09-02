@@ -42,6 +42,10 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
 
         /** A4: connection cap — local slowloris must not exhaust the accept loop. */
         const val MAX_CONNECTIONS = 16
+
+        /** Empty scope is retained as the legacy "all MCP-visible tools" form. */
+        internal fun scopeAllows(scope: Set<String>, toolName: String): Boolean =
+            scope.isEmpty() || toolName in scope
     }
 
     @Volatile
@@ -191,7 +195,9 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                 MCPCodec.METHOD_INITIALIZE -> MCPCodec.response(req.id, MCPCodec.initializeResult())
                 MCPCodec.METHOD_PING -> MCPCodec.response(req.id, MCPCodec.pingResult())
                 MCPCodec.METHOD_TOOLS_LIST -> {
-                    val defs = com.openminis.app.tools.runtime.ToolRegistry.definitionsForCaller(caller)
+                    val defs = com.openminis.app.tools.runtime.ToolRegistry
+                        .definitionsForCaller(caller)
+                        .filter { scopeAllows(tokenRecord.scope, it.name) }
                     val arr = JSONArray()
                     for (d in defs) {
                         arr.put(d.toAnthropicJson())
