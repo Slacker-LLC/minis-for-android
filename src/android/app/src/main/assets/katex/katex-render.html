@@ -28,6 +28,14 @@
   }
   body.dark #math { color: #fff; }
   body.light #math { color: #000; }
+
+  /* Equation-number tags are absolutely positioned by KaTeX. Give tagged
+     display rows a real width and a right-side gutter so the tag cannot be
+     painted over the final formula glyph. */
+  #math.has-tag .katex-display > .katex > .katex-html {
+    min-width: 100%;
+    padding-right: 3.5em;
+  }
 </style>
 </head>
 <body>
@@ -51,6 +59,8 @@ function renderMath(latex, displayMode, fontSize, isDark) {
       trust: true,
       output: 'html'
     });
+    // Avoid :has() so this remains compatible with older Android WebViews.
+    el.classList.toggle('has-tag', !!el.querySelector('.katex-html > .tag'));
     document.fonts.ready.then(function() {
       // T208-6: Wait for one paint cycle after the DOM update so the
       // WebView's display list reflects the new formula before Android

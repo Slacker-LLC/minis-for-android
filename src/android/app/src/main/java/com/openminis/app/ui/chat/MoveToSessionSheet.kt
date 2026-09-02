@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -119,10 +120,11 @@ fun MoveToSessionSheet(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(16.dp),
-                        ),
+                        // Clip the row indications as well as painting the
+                        // rounded container. Background(shape = ...) alone
+                        // does not constrain children at the card corners.
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(color = MaterialTheme.colorScheme.surface),
                 ) {
                     items(sessions, key = { it.id }) { session ->
                         MoveToPickerRow(
