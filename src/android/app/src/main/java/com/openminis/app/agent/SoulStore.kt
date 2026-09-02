@@ -3,8 +3,13 @@ package com.openminis.app.agent
 import android.content.Context
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -178,6 +183,8 @@ object SoulStore {
     private const val TAG = "SoulStore"
     private const val FILE_NAME = "SOUL.md"
     private const val GUEST_PATH = "/var/minis/memory/$FILE_NAME"
+    private const val SOUL_INIT_TIMEOUT_MS = 15_000L
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun fileLocation(context: Context): File =
         // Kept as a diagnostic location for legacy callers. Actual I/O must
@@ -282,6 +289,27 @@ lang: "auto"
     val cachedMetadata: StateFlow<SoulMetadata> = _cachedMetadata.asStateFlow()
 
     /**
+     * Warm the persistent identity without delaying Application.onCreate.
+     * Both existence checks and cache refresh use minisd, so the startup path
+     * must be asynchronous when root authorization or the broker is stale.
+     */
+    fun initializeAsync(context: Context) {
+        val appContext = context.applicationContext
+        backgroundScope.launch {
+            try {
+                withTimeout(SOUL_INIT_TIMEOUT_MS) {
+                    ensureExistsSuspending(appContext)
+                    _cachedMetadata.value = loadSuspending(appContext)?.metadata ?: SoulMetadata.DEFAULT
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                AppLogger.warning(TAG, "async initialization failed: ${error.message}")
+            }
+        }
+    }
+
+    /**
      * Re-read SOUL.md into [cachedMetadata]. Call once at app launch
      * (after [ensureExists]) and any time the file is rewritten outside
      * of [save].
@@ -289,6 +317,27 @@ lang: "auto"
     fun refreshCache(context: Context) {
         val parsed = load(context)
         _cachedMetadata.value = parsed?.metadata ?: SoulMetadata.DEFAULT
+    }
+
+    private suspend fun ensureExistsSuspending(context: Context) {
+        val existing = runCatching { WorkspaceFileClient.info("", GUEST_PATH) }.getOrNull()
+        if (existing?.optString("type") == "file") return
+        WorkspaceFileClient.writeBytes(
+            "",
+            GUEST_PATH,
+            DEFAULT_CONTENT.toByteArray(Charsets.UTF_8),
+        )
+        AppLogger.info(TAG, "seeded SOUL.md at $GUEST_PATH")
+    }
+
+    private suspend fun loadSuspending(context: Context): SoulFile? = try {
+        val bytes = WorkspaceFileClient.readAll("", GUEST_PATH)
+        SoulMDParser.parse(bytes.toString(Charsets.UTF_8))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        AppLogger.warning(TAG, "SOUL.md async load failed: ${error.message}")
+        null
     }
 }
 
