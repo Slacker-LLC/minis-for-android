@@ -23,7 +23,6 @@
     "exec.cancel": { "mode": "allow", "ratePerMin": 120 },
     "proc.killTree": { "mode": "allow" },
     "mount.list": { "mode": "allow" },
-    "mount.prepare": { "mode": "allow" },
     "mount.reconcile": { "mode": "allow" },
     "workspace.info": { "mode": "allow" },
     "workspace.file": { "mode": "allow" },

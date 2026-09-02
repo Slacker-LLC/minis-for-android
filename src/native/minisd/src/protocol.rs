@@ -256,7 +256,6 @@ pub const KNOWN_METHODS: &[&str] = &[
     "exec.cancel",
     "proc.killTree",
     "mount.list",
-    "mount.prepare",
     "mount.reconcile",
     "workspace.info",
     "workspace.file",
@@ -271,6 +270,7 @@ pub fn is_known_method(method: &str) -> bool {
 }
 
 pub const LEGACY_REMOVED_METHODS: &[&str] = &[
+    "mount.prepare",
     "policy.reload",
     "supervisor.status",
     "supervisor.restartCloudflared",

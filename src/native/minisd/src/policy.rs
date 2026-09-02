@@ -181,9 +181,10 @@ mod tests {
     #[test]
     fn legacy_removed_methods_are_stripped_but_unknown_methods_still_fail() {
         let legacy = PolicyFile::parse(
-            r#"{"methods":{"policy.reload":{"mode":"allow"},"system.ping":{"mode":"allow"}}}"#,
+            r#"{"methods":{"mount.prepare":{"mode":"allow"},"policy.reload":{"mode":"allow"},"system.ping":{"mode":"allow"}}}"#,
         )
         .unwrap();
+        assert!(legacy.method("mount.prepare").is_none());
         assert!(legacy.method("policy.reload").is_none());
         assert!(legacy.method("system.ping").is_some());
         assert!(PolicyFile::parse(r#"{"methods":{"nope":{"mode":"allow"}}}"#).is_err());

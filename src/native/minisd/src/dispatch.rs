@@ -281,17 +281,6 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
             }
             Response::ok(req.id, json!({"mounts": []}))
         }
-        "mount.prepare" => {
-            if state.mock {
-                Response::ok(req.id, json!({"prepared": true, "via": "mock"}))
-            } else {
-                Response::err(
-                    req.id,
-                    ErrorCode::RuntimeUnavailable,
-                    "mount ns not started",
-                )
-            }
-        }
         "mount.reconcile" => match crate::mount::mount_reconcile(state, &req.params) {
             Ok(value) => Response::ok(req.id, value),
             Err((code, detail)) => Response::err(req.id, code, detail),
