@@ -4,7 +4,9 @@ use crate::layout::{
     HOST_MEMORY, HOST_ROOTFS, HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE,
     PERSISTENT_DATA_MODE, UBUNTU_PID_FILE, UBUNTU_PROXY_PID_FILE, UBUNTU_ROOTFS_FILE,
 };
-use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
+use crate::protocol::{
+    parse_pre_exec_marker, ErrorCode, MAX_ARGS, MAX_ARG_BYTES, PRE_EXEC_TOKEN_ENV,
+};
 use crate::state::AppState;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -1050,6 +1052,68 @@ fn apt_env() -> BTreeMap<String, String> {
 }
 
 #[cfg(unix)]
+fn new_pre_exec_token() -> Result<String, (ErrorCode, String)> {
+    use std::fmt::Write as _;
+    use std::io::Read;
+
+    let mut bytes = [0u8; 16];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut file| file.read_exact(&mut bytes))
+        .map_err(|e| {
+            (
+                ErrorCode::Internal,
+                format!("generate pre-exec token from /dev/urandom: {e}"),
+            )
+        })?;
+    let mut token = String::with_capacity(32);
+    for byte in bytes {
+        let _ = write!(&mut token, "{byte:02x}");
+    }
+    Ok(token)
+}
+
+fn take_pre_exec_marker(stderr: &str, token: &str) -> (Option<u8>, String) {
+    let Some(newline) = stderr.find('\n') else {
+        let line = stderr.trim_end_matches('\r');
+        return match parse_pre_exec_marker(line, token) {
+            Some(code) => (Some(code), String::new()),
+            None => (None, stderr.to_string()),
+        };
+    };
+    let first = stderr[..newline].trim_end_matches('\r');
+    match parse_pre_exec_marker(first, token) {
+        Some(code) => (Some(code), stderr[newline + 1..].to_string()),
+        None => (None, stderr.to_string()),
+    }
+}
+
+fn classify_pre_exec_failure(helper_code: u8, detail: &str) -> (ErrorCode, String) {
+    let detail = detail.trim().to_string();
+    let code = match helper_code {
+        4 => {
+            let keeper_namespace_lost = (detail.contains("open /proc/")
+                && detail.contains("/ns/mnt"))
+                || detail.contains("setns CLONE_NEWNS");
+            if keeper_namespace_lost {
+                ErrorCode::KeeperNamespaceLost
+            } else {
+                ErrorCode::RuntimeLayoutMismatch
+            }
+        }
+        5 => ErrorCode::ChrootUnavailable,
+        6 => ErrorCode::GuestPrivilegeSetupFailed,
+        7 => ErrorCode::GuestExecveFailed,
+        _ => ErrorCode::Internal,
+    };
+    let detail = if detail.is_empty() {
+        format!("exec helper failed before guest execve with code {helper_code}")
+    } else {
+        detail
+    };
+    (code, detail)
+}
+
+#[cfg(unix)]
 fn exec_live(
     state: &mut AppState,
     req: &UbuntuExec,
@@ -1084,6 +1148,7 @@ fn exec_live(
     } else {
         crate::proxy::PROXY_URI.to_string()
     };
+    let pre_exec_token = new_pre_exec_token()?;
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
         "--helper",
@@ -1103,6 +1168,7 @@ fn exec_live(
         "--proxy",
         &proxy,
     ]);
+    cmd.env(PRE_EXEC_TOKEN_ENV, &pre_exec_token);
     if !session_root.is_empty() {
         cmd.arg("--session-root").arg(&session_root);
     }
@@ -1118,10 +1184,24 @@ fn exec_live(
     cmd.args(&req.argv);
     cmd.stdin(std::process::Stdio::null());
     let output = wait_output_timeout(cmd, Duration::from_millis(req.timeout_ms))?;
+    let (pre_exec_code, stderr) = take_pre_exec_marker(&output.2, &pre_exec_token);
+    if let Some(helper_code) = pre_exec_code {
+        if output.0 != i32::from(helper_code) {
+            return Err((
+                ErrorCode::Internal,
+                format!(
+                    "pre-exec marker/status mismatch: marker={helper_code} status={}",
+                    output.0
+                ),
+            ));
+        }
+        let (code, detail) = classify_pre_exec_failure(helper_code, &stderr);
+        return Err((code, truncate(&detail)));
+    }
     Ok(json!({
         "exit_code": output.0,
         "stdout": truncate(&output.1),
-        "stderr": truncate(&output.2),
+        "stderr": truncate(&stderr),
         "uid": uid,
         "admin": admin,
     }))
@@ -1366,6 +1446,56 @@ mod tests {
         }))
         .is_err());
         assert!(validate_persistent_start_params(&json!({"workspace": "/dev/shm/ws"})).is_err());
+    }
+
+    #[test]
+    fn pre_exec_marker_is_required_before_reserved_helper_codes_are_promoted() {
+        let token = "0123456789abcdef0123456789abcdef";
+        let marker = crate::protocol::format_pre_exec_marker(token, 4).unwrap();
+        let stderr = format!("{marker}\nopen /proc/123/ns/mnt: No such file or directory\n");
+        let (helper_code, clean) = take_pre_exec_marker(&stderr, token);
+        assert_eq!(helper_code, Some(4));
+        assert!(clean.starts_with("open /proc/123/ns/mnt"));
+        let (code, _) = classify_pre_exec_failure(helper_code.unwrap(), &clean);
+        assert_eq!(code, ErrorCode::KeeperNamespaceLost);
+
+        let (helper_code, clean) = take_pre_exec_marker("user stderr\n", token);
+        assert_eq!(helper_code, None);
+        assert_eq!(clean, "user stderr\n");
+    }
+
+    #[test]
+    fn pre_exec_failures_have_distinct_structured_codes() {
+        assert_eq!(
+            classify_pre_exec_failure(4, "setns CLONE_NEWNS: ESRCH").0,
+            ErrorCode::KeeperNamespaceLost
+        );
+        assert_eq!(
+            classify_pre_exec_failure(4, "bind /bad -> /workspace: EINVAL").0,
+            ErrorCode::RuntimeLayoutMismatch
+        );
+        assert_eq!(
+            classify_pre_exec_failure(5, "chroot /data/adb/minis/rootfs: ENOENT").0,
+            ErrorCode::ChrootUnavailable
+        );
+        assert_eq!(
+            classify_pre_exec_failure(6, "setuid: EPERM").0,
+            ErrorCode::GuestPrivilegeSetupFailed
+        );
+        assert_eq!(
+            classify_pre_exec_failure(7, "execve /bin/missing: ENOENT").0,
+            ErrorCode::GuestExecveFailed
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pre_exec_token_is_128_bit_hex_and_not_static() {
+        let first = new_pre_exec_token().unwrap();
+        let second = new_pre_exec_token().unwrap();
+        assert_eq!(first.len(), 32);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_ne!(first, second);
     }
 
     #[test]
