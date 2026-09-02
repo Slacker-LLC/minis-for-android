@@ -2,7 +2,6 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.runtime.distribution.RuntimeDistributionManager
 import com.openminis.app.runtime.distribution.RuntimePayloadVerifier
 import com.openminis.app.runtime.minisd.MinisdBootstrap
