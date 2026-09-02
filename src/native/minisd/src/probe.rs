@@ -83,20 +83,6 @@ fn parse_enforcing(raw: &str) -> Option<bool> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::parse_enforcing;
-
-    #[test]
-    fn selinux_enforcement_parser_preserves_unknown() {
-        assert_eq!(parse_enforcing("0\n"), Some(false));
-        assert_eq!(parse_enforcing("1\n"), Some(true));
-        assert_eq!(parse_enforcing(""), None);
-        assert_eq!(parse_enforcing("not available"), None);
-        assert_eq!(parse_enforcing("2"), None);
-    }
-}
-
 #[cfg(unix)]
 fn kernelsu_info(uid0: bool) -> KernelSuInfo {
     let mut version = String::new();
@@ -119,4 +105,18 @@ fn kernelsu_info(uid0: bool) -> KernelSuInfo {
 #[cfg(not(unix))]
 pub fn live_probe() -> ProbeResult {
     mock_probe()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_enforcing;
+
+    #[test]
+    fn selinux_enforcement_parser_preserves_unknown() {
+        assert_eq!(parse_enforcing("0\n"), Some(false));
+        assert_eq!(parse_enforcing("1\n"), Some(true));
+        assert_eq!(parse_enforcing(""), None);
+        assert_eq!(parse_enforcing("not available"), None);
+        assert_eq!(parse_enforcing("2"), None);
+    }
 }
