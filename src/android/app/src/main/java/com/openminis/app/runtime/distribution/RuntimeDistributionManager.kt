@@ -52,6 +52,9 @@ object RuntimeDistributionManager {
         val rootfsSha256: String,
         val minisdSha256: String,
         val provisionRevision: Int,
+        val rootfsRelease: String? = null,
+        val rootfsProfile: String? = null,
+        val rootfsUpstreamSha256: String? = null,
     ) {
         fun matches(manifest: RuntimeDistributionManifest): Boolean =
             rootfsVersion == manifest.rootfsVersion &&
@@ -65,6 +68,11 @@ object RuntimeDistributionManager {
             .put("rootfsSha256", rootfsSha256)
             .put("minisdSha256", minisdSha256)
             .put("provisionRevision", provisionRevision)
+            .apply {
+                rootfsRelease?.let { put("rootfsRelease", it) }
+                rootfsProfile?.let { put("rootfsProfile", it) }
+                rootfsUpstreamSha256?.let { put("rootfsUpstreamSha256", it) }
+            }
 
         companion object {
             fun parse(raw: String): DeployedIdentity {
@@ -89,7 +97,26 @@ object RuntimeDistributionManager {
                         minisdSha256.matches(Regex("^[0-9a-f]{64}$")) &&
                         revision > 0,
                 ) { "deployed identity has invalid fields" }
-                return DeployedIdentity(rootfsVersion, rootfsSha256, minisdSha256, revision)
+                val release = root.optString("rootfsRelease").takeIf { it.isNotEmpty() }
+                val profile = root.optString("rootfsProfile").takeIf { it.isNotEmpty() }
+                val upstream = root.optString("rootfsUpstreamSha256")
+                    .lowercase()
+                    .takeIf { it.isNotEmpty() }
+                require(
+                    (release == null && profile == null && upstream == null) ||
+                        (release != null && profile != null && upstream != null &&
+                            release.startsWith("24.04") &&
+                            SHA256.matches(upstream)),
+                ) { "deployed identity has incomplete rootfs metadata" }
+                return DeployedIdentity(
+                    rootfsVersion,
+                    rootfsSha256,
+                    minisdSha256,
+                    revision,
+                    release,
+                    profile,
+                    upstream,
+                )
             }
         }
     }
@@ -191,26 +218,29 @@ object RuntimeDistributionManager {
             rootfsSha256 = manifest.rootfsSha256,
             minisdSha256 = manifest.minisdSha256,
             provisionRevision = manifest.provisionRevision,
+            rootfsRelease = manifest.rootfsRelease,
+            rootfsProfile = manifest.rootfsProfile,
+            rootfsUpstreamSha256 = manifest.rootfsUpstreamSha256,
         ),
-        manifest,
     )
 
     private fun rootfsMatchesIdentity(
         health: RootfsHealth,
         identity: DeployedIdentity,
-        manifest: RuntimeDistributionManifest,
     ): Boolean {
         if (!health.healthy) return false
         val metadata = health.metadata ?: return false
+        val release = identity.rootfsRelease ?: return false
+        val profile = identity.rootfsProfile ?: return false
+        val upstream = identity.rootfsUpstreamSha256 ?: return false
         val revision = identity.rootfsVersion
             .substringAfter("-r")
             .substringBefore("-")
             .toIntOrNull()
             ?: return false
-        return metadata.optString("release") == manifest.rootfsRelease &&
-            metadata.optString("profile") == RuntimeDistributionManifest.ROOTFS_PROFILE &&
-            metadata.optString("upstream_sha256").lowercase() ==
-                RuntimeDistributionManifest.PINNED_UPSTREAM_SHA256 &&
+        return metadata.optString("release") == release &&
+            metadata.optString("profile") == profile &&
+            metadata.optString("upstream_sha256").lowercase() == upstream &&
             metadata.optInt("revision", -1) == revision &&
             metadata.optString("archive_sha256").lowercase() == identity.rootfsSha256
     }
@@ -299,7 +329,7 @@ object RuntimeDistributionManager {
                 )
             }
             val previousMatches = pending.previousIdentity?.let { identity ->
-                previous?.provisioned == true && rootfsMatchesIdentity(previous, identity, manifest)
+                previous?.provisioned == true && rootfsMatchesIdentity(previous, identity)
             } == true
             return when (decideRecovery(
                 phase = pending.phase,
@@ -602,7 +632,7 @@ object RuntimeDistributionManager {
         }
         val previous = probeRootfs(maintainer, TARGET_PREVIOUS)
         if (!previous.isKnown() || previous.provisioned != true ||
-            !rootfsMatchesIdentity(previous, previousIdentity, manifest)
+            !rootfsMatchesIdentity(previous, previousIdentity)
         ) {
             return DeploymentResult(
                 DeploymentOutcome.FAILED,
@@ -686,9 +716,19 @@ object RuntimeDistributionManager {
             .put("rootfsSha256", manifest.rootfsSha256)
             .put("minisdSha256", manifest.minisdSha256)
             .put("provisionRevision", manifest.provisionRevision)
+            .put("rootfsRelease", manifest.rootfsRelease)
+            .put("rootfsProfile", manifest.rootfsProfile)
+            .put("rootfsUpstreamSha256", manifest.rootfsUpstreamSha256)
             .toString()
         return writeState(maintainer, STATE_DEPLOYED, json)
     }
+
+
+    /** Read-only rootfs inspection through the authenticated broker channel. */
+    suspend fun inspectRootfs(
+        maintainer: RuntimeMaintainer,
+        target: String = TARGET_CANONICAL,
+    ): RootfsHealth = probeRootfs(maintainer, target)
 
     private suspend fun probeRootfs(maintainer: RuntimeMaintainer, target: String): RootfsHealth {
         val response = call(
@@ -714,27 +754,13 @@ object RuntimeDistributionManager {
         if (code == RootfsHealthCode.HEALTHY && provisioned !is Boolean) {
             return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned no provision state")
         }
-        val rawSize = result.opt("size_bytes")
-        val sizeBytes = when {
-            rawSize == null || rawSize == JSONObject.NULL -> null
-            rawSize !is Number || rawSize.toLong() < 0L ->
-                return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned an invalid rootfs size")
-            else -> rawSize.toLong()
-        }
         return RootfsHealth(
             code = code,
             detail = result.optString("detail").ifEmpty { "runtime probe completed" },
             metadata = result.optJSONObject("metadata"),
             provisioned = provisioned as? Boolean ?: false,
-            sizeBytes = sizeBytes,
         )
     }
-
-    /** Read-only rootfs inspection through the authenticated broker channel. */
-    suspend fun inspectRootfs(
-        maintainer: RuntimeMaintainer,
-        target: String = TARGET_CANONICAL,
-    ): RootfsHealth = probeRootfs(maintainer, target)
 
     private fun RootfsHealth.isKnown(): Boolean = code != RootfsHealthCode.ROOT_UNAVAILABLE &&
         code != RootfsHealthCode.UNKNOWN

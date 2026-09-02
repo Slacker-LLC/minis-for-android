@@ -7,7 +7,6 @@ import com.openminis.app.deeplink.DeepLinkAction
 import com.openminis.app.deeplink.DeepLinkHandler
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
-import com.openminis.app.tools.ExternalMountAccess
 import com.openminis.app.ui.sandbox.FileItem
 import java.io.File
 
@@ -29,7 +28,7 @@ sealed class ChatLinkAction {
 
 object ChatLinkResolver {
 
-    suspend fun resolve(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction {
+    fun resolve(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction {
         val trimmed = rawUrl.trim()
         if (trimmed.isEmpty()) return ChatLinkAction.Web(rawUrl)
 
@@ -45,8 +44,8 @@ object ChatLinkResolver {
             }
         }
 
-        // 2. Sandbox file resolution — guest files, including SAF mounts, are
-        // staged through minisd; only app-local file:// paths use host files.
+        // 2. Sandbox file resolution — canonical guest files are staged through
+        // minisd; only SAF mounts and app-local file:// paths use host files.
         val guestPath = resolveGuestPath(trimmed, scheme)
         if (guestPath != null && context != null) {
             stageGuestFile(context, guestPath, sessionId)?.let { staged ->
@@ -133,18 +132,18 @@ object ChatLinkResolver {
             null -> raw.takeIf { it.startsWith('/') }
             else -> null
         } ?: return null
-        return path.takeIf { isCanonicalGuestPath(it) || ExternalMountAccess.isPath(it) }
+        return path.takeIf(::isCanonicalGuestPath)
     }
 
-    private suspend fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
+    private fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
+        if (sessionId == null && isSessionScopedGuestPath(path)) return null
         val fileName = path.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
         val digest = java.security.MessageDigest.getInstance("SHA-256")
             .digest("${sessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(java.util.Locale.US, it) }
         val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
         return runCatching {
-            val brokerSession = if (ExternalMountAccess.isPath(path)) null else sessionId.orEmpty()
-            WorkspaceFileClient.readToFile(brokerSession, path, cacheFile)
+            WorkspaceFileClient.readToFileBlocking(sessionId.orEmpty(), path, cacheFile)
             cacheFile.takeIf { it.isFile }
         }.getOrNull()
     }
@@ -161,6 +160,14 @@ object ChatLinkResolver {
         return roots.any { path == it || path.startsWith("$it/") } &&
             path != "/var/minis/mounts" && !path.startsWith("/var/minis/mounts/")
     }
+
+    private fun isSessionScopedGuestPath(path: String): Boolean =
+        path == "/var/minis" || path.startsWith("/var/minis/workspace/") ||
+            path == "/var/minis/workspace" || path.startsWith("/var/minis/attachments/") ||
+            path == "/var/minis/attachments" || path.startsWith("/var/minis/offloads/") ||
+            path == "/var/minis/offloads" || path.startsWith("/var/minis/browser/") ||
+            path == "/var/minis/browser" || path == "/workspace" ||
+            path.startsWith("/workspace/")
 
     /** Fire a system intent so MainActivity's BROWSABLE filter picks the deep link up. */
     fun dispatchDeepLink(context: Context, originalUrl: String) {
