@@ -8,7 +8,6 @@ import androidx.core.app.NotificationCompat
 import com.openminis.app.MinisApp
 import com.openminis.app.debug.HeadlessChatRunner
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.service.AgentForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,10 +54,9 @@ object ScheduledAgentRunner {
      *   take up to [RUN_TIMEOUT_MS] (10 min) and the wait lands on the main
      *   thread (HeadlessChatRunner.prompt/retry are
      *   `withContext(Dispatchers.Main)`), so a receiver that waits blows its
-     *   ~10s broadcast budget and gets the whole process ANR-killed, along
-     *   with every PRoot sandbox child. The alarm path passing the default
-     *   `true` was exactly that bug. Waiting is only safe off a broadcast —
-     *   e.g. the minis-scheduled CLI, which runs in its own offload thread.
+     *   ~10s broadcast budget and gets the whole process ANR-killed. Waiting
+     *   is only safe off a broadcast — e.g. the minis-scheduled CLI, which
+     *   runs in its own offload thread.
      * @return the session id once the action has been DISPATCHED (resolved +
      *   prompt sent), or null when the runner couldn't even start (no provider,
      *   target chat gone, MinisApp not initialized).
@@ -68,23 +66,6 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         waitForCompletion: Boolean = true,
     ): String? {
-        // [T-android-scheduled-lateinit-crash-156] `as? MinisApp` only rules out
-        // a null / wrong-type Application — it does NOT mean the Application is
-        // INITIALIZED, which is what the old comment here claimed. Every
-        // `app.chatRepository` read below goes through a lateinit getter that
-        // throws UninitializedPropertyAccessException when onCreate
-        // early-returned (safe-mode) or aborted partway.
-        //
-        // GH#156: an alarm fires while the process is in that state and the app
-        // crashes. A scheduled task is the worst case for this because the alarm
-        // can START the process — Android creates the Application, onCreate
-        // early-returns under safe-mode, and the receiver runs against a
-        // permanently half-built app with no Activity anywhere in the picture
-        // (so MainActivity's guard never gets a say).
-        //
-        // Skipping the run is the right degradation: the task stays scheduled
-        // and its next occurrence was already armed by the receiver before this
-        // call, so a skipped fire self-heals on the following launch.
         val app = context.applicationContext as? MinisApp ?: run {
             AppLogger.error(TAG, "Application is not MinisApp — skipping task ${task.id}")
             return null
@@ -97,15 +78,12 @@ object ScheduledAgentRunner {
             return null
         }
 
-        // Kick the FGS so the agent loop survives Doze / screen-off. The
-        // existing service is idempotent and reused by chat UI; we pass a
-        // generic status string so it shows up in the ongoing notification.
-        AgentForegroundService.startService(
-            context = app,
-            sessionCount = 1,
-            toolStatus = "Scheduled: ${task.label.ifBlank { "task" }}",
-        )
-
+        // Do not pre-start AgentForegroundService here. A scheduled task may
+        // fail before it resolves a target session/provider, and Android FGS
+        // background-start rules depend on the actual launch context. The
+        // existing ChatViewModel execution path marks the session active only
+        // when a real agent turn begins; that transition is the single owner of
+        // the Agent FGS lifecycle.
         val sessionId = withContext(Dispatchers.IO) {
             resolveSessionId(app, task)
         } ?: return null
@@ -125,12 +103,10 @@ object ScheduledAgentRunner {
             return sessionId
         }
 
-        // Fire-and-forget: the session is resolved and the FGS is up, so the
-        // task HAS started. Run the actual dispatch + completion entirely off
-        // the app scope (wait=true so we still mark-fired + notify when it
-        // finishes), and return the session id immediately so the UI can show
-        // "task started" without blocking on the agent loop. Leaving the editor
-        // can't cancel it because bgScope outlives the screen.
+        // Fire-and-forget: the session is resolved and the prompt will claim
+        // its own active-turn lifecycle through ChatViewModel. Run the actual
+        // dispatch + completion off the app scope and return the session id
+        // immediately so the UI can show "task started" without blocking.
         bgScope.launch {
             val result = dispatch(app, task, sessionId, wait = true)
             val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
@@ -189,8 +165,6 @@ object ScheduledAgentRunner {
     private suspend fun resolveSessionId(app: MinisApp, task: ScheduledTask): String? {
         return when (val mode = task.targetMode) {
             is ScheduledTargetMode.AppendToSession -> {
-                // Follow-up: the target session must still exist. If the user
-                // deleted it, abort rather than silently spawning a new chat.
                 if (app.chatRepository.getSession(mode.sessionId) == null) {
                     AppLogger.warning(TAG, "task ${task.id}: follow-up session ${mode.sessionId} gone — abort")
                     null
@@ -207,15 +181,6 @@ object ScheduledAgentRunner {
                 }
             }
             ScheduledTargetMode.NewSession -> {
-                // Resolution priority (mirrors the UI's normal-chat boot):
-                //   1. task.modelBinding (user picked a group or specific entry
-                //      on the task editor) → write it through verbatim so the
-                //      new session lights up the same group/entry chip.
-                //   2. legacy task.modelId (pre-binding, kept for backcompat) →
-                //      pin to that entry, no binding.
-                //   3. default primary group → write a group binding so the
-                //      session boots through the user's default group.
-                //   4. first visible entry → last-resort fallback.
                 val explicitBinding = task.modelBinding
                 val pinnedModelId = task.modelId
                 val defaultGroupId =
@@ -223,19 +188,14 @@ object ScheduledAgentRunner {
                         app.providerRepository.defaultPrimaryGroupId
                     } else null
 
-                // Derive the seed modelId for the session row (must be valid
-                // even before restoreFromBinding runs).
                 val seedModelId: String = pinnedModelId
                     ?: run {
-                        // Try to peek a member from whichever binding we'll
-                        // write — explicit takes priority, then default group.
                         val groupIdForSeed: String? = explicitBinding
                             ?.let { parseGroupIdFromBinding(it) }
                             ?: defaultGroupId
                         val entryIdForSeed: String? = explicitBinding
                             ?.let { parseEntryIdFromBinding(it) }
 
-                        // Entry binding → use that entry's model id.
                         entryIdForSeed
                             ?.let { eid -> app.providerRepository.config.value.modelEntries.firstOrNull { it.id == eid }?.model?.id }
                             ?: groupIdForSeed
@@ -256,10 +216,6 @@ object ScheduledAgentRunner {
                 )
                 app.chatRepository.dao.updateSource(session.id, "scheduled")
 
-                // Write a model_binding when the task carried one OR when we
-                // fell back to defaultPrimaryGroupId. Pinned modelId (no
-                // binding) leaves modelBinding null so the chat layer treats
-                // it as a hard-pinned entry, matching what the user picked.
                 val bindingToWrite: String? = explicitBinding
                     ?: defaultGroupId?.let { """{"type":"group","groupId":"$it"}""" }
                 if (bindingToWrite != null) {
@@ -270,8 +226,6 @@ object ScheduledAgentRunner {
         }
     }
 
-    // Mirrors ChatViewModel.restoreFromBinding's JSON shape. Robust against
-    // malformed JSON — both parsers return null and the caller fall-backs.
     private fun parseGroupIdFromBinding(json: String): String? = runCatching {
         val o = org.json.JSONObject(json)
         if (o.optString("type") == "group") {
