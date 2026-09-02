@@ -15,6 +15,7 @@ import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -435,6 +436,10 @@ class DebugRPCHandler(private val context: Context) {
             return handleGuestLS(path, params.optString("sessionId"), recursive, maxDepth)
         }
 
+        if (ExternalMountAccess.isPath(path)) {
+            return handleExternalLS(path, recursive, maxDepth)
+        }
+
         val hostFile = RuntimePathRegistry.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
 
@@ -458,6 +463,51 @@ class DebugRPCHandler(private val context: Context) {
         } else {
             listGuestFlat(sessionId, path)
         }
+    }
+
+    private suspend fun handleExternalLS(
+        path: String,
+        recursive: Boolean,
+        maxDepth: Int,
+    ): JSONArray {
+        val boundedDepth = maxDepth.coerceIn(0, 8)
+        return listExternalDirectory(path.trimEnd('/').ifEmpty { "/var/minis/mounts" }, recursive, boundedDepth, 0)
+    }
+
+    private suspend fun listExternalDirectory(
+        path: String,
+        recursive: Boolean,
+        maxDepth: Int,
+        depth: Int,
+    ): JSONArray {
+        val array = JSONArray()
+        var offset = 0
+        while (true) {
+            val page = ExternalMountAccess.list(path, 500, offset)
+            val entries = page.optJSONArray("entries") ?: JSONArray()
+            for (index in 0 until entries.length()) {
+                val entry = entries.optJSONObject(index) ?: continue
+                val name = entry.optString("name")
+                if (name.isEmpty()) continue
+                val type = entry.optString("type", "other")
+                val childPath = "$path/$name"
+                val item = JSONObject().apply {
+                    put("name", name)
+                    if (recursive) put("path", childPath)
+                    put("type", if (type == "dir") "directory" else type)
+                    put("size", entry.optLong("size", 0L))
+                    put("modified", entry.optLong("modified", 0L))
+                }
+                if (recursive && type == "dir" && depth < maxDepth) {
+                    item.put("children", listExternalDirectory(childPath, true, maxDepth, depth + 1))
+                }
+                array.put(item)
+            }
+            val next = page.optInt("next_offset", -1)
+            if (next < 0 || next <= offset) break
+            offset = next
+        }
+        return array
     }
 
     private suspend fun listGuestFlat(sessionId: String, path: String): JSONArray {
@@ -569,6 +619,16 @@ class DebugRPCHandler(private val context: Context) {
             return handleGuestReadFile(params)
         }
 
+        if (ExternalMountAccess.isPath(path)) {
+            val metadata = ExternalMountAccess.info(path)
+            val fileSize = metadata.optLong("size", 0L).coerceAtLeast(0L)
+            val offset = params.optLong("offset", 0L).coerceAtLeast(0L)
+            val limit = params.optInt("limit", 524_288).coerceIn(0, 16 * 1024 * 1024)
+            val forceBase64 = params.optBoolean("base64", false)
+            val bytes = readExternalRange(path, offset, limit)
+            return formatReadResult(bytes, fileSize, offset, forceBase64)
+        }
+
         val hostFile = RuntimePathRegistry.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
 
@@ -597,6 +657,46 @@ class DebugRPCHandler(private val context: Context) {
             it in 0x09..0x0D || it in 0x20..0x7E || it.toInt() and 0xFF > 0x7F
         }
 
+        return JSONObject().apply {
+            put("size", fileSize)
+            if (isText) {
+                put("content", String(bytes, Charsets.UTF_8))
+                put("encoding", "utf8")
+            } else {
+                put("content", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+                put("encoding", "base64")
+            }
+            put("bytesRead", bytes.size)
+            if (offset + bytes.size < fileSize) put("truncated", true)
+        }
+    }
+
+    private suspend fun readExternalRange(path: String, offset: Long, limit: Int): ByteArray {
+        if (limit == 0) return ByteArray(0)
+        val output = ByteArrayOutputStream(limit.coerceAtMost(524_288))
+        var nextOffset = offset
+        while (output.size() < limit) {
+            val length = minOf(WorkspaceFileClient.MAX_READ_CHUNK, limit - output.size())
+            val chunk = WorkspaceFileClient.readChunk(null, path, nextOffset, length)
+            if (chunk.offset != nextOffset) {
+                throw RPCException(-32000, "Broker returned offset ${chunk.offset}, expected $nextOffset: $path")
+            }
+            output.write(chunk.bytes)
+            nextOffset += chunk.bytes.size
+            if (chunk.eof || chunk.bytes.isEmpty()) break
+        }
+        return output.toByteArray()
+    }
+
+    private fun formatReadResult(
+        bytes: ByteArray,
+        fileSize: Long,
+        offset: Long,
+        forceBase64: Boolean,
+    ): JSONObject {
+        val isText = !forceBase64 && bytes.all {
+            it in 0x09..0x0D || it in 0x20..0x7E || it.toInt() and 0xFF > 0x7F
+        }
         return JSONObject().apply {
             put("size", fileSize)
             if (isText) {
@@ -1279,13 +1379,7 @@ class DebugRPCHandler(private val context: Context) {
         }
     }
 
-    /**
-     * Write a file into the proot-mounted Linux namespace. Resolves the
-     * Linux path through RuntimePathRegistry.resolveHostPath, creates parent dirs,
-     * writes the bytes, and best-effort applies the requested mode bits.
-     * No fakefs registration is needed — proot reads the host directly,
-     * so the guest sees the file the moment it lands on disk.
-     */
+    /** Write a file into the guest namespace or the minisd-owned mount broker. */
     private suspend fun handleWriteFile(params: JSONObject): JSONObject {
         val path = params.optString("path").ifEmpty {
             throw RPCException(-32602, "Invalid params: 'path' is required")
@@ -1319,6 +1413,18 @@ class DebugRPCHandler(private val context: Context) {
                 }
             }
             val size = WorkspaceFileClient.writeBytes(params.optString("sessionId"), path, bytes)
+            return JSONObject().apply {
+                put("ok", true)
+                put("path", path)
+                put("size", size)
+            }
+        }
+
+        if (ExternalMountAccess.isPath(path)) {
+            if (!overwrite && runCatching { ExternalMountAccess.info(path) }.getOrNull() != null) {
+                throw RPCException(-32000, "File exists and overwrite=false: $path")
+            }
+            val size = ExternalMountAccess.write(path, bytes, append = false)
             return JSONObject().apply {
                 put("ok", true)
                 put("path", path)

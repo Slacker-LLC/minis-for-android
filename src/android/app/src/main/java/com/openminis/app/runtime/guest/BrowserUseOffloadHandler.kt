@@ -5,11 +5,11 @@ import com.openminis.app.MinisApp
 import com.openminis.app.browser.BrowserAction
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserActionResult
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -310,7 +310,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
     private fun readGuestText(path: String, sessionId: String?): String? = runCatching {
         val guestPath = path.removePrefix("file://")
         if (guestPath == "/var/minis/mounts" || guestPath.startsWith("/var/minis/mounts/")) {
-            return@runCatching RuntimePathRegistry.resolveHostPath(guestPath)?.readText()
+            return@runCatching String(ExternalMountAccess.readBlocking(guestPath), Charsets.UTF_8)
         }
         String(
             WorkspaceFileClient.readAllBlocking(

@@ -2,6 +2,8 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.data.MountedFoldersStore
+import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.distribution.RuntimeDistributionManager
 import com.openminis.app.runtime.distribution.RuntimePayloadVerifier
 import com.openminis.app.runtime.minisd.MinisdBootstrap
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -45,6 +48,8 @@ object UbuntuRuntime {
         val hostMemory: String? = null,
         val hostSkills: String? = null,
         val hostShared: String? = null,
+        val externalMountDigest: String? = null,
+        val externalMountVerified: Boolean = false,
         val lastError: String? = null,
         val mock: Boolean = false,
         /** False means the fields below are the last known values, not a fresh RPC result. */
@@ -151,6 +156,24 @@ object UbuntuRuntime {
         ensureBrokerReadyLocked(ctx).also { if (it.ok) apply(it) }
     }
 
+    /** Re-attest a complete external mount snapshot through minisd's App socket. */
+    suspend fun reconcileExternalMounts(
+        entries: List<MountedFoldersStore.Entry>? = null,
+    ): Boolean {
+        val ready = ensureReady()
+        if (!ready.statusFresh || !ready.running) return false
+        return startLock.withLock {
+            val response = reconcileExternalMountsLocked(entries)
+            if (!response.ok) {
+                Log.w(
+                    TAG,
+                    "mount.reconcile failed code=${response.error?.code} detail=${response.error?.detail}",
+                )
+            }
+            response.ok
+        }
+    }
+
     suspend fun ensureReady(): Snapshot = startLock.withLock {
         val ctx = appContext
             ?: return@withLock fail(
@@ -233,8 +256,15 @@ object UbuntuRuntime {
             Log.w(TAG, "legacy filesDir migration: ${migrated.error}")
         }
         if (cur.statusFresh && cur.running && runtimeLayoutMatches(cur)) {
+            val reconciled = reconcileExternalMountsLocked()
+            if (!reconciled.ok) {
+                return@withLock failStructured(
+                    reconciled.error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                    reconciled.error?.detail ?: "external mount reconciliation failed",
+                )
+            }
             redirectPaths = true
-            return@withLock cur
+            return@withLock _snapshot.value
         }
 
         if (cur.statusFresh && cur.running) {
@@ -276,12 +306,40 @@ object UbuntuRuntime {
                 ),
             )
         }
+        val reconciled = reconcileExternalMountsLocked()
+        if (!reconciled.ok) {
+            return@withLock failStructured(
+                reconciled.error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+                reconciled.error?.detail ?: "external mount reconciliation failed",
+            )
+        }
         redirectPaths = true
         Log.i(
             TAG,
             "ubuntu.start ok pid=${started.pid} version=${started.version} uid=$expectedUid layoutKnown=${started.layoutKnown} migrated=${migrated.copied}",
         )
-        started
+        _snapshot.value
+    }
+
+    private suspend fun reconcileExternalMountsLocked(
+        entries: List<MountedFoldersStore.Entry>? = null,
+    ): MinisdResponse {
+        val store = RuntimePathRegistry.mountedFoldersStore
+        val snapshot = if (store != null) {
+            store.buildMountSnapshot(entries ?: store.entries.value)
+        } else {
+            JSONObject().put("mounts", JSONArray())
+        }
+        val response = client.mountReconcile(snapshot)
+        if (response.ok) {
+            val result = response.result
+            _snapshot.value = _snapshot.value.copy(
+                externalMountDigest = result?.optString("snapshot_digest")
+                    ?.takeIf { it.isNotEmpty() },
+                externalMountVerified = result?.optBoolean("keeper_verified", false) == true,
+            )
+        }
+        return response
     }
 
     private fun runtimeLayoutMatches(snapshot: Snapshot): Boolean =
@@ -860,6 +918,8 @@ object UbuntuRuntime {
                 hostMemory = result.optNullableString("memory"),
                 hostSkills = result.optNullableString("skills"),
                 hostShared = result.optNullableString("shared"),
+                externalMountDigest = result.optNullableString("external_mount_digest"),
+                externalMountVerified = result.optBoolean("external_mount_verified", false),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
                 statusFresh = true,

@@ -44,6 +44,9 @@ mod unix_impl {
         if operation.is_empty() {
             return Err((ErrorCode::BadParams, "operation required".into()));
         }
+        if crate::mount::request_has_external_path(params) {
+            return crate::mount::handle_file(state, params);
+        }
         if state.mock {
             return Ok(serde_json::json!({
                 "mock": true,

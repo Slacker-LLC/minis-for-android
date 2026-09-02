@@ -378,6 +378,7 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
         "shared",
         "mnt",
         "var/minis",
+        "var/minis/mounts",
         "etc/minis",
         "home",
         "home/minis",

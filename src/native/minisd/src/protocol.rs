@@ -34,6 +34,8 @@ pub enum ErrorCode {
     ConfirmRequired,
     RateLimited,
     UnsupportedVersion,
+    MountRoUnsupported,
+    MountAttestationRequired,
 }
 
 impl ErrorCode {
@@ -60,6 +62,8 @@ impl ErrorCode {
             Self::ConfirmRequired => "CONFIRM_REQUIRED",
             Self::RateLimited => "RATE_LIMITED",
             Self::UnsupportedVersion => "UNSUPPORTED_VERSION",
+            Self::MountRoUnsupported => "MOUNT_RO_UNSUPPORTED",
+            Self::MountAttestationRequired => "MOUNT_ATTESTATION_REQUIRED",
         }
     }
 
@@ -86,6 +90,8 @@ impl ErrorCode {
             Self::ConfirmRequired,
             Self::RateLimited,
             Self::UnsupportedVersion,
+            Self::MountRoUnsupported,
+            Self::MountAttestationRequired,
         ]
     }
 }
@@ -251,6 +257,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "proc.killTree",
     "mount.list",
     "mount.prepare",
+    "mount.reconcile",
     "workspace.info",
     "workspace.file",
     "workspace.setQuota",

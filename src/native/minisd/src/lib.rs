@@ -6,6 +6,7 @@ pub mod exec;
 pub mod exec_registry;
 pub mod ipc_exec;
 pub mod layout;
+pub mod mount;
 pub mod ns;
 pub mod path_guard;
 pub mod policy;
@@ -30,8 +31,17 @@ pub use state::AppState;
 /// normal stateful dispatcher: the execution registry is process-global and
 /// cancellation must not wait behind a long AppState operation.
 pub fn handle(state: &mut AppState, req: Request, peer: Option<auth::PeerCred>) -> Response {
+    handle_on_socket(state, req, peer, false)
+}
+
+pub fn handle_on_socket(
+    state: &mut AppState,
+    req: Request,
+    peer: Option<auth::PeerCred>,
+    app_socket: bool,
+) -> Response {
     if req.method == "exec.cancel" {
-        if let Err(resp) = dispatch::authorize_request(state, &req, peer) {
+        if let Err(resp) = dispatch::authorize_request_with_socket(state, &req, peer, app_socket) {
             return resp;
         }
         let Some(execution_id) = req.params.get("execution_id").and_then(|v| v.as_str()) else {
@@ -53,7 +63,10 @@ pub fn handle(state: &mut AppState, req: Request, peer: Option<auth::PeerCred>) 
             Err(code) => Response::err(req.id, code, "exec cancellation failed"),
         };
     }
-    dispatch::handle(state, req, peer)
+    if let Err(resp) = dispatch::authorize_request_with_socket(state, &req, peer, app_socket) {
+        return resp;
+    }
+    dispatch::dispatch_authorized(state, &req)
 }
 
 /// Test-only convenience entry: always passes peer=None, so outside mock

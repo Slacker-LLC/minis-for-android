@@ -53,6 +53,8 @@ object MinisdProtocol {
     const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
     const val ERROR_POLICY_DENIED = "POLICY_DENIED"
     const val ERROR_BAD_PARAMS = "BAD_PARAMS"
+    const val ERROR_MOUNT_RO_UNSUPPORTED = "MOUNT_RO_UNSUPPORTED"
+    const val ERROR_MOUNT_ATTESTATION_REQUIRED = "MOUNT_ATTESTATION_REQUIRED"
 
     const val RUNTIME_MAINTENANCE_METHOD = "runtime.maintenance"
     const val RUNTIME_MAINTENANCE_TIMEOUT_MS = 1_500_000L
@@ -252,6 +254,13 @@ object MinisdProtocol {
 
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
+
+    fun mountReconcile(mounts: JSONArray, id: Long = 1): MinisdRequest =
+        MinisdRequest(
+            id = id,
+            method = "mount.reconcile",
+            params = JSONObject().put("mounts", mounts),
+        )
 
     fun runtimeMaintenance(
         operation: String,

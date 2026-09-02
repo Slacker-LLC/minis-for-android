@@ -35,6 +35,28 @@ class MinisdClient(
     suspend fun rootProbe(): MinisdResponse = call(MinisdProtocol.rootProbe(nextId()))
     suspend fun ubuntuStatus(): MinisdResponse = call(MinisdProtocol.ubuntuStatus(nextId()))
 
+    /** Re-attest external mounts only through the App-owned socket. */
+    suspend fun mountReconcile(params: JSONObject, timeoutMs: Long = 30_000): MinisdResponse =
+        withContext(Dispatchers.IO) {
+            val path = appSocketPath
+                ?: return@withContext unavailable("minisd App socket is not configured")
+            if (!File(path).exists()) {
+                return@withContext unavailable("minisd App socket is unavailable")
+            }
+            val request = MinisdRequest(
+                id = nextId(),
+                method = "mount.reconcile",
+                params = params,
+            )
+            val local = callLocal(
+                path = path,
+                payload = MinisdProtocol.encodeRequest(request),
+                timeoutMs = timeoutMs,
+                cancellationKey = null,
+            )
+            local ?: unavailable("minisd App socket transport failed")
+        }
+
     suspend fun ubuntuStart(
         rootfs: String = MinisdProtocol.DEFAULT_ROOTFS,
         workspace: String = "",

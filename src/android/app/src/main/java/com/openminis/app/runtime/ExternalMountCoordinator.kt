@@ -3,10 +3,9 @@ package com.openminis.app.runtime
 import com.openminis.app.data.MountedFoldersStore
 
 /**
- * Maps user-selected SAF folders into the current Ubuntu runtime contract.
- * Resolved host paths become bind-mount inputs for the minisd-owned mount
- * namespace; guest paths live under `/var/minis/mounts/<name>`. This layer
- * also enforces the user-visible read-only policy before file tools write.
+ * Maps user-selected SAF folders into the minisd-owned Ubuntu runtime
+ * contract. The App sends URI-derived identities to `mount.reconcile`; it
+ * never hands a resolved host path to the runtime or file tools.
  */
 object ExternalMountCoordinator {
 
@@ -42,23 +41,12 @@ object ExternalMountCoordinator {
         val name = tail.substringBefore('/')
         if (name.isEmpty()) return false
         val entry = store.entries.value.firstOrNull { it.name == name } ?: return false
-        return !entry.effectiveWritable
+        return !entry.isActive || !entry.effectiveWritable
     }
 
-    /**
-     * Snapshot of bind-mount specs supplied to the Ubuntu/minisd runtime. Only entries with a
-     * resolved POSIX path are returned — entries whose URI resolution
-     * failed (e.g. cloud provider, removable volume unmounted) silently
-     * drop out of the snapshot until their state changes.
-     *
-     * Returns `(linuxDir, hostPath)` pairs.
-     */
-    fun bindMountSpecs(store: MountedFoldersStore): List<Pair<String, String>> =
-        store.entries.value
-            .mapNotNull { e ->
-                val host = e.resolvedHostPath ?: return@mapNotNull null
-                "$MOUNTS_PREFIX${e.name}" to host
-            }
+    /** Compatibility seam for callers that still ask for legacy bind specs. */
+    @Suppress("UNUSED_PARAMETER")
+    fun bindMountSpecs(store: MountedFoldersStore): List<Pair<String, String>> = emptyList()
 }
 
 /**

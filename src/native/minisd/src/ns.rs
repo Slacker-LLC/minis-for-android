@@ -108,6 +108,38 @@ pub fn bind_mount(src: &str, dst: &str, recursive: bool) -> Result<(), String> {
 }
 
 #[cfg(unix)]
+pub fn bind_mount_fd(fd: std::os::fd::RawFd, dst: &str) -> Result<(), String> {
+    let source = format!("/proc/self/fd/{fd}");
+    bind_mount(&source, dst, false)
+}
+
+#[cfg(unix)]
+pub fn remount_external(dst: &str, read_only: bool) -> Result<(), String> {
+    let c_dst = cstr(dst)?;
+    let mut flags =
+        libc::MS_BIND | libc::MS_REMOUNT | libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC;
+    if read_only {
+        flags |= libc::MS_RDONLY;
+    }
+    let rc = unsafe {
+        libc::mount(
+            std::ptr::null(),
+            c_dst.as_ptr(),
+            std::ptr::null(),
+            flags,
+            std::ptr::null(),
+        )
+    };
+    if rc == 0 {
+        Ok(())
+    } else if read_only {
+        Err(last_err(&format!("remount external read-only {dst}")))
+    } else {
+        Err(last_err(&format!("remount external restricted {dst}")))
+    }
+}
+
+#[cfg(unix)]
 pub fn remount_ro(dst: &str) -> Result<(), String> {
     let c_dst = cstr(dst)?;
     let flags = libc::MS_BIND | libc::MS_REMOUNT | libc::MS_RDONLY | libc::MS_REC;

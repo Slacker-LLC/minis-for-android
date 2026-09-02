@@ -13,6 +13,7 @@ import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -1244,7 +1245,7 @@ class ModelUseOffloadHandler(
 
     /**
      * [T-android-model-use-session-scoped-write] Resolve a `/var/minis/<sub>/...`
-     * Linux path to the caller session's OWN host directory, bypassing the
+     * Linux path to the caller session's OWN broker namespace, bypassing the
      * global (last-writer-wins) RuntimePathRegistry.bindMounts map. That global map is
      * overwritten by ExecutionCoordinator.buildSessionBindMounts on every shell
      * build, so RuntimePathRegistry.resolveHostPath("/var/minis/attachments") returns
@@ -1257,7 +1258,7 @@ class ModelUseOffloadHandler(
      * Session-scoped subdirs are attachments/offloads/workspace/browser (see
      * buildSessionBindMounts). For those, host dir = filesDir/minis-sessions/
      * <sid>/<sub>/<rest>. Returns null when [sessionId] is null (caller then
-     * falls back to the global resolveHostPath and logs the degrade) or the path
+     * falls back to the broker and logs the degrade) or the path
      * isn't a session-scoped `/var/minis/<sub>` path.
      */
     private fun safeGuestName(name: String): String =
@@ -1431,10 +1432,7 @@ class ModelUseOffloadHandler(
         val path = linuxPath.removePrefix("file://")
         return try {
             val bytes = if (path.startsWith("/var/minis/mounts/")) {
-                val hostFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(path)
-                    ?: return null
-                if (!hostFile.exists() || !hostFile.isFile) return null
-                hostFile.readBytes()
+                ExternalMountAccess.readBlocking(path)
             } else {
                 WorkspaceFileClient.readAllBlocking(sessionId.orEmpty(), path)
             }
@@ -1621,12 +1619,9 @@ class ModelUseOffloadHandler(
         }
         val bytes = try {
             if (linuxPath.startsWith("/var/minis/mounts/")) {
-                val hostFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
-                    ?: throw ImageInputError("Image file not found at '$url'.")
-                if (!hostFile.exists() || !hostFile.isFile) {
-                    throw ImageInputError("Image file not found at '$url'.")
+                runCatching { ExternalMountAccess.readBlocking(linuxPath) }.getOrElse {
+                    throw ImageInputError("Image file at '$url' is unreadable: ${it.message}")
                 }
-                hostFile.readBytes()
             } else {
                 WorkspaceFileClient.readAllBlocking(sessionId.orEmpty(), linuxPath)
             }

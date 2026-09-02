@@ -31,18 +31,21 @@ import java.util.UUID
  *     survives process death and reboots once persisted, so there's no
  *     "activation" step — access is always available while the permission
  *     grant is held.
- *   - The shell-level bind-mount at `/var/minis/mounts/<name>` is NOT
- *     implemented in this pass. DocumentFile doesn't expose POSIX paths,
- *     so exposing these trees inside the PRoot / iSH rootfs needs a
- *     FUSE bridge or a periodic mirror pass. Spec §2.9.4 calls out the
- *     tradeoffs; we ship MVP scaffolding (persistence + CRUD + StateFlow)
- *     and leave the shell mount as a follow-up.
+ *   - The shell-level bind-mount at `/var/minis/mounts/<name>` is owned by
+ *     minisd. This store sends only a URI-derived volume and segment identity
+ *     in a complete `mount.reconcile` snapshot; it never persists a resolved
+ *     host path as an authorization capability.
  *
  * Persistence: `filesDir/minis-config/mounted-folders.json`. The path is
  * intentionally outside `minis-global/` so it can't leak into the
  * DocumentsProvider-exposed tree.
  */
 class MountedFoldersStore(private val context: Context) {
+
+    data class MountIdentity(
+        val volume: String,
+        val pathSegments: List<String>,
+    )
 
     @Serializable
     data class Entry(
@@ -53,13 +56,10 @@ class MountedFoldersStore(private val context: Context) {
         val createdAt: Long = System.currentTimeMillis(),
         var isWritable: Boolean = true,
         var userAllowWrite: Boolean = true,
-        /**
-         * Cached POSIX host path resolved from the SAF tree URI (e.g.
-         * `/storage/emulated/0/Documents/Vault`). null when the URI
-         * came from a non-externalstorage provider or resolution failed —
-         * UI / coordinator should treat such entries as inactive.
-         */
-        var resolvedHostPath: String? = null,
+        /** URI-derived identity used to build the next mount attestation. */
+        val volume: String? = null,
+        val pathSegments: List<String> = emptyList(),
+        var isActive: Boolean = true,
     ) {
         /** Final effective writable = OS-level `isWritable` AND user intent. */
         val effectiveWritable: Boolean get() = isWritable && userAllowWrite
@@ -75,14 +75,15 @@ class MountedFoldersStore(private val context: Context) {
     private val _entries = MutableStateFlow<List<Entry>>(emptyList())
     val entries: StateFlow<List<Entry>> = _entries.asStateFlow()
 
-    /**
-     * T219-5: fired after every CRUD operation that mutates the persisted
-     * list. MinisApp wires this to `RuntimePathRegistry.applyMountedFoldersSnapshot`
-     * so future shells pick up the new bind specs without a process restart.
-     * Note that already-running proot processes are unaffected — proot is
-     * one-shot and the next `shell_execute` is what carries the new mounts.
-     */
+    /** Fires after a snapshot has been accepted by minisd and persisted. */
     var onChange: (() -> Unit)? = null
+
+    /**
+     * Candidate snapshots are offered to minisd before they are persisted.
+     * Returning false keeps the old snapshot, which makes delete/rename and
+     * permission changes fail closed when replacement keeper creation fails.
+     */
+    var onSnapshotChange: (suspend (List<Entry>) -> Boolean)? = null
 
     init {
         loadFromDisk()
@@ -93,7 +94,7 @@ class MountedFoldersStore(private val context: Context) {
      * already called `contentResolver.takePersistableUriPermission(uri, …)`
      * — typically via the SAF picker result in [SafMountHelper.handlePickerResult].
      *
-     * Resolves the SAF tree URI to a real POSIX path under
+     * Resolves the SAF tree URI transiently to a real POSIX path under
      * `/storage/emulated/0/...` (Option A — see T219 spec §1.3). Returns
      * null when:
      *   - the URI came from a non-externalstorage provider (Drive, Dropbox,
@@ -109,7 +110,15 @@ class MountedFoldersStore(private val context: Context) {
         val name = sanitizeName(customName).takeIf { it.isNotEmpty() } ?: return@withLock null
         if (_entries.value.any { it.name.equals(name, ignoreCase = true) }) return@withLock null
         if (_entries.value.size >= MAX_MOUNTS) return@withLock null
+        if (!hasPersistedRead(treeUri) || !hasRawReadCapability()) {
+            AppLogger.warning(TAG, "add: rejected URI without read grant or raw read capability $treeUri")
+            return@withLock null
+        }
 
+        val identity = mountIdentity(treeUri) ?: run {
+            AppLogger.warning(TAG, "add: rejected invalid external-storage URI $treeUri")
+            return@withLock null
+        }
         val resolvedHostPath = resolvePosixPath(treeUri, context) ?: run {
             AppLogger.warning(TAG, "add: rejected non-resolvable URI $treeUri")
             return@withLock null
@@ -121,21 +130,21 @@ class MountedFoldersStore(private val context: Context) {
         // OS-level writability driven by the actual filesystem (Option A path
         // is what PRoot will use, not the SAF grant). isWritePermission can
         // be true while a per-package scoped-storage rule still rejects open(2).
-        val probedWritable = probeWritable(resolvedHostPath)
+        val probedWritable = hasRawWriteCapability() && probeWritable(resolvedHostPath)
         val entry = Entry(
             name = name,
             sourceDisplayName = sourceDisplayName,
             treeUri = treeUri.toString(),
             isWritable = probedWritable,
             userAllowWrite = userAllowWrite,
-            resolvedHostPath = resolvedHostPath,
+            volume = identity.volume,
+            pathSegments = identity.pathSegments,
         )
-        _entries.value = _entries.value + entry
-        saveToDisk(_entries.value)
-        onChange?.invoke()
+        if (!commitSnapshot(_entries.value + entry)) return@withLock null
         AppLogger.info(
             TAG,
-            "add: name=$name host=$resolvedHostPath writable=$probedWritable ${storageDiag(context)}",
+            "add: name=$name volume=${identity.volume} segments=${identity.pathSegments} " +
+                "writable=$probedWritable ${storageDiag(context)}",
         )
         entry
     }
@@ -175,8 +184,9 @@ class MountedFoldersStore(private val context: Context) {
         val before = _entries.value
         val after = before.filterNot { it.id == id }
         if (after.size == before.size) return@withLock false
-        // Release the persisted URI grant so the system stops listing
-        // us under "apps with access" and the user can re-pick later.
+        // Reconcile first. Only after the replacement is live do we remove
+        // the persisted record and release the URI grant.
+        if (!commitSnapshot(after)) return@withLock false
         before.firstOrNull { it.id == id }?.let { e ->
             runCatching {
                 context.contentResolver.releasePersistableUriPermission(
@@ -185,9 +195,6 @@ class MountedFoldersStore(private val context: Context) {
                 )
             }
         }
-        _entries.value = after
-        saveToDisk(after)
-        onChange?.invoke()
         true
     }
 
@@ -196,51 +203,82 @@ class MountedFoldersStore(private val context: Context) {
         if (_entries.value.any { it.id != id && it.name.equals(trimmed, ignoreCase = true) }) {
             return@withLock false
         }
-        _entries.value = _entries.value.map { e ->
+        val after = _entries.value.map { e ->
             if (e.id == id) e.copy(name = trimmed) else e
         }
-        saveToDisk(_entries.value)
-        onChange?.invoke()
-        true
+        commitSnapshot(after)
     }
 
     suspend fun setUserAllowWrite(id: String, allow: Boolean): Boolean = mutex.withLock {
         var changed = false
-        _entries.value = _entries.value.map { e ->
+        val after = _entries.value.map { e ->
             if (e.id == id && e.userAllowWrite != allow) {
                 changed = true
                 e.copy(userAllowWrite = allow)
             } else e
         }
-        if (changed) {
-            saveToDisk(_entries.value)
-            onChange?.invoke()
-        }
-        changed
+        if (!changed) return@withLock false
+        commitSnapshot(after)
     }
 
     /**
-     * Re-probe OS-level writability against the actual host path. Called
-     * on foreground resume so changes (user revoked permission, removed
-     * the folder, removable storage unmounted, …) propagate into the UI
-     * and the coordinator's bind specs. Entries whose `resolvedHostPath`
-     * is null (non-externalstorage) stay marked non-writable.
+     * Re-prove the URI grant, storage capability and source directory on
+     * foreground resume. Invalid entries are marked inactive and the same
+     * complete snapshot is reconciled immediately.
      */
     suspend fun refreshWritability() = mutex.withLock {
         val before = _entries.value
         val after = before.map { e ->
-            val probed = e.resolvedHostPath?.let { probeWritable(it) } ?: false
-            if (probed != e.isWritable) e.copy(isWritable = probed) else e
+            val uri = Uri.parse(e.treeUri)
+            val identity = mountIdentity(uri)
+            val readable = identity != null && hasPersistedRead(uri) && hasRawReadCapability()
+            val host = if (readable) resolvePosixPath(uri, context) else null
+            val active = host != null
+            val writable = active && hasRawWriteCapability() && probeWritable(host!!)
+            if (writable != e.isWritable || active != e.isActive) {
+                e.copy(isWritable = writable, isActive = active)
+            } else e
         }
         if (after != before) {
-            _entries.value = after
-            saveToDisk(after)
-            onChange?.invoke()
+            commitSnapshot(after)
         }
     }
 
+    /** Build the only external-mount authorization payload accepted by minisd. */
+    suspend fun buildMountSnapshot(entries: List<Entry> = _entries.value): org.json.JSONObject =
+        withContext(Dispatchers.IO) {
+            val mounts = org.json.JSONArray()
+            entries.forEach { entry ->
+                // An inactive entry is an explicit, persisted result of the
+                // foreground re-proof. It is deliberately absent from the
+                // active mount set; active entries must never be silently
+                // omitted when their authorization cannot be re-derived.
+                if (!entry.isActive) return@forEach
+                val uri = Uri.parse(entry.treeUri)
+                val identity = mountIdentity(uri)
+                    ?: error("active mount ${entry.id} has invalid storage identity")
+                check(hasPersistedRead(uri)) { "active mount ${entry.id} has no persisted read grant" }
+                check(hasRawReadCapability()) { "active mount ${entry.id} has no raw read capability" }
+                val host = resolvePosixPath(uri, context)
+                    ?: error("active mount ${entry.id} source is unavailable")
+                val writable = entry.userAllowWrite &&
+                    hasPersistedWrite(uri) &&
+                    hasRawWriteCapability() &&
+                    probeWritable(host)
+                mounts.put(org.json.JSONObject().apply {
+                    put("id", entry.id)
+                    put("name", entry.name)
+                    put("volume", identity.volume)
+                    put("path_segments", org.json.JSONArray(identity.pathSegments))
+                    put("access", if (writable) "rw" else "ro")
+                })
+            }
+            org.json.JSONObject().put("mounts", mounts)
+        }
+
     /**
-     * Decode a SAF tree URI into a POSIX host path PRoot can `-b` mount.
+     * Decode a SAF tree URI into a transient POSIX validation path. The
+     * returned path is never persisted or sent over the RPC boundary.
      *
      * Only accepts `com.android.externalstorage.documents` URIs — those
      * encode a `volume:relPath` document id where `volume` is either
@@ -263,16 +301,16 @@ class MountedFoldersStore(private val context: Context) {
             }
             val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
                 ?: return@withContext null
-            val sep = docId.indexOf(':')
-            val volume = if (sep < 0) docId else docId.substring(0, sep)
-            val relPath = if (sep < 0) "" else docId.substring(sep + 1)
+            val identity = mountIdentity(treeUri) ?: return@withContext null
+            val volume = identity.volume
 
             val volumeRoot = resolveVolumeRoot(context, volume) ?: run {
                 AppLogger.warning(TAG, "resolvePosixPath: unknown volume=$volume in docId=$docId")
                 return@withContext null
             }
-            val full = if (relPath.isEmpty()) File(volumeRoot)
-                else File(volumeRoot, relPath)
+            val full = identity.pathSegments.fold(File(volumeRoot)) { current, segment ->
+                File(current, segment)
+            }
             if (!full.exists() || !full.isDirectory) {
                 AppLogger.warning(TAG, "resolvePosixPath: path missing or not dir: ${full.absolutePath}")
                 return@withContext null
@@ -285,13 +323,64 @@ class MountedFoldersStore(private val context: Context) {
                 AppLogger.warning(
                     TAG,
                     "resolvePosixPath: ${full.absolutePath} canRead=${full.canRead()} but list()=null " +
-                        "(readdir blocked by scoped storage) — mount will read EMPTY on this device",
+                    "(readdir blocked by scoped storage) — mount is inactive until access is restored",
                 )
+                return@withContext null
             } else {
                 AppLogger.info(TAG, "resolvePosixPath: ${full.absolutePath} ok childCount=${children.size}")
             }
             full.absolutePath
         }
+
+    fun mountIdentity(treeUri: Uri): MountIdentity? {
+        if (treeUri.authority != EXTERNALSTORAGE_AUTHORITY) return null
+        val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return null
+        val parts = docId.split(':', limit = 2)
+        val volume = parts.firstOrNull().orEmpty()
+        if (volume != "primary" && !isStorageUuid(volume)) return null
+        val relative = parts.getOrNull(1).orEmpty()
+        val segments = if (relative.isEmpty()) emptyList() else relative.split('/')
+        if (segments.any { !isSafeSegment(it) }) return null
+        return MountIdentity(volume = volume.lowercase(), pathSegments = segments)
+    }
+
+    private fun isStorageUuid(value: String): Boolean =
+        Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+            .matches(value)
+
+    private fun isSafeSegment(value: String): Boolean =
+        value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
+            !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
+
+    private fun hasPersistedRead(uri: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+
+    private fun hasPersistedWrite(uri: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission }
+
+    private fun hasRawReadCapability(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+            context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+
+    private fun hasRawWriteCapability(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+            context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+
+    private suspend fun commitSnapshot(after: List<Entry>): Boolean {
+        if (onSnapshotChange?.invoke(after) == false) return false
+        _entries.value = after
+        saveToDisk(after)
+        onChange?.invoke()
+        return true
+    }
 
     /**
      * Try to create + delete a hidden probe file under [hostPath]. Captures
@@ -347,7 +436,7 @@ class MountedFoldersStore(private val context: Context) {
     private fun sanitizeName(raw: String): String {
         val trimmed = raw.trim()
         if (trimmed == "." || trimmed == "..") return ""
-        if (trimmed.contains('/') || trimmed.contains(' ')) return ""
+        if (trimmed.contains('/') || trimmed.contains('\u0000')) return ""
         return trimmed.take(64)
     }
 

@@ -650,20 +650,18 @@ fun AppNavigation(
                 onBack = { navController.safePopBackStack() },
                 onBrowseFiles = {
                     val entry = mountedFoldersStore.entries.value.firstOrNull { it.id == mountId }
-                    val hostPath = entry?.resolvedHostPath
-                    if (hostPath != null) {
+                    if (entry != null && entry.isActive) {
                         FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                            rootPath = java.io.File(hostPath),
+                            rootPath = java.io.File(context.cacheDir, "mount-browser"),
                             rootLabel = entry.name,
+                            guestRootPath = "/var/minis/mounts/${entry.name}",
+                            guestSessionId = null,
                         )
                         navController.safeNavigate(Routes.FILE_BROWSER)
                     } else {
-                        // resolvedHostPath null = SAF tree from a non-externalstorage
-                        // provider (cloud / Drive). Picker normally rejects these at
-                        // add time, so this is a defensive fallback.
                         android.widget.Toast.makeText(
                             context,
-                            "Mount path unavailable",
+                            "Mount path unavailable or permission revoked",
                             android.widget.Toast.LENGTH_SHORT,
                         ).show()
                     }

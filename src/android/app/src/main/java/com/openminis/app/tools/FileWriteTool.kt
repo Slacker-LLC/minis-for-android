@@ -79,22 +79,11 @@ object FileWriteTool {
             // file remains behind minisd because App cannot cross the SELinux
             // boundary to /data/adb/minis directly.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
-                val externalMountFile = if (path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")) {
-                    RuntimePathRegistry.resolveHostPath(path)
-                        ?: return@withKey ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
-                } else {
-                    null
-                }
+                val externalMountPath = ExternalMountAccess.isPath(path)
                 if (expectedSha256.isNotEmpty()) {
                     val current = try {
-                        if (externalMountFile != null) {
-                            if (!externalMountFile.exists() || !externalMountFile.isFile) {
-                                return@withKey ToolExecutionResult(
-                                    "Error: File changed since it was opened (it no longer exists): $path",
-                                    false, toolTitle = toolTitle,
-                                )
-                            }
-                            externalMountFile.readBytes()
+                        if (externalMountPath) {
+                            ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
                         } else {
                             WorkspaceFileClient.readAll(sessionId, path)
                         }
@@ -115,7 +104,7 @@ object FileWriteTool {
                     }
                 }
 
-                val bytes = if (externalMountFile != null) {
+                val bytes = if (externalMountPath) {
                     ExternalMountAccess.write(path, contentBytes, append)
                 } else if (append) {
                     WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
@@ -123,11 +112,10 @@ object FileWriteTool {
                     WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)
                 }
 
-                if (externalMountFile != null) {
+                if (externalMountPath) {
                     com.openminis.app.logging.AppLogger.info(
                         "FileWrite",
-                        "mount write path=$path host=${externalMountFile.absolutePath} bytes=$bytes " +
-                            "landedOk=${externalMountFile.exists()} via=android-mount",
+                        "mount write path=$path bytes=$bytes via=minisd-broker",
                     )
                 }
                 ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)

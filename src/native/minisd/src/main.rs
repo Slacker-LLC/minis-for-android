@@ -7,7 +7,7 @@ use minisd::state::AppState;
 use minisd::{handle, parse_request};
 use std::fs;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 struct Args {
@@ -340,8 +340,12 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
                 return ExitCode::from(1);
             }
         };
+        let app_uid = state.policy.caller.app_uid;
         let app_listener = match app_socket.as_ref() {
-            Some(p) => match bind_sock(p, 0o666) {
+            Some(p) => match bind_sock(p, 0o600).and_then(|listener| {
+                set_socket_owner(p, app_uid)?;
+                Ok(listener)
+            }) {
                 Ok(l) => {
                     eprintln!("minisd app-socket {}", p.display());
                     Some(l)
@@ -356,21 +360,26 @@ fn unix_server(state: AppState, socket: PathBuf, app_socket: Option<PathBuf>) ->
         let state = Arc::new(Mutex::new(state));
         eprintln!("minisd listen {}", socket.display());
         loop {
-            let accepted = if let Some(app) = app_listener.as_ref() {
+            let (stream, app_socket) = if let Some(app) = app_listener.as_ref() {
                 tokio::select! {
-                    a = listener.accept() => a,
-                    b = app.accept() => b,
+                    result = listener.accept() => match result {
+                        Ok((stream, _)) => (stream, false),
+                        Err(_) => continue,
+                    },
+                    result = app.accept() => match result {
+                        Ok((stream, _)) => (stream, true),
+                        Err(_) => continue,
+                    },
                 }
             } else {
-                listener.accept().await
-            };
-            let (stream, _) = match accepted {
-                Ok(s) => s,
-                Err(_) => continue,
+                match listener.accept().await {
+                    Ok((stream, _)) => (stream, false),
+                    Err(_) => continue,
+                }
             };
             let state = Arc::clone(&state);
             tokio::spawn(async move {
-                serve_client(stream, state).await;
+                serve_client(stream, state, app_socket).await;
             });
         }
     })
@@ -387,6 +396,26 @@ fn bind_sock(path: &PathBuf, mode: u32) -> Result<tokio::net::UnixListener, Stri
         .map_err(|e| format!("bind {}: {e}", path.display()))?;
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
     Ok(listener)
+}
+
+#[cfg(unix)]
+fn set_socket_owner(path: &Path, uid: u32) -> Result<(), String> {
+    if uid == 0 {
+        return Err("App socket requires a non-root configured App UID".into());
+    }
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| "App socket path contains NUL".to_string())?;
+    let rc = unsafe { libc::chown(c_path.as_ptr(), uid, uid) };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "chown App socket {}: {}",
+            path.display(),
+            std::io::Error::last_os_error()
+        ))
+    }
 }
 
 #[cfg(unix)]
@@ -433,13 +462,16 @@ async fn dispatch_socket_request(
     state: std::sync::Arc<std::sync::Mutex<AppState>>,
     req: Request,
     peer: Option<minisd::auth::PeerCred>,
+    app_socket: bool,
 ) -> Response {
     let id = req.id;
     match req.method.as_str() {
         "runtime.maintenance" => {
             let mock = {
                 let mut st = poisoned_lock(&state);
-                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                if let Err(resp) =
+                    minisd::dispatch::authorize_request_with_socket(&mut st, &req, peer, app_socket)
+                {
                     return resp;
                 }
                 st.mock
@@ -461,7 +493,9 @@ async fn dispatch_socket_request(
         "root.exec" | "root.fullExec" => {
             let (mock, spec) = {
                 let mut st = poisoned_lock(&state);
-                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                if let Err(resp) =
+                    minisd::dispatch::authorize_request_with_socket(&mut st, &req, peer, app_socket)
+                {
                     return resp;
                 }
                 (st.mock, st.policy.method("root.exec").cloned())
@@ -484,7 +518,9 @@ async fn dispatch_socket_request(
             let admin = req.method == "ubuntu.adminExec";
             let params = {
                 let mut st = poisoned_lock(&state);
-                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                if let Err(resp) =
+                    minisd::dispatch::authorize_request_with_socket(&mut st, &req, peer, app_socket)
+                {
                     return resp;
                 }
                 if st.mock {
@@ -516,6 +552,36 @@ async fn dispatch_socket_request(
                 Ok(response) => response,
             }
         }
+        "mount.reconcile" => {
+            let params = {
+                let mut st = poisoned_lock(&state);
+                if let Err(resp) =
+                    minisd::dispatch::authorize_request_with_socket(&mut st, &req, peer, app_socket)
+                {
+                    return resp;
+                }
+                if st.mock {
+                    return minisd::dispatch::dispatch_authorized(&mut st, &req);
+                }
+                req.params.clone()
+            };
+            match tokio::task::spawn_blocking(move || {
+                let _lifecycle = match minisd::runtime_maintenance::acquire_lifecycle_lock() {
+                    Ok(guard) => guard,
+                    Err(detail) => return Response::err(id, ErrorCode::Internal, detail),
+                };
+                let mut st = poisoned_lock(&state);
+                match minisd::mount::mount_reconcile(&mut st, &params) {
+                    Ok(value) => Response::ok(id, value),
+                    Err((code, detail)) => Response::err(id, code, detail),
+                }
+            })
+            .await
+            {
+                Ok(response) => response,
+                Err(_) => Response::err(id, ErrorCode::Internal, "mount reconcile worker failed"),
+            }
+        }
         _ => {
             let lifecycle = matches!(
                 req.method.as_str(),
@@ -533,7 +599,7 @@ async fn dispatch_socket_request(
                     None
                 };
                 let mut st = poisoned_lock(&state);
-                handle(&mut st, req, peer)
+                minisd::handle_on_socket(&mut st, req, peer, app_socket)
             })
             .await
             {
@@ -548,6 +614,7 @@ async fn dispatch_socket_request(
 async fn serve_client(
     mut stream: tokio::net::UnixStream,
     state: std::sync::Arc<std::sync::Mutex<AppState>>,
+    app_socket: bool,
 ) {
     use minisd::auth::read_peer;
     use std::os::unix::io::AsRawFd;
@@ -572,7 +639,7 @@ async fn serve_client(
             return;
         }
     };
-    let resp = dispatch_socket_request(state, req, peer).await;
+    let resp = dispatch_socket_request(state, req, peer, app_socket).await;
     if let Ok(encoded) = encode_response(&resp) {
         let _ = write_frame_async(&mut stream, encoded.as_bytes(), MAX_RESPONSE_BYTES).await;
     }
@@ -620,6 +687,8 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut listen = minisd::proxy::PROXY_LISTEN.to_string();
     let mut tz = "LCL-8".to_string();
     let mut proxy = String::new();
+    let mut app_uid = minisd::layout::GUEST_UID;
+    let mut external_mounts_json = String::new();
     let mut extra_env: std::collections::BTreeMap<String, String> =
         std::collections::BTreeMap::new();
     let mut guest_argv: Vec<String> = Vec::new();
@@ -676,6 +745,21 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 rootfs = args
                     .get(i + 1)
                     .ok_or((8u8, "--rootfs needs value".into()))?
+                    .clone();
+                i += 2;
+            }
+            "--app-uid" => {
+                app_uid = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--app-uid needs value".into()))?
+                    .parse()
+                    .map_err(|_| (8u8, "bad --app-uid".into()))?;
+                i += 2;
+            }
+            "--external-mounts-json" => {
+                external_mounts_json = args
+                    .get(i + 1)
+                    .ok_or((8u8, "--external-mounts-json needs value".into()))?
                     .clone();
                 i += 2;
             }
@@ -737,7 +821,15 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
         }
     }
     match kind {
-        "keep" => helper_keep(&rootfs, &workspace, &memory, &skills, &shared),
+        "keep" => helper_keep(
+            &rootfs,
+            &workspace,
+            &memory,
+            &skills,
+            &shared,
+            app_uid,
+            &external_mounts_json,
+        ),
         "exec" => helper_exec(
             pid,
             &rootfs,
@@ -762,6 +854,8 @@ fn helper_keep(
     memory: &str,
     skills: &str,
     shared: &str,
+    app_uid: u32,
+    external_mounts_json: &str,
 ) -> Result<(), (u8, String)> {
     use minisd::ns;
     unsafe {
@@ -771,6 +865,10 @@ fn helper_keep(
     ns::unshare_mount().map_err(|e| (1u8, e))?;
     ns::make_rprivate_root().map_err(|e| (2u8, e))?;
     ns::setup_rootfs_mounts(rootfs, workspace, memory, skills, shared).map_err(|e| (3u8, e))?;
+    if !external_mounts_json.is_empty() {
+        minisd::mount::apply_to_namespace(rootfs, external_mounts_json, app_uid)
+            .map_err(|e| (3u8, e))?;
+    }
     println!("READY {}", std::process::id());
     let _ = std::io::Write::flush(&mut std::io::stdout());
     unsafe {

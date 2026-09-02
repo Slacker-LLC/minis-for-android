@@ -100,6 +100,12 @@ object UbuntuPaths {
 
     fun resolveHostPath(linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
+        // External SAF mounts are owned by minisd. Returning a host File here
+        // would bypass the persisted-grant re-attestation and kernel mount
+        // policy, so callers must use the broker-backed file client instead.
+        if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+            return null
+        }
         resolveGuest(linuxPath)?.let { return it }
         val sorted = bindMounts.keys.sortedByDescending { it.length }
         for (mount in sorted) {

@@ -5,11 +5,10 @@ import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 /**
  * `minis-config` offload handler. Mirrors iOS `ConfigOffload.m`.
@@ -385,9 +384,9 @@ class ConfigOffloadHandler : NativeOffloadHandler {
     private fun readLinuxPath(linuxPath: String, sessionId: String?): String? {
         val guestPath = linuxPath.removePrefix("file://")
         if (guestPath == "/var/minis/mounts" || guestPath.startsWith("/var/minis/mounts/")) {
-            val hostFile: File = RuntimePathRegistry.resolveHostPath(guestPath) ?: return null
-            if (!hostFile.exists() || !hostFile.isFile) return null
-            return try { hostFile.readText() } catch (_: Throwable) { null }
+            return runCatching {
+                String(ExternalMountAccess.readBlocking(guestPath), Charsets.UTF_8)
+            }.getOrNull()
         }
         if (sessionId.isNullOrBlank()) return null
         return runCatching {

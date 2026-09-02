@@ -19,8 +19,8 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -42,8 +42,8 @@ import java.util.concurrent.TimeUnit
  *   - `transcribe` is the new canonical subcommand; `listen` is an alias kept
  *     for back-compat with prompts that learned the old form.
  *   - `--source <mic|path>` mirrors apple-speech: defaults to system mic,
- *     also accepts a Linux file path under /var/minis/... resolved via
- *     [RuntimePathRegistry.resolveHostPath]. **Audio-file transcription is not
+ *     also accepts a Linux file path under /var/minis/... validated through
+ *     minisd. **Audio-file transcription is not
  *     yet wired through the recognizer** — Android's [SpeechRecognizer]
  *     only exposes microphone input on most vendor implementations
  *     (the API 31 `EXTRA_AUDIO_SOURCE` extension is not honoured by
@@ -126,7 +126,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
             val exists = resolved.exists
             AppLogger.warning(
                 TAG,
-                "transcribe --source=$source resolved=${resolved.hostPath} exists=$exists — file source not yet wired",
+                "transcribe --source=$source exists=$exists — file source not yet wired",
             )
             val body = JSONObject()
                 .put("error", "not_supported")
@@ -138,7 +138,6 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
                         "`android-speech transcribe --source mic` or omit --source.",
                 )
                 .put("requested_path", source)
-                .put("resolved_host_path", resolved.hostPath ?: "")
                 .put("file_exists", exists)
                 .toString()
             return NativeOffloadResult(2, OffloadOutput.formatBody(body, args) + "\n")
@@ -222,40 +221,39 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         return s.isEmpty() || s == "mic" || s == "system-mic" || s == "system_mic" || s == "microphone"
     }
 
-    /**
-     * Validate a guest path through minisd, while preserving the direct
-     * Android-side mapping used by SAF-backed external mounts. Arbitrary host
-     * paths are rejected rather than treated as guest data.
-     */
-    private data class SourcePathCheck(val exists: Boolean, val hostPath: String?)
+    /** Validate a guest path through minisd without exposing a host path. */
+    private data class SourcePathCheck(val exists: Boolean)
 
     private fun resolveSourcePath(source: String, sessionId: String?): SourcePathCheck {
         val trimmed = source.trim()
-        if (trimmed.isEmpty()) return SourcePathCheck(false, null)
+        if (trimmed.isEmpty()) return SourcePathCheck(false)
         return try {
             if (trimmed == "/var/minis/mounts" || trimmed.startsWith("/var/minis/mounts/")) {
-                val host = RuntimePathRegistry.resolveHostPath(trimmed)
-                SourcePathCheck(host?.isFile == true, host?.absolutePath)
+                SourcePathCheck(runCatching {
+                    runBlocking {
+                        ExternalMountAccess.info(trimmed).optString("type") == "file"
+                    }
+                }.getOrDefault(false))
             } else if (trimmed.startsWith("/var/minis/") || trimmed.startsWith("/workspace")) {
                 val sid = sessionId?.takeIf { it.isNotBlank() }
                 if (sid == null && trimmed.startsWith("/var/minis/workspace")) {
-                    SourcePathCheck(false, null)
+                    SourcePathCheck(false)
                 } else {
                     val exists = runCatching {
                         runBlocking {
                             WorkspaceFileClient.info(sid.orEmpty(), trimmed).optString("type") == "file"
                         }
                     }.getOrDefault(false)
-                    SourcePathCheck(exists, null)
+                    SourcePathCheck(exists)
                 }
             } else {
                 // Never fall back to an arbitrary Android host path. A source
                 // supplied by the guest must be a guest path or an external mount.
-                SourcePathCheck(false, null)
+                SourcePathCheck(false)
             }
         } catch (e: Throwable) {
             AppLogger.warning(TAG, "resolveSourcePath('$trimmed') failed: ${e.message}")
-            SourcePathCheck(false, null)
+            SourcePathCheck(false)
         }
     }
 

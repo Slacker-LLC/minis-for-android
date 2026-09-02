@@ -8,8 +8,8 @@ import coil.fetch.Fetcher
 import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okio.buffer
@@ -37,8 +37,13 @@ class MinisImageFetcher(
         val decoded = java.net.URLDecoder.decode(stripped, "UTF-8")
         val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
         val hostFile = if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-            RuntimePathRegistry.resolveHostPath(linuxPath)
-                ?: throw IllegalArgumentException("Cannot resolve mount path: $linuxPath")
+            val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(linuxPath.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+            val cacheFile = File(File(options.context.cacheDir, "minis-image-cache"), "$digest-$fileName")
+            WorkspaceFileClient.readToFile(null, linuxPath, cacheFile)
+            cacheFile
         } else {
             val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
             val digest = java.security.MessageDigest.getInstance("SHA-256")
@@ -136,7 +141,11 @@ class MinisImageFetcher(
             }
             val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             val mtime = if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-                try { RuntimePathRegistry.resolveHostPath(linuxPath)?.lastModified() ?: 0L } catch (_: Throwable) { 0L }
+                try {
+                    runBlocking(Dispatchers.IO) {
+                        ExternalMountAccess.info(linuxPath).optLong("modified", 0L)
+                    }
+                } catch (_: Throwable) { 0L }
             } else {
                 runCatching {
                     runBlocking(Dispatchers.IO) {
