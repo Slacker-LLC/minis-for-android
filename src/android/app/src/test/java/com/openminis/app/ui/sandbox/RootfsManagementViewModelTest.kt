@@ -16,12 +16,21 @@ class RootfsManagementViewModelTest {
         )
 
         val next = state.withHealth(
-            RootfsHealth(RootfsHealthCode.CORRUPT, "rootfs manifest is invalid"),
+            RootfsHealth(RootfsHealthCode.CORRUPT, "rootfs manifest is invalid", sizeBytes = 8192L),
         )
 
         assertFalse(next.isInstalled)
         assertEquals(RootfsHealthCode.CORRUPT, next.rootfsHealthCode)
         assertEquals("rootfs manifest is invalid", next.rootfsHealthDetail)
         assertEquals(0L, next.rootfsSize)
+    }
+
+    @Test
+    fun `healthy mapping consumes broker size`() {
+        val next = RootfsManagementUiState().withHealth(
+            RootfsHealth(RootfsHealthCode.HEALTHY, "ok", sizeBytes = 8192L),
+        )
+
+        assertEquals(8192L, next.rootfsSize)
     }
 }

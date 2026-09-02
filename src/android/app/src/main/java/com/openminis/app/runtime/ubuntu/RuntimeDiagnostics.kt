@@ -55,6 +55,7 @@ data class BrokerDiagnostic(
 data class RootfsDiagnostic(
     val state: RootfsHealthCode = RootfsHealthCode.UNKNOWN,
     val available: Boolean? = null,
+    val sizeBytes: Long? = null,
     val detail: String? = null,
 )
 
@@ -131,6 +132,7 @@ object RuntimeDiagnosticsMapper {
                 RootfsDiagnostic(
                     state = it.code,
                     available = it.healthy,
+                    sizeBytes = it.sizeBytes,
                     detail = it.detail,
                 )
             } ?: mapRootfs(status, statusOk, statusDetail),

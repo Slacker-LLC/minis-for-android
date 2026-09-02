@@ -714,11 +714,19 @@ object RuntimeDistributionManager {
         if (code == RootfsHealthCode.HEALTHY && provisioned !is Boolean) {
             return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned no provision state")
         }
+        val rawSize = result.opt("size_bytes")
+        val sizeBytes = when {
+            rawSize == null || rawSize == JSONObject.NULL -> null
+            rawSize !is Number || rawSize.toLong() < 0L ->
+                return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned an invalid rootfs size")
+            else -> rawSize.toLong()
+        }
         return RootfsHealth(
             code = code,
             detail = result.optString("detail").ifEmpty { "runtime probe completed" },
             metadata = result.optJSONObject("metadata"),
             provisioned = provisioned as? Boolean ?: false,
+            sizeBytes = sizeBytes,
         )
     }
 
