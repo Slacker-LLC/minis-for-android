@@ -2,11 +2,20 @@
 
 本文记录 **master 代码尚未对齐合同** 的事实。允许出现遗留包名、旧路径与已废弃实现的名字，供排障与迁移使用。其它现行产品文档不得把下列缺口写成「已经如此」。
 
-## G1 存储真源 — 代码已对齐合同
+## G1 存储真源 — 核心路径已迁移，App 侧仍有直接访问
 
-App 与 minisd 均以 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 为持久化真源。`ubuntu.start` 不再传 filesDir。旧 `Context.filesDir/minis*` 只做一次迁移。
+minisd、`ubuntu.start` 和核心 `linux.file.*`/`file_*` 工具均使用
+`/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。新的
+`workspace.file` RPC 负责受限 guest 文件读写；旧 `Context.filesDir/minis*`
+只做一次迁移，IPC 仍可使用 filesDir 上的 app-socket。
 
-仍待真机验收：SELinux 标签、`df` 非 tmpfs、强停后文件仍在。IPC 仍可能走 filesDir 上的 app-socket（非本条范围）。
+当前拆分堆栈已将 Soul/Memory/Skill repository、文件浏览器及 Markdown/媒体预览
+的 canonical 文件访问改为 RPC；WebApp/APK 检查、部分调试/存储管理路径仍需
+继续审计，明确区分 RPC 与 App-local cache。`/var/minis/mounts` 的 SAF 映射保持
+独立，不属于 canonical workspace RPC。
+
+仍待验证：broker 文件 RPC 的真实 App UID/GID 与 SELinux 边界、symlink/TOCTOU
+行为、首装/升级/强停后的持久化、`df` 非 tmpfs，以及真机上的完整文件流转。
 
 ## G2 发行自举 — App 已消费 manifest 并按版本执行原子 rootfs 事务
 
