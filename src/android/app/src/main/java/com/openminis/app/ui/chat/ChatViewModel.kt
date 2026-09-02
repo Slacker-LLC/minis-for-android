@@ -53,6 +53,7 @@ import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
 import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.ContextPressure
@@ -2198,7 +2199,7 @@ class ChatViewModel(
      * Emits a one-shot [requestBudgetEvent] for the UI Snackbar so the
      * user knows older images were compacted into placeholders.
      */
-    private fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
+    private suspend fun applyRequestImageBudget(messages: List<LLMMessage>): List<LLMMessage> {
         // Collect every image in chronological order so the planner can
         // walk in reverse and protect the most recent images.
         data class ImageRef(val msgIdx: Int, val partIdx: Int, val image: ImageBudget.BudgetImage)
@@ -2238,11 +2239,8 @@ class ChatViewModel(
         val plan = ImageBudget.planRequestBudget(images.map { it.image })
         if (!plan.mutated) return messages
 
-        // For dropped images without a linuxPath, lazily spill to disk so
-        // the placeholder still gives the model an addressable reference.
-        val attachmentsRoot = activeSessionId?.let { sid ->
-            java.io.File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, "$sid/attachments")
-        }
+        // For dropped images without a linuxPath, lazily spill through minisd
+        // so the placeholder still gives the model an addressable reference.
         val resolvedPaths = HashMap<ImageBudget.ImagePartId, String?>()
         for (ref in images) {
             val id = ImageBudget.ImagePartId.of(ref.image.data)
@@ -2250,12 +2248,19 @@ class ChatViewModel(
             val existing = ref.image.linuxPath
             if (existing != null) {
                 resolvedPaths[id] = existing
-            } else if (attachmentsRoot != null) {
-                resolvedPaths[id] = ImageBudget.ensureSpillover(
-                    attachmentsRoot, ref.image.data, ref.image.mimeType,
-                )
             } else {
-                resolvedPaths[id] = null
+                val spilloverPath = ImageBudget.spilloverPath(ref.image.data, ref.image.mimeType)
+                resolvedPaths[id] = if (spilloverPath == null) {
+                    null
+                } else {
+                    runCatching {
+                        val existing = WorkspaceFileClient.info(activeSessionId, spilloverPath)
+                        if (existing.optString("type") != "file") {
+                            WorkspaceFileClient.writeBytes(activeSessionId, spilloverPath, ref.image.data)
+                        }
+                        spilloverPath
+                    }.getOrNull()
+                }
             }
         }
 
