@@ -1,27 +1,17 @@
 package com.openminis.app.runtime.distribution
 
 import android.content.Context
-import com.openminis.app.runtime.minisd.MinisdBootstrap
 import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.runtime.minisd.MinisdResponse
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
-import com.openminis.app.runtime.ubuntu.RuntimeProvision
-import com.openminis.app.sandbox.RootfsManager
 import org.json.JSONObject
 
 /**
  * Single active owner of runtime deployment, upgrade, and rollback.
  *
- * The canonical guest rootfs remains `/data/adb/minis/rootfs` per the storage
- * contract. Versioned state lives under `/data/adb/minis/runtime/`:
- *
- * - `staging/` holds the extracted APK rootfs before the atomic switch;
- * - `previous/rootfs` is the single rollback slot;
- * - `pending.json` records an in-flight switch so a killed App can resume or
- *   roll back on the next launch;
- * - `deployed.json` records the committed runtime identity.
- *
- * User data directories are never named in any delete or replace command.
+ * The App owns the transaction decisions. The privileged broker owns every
+ * operation that touches `/data/adb/minis/runtime` or the canonical rootfs.
  */
 object RuntimeDistributionManager {
     const val RUNTIME_DIR = "/data/adb/minis/runtime"
@@ -30,29 +20,32 @@ object RuntimeDistributionManager {
     const val PENDING_FILE = "$RUNTIME_DIR/pending.json"
     const val DEPLOYED_FILE = "$RUNTIME_DIR/deployed.json"
     const val STATE_SCHEMA_VERSION = 2
+    private const val PENDING_SCHEMA_VERSION = 4
+    private val SHA256 = Regex("^[0-9a-f]{64}$")
+    private val TRANSACTION_ID = Regex("^[A-Za-z0-9_.-]{1,128}$")
+    private val ROOTFS_VERSION = Regex("^ubuntu-24\\.04-r[1-9][0-9]*-[0-9a-f]{16}$")
+
+    private const val STATE_PENDING = "pending"
+    private const val STATE_DEPLOYED = "deployed"
+    private const val TARGET_CANONICAL = "canonical"
+    private const val TARGET_PREVIOUS = "previous"
+
+    fun interface RuntimeMaintainer {
+        suspend fun call(operation: String, params: JSONObject): MinisdResponse
+    }
 
     enum class DeploymentOutcome {
         MATCHED,
         DEPLOYED,
         RECOVERED,
         ROLLED_BACK,
+        RESET,
         FAILED,
         ROOT_UNAVAILABLE,
         PAYLOAD_INVALID,
     }
 
     data class DeploymentResult(val outcome: DeploymentOutcome, val detail: String)
-
-    fun interface RootRunner {
-        fun run(command: String): RootCommandResult
-    }
-
-    data class RootCommandResult(
-        val completed: Boolean,
-        val exitCode: Int,
-        val output: String,
-        val error: String? = null,
-    )
 
     data class DeployedIdentity(
         val rootfsVersion: String,
@@ -66,6 +59,13 @@ object RuntimeDistributionManager {
                 minisdSha256 == manifest.minisdSha256 &&
                 provisionRevision == manifest.provisionRevision
 
+        internal fun toJsonObject(): JSONObject = JSONObject()
+            .put("schemaVersion", STATE_SCHEMA_VERSION)
+            .put("rootfsVersion", rootfsVersion)
+            .put("rootfsSha256", rootfsSha256)
+            .put("minisdSha256", minisdSha256)
+            .put("provisionRevision", provisionRevision)
+
         companion object {
             fun parse(raw: String): DeployedIdentity {
                 val root = try {
@@ -73,6 +73,10 @@ object RuntimeDistributionManager {
                 } catch (t: Throwable) {
                     throw IllegalArgumentException("deployed identity is not valid JSON: ${t.message}")
                 }
+                return parseObject(root)
+            }
+
+            internal fun parseObject(root: JSONObject): DeployedIdentity {
                 val schema = root.optInt("schemaVersion", -1)
                 require(schema == STATE_SCHEMA_VERSION) { "deployed identity schemaVersion mismatch" }
                 val rootfsVersion = root.optString("rootfsVersion")
@@ -80,7 +84,7 @@ object RuntimeDistributionManager {
                 val minisdSha256 = root.optString("minisdSha256")
                 val revision = root.optInt("provisionRevision", 0)
                 require(
-                    rootfsVersion.isNotEmpty() &&
+                    ROOTFS_VERSION.matches(rootfsVersion) &&
                         rootfsSha256.matches(Regex("^[0-9a-f]{64}$")) &&
                         minisdSha256.matches(Regex("^[0-9a-f]{64}$")) &&
                         revision > 0,
@@ -90,25 +94,35 @@ object RuntimeDistributionManager {
         }
     }
 
+    enum class PendingPhase {
+        PREPARED,
+        SWITCHING,
+    }
+
     data class PendingTransaction(
         val transactionId: String,
         val targetRootfsVersion: String,
         val targetRootfsSha256: String,
         val targetMinisdSha256: String,
-        val previousRootfsVersion: String? = null,
+        val targetProvisionRevision: Int,
+        val previousIdentity: DeployedIdentity? = null,
+        val phase: PendingPhase = PendingPhase.PREPARED,
     ) {
         fun matches(manifest: RuntimeDistributionManifest): Boolean =
             targetRootfsVersion == manifest.rootfsVersion &&
                 targetRootfsSha256 == manifest.rootfsSha256 &&
-                targetMinisdSha256 == manifest.minisdSha256
+                targetMinisdSha256 == manifest.minisdSha256 &&
+                targetProvisionRevision == manifest.provisionRevision
 
         fun toJson(): String = JSONObject()
-            .put("schemaVersion", STATE_SCHEMA_VERSION)
+            .put("schemaVersion", PENDING_SCHEMA_VERSION)
             .put("transactionId", transactionId)
             .put("targetRootfsVersion", targetRootfsVersion)
             .put("targetRootfsSha256", targetRootfsSha256)
             .put("targetMinisdSha256", targetMinisdSha256)
-            .put("previousRootfsVersion", previousRootfsVersion ?: JSONObject.NULL)
+            .put("targetProvisionRevision", targetProvisionRevision)
+            .put("previousIdentity", previousIdentity?.toJsonObject() ?: JSONObject.NULL)
+            .put("phase", phase.name)
             .toString()
 
         companion object {
@@ -119,136 +133,91 @@ object RuntimeDistributionManager {
                     throw IllegalArgumentException("pending transaction is not valid JSON: ${t.message}")
                 }
                 val schema = root.optInt("schemaVersion", -1)
-                require(schema == STATE_SCHEMA_VERSION) { "pending transaction schemaVersion mismatch" }
+                require(schema == PENDING_SCHEMA_VERSION) { "pending transaction schemaVersion mismatch" }
                 val transactionId = root.optString("transactionId")
                 val targetRootfsVersion = root.optString("targetRootfsVersion")
                 val targetRootfsSha256 = root.optString("targetRootfsSha256")
                 val targetMinisdSha256 = root.optString("targetMinisdSha256")
+                val targetProvisionRevision = root.optInt("targetProvisionRevision", 0)
                 require(
-                    transactionId.isNotEmpty() &&
-                        targetRootfsVersion.isNotEmpty() &&
-                        targetRootfsSha256.matches(Regex("^[0-9a-f]{64}$")) &&
-                        targetMinisdSha256.matches(Regex("^[0-9a-f]{64}$")),
+                    TRANSACTION_ID.matches(transactionId) &&
+                        ROOTFS_VERSION.matches(targetRootfsVersion) &&
+                        SHA256.matches(targetRootfsSha256) &&
+                        SHA256.matches(targetMinisdSha256) &&
+                        targetProvisionRevision > 0,
                 ) { "pending transaction has invalid fields" }
-                val previous = root.optString("previousRootfsVersion").takeIf { it.isNotEmpty() }
+                require(root.has("previousIdentity")) { "pending transaction previous identity is missing" }
+                val previous = if (root.isNull("previousIdentity")) {
+                    null
+                } else {
+                    root.optJSONObject("previousIdentity")?.let(DeployedIdentity::parseObject)
+                        ?: throw IllegalArgumentException("pending transaction previous identity is invalid")
+                }
+                val phase = runCatching { PendingPhase.valueOf(root.optString("phase")) }
+                    .getOrElse { throw IllegalArgumentException("pending transaction phase is invalid") }
                 return PendingTransaction(
                     transactionId = transactionId,
                     targetRootfsVersion = targetRootfsVersion,
                     targetRootfsSha256 = targetRootfsSha256,
                     targetMinisdSha256 = targetMinisdSha256,
-                    previousRootfsVersion = previous,
+                    targetProvisionRevision = targetProvisionRevision,
+                    previousIdentity = previous,
+                    phase = phase,
                 )
             }
         }
     }
 
-    internal enum class RecoveryDecision { COMPLETE, ROLLBACK, REDEPLOY }
+    internal enum class RecoveryDecision { COMPLETE, ROLLBACK, REDEPLOY, REFUSE }
 
     internal fun decideRecovery(
-        canonicalHealthy: Boolean,
+        phase: PendingPhase,
         canonicalMatchesTarget: Boolean,
-        previousHealthy: Boolean,
+        previousMatchesExpected: Boolean,
     ): RecoveryDecision = when {
-        canonicalHealthy && canonicalMatchesTarget -> RecoveryDecision.COMPLETE
-        previousHealthy -> RecoveryDecision.ROLLBACK
-        else -> RecoveryDecision.REDEPLOY
+        canonicalMatchesTarget -> RecoveryDecision.COMPLETE
+        phase == PendingPhase.PREPARED -> RecoveryDecision.REDEPLOY
+        previousMatchesExpected -> RecoveryDecision.ROLLBACK
+        else -> RecoveryDecision.REFUSE
     }
 
     internal fun rootfsMatchesManifest(
         health: RootfsHealth,
         manifest: RuntimeDistributionManifest,
+    ): Boolean = rootfsMatchesIdentity(
+        health,
+        DeployedIdentity(
+            rootfsVersion = manifest.rootfsVersion,
+            rootfsSha256 = manifest.rootfsSha256,
+            minisdSha256 = manifest.minisdSha256,
+            provisionRevision = manifest.provisionRevision,
+        ),
+        manifest,
+    )
+
+    private fun rootfsMatchesIdentity(
+        health: RootfsHealth,
+        identity: DeployedIdentity,
+        manifest: RuntimeDistributionManifest,
     ): Boolean {
         if (!health.healthy) return false
         val metadata = health.metadata ?: return false
+        val revision = identity.rootfsVersion
+            .substringAfter("-r")
+            .substringBefore("-")
+            .toIntOrNull()
+            ?: return false
         return metadata.optString("release") == manifest.rootfsRelease &&
-            metadata.optString("profile") == manifest.rootfsProfile &&
-            metadata.optString("upstream_sha256").lowercase() == manifest.rootfsUpstreamSha256
-    }
-
-    internal fun stageArchiveCommand(packageName: String): String =
-        RuntimeProvision.stageRootfsFromApkCommand(packageName)
-
-    internal fun verifyStagedArchiveCommand(expectedSha256: String): String = """
-ARCHIVE='${RuntimeProvision.STAGED_ROOTFS_ARCHIVE}'
-[ -s "${'$'}ARCHIVE" ] || { echo 'STAGED_ARCHIVE_EMPTY' >&2; exit 140; }
-ACTUAL=${'$'}(sha256sum "${'$'}ARCHIVE" | awk '{print ${'$'}1}')
-[ "${'$'}ACTUAL" = '${expectedSha256}' ] || { echo "STAGED_ARCHIVE_MISMATCH: ${'$'}ACTUAL" >&2; exit 141; }
-echo "STAGED_ARCHIVE_OK: ${'$'}ACTUAL"
-    """.trimIndent()
-
-    internal fun deployRootfsCommand(transactionId: String): String {
-        val rootfs = shellQuote(MinisdProtocol.DEFAULT_ROOTFS)
-        val stage = shellQuote("$STAGING_DIR/rootfs.$transactionId")
-        val previous = shellQuote(PREVIOUS_ROOTFS)
-        val archive = shellQuote(RuntimeProvision.STAGED_ROOTFS_ARCHIVE)
-        val commands = mutableListOf<String>()
-        commands += "ROOTFS=$rootfs"
-        commands += "ARCHIVE=$archive"
-        commands += "STAGE=$stage"
-        commands += "PREV=$previous"
-        commands += "rm -rf \"\$STAGE\""
-        commands += "mkdir -p \"\$STAGE\" || { rm -rf \"\$STAGE\"; exit 90; }"
-        commands += "tar -xzf \"\$ARCHIVE\" -C \"\$STAGE\" || { rm -rf \"\$STAGE\"; exit 91; }"
-        REQUIRED_LAYOUT.forEachIndexed { index, rel ->
-            commands += "[ -e \"\$STAGE/$rel\" ] || { rm -rf \"\$STAGE\"; exit $((92 + index)); }"
-        }
-        commands += "if [ ! -x \"\$STAGE/bin/bash\" ] && [ ! -x \"\$STAGE/usr/bin/bash\" ] && [ ! -x \"\$STAGE/bin/sh\" ]; then rm -rf \"\$STAGE\"; exit 106; fi"
-        commands += "META=\"\$STAGE/etc/minis/rootfs.json\""
-        commands += "grep -Eq '\"distro\"[[:space:]]*:[[:space:]]*\"ubuntu\"' \"\$META\" || { rm -rf \"\$STAGE\"; exit 107; }"
-        commands += "grep -Eq '\"release\"[[:space:]]*:[[:space:]]*\"24\\.04' \"\$META\" || { rm -rf \"\$STAGE\"; exit 108; }"
-        commands += "grep -Eq '\"arch\"[[:space:]]*:[[:space:]]*\"arm64\"' \"\$META\" || { rm -rf \"\$STAGE\"; exit 109; }"
-        commands += "grep -Eq '\"profile\"[[:space:]]*:[[:space:]]*\"base\"' \"\$META\" || { rm -rf \"\$STAGE\"; exit 110; }"
-        commands += "rm -rf \"\$PREV\""
-        commands += "if [ -e \"\$ROOTFS\" ]; then mv \"\$ROOTFS\" \"\$PREV\" || { rm -rf \"\$STAGE\"; exit 111; }; fi"
-        commands += "if ! mv \"\$STAGE\" \"\$ROOTFS\"; then [ -e \"\$PREV\" ] && mv \"\$PREV\" \"\$ROOTFS\" 2>/dev/null || true; rm -rf \"\$STAGE\" 2>/dev/null || true; exit 112; fi"
-        commands += "echo 'MINIS_ROOTFS:DEPLOYED'"
-        return commands.joinToString("\n")
-    }
-
-    internal fun rollbackRootfsCommand(): String = """
-ROOTFS='${MinisdProtocol.DEFAULT_ROOTFS}'
-PREV='$PREVIOUS_ROOTFS'
-OLD="${'$'}PREV.trash.${'$'}${'$'}"
-[ -d "${'$'}PREV" ] || { echo 'no previous rootfs to restore' >&2; exit 120; }
-[ -e "${'$'}ROOTFS" ] && mv "${'$'}ROOTFS" "${'$'}OLD" 2>/dev/null || true
-mv "${'$'}PREV" "${'$'}ROOTFS" || { [ -e "${'$'}OLD" ] && mv "${'$'}OLD" "${'$'}ROOTFS" 2>/dev/null || true; exit 121; }
-rm -rf "${'$'}OLD"
-echo 'MINIS_ROOTFS:ROLLED_BACK'
-    """.trimIndent()
-
-    internal fun writeStateFileCommand(path: String, content: String): String {
-        val dir = shellQuote(path.substringBeforeLast('/', path))
-        val file = shellQuote(path)
-        return """
-DIR=$dir
-FILE=$file
-mkdir -p "${'$'}DIR" || { echo "cannot create ${'$'}DIR" >&2; exit 130; }
-umask 077
-TMP="${'$'}FILE.tmp.${'$'}${'$'}"
-printf '%s' '${content.replace("'", "'\"'\"'")}' > "${'$'}TMP" || { rm -f "${'$'}TMP"; exit 131; }
-mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
-    """.trimIndent()
-    }
-
-    internal fun readStateFileCommand(path: String): String = "cat '${path.replace("'", "'\"'\"'")}'"
-
-    internal fun clearStateFileCommand(path: String): String =
-        "rm -f '${path.replace("'", "'\"'\"'")}'"
-
-    internal fun probeRootfs(runner: RootRunner, rootfs: String): RootfsHealth {
-        val result = runner.run(RootfsManager.buildProbeCommand(rootfs))
-        if (!result.completed || result.exitCode != 0) {
-            return RootfsHealth(
-                RootfsHealthCode.ROOT_UNAVAILABLE,
-                result.error ?: result.output.ifBlank { "rootfs probe failed" },
-            )
-        }
-        return RootfsManager.evaluateProbeOutput(result.output)
+            metadata.optString("profile") == RuntimeDistributionManifest.ROOTFS_PROFILE &&
+            metadata.optString("upstream_sha256").lowercase() ==
+                RuntimeDistributionManifest.PINNED_UPSTREAM_SHA256 &&
+            metadata.optInt("revision", -1) == revision &&
+            metadata.optString("archive_sha256").lowercase() == identity.rootfsSha256
     }
 
     suspend fun ensureDeployed(
         context: Context,
-        runner: RootRunner,
+        maintainer: RuntimeMaintainer,
         stopKeeper: suspend () -> Boolean,
         startKeeper: suspend () -> Boolean,
         provision: suspend () -> Boolean,
@@ -267,158 +236,328 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
         if (!payload.ok) {
             return DeploymentResult(DeploymentOutcome.PAYLOAD_INVALID, payload.error.orEmpty())
         }
-        return ensureDeployedCore(manifest, context.packageName, runner, stopKeeper, startKeeper, provision)
+        return ensureDeployedCore(manifest, context.packageName, maintainer, stopKeeper, startKeeper, provision)
+    }
+
+    suspend fun resetRootfs(
+        maintainer: RuntimeMaintainer,
+        stopKeeper: suspend () -> Boolean,
+    ): DeploymentResult {
+        if (!stopKeeper()) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "cannot stop keeper before rootfs reset",
+            )
+        }
+        val reset = call(maintainer, MinisdProtocol.RUNTIME_OP_RESET)
+        if (!reset.ok) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "rootfs reset failed: ${responseDetail(reset)}",
+            )
+        }
+        return DeploymentResult(DeploymentOutcome.RESET, "rootfs reset; persistent user data preserved")
     }
 
     internal suspend fun ensureDeployedCore(
         manifest: RuntimeDistributionManifest,
         packageName: String,
-        runner: RootRunner,
+        maintainer: RuntimeMaintainer,
         stopKeeper: suspend () -> Boolean,
         startKeeper: suspend () -> Boolean = { true },
         provision: suspend () -> Boolean = { true },
     ): DeploymentResult {
-        val rootCheck = runner.run("id -u")
-        if (!rootCheck.completed || rootCheck.exitCode != 0) {
-            return DeploymentResult(
-                DeploymentOutcome.ROOT_UNAVAILABLE,
-                rootCheck.error ?: rootCheck.output.ifBlank { "root unavailable" },
-            )
-        }
-        if (MinisdBootstrap.parseEffectiveUid(rootCheck.output) != 0) {
-            return DeploymentResult(
-                DeploymentOutcome.ROOT_UNAVAILABLE,
-                "root authorization invalid: expected uid 0",
-            )
-        }
-
         val pending = try {
-            readPending(runner)
+            readPending(maintainer)
         } catch (t: Throwable) {
-            return DeploymentResult(
-                DeploymentOutcome.FAILED,
-                "cannot recover: ${t.message}",
-            )
+            return DeploymentResult(DeploymentOutcome.FAILED, "cannot recover: ${t.message}")
         }
         if (pending != null) {
+            if (!pending.matches(manifest)) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "pending transaction targets a different runtime; refusing recovery",
+                )
+            }
+            val canonical = probeRootfs(maintainer, TARGET_CANONICAL)
+            if (!canonical.isKnown()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "runtime probe was inconclusive; pending transaction retained",
+                )
+            }
+            val canonicalMatches = rootfsMatchesManifest(canonical, manifest)
+            val previous = if (pending.phase == PendingPhase.SWITCHING) {
+                probeRootfs(maintainer, TARGET_PREVIOUS)
+            } else {
+                null
+            }
+            if (previous != null && !previous.isKnown()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "runtime probe was inconclusive; pending transaction retained",
+                )
+            }
+            val previousMatches = pending.previousIdentity?.let { identity ->
+                previous?.provisioned == true && rootfsMatchesIdentity(previous, identity, manifest)
+            } == true
             return when (decideRecovery(
-                canonicalHealthy = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS).healthy,
-                canonicalMatchesTarget = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS)
-                    .let { rootfsMatchesManifest(it, manifest) },
-                previousHealthy = probeRootfs(runner, PREVIOUS_ROOTFS).healthy,
+                phase = pending.phase,
+                canonicalMatchesTarget = canonicalMatches,
+                previousMatchesExpected = previousMatches,
             )) {
                 RecoveryDecision.COMPLETE -> {
-                    if (!completeInterruptedUpgrade(runner, manifest, startKeeper, provision)) {
-                        return DeploymentResult(
+                    if (!completeInterruptedUpgrade(
+                            maintainer,
+                            manifest,
+                            previousMatches,
+                            stopKeeper,
+                            startKeeper,
+                            provision,
+                        )
+                    ) {
+                        DeploymentResult(
                             DeploymentOutcome.FAILED,
                             "interrupted upgrade could not be provisioned; retry or inspect pending state",
                         )
-                    }
-                    DeploymentResult(
-                        DeploymentOutcome.RECOVERED,
-                        "completed interrupted upgrade to ${pending.targetRootfsVersion}",
-                    )
-                }
-                RecoveryDecision.ROLLBACK -> {
-                    val rollback = runner.run(rollbackRootfsCommand())
-                    if (!rollback.completed || rollback.exitCode != 0) {
-                        return DeploymentResult(
-                            DeploymentOutcome.FAILED,
-                            "rollback failed: ${rollback.error ?: rollback.output}",
+                    } else {
+                        DeploymentResult(
+                            DeploymentOutcome.RECOVERED,
+                            "completed interrupted upgrade to ${pending.targetRootfsVersion}",
                         )
                     }
-                    runner.run(clearStateFileCommand(PENDING_FILE))
-                    DeploymentResult(
-                        DeploymentOutcome.ROLLED_BACK,
-                        "restored previous rootfs after interrupted upgrade",
-                    )
+                }
+                RecoveryDecision.ROLLBACK -> {
+                    if (!stopKeeper()) {
+                        DeploymentResult(
+                            DeploymentOutcome.FAILED,
+                            "cannot stop keeper before interrupted-upgrade rollback",
+                        )
+                    } else {
+                        val rollback = call(maintainer, MinisdProtocol.RUNTIME_OP_ROLLBACK)
+                        if (!rollback.ok) {
+                            DeploymentResult(
+                                DeploymentOutcome.FAILED,
+                                "rollback failed: ${responseDetail(rollback)}",
+                            )
+                        } else if (!clearState(maintainer, STATE_PENDING)) {
+                            DeploymentResult(
+                                DeploymentOutcome.FAILED,
+                                "rollback completed but pending transaction could not be cleared",
+                            )
+                        } else {
+                            DeploymentResult(
+                                DeploymentOutcome.ROLLED_BACK,
+                                "restored previous rootfs after interrupted upgrade",
+                            )
+                        }
+                    }
                 }
                 RecoveryDecision.REDEPLOY -> {
-                    runner.run(clearStateFileCommand(PENDING_FILE))
-                    deployNew(manifest, packageName, runner, stopKeeper, startKeeper, provision)
+                    if (!clearState(maintainer, STATE_PENDING)) {
+                        DeploymentResult(
+                            DeploymentOutcome.FAILED,
+                            "cannot clear unusable pending transaction",
+                        )
+                    } else {
+                        deployNew(manifest, packageName, maintainer, stopKeeper, startKeeper, provision)
+                    }
                 }
+                RecoveryDecision.REFUSE -> DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "pending transaction filesystem state is not safely recoverable; pending transaction retained",
+                )
             }
         }
 
-        val deployed = readDeployed(runner)
-        if (deployed != null && deployed.matches(manifest)) {
-            val health = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS)
-            if (rootfsMatchesManifest(health, manifest)) {
+        val deployed = try {
+            readDeployed(maintainer)
+        } catch (t: Throwable) {
+            return DeploymentResult(DeploymentOutcome.FAILED, "cannot read deployed identity: ${t.message}")
+        }
+        val health = probeRootfs(maintainer, TARGET_CANONICAL)
+        if (!health.isKnown()) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "runtime probe was inconclusive; refusing deployment side effects",
+            )
+        }
+        if (deployed != null && deployed.matches(manifest) && rootfsMatchesManifest(health, manifest)) {
+            if (health.provisioned) {
                 return DeploymentResult(
                     DeploymentOutcome.MATCHED,
                     "runtime identity matches manifest ${manifest.rootfsVersion}",
                 )
             }
+            return provisionExisting(maintainer, stopKeeper, startKeeper, provision)
         }
-        return deployNew(manifest, packageName, runner, stopKeeper, startKeeper, provision)
+        return deployNew(manifest, packageName, maintainer, stopKeeper, startKeeper, provision)
+    }
+
+    private suspend fun provisionExisting(
+        maintainer: RuntimeMaintainer,
+        stopKeeper: suspend () -> Boolean,
+        startKeeper: suspend () -> Boolean,
+        provision: suspend () -> Boolean,
+    ): DeploymentResult {
+        if (!stopKeeper()) {
+            return DeploymentResult(DeploymentOutcome.FAILED, "cannot stop keeper before provision")
+        }
+        if (!startKeeper()) {
+            val stopped = stopKeeper()
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                if (stopped) "cannot start keeper before provision"
+                else "cannot start keeper before provision; keeper stop not confirmed",
+            )
+        }
+        if (!provision()) {
+            val stopped = stopKeeper()
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                if (stopped) "provision failed on existing rootfs"
+                else "provision failed on existing rootfs; keeper stop not confirmed",
+            )
+        }
+        return DeploymentResult(DeploymentOutcome.DEPLOYED, "provisioned existing runtime rootfs")
     }
 
     private suspend fun deployNew(
         manifest: RuntimeDistributionManifest,
         packageName: String,
-        runner: RootRunner,
+        maintainer: RuntimeMaintainer,
         stopKeeper: suspend () -> Boolean,
         startKeeper: suspend () -> Boolean,
         provision: suspend () -> Boolean,
     ): DeploymentResult {
+        val previousIdentity = try {
+            readDeployed(maintainer)
+        } catch (t: Throwable) {
+            return DeploymentResult(DeploymentOutcome.FAILED, "cannot read deployed identity: ${t.message}")
+        }
         val transactionId = "tx-${System.currentTimeMillis()}-${(0..0xFFFFFF).random()}"
         val pending = PendingTransaction(
             transactionId = transactionId,
             targetRootfsVersion = manifest.rootfsVersion,
             targetRootfsSha256 = manifest.rootfsSha256,
             targetMinisdSha256 = manifest.minisdSha256,
-            previousRootfsVersion = readDeployed(runner)?.rootfsVersion,
+            targetProvisionRevision = manifest.provisionRevision,
+            previousIdentity = previousIdentity,
         )
-        val pendingWrite = runner.run(writeStateFileCommand(PENDING_FILE, pending.toJson()))
-        if (!pendingWrite.completed || pendingWrite.exitCode != 0) {
+        if (!writeState(maintainer, STATE_PENDING, pending.toJson())) {
             return DeploymentResult(
                 DeploymentOutcome.FAILED,
-                "cannot record pending transaction: ${pendingWrite.error ?: pendingWrite.output}",
+                "cannot record pending transaction: runtime state write failed",
             )
         }
 
-        fun fail(detail: String): DeploymentResult {
-            runner.run(clearStateFileCommand(PENDING_FILE))
+        suspend fun fail(detail: String): DeploymentResult {
+            clearState(maintainer, STATE_PENDING)
             return DeploymentResult(DeploymentOutcome.FAILED, detail)
         }
 
-        val staged = runner.run(stageArchiveCommand(packageName))
-        if (!staged.completed || staged.exitCode != 0) {
-            return fail("rootfs staging failed: ${staged.error ?: staged.output}")
+        val staged = call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_STAGE,
+            JSONObject().put("package_name", packageName),
+        )
+        if (!staged.ok) return fail("rootfs staging failed: ${responseDetail(staged)}")
+
+        val verify = call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_VERIFY,
+            JSONObject().put("expected_sha256", manifest.rootfsSha256),
+        )
+        if (!verify.ok) return fail("staged rootfs digest verification failed: ${responseDetail(verify)}")
+
+        if (!stopKeeper()) return fail("cannot stop keeper before rootfs switch")
+
+        if (!writeState(
+                maintainer,
+                STATE_PENDING,
+                pending.copy(phase = PendingPhase.SWITCHING).toJson(),
+            )
+        ) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "cannot record switch phase; pending transaction retained",
+            )
         }
-        val verify = runner.run(verifyStagedArchiveCommand(manifest.rootfsSha256))
-        if (!verify.completed || verify.exitCode != 0) {
-            return fail(verify.output.ifBlank { "staged rootfs digest verification failed" })
+
+        val deploy = call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_SWITCH,
+            JSONObject()
+                .put("transaction_id", transactionId)
+                .put("expected_sha256", manifest.rootfsSha256),
+        )
+        if (!deploy.ok) {
+            if (deploy.code == MinisdProtocol.ERROR_RUNTIME_SWITCH_UNKNOWN) {
+                // The broker reports an unknown outcome only after the first
+                // namespace exchange. Keep pending for state-based recovery.
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "rootfs deploy outcome is unknown; pending transaction retained: ${responseDetail(deploy)}",
+                )
+            }
+            return fail("rootfs deploy failed before switch: ${responseDetail(deploy)}")
         }
-        if (!stopKeeper()) {
-            return fail("cannot stop keeper before rootfs switch")
+
+        val health = probeRootfs(maintainer, TARGET_CANONICAL)
+        if (!health.isKnown()) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "post-switch rootfs probe was inconclusive; pending transaction retained",
+            )
         }
-        val deploy = runner.run(deployRootfsCommand(transactionId))
-        if (!deploy.completed || deploy.exitCode != 0) {
-            return fail("rootfs deploy failed: ${deploy.error ?: deploy.output}")
-        }
-        val health = probeRootfs(runner, MinisdProtocol.DEFAULT_ROOTFS)
         if (!rootfsMatchesManifest(health, manifest)) {
-            runner.run(rollbackRootfsCommand())
-            return fail("deployed rootfs does not match manifest: ${health.detail}")
+            return rollbackAfterSwitch(
+                maintainer,
+                pending,
+                manifest,
+                "deployed rootfs does not match manifest: ${health.detail}",
+            )
         }
         if (!startKeeper()) {
-            stopKeeper()
-            rollbackAfterFailedProvision(runner)
-            return fail("cannot start keeper after rootfs switch")
+            if (!stopKeeper()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "cannot stop keeper after failed start; pending transaction retained",
+                )
+            }
+            return rollbackAfterSwitch(
+                maintainer,
+                pending,
+                manifest,
+                "cannot start keeper after rootfs switch",
+            )
         }
         if (!provision()) {
-            stopKeeper()
-            rollbackAfterFailedProvision(runner)
-            return fail("provision failed on deployed rootfs; rolled back to previous")
+            if (!stopKeeper()) {
+                return DeploymentResult(
+                    DeploymentOutcome.FAILED,
+                    "provision failed on deployed rootfs; cannot stop keeper; pending transaction retained",
+                )
+            }
+            return rollbackAfterSwitch(
+                maintainer,
+                pending,
+                manifest,
+                "provision failed on deployed rootfs",
+            )
         }
-        if (!writeDeployed(runner, manifest)) {
+        if (!writeDeployed(maintainer, manifest)) {
             return DeploymentResult(
                 DeploymentOutcome.FAILED,
                 "cannot record deployed identity after successful switch",
             )
         }
-        runner.run(clearStateFileCommand(PENDING_FILE))
+        if (!clearState(maintainer, STATE_PENDING)) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "cannot clear pending transaction after successful deployment",
+            )
+        }
         return DeploymentResult(
             DeploymentOutcome.DEPLOYED,
             "deployed ${manifest.rootfsVersion}",
@@ -426,34 +565,66 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
     }
 
     private suspend fun completeInterruptedUpgrade(
-        runner: RootRunner,
+        maintainer: RuntimeMaintainer,
         manifest: RuntimeDistributionManifest,
+        previousMatchesExpected: Boolean,
+        stopKeeper: suspend () -> Boolean,
         startKeeper: suspend () -> Boolean,
         provision: suspend () -> Boolean,
     ): Boolean {
+        if (!stopKeeper()) return false
         if (!startKeeper()) {
-            rollbackAfterFailedProvision(runner)
+            if (!stopKeeper()) return false
+            if (previousMatchesExpected) rollbackAndClearPending(maintainer)
             return false
         }
         if (!provision()) {
-            rollbackAfterFailedProvision(runner)
+            if (!stopKeeper()) return false
+            if (previousMatchesExpected) rollbackAndClearPending(maintainer)
             return false
         }
-        if (!writeDeployed(runner, manifest)) {
-            rollbackAfterFailedProvision(runner)
-            return false
+        if (!writeDeployed(maintainer, manifest)) return false
+        return clearState(maintainer, STATE_PENDING)
+    }
+
+    private suspend fun rollbackAfterSwitch(
+        maintainer: RuntimeMaintainer,
+        pending: PendingTransaction,
+        manifest: RuntimeDistributionManifest,
+        detail: String,
+    ): DeploymentResult {
+        val previousIdentity = pending.previousIdentity
+        if (previousIdentity == null) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "$detail; no matching previous identity; pending transaction retained",
+            )
         }
-        runner.run(clearStateFileCommand(PENDING_FILE))
-        return true
+        val previous = probeRootfs(maintainer, TARGET_PREVIOUS)
+        if (!previous.isKnown() || previous.provisioned != true ||
+            !rootfsMatchesIdentity(previous, previousIdentity, manifest)
+        ) {
+            return DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "$detail; previous identity was not confirmed; pending transaction retained",
+            )
+        }
+        return if (rollbackAndClearPending(maintainer)) {
+            DeploymentResult(DeploymentOutcome.FAILED, "$detail; rolled back to previous")
+        } else {
+            DeploymentResult(
+                DeploymentOutcome.FAILED,
+                "$detail; rollback not confirmed; pending transaction retained",
+            )
+        }
     }
 
-    private fun rollbackAfterFailedProvision(runner: RootRunner) {
-        runner.run(rollbackRootfsCommand())
-        runner.run(clearStateFileCommand(PENDING_FILE))
-    }
+    private suspend fun rollbackAndClearPending(maintainer: RuntimeMaintainer): Boolean =
+        call(maintainer, MinisdProtocol.RUNTIME_OP_ROLLBACK).ok &&
+            clearState(maintainer, STATE_PENDING)
 
-    private fun readPending(runner: RootRunner): PendingTransaction? =
-        readState(runner, PENDING_FILE)?.let { raw ->
+    private suspend fun readPending(maintainer: RuntimeMaintainer): PendingTransaction? =
+        readState(maintainer, STATE_PENDING)?.let { raw ->
             try {
                 PendingTransaction.parse(raw)
             } catch (t: Throwable) {
@@ -461,52 +632,112 @@ mv -f "${'$'}TMP" "${'$'}FILE" || { rm -f "${'$'}TMP"; exit 132; }
             }
         }
 
-    private fun readDeployed(runner: RootRunner): DeployedIdentity? =
-        readState(runner, DEPLOYED_FILE)?.let { raw ->
-            runCatching { DeployedIdentity.parse(raw) }.getOrNull()
+    private suspend fun readDeployed(maintainer: RuntimeMaintainer): DeployedIdentity? =
+        readState(maintainer, STATE_DEPLOYED)?.let { raw ->
+            try {
+                DeployedIdentity.parse(raw)
+            } catch (t: Throwable) {
+                throw IllegalStateException("$DEPLOYED_FILE is corrupt: ${t.message}")
+            }
         }
 
-    private fun readState(runner: RootRunner, path: String): String? {
-        val result = runner.run(readStateFileCommand(path))
-        if (!result.completed || result.exitCode != 0) return null
-        return result.output.ifBlank { null }
+    private suspend fun readState(maintainer: RuntimeMaintainer, name: String): String? {
+        val response = call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_READ_STATE,
+            JSONObject().put("name", name),
+        )
+        if (!response.ok) throw IllegalStateException(responseDetail(response))
+        val result = response.result ?: throw IllegalStateException("runtime state response is empty")
+        val present = result.opt("present")
+        if (present !is Boolean) throw IllegalStateException("runtime state $name has invalid presence")
+        if (!present) return null
+        val content = result.opt("content")
+        if (content !is String || content.isEmpty()) {
+            throw IllegalStateException("runtime state $name is empty")
+        }
+        return content
     }
 
-    private fun writeDeployed(runner: RootRunner, manifest: RuntimeDistributionManifest): Boolean {
-        val identity = DeployedIdentity(
-            rootfsVersion = manifest.rootfsVersion,
-            rootfsSha256 = manifest.rootfsSha256,
-            minisdSha256 = manifest.minisdSha256,
-            provisionRevision = manifest.provisionRevision,
-        )
+    private suspend fun writeState(
+        maintainer: RuntimeMaintainer,
+        name: String,
+        content: String,
+    ): Boolean = call(
+        maintainer,
+        MinisdProtocol.RUNTIME_OP_WRITE_STATE,
+        JSONObject().put("name", name).put("content", content),
+    ).ok
+
+    private suspend fun clearState(maintainer: RuntimeMaintainer, name: String): Boolean =
+        call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_CLEAR_STATE,
+            JSONObject().put("name", name),
+        ).ok
+
+    private suspend fun writeDeployed(
+        maintainer: RuntimeMaintainer,
+        manifest: RuntimeDistributionManifest,
+    ): Boolean {
         val json = JSONObject()
             .put("schemaVersion", STATE_SCHEMA_VERSION)
-            .put("rootfsVersion", identity.rootfsVersion)
-            .put("rootfsSha256", identity.rootfsSha256)
-            .put("minisdSha256", identity.minisdSha256)
-            .put("provisionRevision", identity.provisionRevision)
+            .put("rootfsVersion", manifest.rootfsVersion)
+            .put("rootfsSha256", manifest.rootfsSha256)
+            .put("minisdSha256", manifest.minisdSha256)
+            .put("provisionRevision", manifest.provisionRevision)
             .toString()
-        val result = runner.run(writeStateFileCommand(DEPLOYED_FILE, json))
-        return result.completed && result.exitCode == 0
+        return writeState(maintainer, STATE_DEPLOYED, json)
     }
 
-    private val REQUIRED_LAYOUT = listOf(
-        "etc/os-release",
-        "etc/passwd",
-        "etc/group",
-        "etc/minis/rootfs.json",
-        "workspace",
-        "memory",
-        "skills",
-        "shared",
-        "proc",
-        "sys",
-        "dev",
-        "tmp",
-        "run",
-        "var/minis",
-    )
+    private suspend fun probeRootfs(maintainer: RuntimeMaintainer, target: String): RootfsHealth {
+        val response = call(
+            maintainer,
+            MinisdProtocol.RUNTIME_OP_PROBE,
+            JSONObject().put("target", target),
+        )
+        if (!response.ok) return RootfsHealth(RootfsHealthCode.ROOT_UNAVAILABLE, responseDetail(response))
+        val result = response.result ?: return RootfsHealth(
+            RootfsHealthCode.UNKNOWN,
+            "runtime probe returned no result",
+        )
+        val code = runCatching { RootfsHealthCode.valueOf(result.optString("code")) }.getOrNull()
+            ?: return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned an unknown health code")
+        val healthy = result.opt("healthy")
+        if (healthy !is Boolean || healthy != (code == RootfsHealthCode.HEALTHY)) {
+            return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned an inconsistent health result")
+        }
+        if (code == RootfsHealthCode.HEALTHY && result.opt("metadata") !is JSONObject) {
+            return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned no metadata")
+        }
+        val provisioned = result.opt("provisioned")
+        if (code == RootfsHealthCode.HEALTHY && provisioned !is Boolean) {
+            return RootfsHealth(RootfsHealthCode.UNKNOWN, "runtime probe returned no provision state")
+        }
+        return RootfsHealth(
+            code = code,
+            detail = result.optString("detail").ifEmpty { "runtime probe completed" },
+            metadata = result.optJSONObject("metadata"),
+            provisioned = provisioned as? Boolean ?: false,
+        )
+    }
 
-    private fun shellQuote(value: String): String =
-        "'" + value.replace("'", "'\"'\"'") + "'"
+    private fun RootfsHealth.isKnown(): Boolean = code != RootfsHealthCode.ROOT_UNAVAILABLE &&
+        code != RootfsHealthCode.UNKNOWN
+
+    private suspend fun call(
+        maintainer: RuntimeMaintainer,
+        operation: String,
+        params: JSONObject = JSONObject(),
+    ): MinisdResponse = runCatching {
+        maintainer.call(operation, params)
+    }.getOrElse {
+        MinisdProtocol.runtimeError(
+            MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
+            "runtime maintenance transport failed: ${it.message}",
+        )
+    }
+
+    private fun responseDetail(response: MinisdResponse): String =
+        response.error?.let { "${it.code}: ${it.detail}" } ?: "runtime maintenance failed"
 }

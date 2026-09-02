@@ -32,6 +32,7 @@ rootfs_metadata = json.dumps({
     "release": "24.04.3",
     "arch": "arm64",
     "profile": "base",
+    "revision": 1,
     "upstream_sha256": "7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048",
 }).encode()
 with tarfile.open(root / "ubuntu-arm64-rootfs.tar.gz", "w:gz") as tar:

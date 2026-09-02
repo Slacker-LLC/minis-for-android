@@ -436,6 +436,28 @@ async fn dispatch_socket_request(
 ) -> Response {
     let id = req.id;
     match req.method.as_str() {
+        "runtime.maintenance" => {
+            let mock = {
+                let mut st = poisoned_lock(&state);
+                if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
+                    return resp;
+                }
+                st.mock
+            };
+            match tokio::task::spawn_blocking(move || {
+                match minisd::runtime_maintenance::handle(mock, &req.params) {
+                    Ok(value) => Response::ok(id, value),
+                    Err((code, detail)) => Response::err(id, code, detail),
+                }
+            })
+            .await
+            {
+                Ok(resp) => resp,
+                Err(_) => {
+                    Response::err(id, ErrorCode::Internal, "runtime maintenance worker failed")
+                }
+            }
+        }
         "root.exec" | "root.fullExec" => {
             let (mock, spec) = {
                 let mut st = poisoned_lock(&state);
@@ -460,7 +482,7 @@ async fn dispatch_socket_request(
         }
         "ubuntu.exec" | "ubuntu.adminExec" => {
             let admin = req.method == "ubuntu.adminExec";
-            let snapshot = {
+            let params = {
                 let mut st = poisoned_lock(&state);
                 if let Err(resp) = minisd::dispatch::authorize_request(&mut st, &req, peer) {
                     return resp;
@@ -468,31 +490,57 @@ async fn dispatch_socket_request(
                 if st.mock {
                     return minisd::dispatch::dispatch_authorized(&mut st, &req);
                 }
-                match minisd::ipc_exec::snapshot_ubuntu_exec(&mut st) {
-                    Ok(snapshot) => snapshot,
-                    Err((code, detail)) => return Response::err(id, code, detail),
-                }
+                req.params.clone()
             };
-            let params = req.params.clone();
+            let state_for_worker = std::sync::Arc::clone(&state);
             match tokio::task::spawn_blocking(move || {
-                minisd::ipc_exec::execute_ubuntu_snapshot(snapshot, params, admin)
+                let _lifecycle = match minisd::runtime_maintenance::acquire_lifecycle_lock() {
+                    Ok(guard) => guard,
+                    Err(detail) => return Response::err(id, ErrorCode::Internal, detail),
+                };
+                let snapshot = {
+                    let mut st = poisoned_lock(&state_for_worker);
+                    match minisd::ipc_exec::snapshot_ubuntu_exec(&mut st) {
+                        Ok(snapshot) => snapshot,
+                        Err((code, detail)) => return Response::err(id, code, detail),
+                    }
+                };
+                match minisd::ipc_exec::execute_ubuntu_snapshot(snapshot, params, admin) {
+                    Ok(value) => Response::ok(id, value),
+                    Err((code, detail)) => Response::err(id, code, detail),
+                }
             })
             .await
             {
-                Ok(Ok(value)) => Response::ok(id, value),
-                Ok(Err((code, detail))) => Response::err(id, code, detail),
                 Err(_) => Response::err(id, ErrorCode::Internal, "ubuntu.exec worker failed"),
+                Ok(response) => response,
             }
         }
-        _ => match tokio::task::spawn_blocking(move || {
-            let mut st = poisoned_lock(&state);
-            handle(&mut st, req, peer)
-        })
-        .await
-        {
-            Ok(resp) => resp,
-            Err(_) => Response::err(id, ErrorCode::Internal, "request worker failed"),
-        },
+        _ => {
+            let lifecycle = matches!(
+                req.method.as_str(),
+                "ubuntu.start" | "ubuntu.stop" | "ubuntu.provision"
+            );
+            match tokio::task::spawn_blocking(move || {
+                let _lifecycle = if lifecycle {
+                    Some(
+                        match minisd::runtime_maintenance::acquire_lifecycle_lock() {
+                            Ok(guard) => guard,
+                            Err(detail) => return Response::err(id, ErrorCode::Internal, detail),
+                        },
+                    )
+                } else {
+                    None
+                };
+                let mut st = poisoned_lock(&state);
+                handle(&mut st, req, peer)
+            })
+            .await
+            {
+                Ok(resp) => resp,
+                Err(_) => Response::err(id, ErrorCode::Internal, "request worker failed"),
+            }
+        }
     }
 }
 

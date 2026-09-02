@@ -32,7 +32,12 @@ class RuntimePayloadVerifierTest {
         return RuntimeDistributionManifest.parse(text)
     }
 
-    private fun tarEntry(name: String, content: ByteArray? = null, type: Char = '0'): ByteArray {
+    private fun tarEntry(
+        name: String,
+        content: ByteArray? = null,
+        type: Char = '0',
+        linkName: String = "",
+    ): ByteArray {
         val header = ByteArray(512)
         val nameBytes = name.toByteArray(Charsets.UTF_8)
         nameBytes.copyInto(header, 0, 0, minOf(100, nameBytes.size))
@@ -42,6 +47,7 @@ class RuntimePayloadVerifierTest {
         writeOctal(header, 124, (content?.size ?: 0).toLong(), 11)
         writeOctal(header, 136, 0, 11)
         header[156] = type.code.toByte()
+        linkName.toByteArray(Charsets.UTF_8).copyInto(header, 157, 0, minOf(100, linkName.length))
         "ustar".toByteArray(Charsets.US_ASCII).copyInto(header, 257)
         header[263] = '0'.code.toByte()
         header[264] = '0'.code.toByte()
@@ -59,27 +65,47 @@ class RuntimePayloadVerifierTest {
         formatted.copyInto(buffer, offset, 0, minOf(digits, formatted.size))
     }
 
+    private fun paxRecords(vararg fields: Pair<String, String>): ByteArray = buildString {
+        fields.forEach { (field, value) ->
+            var length = ("$field=$value\n".toByteArray(Charsets.UTF_8).size + 3)
+            while (true) {
+                val record = "$length $field=$value\n"
+                val bytes = record.toByteArray(Charsets.UTF_8)
+                if (bytes.size == length) {
+                    append(record)
+                    break
+                }
+                length = bytes.size
+            }
+        }
+    }.toByteArray(Charsets.UTF_8)
+
     private fun rootfsTar(
         dirs: List<String> = listOf(
             "workspace", "memory", "skills", "shared", "proc", "sys", "dev", "tmp", "run",
             "var", "var/minis", "etc", "etc/minis", "bin",
         ),
         shell: String? = "bin/bash",
+        memberPrefix: String = "",
+        directorySuffix: String = "",
+        extraEntries: List<ByteArray> = emptyList(),
         metadata: JSONObject = JSONObject()
             .put("distro", "ubuntu")
             .put("version", "24.04")
             .put("release", "24.04.3")
             .put("arch", "arm64")
             .put("profile", "base")
+            .put("revision", 1)
             .put("upstream_sha256", upstream),
     ): ByteArray {
         val out = ByteArrayOutputStream()
-        dirs.forEach { out.write(tarEntry(it, null, '5')) }
-        out.write(tarEntry("etc/os-release", "VERSION_ID=\"24.04\"\n".toByteArray()))
-        out.write(tarEntry("etc/passwd", "root:x:0:0:root:/root:/bin/bash\n".toByteArray()))
-        out.write(tarEntry("etc/group", "root:x:0:\n".toByteArray()))
-        out.write(tarEntry("etc/minis/rootfs.json", metadata.toString().toByteArray()))
-        if (shell != null) out.write(tarEntry(shell, "#!/bin/sh\n".toByteArray()))
+        dirs.forEach { out.write(tarEntry("$memberPrefix$it$directorySuffix", null, '5')) }
+        out.write(tarEntry("${memberPrefix}etc/os-release", "VERSION_ID=\"24.04\"\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/passwd", "root:x:0:0:root:/root:/bin/bash\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/group", "root:x:0:\n".toByteArray()))
+        out.write(tarEntry("${memberPrefix}etc/minis/rootfs.json", metadata.toString().toByteArray()))
+        if (shell != null) out.write(tarEntry("$memberPrefix$shell", "#!/bin/sh\n".toByteArray()))
+        extraEntries.forEach { out.write(it) }
         out.write(ByteArray(1024))
         return out.toByteArray()
     }
@@ -99,7 +125,19 @@ class RuntimePayloadVerifierTest {
             manifest(digest),
         )
 
-        assertTrue(result.ok)
+        assertTrue(result.error.orEmpty(), result.ok)
+    }
+
+    @Test
+    fun `rootfs archive normalizes dot slash and directory suffixes`() {
+        val archive = gzip(rootfsTar(memberPrefix = "./", directorySuffix = "/"))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertTrue(result.error.orEmpty(), result.ok)
     }
 
     @Test
@@ -168,13 +206,138 @@ class RuntimePayloadVerifierTest {
     }
 
     @Test
+    fun `absolute symlink target is rejected`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry("etc/minis/escape", type = '2', linkName = "/data/adb/minis/workspace"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertFalse(result.ok)
+        assertTrue(result.error.orEmpty().contains("unsafe link"))
+    }
+
+    @Test
+    fun `fixed guest bridge symlink is allowed`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry("var/minis/workspace", type = '2', linkName = "/workspace"),
+                tarEntry("var/run", type = '2', linkName = "/run"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertTrue(result.error.orEmpty(), result.ok)
+    }
+
+    @Test
+    fun `pax path and linkpath metadata are honored`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry(
+                    "PaxHeaders.0/entry",
+                    content = paxRecords("path" to "var/minis/workspace", "linkpath" to "/workspace"),
+                    type = 'x',
+                ),
+                tarEntry("placeholder", type = '2', linkName = "wrong"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertTrue(result.error.orEmpty(), result.ok)
+    }
+
+    @Test
+    fun `global pax linkpath metadata is honored`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry(
+                    "PaxHeaders.0/global",
+                    content = paxRecords("linkpath" to "/workspace"),
+                    type = 'g',
+                ),
+                tarEntry("var/minis/workspace", type = '2', linkName = "wrong"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertTrue(result.error.orEmpty(), result.ok)
+    }
+
+    @Test
+    fun `symlink chain through fixed guest bridge is rejected`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry("var/run", type = '2', linkName = "/run"),
+                tarEntry("etc/minis/escape", type = '2', linkName = "../../var/run"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertFalse(result.ok)
+        assertTrue(result.error.orEmpty(), result.error.orEmpty().contains("absolute link"))
+    }
+
+    @Test
+    fun `special archive node is rejected`() {
+        val archive = gzip(rootfsTar(extraEntries = listOf(tarEntry("etc/minis/device", type = '3'))))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertFalse(result.ok)
+        assertTrue(result.error.orEmpty().contains("unsupported node type"))
+    }
+
+    @Test
+    fun `hardlink target must be a regular archive file`() {
+        val archive = gzip(rootfsTar(
+            extraEntries = listOf(
+                tarEntry("etc/minis/link", type = '1', linkName = "etc/minis/missing"),
+            ),
+        ))
+        val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
+        val result = RuntimePayloadVerifier.verifyRootfsArchive(
+            ByteArrayInputStream(archive),
+            manifest(digest),
+        )
+
+        assertFalse(result.ok)
+        assertTrue(result.error.orEmpty().contains("hardlink target"))
+    }
+
+    @Test
     fun `rootfs metadata release mismatch is rejected`() {
         val archive = gzip(rootfsTar(metadata = JSONObject()
             .put("distro", "ubuntu")
-            .put("version", "22.04")
+            .put("version", "24.04")
             .put("release", "22.04")
             .put("arch", "arm64")
             .put("profile", "base")
+            .put("revision", 1)
             .put("upstream_sha256", upstream)))
         val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
         val result = RuntimePayloadVerifier.verifyRootfsArchive(
@@ -194,6 +357,7 @@ class RuntimePayloadVerifierTest {
             .put("release", "24.04.3")
             .put("arch", "arm64")
             .put("profile", "base")
+            .put("revision", 1)
             .put("upstream_sha256", "a".repeat(64))))
         val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
         val result = RuntimePayloadVerifier.verifyRootfsArchive(
@@ -213,6 +377,7 @@ class RuntimePayloadVerifierTest {
             .put("release", "24.04.3")
             .put("arch", "arm64")
             .put("profile", "full")
+            .put("revision", 1)
             .put("upstream_sha256", upstream)))
         val digest = RuntimePayloadVerifier.sha256(ByteArrayInputStream(archive))
         val result = RuntimePayloadVerifier.verifyRootfsArchive(

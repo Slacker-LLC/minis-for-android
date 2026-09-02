@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import org.json.JSONObject
 
 /** App-side client for the already-installed minisd. */
 class MinisdClient(
@@ -71,6 +72,15 @@ class MinisdClient(
 
     suspend fun ubuntuProvision(timeoutMs: Long = 600_000): MinisdResponse =
         call(MinisdProtocol.ubuntuProvision(nextId()), timeoutMs + 5_000)
+
+    suspend fun runtimeMaintenance(
+        operation: String,
+        params: JSONObject = JSONObject(),
+        timeoutMs: Long = MinisdProtocol.RUNTIME_MAINTENANCE_TIMEOUT_MS,
+    ): MinisdResponse = call(
+        MinisdProtocol.runtimeMaintenance(operation, params, nextId()),
+        timeoutMs + 5_000,
+    )
 
     suspend fun ubuntuAdminExec(
         argv: List<String>,
