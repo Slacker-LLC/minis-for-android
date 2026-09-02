@@ -16,6 +16,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -35,6 +36,7 @@ import java.io.File
 class BrowserUseManager(
     val webView: WebView,
     profile: UserAgentProfile = UserAgentProfile.MOBILE_CHROME,
+    private val sessionIdProvider: () -> String? = { null },
 ) {
     companion object {
         private const val TAG = "BrowserUseManager"
@@ -396,27 +398,35 @@ class BrowserUseManager(
     /** Resolve minis:// URLs to local workspace files. */
     private fun interceptMinisURL(uri: android.net.Uri): android.webkit.WebResourceResponse? {
         try {
-            // minis://workspace/foo.html → /var/minis/workspace/foo.html, then
-            // resolve to the host file via PRoot bind mounts (per-session
-            // workspace lives under filesDir/minis-sessions/<sid>/workspace/).
             val host = uri.host ?: return null
             val path = uri.path ?: ""
             val linuxPath = "/var/minis/$host$path"
-            val localFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
-            if (localFile == null || !localFile.exists() || !localFile.isFile) {
-                return android.webkit.WebResourceResponse("text/plain", "UTF-8", 404, "Not Found",
-                    emptyMap(), "File not found: $host$path".byteInputStream())
+            val name = path.substringAfterLast('/').ifEmpty { host }
+            val bytes = if (linuxPath.startsWith("/var/minis/mounts/")) {
+                val localFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
+                    ?: return notFound(host, path)
+                if (!localFile.exists() || !localFile.isFile) return notFound(host, path)
+                localFile.readBytes()
+            } else {
+                val sid = sessionIdProvider()?.takeIf { it.isNotBlank() }
+                    ?: return notFound(host, path)
+                runCatching {
+                    WorkspaceFileClient.readAllBlocking(sid, linuxPath)
+                }.getOrElse {
+                    Log.w(TAG, "minis:// read failed for $linuxPath: ${it.message}")
+                    return notFound(host, path)
+                }
             }
-            val mimeType = guessMimeType(localFile.name)
+            val mimeType = guessMimeType(name)
             // For HTML mainframe responses, inject a `<meta viewport>` matching
             // the agent's session viewport when the page doesn't declare one.
             // Without this, Android WebView falls back to a hardcoded 980 CSS
             // px width regardless of the WebView's measured size, making
             // `set_viewport` look like a no-op for `minis://` HTML pages.
             val stream = if (mimeType == "text/html" && lastAppliedViewport != null) {
-                ensureMetaViewport(localFile.readBytes(), lastAppliedViewport!!.first)
+                ensureMetaViewport(bytes, lastAppliedViewport!!.first)
             } else {
-                localFile.inputStream()
+                bytes.inputStream()
             }
             return android.webkit.WebResourceResponse(mimeType, "UTF-8", 200, "OK",
                 mapOf("Access-Control-Allow-Origin" to "*"),
@@ -426,6 +436,16 @@ class BrowserUseManager(
             return null
         }
     }
+
+    private fun notFound(host: String, path: String): android.webkit.WebResourceResponse =
+        android.webkit.WebResourceResponse(
+            "text/plain",
+            "UTF-8",
+            404,
+            "Not Found",
+            emptyMap(),
+            "File not found: $host$path".byteInputStream(),
+        )
 
     /**
      * If the HTML lacks a `<meta name="viewport">`, splice one in matching
@@ -551,9 +571,13 @@ class BrowserUseManager(
         return try {
             delay(300) // Let page settle
             val bitmap = captureWebViewBitmap() ?: return result
-            val file = saveBitmapToFile(bitmap, "snapshot", SNAPSHOT_QUALITY)
+            val output = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, SNAPSHOT_QUALITY, output)
             bitmap.recycle()
-            result.copy(imageFilePath = file.absolutePath)
+            result.copy(
+                base64Image = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP),
+                imageFilePath = null,
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Auto-snapshot failed: ${e.message}")
             result

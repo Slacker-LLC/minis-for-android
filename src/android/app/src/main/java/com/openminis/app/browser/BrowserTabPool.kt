@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.openminis.app.R
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import org.json.JSONObject
 import java.io.File
 import java.util.Date
@@ -366,13 +368,28 @@ class BrowserTabPool(private val context: Context) {
     }
 
 
-    /** The session's /var/minis/workspace/ host directory — downloads land here
-     *  so the agent can read and operate on them in follow-up turns. */
-    private fun sessionWorkspaceDir(): File? {
+    /** The session's guest workspace — downloads land in minisd-managed storage. */
+    private fun sessionWorkspacePath(): String? {
+        if (sessionId == null) return null
+        return "/var/minis/workspace"
+    }
+
+    private val downloadCacheDir: File by lazy {
+        File(context.cacheDir, "browser_downloads").also { it.mkdirs() }
+    }
+
+    private fun safeDownloadName(name: String): String =
+        name.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .ifBlank { "download.bin" }
+
+    private suspend fun uniqueWorkspacePath(name: String): String? {
         val sid = sessionId ?: return null
-        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sid)
-            ?: return File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sid), "workspace").apply { mkdirs() }
-        return File(session, "workspace").apply { mkdirs() }
+        return WorkspaceFileClient.uniqueChildPath(
+            sid,
+            sessionWorkspacePath() ?: return null,
+            safeDownloadName(name),
+        )
     }
 
     /** name.ext → name-1.ext → name-2.ext … until unused. */
@@ -397,80 +414,96 @@ class BrowserTabPool(private val context: Context) {
         mimeType: String?,
         contentLength: Long,
     ) {
-        val dir = sessionWorkspaceDir() ?: run {
+        val sid = sessionId ?: run {
             Log.w(TAG, "download rejected: no session bound to pool")
             return
         }
-        val name = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType)
-        val dest = uniqueFile(dir, name)
-        onDownloadEvent?.invoke("Downloading ${middleTruncated(dest.name)}…")
-        val id = registerDownload(dest, contentLength)
-        val job = downloadScope.launch {
+        downloadScope.launch {
+            val name = safeDownloadName(android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType))
+            val linuxPath = try {
+                uniqueWorkspacePath(name)
+            } catch (t: Throwable) {
+                Log.w(TAG, "download path allocation failed: ${t.message}")
+                null
+            } ?: run {
+                onDownloadEvent?.invoke("Download failed: ${middleTruncated(name)} — workspace unavailable")
+                return@launch
+            }
+            val cacheFile = uniqueFile(downloadCacheDir, name)
+            onDownloadEvent?.invoke("Downloading ${middleTruncated(cacheFile.name)}…")
+            val id = registerDownload(cacheFile, contentLength)
+            downloadJobs[id] = currentCoroutineContext()[Job] ?: error("download job unavailable")
+            var conn: java.net.HttpURLConnection? = null
             try {
-                val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout = 15_000
-                conn.readTimeout = 30_000
-                conn.instanceFollowRedirects = true
-                userAgent?.takeIf { it.isNotEmpty() }?.let { conn.setRequestProperty("User-Agent", it) }
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                conn = connection
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 30_000
+                connection.instanceFollowRedirects = true
+                userAgent?.takeIf { it.isNotEmpty() }?.let { connection.setRequestProperty("User-Agent", it) }
                 // Reuse the WebView's cookies so authenticated downloads work.
                 android.webkit.CookieManager.getInstance().getCookie(url)?.let {
-                    conn.setRequestProperty("Cookie", it)
+                    connection.setRequestProperty("Cookie", it)
                 }
-                val total = if (contentLength > 0) contentLength else conn.contentLengthLong
-                conn.inputStream.use { input ->
-                    dest.outputStream().use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var copied = 0L
-                        while (true) {
-                            // Makes cancelDownload() actually stop mid-stream
-                            // instead of copying to completion.
+                val total = if (contentLength > 0) contentLength else connection.contentLengthLong
+                connection.inputStream.use { input ->
+                    cacheFile.outputStream().use { out ->
+                        WorkspaceFileClient.writeStream(sid, linuxPath, input) { chunk, copied ->
                             ensureActive()
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            copied += n
-                            updateDownloadProgress(id, dest.name, copied, total)
+                            out.write(chunk)
+                            updateDownloadProgress(id, cacheFile.name, copied, total)
                         }
                     }
                 }
-                conn.disconnect()
-                finishDownload(id, dest)
+                finishDownload(id, cacheFile, linuxPath)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // User cancel is not a failure notice-worthy event: delete the
                 // partial file, settle as cancelled, keep the chat quiet.
-                Log.i(TAG, "download cancelled: ${dest.name}")
-                runCatching { dest.delete() }
+                Log.i(TAG, "download cancelled: ${cacheFile.name}")
+                runCatching { cacheFile.delete() }
                 settleDownload(id, DownloadState.FAILED, reason = "Cancelled")
             } catch (t: Throwable) {
-                Log.w(TAG, "download failed: ${dest.name} — ${t.message}")
-                runCatching { dest.delete() }
+                Log.w(TAG, "download failed: ${cacheFile.name} — ${t.message}")
+                runCatching { cacheFile.delete() }
                 settleDownload(id, DownloadState.FAILED, reason = t.message ?: "error")
-                onDownloadEvent?.invoke("Download failed: ${middleTruncated(dest.name)} — ${t.message}")
+                onDownloadEvent?.invoke("Download failed: ${middleTruncated(cacheFile.name)} — ${t.message}")
+            } finally {
+                conn?.disconnect()
             }
         }
-        downloadJobs[id] = job
     }
 
     /** Persist decoded blob: bytes (from the JS bridge) into the workspace. */
     internal fun saveBlobDownload(data: ByteArray, filename: String, mimeType: String?) {
-        val dir = sessionWorkspaceDir() ?: run {
+        val sid = sessionId ?: run {
             Log.w(TAG, "blob download rejected: no session bound to pool")
             return
         }
         // guessFileName on a blob: URL yields "downloadfile.bin" — refine the
         // extension from the blob's actual MIME type when we have one.
-        var name = filename
+        var name = safeDownloadName(filename)
         if ((name.endsWith(".bin") || !name.contains('.')) && mimeType != null) {
             android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)?.let { ext ->
                 name = name.substringBeforeLast('.') + "." + ext
             }
         }
-        val dest = uniqueFile(dir, name)
-        val id = registerDownload(dest, data.size.toLong())
-        val job = downloadScope.launch {
+        downloadScope.launch {
+            val linuxPath = try { uniqueWorkspacePath(name) } catch (t: Throwable) {
+                Log.w(TAG, "blob download path allocation failed: ${t.message}")
+                null
+            } ?: run {
+                onDownloadEvent?.invoke("Download failed: ${middleTruncated(name)} — workspace unavailable")
+                return@launch
+            }
+            val dest = uniqueFile(downloadCacheDir, name)
+            val id = registerDownload(dest, data.size.toLong())
+            downloadJobs[id] = currentCoroutineContext()[Job] ?: error("download job unavailable")
             try {
+                ensureActive()
                 dest.writeBytes(data)
-                finishDownload(id, dest)
+                WorkspaceFileClient.writeBytes(sid, linuxPath, data)
+                updateDownloadProgress(id, dest.name, data.size.toLong(), data.size.toLong())
+                finishDownload(id, dest, linuxPath)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 runCatching { dest.delete() }
                 settleDownload(id, DownloadState.FAILED, reason = "Cancelled")
@@ -481,14 +514,13 @@ class BrowserTabPool(private val context: Context) {
                 onDownloadEvent?.invoke("Download failed: ${middleTruncated(dest.name)} — ${t.message}")
             }
         }
-        downloadJobs[id] = job
     }
 
-    private fun finishDownload(id: Long, dest: File) {
+    private fun finishDownload(id: Long, dest: File, linuxPath: String) {
         val size = dest.length()
         settleDownload(id, DownloadState.COMPLETED, bytes = size)
         val sizeText = android.text.format.Formatter.formatShortFileSize(context, size)
-        Log.i(TAG, "download finished: ${dest.name} ($sizeText) → ${dest.absolutePath}")
+        Log.i(TAG, "download finished: ${dest.name} ($sizeText) → $linuxPath")
         // [T-android-browser-download-ux] iOS v3 semantics: the human-facing
         // notice is just name+size (middle-truncated) — the old full
         // "/var/minis/workspace/… — minis://workspace/…" path+link tail
@@ -784,7 +816,7 @@ class BrowserTabPool(private val context: Context) {
 
         val id = nextTabId++
         val webView = WebView(context)
-        val manager = BrowserUseManager(webView, userAgentProfile)
+        val manager = BrowserUseManager(webView, userAgentProfile) { sessionId }
         if (userAgentProfile == UserAgentProfile.CUSTOM && !customUserAgentString.isNullOrEmpty()) {
             manager.setUserAgent(userAgentProfile, customUserAgentString)
         }
@@ -885,7 +917,7 @@ class BrowserTabPool(private val context: Context) {
         }
         val id = nextTabId++
         val newWebView = WebView(context)
-        val manager = BrowserUseManager(newWebView, userAgentProfile)
+        val manager = BrowserUseManager(newWebView, userAgentProfile) { sessionId }
         if (userAgentProfile == UserAgentProfile.CUSTOM && !customUserAgentString.isNullOrEmpty()) {
             manager.setUserAgent(userAgentProfile, customUserAgentString)
         }

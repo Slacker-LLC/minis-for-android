@@ -12,7 +12,7 @@ import com.openminis.app.provider.safeOptString
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -186,11 +186,13 @@ class ModelUseOffloadHandler(
         }
 
         // System prompt: --system takes precedence over --system-file
-        val explicitSystem = args.get("system") ?: args.get("system-file")?.let { readLinuxPath(it) }
+        val explicitSystem = args.get("system") ?: args.get("system-file")?.let {
+            readLinuxPath(it, request.sessionId)
+        }
 
         // Parse input messages: --input <path> | stdin
         val inputText = when {
-            args.get("input") != null -> readLinuxPath(args.get("input")!!)
+            args.get("input") != null -> readLinuxPath(args.get("input")!!, request.sessionId)
                 ?: return NativeOffloadResult(
                     2,
                     "minis-model-use run: cannot read --input '${args.get("input")}'\n",
@@ -198,7 +200,7 @@ class ModelUseOffloadHandler(
             else -> ""
         }
         val parsed = try {
-            parseMessages(inputText)
+            parseMessages(inputText, request.sessionId)
         } catch (e: ImageInputError) {
             return NativeOffloadResult(
                 2,
@@ -408,22 +410,16 @@ class ModelUseOffloadHandler(
         val ts = System.currentTimeMillis() / 1000
         val modelSlug = entry.model.id.replace("/", "_")
         if (outputPath != null) {
-            // [T-android-model-use-session-scoped-write] Prefer the caller
-            // session's own host dir; fall back to the global resolver only when
-            // sessionId is null or the path isn't a session-scoped /var/minis
-            // subdir. Guaranteed absolute here (relative --output rejected above).
-            val hostFile = sessionScopedHostFile(outputPath, sessionId)
-                ?: RuntimePathRegistry.resolveHostPath(outputPath)
-                ?: return NativeOffloadResult(
-                    2,
-                    "minis-model-use run: cannot resolve --output '$outputPath'\n",
-                )
+            val guestPath = outputPath.removePrefix("file://")
             val firstMedia = response.mediaAttachments.firstOrNull()
             val outputIsMedia = isImageExt(outputExt) || isAudioExt(outputExt) || isVideoExt(outputExt)
             if (firstMedia != null && outputIsMedia) {
-                hostFile.parentFile?.mkdirs()
-                hostFile.writeBytes(firstMedia.data)
-                logModelUseWrite(outputPath, hostFile, sessionId)
+                try {
+                    writeGuestBytes(guestPath, firstMedia.data, sessionId)
+                } catch (e: Throwable) {
+                    return NativeOffloadResult(2, "minis-model-use run: cannot write --output '$outputPath': ${e.message}\n")
+                }
+                logModelUseWrite(guestPath, firstMedia.data.size, sessionId)
                 mediaFiles.put(JSONObject().apply {
                     put("type", firstMedia.type.value)
                     put("mime_type", firstMedia.mimeType)
@@ -436,30 +432,30 @@ class ModelUseOffloadHandler(
                     "handler text fallback: path=$outputPath textLen=${response.text.length} " +
                         "mediaAttachments=${response.mediaAttachments.size} outputIsMedia=$outputIsMedia",
                 )
-                hostFile.parentFile?.mkdirs()
-                hostFile.writeText(response.text)
+                try {
+                    writeGuestBytes(guestPath, response.text.toByteArray(Charsets.UTF_8), sessionId)
+                } catch (e: Throwable) {
+                    return NativeOffloadResult(2, "minis-model-use run: cannot write --output '$outputPath': ${e.message}\n")
+                }
             }
         } else if (response.mediaAttachments.isNotEmpty()) {
-            // [T-android-model-use-session-scoped-write] Auto-save to the caller
-            // session's attachments dir, not the global (last-writer-wins) mount.
-            val attachDir = sessionScopedHostFile("/var/minis/attachments", sessionId)
-                ?: RuntimePathRegistry.resolveHostPath("/var/minis/attachments")
-            if (attachDir != null) {
-                attachDir.mkdirs()
-                for ((idx, media) in response.mediaAttachments.withIndex()) {
-                    val ext = mimeToExt(media.mimeType)
-                    val fileName = "model-use-$modelSlug-$ts-$idx.$ext"
-                    val hostFile = File(attachDir, fileName)
-                    hostFile.writeBytes(media.data)
-                    val responsePath = "/var/minis/attachments/$fileName"
-                    logModelUseWrite(responsePath, hostFile, sessionId)
-                    mediaFiles.put(JSONObject().apply {
-                        put("type", media.type.value)
-                        put("mime_type", media.mimeType)
-                        put("path", responsePath)
-                        put("size", media.data.size)
-                    })
+            for ((idx, media) in response.mediaAttachments.withIndex()) {
+                val ext = mimeToExt(media.mimeType)
+                val fileName = safeGuestName("model-use-$modelSlug-$ts-$idx.$ext")
+                val responsePath = uniqueGuestPath("/var/minis/attachments", fileName, sessionId)
+                try {
+                    writeGuestBytes(responsePath, media.data, sessionId)
+                } catch (e: Throwable) {
+                    Log.w(TAG, "model-use attachment write failed: ${e.message}")
+                    continue
                 }
+                logModelUseWrite(responsePath, media.data.size, sessionId)
+                mediaFiles.put(JSONObject().apply {
+                    put("type", media.type.value)
+                    put("mime_type", media.mimeType)
+                    put("path", responsePath)
+                    put("size", media.data.size)
+                })
             }
         }
 
@@ -954,23 +950,16 @@ class ModelUseOffloadHandler(
             .put("model_id", entry.model.id)
 
         if (outputPath != null) {
-            val hostFile = sessionScopedHostFile(outputPath, sessionId)
-                ?: RuntimePathRegistry.resolveHostPath(outputPath)
-            if (hostFile == null) {
-                out.put("output_error", "Could not resolve --output '$outputPath'")
+            val guestPath = outputPath.removePrefix("file://")
+            try {
+                writeGuestBytes(guestPath, result.data, sessionId)
+                logModelUseWrite(guestPath, result.data.size, sessionId)
+                out.put("output_file", outputPath)
+            } catch (e: Throwable) {
+                // Don't fail the whole call over an unwritable --output — the
+                // request already succeeded. Surface it + fall back to inline.
+                out.put("output_error", "Could not write --output at $outputPath: ${e.message}")
                 inlineTextIfPossible(result.data, out)
-            } else {
-                try {
-                    hostFile.parentFile?.mkdirs()
-                    hostFile.writeBytes(result.data)
-                    logModelUseWrite(outputPath, hostFile, sessionId)
-                    out.put("output_file", outputPath)
-                } catch (e: Throwable) {
-                    // Don't fail the whole call over an unwritable --output — the
-                    // request already succeeded. Surface it + fall back to inline.
-                    out.put("output_error", "Could not write --output at $outputPath: ${e.message}")
-                    inlineTextIfPossible(result.data, out)
-                }
             }
         } else {
             inlineTextIfPossible(result.data, out)
@@ -1200,20 +1189,15 @@ class ModelUseOffloadHandler(
         val ts = System.currentTimeMillis() / 1000
         val modelSlug = entry.model.id.replace("/", "_")
         if (outputPath != null) {
-            // [T-android-model-use-session-scoped-write] Session-scoped first,
-            // global resolver as fallback. --output is absolute here (relative
-            // rejected in cmdRun before the API call).
-            val hostFile = sessionScopedHostFile(outputPath, sessionId)
-                ?: RuntimePathRegistry.resolveHostPath(outputPath)
-                ?: return NativeOffloadResult(
-                    2,
-                    "minis-model-use run: cannot resolve --output '$outputPath'\n",
-                )
+            val guestPath = outputPath.removePrefix("file://")
             val outputIsMedia = isImageExt(outputExt)
             if (firstMedia != null && outputIsMedia) {
-                hostFile.parentFile?.mkdirs()
-                hostFile.writeBytes(firstMedia.data)
-                logModelUseWrite(outputPath, hostFile, sessionId)
+                try {
+                    writeGuestBytes(guestPath, firstMedia.data, sessionId)
+                } catch (e: Throwable) {
+                    return NativeOffloadResult(2, "minis-model-use run: cannot write --output '$outputPath': ${e.message}\n")
+                }
+                logModelUseWrite(guestPath, firstMedia.data.size, sessionId)
                 mediaFiles.put(JSONObject().apply {
                     put("type", firstMedia.type.value)
                     put("mime_type", firstMedia.mimeType)
@@ -1221,30 +1205,30 @@ class ModelUseOffloadHandler(
                     put("size", firstMedia.data.size)
                 })
             } else {
-                hostFile.parentFile?.mkdirs()
-                hostFile.writeText(response.text)
+                try {
+                    writeGuestBytes(guestPath, response.text.toByteArray(Charsets.UTF_8), sessionId)
+                } catch (e: Throwable) {
+                    return NativeOffloadResult(2, "minis-model-use run: cannot write --output '$outputPath': ${e.message}\n")
+                }
             }
         } else if (response.mediaAttachments.isNotEmpty()) {
-            // [T-android-model-use-session-scoped-write] Auto-save to the caller
-            // session's attachments dir, not the global (last-writer-wins) mount.
-            val attachDir = sessionScopedHostFile("/var/minis/attachments", sessionId)
-                ?: RuntimePathRegistry.resolveHostPath("/var/minis/attachments")
-            if (attachDir != null) {
-                attachDir.mkdirs()
-                for ((idx, media) in response.mediaAttachments.withIndex()) {
-                    val ext = mimeToExt(media.mimeType)
-                    val fileName = "model-use-$modelSlug-$ts-$idx.$ext"
-                    val hostFile = File(attachDir, fileName)
-                    hostFile.writeBytes(media.data)
-                    val responsePath = "/var/minis/attachments/$fileName"
-                    logModelUseWrite(responsePath, hostFile, sessionId)
-                    mediaFiles.put(JSONObject().apply {
-                        put("type", media.type.value)
-                        put("mime_type", media.mimeType)
-                        put("path", responsePath)
-                        put("size", media.data.size)
-                    })
+            for ((idx, media) in response.mediaAttachments.withIndex()) {
+                val ext = mimeToExt(media.mimeType)
+                val fileName = safeGuestName("model-use-$modelSlug-$ts-$idx.$ext")
+                val responsePath = uniqueGuestPath("/var/minis/attachments", fileName, sessionId)
+                try {
+                    writeGuestBytes(responsePath, media.data, sessionId)
+                } catch (e: Throwable) {
+                    Log.w(TAG, "model-use attachment write failed: ${e.message}")
+                    continue
                 }
+                logModelUseWrite(responsePath, media.data.size, sessionId)
+                mediaFiles.put(JSONObject().apply {
+                    put("type", media.type.value)
+                    put("mime_type", media.mimeType)
+                    put("path", responsePath)
+                    put("size", media.data.size)
+                })
             }
         }
         val body = JSONObject().apply {
@@ -1276,26 +1260,26 @@ class ModelUseOffloadHandler(
      * falls back to the global resolveHostPath and logs the degrade) or the path
      * isn't a session-scoped `/var/minis/<sub>` path.
      */
-    private fun sessionScopedHostFile(linuxPath: String, sessionId: String?): File? {
-        if (sessionId == null) return null
-        val m = Regex("^/var/minis/(attachments|offloads|workspace|browser)(/.*)?$").find(linuxPath)
-            ?: return null
-        val sub = m.groupValues[1]
-        val rest = m.groupValues[2].removePrefix("/")
-        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
-            ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId)
-        val base = File(session, sub)
-        return if (rest.isEmpty()) base else File(base, rest)
-    }
+    private fun safeGuestName(name: String): String =
+        name.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .ifBlank { "model-output.bin" }
+
+    private fun uniqueGuestPath(directory: String, filename: String, sessionId: String?): String =
+        runBlocking {
+            WorkspaceFileClient.uniqueChildPath(sessionId.orEmpty(), directory, safeGuestName(filename))
+        }
+
+    private fun writeGuestBytes(path: String, bytes: ByteArray, sessionId: String?): Long =
+        runBlocking { WorkspaceFileClient.writeBytes(sessionId.orEmpty(), path, bytes) }
 
     /** [T-android-model-use-session-scoped-write] One-line audit of a model-use
      *  write so the response path vs on-disk host path vs session scoping is
      *  greppable when diagnosing "file disappears / wrong session" reports. */
-    private fun logModelUseWrite(responsePath: String, hostFile: File, sessionId: String?) {
+    private fun logModelUseWrite(responsePath: String, bytes: Int, sessionId: String?) {
         Log.i(
             "ModelUseImage",
-            "[ModelUseWrite] path=$responsePath hostFile=${hostFile.absolutePath} " +
-                "sessionId=$sessionId globalAttachMount=${RuntimePathRegistry.bindMounts["/var/minis/attachments"]}",
+            "[ModelUseWrite] path=$responsePath bytes=$bytes sessionId=$sessionId via=minisd",
         )
     }
 
@@ -1443,10 +1427,21 @@ class ModelUseOffloadHandler(
         return true
     }
 
-    private fun readLinuxPath(linuxPath: String): String? {
-        val hostFile: File = RuntimePathRegistry.resolveHostPath(linuxPath) ?: return null
-        if (!hostFile.exists() || !hostFile.isFile) return null
-        return try { hostFile.readText() } catch (_: Throwable) { null }
+    private fun readLinuxPath(linuxPath: String, sessionId: String?): String? {
+        val path = linuxPath.removePrefix("file://")
+        return try {
+            val bytes = if (path.startsWith("/var/minis/mounts/")) {
+                val hostFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(path)
+                    ?: return null
+                if (!hostFile.exists() || !hostFile.isFile) return null
+                hostFile.readBytes()
+            } else {
+                WorkspaceFileClient.readAllBlocking(sessionId.orEmpty(), path)
+            }
+            bytes.toString(Charsets.UTF_8)
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     /**
@@ -1480,7 +1475,7 @@ class ModelUseOffloadHandler(
      * - `[{"role":"...","content":"..."}, ...]` — array of messages
      * - Plain text → wrapped as a single user message
      */
-    private fun parseMessages(text: String): List<ParsedMessage> {
+    private fun parseMessages(text: String, sessionId: String?): List<ParsedMessage> {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return emptyList()
         try {
@@ -1488,10 +1483,10 @@ class ModelUseOffloadHandler(
                 val obj = JSONObject(trimmed)
                 val arr = obj.optJSONArray("messages")
                     ?: return listOf(ParsedMessage("user", trimmed, emptyList()))
-                return parseMessageArray(arr)
+                return parseMessageArray(arr, sessionId)
             }
             if (trimmed.startsWith("[")) {
-                return parseMessageArray(JSONArray(trimmed))
+                return parseMessageArray(JSONArray(trimmed), sessionId)
             }
         } catch (e: ImageInputError) {
             // Deliberate hard errors from block parsing must NOT be swallowed
@@ -1507,7 +1502,7 @@ class ModelUseOffloadHandler(
         return listOf(ParsedMessage("user", trimmed, emptyList()))
     }
 
-    private fun parseMessageArray(arr: JSONArray): List<ParsedMessage> {
+    private fun parseMessageArray(arr: JSONArray, sessionId: String?): List<ParsedMessage> {
         val out = mutableListOf<ParsedMessage>()
         for (i in 0 until arr.length()) {
             val m = arr.optJSONObject(i) ?: continue
@@ -1528,7 +1523,7 @@ class ModelUseOffloadHandler(
                             val url = imgObj.optString("url", "").takeIf { it.isNotEmpty() }
                                 ?: continue
                             try {
-                                imgs.add(resolveImageUrl(url))
+                                imgs.add(resolveImageUrl(url, sessionId))
                             } catch (e: ImageInputError) {
                                 // Don't silently drop — surface to the agent so it
                                 // can correct the URL or fall back to text.
@@ -1586,7 +1581,7 @@ class ModelUseOffloadHandler(
      * non-zero with a descriptive message instead of silently feeding
      * the model an image-less request (the prior failure mode).
      */
-    private fun resolveImageUrl(url: String): LLMMessage.ImagePart {
+    private fun resolveImageUrl(url: String, sessionId: String?): LLMMessage.ImagePart {
         // data:<mime>;base64,<base64>
         if (url.startsWith("data:")) {
             val rest = url.substring(5)
@@ -1614,9 +1609,8 @@ class ModelUseOffloadHandler(
             )
         }
 
-        // file:///abs/path → strip prefix, treat as host path; fall back
-        // to resolveHostPath so bind-mounted /var/minis/* still works
-        // when callers write file:///var/minis/... .
+        // file:///guest/path → strip prefix and read through minisd. External
+        // SAF mounts retain their independent Android-side mapping.
         val linuxPath = when {
             url.startsWith("file://") -> url.removePrefix("file://")
             url.startsWith("/") -> url
@@ -1625,15 +1619,19 @@ class ModelUseOffloadHandler(
                     "/var/minis/<scope>/<path>, or an absolute Linux path."
             )
         }
-        val hostFile: File = RuntimePathRegistry.resolveHostPath(linuxPath)
-            ?: File(linuxPath).takeIf { it.exists() && it.isFile }
-            ?: throw ImageInputError("Image file not found at '$url'.")
-        if (!hostFile.exists() || !hostFile.isFile) {
-            throw ImageInputError("Image file not found at '$url' (resolved to ${hostFile.absolutePath}).")
-        }
         val bytes = try {
-            hostFile.readBytes()
+            if (linuxPath.startsWith("/var/minis/mounts/")) {
+                val hostFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
+                    ?: throw ImageInputError("Image file not found at '$url'.")
+                if (!hostFile.exists() || !hostFile.isFile) {
+                    throw ImageInputError("Image file not found at '$url'.")
+                }
+                hostFile.readBytes()
+            } else {
+                WorkspaceFileClient.readAllBlocking(sessionId.orEmpty(), linuxPath)
+            }
         } catch (e: Throwable) {
+            if (e is ImageInputError) throw e
             throw ImageInputError("Image file at '$url' is unreadable: ${e.message}")
         }
         return LLMMessage.ImagePart(
