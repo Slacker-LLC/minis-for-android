@@ -271,6 +271,41 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `legacy migration request uses fixed target and relative path`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.workspaceFile(
+                operation = "migration_write",
+                target = "memory",
+                path = "SOUL.md",
+                dataBase64 = "bWVt",
+                id = 18,
+            ),
+        )
+        val params = JSONObject(raw).getJSONObject("params")
+        assertEquals("migration_write", params.getString("operation"))
+        assertEquals("memory", params.getString("target"))
+        assertEquals("SOUL.md", params.getString("path"))
+        assertEquals("bWVt", params.getString("data_base64"))
+        assertFalse(params.has("host_path"))
+    }
+
+    @Test
+    fun `session deletion request carries only broker session identity`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.workspaceFile(
+                operation = "delete_session",
+                sessionId = "session-a",
+                id = 19,
+            ),
+        )
+        val params = JSONObject(raw).getJSONObject("params")
+        assertEquals("delete_session", params.getString("operation"))
+        assertEquals("session-a", params.getString("session_id"))
+        assertFalse(params.has("path"))
+        assertFalse(params.has("host_path"))
+    }
+
+    @Test
     fun `root exec is structured and has no shell command`() {
         val raw = MinisdProtocol.encodeRequest(
             MinisdProtocol.rootExec("getprop", listOf("ro.build.version.sdk"), 12_000, id = 8),

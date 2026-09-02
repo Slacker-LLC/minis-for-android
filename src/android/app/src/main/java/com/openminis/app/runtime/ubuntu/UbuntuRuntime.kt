@@ -98,7 +98,6 @@ object UbuntuRuntime {
         val ctx = context.applicationContext
         appContext = ctx
         verifiedPackagedBrokerSha256 = null
-        UbuntuPaths.init(ctx)
         val dir = java.io.File(ctx.filesDir, "minis")
         dir.mkdirs()
         client = MinisdClient(appSocketPath = java.io.File(dir, "minisd.sock").absolutePath)
@@ -229,6 +228,10 @@ object UbuntuRuntime {
         }
 
         cur = refresh()
+        val migrated = UbuntuPaths.migrateLegacyFilesDirAfterBrokerReady(ctx.filesDir)
+        if (migrated.error != null) {
+            Log.w(TAG, "legacy filesDir migration: ${migrated.error}")
+        }
         if (cur.statusFresh && cur.running && runtimeLayoutMatches(cur)) {
             redirectPaths = true
             return@withLock cur
@@ -272,10 +275,6 @@ object UbuntuRuntime {
                     UbuntuPaths.hostShared,
                 ),
             )
-        }
-        val migrated = UbuntuPaths.migrateLegacyFilesDir(ctx.filesDir)
-        if (migrated.error != null) {
-            Log.w(TAG, "legacy filesDir migration: ${migrated.error}")
         }
         redirectPaths = true
         Log.i(

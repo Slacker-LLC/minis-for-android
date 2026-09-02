@@ -382,6 +382,88 @@ internal object WorkspaceFileClient {
         )
     }
 
+    suspend fun migrationStatus(ensureBroker: Boolean = true): JSONObject {
+        if (ensureBroker) ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(operation = "migration_status"),
+        )
+    }
+
+    suspend fun migrationInfo(
+        target: String,
+        path: String,
+        sessionId: String? = null,
+        ensureBroker: Boolean = true,
+    ): JSONObject {
+        if (ensureBroker) ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(
+                operation = "migration_info",
+                sessionId = sessionId,
+                target = target,
+                path = path,
+            ),
+        )
+    }
+
+    suspend fun migrationMkdir(
+        target: String,
+        path: String,
+        sessionId: String? = null,
+        ensureBroker: Boolean = true,
+    ): JSONObject {
+        if (ensureBroker) ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(
+                operation = "migration_mkdir",
+                sessionId = sessionId,
+                target = target,
+                path = path,
+            ),
+        )
+    }
+
+    suspend fun migrationWrite(
+        target: String,
+        path: String,
+        dataBase64: String,
+        append: Boolean,
+        sessionId: String? = null,
+        ensureBroker: Boolean = true,
+    ): JSONObject {
+        if (ensureBroker) ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(
+                operation = if (append) "migration_append" else "migration_write",
+                sessionId = sessionId,
+                target = target,
+                path = path,
+                dataBase64 = dataBase64,
+            ),
+        )
+    }
+
+    suspend fun migrationComplete(ensureBroker: Boolean = true): JSONObject {
+        if (ensureBroker) ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(operation = "migration_complete"),
+        )
+    }
+
+    suspend fun deleteSession(sessionId: String): JSONObject {
+        ensureBrokerReady()
+        return requireResult(
+            UbuntuRuntime.client.workspaceFile(
+                operation = "delete_session",
+                sessionId = sessionId,
+            ),
+        )
+    }
+
+    fun deleteSessionBlocking(sessionId: String): JSONObject = runBlocking(Dispatchers.IO) {
+        deleteSession(sessionId)
+    }
+
     suspend fun delete(sessionId: String?, path: String): JSONObject {
         ensureBrokerReady()
         return requireResult(

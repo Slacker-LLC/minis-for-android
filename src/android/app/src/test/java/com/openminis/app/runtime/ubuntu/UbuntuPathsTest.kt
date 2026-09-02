@@ -121,8 +121,7 @@ class UbuntuPathsTest {
                 )!!.canonicalFile,
             )
 
-            assertTrue(UbuntuPaths.deleteSessionFiles(sessionsRoot, "session-a"))
-            assertTrue(!first.exists())
+            assertTrue(first.exists())
             assertTrue(second.exists())
         } finally {
             filesDir.deleteRecursively()
