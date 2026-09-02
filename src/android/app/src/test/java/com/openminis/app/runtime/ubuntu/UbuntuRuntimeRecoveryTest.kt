@@ -6,6 +6,7 @@ import com.openminis.app.runtime.minisd.MinisdResponse
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -101,6 +102,26 @@ class UbuntuRuntimeRecoveryTest {
 
         assertFalse(UbuntuRuntime.brokerIdentityMatches(snapshot, expectedUid = 10422))
         assertTrue(UbuntuRuntime.brokerIdentityMatches(snapshot, expectedUid = 10421))
+    }
+
+    @Test
+    fun `broker hash parser ignores root diagnostics`() {
+        assertEquals(
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            UbuntuRuntime.parseSha256sum(
+                "KernelSU: granted\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  /data/adb/minis/bin/minisd\n",
+            ),
+        )
+        assertNull(UbuntuRuntime.parseSha256sum("permission denied"))
+    }
+
+    @Test
+    fun `broker binary mismatch is detected`() {
+        val expected = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        val other = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+
+        assertTrue(UbuntuRuntime.brokerBinaryMatches(expected, "$expected  /data/adb/minis/bin/minisd"))
+        assertFalse(UbuntuRuntime.brokerBinaryMatches(expected, "$other  /data/adb/minis/bin/minisd"))
     }
 
     @Test

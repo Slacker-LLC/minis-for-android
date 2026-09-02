@@ -49,8 +49,21 @@ object MinisdProtocol {
     const val ERROR_PRIVILEGE_SETUP_FAILED = "PRIVILEGE_SETUP_FAILED"
     const val ERROR_EXEC_UNAVAILABLE = "EXEC_UNAVAILABLE"
     const val ERROR_RUNTIME_UNAVAILABLE = "RUNTIME_UNAVAILABLE"
+    const val ERROR_RUNTIME_SWITCH_UNKNOWN = "RUNTIME_SWITCH_UNKNOWN"
     const val ERROR_CONFIRM_REQUIRED = "CONFIRM_REQUIRED"
     const val ERROR_POLICY_DENIED = "POLICY_DENIED"
+
+    const val RUNTIME_MAINTENANCE_METHOD = "runtime.maintenance"
+    const val RUNTIME_MAINTENANCE_TIMEOUT_MS = 1_500_000L
+    const val RUNTIME_OP_PROBE = "probe"
+    const val RUNTIME_OP_STAGE = "stage"
+    const val RUNTIME_OP_VERIFY = "verify"
+    const val RUNTIME_OP_SWITCH = "switch"
+    const val RUNTIME_OP_ROLLBACK = "rollback"
+    const val RUNTIME_OP_RESET = "reset"
+    const val RUNTIME_OP_READ_STATE = "read_state"
+    const val RUNTIME_OP_WRITE_STATE = "write_state"
+    const val RUNTIME_OP_CLEAR_STATE = "clear_state"
 
     private const val HELPER_NAMESPACE_FAILED = 4
     private const val HELPER_CHROOT_FAILED = 5
@@ -238,6 +251,19 @@ object MinisdProtocol {
 
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
+
+    fun runtimeMaintenance(
+        operation: String,
+        params: JSONObject = JSONObject(),
+        id: Long = 1,
+    ): MinisdRequest {
+        val requestParams = JSONObject(params.toString()).put("operation", operation)
+        return MinisdRequest(
+            id = id,
+            method = RUNTIME_MAINTENANCE_METHOD,
+            params = requestParams,
+        )
+    }
 
     fun rootExec(
         tool: String,

@@ -13,6 +13,7 @@ pub mod probe;
 pub mod protocol;
 pub mod proxy;
 pub mod rate;
+pub mod runtime_maintenance;
 pub mod session;
 pub mod state;
 #[path = "ubuntu_persistent.rs"]

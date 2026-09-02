@@ -424,8 +424,11 @@ pub fn read_os_release(rootfs: &str) -> Option<String> {
 }
 
 pub fn is_provisioned(rootfs: &str) -> bool {
-    Path::new(rootfs).join(PROVISION_MARKER).is_file()
-        || Path::new(rootfs).join("usr/bin/python3").exists()
+    let root = Path::new(rootfs);
+    root.join(PROVISION_MARKER).is_file()
+        && ["usr/bin/python3", "usr/bin/git", "usr/bin/curl"]
+            .iter()
+            .all(|command| root.join(command).is_file())
 }
 
 pub fn ensure_guest_user(rootfs: &str) -> Result<(), String> {
@@ -576,6 +579,22 @@ mod tests {
     #[test]
     fn invalid_rootfs_rejected() {
         assert!(!rootfs_looks_valid("/no/such/rootfs"));
+    }
+
+    #[test]
+    fn provision_requires_marker_and_required_commands() {
+        let layout = temp_layout("provisioned");
+        let root = layout.root();
+        std::fs::create_dir_all(root.join("etc/minis")).unwrap();
+        std::fs::create_dir_all(root.join("usr/bin")).unwrap();
+        std::fs::write(root.join(PROVISION_MARKER), "ok\n").unwrap();
+        std::fs::write(root.join("usr/bin/python3"), "").unwrap();
+        assert!(!is_provisioned(root.to_str().unwrap()));
+        for command in ["git", "curl"] {
+            std::fs::write(root.join("usr/bin").join(command), "").unwrap();
+        }
+        assert!(is_provisioned(root.to_str().unwrap()));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

@@ -276,6 +276,12 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
             state.workspace_quota_bytes = n;
             Response::ok(req.id, json!({"quota_bytes": n}))
         }
+        "runtime.maintenance" => {
+            match crate::runtime_maintenance::handle(state.mock, &req.params) {
+                Ok(value) => Response::ok(req.id, value),
+                Err((code, detail)) => Response::err(req.id, code, detail),
+            }
+        }
         "policy.get" => Response::ok(
             req.id,
             json!({
