@@ -424,6 +424,9 @@
     <string name="usage_detail_cache_hit_rate">캐시 적중률</string>
     <string name="usage_detail_daily_avg">일 평균</string>
     <string name="usage_detail_session_avg">세션 평균</string>
+    <string name="usage_detail_attribution">귀속 정보</string>
+    <string name="usage_detail_attribution_measured">메시지별 스냅샷</string>
+    <string name="usage_detail_attribution_estimated">기존 행 %1$d개에 대한 추정</string>
     <string name="usage_detail_sessions">세션</string>
     <string name="usage_detail_active_days">활동 일수</string>
     <string name="mirror_back">뒤로</string>

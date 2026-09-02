@@ -41,6 +41,7 @@ import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ModelGroup
+import com.openminis.app.data.model.ModelAttributionSnapshot
 import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
@@ -52,6 +53,7 @@ import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.ProviderFactory
 import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
+import com.openminis.app.provider.selectableThinkingLevels
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.tools.AgentTools
@@ -1249,6 +1251,12 @@ class ChatViewModel(
      */
     val availableThinkingLevels: List<ThinkingLevel>
         get() {
+            val activeModel = _activeEntryId.value
+                ?.let { id -> providerRepository.config.value.modelEntries.find { it.id == id }?.model }
+                ?: currentModel
+            val declared = activeModel?.selectableThinkingLevels.orEmpty()
+            if (declared.isNotEmpty()) return declared
+
             val ceiling = currentModelMaxThinkingLevel
             return ThinkingLevel.entries.filter { it != ThinkingLevel.OFF && it.rank <= ceiling.rank }
         }
@@ -1601,7 +1609,12 @@ class ChatViewModel(
         // caller — cap to the current model's ceiling so a stale/over-range
         // request can't persist a level the model can't reach.
         val ceiling = currentModelMaxThinkingLevel
-        val clamped = if (level.rank > ceiling.rank) ceiling else level
+        val declared = availableThinkingLevels
+        val clamped = when {
+            level == ThinkingLevel.OFF -> ThinkingLevel.OFF
+            declared.isEmpty() -> if (level.rank > ceiling.rank) ceiling else level
+            else -> declared.lastOrNull { it.rank <= level.rank } ?: declared.first()
+        }
         if (_thinkingLevel.value == clamped) return
         _thinkingLevel.value = clamped
         persistThinkingOverride(clamped)
@@ -7846,7 +7859,13 @@ class ChatViewModel(
                 }
                 val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
                 val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-                persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta)
+                persistAssistantTurn(
+                    turnParts,
+                    lastUsage,
+                    turnReasoningContent,
+                    blockMeta,
+                    modelSnapshot = modelAttributionSnapshot(currentProvider),
+                )
                 // [T-error-persist-android] Empty-response hint: the model ended a
                 // turn (finish=stop/end_turn) with no visible text anywhere in the
                 // reply and no tool blocks — the user just sees a blank bubble.
@@ -8326,7 +8345,13 @@ class ChatViewModel(
             // assistant entry — compact-marker boundary resolution depends on it.
             val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
             val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-            val assistantDbId = persistAssistantTurn(turnParts, lastUsage, turnReasoningContent, blockMeta)
+            val assistantDbId = persistAssistantTurn(
+                turnParts,
+                lastUsage,
+                turnReasoningContent,
+                blockMeta,
+                modelSnapshot = modelAttributionSnapshot(currentProvider),
+            )
             if (assistantDbId != null) {
                 val lastIdx = agentHistory.indexOfLast { it.role == LLMMessage.Role.ASSISTANT && it.dbMessageId == null }
                 if (lastIdx >= 0) {
@@ -9100,11 +9125,31 @@ class ChatViewModel(
         append("]")
     }
 
+    /**
+     * Resolve the immutable identity for the provider that actually emitted
+     * this turn. The active entry id is important: model ids are not unique
+     * across provider instances, especially after group fallback.
+     */
+    private fun modelAttributionSnapshot(provider: LLMProvider?): ModelAttributionSnapshot? {
+        val actualProvider = provider ?: return null
+        val entry = _activeEntryId.value?.let { entryId ->
+            providerRepository.config.value.modelEntries.firstOrNull { it.id == entryId }
+        } ?: return null
+        val instance = providerRepository.instance(entry.providerInstanceId) ?: return null
+        return ModelAttributionSnapshot(
+            modelId = actualProvider.model.id,
+            displayName = actualProvider.model.displayName,
+            providerTypeRaw = instance.providerType.name,
+            providerInstanceId = instance.id,
+        )
+    }
+
     private suspend fun persistAssistantTurn(
         parts: List<AgentContentPart>,
         usage: LLMUsage?,
         reasoningContent: String? = null,
         toolBlockMeta: Map<String, AssistantBlock> = emptyMap(),
+        modelSnapshot: ModelAttributionSnapshot? = null,
     ): String? {
         if (parts.isEmpty()) return null
         val partsJson = buildAssistantPartsJson(parts, toolBlockMeta)
@@ -9114,6 +9159,7 @@ class ChatViewModel(
         val entity = chatRepository.appendMessage(
             realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
             reasoningContent = reasoningContent,
+            modelSnapshot = modelSnapshot,
         )
         return entity.id
     }
@@ -9159,6 +9205,7 @@ class ChatViewModel(
         chatRepository.appendMessage(
             realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
             reasoningContent = reasoningContent,
+            modelSnapshot = modelAttributionSnapshot(currentProvider),
         )
     }
 
@@ -10637,7 +10684,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             )
             viewModelScope.launch(Dispatchers.IO) {
                 val partsJson = buildAssistantPartsJson(parts)
-                chatRepository.appendMessage(activeSessionId, "assistant", partsJson)
+                chatRepository.appendMessage(
+                    activeSessionId,
+                    "assistant",
+                    partsJson,
+                    modelSnapshot = modelAttributionSnapshot(currentProvider),
+                )
             }
             _canResume.value = true
         } else if (historyEndsWithAssistant) {

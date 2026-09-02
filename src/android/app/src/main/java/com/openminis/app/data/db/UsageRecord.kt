@@ -10,6 +10,14 @@ data class UsageRecord(
      * stayed non-null. Callers group these under "Unknown".
      */
     val modelId: String?,
+    /** Display name captured at the time the message was produced. */
+    val modelDisplayName: String?,
+    /** ProviderType raw name captured at the time the message was produced. */
+    val providerType: String?,
+    /** Provider instance id captured at the time the message was produced. */
+    val providerInstanceId: String?,
+    /** True when the row has immutable message-level attribution. */
+    val hasSnapshot: Boolean,
     val tokenUsage: String,
     val createdAt: Long,
     val sessionId: String,

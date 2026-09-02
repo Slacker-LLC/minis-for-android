@@ -5,6 +5,7 @@ import com.openminis.app.data.db.ChatDao
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.data.db.MessageEntity
+import com.openminis.app.data.model.ModelAttributionSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -348,6 +349,7 @@ class ChatRepository(
         partsJson: String,
         tokenUsage: String? = null,
         reasoningContent: String? = null,
+        modelSnapshot: ModelAttributionSnapshot? = null,
     ): MessageEntity {
         val sortOrder = dao.nextSortOrder(sessionId)
         val now = System.currentTimeMillis()
@@ -371,6 +373,10 @@ class ChatRepository(
             tokenUsage = tokenUsage,
             sortOrder = sortOrder,
             reasoningContent = reasoningContent,
+            modelId = modelSnapshot?.modelId,
+            modelDisplayName = modelSnapshot?.displayName,
+            providerType = modelSnapshot?.providerTypeRaw,
+            providerInstanceId = modelSnapshot?.providerInstanceId,
         )
         dao.insertMessage(message)
         val preview = extractTextPreview(capped)

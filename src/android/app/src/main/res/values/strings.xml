@@ -952,6 +952,9 @@
     <string name="usage_detail_cache_hit_rate">Cache Hit Rate</string>
     <string name="usage_detail_daily_avg">Daily Avg</string>
     <string name="usage_detail_session_avg">Per-Session Avg</string>
+    <string name="usage_detail_attribution">Attribution</string>
+    <string name="usage_detail_attribution_measured">Per-message snapshot</string>
+    <string name="usage_detail_attribution_estimated">Estimated for %1$d legacy rows</string>
     <string name="usage_detail_sessions">Sessions</string>
     <string name="usage_detail_active_days">Active Days</string>
     <string name="mirror_back">Back</string>

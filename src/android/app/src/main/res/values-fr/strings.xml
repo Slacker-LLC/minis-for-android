@@ -424,6 +424,9 @@
     <string name="usage_detail_cache_hit_rate">Taux de succès du cache</string>
     <string name="usage_detail_daily_avg">Moy. quotidienne</string>
     <string name="usage_detail_session_avg">Moy. par session</string>
+    <string name="usage_detail_attribution">Attribution</string>
+    <string name="usage_detail_attribution_measured">Instantané par message</string>
+    <string name="usage_detail_attribution_estimated">Estimé pour %1$d anciennes lignes</string>
     <string name="usage_detail_sessions">Sessions</string>
     <string name="usage_detail_active_days">Jours actifs</string>
     <string name="mirror_back">Retour</string>

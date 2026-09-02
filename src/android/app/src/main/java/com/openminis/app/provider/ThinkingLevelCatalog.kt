@@ -77,7 +77,32 @@ val LLMModel.catalogMaxThinkingLevel: ThinkingLevel
         // ceiling of that family's non-reasoning members (mimo-v2.5-tts/-asr).
         // [T-fallback-thinking-preclamp]
         if (supportsReasoning == false) return ThinkingLevel.OFF
+        // [T-thinking-levels-data-driven] A declared effort set is a stronger
+        // statement than an id-substring rule: it names the tiers accepted by
+        // the backend. Use its strongest known tier as the ceiling so sparse
+        // declarations such as ["high", "max"] remain reachable from the UI.
+        selectableThinkingLevels.lastOrNull()?.let { return it }
         return ThinkingLevelCatalog.declaredMaxLevel(id) ?: ThinkingLevel.XHIGH
+    }
+
+/**
+ * Thinking levels that map to distinct declared wire tiers for this model.
+ * Empty means the model has no explicit effort declaration and should use the
+ * legacy id-rule/default ladder. OFF is a separate toggle and is never listed.
+ */
+val LLMModel.selectableThinkingLevels: List<ThinkingLevel>
+    get() {
+        val declared = reasoningEffortValues
+        if (declared.isNullOrEmpty()) return emptyList()
+        val mapping = listOf(
+            "low" to ThinkingLevel.LOW,
+            "medium" to ThinkingLevel.MEDIUM,
+            "high" to ThinkingLevel.HIGH,
+            "xhigh" to ThinkingLevel.XHIGH,
+            "max" to ThinkingLevel.MAX,
+        )
+        val declaredSet = declared.map { it.lowercase() }.toSet()
+        return mapping.filter { it.first in declaredSet }.map { it.second }
     }
 
 /**

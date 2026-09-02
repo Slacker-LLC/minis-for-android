@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FolderEntity::class,
         SessionEventEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -242,6 +242,32 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * [T-token-attribution-snapshot] Record the model/provider that
+         * produced each message. All columns are nullable and have no default:
+         * existing rows remain intact and are explicitly treated as legacy
+         * estimates by the usage screen.
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN model_id TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN model_display_name TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN provider_type TEXT")
+                db.execSQL("ALTER TABLE messages ADD COLUMN provider_instance_id TEXT")
+            }
+        }
+
+        /**
+         * [T-android-downgrade-compat] Keep the additive attribution columns
+         * during a 14 → 13 downgrade. Older Room entities ignore extra columns,
+         * while dropping them would destroy the only exact attribution record.
+         */
+        val MIGRATION_14_13 = object : Migration(14, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Intentionally empty; see MIGRATION_13_14.
+            }
+        }
+
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // sessions: add iOS-parity columns
@@ -292,6 +318,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
+                        MIGRATION_13_14,
+                        MIGRATION_14_13,
                     )
                     .build()
                     .also { INSTANCE = it }

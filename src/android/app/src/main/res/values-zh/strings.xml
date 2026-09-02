@@ -585,6 +585,9 @@
     <string name="usage_detail_cache_hit_rate">缓存命中率</string>
     <string name="usage_detail_daily_avg">日均</string>
     <string name="usage_detail_session_avg">会话均值</string>
+    <string name="usage_detail_attribution">归因信息</string>
+    <string name="usage_detail_attribution_measured">每条消息快照</string>
+    <string name="usage_detail_attribution_estimated">对 %1$d 条旧记录估算</string>
     <string name="usage_detail_sessions">会话</string>
     <string name="usage_detail_active_days">活跃天数</string>
     <string name="mirror_back">返回</string>
