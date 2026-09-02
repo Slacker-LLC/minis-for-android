@@ -2,6 +2,9 @@ package com.openminis.app.debug
 
 import android.content.Context
 import android.util.Log
+import com.openminis.app.network.BoundedHttp
+import com.openminis.app.network.BoundedHttpException
+import com.openminis.app.network.BoundedHttpRequestReader
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,9 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.PrintWriter
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -52,8 +53,6 @@ class DebugServer(
             return diff == 0
         }
 
-        private const val MAX_BODY_BYTES = 4 * 1024 * 1024
-        private const val MAX_HEADER_LINE_BYTES = 16 * 1024
     }
 
     private var serverSocket: ServerSocket? = null
@@ -150,61 +149,35 @@ class DebugServer(
 
     private fun handleConnection(socket: Socket) {
         socket.use { s ->
+            val output = s.getOutputStream()
             try {
                 s.soTimeout = 30_000
-                val reader = BufferedReader(InputStreamReader(s.getInputStream()))
-                val writer = PrintWriter(s.getOutputStream(), true)
+                val reader = BoundedHttpRequestReader(s.getInputStream())
 
                 // Read HTTP request line (bounded — an unbounded readLine
                 // would let a peer allocate unbounded memory).
-                val requestLine = readBoundedLine(reader) ?: return
-                val parts = requestLine.split(" ", limit = 3)
-                if (parts.size < 2) {
-                    sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Parse error"))
-                    return
-                }
-                val method = parts[0]
+                val head = reader.readHead() ?: return
+                val method = head.method
                 // [T-android-debugserver-skill] Path (query stripped) so the
                 // authenticated GET skill routes can be dispatched.
-                val path = parts.getOrNull(1)?.substringBefore('?') ?: "/"
+                val path = head.target.substringBefore('?')
 
                 // Handle CORS preflight
                 if (method == "OPTIONS") {
-                    sendCorsPreflightResponse(writer)
+                    sendCorsPreflightResponse(output)
                     return
                 }
 
                 // Read headers
-                var contentLength = 0
-                var providedToken: String? = null
-                var accept = ""
-                var headerCount = 0
-                while (true) {
-                    val headerLine = readBoundedLine(reader) ?: break
-                    if (headerLine.isEmpty()) break
-                    headerCount++
-                    if (headerCount > 100) {
-                        sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Too many headers"))
-                        return
-                    }
-                    val lower = headerLine.lowercase()
-                    if (lower.startsWith("content-length:")) {
-                        contentLength = headerLine.substringAfter(":").trim().toIntOrNull() ?: 0
-                    }
-                    if (lower.startsWith("accept:")) {
-                        accept = lower.substringAfter(":").trim()
-                    }
-                    // [T-android-debugserver-auth] Token via X-Minis-Token or
-                    // Authorization: Bearer — either spelling accepted.
-                    if (lower.startsWith("x-minis-token:")) {
-                        providedToken = headerLine.substringAfter(":").trim()
-                    }
-                    if (lower.startsWith("authorization:")) {
-                        val v = headerLine.substringAfter(":").trim()
-                        if (v.lowercase().startsWith("bearer ")) {
-                            providedToken = v.substring(7).trim()
-                        }
-                    }
+                val contentLength = head.contentLength
+                val accept = head.header("accept").orEmpty().lowercase()
+                // [T-android-debugserver-auth] Token via X-Minis-Token or
+                // Authorization: Bearer — either spelling accepted.
+                val authorization = head.header("authorization").orEmpty()
+                val providedToken = if (authorization.lowercase().startsWith("bearer ")) {
+                    authorization.substring(7).trim()
+                } else {
+                    head.header("x-minis-token")
                 }
 
                 // [T-android-debugserver-auth] Gate BEFORE any RPC dispatch:
@@ -214,7 +187,7 @@ class DebugServer(
                     val peer = if (isLoopback) "loopback" else s.inetAddress?.hostAddress ?: "?"
                     Log.w(TAG, "401 unauthorized $peer (missing/wrong token)")
                     sendResponse(
-                        writer, 401,
+                        output, 401,
                         rpcHandler.errorJSON(
                             -32000,
                             "Unauthorized — send X-Minis-Token (see `adb shell run-as <applicationId> cat files/debug_server_token`)"
@@ -239,59 +212,55 @@ class DebugServer(
                         accept.contains("text/plain")
                     when (path) {
                         "/schema" -> {
-                            sendResponse(writer, 200, schemaJSON())
+                            sendResponse(output, 200, schemaJSON())
                             return
                         }
                         "/", "/skill", "/skill/" -> {
                             // A bare `GET /` from a tool (no human Accept) keeps
                             // returning the machine schema, same contract as iOS.
                             if (path == "/" && !wantsHuman) {
-                                sendResponse(writer, 200, schemaJSON())
+                                sendResponse(output, 200, schemaJSON())
                             } else {
-                                sendSkill(writer, wantsHuman)
+                                sendSkill(output, wantsHuman)
                             }
                             return
                         }
                         "/skill/examples/python", "/skill/examples/minis_rpc_android.py" -> {
-                            sendSkillAsset(writer, "examples/minis_rpc_android.py", "text/x-python; charset=utf-8")
+                            sendSkillAsset(output, "examples/minis_rpc_android.py", "text/x-python; charset=utf-8")
                             return
                         }
                         "/skill/examples/curl", "/skill/examples/curl.md" -> {
-                            sendSkillAsset(writer, "examples/curl.md", "text/markdown; charset=utf-8")
+                            sendSkillAsset(output, "examples/curl.md", "text/markdown; charset=utf-8")
                             return
                         }
                     }
                 }
 
                 if (method != "POST") {
-                    sendResponse(writer, 405, rpcHandler.errorJSON(-32600, "Only POST accepted"))
+                    sendResponse(output, 405, rpcHandler.errorJSON(-32600, "Only POST accepted"))
                     return
                 }
 
                 if (contentLength <= 0) {
-                    sendResponse(writer, 400, rpcHandler.errorJSON(-32700, "Empty body"))
-                    return
-                }
-                if (contentLength > MAX_BODY_BYTES) {
-                    sendResponse(writer, 413, rpcHandler.errorJSON(-32700, "Request body too large"))
+                    sendResponse(output, 400, rpcHandler.errorJSON(-32700, "Empty body"))
                     return
                 }
 
-                // Read body
-                val body = CharArray(contentLength)
-                var totalRead = 0
-                while (totalRead < contentLength) {
-                    val n = reader.read(body, totalRead, contentLength - totalRead)
-                    if (n < 0) break
-                    totalRead += n
-                }
-                val jsonBody = String(body, 0, totalRead)
+                // Content-Length is a byte count. Decode only after exactly
+                // that many bytes have arrived, using strict UTF-8.
+                val jsonBody = BoundedHttp.decodeUtf8(reader.readBody(contentLength))
 
                 val responseJSON = runBlocking {
                     rpcHandler.handle(jsonBody)
                 }
 
-                sendResponse(writer, 200, responseJSON)
+                sendResponse(output, 200, responseJSON)
+            } catch (e: BoundedHttpException) {
+                sendResponse(
+                    output,
+                    e.statusCode,
+                    rpcHandler.errorJSON(-32700, e.message ?: "Parse error"),
+                )
             } catch (e: Exception) {
                 Log.w(TAG, "Connection error: ${e.message}")
             }
@@ -319,14 +288,14 @@ class DebugServer(
 
     /// GET / and /skill. Human clients get raw markdown; tools get JSON with the
     /// manual plus every reference client inlined, so one request bootstraps.
-    private fun sendSkill(writer: PrintWriter, wantsHuman: Boolean) {
+    private fun sendSkill(output: OutputStream, wantsHuman: Boolean) {
         val skill = readSkillAsset("SKILL.md")
         if (skill == null) {
-            sendResponse(writer, 503, """{"error":"skill assets not bundled in this build"}""")
+            sendResponse(output, 503, """{"error":"skill assets not bundled in this build"}""")
             return
         }
         if (wantsHuman) {
-            sendResponse(writer, 200, skill, "text/markdown; charset=utf-8")
+            sendResponse(output, 200, skill, "text/markdown; charset=utf-8")
             return
         }
         val py = readSkillAsset("examples/minis_rpc_android.py") ?: ""
@@ -342,16 +311,16 @@ class DebugServer(
                 put("curl", "/skill/examples/curl")
             })
         }
-        sendResponse(writer, 200, payload.toString())
+        sendResponse(output, 200, payload.toString())
     }
 
-    private fun sendSkillAsset(writer: PrintWriter, assetPath: String, contentType: String) {
+    private fun sendSkillAsset(output: OutputStream, assetPath: String, contentType: String) {
         val body = readSkillAsset(assetPath)
         if (body == null) {
-            sendResponse(writer, 503, """{"error":"asset not bundled: $assetPath"}""")
+            sendResponse(output, 503, """{"error":"asset not bundled: $assetPath"}""")
             return
         }
-        sendResponse(writer, 200, body, contentType)
+        sendResponse(output, 200, body, contentType)
     }
 
     /// Reads from the DEBUG-only asset source set staged by
@@ -364,54 +333,17 @@ class DebugServer(
     }
 
     private fun sendResponse(
-        writer: PrintWriter,
+        output: OutputStream,
         statusCode: Int,
         body: String,
         contentType: String = "application/json",
     ) {
-        val statusText = when (statusCode) {
-            200 -> "OK"
-            400 -> "Bad Request"
-            401 -> "Unauthorized"
-            405 -> "Method Not Allowed"
-            503 -> "Service Unavailable"
-            else -> "Error"
-        }
-        val bytes = body.toByteArray(Charsets.UTF_8)
-        writer.print("HTTP/1.1 $statusCode $statusText\r\n")
-        writer.print("Content-Type: $contentType\r\n")
-        writer.print("Content-Length: ${bytes.size}\r\n")
-        writer.print("Connection: close\r\n")
-        writer.print("\r\n")
-        writer.print(body)
-        writer.flush()
+        BoundedHttp.writeResponse(output, statusCode, body, contentType)
     }
 
-    private fun sendCorsPreflightResponse(writer: PrintWriter) {
+    private fun sendCorsPreflightResponse(output: OutputStream) {
         // Preflight answers 204 WITHOUT any Access-Control-Allow-* headers,
         // so browsers refuse the cross-origin call outright.
-        writer.print("HTTP/1.1 204 No Content\r\n")
-        writer.print("Connection: close\r\n")
-        writer.print("\r\n")
-        writer.flush()
-    }
-
-    /**
-     * Read one line with a hard byte cap. BufferedReader.readLine() has no
-     * limit, so a peer that never sends a newline could grow memory without
-     * bound; this keeps both the request line and every header line bounded.
-     */
-    private fun readBoundedLine(reader: BufferedReader): String? {
-        val sb = StringBuilder(256)
-        while (true) {
-            val ch = reader.read()
-            if (ch < 0) return if (sb.isEmpty()) null else sb.toString()
-            if (ch == '\n'.code) {
-                val len = sb.length
-                return if (len > 0 && sb[len - 1] == '\r') sb.deleteCharAt(len - 1).toString() else sb.toString()
-            }
-            sb.append(ch.toChar())
-            if (sb.length > MAX_HEADER_LINE_BYTES) throw IllegalArgumentException("header line too long")
-        }
+        BoundedHttp.writeResponse(output, 204, "", contentType = null)
     }
 }
