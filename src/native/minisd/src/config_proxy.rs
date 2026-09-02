@@ -11,10 +11,15 @@ const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BRIDGE_BYTES: usize = 2 * 1024 * 1024;
 const MAGIC: &str = "MINISCFG1";
 
-static STARTED: OnceLock<()> = OnceLock::new();
+struct ProxyConfig {
+    port: u16,
+    token: String,
+}
+
+static PROXY_CONFIG: OnceLock<ProxyConfig> = OnceLock::new();
 static START_LOCK: Mutex<()> = Mutex::new(());
 
-/// Start the guest-facing minis-config proxy once per minisd process.
+/// Start the proxy once and refresh its guest wrapper for the active rootfs.
 ///
 /// The proxy is deliberately separate from minisd's privileged JSON-RPC
 /// socket: arbitrary Ubuntu code receives only the minis-config surface and
@@ -27,22 +32,25 @@ static START_LOCK: Mutex<()> = Mutex::new(());
 /// covers transient bind/rootfs filesystem races during broker startup; a later
 /// call may retry again if all attempts fail.
 pub fn ensure_started(app_uid: u32) {
-    if app_uid == 0 || STARTED.get().is_some() {
+    if app_uid == 0 {
         return;
     }
     let _guard = match START_LOCK.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    if STARTED.get().is_some() {
+    if let Some(config) = PROXY_CONFIG.get() {
+        if let Err(error) = install_guest_cli(config.port, &config.token) {
+            eprintln!("minis-config proxy CLI refresh failed: {error}");
+        }
         return;
     }
 
     let mut last_error = None;
     for attempt in 0..3 {
         match start_proxy(app_uid) {
-            Ok(()) => {
-                let _ = STARTED.set(());
+            Ok(config) => {
+                let _ = PROXY_CONFIG.set(config);
                 return;
             }
             Err(error) => {
@@ -58,7 +66,7 @@ pub fn ensure_started(app_uid: u32) {
     }
 }
 
-fn start_proxy(app_uid: u32) -> Result<(), String> {
+fn start_proxy(app_uid: u32) -> Result<ProxyConfig, String> {
     let listener =
         TcpListener::bind(("127.0.0.1", 0)).map_err(|e| format!("bind minis-config proxy: {e}"))?;
     let port = listener
@@ -68,11 +76,13 @@ fn start_proxy(app_uid: u32) -> Result<(), String> {
     let token = random_token()?;
     install_guest_cli(port, &token)?;
     let bridge_name = format!("minis-config-bridge-{app_uid}");
+    let config = ProxyConfig { port, token };
+    let token_for_thread = config.token.clone();
     std::thread::Builder::new()
         .name("minisd-config-proxy".into())
-        .spawn(move || accept_loop(listener, token, bridge_name))
+        .spawn(move || accept_loop(listener, token_for_thread, bridge_name))
         .map_err(|e| format!("spawn minis-config proxy: {e}"))?;
-    Ok(())
+    Ok(config)
 }
 
 fn accept_loop(listener: TcpListener, token: String, bridge_name: String) {

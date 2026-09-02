@@ -20,6 +20,7 @@ pub mod state;
 pub mod ubuntu;
 #[path = "ubuntu.rs"]
 mod ubuntu_legacy;
+pub mod workspace_file;
 
 pub use policy::PolicyFile;
 pub use protocol::{encode_response, parse_request, Request, Response};

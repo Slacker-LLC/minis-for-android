@@ -4,6 +4,8 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock as withMutexLock
 
 /**
  * Serializes mutations targeting the same canonical host path while allowing
@@ -14,6 +16,7 @@ import kotlin.concurrent.withLock
 object FileMutationQueue {
     private data class Entry(val lock: ReentrantLock = ReentrantLock(true), var users: Int = 0)
     private val entries = ConcurrentHashMap<String, Entry>()
+    private val suspendEntries = ConcurrentHashMap<String, Mutex>()
     private val guard = Any()
 
     fun <T> withFile(file: File, block: () -> T): T {
@@ -32,6 +35,13 @@ object FileMutationQueue {
                     entries.remove(key, entry)
                 }
             }
+        }
+    }
+
+    suspend fun <T> withKey(key: String, block: suspend () -> T): T {
+        val mutex = suspendEntries.getOrPut(key) { Mutex() }
+        return mutex.withMutexLock {
+            block()
         }
     }
 }

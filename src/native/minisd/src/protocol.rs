@@ -252,6 +252,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "mount.list",
     "mount.prepare",
     "workspace.info",
+    "workspace.file",
     "workspace.setQuota",
     "runtime.maintenance",
     "policy.get",

@@ -212,6 +212,65 @@ class MinisdProtocolTest {
     }
 
     @Test
+    fun `workspace file request carries only fixed guest path fields`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.workspaceFile(
+                operation = "write",
+                sessionId = "session-a",
+                path = "/workspace/hello.txt",
+                dataBase64 = "aGVsbG8=",
+                createDirs = true,
+                id = 15,
+            ),
+        )
+        val obj = JSONObject(raw)
+        assertEquals("workspace.file", obj.getString("method"))
+        val params = obj.getJSONObject("params")
+        assertEquals("write", params.getString("operation"))
+        assertEquals("session-a", params.getString("session_id"))
+        assertEquals("/workspace/hello.txt", params.getString("path"))
+        assertEquals("aGVsbG8=", params.getString("data_base64"))
+        assertTrue(params.getBoolean("create_dirs"))
+        assertFalse(params.has("host_path"))
+    }
+
+    @Test
+    fun `workspace file copy and move requests carry source separately from path`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.workspaceFile(
+                operation = "move",
+                sessionId = "session-a",
+                source = "/workspace/.tmp",
+                destination = "/workspace/final.txt",
+                id = 16,
+            ),
+        )
+        val params = JSONObject(raw).getJSONObject("params")
+        assertEquals("move", params.getString("operation"))
+        assertEquals("/workspace/.tmp", params.getString("source"))
+        assertEquals("/workspace/final.txt", params.getString("destination"))
+        assertFalse(params.has("path"))
+    }
+
+    @Test
+    fun `workspace file cross-session move carries both session scopes`() {
+        val raw = MinisdProtocol.encodeRequest(
+            MinisdProtocol.workspaceFile(
+                operation = "move",
+                sourceSessionId = "draft",
+                destinationSessionId = "real",
+                source = "/var/minis/browser/state.json",
+                destination = "/var/minis/browser/state.json",
+                id = 17,
+            ),
+        )
+        val params = JSONObject(raw).getJSONObject("params")
+        assertEquals("draft", params.getString("source_session_id"))
+        assertEquals("real", params.getString("destination_session_id"))
+        assertFalse(params.has("session_id"))
+    }
+
+    @Test
     fun `root exec is structured and has no shell command`() {
         val raw = MinisdProtocol.encodeRequest(
             MinisdProtocol.rootExec("getprop", listOf("ro.build.version.sdk"), 12_000, id = 8),

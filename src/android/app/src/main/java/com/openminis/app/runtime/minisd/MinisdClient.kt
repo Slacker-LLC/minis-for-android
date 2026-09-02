@@ -82,6 +82,39 @@ class MinisdClient(
         timeoutMs + 5_000,
     )
 
+    suspend fun workspaceFile(
+        operation: String,
+        sessionId: String? = null,
+        sourceSessionId: String? = null,
+        destinationSessionId: String? = null,
+        path: String? = null,
+        source: String? = null,
+        destination: String? = null,
+        dataBase64: String? = null,
+        offset: Long? = null,
+        length: Int? = null,
+        limit: Int? = null,
+        createDirs: Boolean? = null,
+        timeoutMs: Long = 60_000,
+    ): MinisdResponse = call(
+        MinisdProtocol.workspaceFile(
+            operation = operation,
+            sessionId = sessionId,
+            sourceSessionId = sourceSessionId,
+            destinationSessionId = destinationSessionId,
+            path = path,
+            source = source,
+            destination = destination,
+            dataBase64 = dataBase64,
+            offset = offset,
+            length = length,
+            limit = limit,
+            createDirs = createDirs,
+            id = nextId(),
+        ),
+        timeoutMs + 5_000,
+    )
+
     suspend fun ubuntuAdminExec(
         argv: List<String>,
         timeoutMs: Long = 120_000,
