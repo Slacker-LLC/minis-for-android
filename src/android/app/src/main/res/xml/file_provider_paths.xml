@@ -15,12 +15,14 @@
          FileProvider.getUriForFile threw IllegalArgumentException and the
          user saw "分享失败" toasts instead of the share sheet. -->
     <cache-path name="share" path="share/" />
+    <!-- Browser download preview copies; canonical guest bytes remain behind
+         minisd and are mirrored here for ACTION_VIEW. -->
+    <cache-path name="browser-downloads" path="browser_downloads/" />
     <!-- PRoot rootfs — expose so inline video/audio cards can hand the host
          file to the system player via ACTION_VIEW. -->
     <files-path name="rootfs" path="alpine-rootfs/" />
     <files-path name="sessions" path="minis-sessions/" />
     <files-path name="global" path="minis-global/" />
-    <root-path name="minis-persistent" path="/data/adb/minis/" />
     <!-- Downloaded update APKs (UpdateChecker → PendingUpdateStore). Moved
          from cacheDir/shared/ to filesDir/updates/ so the OS doesn't evict
          the APK while the user is in system Settings granting "install

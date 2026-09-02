@@ -9,6 +9,9 @@ import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import okio.buffer
 import okio.source
 import java.io.File
@@ -20,7 +23,7 @@ import java.io.File
  *     add(MinisImageFetcher.Factory())
  * }
  *
- * minis://attachments/foo.jpg → /var/minis/attachments/foo.jpg → host path
+ * minis://shared/foo.jpg → /var/minis/shared/foo.jpg → broker/cache
  */
 class MinisImageFetcher(
     private val uri: String,
@@ -32,12 +35,18 @@ class MinisImageFetcher(
         // Chinese/emoji/space filenames resolve to the actual on-disk file.
         val stripped = uri.removePrefix("minis://").substringBefore('?')
         val decoded = java.net.URLDecoder.decode(stripped, "UTF-8")
-        val linuxPath = "/var/minis/$decoded"
-        val hostFile = RuntimePathRegistry.resolveHostPath(linuxPath)
-            ?: throw IllegalArgumentException("Cannot resolve path: $linuxPath")
-
-        if (!hostFile.exists()) {
-            throw java.io.FileNotFoundException("File not found: ${hostFile.absolutePath}")
+        val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
+        val hostFile = if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+            RuntimePathRegistry.resolveHostPath(linuxPath)
+                ?: throw IllegalArgumentException("Cannot resolve mount path: $linuxPath")
+        } else {
+            val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(linuxPath.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+            val cacheFile = File(File(options.context.cacheDir, "minis-image-cache"), "$digest-$fileName")
+            WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
+            cacheFile
         }
 
         return SourceResult(
@@ -92,9 +101,9 @@ class MinisImageFetcher(
      * off the URI alone and keeps serving the previous bitmap; only the
      * ToolDetailSheet — which reads the File directly — saw the new bytes.
      *
-     * The key composes `<minis-uri>?mt=<lastModified>`. The fetcher above
+      * The key composes `<minis-uri>?mt=<broker mtime>`. The fetcher above
      * already strips `?query` before resolving, so adding the suffix here
-     * does not interfere with on-disk lookup. Returning `null` falls back
+      * does not interfere with cache staging. Returning `null` falls back
      * to Coil's default keying, which is correct for non-minis data.
      *
      * Memory cache key is set by [Keyer]; disk cache key derives from the
@@ -116,8 +125,8 @@ class MinisImageFetcher(
 
     companion object {
         private fun composeMtimeKey(uri: String): String {
-            // Resolve once to fetch mtime. Cheap (single stat on host fs);
-            // Coil only calls Keyer when computing/looking up cache keys,
+            // Resolve once through minisd; Coil only calls Keyer when computing
+            // or looking up cache keys,
             // not on every recomposition.
             val stripped = uri.removePrefix("minis://").substringBefore('?')
             val decoded = try {
@@ -125,11 +134,15 @@ class MinisImageFetcher(
             } catch (_: Throwable) {
                 stripped
             }
-            val linuxPath = "/var/minis/$decoded"
-            val mtime = try {
-                RuntimePathRegistry.resolveHostPath(linuxPath)?.lastModified() ?: 0L
-            } catch (_: Throwable) {
-                0L
+            val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
+            val mtime = if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+                try { RuntimePathRegistry.resolveHostPath(linuxPath)?.lastModified() ?: 0L } catch (_: Throwable) { 0L }
+            } else {
+                runCatching {
+                    runBlocking(Dispatchers.IO) {
+                        WorkspaceFileClient.info("", linuxPath).optLong("modified", 0L)
+                    }
+                }.getOrDefault(0L)
             }
             return "$uri?mt=$mtime"
         }

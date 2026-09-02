@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import java.io.File
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -2151,8 +2152,19 @@ fun ChatScreen(
         if (pending.sessionId != sessionId) return@LaunchedEffect
         com.openminis.app.deeplink.DeepLinkCoordinator.consumePendingHtmlPreview()
         val absPath = "/var/minis" + pending.resourcePath
-        val file = java.io.File(absPath)
-        if (!file.exists()) {
+        val file = withContext(Dispatchers.IO) {
+            val name = pending.resourcePath.substringAfterLast('/')
+                .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest("${pending.sessionId}:$absPath".toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+            val staged = File(File(context.cacheDir, "pinned-html"), "$digest-$name")
+            runCatching {
+                WorkspaceFileClient.readToFile(pending.sessionId, absPath, staged)
+                staged.takeIf { it.isFile }
+            }.getOrNull()
+        }
+        if (file == null) {
             com.openminis.app.logging.AppLogger.warning(
                 "ChatScreen",
                 "pinned HTML preview path missing: $absPath",
@@ -2183,48 +2195,50 @@ fun ChatScreen(
     // T-pwa-2: long-press on an HTML attachment chip opens the
     // "Add to Home Screen" sheet for that attachment.
     var webAppSheetTarget by remember { mutableStateOf<InputAttachment?>(null) }
-    val urlClickHandler = remember<(String) -> Unit>(viewModel) {
+    val urlClickHandler = remember<(String) -> Unit>(viewModel, coroutineScope) {
         { url ->
-            // Pass the current session id so `minis://attachments/...` resolves
-            // against this chat's session directory rather than whichever
-            // session booted its PRoot shell most recently (which is what
-            // the global bindMounts map would answer).
-            when (val action = ChatLinkResolver.resolve(url, viewModel.currentSessionId, context)) {
-                is ChatLinkAction.DeepLink -> ChatLinkResolver.dispatchDeepLink(context, url)
-                is ChatLinkAction.SandboxFile -> {
-                    when {
-                        action.item.isImageFile -> {
-                            // Single image — caption = filename. Sibling
-                            // collection from markdown context is not
-                            // plumbed here (iOS does cross-session
-                            // assistant images via fingerprint).
-                            previewImageGallery = listOf(
-                                com.openminis.app.ui.components.ImageGalleryItem(
-                                    model = action.item.file,
-                                    caption = action.item.name,
-                                ),
-                            ) to 0
+            coroutineScope.launch {
+                // Pass the current session id so `minis://attachments/...` resolves
+                // against this chat's session directory rather than whichever
+                // session booted its PRoot shell most recently (which is what
+                // the global bindMounts map would answer).
+                when (val action = ChatLinkResolver.resolve(url, viewModel.currentSessionId, context)) {
+                    is ChatLinkAction.DeepLink -> ChatLinkResolver.dispatchDeepLink(context, url)
+                    is ChatLinkAction.SandboxFile -> {
+                        when {
+                            action.item.isImageFile -> {
+                                // Single image — caption = filename. Sibling
+                                // collection from markdown context is not
+                                // plumbed here (iOS does cross-session
+                                // assistant images via fingerprint).
+                                previewImageGallery = listOf(
+                                    com.openminis.app.ui.components.ImageGalleryItem(
+                                        model = action.item.file,
+                                        caption = action.item.name,
+                                    ),
+                                ) to 0
+                            }
+                            action.item.isVideoFile -> previewVideoFile = action.item.file
+                            // T146: HTML files take the immersive web-preview path
+                            // (iOS-style 90% bottom sheet + fullscreen toggle)
+                            // instead of FilePreviewScreen's plain fullscreen
+                            // Scaffold. snake_game.html and similar generated
+                            // pages need browser controls to feel right.
+                            action.item.isHtmlFile -> openHtmlPreview(action.item.file, action.item.name)
+                            // T279: route through the NavHost FILE_PREVIEW destination
+                            // (same path as user-bubble attachments and "Browse Chat Files")
+                            // so FilePreviewScreen inherits the Activity's edge-to-edge
+                            // window setup. The previous in-place Dialog wrapper had
+                            // its own Window without enableEdgeToEdge, painting the
+                            // platform default scrim on the status / nav bars.
+                            else -> onPreviewAttachment(action.item)
                         }
-                        action.item.isVideoFile -> previewVideoFile = action.item.file
-                        // T146: HTML files take the immersive web-preview path
-                        // (iOS-style 90% bottom sheet + fullscreen toggle)
-                        // instead of FilePreviewScreen's plain fullscreen
-                        // Scaffold. snake_game.html and similar generated
-                        // pages need browser controls to feel right.
-                        action.item.isHtmlFile -> openHtmlPreview(action.item.file, action.item.name)
-                        // T279: route through the NavHost FILE_PREVIEW destination
-                        // (same path as user-bubble attachments and "Browse Chat Files")
-                        // so FilePreviewScreen inherits the Activity's edge-to-edge
-                        // window setup. The previous in-place Dialog wrapper had
-                        // its own Window without enableEdgeToEdge, painting the
-                        // platform default scrim on the status / nav bars.
-                        else -> onPreviewAttachment(action.item)
                     }
+                    is ChatLinkAction.ExternalApp ->
+                        com.openminis.app.ui.browser.BrowserExternalSchemeHandler
+                            .handle(context, action.url)
+                    is ChatLinkAction.Web -> previewUrl = action.url
                 }
-                is ChatLinkAction.ExternalApp ->
-                    com.openminis.app.ui.browser.BrowserExternalSchemeHandler
-                        .handle(context, action.url)
-                is ChatLinkAction.Web -> previewUrl = action.url
             }
         }
     }
@@ -2259,8 +2273,9 @@ fun ChatScreen(
     // in `content`). Video/audio extensions are filtered out so the gallery
     // only contains still images. Resolution of `minis://` → host File is
     // resolved to a session-owned File before being handed to the gallery.
-    val markdownImageTapHandler = remember<(String, String) -> Unit>(messages, sessionId) {
-        handler@{ tappedMessageId, tappedUrl ->
+    val markdownImageTapHandler = remember<(String, String) -> Unit>(messages, sessionId, coroutineScope) {
+        { tappedMessageId, tappedUrl ->
+            coroutineScope.launch {
             val imageRegex = Regex("!\\[([^\\]]*)\\]\\(([^)\\s]+)\\)")
             data class Ref(val messageId: String, val source: String, val title: String)
             val refs = mutableListOf<Ref>()
@@ -2287,8 +2302,8 @@ fun ChatScreen(
                 // window (compacted away, just deleted, etc.). Fall back to
                 // the single-item URL handler so the user still sees the
                 // tapped image rather than swallowing the tap silently.
-                urlClickHandler(tappedUrl)
-                return@handler
+                    urlClickHandler(tappedUrl)
+                    return@launch
             }
             val startIndex = refs.indexOfFirst { it.messageId == tappedMessageId && it.source == tappedUrl }
                 .takeIf { it >= 0 }
@@ -2314,6 +2329,7 @@ fun ChatScreen(
                 )
             }
             previewImageGallery = items to startIndex
+            }
         }
     }
 
