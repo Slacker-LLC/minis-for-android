@@ -5,6 +5,7 @@ import android.util.Log
 import com.openminis.app.runtime.minisd.MinisdProtocol
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
+import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,6 @@ import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.Charset
-import java.util.concurrent.TimeUnit
 
 sealed class RootfsInstallState {
     object Idle : RootfsInstallState()
@@ -59,31 +59,14 @@ class RootfsManager private constructor(private val context: Context) {
             return@withContext
         }
 
-        val su = findSu()
-        if (su == null) {
-            _installState.value = RootfsInstallState.Failed("Root unavailable: no executable su found")
-            return@withContext
-        }
-
         _installState.value = RootfsInstallState.Extracting(0f)
-        val staged = runSu(
-            su,
-            com.openminis.app.runtime.ubuntu.RuntimeProvision.stageRootfsFromApkCommand(
-                context.packageName,
-            ),
-            REPAIR_TIMEOUT_MS,
-        )
-        if (!staged.completed || staged.exitCode != 0) {
-            val detail = staged.error
-                ?: staged.output.ifBlank { "rootfs staging exited ${staged.exitCode}" }
-            _installState.value = RootfsInstallState.Failed(detail)
-            return@withContext
-        }
-        val repaired = runSu(su, repairCommand(), REPAIR_TIMEOUT_MS)
-        if (!repaired.completed || repaired.exitCode != 0) {
-            val detail = repaired.error
-                ?: repaired.output.ifBlank { "rootfs recovery exited ${repaired.exitCode}" }
-            _installState.value = RootfsInstallState.Failed(detail)
+        // RuntimeDistributionManager owns staging, validation, switching, and
+        // rollback. RootfsManager must not recreate those privileged actions.
+        val started = UbuntuRuntime.start()
+        if (!started.statusFresh || !started.running) {
+            _installState.value = RootfsInstallState.Failed(
+                started.lastError ?: "rootfs deployment did not start Ubuntu",
+            )
             return@withContext
         }
 
@@ -102,22 +85,15 @@ class RootfsManager private constructor(private val context: Context) {
 
     suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
         if (keepUserData) Log.i(TAG, "reset: persistent user data is external to rootfs and will be preserved")
-        val su = findSu() ?: run {
-            _installState.value = RootfsInstallState.Failed("Root unavailable: no executable su found")
-            return@withContext null
+        if (!UbuntuRuntime.isInitialized) {
+            UbuntuRuntime.init(context)
         }
-        val result = runSu(
-            su,
-            "rm -rf ${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)}",
-            HEALTH_TIMEOUT_MS,
-        )
-        if (result.completed && result.exitCode == 0) {
-            _installState.value = RootfsInstallState.Idle
-        } else {
-            _installState.value = RootfsInstallState.Failed(
-                result.error ?: result.output.ifBlank { "rootfs reset failed" },
-            )
+        val result = UbuntuRuntime.resetRootfs()
+        if (result.outcome != com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome.RESET) {
+            _installState.value = RootfsInstallState.Failed(result.detail)
+            throw IllegalStateException(result.detail)
         }
+        _installState.value = RootfsInstallState.Idle
         null
     }
 
@@ -134,55 +110,6 @@ class RootfsManager private constructor(private val context: Context) {
     fun refreshDns() = Unit
 
     suspend fun applyDefaultMountOverlay() = withContext(Dispatchers.IO) { Unit }
-
-    private fun findSu(): String? {
-        val direct = SU_CANDIDATES.firstOrNull { File(it).canExecute() }
-        if (direct != null) return direct
-        return System.getenv("PATH").orEmpty()
-            .split(File.pathSeparatorChar)
-            .asSequence()
-            .map { File(it, "su") }
-            .firstOrNull { it.canExecute() }
-            ?.absolutePath
-    }
-
-    private data class RootCommandResult(
-        val completed: Boolean,
-        val exitCode: Int,
-        val output: String,
-        val error: String? = null,
-    )
-
-    private fun runSu(su: String, command: String, timeoutMs: Long): RootCommandResult {
-        val process = try {
-            ProcessBuilder(su, "-c", command)
-                .redirectErrorStream(true)
-                .start()
-        } catch (t: Throwable) {
-            return RootCommandResult(false, -1, "", "failed to start su: ${t.message}")
-        }
-        return try {
-            if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly()
-                process.waitFor(1, TimeUnit.SECONDS)
-                RootCommandResult(false, -1, "", "root command timed out")
-            } else {
-                val output = runCatching {
-                    process.inputStream.bufferedReader().use { it.readText().trim() }
-                }.getOrDefault("")
-                RootCommandResult(true, process.exitValue(), output)
-            }
-        } finally {
-            process.destroy()
-        }
-    }
-
-    private fun probeCommand(): String = buildProbeCommand(MinisdProtocol.DEFAULT_ROOTFS)
-
-    private fun repairCommand(): String = buildRepairCommand(
-        rootfs = MinisdProtocol.DEFAULT_ROOTFS,
-        archive = STAGED_ROOTFS_ARCHIVE,
-    )
 
     // --- POSIX tar extraction (kept for TarExtractionTest) ---
 
@@ -281,18 +208,8 @@ class RootfsManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "RootfsManager"
-        private const val HEALTH_TIMEOUT_MS = 15_000L
-        private const val REPAIR_TIMEOUT_MS = 180_000L
         internal const val STAGED_ROOTFS_ARCHIVE =
             com.openminis.app.runtime.ubuntu.RuntimeProvision.STAGED_ROOTFS_ARCHIVE
-        private val SU_CANDIDATES = listOf(
-            "/system/bin/su",
-            "/system/xbin/su",
-            "/sbin/su",
-            "/su/bin/su",
-            "/data/adb/ksu/bin/su",
-            "/debug_ramdisk/su",
-        )
         private val REQUIRED_LAYOUT = listOf(
             "etc/os-release",
             "etc/passwd",
