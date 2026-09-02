@@ -1,0 +1,860 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index df258cc3593c407d1820cc2acafe3210085b6685..8dfa9817b9360dd2561293385f1ec7690afdde7b 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -23,6 +23,18 @@ jobs:
+       - name: Check current docs and provenance allowlist
+         run: python3 scripts/check_docs_provenance.py
+ 
++  build-cleanup:
++    name: Build cleanup regression guard
++    runs-on: ubuntu-24.04
++    steps:
++      - uses: actions/checkout@v5
++      - name: Guard unit tests
++        run: python3 scripts/test_build_cleanup_guard.py
++      - name: Reject obsolete build paths
++        run: python3 scripts/check_build_cleanup.py
++      - name: Models.dev tooling syntax
++        run: bash -n scripts/update_models_dev.sh
++
+   minisd:
+     name: minisd quality
+     runs-on: ubuntu-24.04
+diff --git a/BUILDING.md b/BUILDING.md
+index 23c0b02d391b0cfdfb433dc2cc497d89e78e6217..fdd5a40d8174bbbd93e3cf19a779399fea33220c 100644
+--- a/BUILDING.md
++++ b/BUILDING.md
+@@ -1,9 +1,24 @@
+ # Building Minis for Android
+ 
+-This is the primary build guide for the current `master` branch. The public repository currently distributes source code rather than production APK releases.
++This is the single canonical build and release guide for the current `master` branch. The public repository currently distributes source code rather than production APK releases.
+ 
+ Chinese translation: [BUILDING.zh-CN.md](BUILDING.zh-CN.md)
+ 
++## Canonical entry points
++
++Current builds operate directly on this repository. They do not clone or patch an upstream checkout as part of the Android build.
++
++| Purpose | Canonical entry point |
++|---|---|
++| Android debug APK | `cd src/android && ./gradlew :app:assembleDebug --no-daemon` |
++| Android debug APK on Windows PowerShell | `./scripts/build-android-debug.ps1` |
++| Android release APK | `cd src/android && ./gradlew :app:assembleRelease --no-daemon` |
++| Rust `minisd` | `cargo ... --manifest-path src/native/minisd/Cargo.toml` |
++| Ubuntu rootfs | `./scripts/build-ubuntu-rootfs.sh` |
++| CI | `.github/workflows/ci.yml` |
++
++The PowerShell wrapper is a convenience entry point around the same checked-in Android Gradle project; it must not introduce a second build pipeline.
++
+ ## Toolchain
+ 
+ The build files are authoritative. At the time of writing the repository uses:
+@@ -71,12 +86,20 @@ The script downloads the pinned Ubuntu 24.04 arm64 base archive and verifies its
+ 
+ ## 5. Build a debug APK
+ 
++Linux / WSL2:
++
+ ```bash
+ cd src/android
+ ./gradlew :app:assembleDebug --no-daemon
+ ```
+ 
+-Output:
++Windows PowerShell from the repository root:
++
++```powershell
++./scripts/build-android-debug.ps1
++```
++
++Both entry points build the checked-in `src/android` Gradle project and produce:
+ 
+ ```text
+ src/android/app/build/outputs/apk/debug/app-debug.apk
+@@ -141,6 +164,14 @@ python3 scripts/test_docs_provenance.py
+ python3 scripts/check_docs_provenance.py
+ ```
+ 
++Build cleanup regression guard:
++
++```bash
++python3 scripts/test_build_cleanup_guard.py
++python3 scripts/check_build_cleanup.py
++bash -n scripts/update_models_dev.sh
++```
++
+ ## 7. Release builds
+ 
+ Release signing is fail-closed. A production release package requires all four environment variables:
+@@ -163,6 +194,7 @@ Without explicit release credentials, the release-signing gate must fail. Debug
+ 
+ The repository CI validates:
+ 
++- obsolete build-path regression guard;
+ - Rust format, Clippy, tests, and release build;
+ - rootfs checksum failure paths;
+ - Android unit tests;
+diff --git a/BUILDING.zh-CN.md b/BUILDING.zh-CN.md
+index 6fbb308ea764750aff26e4acda4df79a2c0123ae..6e761c99f76569fb0a04ac64327f9bba0db0f719 100644
+--- a/BUILDING.zh-CN.md
++++ b/BUILDING.zh-CN.md
+@@ -1,6 +1,21 @@
+ # Minis for Android 构建说明（中文翻译）
+ 
+-> [BUILDING.md](BUILDING.md) 是权威英文构建文档。本文件只作为中文翻译；如果版本号、命令或行为与英文文档冲突，以英文文档和实际构建脚本为准。
++> [BUILDING.md](BUILDING.md) 是当前 `master` 唯一权威的构建与发布文档。本文件只作为中文翻译；如果版本号、命令或行为与英文文档冲突，以英文文档和实际构建脚本为准。
++
++## Canonical 构建入口
++
++当前构建直接使用本仓库源码，不会在 Android 构建过程中重新克隆或 patch 上游仓库。
++
++| 用途 | 当前入口 |
++|---|---|
++| Android Debug APK | `cd src/android && ./gradlew :app:assembleDebug --no-daemon` |
++| Windows PowerShell Debug APK | `./scripts/build-android-debug.ps1` |
++| Android Release APK | `cd src/android && ./gradlew :app:assembleRelease --no-daemon` |
++| Rust `minisd` | `cargo ... --manifest-path src/native/minisd/Cargo.toml` |
++| Ubuntu rootfs | `./scripts/build-ubuntu-rootfs.sh` |
++| CI | `.github/workflows/ci.yml` |
++
++PowerShell 脚本只是对同一个 `src/android` Gradle 工程的便捷封装，不允许演变成第二套构建链。
+ 
+ ## 当前工具链
+ 
+@@ -56,12 +71,20 @@ cargo build --locked --release \
+ 
+ ## 5. 构建 Debug APK
+ 
++Linux / WSL2：
++
+ ```bash
+ cd src/android
+ ./gradlew :app:assembleDebug --no-daemon
+ ```
+ 
+-产物：
++Windows PowerShell，从仓库根目录执行：
++
++```powershell
++./scripts/build-android-debug.ps1
++```
++
++两者都构建仓库中的 `src/android` 工程，产物为：
+ 
+ ```text
+ src/android/app/build/outputs/apk/debug/app-debug.apk
+@@ -77,6 +100,8 @@ APK/AAB 只作为本地或 CI 构建产物，不应提交到 Git。
+ 
+ ## 6. 测试
+ 
++Android：
++
+ ```bash
+ cd src/android
+ ./gradlew :app:testDebugUnitTest --no-daemon
+@@ -106,6 +131,14 @@ python3 scripts/test_docs_provenance.py
+ python3 scripts/check_docs_provenance.py
+ ```
+ 
++构建路径回归检查：
++
++```bash
++python3 scripts/test_build_cleanup_guard.py
++python3 scripts/check_build_cleanup.py
++bash -n scripts/update_models_dev.sh
++```
++
+ ## 7. Release 签名
+ 
+ Release 构建必须显式提供正式签名配置：
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 0638e0420dd9a90504130562fe9bab1845c0722f..869ac424e75b37f4744a6cd5d99e59f04f532ba6 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -33,6 +33,7 @@ A change should preserve these project invariants:
+ 7. Security-sensitive paths fail closed.
+ 8. Tests and English primary documentation are updated with behavior changes.
+ 9. GPL and third-party license obligations are preserved.
++10. Build/tooling changes use the canonical entry points in [BUILDING.md](BUILDING.md) and must not reintroduce an upstream clone/patch build pipeline.
+ 
+ ## Runtime architecture
+ 
+@@ -99,6 +100,14 @@ Security tests should cover negative cases, not only successful paths.
+ 
+ Use the narrowest relevant checks locally, and rely on repository CI for the full gate.
+ 
++Build/tooling changes:
++
++```bash
++python3 scripts/test_build_cleanup_guard.py
++python3 scripts/check_build_cleanup.py
++bash -n scripts/update_models_dev.sh
++```
++
+ Android:
+ 
+ ```bash
+diff --git a/README.md b/README.md
+index e179c2fd3da4877e8501454f61c3f73b48a6a5a3..8ac595a852296fdff35ad1052d137bf56fa3b74e 100644
+--- a/README.md
++++ b/README.md
+@@ -81,14 +81,9 @@ The rootfs is built by `scripts/build-ubuntu-rootfs.sh` and verified against a p
+ 
+ ## Build from source
+ 
+-Use [BUILDING.md](BUILDING.md) as the authoritative build and release guide.
++[BUILDING.md](BUILDING.md) is the single canonical build and release guide for this repository. It defines the supported toolchain, Android/Rust/rootfs entry points, validation commands, release-signing gate, and troubleshooting steps.
+ 
+-Minimal debug APK entry point:
+-
+-```bash
+-cd src/android
+-./gradlew :app:assembleDebug --no-daemon
+-```
++Do not copy build commands from archived material or historical upstream documentation into current automation without checking them against `BUILDING.md` and the repository build files.
+ 
+ ## Repository layout
+ 
+diff --git a/README.zh-CN.md b/README.zh-CN.md
+index 517303b9cf4c1d76c454c4d947c2fb1f3f628370..1e5cc6bc9a83beb692a484b5a4eb7bba92bc7e5d 100644
+--- a/README.zh-CN.md
++++ b/README.zh-CN.md
+@@ -78,12 +78,9 @@ rootfs 由 `scripts/build-ubuntu-rootfs.sh` 构建，并使用固定 SHA-256 校
+ 
+ ## 构建
+ 
+-完整、权威的构建和发布说明见 [BUILDING.md](BUILDING.md)。
++[BUILDING.md](BUILDING.md) 是本仓库唯一权威的构建与发布说明，定义当前支持的工具链、Android/Rust/rootfs 入口、验证命令和 Release 签名规则。[BUILDING.zh-CN.md](BUILDING.zh-CN.md) 仅作为中文翻译。
+ 
+-```bash
+-cd src/android
+-./gradlew :app:assembleDebug --no-daemon
+-```
++不要从归档材料或历史上游文档直接复制旧构建命令到当前自动化；应先与 `BUILDING.md` 和实际构建文件核对。
+ 
+ ## 文档规则
+ 
+diff --git a/docs/BUILD-CLEANUP-AUDIT.md b/docs/BUILD-CLEANUP-AUDIT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..264c8022ee412d29d0bfc1dfdeb53608e21d5ad9
+--- /dev/null
++++ b/docs/BUILD-CLEANUP-AUDIT.md
+@@ -0,0 +1,63 @@
++# Issue #53 Build Cleanup Audit
++
++This audit records the build-path decisions for Issue #53. It is intentionally narrower than runtime cleanup, package-identity migration, and source-provenance history.
++
++## Classification
++
++### Removed dead build/tooling paths
++
++- `scripts/verify_models_dev_resolution.py`: iOS-only verifier with no current Android/Rust build role.
++- The iOS copy/output branch in `scripts/update_models_dev.sh`: the active Android catalog output remains `src/android/app/src/main/assets/models-dev-api.json`.
++
++### Migrated active legacy entry point
++
++- The old pet-named PowerShell APK wrapper was still functionally valid because it directly built the checked-in Android Gradle project. Its behavior was retained under `scripts/build-android-debug.ps1`; the legacy filename was removed.
++
++### Preserved migration-only identity
++
++The current Android build still uses migration-owned package identity in active source, including:
++
++- `namespace = "com.openminis.app"`
++- `applicationId = "dev.openminispet.android"`
++
++These values are part of the current supported Android build and are therefore not removed by Issue #53. Package/namespace migration is tracked separately by Issue #52.
++
++### Preserved legal/provenance material
++
++Legal attribution and source-lineage records are outside the build-cleanup guard's target. Current authoritative locations include:
++
++- `LICENSE`
++- `PROVENANCE.md`
++- `THIRD_PARTY_LICENSES.md`
++- historical Git history and explicitly archived material under `docs/archive/`
++
++Issue #53 does not rewrite those records; it only prevents historical build mechanisms from becoming active tooling again.
++
++### Deferred to other issues
++
++Historical runtime/code-path cleanup is not broadened into this build-path change. Issue #44 owns obsolete runtime/code-path cleanup; Issue #53 only prevents obsolete build pipelines from becoming active tooling again.
++
++## Canonical build contract
++
++`BUILDING.md` is the single canonical build/release guide. Current build entry points operate directly on this repository:
++
++- Android: `src/android/gradlew`
++- Rust: `src/native/minisd/Cargo.toml`
++- rootfs: `scripts/build-ubuntu-rootfs.sh`
++- Windows convenience wrapper: `scripts/build-android-debug.ps1`
++- CI: `.github/workflows/ci.yml`
++
++README files point to `BUILDING.md` instead of carrying a second copy of the full build recipe.
++
++## Regression guard
++
++`scripts/check_build_cleanup.py` scans active root build docs, scripts, and GitHub workflows. It rejects:
++
++- the removed legacy PowerShell build wrapper;
++- references from active tooling to the removed iOS source tree;
++- active tooling that clones a historical upstream repository as a build stage;
++- active tooling that applies a historical upstream patch pipeline.
++
++`scripts/test_build_cleanup_guard.py` covers positive and negative fixtures, including explicit acceptance of migration-only Android package identity and provenance-only historical references.
++
++The guard deliberately does not scan legal/provenance documents or all application source for migration-owned naming. Doing so would conflate Issue #53 with the separate package-identity migration and could break the currently supported Android build.
+diff --git a/docs/README.md b/docs/README.md
+index 12f9e272c34dd4bad5e4db8448a4f87d3ac3d5a6..437ff4e27381bf967d51faa6bfedb43999e02681 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -7,10 +7,11 @@ English is the primary language for current project documentation. Translations
+ | Document | Purpose |
+ |---|---|
+ | [`../README.md`](../README.md) | project overview and architecture |
+-| [`../BUILDING.md`](../BUILDING.md) | authoritative build and release guide |
++| [`../BUILDING.md`](../BUILDING.md) | single canonical build and release guide |
+ | [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | current engineering state and active risk areas |
+ | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | rooted-device Ubuntu/minisd execution model |
+ | [`SECURITY.md`](SECURITY.md) | security boundaries and hardening rules |
++| [`BUILD-CLEANUP-AUDIT.md`](BUILD-CLEANUP-AUDIT.md) | Issue #53 build-path classification and allowlist decisions |
+ | [`VOICE.md`](VOICE.md) | speech recognition, voice provider, TTS, and pet/chat voice paths |
+ | [`../PROVENANCE.md`](../PROVENANCE.md) | source lineage and legal attribution |
+ | [`../THIRD_PARTY_LICENSES.md`](../THIRD_PARTY_LICENSES.md) | third-party license inventory |
+diff --git a/scripts/build-android-debug.ps1 b/scripts/build-android-debug.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..4133417fb3cd3a4c4a7dd25ae331e23be12b5c1a
+--- /dev/null
++++ b/scripts/build-android-debug.ps1
+@@ -0,0 +1,26 @@
++$ErrorActionPreference = "Stop"
++
++$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
++$androidDir = Join-Path $repoRoot "src/android"
++$gradlew = Join-Path $androidDir "gradlew.bat"
++$apk = Join-Path $androidDir "app/build/outputs/apk/debug/app-debug.apk"
++
++if (-not (Test-Path $gradlew)) {
++  throw "Gradle wrapper not found at $gradlew"
++}
++
++Push-Location $androidDir
++try {
++  & $gradlew ":app:assembleDebug" "--no-parallel" "--max-workers=2" "--stacktrace"
++  if ($LASTEXITCODE -ne 0) {
++    throw "Gradle debug build failed with exit code $LASTEXITCODE"
++  }
++} finally {
++  Pop-Location
++}
++
++if (-not (Test-Path $apk)) {
++  throw "Expected debug APK was not produced at $apk"
++}
++
++Write-Host "Built APK: $apk"
+diff --git a/scripts/build-pet-apk.ps1 b/scripts/build-pet-apk.ps1
+deleted file mode 100644
+index bd40d735311b9f413ba19787d476a4f00b75da09..0000000000000000000000000000000000000000
+--- a/scripts/build-pet-apk.ps1
++++ /dev/null
+@@ -1,54 +0,0 @@
+-#!/usr/bin/env pwsh
+-# Build the Minis for Android debug APK.
+-#
+-# The APK remains a local Gradle build artifact and is not copied into the
+-# repository root. See BUILDING.md for the supported build environment.
+-#
+-# Usage:
+-#   powershell -ExecutionPolicy Bypass -File scripts/build-pet-apk.ps1
+-
+-$ErrorActionPreference = 'Stop'
+-
+-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+-$RepoRoot = Split-Path -Parent $ScriptDir
+-$AndroidDir = Join-Path $RepoRoot 'src\android'
+-
+-function Invoke-AndroidDebugBuild {
+-    $wrapperBat = Join-Path $AndroidDir 'gradlew.bat'
+-    $wrapperJar = Join-Path $AndroidDir 'gradle\wrapper\gradle-wrapper.jar'
+-    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+-
+-    if (Test-Path $wrapperBat) {
+-        Push-Location $AndroidDir
+-        try {
+-            & $wrapperBat :app:assembleDebug --console=plain
+-        } finally {
+-            Pop-Location
+-        }
+-    } elseif ($wsl) {
+-        $linuxPath = ($AndroidDir -replace '\\','/' -replace '^([A-Za-z]):','/mnt/$1').ToLower()
+-        wsl.exe -e bash -lc "cd '$linuxPath' && ./gradlew :app:assembleDebug --console=plain" 2>&1
+-    } elseif (Test-Path $wrapperJar) {
+-        Push-Location $AndroidDir
+-        try {
+-            & java -cp $wrapperJar org.gradle.wrapper.GradleWrapperMain :app:assembleDebug --console=plain
+-        } finally {
+-            Pop-Location
+-        }
+-    } else {
+-        throw "Gradle wrapper not found under $AndroidDir"
+-    }
+-
+-    if ($LASTEXITCODE -ne 0) {
+-        throw "assembleDebug failed with exit code $LASTEXITCODE"
+-    }
+-}
+-
+-Invoke-AndroidDebugBuild
+-
+-$apk = Join-Path $AndroidDir 'app\build\outputs\apk\debug\app-debug.apk'
+-if (-not (Test-Path $apk)) {
+-    throw "Build output not found: $apk"
+-}
+-
+-Write-Host "OK: $apk"
+diff --git a/scripts/check_build_cleanup.py b/scripts/check_build_cleanup.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bb861c36619aa5e5a90d388458f93adfc75ee3b5
+--- /dev/null
++++ b/scripts/check_build_cleanup.py
+@@ -0,0 +1,117 @@
++#!/usr/bin/env python3
++"""Reject obsolete build paths without banning provenance or migration-only identity."""
++
++from __future__ import annotations
++
++import re
++import sys
++from pathlib import Path
++
++REQUIRED_PATHS = (
++    "src/android/gradlew",
++    "src/android/app/build.gradle.kts",
++    "src/native/minisd/Cargo.toml",
++    "scripts/build-android-debug.ps1",
++    "scripts/build-ubuntu-rootfs.sh",
++    "scripts/verify-android-release.sh",
++)
++
++FORBIDDEN_PATHS = (
++    "scripts/build-pet-apk.ps1",
++    "scripts/verify_models_dev_resolution.py",
++)
++
++ROOT_ACTIVE_DOCS = (
++    "README.md",
++    "README.zh-CN.md",
++    "BUILDING.md",
++    "BUILDING.zh-CN.md",
++    "CONTRIBUTING.md",
++)
++
++SCRIPT_SUFFIXES = {".sh", ".ps1", ".py"}
++SELF_EXCLUDED_SCRIPTS = {
++    "scripts/check_build_cleanup.py",
++    "scripts/test_build_cleanup_guard.py",
++}
++
++LEGACY_IOS_RE = re.compile(r"(?i)(?:^|[\\/\s'\"`])src[\\/]ios(?:[\\/\s'\"`]|$)")
++LEGACY_WRAPPER_RE = re.compile(r"(?i)build-pet-apk\.ps1")
++UPSTREAM_CLONE_RE = re.compile(
++    r"(?is)\bgit\s+clone\b[^\n]*(?:github\.com[/:]OpenMinis/OpenMinis(?:\.git)?|\bOpenMinisPet\b)"
++)
++UPSTREAM_PATCH_RE = re.compile(
++    r"(?is)(?:\bgit\s+apply\b|\bpatch\b)[^\n]*(?:OpenMinis|OpenMinisPet)"
++)
++
++
++def _active_files(root: Path) -> list[Path]:
++    files: set[Path] = set()
++
++    for relative in ROOT_ACTIVE_DOCS:
++        path = root / relative
++        if path.is_file():
++            files.add(path)
++
++    scripts = root / "scripts"
++    if scripts.is_dir():
++        for path in scripts.iterdir():
++            if not path.is_file() or path.suffix.lower() not in SCRIPT_SUFFIXES:
++                continue
++            relative = path.relative_to(root).as_posix()
++            if relative not in SELF_EXCLUDED_SCRIPTS:
++                files.add(path)
++
++    workflows = root / ".github" / "workflows"
++    if workflows.is_dir():
++        for pattern in ("*.yml", "*.yaml"):
++            files.update(path for path in workflows.glob(pattern) if path.is_file())
++
++    return sorted(files)
++
++
++def check_repository(root: Path) -> list[str]:
++    root = root.resolve()
++    errors: list[str] = []
++
++    for relative in REQUIRED_PATHS:
++        if not (root / relative).is_file():
++            errors.append(f"missing canonical build path: {relative}")
++
++    for relative in FORBIDDEN_PATHS:
++        if (root / relative).exists():
++            errors.append(f"obsolete build path exists: {relative}")
++
++    for path in _active_files(root):
++        relative = path.relative_to(root).as_posix()
++        try:
++            text = path.read_text(encoding="utf-8")
++        except UnicodeDecodeError:
++            errors.append(f"active tooling is not UTF-8 text: {relative}")
++            continue
++
++        if LEGACY_WRAPPER_RE.search(text):
++            errors.append(f"legacy build wrapper referenced by active tooling: {relative}")
++        if LEGACY_IOS_RE.search(text):
++            errors.append(f"removed iOS source path referenced by active tooling: {relative}")
++        if UPSTREAM_CLONE_RE.search(text):
++            errors.append(f"obsolete upstream clone pipeline referenced by active tooling: {relative}")
++        if UPSTREAM_PATCH_RE.search(text):
++            errors.append(f"obsolete upstream patch pipeline referenced by active tooling: {relative}")
++
++    return errors
++
++
++def main(argv: list[str]) -> int:
++    root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[1]
++    errors = check_repository(root)
++    if errors:
++        for error in errors:
++            print(f"build-cleanup guard: {error}", file=sys.stderr)
++        return 1
++    print("build-cleanup guard passed")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main(sys.argv))
+diff --git a/scripts/test_build_cleanup_guard.py b/scripts/test_build_cleanup_guard.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0793c39a16c126f33d82e254e1b884c988b8c2b2
+--- /dev/null
++++ b/scripts/test_build_cleanup_guard.py
+@@ -0,0 +1,72 @@
++#!/usr/bin/env python3
++from __future__ import annotations
++
++import importlib.util
++import tempfile
++import unittest
++from pathlib import Path
++
++MODULE_PATH = Path(__file__).with_name("check_build_cleanup.py")
++SPEC = importlib.util.spec_from_file_location("check_build_cleanup", MODULE_PATH)
++assert SPEC is not None and SPEC.loader is not None
++GUARD = importlib.util.module_from_spec(SPEC)
++SPEC.loader.exec_module(GUARD)
++
++
++class BuildCleanupGuardTests(unittest.TestCase):
++    def make_repo(self) -> Path:
++        tmp = tempfile.TemporaryDirectory()
++        self.addCleanup(tmp.cleanup)
++        root = Path(tmp.name)
++        for relative in GUARD.REQUIRED_PATHS:
++            path = root / relative
++            path.parent.mkdir(parents=True, exist_ok=True)
++            path.write_text("canonical\n", encoding="utf-8")
++        (root / ".github/workflows").mkdir(parents=True, exist_ok=True)
++        (root / ".github/workflows/ci.yml").write_text("name: CI\n", encoding="utf-8")
++        (root / "BUILDING.md").write_text("Build from src/android.\n", encoding="utf-8")
++        return root
++
++    def test_clean_repository_passes(self) -> None:
++        self.assertEqual([], GUARD.check_repository(self.make_repo()))
++
++    def test_legacy_wrapper_is_rejected(self) -> None:
++        root = self.make_repo()
++        (root / "scripts/build-pet-apk.ps1").write_text("legacy\n", encoding="utf-8")
++        self.assertTrue(any("obsolete build path exists" in error for error in GUARD.check_repository(root)))
++
++    def test_removed_ios_source_reference_is_rejected(self) -> None:
++        root = self.make_repo()
++        (root / "scripts/tool.sh").write_text(
++            "cp catalog.json src/ios/App/catalog.json\n",
++            encoding="utf-8",
++        )
++        self.assertTrue(any("removed iOS source path" in error for error in GUARD.check_repository(root)))
++
++    def test_upstream_clone_pipeline_is_rejected(self) -> None:
++        root = self.make_repo()
++        (root / "scripts/tool.ps1").write_text(
++            "git clone https://github.com/OpenMinis/OpenMinis.git upstream\n",
++            encoding="utf-8",
++        )
++        self.assertTrue(any("upstream clone pipeline" in error for error in GUARD.check_repository(root)))
++
++    def test_migration_only_package_identity_is_allowed(self) -> None:
++        root = self.make_repo()
++        (root / "src/android/app/build.gradle.kts").write_text(
++            'namespace = "com.openminis.app"\napplicationId = "dev.openminispet.android"\n',
++            encoding="utf-8",
++        )
++        self.assertEqual([], GUARD.check_repository(root))
++
++    def test_provenance_document_is_allowlisted(self) -> None:
++        root = self.make_repo()
++        (root / "UPSTREAM.md").write_text(
++            "Historical provenance: git clone https://github.com/OpenMinis/OpenMinis.git\n",
++            encoding="utf-8",
++        )
++        self.assertEqual([], GUARD.check_repository(root))
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/scripts/update_models_dev.sh b/scripts/update_models_dev.sh
+old mode 100644
+new mode 100755
+index 668331d404b8875a044d3c96a6e274faf0108d00..afc95fffdbb2a8c0a258a7d67a4d6213a7b05d18
+--- a/scripts/update_models_dev.sh
++++ b/scripts/update_models_dev.sh
+@@ -1,41 +1,12 @@
+-#!/bin/bash
+-# Updates the bundled models.dev/api.json used as a fallback model registry.
+-# Run this periodically to keep the bundled data fresh.
+-
++#!/usr/bin/env bash
++# Refresh the models.dev catalog consumed by the Android application.
+ set -euo pipefail
+ 
+-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+-IOS_DEST="$SCRIPT_DIR/../src/ios/Resources/models-dev-api.json"
+-ANDROID_DEST="$SCRIPT_DIR/../src/android/app/src/main/assets/models-dev-api.json"
+-URL="https://models.dev/api.json"
+-
+-echo "Downloading $URL ..."
+-curl -fsSL "$URL" -o "$IOS_DEST.tmp"
+-
+-# Validate JSON
+-if ! python3 -m json.tool "$IOS_DEST.tmp" > /dev/null 2>&1; then
+-    echo "ERROR: Downloaded file is not valid JSON"
+-    rm -f "$IOS_DEST.tmp"
+-    exit 1
+-fi
+-
+-PROVIDERS=$(python3 -c "import json; d=json.load(open('$IOS_DEST.tmp')); print(len(d))")
+-echo "Valid JSON — $PROVIDERS providers"
+-
+-mv "$IOS_DEST.tmp" "$IOS_DEST"
+-echo "Updated $IOS_DEST"
+-
+-# The app resolves cross-provider model ids through a precomputed stage-2 index
+-# (ModelsDevAPI.buildStage2Index). Verify the new catalog still resolves exactly
+-# as a full per-key scan would, so a catalog update can never silently change
+-# which entry wins the majority vote.
+-echo "Verifying stage-2 resolution against the new catalog ..."
+-python3 "$SCRIPT_DIR/verify_models_dev_resolution.py"
++REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++OUTPUT="$REPO_ROOT/src/android/app/src/main/assets/models-dev-api.json"
+ 
+-# Copy to Android assets
+-cp "$IOS_DEST" "$ANDROID_DEST"
+-echo "Updated $ANDROID_DEST"
++curl --fail --silent --show-error --location \
++  https://models.dev/api.json \
++  -o "$OUTPUT"
+ 
+-# Show size
+-SIZE=$(wc -c < "$IOS_DEST" | tr -d ' ')
+-echo "File size: ${SIZE} bytes"
++echo "Updated Android models.dev API data: $OUTPUT"
+diff --git a/scripts/verify_models_dev_resolution.py b/scripts/verify_models_dev_resolution.py
+deleted file mode 100644
+index 028c1a01bbfb1c5ff4441d4e9e15852de8e40a4c..0000000000000000000000000000000000000000
+--- a/scripts/verify_models_dev_resolution.py
++++ /dev/null
+@@ -1,181 +0,0 @@
+-#!/usr/bin/env python3
+-"""Precompute the models.dev stage-2 resolution index.
+-
+-Background
+-----------
+-`ModelsDevAPI.resolveDevModel` has two stages. Stage 1 looks the model up in its
+-OWN provider (cheap: one dict hit, or a scan of <=339 entries). Stage 2 is the
+-cross-provider fallback that third-party relays actually hit, and it used to
+-re-sort all 182 provider keys, re-sort every provider's model ids, and re-run
+-`normalizedModelKey` over all 6,243 catalog ids -- once per model being enriched.
+-
+-Time Profiler on an iPhone 11 (2026-08-11) measured that at 1,418ms of a 8,971ms
+-launch, 997ms of it inside `normalizedModelKey` alone, recomputing a value that
+-cannot change while the catalog is unchanged.
+-
+-The app now builds that index once at runtime (`buildStage2Index`). This script
+-verifies that the grouped formulation agrees with a literal replay of the old
+-per-key scan, over the whole real catalog.
+-
+-Why this does NOT emit a checked-in index
+------------------------------------------
+-It was written to, and that was measured to be the wrong trade:
+-
+-* The expensive part was never the grouping pass -- that is a single linear walk
+-  (~3ms). The 1,418ms came from repeating that walk once per model enriched.
+-  Doing it once, at runtime, already recovers essentially all of it, so a
+-  prebuilt artifact saves only that one remaining pass.
+-* The registry is refreshed from the network at runtime (`loadDiskCache`), so a
+-  build-time index can only ever describe the BUNDLED snapshot. The runtime
+-  builder has to exist anyway for the refreshed case.
+-* A checked-in index is a second copy of a derived value. If someone updates
+-  models-dev-api.json without regenerating it, the two disagree silently -- and
+-  the failure mode is wrong model capabilities, which is exactly the class of
+-  bug the normalization work was undertaken to fix.
+-
+-So the value here is the VERIFICATION, not an artifact. Run it whenever the
+-catalog is updated (`update_models_dev.sh` does so automatically).
+-
+-Usage
+------
+-    scripts/build_models_dev_index.py            # verify the runtime formulation
+-
+-Exits non-zero if the grouped index disagrees with the replayed scan on any
+-key, which is the invariant that makes the runtime rewrite safe.
+-"""
+-
+-import argparse
+-import collections
+-import json
+-import os
+-import sys
+-
+-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+-CATALOG = os.path.join(REPO, "src/ios/Resources/models-dev-api.json")
+-
+-
+-def normalized_model_key(model_id):
+-    """Mirror of `ModelsDevAPI.normalizedModelKey`.
+-
+-    Drop the vendor/namespace path, lowercase, unify `.` and `_` to `-`.
+-    """
+-    bare = model_id.split("/")[-1]
+-    return bare.lower().replace(".", "-").replace("_", "-")
+-
+-
+-def effort_values(model):
+-    """Mirror of `ModelsDevModel.effortValues`.
+-
+-    nil unless the entry declares an `effort`-type reasoning option with a
+-    non-empty value list. `toggle` / `budget_tokens` are different mechanisms
+-    and must NOT count as effort support.
+-
+-    Non-string elements are dropped to match the Swift decoder, which tolerates
+-    the `[null,"low","medium","high"]` that sarvam-30b / sarvam-105b ship.
+-    """
+-    options = model.get("reasoning_options")
+-    if options is None:
+-        return None
+-    for option in options:
+-        if option.get("type") != "effort":
+-            continue
+-        values = [v.lower() for v in (option.get("values") or []) if isinstance(v, str)]
+-        if values:
+-            return values
+-    return None
+-
+-
+-def pick_winner(candidates):
+-    """Mirror of the stage-2 majority vote.
+-
+-    `candidates` is the list in scan order: providers sorted by key, and each
+-    provider's model ids sorted. Among entries that declare effort tiers, the
+-    most commonly declared set wins; ties resolve to the first seen, which is
+-    what makes the result reproducible across launches.
+-    """
+-    declaring = [c for c in candidates if c["effort"] is not None]
+-    if not declaring:
+-        return candidates[0] if candidates else None
+-
+-    counts = collections.Counter(tuple(c["effort"]) for c in declaring)
+-    winner, winner_count = None, 0
+-    for candidate in declaring:
+-        key = tuple(candidate["effort"])
+-        if counts[key] > winner_count:
+-            winner_count = counts[key]
+-            winner = key
+-    for candidate in declaring:
+-        if tuple(candidate["effort"]) == winner:
+-            return candidate
+-    return declaring[0]
+-
+-
+-def scan_order(registry):
+-    """Every catalog entry, in the exact order the old stage-2 scan walked it."""
+-    for provider_key in sorted(registry.keys()):
+-        provider = registry[provider_key]
+-        for model_id in sorted(provider.get("models", {}).keys()):
+-            yield provider_key, model_id, provider["models"][model_id]
+-
+-
+-def build_index(registry):
+-    """Group once by normalized id, then vote per group."""
+-    grouped = collections.defaultdict(list)
+-    for provider_key, model_id, model in scan_order(registry):
+-        grouped[normalized_model_key(model_id)].append(
+-            {"provider": provider_key, "id": model_id, "effort": effort_values(model)}
+-        )
+-    return {key: pick_winner(group) for key, group in grouped.items()}
+-
+-
+-def replay_old_scan(registry, wanted):
+-    """Literal replay of the pre-index code: full scan for one normalized key."""
+-    candidates = []
+-    for provider_key, model_id, model in scan_order(registry):
+-        if normalized_model_key(model_id) == wanted:
+-            candidates.append(
+-                {"provider": provider_key, "id": model_id, "effort": effort_values(model)}
+-            )
+-    return pick_winner(candidates)
+-
+-
+-def verify(registry, index):
+-    """Assert the grouped index matches the replayed scan on every key.
+-
+-    This is the whole safety argument for the runtime rewrite: same winner for
+-    every normalized id in the catalog, so no caller can observe a difference.
+-    """
+-    mismatches = []
+-    for wanted in sorted(index.keys()):
+-        if replay_old_scan(registry, wanted) != index[wanted]:
+-            mismatches.append(wanted)
+-    return mismatches
+-
+-
+-def main():
+-    argparse.ArgumentParser(description=__doc__).parse_args()
+-
+-    with open(CATALOG) as handle:
+-        registry = json.load(handle)
+-
+-    providers = len(registry)
+-    entries = sum(len(p.get("models", {})) for p in registry.values())
+-    print(f"catalog: {providers} providers, {entries} model entries")
+-
+-    index = build_index(registry)
+-    print(f"index:   {len(index)} normalized keys")
+-
+-    mismatches = verify(registry, index)
+-    if mismatches:
+-        print(f"FAIL: {len(mismatches)} key(s) disagree with the old scan:")
+-        for key in mismatches[:20]:
+-            print(f"  {key}")
+-            print(f"    old={replay_old_scan(registry, key)}")
+-            print(f"    new={index[key]}")
+-        return 1
+-    print(f"verified: all {len(index)} keys match a replay of the pre-index scan")
+-    return 0
+-
+-
+-if __name__ == "__main__":
+-    sys.exit(main())
