@@ -5,6 +5,7 @@ import com.openminis.app.data.db.WebAppShortcutEntity
 import com.openminis.app.data.repository.WebAppShortcutRepository
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import java.io.File
 
 /**
@@ -18,8 +19,7 @@ import java.io.File
  *   - session_attachment → `/var/minis/attachments/<htmlPath>` through minisd
  *     (with a legacy app-private fallback for already-persisted shortcuts)
  *   - shared             → staged through minisd
- *   - mount              → resolved via [RuntimePathRegistry.resolveHostPath]
- *                          (longest-prefix match against bindMounts)
+ *   - mount              → staged through the minisd broker
  */
 object WebAppPathResolver {
 
@@ -27,7 +27,12 @@ object WebAppPathResolver {
         val file = when (shortcut.pathScope) {
             WebAppShortcutRepository.SCOPE_SESSION_ATTACHMENT -> resolveSession(context, shortcut)
             WebAppShortcutRepository.SCOPE_SHARED -> stageGuestFile(context, shortcut.htmlPath, null, shortcut.id)
-            WebAppShortcutRepository.SCOPE_MOUNT -> RuntimePathRegistry.resolveHostPath(shortcut.htmlPath)
+            WebAppShortcutRepository.SCOPE_MOUNT -> stageGuestFile(
+                context,
+                shortcut.htmlPath,
+                null,
+                shortcut.id,
+            )
             else -> null
         }
         return file?.takeIf { it.exists() && it.isFile }
@@ -92,12 +97,13 @@ object WebAppPathResolver {
         sessionId: String?,
         shortcutId: String,
     ): File? {
-        if (!isCanonicalGuestPath(guestPath)) return null
+        if (!isCanonicalGuestPath(guestPath) && !ExternalMountAccess.isPath(guestPath)) return null
         val name = guestPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
         val id = shortcutId.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val staged = File(File(context.cacheDir, "webapp"), "$id-$name")
         return runCatching {
-            WorkspaceFileClient.readToFile(sessionId.orEmpty(), guestPath, staged)
+            val brokerSession = if (ExternalMountAccess.isPath(guestPath)) null else sessionId.orEmpty()
+            WorkspaceFileClient.readToFile(brokerSession, guestPath, staged)
             staged.takeIf { it.isFile }
         }.getOrNull()
     }

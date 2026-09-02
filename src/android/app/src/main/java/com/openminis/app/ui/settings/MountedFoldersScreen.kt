@@ -556,9 +556,8 @@ private fun MountRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // Source line: prefer spec-contract `resolvedHostPath` (T219-1
-            // adds it). Until that lands, fall back to `sourceDisplayName`
-            // — same rendering shape, just less precise.
+            // The URI-derived volume/segments stay in the broker contract;
+            // the settings screen displays the provider's stable label.
             val source = entry.sourceDisplayName.ifEmpty { stringResource(R.string.mount_path_unavailable) }
             Text(
                 text = "← $source",

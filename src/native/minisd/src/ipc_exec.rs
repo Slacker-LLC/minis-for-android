@@ -33,6 +33,12 @@ pub fn snapshot_ubuntu_exec(
             "ubuntu runtime not started".into(),
         ));
     }
+    if !state.ubuntu.external_mount_verified {
+        return Err((
+            ErrorCode::MountAttestationRequired,
+            "external mount snapshot must be re-attested before guest exec".into(),
+        ));
+    }
     let pid = status
         .get("pid")
         .and_then(Value::as_i64)

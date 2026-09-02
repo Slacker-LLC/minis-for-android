@@ -68,17 +68,10 @@ object FileEditTool {
                 )
             }
 
-            val externalMountFile = if (path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")) {
-                ExternalMountAccess.resolve(path)
-                    ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
-            } else {
-                null
-            }
-            if (externalMountFile != null) {
-                if (!externalMountFile.exists()) {
-                    return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
-                }
-                if (!externalMountFile.isFile) {
+            val externalMountPath = ExternalMountAccess.isPath(path)
+            if (externalMountPath) {
+                val metadata = ExternalMountAccess.info(path)
+                if (metadata.optString("type") != "file") {
                     return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
                 }
             } else {
@@ -89,8 +82,9 @@ object FileEditTool {
             }
 
             FileMutationQueue.withKey("$sessionId\u0000$path") {
-                val content = if (externalMountFile != null) {
-                    externalMountFile.readText()
+                val content = if (externalMountPath) {
+                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
+                        .toString(Charsets.UTF_8)
                 } else {
                     WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
                 }
@@ -117,7 +111,7 @@ object FileEditTool {
                     if (count == 0) return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
                     val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
                     val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
-                    val bytes = if (externalMountFile != null) {
+                    val bytes = if (externalMountPath) {
                         ExternalMountAccess.write(path, restored.toByteArray(Charsets.UTF_8), append = false)
                     } else {
                         WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
@@ -126,7 +120,7 @@ object FileEditTool {
                 }
 
                 val result = FileEditEngine.apply(content, edits, path)
-                val bytes = if (externalMountFile != null) {
+                val bytes = if (externalMountPath) {
                     ExternalMountAccess.write(path, result.newContent.toByteArray(Charsets.UTF_8), append = false)
                 } else {
                     WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))

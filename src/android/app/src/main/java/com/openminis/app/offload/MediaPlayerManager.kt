@@ -3,7 +3,6 @@ package com.openminis.app.offload
 import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import java.io.File
 import java.security.MessageDigest
@@ -11,7 +10,7 @@ import java.security.MessageDigest
 /**
  * Manages multiple concurrent MediaPlayer sessions keyed by session ID.
  * Supports audio playback with play/pause/resume/seek/stop/status operations.
- * SAF mount paths are resolved through RuntimePathRegistry. Canonical guest
+ * SAF mount paths are staged through the minisd broker. Canonical guest
  * files are staged through minisd into app cache before playback.
  */
 object MediaPlayerManager {
@@ -54,8 +53,23 @@ object MediaPlayerManager {
         }
 
         val hostFile = when {
-            isExternalMountPath(filePath) -> RuntimePathRegistry.resolveHostPath(filePath)
-                ?: return "Error: cannot resolve mounted path '$filePath'"
+            isExternalMountPath(filePath) -> {
+                val context = appContext
+                    ?: return "Error: media player is not initialized"
+                val digest = MessageDigest.getInstance("SHA-256")
+                    .digest("$sessionId:$filePath".toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it) }
+                val safeName = filePath.substringAfterLast('/')
+                    .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    .ifBlank { "audio" }
+                val staged = File(File(context.cacheDir, "media-player"), "$digest-$safeName")
+                try {
+                    WorkspaceFileClient.readToFileBlocking(null, filePath, staged)
+                    staged
+                } catch (error: Throwable) {
+                    return "Error: cannot read mounted media '$filePath': ${error.message}"
+                }
+            }
             isCanonicalGuestPath(filePath) -> {
                 val context = appContext
                     ?: return "Error: media player is not initialized"

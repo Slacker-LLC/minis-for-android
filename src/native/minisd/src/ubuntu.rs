@@ -8,6 +8,10 @@ use crate::protocol::{ErrorCode, MAX_ARGS, MAX_ARG_BYTES};
 use crate::state::AppState;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::fs::OpenOptions;
+#[cfg(unix)]
+use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
@@ -565,6 +569,197 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
             ))
         }
     }
+}
+
+/// Start a replacement keeper with a complete, already validated external
+/// mount snapshot. The old keeper is not touched until the replacement emits
+/// READY; if any source, bind or read-only remount fails, the child exits and
+/// the old keeper remains the published runtime.
+#[cfg(unix)]
+pub fn replace_keeper_with_external_mounts(
+    state: &mut AppState,
+    specs_json: &str,
+    app_uid: u32,
+) -> Result<(), (ErrorCode, String)> {
+    if !state.ubuntu.running {
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu keeper is not running".into(),
+        ));
+    }
+    validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
+    if !rootfs_looks_valid(HOST_ROOTFS) {
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            format!("rootfs not installed at {HOST_ROOTFS}"),
+        ));
+    }
+    let previous = state.ubuntu.clone();
+    let Some(old_pid) = previous.pid else {
+        return Err((
+            ErrorCode::Internal,
+            "running keeper has no published PID; refusing replacement".into(),
+        ));
+    };
+    let exe =
+        std::env::current_exe().map_err(|e| (ErrorCode::Internal, format!("current_exe: {e}")))?;
+    let mut child = std::process::Command::new(&exe)
+        .args([
+            "--helper",
+            "keep",
+            "--rootfs",
+            HOST_ROOTFS,
+            "--app-uid",
+            &app_uid.to_string(),
+            "--external-mounts-json",
+            specs_json,
+        ])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            (
+                ErrorCode::Internal,
+                format!("spawn replacement keeper: {e}"),
+            )
+        })?;
+    let new_pid = child.id() as i32;
+    let ready = read_ready_line(&mut child, Duration::from_secs(8));
+    if let Err(error) = ready {
+        let _ = child.kill();
+        let err_out = child
+            .wait_with_output()
+            .ok()
+            .map(|output| String::from_utf8_lossy(&output.stderr).into_owned())
+            .unwrap_or_default();
+        let (code, detail) = if let Some(detail) = error.strip_prefix("MOUNT_RO_UNSUPPORTED: ") {
+            (ErrorCode::MountRoUnsupported, detail.to_string())
+        } else {
+            (ErrorCode::RuntimeUnavailable, format!("{error} {err_out}"))
+        };
+        return Err((
+            code,
+            format!("replacement keeper failed before READY: {detail}"),
+        ));
+    }
+    // Publish both identity files atomically before retiring the old keeper.
+    // If either rename or the subsequent old-keeper retirement fails, restore
+    // the previous identity and keep the old process as the published runtime.
+    if let Err(error) = publish_runtime_identity(new_pid, HOST_ROOTFS) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let rollback = publish_runtime_identity(
+            old_pid,
+            if previous.rootfs.is_empty() {
+                HOST_ROOTFS
+            } else {
+                &previous.rootfs
+            },
+        );
+        return Err((
+            ErrorCode::Internal,
+            format!("publish replacement keeper identity failed: {error}; rollback={rollback:?}"),
+        ));
+    }
+    state.ubuntu.running = true;
+    state.ubuntu.pid = Some(new_pid);
+    state.ubuntu.rootfs = HOST_ROOTFS.to_string();
+    state.ubuntu.sessions_root = HOST_SESSIONS.to_string();
+    state.ubuntu.version = read_os_release(HOST_ROOTFS);
+    state.ubuntu.provisioned = is_provisioned(HOST_ROOTFS);
+    state.ubuntu.last_error = None;
+    if old_pid != new_pid && !terminate_keeper(old_pid) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let rollback = publish_runtime_identity(
+            old_pid,
+            if previous.rootfs.is_empty() {
+                HOST_ROOTFS
+            } else {
+                &previous.rootfs
+            },
+        );
+        state.ubuntu = previous;
+        return Err((
+            ErrorCode::Internal,
+            format!(
+                "old keeper process {old_pid} did not exit during replacement; rollback={rollback:?}"
+            ),
+        ));
+    }
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
+
+#[cfg(unix)]
+fn publish_runtime_identity(pid: i32, rootfs: &str) -> Result<(), String> {
+    let pid_path = Path::new(UBUNTU_PID_FILE);
+    let rootfs_path = Path::new(UBUNTU_ROOTFS_FILE);
+    let pid_tmp = write_synced_temp(pid_path, &format!("{pid}\n"))?;
+    let rootfs_tmp = match write_synced_temp(rootfs_path, &format!("{rootfs}\n")) {
+        Ok(path) => path,
+        Err(error) => {
+            let _ = std::fs::remove_file(&pid_tmp);
+            return Err(error);
+        }
+    };
+    if let Err(error) = std::fs::rename(&pid_tmp, pid_path) {
+        let _ = std::fs::remove_file(&pid_tmp);
+        let _ = std::fs::remove_file(&rootfs_tmp);
+        return Err(format!("rename replacement ubuntu pid: {error}"));
+    }
+    if let Err(error) = std::fs::rename(&rootfs_tmp, rootfs_path) {
+        let _ = std::fs::remove_file(&rootfs_tmp);
+        return Err(format!("rename replacement ubuntu rootfs: {error}"));
+    }
+    sync_identity_parent(pid_path)?;
+    if rootfs_path.parent() != pid_path.parent() {
+        sync_identity_parent(rootfs_path)?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn write_synced_temp(target: &Path, contents: &str) -> Result<std::path::PathBuf, String> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| format!("identity path has no parent: {}", target.display()))?;
+    let name = target
+        .file_name()
+        .ok_or_else(|| format!("identity path has no filename: {}", target.display()))?
+        .to_string_lossy();
+    let temporary = parent.join(format!(".{name}.tmp-{}", std::process::id()));
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+            .map_err(|error| format!("create identity temp {}: {error}", temporary.display()))?;
+        file.write_all(contents.as_bytes())
+            .map_err(|error| format!("write identity temp {}: {error}", temporary.display()))?;
+        file.sync_all()
+            .map_err(|error| format!("sync identity temp {}: {error}", temporary.display()))?;
+        Ok(temporary.clone())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
+
+#[cfg(unix)]
+fn sync_identity_parent(path: &Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("identity path has no parent: {}", path.display()))?;
+    let directory = std::fs::File::open(parent)
+        .map_err(|error| format!("open identity parent {}: {error}", parent.display()))?;
+    directory
+        .sync_all()
+        .map_err(|error| format!("sync identity parent {}: {error}", parent.display()))
 }
 
 #[cfg(unix)]

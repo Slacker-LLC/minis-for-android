@@ -51,8 +51,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -689,7 +689,7 @@ private suspend fun resolveMediaFile(context: Context, url: String): File? {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
             val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-                RuntimePathRegistry.resolveHostPath(linuxPath)
+                stageGuestMedia(context, linuxPath)
             } else {
                 stageGuestMedia(context, linuxPath)
             }
@@ -711,7 +711,8 @@ private suspend fun stageGuestMedia(context: Context, linuxPath: String): File? 
         .joinToString("") { "%02x".format(java.util.Locale.US, it) }
     val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
     return runCatching {
-        WorkspaceFileClient.readToFile("", linuxPath, cacheFile)
+        val sessionId = if (ExternalMountAccess.isPath(linuxPath)) null else ""
+        WorkspaceFileClient.readToFile(sessionId, linuxPath, cacheFile)
         cacheFile.takeIf { it.isFile }
     }.getOrNull()
 }

@@ -2,11 +2,6 @@ package com.openminis.app.runtime
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.os.storage.StorageManager
-import android.provider.DocumentsContract
 import android.util.Log
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.MountedFoldersStore
@@ -50,6 +45,10 @@ object RuntimePathRegistry {
     }
 
     fun addBindMount(linuxPath: String, hostPath: String) {
+        if (linuxPath == MOUNTS_LINUX_PREFIX.trimEnd('/') || linuxPath.startsWith(MOUNTS_LINUX_PREFIX)) {
+            Log.w(TAG, "rejecting App-owned external bind mount for $linuxPath")
+            return
+        }
         bindMounts[linuxPath] = hostPath
     }
 
@@ -92,31 +91,13 @@ object RuntimePathRegistry {
     @Volatile
     var mountedFoldersStore: MountedFoldersStore? = null
 
-    /**
-     * Reconcile [bindMounts] keys under `/var/minis/mounts/` with the
-     * current snapshot of [mountedFoldersStore]. Idempotent.
-     */
+    /** External mounts are broker-owned; this only clears the obsolete App bind map. */
+    @Suppress("UNUSED_PARAMETER")
     fun applyMountedFoldersSnapshot(context: Context) {
-        val store = mountedFoldersStore
-        val desired: Map<String, String> = if (store == null) {
-            emptyMap()
-        } else {
-            store.entries.value
-                .mapNotNull { entry ->
-                    val host = resolveTreeUriToHostPath(entry.treeUri, context) ?: return@mapNotNull null
-                    "$MOUNTS_LINUX_PREFIX${entry.name}" to host
-                }
-                .toMap()
-        }
         val stale = bindMounts.keys
             .filter { it.startsWith(MOUNTS_LINUX_PREFIX) }
-            .filter { it !in desired }
         for (key in stale) bindMounts.remove(key)
-        for ((linuxPath, hostPath) in desired) {
-            bindMounts[linuxPath] = hostPath
-        }
-        val entryCount = store?.entries?.value?.size ?: 0
-        Log.i(TAG, "applyMountedFoldersSnapshot: entries=$entryCount active=${desired.size} removed=${stale.size}")
+        Log.i(TAG, "applyMountedFoldersSnapshot: broker-owned mounts; removedLegacy=${stale.size}")
     }
 
     /**
@@ -130,74 +111,12 @@ object RuntimePathRegistry {
         val name = rest.substringBefore('/')
         if (name.isEmpty()) return false
         val entry = store.entries.value.firstOrNull { it.name == name } ?: return false
-        return !entry.effectiveWritable
+        return !entry.isActive || !entry.effectiveWritable
     }
 
-    /**
-     * Snapshot of mount roots for the @-mention index. Skips entries
-     * whose tree URI doesn't resolve to a POSIX path on this device.
-     */
-    fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> {
-        val store = mountedFoldersStore ?: return emptyList()
-        return store.entries.value.mapNotNull { entry ->
-            val host = resolveTreeUriToHostPath(entry.treeUri, context) ?: return@mapNotNull null
-            FileMentionIndex.MountEntry(name = entry.name, root = File(host))
-        }
-    }
-
-    /**
-     * Decode a SAF tree URI into an absolute POSIX path on the host
-     * filesystem. Returns null for non-externalstorage providers,
-     * unresolvable volumes, or paths not readable by the app uid.
-     */
-    private fun resolveTreeUriToHostPath(treeUriString: String, context: Context): String? = try {
-        val treeUri = Uri.parse(treeUriString)
-        if (treeUri.authority != "com.android.externalstorage.documents") {
-            null
-        } else {
-            val docId = DocumentsContract.getTreeDocumentId(treeUri)
-            val parts = docId.split(':', limit = 2)
-            val volumeId = parts.getOrNull(0).orEmpty()
-            val relPath = parts.getOrNull(1).orEmpty()
-            val volumeRoot = resolveVolumeRoot(volumeId, context)
-            if (volumeRoot == null) {
-                Log.w(TAG, "resolveTreeUriToHostPath: unknown volume '$volumeId' for $treeUriString")
-                null
-            } else {
-                val candidate = if (relPath.isEmpty()) File(volumeRoot) else File(volumeRoot, relPath)
-                if (candidate.exists() && candidate.canRead()) {
-                    candidate.absolutePath
-                } else {
-                    Log.w(
-                        TAG,
-                        "resolveTreeUriToHostPath: host=${candidate.absolutePath} " +
-                            "exists=${candidate.exists()} canRead=${candidate.canRead()} — bind skipped",
-                    )
-                    null
-                }
-            }
-        }
-    } catch (t: Throwable) {
-        Log.w(TAG, "resolveTreeUriToHostPath failed for $treeUriString: ${t.message}")
-        null
-    }
-
-    private fun resolveVolumeRoot(volumeId: String, context: Context): String? {
-        if (volumeId.equals("primary", ignoreCase = true) || volumeId.isEmpty()) {
-            return Environment.getExternalStorageDirectory()?.absolutePath
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager ?: return null
-            for (volume in sm.storageVolumes) {
-                if (volume.uuid?.equals(volumeId, ignoreCase = true) == true) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        return volume.directory?.absolutePath
-                    }
-                }
-            }
-        }
-        return null
-    }
+    /** External roots are indexed through broker listings, never host Files. */
+    @Suppress("UNUSED_PARAMETER")
+    fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> = emptyList()
 
     /**
      * Build a POSIX TZ string from the current system timezone.

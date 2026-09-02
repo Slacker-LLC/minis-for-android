@@ -173,6 +173,9 @@ pub fn stop(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     let result = crate::ubuntu_legacy::stop(state);
     if result.is_ok() {
         clear_runtime_bind_state(state);
+        state.external_mounts.clear();
+        state.ubuntu.external_mount_digest = None;
+        state.ubuntu.external_mount_verified = false;
     }
     result
 }
@@ -196,6 +199,12 @@ pub fn exec(
     admin: bool,
 ) -> Result<Value, (ErrorCode, String)> {
     let parsed = parse_ubuntu_exec(params).map_err(|c| (c, "bad ubuntu exec params".into()))?;
+    if !state.mock && state.ubuntu.running && !state.ubuntu.external_mount_verified {
+        return Err((
+            ErrorCode::MountAttestationRequired,
+            "external mount snapshot must be re-attested before guest exec".into(),
+        ));
+    }
     if state.mock {
         return crate::ubuntu_legacy::exec(state, params, admin);
     }
@@ -245,6 +254,27 @@ pub fn recover_state() -> UbuntuState {
     state.skills.clear();
     state.shared.clear();
     state
+}
+
+#[cfg(unix)]
+pub fn replace_keeper_with_external_mounts(
+    state: &mut AppState,
+    specs_json: &str,
+    app_uid: u32,
+) -> Result<(), (ErrorCode, String)> {
+    crate::ubuntu_legacy::replace_keeper_with_external_mounts(state, specs_json, app_uid)
+}
+
+#[cfg(not(unix))]
+pub fn replace_keeper_with_external_mounts(
+    _state: &mut AppState,
+    _specs_json: &str,
+    _app_uid: u32,
+) -> Result<(), (ErrorCode, String)> {
+    Err((
+        ErrorCode::RuntimeUnavailable,
+        "external mounts require unix".into(),
+    ))
 }
 
 #[cfg(unix)]

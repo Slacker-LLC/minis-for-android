@@ -7,6 +7,7 @@ import com.openminis.app.deeplink.DeepLinkAction
 import com.openminis.app.deeplink.DeepLinkHandler
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import com.openminis.app.ui.sandbox.FileItem
 import java.io.File
 
@@ -44,8 +45,8 @@ object ChatLinkResolver {
             }
         }
 
-        // 2. Sandbox file resolution — canonical guest files are staged through
-        // minisd; only SAF mounts and app-local file:// paths use host files.
+        // 2. Sandbox file resolution — guest files, including SAF mounts, are
+        // staged through minisd; only app-local file:// paths use host files.
         val guestPath = resolveGuestPath(trimmed, scheme)
         if (guestPath != null && context != null) {
             stageGuestFile(context, guestPath, sessionId)?.let { staged ->
@@ -132,7 +133,7 @@ object ChatLinkResolver {
             null -> raw.takeIf { it.startsWith('/') }
             else -> null
         } ?: return null
-        return path.takeIf(::isCanonicalGuestPath)
+        return path.takeIf { isCanonicalGuestPath(it) || ExternalMountAccess.isPath(it) }
     }
 
     private suspend fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
@@ -142,7 +143,8 @@ object ChatLinkResolver {
             .joinToString("") { "%02x".format(java.util.Locale.US, it) }
         val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
         return runCatching {
-            WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)
+            val brokerSession = if (ExternalMountAccess.isPath(path)) null else sessionId.orEmpty()
+            WorkspaceFileClient.readToFile(brokerSession, path, cacheFile)
             cacheFile.takeIf { it.isFile }
         }.getOrNull()
     }

@@ -20,8 +20,32 @@ pub fn authorize_request(
     req: &Request,
     peer: Option<PeerCred>,
 ) -> Result<(), Response> {
+    authorize_request_with_socket(state, req, peer, false)
+}
+
+/// Authorize a request received from the real App-only socket. The socket
+/// origin is kept outside the JSON request so a root caller cannot claim the
+/// App capability in `client.id` or `client.capabilities`.
+#[allow(clippy::result_large_err)]
+pub fn authorize_request_with_socket(
+    state: &mut AppState,
+    req: &Request,
+    peer: Option<PeerCred>,
+    app_socket: bool,
+) -> Result<(), Response> {
     if let Err(code) = check_peer(&state.policy, peer, state.mock, state.skip_peer) {
         return Err(Response::err(req.id, code, "peer not authorized"));
+    }
+    if req.method == "mount.reconcile" && !state.mock {
+        let app_uid = state.policy.caller.app_uid;
+        let peer_is_exact_app = app_uid != 0 && peer.is_some_and(|cred| cred.uid == app_uid);
+        if !app_socket || !peer_is_exact_app {
+            return Err(Response::err(
+                req.id,
+                ErrorCode::NotAuthorized,
+                "mount.reconcile is restricted to the exact App UID on the App socket",
+            ));
+        }
     }
     if req.method != "system.hello" {
         if let Err(code) = check_hello(&state.policy, req.client.as_ref(), &req.method) {
@@ -185,6 +209,19 @@ fn ubuntu_status_with_layout(state: &mut AppState) -> Value {
                 Value::Null
             },
         );
+        obj.insert(
+            "external_mount_digest".into(),
+            state
+                .ubuntu
+                .external_mount_digest
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        obj.insert(
+            "external_mount_verified".into(),
+            Value::Bool(state.ubuntu.external_mount_verified),
+        );
     }
     value
 }
@@ -255,6 +292,10 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
                 )
             }
         }
+        "mount.reconcile" => match crate::mount::mount_reconcile(state, &req.params) {
+            Ok(value) => Response::ok(req.id, value),
+            Err((code, detail)) => Response::err(req.id, code, detail),
+        },
         "workspace.info" => Response::ok(
             req.id,
             json!({
@@ -496,6 +537,7 @@ mod path_param_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::PeerCred;
     use crate::policy::PolicyFile;
     use crate::protocol::{parse_request, ClientHello};
 
@@ -525,6 +567,54 @@ mod tests {
         assert!(authorize_request(&mut state, &request, None).is_ok());
         let resp = dispatch_authorized(&mut state, &request);
         assert!(resp.ok);
+    }
+
+    #[test]
+    fn mount_reconcile_requires_exact_app_peer_and_app_socket() {
+        let mut policy = PolicyFile::default_policy();
+        policy.caller.app_uid = 10123;
+        let request = req("mount.reconcile", json!({"mounts": []}));
+
+        let mut exact = AppState::new(false, policy.clone());
+        assert!(authorize_request_with_socket(
+            &mut exact,
+            &request,
+            Some(PeerCred {
+                uid: 10123,
+                gid: 10123,
+                pid: 7
+            }),
+            true,
+        )
+        .is_ok());
+
+        let mut root = AppState::new(false, policy.clone());
+        let denied_root = authorize_request_with_socket(
+            &mut root,
+            &request,
+            Some(PeerCred {
+                uid: 0,
+                gid: 0,
+                pid: 1,
+            }),
+            true,
+        )
+        .unwrap_err();
+        assert_eq!(denied_root.error.unwrap().code, "NOT_AUTHORIZED");
+
+        let mut wrong_socket = AppState::new(false, policy);
+        let denied_socket = authorize_request_with_socket(
+            &mut wrong_socket,
+            &request,
+            Some(PeerCred {
+                uid: 10123,
+                gid: 10123,
+                pid: 7,
+            }),
+            false,
+        )
+        .unwrap_err();
+        assert_eq!(denied_socket.error.unwrap().code, "NOT_AUTHORIZED");
     }
 
     #[test]

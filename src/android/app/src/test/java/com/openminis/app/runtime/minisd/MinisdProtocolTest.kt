@@ -1,5 +1,6 @@
 package com.openminis.app.runtime.minisd
 
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -393,6 +394,25 @@ class MinisdProtocolTest {
         assertEquals("ubuntu.stop", stop.getString("method"))
         assertEquals(5, stop.getLong("id"))
         assertFalse(stop.getJSONObject("params").has("cmd"))
+    }
+
+    @Test
+    fun `mount reconcile carries only URI-derived identity fields`() {
+        val mounts = JSONArray().put(
+            JSONObject()
+                .put("id", "550e8400-e29b-41d4-a716-446655440000")
+                .put("name", "docs")
+                .put("volume", "primary")
+                .put("path_segments", JSONArray().put("Documents"))
+                .put("access", "ro"),
+        )
+        val obj = JSONObject(MinisdProtocol.encodeRequest(MinisdProtocol.mountReconcile(mounts, 21)))
+        assertEquals("mount.reconcile", obj.getString("method"))
+        val entry = obj.getJSONObject("params").getJSONArray("mounts").getJSONObject(0)
+        assertEquals("primary", entry.getString("volume"))
+        assertEquals("Documents", entry.getJSONArray("path_segments").getString(0))
+        assertFalse(entry.has("host_path"))
+        assertFalse(entry.has("uri"))
     }
 
     @Test

@@ -644,31 +644,18 @@ class MinisApp : Application(), ImageLoaderFactory {
         // PRoot has booted or any shell has started.
         RuntimePathRegistry.registerGlobalBindMounts(this)
 
-        // T219-1: load user-mounted external folders and seed PRoot's
-        // bindMounts before the first proot invocation, so the very first
-        // `shell_execute` already has `/var/minis/mounts/<name>/` visible.
-        // Entries whose SAF tree URI didn't resolve to a real POSIX path
-        // (cloud providers, unmounted SD card) are silently skipped by
-        // bindMountSpecs.
+        // T219-1: load user-mounted external folders. Their URI-derived
+        // identities are sent to minisd only after the keeper is ready.
         mountedFoldersStore = MountedFoldersStore(this)
-        // T219-5: hand the singleton to RuntimePathRegistry so applyMountedFoldersSnapshot
-        // can read the live state, and wire an onChange callback so any UI CRUD
-        // (add/remove/rename/toggle) re-applies the snapshot.
-        // P2: Ubuntu 会话经 minisd 每次 exec 重新解析 SAF 挂载（无长驻 shell
-        // 持有旧 bind 集），applyMountedFoldersSnapshot 后无需杀会话。
+        // Candidate snapshots are reconciled before persistence. A failed
+        // replacement keeper therefore leaves the old Store state intact.
         RuntimePathRegistry.mountedFoldersStore = mountedFoldersStore
+        mountedFoldersStore.onSnapshotChange = { candidate ->
+            com.openminis.app.runtime.ubuntu.UbuntuRuntime.reconcileExternalMounts(candidate)
+        }
         mountedFoldersStore.onChange = {
-            RuntimePathRegistry.applyMountedFoldersSnapshot(this)
             ExecutionCoordinator.stopCurrentCommand()
         }
-        // T219-6: route launch-time seeding through applyMountedFoldersSnapshot
-        // so it (a) reads the live store consistently and (b) materializes the
-        // /var/minis/mounts/<name> placeholder dirs that PRoot's `-b` needs.
-        // Note: this runs before RuntimePathRegistry.boot, so rootfs may not yet exist —
-        // applyMountedFoldersSnapshot tolerates that case (mkdirs fails silently
-        // and RuntimePathRegistry.boot calls applyMountedFoldersSnapshot again at the
-        // end of boot to materialize the targets once rootfs is on disk).
-        RuntimePathRegistry.applyMountedFoldersSnapshot(this)
 
         // Register native_offload handlers and start the server eagerly —
         // the server only needs the rootfs tmp directory, which can be

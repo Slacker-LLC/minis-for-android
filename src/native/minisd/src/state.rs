@@ -13,7 +13,7 @@ pub struct PendingConfirm {
     pub expires: Instant,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct UbuntuState {
     pub running: bool,
     pub pid: Option<i32>,
@@ -26,6 +26,8 @@ pub struct UbuntuState {
     pub version: Option<String>,
     pub provisioned: bool,
     pub last_error: Option<String>,
+    pub external_mount_digest: Option<String>,
+    pub external_mount_verified: bool,
 }
 
 impl UbuntuState {
@@ -77,6 +79,7 @@ pub struct AppState {
     pub rates: RateLimiter,
     pub sessions: SessionTable,
     pub ubuntu: UbuntuState,
+    pub external_mounts: Vec<crate::mount::MountSpec>,
     pub workspace_quota_bytes: u64,
     pub confirms: HashMap<String, PendingConfirm>,
     pub used_confirms: HashMap<String, ()>,
@@ -102,6 +105,7 @@ impl AppState {
             rates: RateLimiter::new(),
             sessions,
             ubuntu: UbuntuState::default(),
+            external_mounts: Vec::new(),
             workspace_quota_bytes: 4 * 1024 * 1024 * 1024,
             confirms: HashMap::new(),
             used_confirms: HashMap::new(),

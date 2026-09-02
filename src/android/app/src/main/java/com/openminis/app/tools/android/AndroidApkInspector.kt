@@ -174,9 +174,7 @@ object AndroidApkInspector {
     ): ResolvedArtifact? {
         if (!path.startsWith('/')) return null
         if (ExternalMountAccess.isPath(path)) {
-            val file = ExternalMountAccess.resolve(path)?.takeIf { it.isFile }
-                ?: return null
-            return ResolvedArtifact(file.canonicalFile, path)
+            return stageExternalArtifact(context, path)
         }
         if (path == "/var/minis" || path.startsWith("/var/minis/") ||
             path == "/workspace" || path.startsWith("/workspace/")) {
@@ -194,11 +192,16 @@ object AndroidApkInspector {
             throw IllegalArgumentException("searchRoot must be an absolute Linux path: $root")
         }
         if (ExternalMountAccess.isPath(root)) {
-            val hostRoot = ExternalMountAccess.resolve(root)
-                ?: throw IllegalArgumentException("searchRoot is not visible from this mount: $root")
-            val file = discover(hostRoot).firstOrNull()
+            val file = ExternalMountAccess.walk(
+                rootPath = root,
+                recursive = true,
+                maxEntries = MAX_DISCOVERY_DIRECTORIES,
+            ).asSequence()
+                .filter { it.type == "file" && it.name.endsWith(".apk", true) }
+                .filter { it.path.substringBeforeLast('/').endsWith("/build/outputs/apk") }
+                .maxWithOrNull(compareBy<ExternalMountAccess.Entry> { it.modified }.thenBy { it.path })
                 ?: throw IllegalArgumentException("no APK under real Gradle build/outputs/apk directories below $root")
-            return ResolvedArtifact(file.canonicalFile, rootForDiscoveredFile(root, hostRoot, file))
+            return stageExternalArtifact(context, file.path)
         }
         if (root != "/var/minis" && !root.startsWith("/var/minis/") &&
             root != "/workspace" && !root.startsWith("/workspace/")) {
@@ -248,6 +251,34 @@ object AndroidApkInspector {
         }
         if (!target.isFile || target.length() != size) {
             throw IllegalStateException("staged APK size mismatch: $linuxPath")
+        }
+        target.setReadable(true, false)
+        return ResolvedArtifact(target, linuxPath)
+    }
+
+    private suspend fun stageExternalArtifact(
+        context: Context,
+        linuxPath: String,
+    ): ResolvedArtifact {
+        val info = ExternalMountAccess.info(linuxPath)
+        if (info.optString("type") != "file") {
+            throw IllegalArgumentException("APK artifact is not a regular file: $linuxPath")
+        }
+        val size = info.optLong("size", -1L)
+        if (size < 0L || size > WorkspaceFileClient.MAX_FILE_BYTES) {
+            throw IllegalArgumentException("APK artifact is too large or has no size: $linuxPath")
+        }
+        val modified = info.optLong("modified", 0L)
+        val name = linuxPath.substringAfterLast('/').ifBlank { "artifact.apk" }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("$linuxPath\u0000$size\u0000$modified".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val target = File(context.cacheDir, "android-deploy/external/$digest-$name")
+        if (!target.isFile || target.length() != size) {
+            WorkspaceFileClient.readToFile(null, linuxPath, target, WorkspaceFileClient.MAX_FILE_BYTES)
+        }
+        if (!target.isFile || target.length() != size) {
+            throw IllegalStateException("staged external APK size mismatch: $linuxPath")
         }
         target.setReadable(true, false)
         return ResolvedArtifact(target, linuxPath)
@@ -319,10 +350,4 @@ object AndroidApkInspector {
         }
     }
 
-    private fun rootForDiscoveredFile(root: String, hostRoot: File, file: File): String? {
-        val relative = runCatching { file.canonicalFile.relativeTo(hostRoot.canonicalFile).path }
-            .getOrNull() ?: return null
-        return "${root.trimEnd('/')}/${relative.replace(File.separatorChar, '/')}"
-            .replace("//", "/")
-    }
 }

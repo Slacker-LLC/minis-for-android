@@ -17,6 +17,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -403,10 +404,9 @@ class BrowserUseManager(
             val linuxPath = "/var/minis/$host$path"
             val name = path.substringAfterLast('/').ifEmpty { host }
             val bytes = if (linuxPath.startsWith("/var/minis/mounts/")) {
-                val localFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
-                    ?: return notFound(host, path)
-                if (!localFile.exists() || !localFile.isFile) return notFound(host, path)
-                localFile.readBytes()
+                runCatching { ExternalMountAccess.readBlocking(linuxPath) }.getOrElse {
+                    return notFound(host, path)
+                }
             } else {
                 val sid = sessionIdProvider()?.takeIf { it.isNotBlank() }
                     ?: return notFound(host, path)

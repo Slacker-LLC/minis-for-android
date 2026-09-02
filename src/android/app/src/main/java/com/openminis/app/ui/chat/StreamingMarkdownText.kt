@@ -105,6 +105,7 @@ import coil.request.ImageRequest
 import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.tools.ExternalMountAccess
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2285,14 +2286,14 @@ internal suspend fun resolveMdMediaFile(context: Context, url: String, sessionId
             // this chat's attachment lookup to whichever session happened to
             // boot last.
             if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-                RuntimePathRegistry.resolveHostPath(linuxPath)
+                stageGuestMedia(context, linuxPath, null)
             } else {
                 stageGuestMedia(context, linuxPath, sessionId)
             }
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
         stripped == "/var/minis/mounts" || stripped.startsWith("/var/minis/mounts/") ->
-            RuntimePathRegistry.resolveHostPath(stripped)
+            stageGuestMedia(context, stripped, null)
         stripped.startsWith("/var/minis") || stripped.startsWith("/workspace") ||
             stripped.startsWith("/memory") || stripped.startsWith("/skills") ||
             stripped.startsWith("/shared") || stripped.startsWith("/home/minis") ->
@@ -2316,7 +2317,8 @@ private suspend fun stageGuestMedia(context: Context, linuxPath: String, session
         .joinToString("") { "%02x".format(java.util.Locale.US, it) }
     val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
     return runCatching {
-        WorkspaceFileClient.readToFile(sessionId.orEmpty(), linuxPath, cacheFile)
+        val brokerSession = if (ExternalMountAccess.isPath(linuxPath)) null else sessionId.orEmpty()
+        WorkspaceFileClient.readToFile(brokerSession, linuxPath, cacheFile)
         cacheFile.takeIf { it.isFile }
     }.getOrNull()
 }
