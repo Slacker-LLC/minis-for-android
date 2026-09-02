@@ -1,7 +1,12 @@
 package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
+import android.util.Base64
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import java.io.File
+import java.io.FileInputStream
+import java.nio.file.Files
+import java.nio.file.LinkOption
 
 /**
  * Persistent Linux guest data is contracted at `/data/adb/minis`.
@@ -61,10 +66,6 @@ object UbuntuPaths {
         val copied: Boolean,
         val error: String? = null,
     )
-
-    fun init(context: Context) {
-        migrateLegacyFilesDir(context.filesDir)
-    }
 
     internal fun useLayoutForTest(root: File) {
         hostWorkspace = File(root, "workspace").absolutePath
@@ -154,92 +155,171 @@ object UbuntuPaths {
             resolveHostPath(linuxPath)
         }
 
-    internal fun deleteSessionFiles(sessionsRoot: File, sessionId: String): Boolean {
-        if (!isSafeSessionId(sessionId)) return false
-        val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return false
-        return !session.exists() || session.deleteRecursively()
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun deleteSession(context: Context, sessionId: String): Boolean =
+        runCatching {
+            WorkspaceFileClient.deleteSessionBlocking(sessionId)
+            true
+        }.getOrDefault(false)
 
-    fun deleteSession(context: Context, sessionId: String): Boolean {
-        val canonical = deleteSessionFiles(File(hostSessions), sessionId)
-        val legacy = deleteSessionFiles(File(context.filesDir, "minis-sessions"), sessionId)
-        return canonical || legacy
-    }
+    internal data class MigrationRoot(
+        val source: File,
+        val target: String,
+        val sessionId: String? = null,
+    )
 
-    fun migrateLegacyFilesDir(filesDir: File, destRoot: File = File(HOST_MINIS)): LegacyMigrationResult =
-        migrateLegacyLayout(filesDir, destRoot)
+    internal fun legacyMigrationRoots(filesDir: File): List<MigrationRoot> = listOf(
+        MigrationRoot(File(filesDir, "minis/workspace"), "workspace"),
+        MigrationRoot(File(filesDir, "minis-global/memory"), "memory"),
+        MigrationRoot(File(filesDir, "minis-global/skills"), "skills"),
+        MigrationRoot(File(filesDir, "minis-global/shared"), "shared"),
+        MigrationRoot(File(filesDir, "minis/home"), "home"),
+    )
 
-    internal fun migrateLegacyLayout(filesDir: File, destRoot: File): LegacyMigrationResult {
-        val marker = File(destRoot, "run/legacy-filesdir-migrated")
-        if (marker.isFile) {
-            return LegacyMigrationResult(skipped = true, copied = false)
-        }
-        val sources = listOf(
-            File(filesDir, "minis/workspace") to File(destRoot, "workspace"),
-            File(filesDir, "minis-global/memory") to File(destRoot, "memory"),
-            File(filesDir, "minis-global/skills") to File(destRoot, "skills"),
-            File(filesDir, "minis-global/shared") to File(destRoot, "shared"),
-            File(filesDir, "minis-sessions") to File(destRoot, "sessions"),
-            File(filesDir, "minis/home") to File(destRoot, "home"),
-        )
-        val present = sources.filter { it.first.isDirectory }
-        if (present.isEmpty()) {
-            return writeMarker(marker, destRoot)
-                ?: LegacyMigrationResult(skipped = true, copied = false)
-        }
-        if (!destRoot.exists() && !destRoot.mkdirs()) {
-            return LegacyMigrationResult(
-                skipped = false,
-                copied = false,
-                error = "persistent root unavailable: ${destRoot.path}",
-            )
-        }
-        for ((src, dest) in present) {
-            val error = copyDirectoryContents(src, dest)
-            if (error != null) {
-                return LegacyMigrationResult(skipped = false, copied = false, error = error)
-            }
-        }
-        return writeMarker(marker, destRoot)
-            ?: LegacyMigrationResult(skipped = false, copied = true)
-    }
+    suspend fun migrateLegacyFilesDir(filesDir: File): LegacyMigrationResult =
+        migrateLegacyFilesDir(filesDir, brokerReady = false)
 
-    private fun writeMarker(marker: File, destRoot: File): LegacyMigrationResult? {
-        val run = File(destRoot, "run")
-        if (!run.exists() && !run.mkdirs()) {
-            return LegacyMigrationResult(
-                skipped = false,
-                copied = false,
-                error = "cannot create ${run.path}",
-            )
-        }
+    internal suspend fun migrateLegacyFilesDirAfterBrokerReady(filesDir: File): LegacyMigrationResult =
+        migrateLegacyFilesDir(filesDir, brokerReady = true)
+
+    private suspend fun migrateLegacyFilesDir(filesDir: File, brokerReady: Boolean): LegacyMigrationResult {
+        val ensureBroker = !brokerReady
         return try {
-            marker.writeText("ok\n")
-            null
+            if (WorkspaceFileClient.migrationStatus(ensureBroker = ensureBroker).optBoolean("complete")) {
+                return LegacyMigrationResult(skipped = true, copied = false)
+            }
+            var present = false
+            for (root in legacyMigrationRoots(filesDir)) {
+                if (!Files.exists(root.source.toPath(), LinkOption.NOFOLLOW_LINKS)) continue
+                if (!root.source.isDirectory || Files.isSymbolicLink(root.source.toPath())) {
+                    return LegacyMigrationResult(
+                        skipped = false,
+                        copied = false,
+                        error = "legacy migration source is not a real directory: ${root.source}",
+                    )
+                }
+                present = true
+                migrateDirectory(root.source, root.target, ensureBroker = ensureBroker)
+            }
+            val sessions = File(filesDir, "minis-sessions")
+            if (Files.exists(sessions.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                if (!sessions.isDirectory || Files.isSymbolicLink(sessions.toPath())) {
+                    return LegacyMigrationResult(
+                        skipped = false,
+                        copied = false,
+                        error = "legacy session source is not a real directory: $sessions",
+                    )
+                }
+                for (session in sessions.listFiles()?.sortedBy { it.name }
+                    ?: throw IllegalStateException("cannot list legacy session source: $sessions")) {
+                    if (!isSafeSessionId(session.name)) {
+                        return LegacyMigrationResult(
+                            skipped = false,
+                            copied = false,
+                            error = "invalid legacy session id: ${session.name}",
+                        )
+                    }
+                    if (!session.isDirectory || Files.isSymbolicLink(session.toPath())) {
+                        return LegacyMigrationResult(
+                            skipped = false,
+                            copied = false,
+                            error = "legacy session is not a real directory: $session",
+                        )
+                    }
+                    present = true
+                    migrateDirectory(session, "session", session.name, ensureBroker = ensureBroker)
+                }
+            }
+            WorkspaceFileClient.migrationComplete(ensureBroker = ensureBroker)
+            LegacyMigrationResult(skipped = !present, copied = present)
         } catch (t: Throwable) {
-            LegacyMigrationResult(skipped = false, copied = false, error = t.message)
+            LegacyMigrationResult(
+                skipped = false,
+                copied = false,
+                error = t.message ?: t::class.java.simpleName,
+            )
         }
     }
 
-    internal fun copyDirectoryContents(src: File, dest: File): String? {
-        if (!src.isDirectory) return null
-        if (!dest.exists() && !dest.mkdirs()) return "mkdir ${dest.path}"
-        src.walkTopDown().forEach { file ->
-            val rel = file.relativeTo(src)
-            if (rel.path.isEmpty()) return@forEach
-            val target = File(dest, rel.path)
+    private suspend fun migrateDirectory(
+        source: File,
+        target: String,
+        sessionId: String? = null,
+        prefix: String = "",
+        ensureBroker: Boolean,
+    ) {
+        for (entry in source.listFiles()?.sortedBy { it.name }
+            ?: throw IllegalStateException("cannot list legacy migration directory: $source")) {
+            if (entry.name.isEmpty() || entry.name == "." || entry.name == ".." ||
+                entry.name.contains('/') || entry.name.contains('\\') ||
+                entry.name.contains('\u0000') || Files.isSymbolicLink(entry.toPath())
+            ) {
+                throw IllegalStateException("unsafe legacy migration entry: ${entry.name}")
+            }
+            val path = if (prefix.isEmpty()) entry.name else "$prefix/${entry.name}"
             when {
-                file.isDirectory -> {
-                    if (!target.exists() && !target.mkdirs()) return "mkdir ${target.path}"
+                entry.isDirectory -> {
+                    WorkspaceFileClient.migrationMkdir(
+                        target,
+                        path,
+                        sessionId,
+                        ensureBroker = ensureBroker,
+                    )
+                    migrateDirectory(entry, target, sessionId, path, ensureBroker)
                 }
-                !target.exists() -> {
-                    target.parentFile?.mkdirs()
-                    runCatching { file.copyTo(target, overwrite = false) }
-                        .onFailure { return "copy ${file.path}: ${it.message}" }
-                }
+                entry.isFile -> migrateFile(entry, target, path, sessionId, ensureBroker)
+                else -> throw IllegalStateException("unsupported legacy migration entry: $entry")
             }
         }
-        return null
+    }
+
+    private suspend fun migrateFile(
+        source: File,
+        target: String,
+        path: String,
+        sessionId: String?,
+        ensureBroker: Boolean,
+    ) {
+        val existing = WorkspaceFileClient.migrationInfo(
+            target,
+            path,
+            sessionId,
+            ensureBroker = ensureBroker,
+        )
+        if (existing.optBoolean("exists", true)) {
+            if (existing.optString("type") != "file") {
+                throw IllegalStateException("legacy migration target is not a file: $target/$path")
+            }
+            if (existing.optLong("size", -1L) == source.length()) return
+        }
+        FileInputStream(source).use { input ->
+            val buffer = ByteArray(WorkspaceFileClient.MAX_WRITE_CHUNK)
+            var append = false
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                WorkspaceFileClient.migrationWrite(
+                    target = target,
+                    path = path,
+                    dataBase64 = Base64.encodeToString(buffer, 0, count, Base64.NO_WRAP),
+                    append = append,
+                    sessionId = sessionId,
+                    ensureBroker = ensureBroker,
+                )
+                append = true
+            }
+            if (!append) {
+                WorkspaceFileClient.migrationWrite(
+                    target = target,
+                    path = path,
+                    dataBase64 = "",
+                    append = false,
+                    sessionId = sessionId,
+                    ensureBroker = ensureBroker,
+                )
+            }
+        }
     }
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {

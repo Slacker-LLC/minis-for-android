@@ -6,8 +6,9 @@ use serde_json::Value;
 mod unix_impl {
     use super::*;
     use crate::layout::{
-        ensure_host_layout_for, validate_persistent_backing, HOST_HOME, HOST_MEMORY, HOST_SESSIONS,
-        HOST_SHARED, HOST_SKILLS, PERSISTENT_DATA_MODE, PERSISTENT_FILE_MODE,
+        ensure_host_layout_for, validate_persistent_backing, HOST_HOME, HOST_MEMORY, HOST_RUN,
+        HOST_SESSIONS, HOST_SHARED, HOST_SKILLS, HOST_WORKSPACE, PERSISTENT_DATA_MODE,
+        PERSISTENT_FILE_MODE,
     };
     use std::cmp::min;
     use std::fs::{self, File, OpenOptions};
@@ -64,6 +65,14 @@ mod unix_impl {
             "read" => read(params, uid, gid),
             "write" | "append" => write(params, uid, gid, operation == "append"),
             "mkdir" => mkdir(params, uid, gid),
+            "migration_status" => migration_status(),
+            "migration_info" => migration_info(params, uid, gid),
+            "migration_mkdir" => migration_mkdir(params, uid, gid),
+            "migration_write" | "migration_append" => {
+                migration_write(params, uid, gid, operation == "migration_append")
+            }
+            "migration_complete" => migration_complete(uid, gid),
+            "delete_session" => delete_session(params, uid, gid),
             "copy" => copy(params, uid, gid),
             "move" => move_path(params, uid, gid),
             "delete" => delete(params, uid, gid),
@@ -262,6 +271,269 @@ mod unix_impl {
         }))
     }
 
+    fn migration_status() -> Result<Value, (ErrorCode, String)> {
+        let marker = Path::new(HOST_RUN).join("legacy-filesdir-migrated");
+        match fs::symlink_metadata(&marker) {
+            Ok(metadata) if metadata.file_type().is_symlink() => Err((
+                ErrorCode::PolicyDenied,
+                format!(
+                    "migration marker must not be a symlink: {}",
+                    marker.display()
+                ),
+            )),
+            Ok(metadata) if metadata.is_file() => Ok(serde_json::json!({
+                "complete": true,
+                "marker": marker,
+            })),
+            Ok(_) => Err((
+                ErrorCode::PolicyDenied,
+                format!(
+                    "migration marker must be a regular file: {}",
+                    marker.display()
+                ),
+            )),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({
+                "complete": false,
+                "marker": marker,
+            })),
+            Err(error) => Err(io_error("stat migration marker", error)),
+        }
+    }
+
+    fn migration_info(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
+        let (path, _) = resolve_migration_path(params, uid, gid)?;
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(serde_json::json!({
+                    "exists": false,
+                    "type": "missing",
+                    "size": 0,
+                }));
+            }
+            Err(error) => return Err(io_error("stat migration path", error)),
+        };
+        if metadata.file_type().is_symlink() {
+            return Err((
+                ErrorCode::PolicyDenied,
+                format!("migration path must not be a symlink: {}", path.display()),
+            ));
+        }
+        Ok(serde_json::json!({
+            "exists": true,
+            "type": if metadata.is_dir() { "dir" } else if metadata.is_file() { "file" } else { "other" },
+            "size": if metadata.is_file() { metadata.len() } else { 0 },
+        }))
+    }
+
+    fn migration_mkdir(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
+        let (path, root) = resolve_migration_path(params, uid, gid)?;
+        if path == root {
+            return Err((
+                ErrorCode::PolicyDenied,
+                "cannot create a migration root".into(),
+            ));
+        }
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!(
+                        "migration directory must not be a symlink: {}",
+                        path.display()
+                    ),
+                ));
+            }
+            Ok(metadata) if metadata.is_dir() => {
+                return Ok(serde_json::json!({"created": false}));
+            }
+            Ok(_) => {
+                return Err((
+                    ErrorCode::BadParams,
+                    format!("migration path is not a directory: {}", path.display()),
+                ));
+            }
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                return Err(io_error("stat migration directory", error));
+            }
+            Err(_) => {}
+        }
+        let parent = path.parent().ok_or((
+            ErrorCode::PolicyDenied,
+            "migration directory has no parent".into(),
+        ))?;
+        ensure_parent_dirs(parent, &root, uid, gid)?;
+        fs::create_dir(&path).map_err(|e| io_error("create migration directory", e))?;
+        set_owner_mode(&path, uid, gid, PERSISTENT_DATA_MODE)?;
+        Ok(serde_json::json!({"created": true}))
+    }
+
+    fn migration_write(
+        params: &Value,
+        uid: u32,
+        gid: u32,
+        append: bool,
+    ) -> Result<Value, (ErrorCode, String)> {
+        let (path, root) = resolve_migration_path(params, uid, gid)?;
+        if path == root {
+            return Err((
+                ErrorCode::PolicyDenied,
+                "cannot write a migration root".into(),
+            ));
+        }
+        let encoded = params
+            .get("data_base64")
+            .and_then(Value::as_str)
+            .ok_or((ErrorCode::BadParams, "data_base64 required".into()))?;
+        let bytes = decode_base64(encoded)?;
+        if bytes.len() > MAX_WRITE_BYTES {
+            return Err((
+                ErrorCode::BadParams,
+                format!("migration write chunk exceeds {MAX_WRITE_BYTES} bytes"),
+            ));
+        }
+        let parent = path.parent().ok_or((
+            ErrorCode::PolicyDenied,
+            "migration file has no parent".into(),
+        ))?;
+        ensure_parent_dirs(parent, &root, uid, gid)?;
+        if fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+            return Err((
+                ErrorCode::PolicyDenied,
+                format!("migration file must not be a symlink: {}", path.display()),
+            ));
+        }
+        if fs::metadata(&path)
+            .map(|meta| meta.is_dir())
+            .unwrap_or(false)
+        {
+            return Err((
+                ErrorCode::BadParams,
+                format!("migration path is a directory: {}", path.display()),
+            ));
+        }
+        let mut options = OpenOptions::new();
+        options
+            .write(true)
+            .create(true)
+            .custom_flags(libc::O_NOFOLLOW);
+        if append {
+            options.append(true);
+        } else {
+            options.truncate(true);
+        }
+        let mut file = options
+            .open(&path)
+            .map_err(|e| io_error("open migration file", e))?;
+        file.write_all(&bytes)
+            .map_err(|e| io_error("write migration file", e))?;
+        file.sync_data()
+            .map_err(|e| io_error("sync migration file", e))?;
+        set_owner_mode(&path, uid, gid, PERSISTENT_FILE_MODE)?;
+        let size = fs::metadata(&path)
+            .map_err(|e| io_error("stat migration file", e))?
+            .len();
+        Ok(serde_json::json!({
+            "bytes": bytes.len(),
+            "size": size,
+            "append": append,
+        }))
+    }
+
+    fn migration_complete(uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
+        let run = fixed_root(Path::new(HOST_RUN))?;
+        let marker = run.join("legacy-filesdir-migrated");
+        match fs::symlink_metadata(&marker) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!(
+                        "migration marker must not be a symlink: {}",
+                        marker.display()
+                    ),
+                ));
+            }
+            Ok(metadata) if metadata.is_file() => {
+                return Ok(serde_json::json!({"complete": true, "already": true}));
+            }
+            Ok(_) => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!(
+                        "migration marker must be a regular file: {}",
+                        marker.display()
+                    ),
+                ));
+            }
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                return Err(io_error("stat migration marker", error));
+            }
+            Err(_) => {}
+        }
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(&marker)
+            .map_err(|e| io_error("create migration marker", e))?;
+        file.write_all(b"ok\n")
+            .map_err(|e| io_error("write migration marker", e))?;
+        file.sync_all()
+            .map_err(|e| io_error("sync migration marker", e))?;
+        set_owner_mode(&marker, uid, gid, PERSISTENT_FILE_MODE)?;
+        sync_directory(&run)?;
+        Ok(serde_json::json!({"complete": true, "already": false}))
+    }
+
+    fn delete_session(params: &Value, _uid: u32, _gid: u32) -> Result<Value, (ErrorCode, String)> {
+        let session_id = params
+            .get("session_id")
+            .and_then(Value::as_str)
+            .ok_or((ErrorCode::BadParams, "session_id required".into()))?;
+        if !is_safe_session_id(session_id) {
+            return Err((ErrorCode::BadParams, "invalid session_id".into()));
+        }
+        let root = fixed_root(Path::new(HOST_SESSIONS))?;
+        delete_session_at(&root, session_id)
+    }
+
+    fn delete_session_at(root: &Path, session_id: &str) -> Result<Value, (ErrorCode, String)> {
+        let session = root.join(session_id);
+        match fs::symlink_metadata(&session) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(serde_json::json!({"deleted": true, "missing": true}));
+            }
+            Err(error) => return Err(io_error("stat session", error)),
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!("session root must not be a symlink: {}", session.display()),
+                ));
+            }
+            Ok(metadata) if !metadata.is_dir() => {
+                return Err((
+                    ErrorCode::PolicyDenied,
+                    format!("session root must be a directory: {}", session.display()),
+                ));
+            }
+            Ok(_) => {}
+        }
+        let canonical =
+            fs::canonicalize(&session).map_err(|e| io_error("canonicalize session", e))?;
+        if canonical == root || !canonical.starts_with(root) {
+            return Err((
+                ErrorCode::PolicyDenied,
+                format!(
+                    "session root escapes persistent sessions: {}",
+                    session.display()
+                ),
+            ));
+        }
+        fs::remove_dir_all(&canonical).map_err(|e| io_error("remove session", e))?;
+        sync_directory(root)?;
+        Ok(serde_json::json!({"deleted": true, "missing": false}))
+    }
+
     fn copy(params: &Value, uid: u32, gid: u32) -> Result<Value, (ErrorCode, String)> {
         let source = resolve_param_path_for(params, "source", "source_session_id", uid, gid)?;
         let destination =
@@ -437,6 +709,68 @@ mod unix_impl {
             "gid": metadata.gid(),
             "mode": metadata.permissions().mode() & 0o777,
         }))
+    }
+
+    fn resolve_migration_path(
+        params: &Value,
+        uid: u32,
+        gid: u32,
+    ) -> Result<(PathBuf, PathBuf), (ErrorCode, String)> {
+        let target = params
+            .get("target")
+            .and_then(Value::as_str)
+            .ok_or((ErrorCode::BadParams, "migration target required".into()))?;
+        let root = match target {
+            "workspace" => PathBuf::from(HOST_WORKSPACE),
+            "memory" => PathBuf::from(HOST_MEMORY),
+            "skills" => PathBuf::from(HOST_SKILLS),
+            "shared" => PathBuf::from(HOST_SHARED),
+            "home" => PathBuf::from(HOST_HOME),
+            "session" => {
+                let session_id = params
+                    .get("session_id")
+                    .and_then(Value::as_str)
+                    .ok_or((ErrorCode::BadParams, "session_id required".into()))?;
+                PathBuf::from(
+                    crate::ubuntu::prepare_session_root(HOST_SESSIONS, session_id, uid, gid)
+                        .map_err(|(code, detail)| {
+                            (code, format!("prepare migration session: {detail}"))
+                        })?,
+                )
+            }
+            _ => {
+                return Err((
+                    ErrorCode::BadParams,
+                    format!("unknown migration target: {target}"),
+                ));
+            }
+        };
+        let root = fixed_root(&root)?;
+        let raw = params
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or((ErrorCode::BadParams, "migration path required".into()))?;
+        if raw.is_empty()
+            || raw.starts_with('/')
+            || raw.contains('\0')
+            || raw.contains('\\')
+            || raw.contains("//")
+            || raw
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == "..")
+        {
+            return Err((ErrorCode::BadParams, "invalid migration path".into()));
+        }
+        Ok((resolve_under(&root, raw)?, root))
+    }
+
+    fn is_safe_session_id(session_id: &str) -> bool {
+        !session_id.is_empty()
+            && session_id.len() <= 128
+            && !matches!(session_id, "." | "..")
+            && session_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
     }
 
     fn resolve_param_path(
@@ -765,6 +1099,12 @@ mod unix_impl {
         Ok(())
     }
 
+    fn sync_directory(path: &Path) -> Result<(), (ErrorCode, String)> {
+        File::open(path)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|e| io_error("sync directory", e))
+    }
+
     fn reject_symlink(path: &Path, metadata: &fs::Metadata) -> Result<(), (ErrorCode, String)> {
         if metadata.file_type().is_symlink() {
             return Err((
@@ -946,6 +1286,42 @@ mod unix_impl {
             assert!(decode_base64("AA=A").is_err());
             assert!(decode_base64("AB==").is_err());
             assert!(decode_base64("AAB=").is_err());
+        }
+
+        #[test]
+        fn session_ids_reject_traversal_and_control_characters() {
+            for session_id in ["", ".", "..", "../escape", "a/b", "a\\b", "a\0b"] {
+                assert!(!is_safe_session_id(session_id), "accepted {session_id:?}");
+            }
+            for session_id in ["session-1", "abc_123", "a.b"] {
+                assert!(is_safe_session_id(session_id), "rejected {session_id:?}");
+            }
+        }
+
+        #[test]
+        fn delete_session_at_removes_only_requested_session() {
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "minisd-workspace-delete-{}-{stamp}",
+                std::process::id(),
+            ));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(root.join("remove-me/workspace")).unwrap();
+            fs::create_dir_all(root.join("keep-me")).unwrap();
+            fs::write(root.join("remove-me/workspace/file.txt"), b"remove").unwrap();
+            fs::write(root.join("keep-me/file.txt"), b"keep").unwrap();
+
+            let result = delete_session_at(&root, "remove-me").unwrap();
+
+            assert_eq!(result["deleted"], true);
+            assert_eq!(result["missing"], false);
+            assert!(!root.join("remove-me").exists());
+            assert_eq!(fs::read(root.join("keep-me/file.txt")).unwrap(), b"keep");
+
+            fs::remove_dir_all(&root).unwrap();
         }
 
         #[test]

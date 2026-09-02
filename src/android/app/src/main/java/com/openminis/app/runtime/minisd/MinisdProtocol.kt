@@ -274,6 +274,7 @@ object MinisdProtocol {
         path: String? = null,
         source: String? = null,
         destination: String? = null,
+        target: String? = null,
         dataBase64: String? = null,
         offset: Long? = null,
         length: Int? = null,
@@ -288,6 +289,7 @@ object MinisdProtocol {
         path?.let { params.put("path", it) }
         source?.let { params.put("source", it) }
         destination?.let { params.put("destination", it) }
+        target?.let { params.put("target", it) }
         dataBase64?.let { params.put("data_base64", it) }
         offset?.let { params.put("offset", it) }
         length?.let { params.put("length", it) }
