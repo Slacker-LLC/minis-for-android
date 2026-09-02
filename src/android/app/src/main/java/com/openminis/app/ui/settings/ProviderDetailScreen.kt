@@ -854,6 +854,8 @@ private fun OAuthCredentialBlock(
     // ProviderInstanceDetailView's `oauthRefreshTrigger.toggle()`.
     var displayedKey by remember(instance.id) { mutableStateOf(storedKey) }
     var isAuthenticating by remember(instance.id) { mutableStateOf(false) }
+    val oauthAvailableInThisBuild = instance.providerType != ProviderType.anthropic ||
+        com.openminis.app.auth.ClaudeOAuthManager.isAvailableInThisBuild
     // [T-kimi-oauth] Device-code dialog state for Kimi re-auth (see
     // AddProviderScreen.OAuthConfigSection for the rationale).
     var kimiDeviceAuth by remember(instance.id) {
@@ -926,6 +928,14 @@ private fun OAuthCredentialBlock(
             Text(stringResource(R.string.provider_detail_sign_out))
         }
     } else {
+        if (!oauthAvailableInThisBuild) {
+            Text(
+                stringResource(R.string.provider_oauth_not_available_in_this_build),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         MinisSmallButton(
             onClick = {
                 if (isAuthenticating) return@MinisSmallButton
@@ -971,6 +981,7 @@ private fun OAuthCredentialBlock(
                     }
                 }
             },
+            enabled = oauthAvailableInThisBuild && !isAuthenticating,
         ) {
             Text(stringResource(R.string.provider_detail_sign_in))
         }

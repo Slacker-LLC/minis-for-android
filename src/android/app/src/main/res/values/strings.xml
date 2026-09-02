@@ -1035,6 +1035,7 @@
     <string name="provider_detail_show_model">Show Model</string>
     <string name="provider_detail_sign_out">Sign Out</string>
     <string name="provider_detail_sign_in">Sign In</string>
+    <string name="provider_oauth_not_available_in_this_build">This OAuth sign-in is not available in this build. Use an API key or install a build with the provider customization enabled.</string>
     <string name="provider_detail_save_key">Save Key</string>
     <string name="provider_detail_paste_bearer_token">Paste bearer token</string>
     <string name="provider_detail_save_token">Save Token</string>

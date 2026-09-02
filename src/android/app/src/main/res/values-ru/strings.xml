@@ -776,6 +776,7 @@
     <string name="provider_detail_delete_model">Удалить модель</string>
     <string name="provider_detail_sign_out">Выйти</string>
     <string name="provider_detail_sign_in">Войти</string>
+    <string name="provider_oauth_not_available_in_this_build">В этой сборке вход через OAuth недоступен. Используйте ключ API или установите сборку с включённой настройкой провайдера.</string>
     <string name="provider_detail_save_key">Сохранить ключ</string>
     <string name="provider_detail_paste_bearer_token">Вставьте Bearer-токен</string>
     <string name="provider_detail_save_token">Сохранить токен</string>
