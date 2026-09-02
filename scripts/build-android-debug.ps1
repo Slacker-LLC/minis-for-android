@@ -5,7 +5,7 @@
 # repository root. See BUILDING.md for the supported build environment.
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File scripts/build-pet-apk.ps1
+#   powershell -ExecutionPolicy Bypass -File scripts/build-android-debug.ps1
 
 $ErrorActionPreference = 'Stop'
 
