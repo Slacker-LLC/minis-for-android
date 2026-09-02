@@ -520,7 +520,7 @@ mod unix_impl {
         }
         let canonical =
             fs::canonicalize(&session).map_err(|e| io_error("canonicalize session", e))?;
-        if canonical == root || !canonical.starts_with(&root) {
+        if canonical == root || !canonical.starts_with(root) {
             return Err((
                 ErrorCode::PolicyDenied,
                 format!(
@@ -530,7 +530,7 @@ mod unix_impl {
             ));
         }
         fs::remove_dir_all(&canonical).map_err(|e| io_error("remove session", e))?;
-        sync_directory(&root)?;
+        sync_directory(root)?;
         Ok(serde_json::json!({"deleted": true, "missing": false}))
     }
 
