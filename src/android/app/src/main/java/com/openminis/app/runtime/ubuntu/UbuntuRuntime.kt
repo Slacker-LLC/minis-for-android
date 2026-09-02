@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.util.Log
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.runtime.distribution.RuntimeDistributionManager
 import com.openminis.app.runtime.distribution.RuntimePayloadVerifier
 import com.openminis.app.runtime.minisd.MinisdBootstrap
 import com.openminis.app.runtime.minisd.MinisdClient
@@ -47,6 +48,8 @@ object UbuntuRuntime {
         val hostShared: String? = null,
         val lastError: String? = null,
         val mock: Boolean = false,
+        /** False means the fields below are the last known values, not a fresh RPC result. */
+        val statusFresh: Boolean = false,
     )
 
     data class ShellResult(
@@ -107,6 +110,40 @@ object UbuntuRuntime {
 
     suspend fun refresh(): Snapshot = apply(client.ubuntuStatus())
 
+    /** Read each runtime component independently without starting Ubuntu or keeper. */
+    suspend fun diagnostics(): RuntimeDiagnostics {
+        val ping = client.ping()
+        val rootProbe = client.rootProbe()
+        val ubuntuStatus = client.ubuntuStatus()
+        val rootfsHealth = inspectRootfs()
+        return RuntimeDiagnosticsMapper.fromResponses(
+            ping = ping,
+            rootProbe = rootProbe,
+            ubuntuStatus = ubuntuStatus,
+            rootfsHealth = rootfsHealth,
+        )
+    }
+
+    /** Read-only rootfs inspection via runtime.maintenance; no direct su path. */
+    suspend fun inspectRootfs(): RootfsHealth {
+        if (appContext == null) return RootfsHealth(
+            RootfsHealthCode.ROOT_UNAVAILABLE,
+            "UbuntuRuntime.init(context) has not been called",
+        )
+        val broker = ensureBrokerReady()
+        if (!broker.ok) {
+            return RootfsHealth(
+                RootfsHealthCode.ROOT_UNAVAILABLE,
+                broker.error?.let { "${it.code}: ${it.detail}" } ?: "minisd broker unavailable",
+            )
+        }
+        return RuntimeDistributionManager.inspectRootfs(
+            maintainer = RuntimeDistributionManager.RuntimeMaintainer { operation, params ->
+                client.runtimeMaintenance(operation, params)
+            },
+        )
+    }
+
     /** Ensure only the Root broker is reachable; Ubuntu/rootfs health is not required. */
     suspend fun ensureBrokerReady(): MinisdResponse = startLock.withLock {
         val ctx = appContext ?: return@withLock MinisdProtocol.runtimeError(
@@ -154,7 +191,7 @@ object UbuntuRuntime {
                             sessionsRoot = UbuntuPaths.hostSessions,
                         ),
                     )
-                    started.running
+                    started.statusFresh && started.running
                 },
                 provision = {
                     val response = runCatching {
@@ -193,14 +230,14 @@ object UbuntuRuntime {
         }
 
         cur = refresh()
-        if (cur.running && runtimeLayoutMatches(cur)) {
+        if (cur.statusFresh && cur.running && runtimeLayoutMatches(cur)) {
             redirectPaths = true
             return@withLock cur
         }
 
-        if (cur.running) {
+        if (cur.statusFresh && cur.running) {
             val stopped = apply(client.ubuntuStop())
-            if (stopped.running) {
+            if (!stopped.statusFresh || stopped.running) {
                 return@withLock failStructured(
                     MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
                     "failed to stop keeper with stale runtime bind layout",
@@ -217,8 +254,8 @@ object UbuntuRuntime {
                 sessionsRoot = UbuntuPaths.hostSessions,
             ),
         )
-        val started = if (raw.running) refresh() else raw
-        if (!started.running) {
+        val started = if (raw.statusFresh && raw.running) refresh() else raw
+        if (!started.statusFresh || !started.running) {
             return@withLock failStructured(
                 MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
                 started.lastError ?: "ubuntu.start failed",
@@ -650,7 +687,7 @@ object UbuntuRuntime {
         attempt += 1
         runCatching { client.ubuntuStop() }
         val ready = ensureReady()
-        if (!ready.running) {
+        if (!ready.statusFresh || !ready.running) {
             return MinisdProtocol.runtimeError(
                 MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
                 ready.lastError ?: "keeper recovery failed",
@@ -685,7 +722,7 @@ object UbuntuRuntime {
         attempt += 1
         runCatching { client.ubuntuStop() }
         val ready = ensureReady()
-        if (!ready.running) {
+        if (!ready.statusFresh || !ready.running) {
             return MinisdProtocol.runtimeError(
                 MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE,
                 ready.lastError ?: "keeper recovery failed",
@@ -777,11 +814,15 @@ object UbuntuRuntime {
             return false
         }
         val stopped = apply(response)
-        return response.result?.optBoolean("running", true) == false && !stopped.running
+        return response.result?.optBoolean("running", true) == false &&
+            stopped.statusFresh && !stopped.running
     }
 
     private fun fail(detail: String): Snapshot {
-        val next = Snapshot(lastError = detail)
+        val next = _snapshot.value.copy(
+            lastError = detail,
+            statusFresh = false,
+        )
         _snapshot.value = next
         redirectPaths = false
         Log.w(TAG, detail)
@@ -789,26 +830,32 @@ object UbuntuRuntime {
     }
 
     private fun apply(resp: MinisdResponse): Snapshot {
+        val next = mergeSnapshot(_snapshot.value, resp)
+        _snapshot.value = next
+        return next
+    }
+
+    internal fun mergeSnapshot(previous: Snapshot, resp: MinisdResponse): Snapshot {
         val result = resp.result
-        val next = if (resp.ok && result != null) {
+        return if (resp.ok && result != null) {
             Snapshot(
                 running = result.optBoolean("running") ||
-                    result.optBoolean("provisioned") && _snapshot.value.running,
+                    result.optBoolean("provisioned") && previous.running,
                 available = result.optBoolean("available", result.optBoolean("running")),
                 pid = if (result.has("pid") && !result.isNull("pid")) {
                     result.optInt("pid")
                 } else {
-                    _snapshot.value.pid
+                    previous.pid
                 },
-                version = result.optString("version").ifEmpty { _snapshot.value.version },
-                provisioned = result.optBoolean("provisioned") || _snapshot.value.provisioned,
+                version = result.optString("version").ifEmpty { previous.version },
+                provisioned = result.optBoolean("provisioned") || previous.provisioned,
                 guestUid = if (result.has("uid") && !result.isNull("uid")) {
                     result.optInt("uid")
                 } else {
-                    _snapshot.value.guestUid
+                    previous.guestUid
                 },
                 sessionsRoot = result.optString("sessions_root")
-                    .ifEmpty { _snapshot.value.sessionsRoot.orEmpty() }
+                    .ifEmpty { previous.sessionsRoot.orEmpty() }
                     .takeIf { it.isNotEmpty() },
                 layoutKnown = result.optBoolean("layout_known", false),
                 hostWorkspace = result.optNullableString("workspace"),
@@ -817,16 +864,14 @@ object UbuntuRuntime {
                 hostShared = result.optNullableString("shared"),
                 lastError = result.optString("last_error").ifEmpty { null },
                 mock = result.optBoolean("mock"),
+                statusFresh = true,
             )
         } else {
-            Snapshot(
-                running = false,
-                available = false,
+            previous.copy(
                 lastError = resp.error?.let { "${it.code}: ${it.detail}" } ?: "ubuntu rpc failed",
+                statusFresh = false,
             )
         }
-        _snapshot.value = next
-        return next
     }
 
     private fun JSONObject.optNullableString(key: String): String? =

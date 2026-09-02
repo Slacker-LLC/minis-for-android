@@ -105,6 +105,18 @@ fun RootfsManagementScreen(
             SettingsSection(title = stringResource(R.string.rootfs_status_section)) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.rootfs_installed_label)) },
+                    supportingContent = {
+                        Text(
+                            buildString {
+                                append(state.rootfsHealthCode.name)
+                                state.rootfsHealthDetail
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { append(" — ").append(it) }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                     trailingContent = {
                         Icon(
                             if (state.isInstalled) Icons.Filled.CheckCircle else Icons.Filled.Cancel,

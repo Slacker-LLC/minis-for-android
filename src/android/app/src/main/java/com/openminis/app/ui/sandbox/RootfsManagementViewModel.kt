@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
+import com.openminis.app.runtime.ubuntu.RootfsHealth
+import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,8 +23,17 @@ data class RootfsManagementUiState(
     val rootfsSize: Long = 0L,
     val rootfsPath: String = "",
     val hasBackup: Boolean = false,
+    val rootfsHealthCode: RootfsHealthCode = RootfsHealthCode.UNKNOWN,
+    val rootfsHealthDetail: String? = null,
     /** Current install phase + 0..1 progress (null when not installing). */
     val installProgress: Float? = null,
+)
+
+internal fun RootfsManagementUiState.withHealth(health: RootfsHealth): RootfsManagementUiState = copy(
+    isInstalled = health.healthy,
+    rootfsHealthCode = health.code,
+    rootfsHealthDetail = health.detail,
+    rootfsSize = if (health.healthy) rootfsSize else 0L,
 )
 
 class RootfsManagementViewModel : ViewModel() {
@@ -73,16 +84,17 @@ class RootfsManagementViewModel : ViewModel() {
         val manager = RootfsManager.getInstance(context)
 
         _uiState.value = _uiState.value.copy(
-            isInstalled = manager.isInstalled,
             rootfsPath = manager.rootfsDir.absolutePath,
         )
 
-        if (manager.isInstalled) {
-            viewModelScope.launch {
-                try {
+        viewModelScope.launch {
+            runCatching {
+                val health = manager.checkHealth()
+                _uiState.value = _uiState.value.withHealth(health)
+                if (health.healthy) {
                     val size = manager.getRootfsSize()
                     _uiState.value = _uiState.value.copy(rootfsSize = size)
-                } catch (_: Exception) { }
+                }
             }
         }
     }
@@ -100,10 +112,19 @@ class RootfsManagementViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 manager.installIfNeeded()
+                val health = manager.checkHealth()
+                val healthState = _uiState.value.withHealth(health)
                 _uiState.value = _uiState.value.copy(
+                    isInstalled = healthState.isInstalled,
                     isProcessing = false,
-                    lastOperationSuccess = true,
-                    resultMessage = "Rootfs installed successfully",
+                    lastOperationSuccess = health.healthy,
+                    resultMessage = if (health.healthy) {
+                        "Rootfs installed successfully"
+                    } else {
+                        "Installation failed: ${health.code} — ${health.detail}"
+                    },
+                    rootfsHealthCode = health.code,
+                    rootfsHealthDetail = health.detail,
                     installProgress = null,
                 )
                 refresh(context)

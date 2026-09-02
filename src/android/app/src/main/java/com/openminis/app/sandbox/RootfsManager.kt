@@ -41,25 +41,10 @@ class RootfsManager private constructor(private val context: Context) {
     val installState: StateFlow<RootfsInstallState> = _installState.asStateFlow()
 
     suspend fun checkHealth(): RootfsHealth = withContext(Dispatchers.IO) {
-        val su = findSu()
-            ?: return@withContext RootfsHealth(
-                RootfsHealthCode.ROOT_UNAVAILABLE,
-                "no executable su found",
-            )
-        val result = runSu(su, probeCommand(), HEALTH_TIMEOUT_MS)
-        if (!result.completed) {
-            return@withContext RootfsHealth(
-                RootfsHealthCode.ROOT_UNAVAILABLE,
-                result.error ?: "rootfs health probe timed out",
-            )
+        if (!com.openminis.app.runtime.ubuntu.UbuntuRuntime.isInitialized) {
+            com.openminis.app.runtime.ubuntu.UbuntuRuntime.init(context)
         }
-        if (result.exitCode != 0) {
-            return@withContext RootfsHealth(
-                RootfsHealthCode.ROOT_UNAVAILABLE,
-                result.output.ifBlank { "rootfs health probe exited ${result.exitCode}" },
-            )
-        }
-        evaluateProbeOutput(result.output)
+        com.openminis.app.runtime.ubuntu.UbuntuRuntime.inspectRootfs()
     }
 
     suspend fun installIfNeeded() = withContext(Dispatchers.IO) {

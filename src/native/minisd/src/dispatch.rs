@@ -297,6 +297,11 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
         "health.get" => {
             let rootfs_ok = crate::layout::rootfs_looks_valid(&state.ubuntu.rootfs_or_default());
             let layout_known = runtime_layout_known(state);
+            let probe = if state.mock {
+                mock_probe()
+            } else {
+                live_probe()
+            };
             Response::ok(
                 req.id,
                 json!({
@@ -308,7 +313,13 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
                     "rootfs_ok": rootfs_ok,
                     "layout_known": layout_known,
                     "sessions": state.sessions.len(),
-                    "selinux_enforcing": true
+                    "selinux_enforcing": probe.enforcing,
+                    "selinux": probe.selinux,
+                    "root_uid": probe.uid,
+                    "root_gid": probe.gid,
+                    "root_groups": probe.groups,
+                    "root_cap_eff": probe.cap_eff,
+                    "kernelsu": probe.kernelsu
                 }),
             )
         }
@@ -610,5 +621,18 @@ mod tests {
         let parsed = parse_request(raw).unwrap();
         let resp = handle(&mut state, parsed, None);
         assert!(resp.ok);
+    }
+
+    #[test]
+    fn health_reports_probe_facts_instead_of_constant_selinux_state() {
+        let mut state = AppState::new(true, PolicyFile::default_policy());
+        let resp = handle(&mut state, req("health.get", json!({})), None);
+        assert!(resp.ok);
+        let result = resp.result.unwrap();
+        assert_eq!(result["root_uid"], 0);
+        assert_eq!(result["root_gid"], 0);
+        assert_eq!(result["root_cap_eff"], "000001ffffffffff");
+        assert_eq!(result["selinux"], "u:r:su:s0");
+        assert_eq!(result["selinux_enforcing"], true);
     }
 }
