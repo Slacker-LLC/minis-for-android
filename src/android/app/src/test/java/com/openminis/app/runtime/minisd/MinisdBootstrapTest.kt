@@ -38,7 +38,7 @@ class MinisdBootstrapTest {
     @Test
     fun `watchdog bootstrap is independent of rootfs health`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            appSocket = "/data/user/0/llc.slacker.minis/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = false,
         )
@@ -53,7 +53,7 @@ class MinisdBootstrapTest {
     @Test
     fun `stale pidfile is cleaned without killing unverified process`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            appSocket = "/data/user/0/llc.slacker.minis/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = false,
         )
@@ -68,7 +68,7 @@ class MinisdBootstrapTest {
     @Test
     fun `force restart only kills verified watchdog lineage`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            appSocket = "/data/user/0/llc.slacker.minis/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = true,
         )
@@ -98,7 +98,7 @@ class MinisdBootstrapTest {
     @Test
     fun `packaged broker is installed before watchdog spawn`() {
         val command = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/user/0/dev.openminispet.android/files/minis/minisd.sock",
+            appSocket = "/data/user/0/llc.slacker.minis/files/minis/minisd.sock",
             policyJson = """{"methods":{},"caller":{"appUid":12345}}""",
             forceRestart = false,
             packagedBroker = "/data/app/pkg/lib/arm64/libminisd.so",

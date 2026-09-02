@@ -1438,11 +1438,11 @@ mod tests {
         }))
         .is_ok());
         assert!(validate_persistent_start_params(&json!({
-            "workspace": "/data/user/0/dev.openminispet.android/files/minis/workspace"
+            "workspace": "/data/user/0/llc.slacker.minis/files/minis/workspace"
         }))
         .is_err());
         assert!(validate_persistent_start_params(&json!({
-            "sessions_root": "/data/user/0/dev.openminispet.android/files/minis-sessions"
+            "sessions_root": "/data/user/0/llc.slacker.minis/files/minis-sessions"
         }))
         .is_err());
         assert!(validate_persistent_start_params(&json!({"workspace": "/dev/shm/ws"})).is_err());

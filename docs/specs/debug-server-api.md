@@ -29,7 +29,7 @@ Every request requires the per-install DebugServer token, including requests tha
 Read the token from an authorized development device:
 
 ```bash
-TOK=$(adb shell run-as dev.openminispet.android cat files/debug_server_token)
+TOK=$(adb shell run-as llc.slacker.minis cat files/debug_server_token)
 ```
 
 Send it using either:
