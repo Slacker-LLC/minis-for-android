@@ -32,6 +32,7 @@ class RuntimeDiagnosticsTest {
             rootfsHealth = RootfsHealth(
                 RootfsHealthCode.INCOMPATIBLE,
                 "rootfs revision is unsupported",
+                sizeBytes = 123_456L,
             ),
         )
 
@@ -39,6 +40,7 @@ class RuntimeDiagnosticsTest {
         assertEquals(RootDiagnosticState.AVAILABLE, diagnostics.root.state)
         assertNull(diagnostics.root.selinuxEnforcing)
         assertEquals(RootfsHealthCode.INCOMPATIBLE, diagnostics.rootfs.state)
+        assertEquals(123_456L, diagnostics.rootfs.sizeBytes)
         assertEquals(KeeperDiagnosticState.STOPPED, diagnostics.keeper.state)
         assertEquals(ProvisionDiagnosticState.NOT_PROVISIONED, diagnostics.provision.state)
         assertEquals("rootfs revision is unsupported", diagnostics.rootfs.detail)

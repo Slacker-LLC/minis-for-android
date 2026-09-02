@@ -121,14 +121,7 @@ class RootfsManager private constructor(private val context: Context) {
         null
     }
 
-    suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
-        val su = findSu() ?: return@withContext 0L
-        val command = "du -sk ${shellQuote(MinisdProtocol.DEFAULT_ROOTFS)} 2>/dev/null | awk '{print \$1}'"
-        val result = runSu(su, command, HEALTH_TIMEOUT_MS)
-        if (!result.completed || result.exitCode != 0) return@withContext 0L
-        val kib = result.output.lineSequence().mapNotNull { it.trim().toLongOrNull() }.firstOrNull() ?: 0L
-        kib * 1024L
-    }
+    suspend fun getRootfsSize(): Long = checkHealth().sizeBytes ?: 0L
 
     suspend fun restoreUserData(backupDir: File) = withContext(Dispatchers.IO) {
         Log.i(TAG, "restoreUserData ignored for ${backupDir.path}: persistent data is not stored in rootfs")

@@ -33,7 +33,7 @@ internal fun RootfsManagementUiState.withHealth(health: RootfsHealth): RootfsMan
     isInstalled = health.healthy,
     rootfsHealthCode = health.code,
     rootfsHealthDetail = health.detail,
-    rootfsSize = if (health.healthy) rootfsSize else 0L,
+    rootfsSize = if (health.healthy) health.sizeBytes ?: 0L else 0L,
 )
 
 class RootfsManagementViewModel : ViewModel() {
@@ -91,10 +91,6 @@ class RootfsManagementViewModel : ViewModel() {
             runCatching {
                 val health = manager.checkHealth()
                 _uiState.value = _uiState.value.withHealth(health)
-                if (health.healthy) {
-                    val size = manager.getRootfsSize()
-                    _uiState.value = _uiState.value.copy(rootfsSize = size)
-                }
             }
         }
     }

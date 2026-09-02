@@ -58,6 +58,7 @@ class RuntimeDistributionManagerTest {
         var rollbackSucceeds: Boolean = true,
         var stateReadSucceeds: Boolean = true,
         var stateWriteSucceeds: Boolean = true,
+        var canonicalSizeBytes: Long? = 4096L,
     ) : RuntimeMaintainer {
         val operations = mutableListOf<Pair<String, JSONObject>>()
 
@@ -112,7 +113,11 @@ class RuntimeDistributionManagerTest {
                                 } else {
                                     canonicalProvisioned
                                 },
-                            ))
+                            ).apply {
+                                if (params.optString("target") != "previous") {
+                                    canonicalSizeBytes?.let { put("size_bytes", it) }
+                                }
+                            })
                     }
                 }
                 MinisdProtocol.RUNTIME_OP_STAGE ->
@@ -264,6 +269,16 @@ class RuntimeDistributionManagerTest {
             RootfsHealth(RootfsHealthCode.CORRUPT, "corrupt"),
             manifest,
         ))
+    }
+
+    @Test
+    fun rootfsProbeCarriesOptionalSizeFromBroker() = runBlocking {
+        val health = RuntimeDistributionManager.inspectRootfs(
+            FakeMaintainer(canonicalSizeBytes = 123_456L),
+        )
+
+        assertEquals(RootfsHealthCode.HEALTHY, health.code)
+        assertEquals(123_456L, health.sizeBytes)
     }
 
     @Test

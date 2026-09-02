@@ -287,6 +287,9 @@ const TAR_PATH: &str = "/system/bin/tar";
 const SHA256SUM_PATH: &str = "/system/bin/sha256sum";
 
 #[cfg(unix)]
+const DU_PATH: &str = "/system/bin/du";
+
+#[cfg(unix)]
 fn handle_unix(operation: &str, params: &Value) -> Result<Value, (ErrorCode, String)> {
     let _guard = acquire_lifecycle_lock().map_err(|detail| (ErrorCode::Internal, detail))?;
     match operation {
@@ -809,6 +812,7 @@ fn probe_rootfs(path: &std::path::Path, target: &str) -> Result<Value, (ErrorCod
     }
     let runtime_identity = read_runtime_identity(path)?;
     let provisioned = read_provisioned_marker(path)?;
+    let size_bytes = rootfs_size_bytes(path).ok().flatten();
     let mut response_metadata = metadata;
     if let Some(archive_sha256) = runtime_identity.as_deref() {
         response_metadata["archive_sha256"] = Value::String(archive_sha256.to_string());
@@ -820,8 +824,32 @@ fn probe_rootfs(path: &std::path::Path, target: &str) -> Result<Value, (ErrorCod
         "code": "HEALTHY",
         "detail": "Ubuntu rootfs metadata/layout valid",
         "metadata": response_metadata,
-        "provisioned": provisioned
+        "provisioned": provisioned,
+        "size_bytes": size_bytes
     }))
+}
+
+#[cfg(unix)]
+fn rootfs_size_bytes(path: &std::path::Path) -> Result<Option<u64>, String> {
+    let mut command = fixed_command(DU_PATH, "du");
+    command.args(["-sk", "-x"]);
+    command.arg(path);
+    let (status, output) = run_capture(command, 4096, TOOL_TIMEOUT)?;
+    if !status.success() {
+        return Ok(None);
+    }
+    Ok(parse_du_size_bytes(&output))
+}
+
+#[cfg(unix)]
+fn parse_du_size_bytes(output: &[u8]) -> Option<u64> {
+    let text = std::str::from_utf8(output).ok()?;
+    let kib = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .find_map(|line| line.split_whitespace().next()?.parse::<u64>().ok())?;
+    kib.checked_mul(1024)
 }
 
 #[cfg(unix)]
@@ -2151,6 +2179,21 @@ mod tests {
         let value = handle(true, &json!({"operation": "switch"})).unwrap();
         assert_eq!(value["operation"], "switch");
         assert_eq!(value["mock"], true);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn du_output_is_parsed_as_bytes_without_shell_reinterpretation() {
+        assert_eq!(
+            parse_du_size_bytes(b"12\t/data/adb/minis/rootfs\n"),
+            Some(12 * 1024)
+        );
+        assert_eq!(
+            parse_du_size_bytes(b"notice\n12 /rootfs\n"),
+            Some(12 * 1024)
+        );
+        assert_eq!(parse_du_size_bytes(b"not-a-size /rootfs\n"), None);
+        assert_eq!(parse_du_size_bytes(b"18446744073709551615 /rootfs\n"), None);
     }
 
     #[cfg(unix)]
