@@ -34,7 +34,7 @@ import java.io.RandomAccessFile
 class MinisDocumentsProvider : DocumentsProvider() {
 
     companion object {
-        const val AUTHORITY = "dev.openminispet.android.documents"
+        const val AUTHORITY = "llc.slacker.minis.documents"
         private const val TAG = "MinisDocumentsProvider"
         private const val ROOT_ID = "minis-root"
         private const val ROOT_DOC_ID = ""

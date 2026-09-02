@@ -10,15 +10,15 @@
 
 这是独立产品。架构、发布、包名与开发决策只由本仓库定义。不与任何外部仓库持续同步。
 
-## 目标 Android 身份（已冻结，尚未落地）
+## 目标 Android 身份（已落地为 `llc.slacker.minis`）
 
 | 项 | 目标值 |
 |---|---|
 | `applicationId` | `llc.slacker.minis` |
 | 未来 Java/Kotlin 包根 | `llc.slacker.minis` |
-| FileProvider / 其它 authority | 随 `applicationId` 派生 |
+| FileProvider / 其它 authority | 随 `applicationId` 派生为 `llc.slacker.minis.documents` 等 |
 
-现行 Gradle 仍使用遗留 `applicationId` 与遗留包路径，见 `06-CURRENT-GAPS.md`。在身份迁移 issue 完成前，**禁止**在本轮改 `namespace` / `applicationId` / 源码目录。
+已落地 `applicationId` 迁移与六阶段事务级属主迁移规范（详见 `07-OWNERSHIP-MIGRATION.md`）。
 
 遗留安装将被视为另一款应用；升级与数据迁移策略在身份迁移时单独规定。
 

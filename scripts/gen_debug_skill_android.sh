@@ -12,7 +12,7 @@ set -eu
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL_DIR="$REPO_ROOT/.claude/skills/debug-server"
 OUT_DIR="$REPO_ROOT/src/android/app/src/debug/assets/debug-skill"
-APP_ID="dev.openminispet.android"
+APP_ID="llc.slacker.minis"
 
 mkdir -p "$OUT_DIR/examples"
 
@@ -31,7 +31,7 @@ Usage:
 
 Setup:
     adb forward tcp:5321 tcp:5321
-    export MINIS_DEBUG_TOKEN="$(adb shell run-as dev.openminispet.android cat files/debug_server_token)"
+    export MINIS_DEBUG_TOKEN="$(adb shell run-as llc.slacker.minis cat files/debug_server_token)"
 
 Example:
     python3 minis_rpc_android.py debug.appInfo '{}'
@@ -54,7 +54,7 @@ def call(host: str, method: str, params: dict, token: str | None) -> dict:
     if not token:
         raise SystemExit(
             "DebugServer token is required. Read it with:\n"
-            "  adb shell run-as dev.openminispet.android cat files/debug_server_token\n"
+            "  adb shell run-as llc.slacker.minis cat files/debug_server_token\n"
             "then pass --token or set MINIS_DEBUG_TOKEN."
         )
 
@@ -80,7 +80,7 @@ def call(host: str, method: str, params: dict, token: str | None) -> dict:
             raise SystemExit(
                 "401 Unauthorized — the DebugServer token is missing or incorrect.\n"
                 "Read it with:\n"
-                "  adb shell run-as dev.openminispet.android cat files/debug_server_token\n"
+                "  adb shell run-as llc.slacker.minis cat files/debug_server_token\n"
                 f"server said: {payload}"
             )
         raise SystemExit(f"HTTP {exc.code}: {payload}")
@@ -125,7 +125,7 @@ requires the per-install token.
 
 ```bash
 adb forward tcp:5321 tcp:5321
-TOK=$(adb shell run-as dev.openminispet.android cat files/debug_server_token)
+TOK=$(adb shell run-as llc.slacker.minis cat files/debug_server_token)
 
 curl -s http://localhost:5321/ \
   -H "X-Minis-Token: $TOK" \

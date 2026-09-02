@@ -97,7 +97,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.openminispet.android"
+        applicationId = "llc.slacker.minis"
         minSdk = 26
         targetSdk = 35
         versionCode = 39

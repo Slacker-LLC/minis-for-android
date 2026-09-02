@@ -281,7 +281,7 @@ class RuntimeDistributionManagerTest {
         )
         val result = RuntimeDistributionManager.ensureDeployedCore(
             manifest(),
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
         )
@@ -314,7 +314,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
         )
@@ -339,7 +339,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
         )
@@ -365,7 +365,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -393,7 +393,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -435,7 +435,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
         )
@@ -473,7 +473,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
         )
@@ -486,7 +486,7 @@ class RuntimeDistributionManagerTest {
     fun stagingFailureClearsPending() = runBlocking {
         val maintainer = FakeMaintainer(canonicalMetadata = null, stageSucceeds = false)
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { true },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
@@ -496,7 +496,7 @@ class RuntimeDistributionManagerTest {
     fun switchFailureBeforeExchangeClearsPending() = runBlocking {
         val maintainer = FakeMaintainer(canonicalMetadata = null, deploySucceeds = false)
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { true },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertTrue(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_CLEAR_STATE })
@@ -510,7 +510,7 @@ class RuntimeDistributionManagerTest {
             deployErrorCode = MinisdProtocol.ERROR_RUNTIME_SWITCH_UNKNOWN,
         )
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { true },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertTrue(result.detail.contains("pending transaction retained"))
@@ -521,7 +521,7 @@ class RuntimeDistributionManagerTest {
     fun keeperStopFailureClearsPendingBeforeSwitch() = runBlocking {
         val maintainer = FakeMaintainer(canonicalMetadata = null)
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { false },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { false },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_SWITCH })
@@ -548,7 +548,7 @@ class RuntimeDistributionManagerTest {
         )
         val result = RuntimeDistributionManager.ensureDeployedCore(
             manifest(),
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -588,7 +588,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             manifest(),
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -611,7 +611,7 @@ class RuntimeDistributionManagerTest {
         )
         val result = RuntimeDistributionManager.ensureDeployedCore(
             manifest(),
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -646,7 +646,7 @@ class RuntimeDistributionManagerTest {
         )
         val result = RuntimeDistributionManager.ensureDeployedCore(
             manifest(),
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
@@ -663,7 +663,7 @@ class RuntimeDistributionManagerTest {
     fun stateReadFailureDoesNotRedeploy() = runBlocking {
         val maintainer = FakeMaintainer(stateReadSucceeds = false)
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { true },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_STAGE })
@@ -673,7 +673,7 @@ class RuntimeDistributionManagerTest {
     fun malformedProbeDoesNotRedeploy() = runBlocking {
         val maintainer = FakeMaintainer(malformedProbe = true)
         val result = RuntimeDistributionManager.ensureDeployedCore(
-            manifest(), "dev.openminispet.android", maintainer, stopKeeper = { true },
+            manifest(), "llc.slacker.minis", maintainer, stopKeeper = { true },
         )
         assertEquals(RuntimeDistributionManager.DeploymentOutcome.FAILED, result.outcome)
         assertFalse(maintainer.operations.any { it.first == MinisdProtocol.RUNTIME_OP_STAGE })
@@ -696,7 +696,7 @@ class RuntimeDistributionManagerTest {
 
         val result = RuntimeDistributionManager.ensureDeployedCore(
             current,
-            "dev.openminispet.android",
+            "llc.slacker.minis",
             maintainer,
             stopKeeper = { true },
             startKeeper = { true },
