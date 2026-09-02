@@ -7,8 +7,10 @@ import android.net.Uri
 import android.util.Log
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -57,6 +62,12 @@ class SkillRepository(private val context: Context) {
          *  any Save-to-Files / AirDrop / upload consumer has finished. */
         private const val EXPORT_TTL_MS = 24L * 3600 * 1000
         private const val SKILLS_ROOT = "/var/minis/skills"
+        /**
+         * Skill metadata is useful but never allowed to hold up application
+         * startup. A broken/stale minisd broker gets one bounded background
+         * load attempt and can be retried when the skills screen is opened.
+         */
+        private const val SKILL_LOAD_TIMEOUT_MS = 15_000L
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -71,6 +82,9 @@ class SkillRepository(private val context: Context) {
      * download failure doesn't poison the next one.
      */
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Serialize initial loading and explicit disk rescans. */
+    private val loadMutex = Mutex()
 
     // -- Data Types --
 
@@ -114,27 +128,21 @@ class SkillRepository(private val context: Context) {
     }
 
     init {
-        // [T-android-safemode-lateinit-crash-147] Never let a bad skill take
-        // the whole app down. This constructor runs inline in
-        // MinisApp.onCreate, BEFORE subsystemsInitialized is set, so anything
-        // escaping here aborts onCreate with the repositories half-assigned.
-        // The Application object is then permanently broken (onCreate never
-        // re-runs), every subsequent launch crashes on the first Compose frame
-        // with "lateinit property chatRepository has not been initialized",
-        // and each crash writes a log that re-trips the crash-burst detector —
-        // the self-sustaining loop reported in GH#147, where the user could
-        // only recover by reinstalling.
-        //
-        // loadAll() reads rows written by third-party skill imports and uses
-        // getColumnIndexOrThrow plus SKILL.md parsing, so a malformed skill
-        // from an external hub is exactly the kind of input that can throw.
-        // Degrading to "some skills missing from the list" is always better
-        // than an app that cannot start.
-        runCatching { loadAll() }.onFailure {
-            Log.e(TAG, "loadAll failed — continuing with ${_skills.value.size} skill(s): ${it.message}", it)
-        }
-        runCatching { installBundledSkills() }.onFailure {
-            Log.e(TAG, "installBundledSkills failed — continuing: ${it.message}", it)
+        // [T-android-safemode-lateinit-crash-147] and GH#129: this constructor
+        // runs inline in MinisApp.onCreate. Disk-backed skill loading performs
+        // broker RPCs and may encounter a stale identity or a dead socket, so
+        // it must never run on the application/main thread. Keep the complete
+        // initialization sequence in the repository-owned IO scope; the app
+        // can finish creating all other subsystems and render its UI while
+        // skills are loaded (or while the runtime failure is logged).
+        backgroundScope.launch {
+            loadMutex.withLock {
+                loadAllSafelyLocked("initialization")
+                runCatching { withTimeout(SKILL_LOAD_TIMEOUT_MS) { installBundledSkills() } }
+                    .onFailure {
+                        Log.e(TAG, "installBundledSkills failed — continuing: ${it.message}", it)
+                    }
+            }
         }
     }
 
@@ -1174,16 +1182,43 @@ class SkillRepository(private val context: Context) {
      * path), not overwriting any preserved DB toggle.
      */
     fun reloadFromDisk() {
-        loadAll()
+        // Keep the public fire-and-forget API used by Compose and ChatViewModel,
+        // but move all broker I/O off their caller threads. The mutex also
+        // prevents a screen-entry rescan from racing the initial load.
+        backgroundScope.launch {
+            loadMutex.withLock {
+                loadAllSafelyLocked("reloadFromDisk")
+            }
+        }
     }
 
     // -- Internal --
 
-    private fun loadAll() {
+    private suspend fun loadAllSafelyLocked(reason: String) {
+        try {
+            withTimeout(SKILL_LOAD_TIMEOUT_MS) { loadAll() }
+        } catch (error: TimeoutCancellationException) {
+            Log.w(
+                TAG,
+                "loadAll timed out after ${SKILL_LOAD_TIMEOUT_MS}ms during $reason; " +
+                    "keeping ${_skills.value.size} currently loaded skill(s)",
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.e(
+                TAG,
+                "loadAll failed during $reason — continuing with ${_skills.value.size} skill(s): ${error.message}",
+                error,
+            )
+        }
+    }
+
+    private suspend fun loadAll() {
         // A broker failure must not look like an empty guest tree. Keep the
         // nullable result so a transient runtime outage cannot prune valid DB
         // rows before the broker becomes ready again.
-        val onDisk = listSkillDirectories()
+        val onDisk = listSkillDirectoriesForLoad()
 
         // Load from DB
         val dbSkills = mutableListOf<Skill>()
@@ -1222,14 +1257,17 @@ class SkillRepository(private val context: Context) {
              // the broker owns the canonical `/var/minis/skills` tree.
              if (importSource != ImportSource.BUNDLED &&
                  onDisk != null &&
-                 (id !in onDisk || readSkillFile(id, "SKILL.md") == null)
+                 (id !in onDisk || readSkillFileForLoad(id, "SKILL.md") == null)
              ) {
                 db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
                 db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
                 Log.i(TAG, "Pruned orphan skill row (no SKILL.md on disk): $id")
                 continue
             }
-            val body = readSkillMdBody(id)
+            // When the broker is unavailable, keep the DB metadata instead of
+            // issuing one more blocking-looking RPC per row. The next bounded
+            // rescan will fill the body once the runtime is healthy again.
+            val body = if (onDisk == null) "" else readSkillMdBodyForLoad(id)
             val sourceUrlIdx = cursor.getColumnIndex("source_url")
             val useCountIdx = cursor.getColumnIndex("use_count")
             var description = cursor.getString(cursor.getColumnIndexOrThrow("description"))
@@ -1255,7 +1293,7 @@ class SkillRepository(private val context: Context) {
             // to heal it — only renaming the skill works, because that mints a
             // new row id.
             if (description == ">" || description == "|" || description.isBlank()) {
-                val skillMd = readSkillFile(id, "SKILL.md")
+                val skillMd = if (onDisk == null) null else readSkillFileForLoad(id, "SKILL.md")
                 if (skillMd != null) {
                     val reparsed = parseSkillMd(skillMd)
                     // Only ever REPLACE an empty/placeholder value with a real
@@ -1300,7 +1338,7 @@ class SkillRepository(private val context: Context) {
 
         // Auto-discover skills in the canonical guest tree without DB entries.
         for (id in onDisk.orEmpty()) {
-            val skillMd = readSkillFile(id, "SKILL.md")
+            val skillMd = readSkillFileForLoad(id, "SKILL.md")
             if (skillMd != null && dbSkills.none { it.id == id }) {
                 val parsed = parseSkillMd(skillMd)
                 if (parsed != null) {
@@ -1346,23 +1384,41 @@ class SkillRepository(private val context: Context) {
         writeSkillFileRaw(skill.id, "SKILL.md", content)
     }
 
-    private fun readSkillMdBody(id: String): String {
-        val parsed = readSkillFile(id, "SKILL.md")?.let(::parseSkillMd)
+    private suspend fun readSkillMdBodyForLoad(id: String): String {
+        val parsed = readSkillFileForLoad(id, "SKILL.md")?.let(::parseSkillMd)
         return parsed?.body ?: ""
     }
 
-    private fun listSkillDirectories(): List<String>? = runCatching {
-        runBlocking(Dispatchers.IO) {
-            WorkspaceFileClient.listAll("", SKILLS_ROOT)
-                .filter { it.optString("type") == "dir" }
-                .mapNotNull { entry ->
-                    val id = entry.optString("name")
-                    id.takeIf(::isSafeSkillId)
-                }
-        }
-    }.getOrElse { error ->
+    /**
+     * Suspending variant used exclusively by [loadAll]. Keeping the startup
+     * path free of `runBlocking` is what makes a dead/stale broker unable to
+     * trigger an Android application-start ANR.
+     */
+    private suspend fun listSkillDirectoriesForLoad(): List<String>? = try {
+        WorkspaceFileClient.listAll("", SKILLS_ROOT)
+            .filter { it.optString("type") == "dir" }
+            .mapNotNull { entry ->
+                val id = entry.optString("name")
+                id.takeIf(::isSafeSkillId)
+            }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
         Log.w(TAG, "Failed to list guest skill directories: ${error.message}")
         null
+    }
+
+    private suspend fun readSkillFileForLoad(skillId: String, relativePath: String): String? {
+        if (!isSafeSkillId(skillId) || !isSafeRelativePath(relativePath)) return null
+        return try {
+            WorkspaceFileClient.readAll("", skillGuestPath(skillId, relativePath))
+                .toString(Charsets.UTF_8)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.w(TAG, "Failed to read guest skill file $skillId/$relativePath: ${error.message}")
+            null
+        }
     }
 
     private fun listSkillGuestFiles(skillId: String): List<String> = runCatching {

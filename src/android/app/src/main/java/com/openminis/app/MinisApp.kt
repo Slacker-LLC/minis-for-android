@@ -435,13 +435,12 @@ class MinisApp : Application(), ImageLoaderFactory {
             return
         }
 
-        // [T-soul-md] Seed SOUL.md with the default content on first launch
-        // so the Soul settings page and chat bubble identity have a real
-        // file to read. Safe no-op on subsequent launches — never
-        // overwrites existing user edits. Cache refresh primes the
-        // synchronous metadata read-path (chat header / system prompt).
-        com.openminis.app.agent.SoulStore.ensureExists(this)
-        com.openminis.app.agent.SoulStore.refreshCache(this)
+        // [T-soul-md] Seed SOUL.md and warm the cached identity after the
+        // application has become renderable. Both operations use minisd and
+        // can encounter root authorization or stale-broker delays; keeping
+        // them in SoulStore's IO scope prevents another Application.onCreate
+        // startup ANR (the same failure mode fixed for SkillRepository/GH#129).
+        com.openminis.app.agent.SoulStore.initializeAsync(this)
 
         // T-config: minis-config CLI surface — registry / audit log /
         // master-switch store. Initialized eagerly here so
