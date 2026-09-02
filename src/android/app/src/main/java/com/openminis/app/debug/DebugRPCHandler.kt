@@ -10,9 +10,11 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import com.openminis.app.BuildConfig
+import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -299,8 +301,28 @@ class DebugRPCHandler(private val context: Context) {
 
     // ── App Info ─────────────────────────────────────────────────────────────
 
-    private fun handleAppInfo(): JSONObject {
+    private suspend fun handleAppInfo(): JSONObject {
         val filesDir = context.filesDir
+        val sessionRoots = listOf(
+            "/var/minis/workspace",
+            "/var/minis/attachments",
+            "/var/minis/offloads",
+            "/var/minis/browser",
+        )
+        val sessionsSize = runCatching {
+            var total = 0L
+            for (session in AppDatabase.getInstance(context).chatDao().listSessions()) {
+                var size = 0L
+                for (root in sessionRoots) {
+                    size += WorkspaceFileClient.treeSize(session.id, root)
+                }
+                total += size
+            }
+            total
+        }.getOrDefault(0L)
+        val memorySize = runCatching { WorkspaceFileClient.treeSize("", "/var/minis/memory") }.getOrDefault(0L)
+        val skillsSize = runCatching { WorkspaceFileClient.treeSize("", "/var/minis/skills") }.getOrDefault(0L)
+        val sharedSize = runCatching { WorkspaceFileClient.treeSize("", "/var/minis/shared") }.getOrDefault(0L)
         return JSONObject().apply {
             put("platform", "android")
             put("sdkVersion", Build.VERSION.SDK_INT)
@@ -315,10 +337,10 @@ class DebugRPCHandler(private val context: Context) {
             put("totalLogSize", AppLogger.totalSize())
             put("diskUsage", JSONObject().apply {
                 put("filesDir", dirSize(filesDir))
-                put("sessions", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)))
-                put("memory", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostMemory)))
-                put("skills", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSkills)))
-                put("shared", dirSize(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostShared)))
+                put("sessions", sessionsSize)
+                put("memory", memorySize)
+                put("skills", skillsSize)
+                put("shared", sharedSize)
             })
         }
     }
@@ -402,12 +424,16 @@ class DebugRPCHandler(private val context: Context) {
 
     // ── File System ─────────────────────────────────────────────────────────
 
-    private fun handleLS(params: JSONObject): Any {
+    private suspend fun handleLS(params: JSONObject): Any {
         val path = params.optString("path", "/")
         if (path.contains("..")) throw RPCException(-32602, "Invalid path: '..' not allowed")
 
         val recursive = params.optBoolean("recursive", false)
         val maxDepth = params.optInt("maxDepth", 3)
+
+        if (isCanonicalGuestPath(path)) {
+            return handleGuestLS(path, params.optString("sessionId"), recursive, maxDepth)
+        }
 
         val hostFile = RuntimePathRegistry.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
@@ -419,6 +445,58 @@ class DebugRPCHandler(private val context: Context) {
         } else {
             listFlat(hostFile)
         }
+    }
+
+    private suspend fun handleGuestLS(
+        path: String,
+        sessionId: String,
+        recursive: Boolean,
+        maxDepth: Int,
+    ): Any {
+        return if (recursive) {
+            listGuestRecursive(sessionId, path, maxDepth.coerceIn(0, 8), 0)
+        } else {
+            listGuestFlat(sessionId, path)
+        }
+    }
+
+    private suspend fun listGuestFlat(sessionId: String, path: String): JSONArray {
+        val array = JSONArray()
+        for (entry in WorkspaceFileClient.listAll(sessionId, path)) {
+            array.put(JSONObject().apply {
+                put("name", entry.optString("name"))
+                put("type", if (entry.optString("type") == "dir") "directory" else entry.optString("type"))
+                put("size", entry.optLong("size", 0L))
+                put("modified", entry.optLong("modified", 0L))
+            })
+        }
+        return array
+    }
+
+    private suspend fun listGuestRecursive(
+        sessionId: String,
+        path: String,
+        maxDepth: Int,
+        depth: Int,
+    ): JSONArray {
+        val array = JSONArray()
+        for (entry in WorkspaceFileClient.listAll(sessionId, path)) {
+            val name = entry.optString("name")
+            val type = entry.optString("type")
+            val childPath = "$path/$name"
+            val item = JSONObject().apply {
+                put("name", name)
+                put("path", childPath)
+                put("type", if (type == "dir") "directory" else type)
+                put("size", entry.optLong("size", 0L))
+                put("modified", entry.optLong("modified", 0L))
+            }
+            if (type == "dir" && depth < maxDepth) {
+                item.put("children", listGuestRecursive(sessionId, childPath, maxDepth, depth + 1))
+            }
+            array.put(item)
+        }
+        return array
     }
 
     /**
@@ -482,10 +560,14 @@ class DebugRPCHandler(private val context: Context) {
         return array
     }
 
-    private fun handleReadFile(params: JSONObject): JSONObject {
+    private suspend fun handleReadFile(params: JSONObject): JSONObject {
         val path = params.optString("path")
         if (path.isEmpty()) throw RPCException(-32602, "Invalid params: 'path' is required")
         if (path.contains("..")) throw RPCException(-32602, "Invalid path: '..' not allowed")
+
+        if (isCanonicalGuestPath(path)) {
+            return handleGuestReadFile(params)
+        }
 
         val hostFile = RuntimePathRegistry.resolveHostPath(path)
             ?: throw RPCException(-32602, "Cannot resolve path: $path")
@@ -526,6 +608,46 @@ class DebugRPCHandler(private val context: Context) {
             }
             put("bytesRead", bytes.size)
             if (offset + bytes.size < fileSize) put("truncated", true)
+        }
+    }
+
+    private suspend fun handleGuestReadFile(params: JSONObject): JSONObject {
+        val path = params.optString("path")
+        val sessionId = params.optString("sessionId")
+        val offset = params.optLong("offset", 0L).coerceAtLeast(0L)
+        val limit = params.optInt("limit", 524_288).coerceIn(0, 16 * 1024 * 1024)
+        val metadata = WorkspaceFileClient.info(sessionId, path)
+        val fileSize = metadata.optLong("size", 0L).coerceAtLeast(0L)
+        val output = ByteArrayOutputStream(limit.coerceAtMost(524_288))
+        var nextOffset = offset
+        var eof = limit == 0
+        while (!eof && output.size() < limit) {
+            val chunk = WorkspaceFileClient.readChunk(sessionId, path, nextOffset)
+            if (chunk.bytes.isEmpty()) {
+                eof = true
+                break
+            }
+            val remaining = limit - output.size()
+            val count = minOf(remaining, chunk.bytes.size)
+            output.write(chunk.bytes, 0, count)
+            nextOffset += count
+            eof = chunk.eof || count < chunk.bytes.size
+        }
+        val bytes = output.toByteArray()
+        val isText = bytes.all {
+            it in 0x09..0x0D || it in 0x20..0x7E || it.toInt() and 0xFF > 0x7F
+        }
+        return JSONObject().apply {
+            put("size", fileSize)
+            if (isText) {
+                put("content", String(bytes, Charsets.UTF_8))
+                put("encoding", "utf8")
+            } else {
+                put("content", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+                put("encoding", "base64")
+            }
+            put("bytesRead", bytes.size)
+            if (!eof || offset + bytes.size < fileSize) put("truncated", true)
         }
     }
 
@@ -1164,7 +1286,7 @@ class DebugRPCHandler(private val context: Context) {
      * No fakefs registration is needed — proot reads the host directly,
      * so the guest sees the file the moment it lands on disk.
      */
-    private fun handleWriteFile(params: JSONObject): JSONObject {
+    private suspend fun handleWriteFile(params: JSONObject): JSONObject {
         val path = params.optString("path").ifEmpty {
             throw RPCException(-32602, "Invalid params: 'path' is required")
         }
@@ -1174,6 +1296,35 @@ class DebugRPCHandler(private val context: Context) {
         val encoding = params.optString("encoding", "utf8").lowercase().ifEmpty { "utf8" }
         val overwrite = params.optBoolean("overwrite", true)
         val modeStr = params.optString("mode", "0644")
+
+        val bytes = when (encoding) {
+            "utf8" -> content.toByteArray(Charsets.UTF_8)
+            "base64" -> try {
+                android.util.Base64.decode(content, android.util.Base64.DEFAULT)
+            } catch (e: IllegalArgumentException) {
+                throw RPCException(-32602, "Invalid base64 content: ${e.message}")
+            }
+            else -> throw RPCException(-32602, "Invalid encoding: '$encoding' (must be utf8 or base64)")
+        }
+        if (bytes.size.toLong() > WorkspaceFileClient.MAX_FILE_BYTES) {
+            throw RPCException(-32602, "File exceeds ${WorkspaceFileClient.MAX_FILE_BYTES} bytes")
+        }
+
+        if (isCanonicalGuestPath(path)) {
+            if (!overwrite) {
+                val existing = runCatching { WorkspaceFileClient.info(params.optString("sessionId"), path) }
+                    .getOrNull()
+                if (existing != null) {
+                    throw RPCException(-32000, "File exists and overwrite=false: $path")
+                }
+            }
+            val size = WorkspaceFileClient.writeBytes(params.optString("sessionId"), path, bytes)
+            return JSONObject().apply {
+                put("ok", true)
+                put("path", path)
+                put("size", size)
+            }
+        }
 
         // Pre-boot fallback: resolveHostPath returns null until proot boots
         // (it lazy-initializes its RootfsManager). Test harnesses commonly
@@ -1186,16 +1337,6 @@ class DebugRPCHandler(private val context: Context) {
 
         if (hostFile.exists() && !overwrite) {
             throw RPCException(-32000, "File exists and overwrite=false: $path")
-        }
-
-        val bytes = when (encoding) {
-            "utf8" -> content.toByteArray(Charsets.UTF_8)
-            "base64" -> try {
-                android.util.Base64.decode(content, android.util.Base64.DEFAULT)
-            } catch (e: IllegalArgumentException) {
-                throw RPCException(-32602, "Invalid base64 content: ${e.message}")
-            }
-            else -> throw RPCException(-32602, "Invalid encoding: '$encoding' (must be utf8 or base64)")
         }
 
         hostFile.parentFile?.mkdirs()
@@ -1219,6 +1360,19 @@ class DebugRPCHandler(private val context: Context) {
             put("hostPath", hostFile.absolutePath)
             put("size", bytes.size)
         }
+    }
+
+    private fun isCanonicalGuestPath(path: String): Boolean {
+        val roots = listOf(
+            "/var/minis",
+            "/workspace",
+            "/memory",
+            "/skills",
+            "/shared",
+            "/home/minis",
+        )
+        return roots.any { path == it || path.startsWith("$it/") } &&
+            !path.startsWith("/var/minis/mounts")
     }
 
     private suspend fun handleScreenshotCapture(params: JSONObject): JSONObject {

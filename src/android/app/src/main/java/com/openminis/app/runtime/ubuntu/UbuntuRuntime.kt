@@ -707,17 +707,6 @@ object UbuntuRuntime {
         lineCallback: ((String) -> Unit)? = null,
     ): ShellResult {
         val start = System.currentTimeMillis()
-        if (sessionId != null) {
-            val ctx = appContext
-            if (ctx == null || UbuntuPaths.ensureSessionDirs(sessionId) == null) {
-                throw RuntimeInfrastructureException(
-                    MinisdError(
-                        MinisdProtocol.ERROR_RUNTIME_LAYOUT_MISMATCH,
-                        "invalid or unavailable session workspace: $sessionId",
-                    ),
-                )
-            }
-        }
         val scopedEnv = if (sessionId == null) {
             env
         } else {

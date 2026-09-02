@@ -113,6 +113,7 @@ fn kill_process_tree(pid: i32) {
     }
 }
 
+#[cfg(unix)]
 pub fn execute_ubuntu_snapshot(
     snapshot: UbuntuExecSnapshot,
     params: Value,

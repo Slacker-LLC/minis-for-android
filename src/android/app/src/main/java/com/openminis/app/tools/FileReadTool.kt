@@ -3,9 +3,8 @@ package com.openminis.app.tools
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import org.json.JSONObject
-import java.io.File
 
 object FileReadTool {
     const val NAME = "file_read"
@@ -26,7 +25,7 @@ object FileReadTool {
         timeoutMs = 60_000L,
     )
 
-    fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
+    suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
             val path = args.optString("path", "")
@@ -51,35 +50,19 @@ object FileReadTool {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
-            // T123: per-session resolver — see FileWriteTool for rationale.
-            val file = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveSessionHostPath(sessionId, path, context)
-                ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
-
-            if (!file.exists()) {
-                return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
-            }
-
-            if (file.isDirectory) {
-                return ToolExecutionResult("Error: Path is a directory: $path", false, toolTitle = toolTitle)
-            }
-
-            val size = file.length()
-
-            // Refuse to read very large files: readLines() loads the whole file
-            // into memory.
-            if (size > 50L * 1024 * 1024) {
-                return ToolExecutionResult(
-                    "Error: File too large to read ($size bytes): $path",
-                    false, toolTitle = toolTitle,
+            val fileBytes = if (ExternalMountAccess.isPath(path)) {
+                ExternalMountAccess.read(path, 50L * 1024 * 1024)
+            } else {
+                WorkspaceFileClient.readAll(
+                    sessionId = sessionId,
+                    path = path,
+                    maxBytes = 50L * 1024 * 1024,
                 )
             }
+            val size = fileBytes.size.toLong()
 
-            // Binary detection: check first 8192 bytes for null bytes
-            val isBinary = file.inputStream().use { input ->
-                val buf = ByteArray(minOf(8192L, size).toInt())
-                val read = input.read(buf)
-                if (read > 0) buf.take(read).any { it == 0.toByte() } else false
-            }
+            // Binary detection: check first 8192 bytes for null bytes.
+            val isBinary = fileBytes.take(8192).any { it == 0.toByte() }
 
             if (isBinary) {
                 return ToolExecutionResult(
@@ -88,7 +71,7 @@ object FileReadTool {
                 )
             }
 
-            val allLines = file.readLines()
+            val allLines = fileBytes.toString(Charsets.UTF_8).lines()
             val totalLines = allLines.size
 
             val requestedLines = if (args.has("lines")) args.optInt("lines").coerceAtLeast(0) else null
