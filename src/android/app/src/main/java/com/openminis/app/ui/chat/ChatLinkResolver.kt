@@ -6,6 +6,7 @@ import androidx.core.net.toUri
 import com.openminis.app.deeplink.DeepLinkAction
 import com.openminis.app.deeplink.DeepLinkHandler
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.sandbox.FileItem
 import java.io.File
 
@@ -27,7 +28,7 @@ sealed class ChatLinkAction {
 
 object ChatLinkResolver {
 
-    fun resolve(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction {
+    suspend fun resolve(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction {
         val trimmed = rawUrl.trim()
         if (trimmed.isEmpty()) return ChatLinkAction.Web(rawUrl)
 
@@ -43,7 +44,16 @@ object ChatLinkResolver {
             }
         }
 
-        // 2. Sandbox file resolution — prefer a session-scoped resolver when
+        // 2. Sandbox file resolution — canonical guest files are staged through
+        // minisd; only SAF mounts and app-local file:// paths use host files.
+        val guestPath = resolveGuestPath(trimmed, scheme)
+        if (guestPath != null && context != null) {
+            stageGuestFile(context, guestPath, sessionId)?.let { staged ->
+                FileItem.from(staged)?.let { return ChatLinkAction.SandboxFile(it) }
+            }
+        }
+
+        // Prefer a session-scoped resolver when we know which chat this link
         //    the caller knows which chat this link belongs to. The global
         //    `RuntimePathRegistry.bindMounts` is last-writer-wins, so on a device
         //    with multiple sessions the resolver otherwise points at
@@ -83,7 +93,9 @@ object ChatLinkResolver {
         context: Context?,
     ): File? {
         fun lookup(linuxPath: String): File? =
-            if (sessionId != null && context != null) {
+            if (isCanonicalGuestPath(linuxPath)) {
+                null
+            } else if (sessionId != null && context != null) {
                 RuntimePathRegistry.resolveSessionHostPath(sessionId, linuxPath, context)
             } else {
                 RuntimePathRegistry.resolveHostPath(linuxPath)
@@ -107,6 +119,45 @@ object ChatLinkResolver {
             }
             else -> null
         }
+    }
+
+    private fun resolveGuestPath(raw: String, scheme: String?): String? {
+        val path = when (scheme) {
+            "minis" -> {
+                val stripped = raw.removePrefix("minis://").substringBefore('?')
+                val decoded = runCatching { java.net.URLDecoder.decode(stripped, "UTF-8") }
+                    .getOrDefault(stripped)
+                if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
+            }
+            null -> raw.takeIf { it.startsWith('/') }
+            else -> null
+        } ?: return null
+        return path.takeIf(::isCanonicalGuestPath)
+    }
+
+    private suspend fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
+        val fileName = path.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest("${sessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+        val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
+        return runCatching {
+            WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)
+            cacheFile.takeIf { it.isFile }
+        }.getOrNull()
+    }
+
+    private fun isCanonicalGuestPath(path: String): Boolean {
+        val roots = listOf(
+            "/var/minis",
+            "/workspace",
+            "/memory",
+            "/skills",
+            "/shared",
+            "/home/minis",
+        )
+        return roots.any { path == it || path.startsWith("$it/") } &&
+            path != "/var/minis/mounts" && !path.startsWith("/var/minis/mounts/")
     }
 
     /** Fire a system intent so MainActivity's BROWSABLE filter picks the deep link up. */

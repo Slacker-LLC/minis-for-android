@@ -104,6 +104,7 @@ import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -1899,7 +1900,11 @@ private fun RenderBlock(block: MdBlock) {
             // Resolve to a host File via the session-scoped resolver before
             // handing off to Coil. The generic minis:// fetcher has no chat
             // identity, so a known-session miss must never fall through to it.
-            val file = remember(block.url, sessionId) { resolveMdMediaFile(context, block.url, sessionId) }
+            val file by produceState<File?>(initialValue = null, block.url, sessionId) {
+                value = withContext(Dispatchers.IO) {
+                    resolveMdMediaFile(context, block.url, sessionId)
+                }
+            }
             val imageData = remember(file, block.url, sessionId) {
                 if (file != null) {
                     file
@@ -2257,12 +2262,13 @@ private fun BrokenImagePlaceholder(alt: String?) {
 
 /**
  * Resolve a markdown media URL (`minis://attachments/foo.mp4`, file://, or
- * plain absolute path) to a host File.
+ * plain absolute path) to a local File. Canonical guest files are staged from
+ * minisd; SAF mounts and rootfs files retain their Android-side File mapping.
  *
  * A caller with a session id resolves only within that session. Sessionless
- * legacy callers retain the old compatibility search across draft folders.
+ * callers can resolve global guest roots but never search another session.
  */
-internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String? = null): File? {
+internal suspend fun resolveMdMediaFile(context: Context, url: String, sessionId: String? = null): File? {
     if (url.isBlank()) return null
     // Strip a real query (`?`), but NOT `#` — attachment filenames legitimately
     // contain '#' (hashtags). `minis://` URLs don't carry fragments anyway,
@@ -2272,16 +2278,25 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
     val primary: File? = when {
         stripped.startsWith("minis://") -> {
             val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-            val linuxPath = "/var/minis/$decoded"
+            val linuxPath = if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             // Prefer the session-scoped resolver when the caller supplied a
             // sessionId: the global `bindMounts` map is overwritten every time
             // another session boots its shell, so without sessionId we'd route
             // this chat's attachment lookup to whichever session happened to
             // boot last.
-            if (sessionId != null) RuntimePathRegistry.resolveSessionHostPath(sessionId, linuxPath, context)
-            else RuntimePathRegistry.resolveHostPath(linuxPath)
+            if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
+                RuntimePathRegistry.resolveHostPath(linuxPath)
+            } else {
+                stageGuestMedia(context, linuxPath, sessionId)
+            }
         }
         stripped.startsWith("file://") -> File(Uri.parse(stripped).path ?: return null)
+        stripped == "/var/minis/mounts" || stripped.startsWith("/var/minis/mounts/") ->
+            RuntimePathRegistry.resolveHostPath(stripped)
+        stripped.startsWith("/var/minis") || stripped.startsWith("/workspace") ||
+            stripped.startsWith("/memory") || stripped.startsWith("/skills") ||
+            stripped.startsWith("/shared") || stripped.startsWith("/home/minis") ->
+            stageGuestMedia(context, stripped, sessionId)
         stripped.startsWith("/") -> File(stripped)
         else -> null
     }
@@ -2290,40 +2305,20 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
         return primary
     }
 
-    // With an owning session, a miss must stay a miss. Searching every chat
-    // would make a known filename from another session readable and would
-    // make historical links resolve nondeterministically.
-    if (sessionId != null) return null
-
-    // Fallback: search every minis-sessions/<id>/{attachments,workspace,offloads,browser}
-    // subtree for a file whose basename matches. Handles leftover files from a
-    // draft session whose bind mount has already switched over, and the case
-    // where `resolveHostPath`'s global bindMounts map points at a different
-    // session than the one owning this message.
-    if (!stripped.startsWith("minis://")) {
-        android.util.Log.d("MdStream", "resolveMdMediaFile primary miss url=$url (non-minis scheme, no fallback)")
-        return null
-    }
-    val decoded = java.net.URLDecoder.decode(stripped.removePrefix("minis://"), "UTF-8")
-    val basename = decoded.substringAfterLast('/')
-    val subdir = decoded.substringBefore('/', missingDelimiterValue = "").takeIf { it.isNotEmpty() } ?: "attachments"
-    val root = File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions)
-    if (root.isDirectory) {
-        root.listFiles()?.forEach { sessionDir ->
-            val candidate = File(sessionDir, "$subdir/$basename")
-            if (candidate.exists() && candidate.isFile) {
-                android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> fallback=${candidate.absolutePath}")
-                return candidate
-            }
-        }
-    }
-    val globalCandidate = File(File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_MINIS, subdir), basename)
-    if (globalCandidate.exists() && globalCandidate.isFile) {
-        android.util.Log.d("MdStream", "resolveMdMediaFile url=$url -> global=${globalCandidate.absolutePath}")
-        return globalCandidate
-    }
     android.util.Log.w("MdStream", "resolveMdMediaFile url=$url -> NOT FOUND (primary=${primary?.absolutePath})")
     return null
+}
+
+private suspend fun stageGuestMedia(context: Context, linuxPath: String, sessionId: String?): File? {
+    val fileName = linuxPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest("${sessionId.orEmpty()}:$linuxPath".toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(java.util.Locale.US, it) }
+    val cacheFile = File(File(context.cacheDir, "markdown-media"), "$digest-$fileName")
+    return runCatching {
+        WorkspaceFileClient.readToFile(sessionId.orEmpty(), linuxPath, cacheFile)
+        cacheFile.takeIf { it.isFile }
+    }.getOrNull()
 }
 
 private fun filenameFromMdUrl(url: String): String {
@@ -2366,12 +2361,17 @@ private fun RenderMdVideo(block: MdBlock.Video) {
     val context = LocalContext.current
     val colors = currentMdColors()
     val sessionId = LocalMarkdownSessionId.current
-    val file = remember(block.url, sessionId) { resolveMdMediaFile(context, block.url, sessionId) }
+    val file by produceState<File?>(initialValue = null, block.url, sessionId) {
+        value = withContext(Dispatchers.IO) {
+            resolveMdMediaFile(context, block.url, sessionId)
+        }
+    }
+    val resolvedFile = file
     val filename = remember(block.url) { filenameFromMdUrl(block.url) }
     var showPlayer by remember { mutableStateOf(false) }
 
-    val thumbnail by produceState<Bitmap?>(initialValue = null, key1 = file?.absolutePath) {
-        val f = file ?: run { value = null; return@produceState }
+    val thumbnail by produceState<Bitmap?>(initialValue = null, key1 = resolvedFile?.absolutePath) {
+        val f = resolvedFile ?: run { value = null; return@produceState }
         value = withContext(Dispatchers.IO) {
             val retriever = MediaMetadataRetriever()
             try {
@@ -2388,9 +2388,9 @@ private fun RenderMdVideo(block: MdBlock.Video) {
         }
     }
 
-    if (showPlayer && file != null) {
+    if (showPlayer && resolvedFile != null) {
         com.openminis.app.ui.media.MinisFullscreenVideoPlayer(
-            file = file,
+            file = resolvedFile,
             onDismiss = { showPlayer = false },
         )
     }
@@ -2402,8 +2402,8 @@ private fun RenderMdVideo(block: MdBlock.Video) {
             .clip(RoundedCornerShape(8.dp))
             .background(colors.inlineCodeBg)
             .border(0.5.dp, colors.tableBorder, RoundedCornerShape(8.dp))
-            .clickable(enabled = file != null) {
-                android.util.Log.d("MdStream", "open fullscreen video for ${file?.absolutePath}")
+            .clickable(enabled = resolvedFile != null) {
+                android.util.Log.d("MdStream", "open fullscreen video for ${resolvedFile?.absolutePath}")
                 showPlayer = true
             },
     ) {
@@ -2457,12 +2457,17 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
     val context = LocalContext.current
     val colors = currentMdColors()
     val sessionId = LocalMarkdownSessionId.current
-    val file = remember(block.url, sessionId) { resolveMdMediaFile(context, block.url, sessionId) }
+    val file by produceState<File?>(initialValue = null, block.url, sessionId) {
+        value = withContext(Dispatchers.IO) {
+            resolveMdMediaFile(context, block.url, sessionId)
+        }
+    }
+    val resolvedFile = file
     val filename = remember(block.url) { filenameFromMdUrl(block.url) }
 
-    val player = remember(file?.absolutePath) {
-        if (file == null) null else try {
-            MediaPlayer().apply { setDataSource(file.absolutePath); prepare() }
+    val player = remember(resolvedFile?.absolutePath) {
+        if (resolvedFile == null) null else try {
+            MediaPlayer().apply { setDataSource(resolvedFile.absolutePath); prepare() }
         } catch (t: Throwable) {
             android.util.Log.w("MdStream", "audio prepare failed: ${t.message}")
             null
@@ -2499,9 +2504,9 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
             .clip(RoundedCornerShape(10.dp))
             .background(colors.inlineCodeBg)
             .border(0.5.dp, colors.tableBorder, RoundedCornerShape(10.dp))
-            .clickable(enabled = file != null) {
+            .clickable(enabled = resolvedFile != null) {
                 if (player == null) {
-                    file?.let { openMdMediaExternally(context, it, "audio/*") }
+                    resolvedFile?.let { openMdMediaExternally(context, it, "audio/*") }
                 } else {
                     if (isPlaying) { try { player.pause() } catch (_: Throwable) {} ; isPlaying = false }
                     else { try { player.start(); isPlaying = true } catch (_: Throwable) {} }

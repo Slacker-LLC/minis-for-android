@@ -4,28 +4,29 @@ import android.content.Context
 import com.openminis.app.data.db.WebAppShortcutEntity
 import com.openminis.app.data.repository.WebAppShortcutRepository
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import java.io.File
 
 /**
  * T-pwa-1 (renamed Pwa → WebApp): resolve the stored
  * ([WebAppShortcutEntity.pathScope], [WebAppShortcutEntity.scopeContext],
- * [WebAppShortcutEntity.htmlPath]) triple back to a host File. Returns
+ * [WebAppShortcutEntity.htmlPath]) triple back to a local File. Canonical
+ * guest files are staged through minisd; returns
  * null if the file no longer exists — caller should surface a "source
  * missing" UI instead of crashing.
  *
- *   - session_attachment → `<filesDir>/sessions/<sessionId>/attachments/<htmlPath>`
- *     (htmlPath relative to the session's attachments dir; absolute paths
- *      under /var/minis/<sub>/ are also accepted via resolveSessionHostPath)
- *   - shared             → resolved via [RuntimePathRegistry.resolveHostPath]
+ *   - session_attachment → `/var/minis/attachments/<htmlPath>` through minisd
+ *     (with a legacy app-private fallback for already-persisted shortcuts)
+ *   - shared             → staged through minisd
  *   - mount              → resolved via [RuntimePathRegistry.resolveHostPath]
  *                          (longest-prefix match against bindMounts)
  */
 object WebAppPathResolver {
 
-    fun resolve(context: Context, shortcut: WebAppShortcutEntity): File? {
+    suspend fun resolve(context: Context, shortcut: WebAppShortcutEntity): File? {
         val file = when (shortcut.pathScope) {
             WebAppShortcutRepository.SCOPE_SESSION_ATTACHMENT -> resolveSession(context, shortcut)
-            WebAppShortcutRepository.SCOPE_SHARED -> RuntimePathRegistry.resolveHostPath(shortcut.htmlPath)
+            WebAppShortcutRepository.SCOPE_SHARED -> stageGuestFile(context, shortcut.htmlPath, null, shortcut.id)
             WebAppShortcutRepository.SCOPE_MOUNT -> RuntimePathRegistry.resolveHostPath(shortcut.htmlPath)
             else -> null
         }
@@ -70,15 +71,47 @@ object WebAppPathResolver {
         return null
     }
 
-    private fun resolveSession(context: Context, shortcut: WebAppShortcutEntity): File? {
+    private suspend fun resolveSession(context: Context, shortcut: WebAppShortcutEntity): File? {
         val sessionId = shortcut.scopeContext ?: return null
-        // Absolute /var/minis/<perSession>/... — go through RuntimePathRegistry which
-        // knows how to map per-session subdirs to <filesDir>/minis-sessions/<id>/<sub>.
+        // Absolute guest paths are owned by the broker, not the Android host.
         if (shortcut.htmlPath.startsWith("/var/minis/")) {
-            return RuntimePathRegistry.resolveSessionHostPath(sessionId, shortcut.htmlPath, context)
+            return stageGuestFile(context, shortcut.htmlPath, sessionId, shortcut.id)
         }
-        // Relative path — under the session's attachments dir.
+        // New relative shortcuts are stored under the canonical attachment
+        // root. Keep the old app-private path only for persisted shortcuts
+        // created before the canonical migration.
+        val guestPath = "/var/minis/attachments/${shortcut.htmlPath}"
+        stageGuestFile(context, guestPath, sessionId, shortcut.id)?.let { return it }
         val attachmentsDir = File(context.filesDir, "sessions/$sessionId/attachments")
         return File(attachmentsDir, shortcut.htmlPath)
+    }
+
+    private suspend fun stageGuestFile(
+        context: Context,
+        guestPath: String,
+        sessionId: String?,
+        shortcutId: String,
+    ): File? {
+        if (!isCanonicalGuestPath(guestPath)) return null
+        val name = guestPath.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val id = shortcutId.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val staged = File(File(context.cacheDir, "webapp"), "$id-$name")
+        return runCatching {
+            WorkspaceFileClient.readToFile(sessionId.orEmpty(), guestPath, staged)
+            staged.takeIf { it.isFile }
+        }.getOrNull()
+    }
+
+    private fun isCanonicalGuestPath(path: String): Boolean {
+        val roots = listOf(
+            "/var/minis",
+            "/workspace",
+            "/memory",
+            "/skills",
+            "/shared",
+            "/home/minis",
+        )
+        return roots.any { path == it || path.startsWith("$it/") } &&
+            path != "/var/minis/mounts" && !path.startsWith("/var/minis/mounts/")
     }
 }
