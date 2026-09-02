@@ -48,6 +48,41 @@ pub const UBUNTU_PID_FILE: &str = "/data/adb/minis/run/ubuntu.pid";
 pub const UBUNTU_ROOTFS_FILE: &str = "/data/adb/minis/run/ubuntu.rootfs";
 pub const UBUNTU_PROXY_PID_FILE: &str = "/data/adb/minis/run/ubuntu-proxy.pid";
 
+const ROOTFS_REQUIRED_LAYOUT: &[&str] = &[
+    "etc/os-release",
+    "etc/passwd",
+    "etc/group",
+    ROOTFS_MARKER,
+    "workspace",
+    "memory",
+    "skills",
+    "shared",
+    "proc",
+    "sys",
+    "dev",
+    "tmp",
+    "run",
+    "var/minis",
+];
+
+const ROOTFS_REQUIRED_REAL_DIRECTORIES: &[&str] = &[
+    "etc",
+    "etc/minis",
+    "workspace",
+    "memory",
+    "skills",
+    "shared",
+    "proc",
+    "sys",
+    "dev",
+    "tmp",
+    "run",
+    "var",
+    "var/minis",
+];
+
+const ROOTFS_REQUIRED_REGULAR_FILES: &[&str] = &["etc/passwd", "etc/group", ROOTFS_MARKER];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PersistentLayout {
     root: PathBuf,
@@ -409,10 +444,106 @@ pub fn ensure_rootfs_layout(rootfs: &str) -> Result<(), String> {
 
 pub fn rootfs_looks_valid(rootfs: &str) -> bool {
     let root = Path::new(rootfs);
-    root.join("etc/os-release").is_file()
-        && (root.join("bin/bash").exists()
-            || root.join("usr/bin/bash").exists()
-            || root.join("bin/sh").exists())
+    let Ok(root_metadata) = std::fs::symlink_metadata(root) else {
+        return false;
+    };
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return false;
+    }
+
+    // This predicate is used by status/recovery paths before the full broker
+    // probe runs. Keep it fail-closed and aligned with the authoritative
+    // runtime maintenance probe instead of accepting any directory that only
+    // happens to contain os-release and a shell.
+    if ROOTFS_REQUIRED_LAYOUT
+        .iter()
+        .any(|relative| std::fs::symlink_metadata(root.join(relative)).is_err())
+    {
+        return false;
+    }
+    if ROOTFS_REQUIRED_REAL_DIRECTORIES.iter().any(|relative| {
+        std::fs::symlink_metadata(root.join(relative))
+            .map(|metadata| metadata.file_type().is_symlink() || !metadata.is_dir())
+            .unwrap_or(true)
+    }) {
+        return false;
+    }
+    if ROOTFS_REQUIRED_REGULAR_FILES.iter().any(|relative| {
+        std::fs::symlink_metadata(root.join(relative))
+            .map(|metadata| metadata.file_type().is_symlink() || !metadata.is_file())
+            .unwrap_or(true)
+    }) {
+        return false;
+    }
+
+    let shell_is_executable = |relative: &str| {
+        let Ok(metadata) = std::fs::metadata(root.join(relative)) else {
+            return false;
+        };
+        if !metadata.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
+    };
+    if !["bin/bash", "usr/bin/bash", "bin/sh"]
+        .iter()
+        .any(|relative| shell_is_executable(relative))
+    {
+        return false;
+    }
+
+    let Ok(os_release) = std::fs::read_to_string(root.join("etc/os-release")) else {
+        return false;
+    };
+    if !os_release
+        .lines()
+        .any(|line| line == "ID=ubuntu" || line == "ID=\"ubuntu\"")
+        || !os_release.lines().any(|line| {
+            line.strip_prefix("VERSION_ID=")
+                .map(|value| value.trim_matches('"').starts_with("24.04"))
+                .unwrap_or(false)
+        })
+    {
+        return false;
+    }
+
+    let Some(metadata) = std::fs::read_to_string(root.join(ROOTFS_MARKER))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .and_then(|value| value.as_object().cloned())
+    else {
+        return false;
+    };
+    let sha256 = |value: Option<&serde_json::Value>| {
+        value
+            .and_then(serde_json::Value::as_str)
+            .map(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .unwrap_or(false)
+    };
+    metadata.get("distro").and_then(serde_json::Value::as_str) == Some("ubuntu")
+        && metadata
+            .get("version")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| value.starts_with("24.04"))
+        && metadata
+            .get("release")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| value.starts_with("24.04"))
+        && metadata.get("arch").and_then(serde_json::Value::as_str) == Some("arm64")
+        && metadata.get("profile").and_then(serde_json::Value::as_str) == Some("base")
+        && metadata
+            .get("revision")
+            .and_then(serde_json::Value::as_u64)
+            .is_some_and(|revision| revision > 0)
+        && sha256(metadata.get("upstream_sha256"))
 }
 
 pub fn read_os_release(rootfs: &str) -> Option<String> {
@@ -580,6 +711,77 @@ mod tests {
     #[test]
     fn invalid_rootfs_rejected() {
         assert!(!rootfs_looks_valid("/no/such/rootfs"));
+    }
+
+    #[cfg(unix)]
+    fn valid_test_rootfs(name: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let layout = temp_layout(name);
+        let root = layout.rootfs();
+        for relative in ROOTFS_REQUIRED_REAL_DIRECTORIES {
+            std::fs::create_dir_all(root.join(relative)).unwrap();
+        }
+        std::fs::create_dir_all(root.join("bin")).unwrap();
+        std::fs::write(
+            root.join("etc/os-release"),
+            "ID=ubuntu\nVERSION_ID=\"24.04\"\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("etc/passwd"), "root:x:0:0:root:/root:/bin/bash\n").unwrap();
+        std::fs::write(root.join("etc/group"), "root:x:0:\n").unwrap();
+        std::fs::write(
+            root.join(ROOTFS_MARKER),
+            serde_json::json!({
+                "distro": "ubuntu",
+                "version": "24.04.3",
+                "release": "24.04.3",
+                "arch": "arm64",
+                "profile": "base",
+                "revision": 1,
+                "upstream_sha256": "a".repeat(64)
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(root.join("bin/sh"), "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(root.join("bin/sh"), std::fs::Permissions::from_mode(0o755))
+            .unwrap();
+        root
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn metadata_and_layout_are_required_for_rootfs_validity() {
+        let root = valid_test_rootfs("rootfs-valid");
+        assert!(rootfs_looks_valid(root.to_str().unwrap()));
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn partial_or_incompatible_rootfs_is_rejected_before_start() {
+        let root = valid_test_rootfs("rootfs-invalid");
+        std::fs::remove_file(root.join("etc/group")).unwrap();
+        assert!(!rootfs_looks_valid(root.to_str().unwrap()));
+
+        std::fs::write(root.join("etc/group"), "root:x:0:\n").unwrap();
+        std::fs::write(
+            root.join(ROOTFS_MARKER),
+            serde_json::json!({
+                "distro": "ubuntu",
+                "version": "24.04.3",
+                "release": "24.04.3",
+                "arch": "x86_64",
+                "profile": "base",
+                "revision": 1,
+                "upstream_sha256": "a".repeat(64)
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(!rootfs_looks_valid(root.to_str().unwrap()));
+        let _ = std::fs::remove_dir_all(root.parent().unwrap());
     }
 
     #[test]

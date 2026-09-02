@@ -500,7 +500,7 @@ fn start_live(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode,
     validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
     if !rootfs_looks_valid(HOST_ROOTFS) {
         return Err((
-            ErrorCode::RuntimeUnavailable,
+            ErrorCode::RootfsInvalid,
             format!("rootfs not installed at {HOST_ROOTFS}"),
         ));
     }
@@ -592,7 +592,7 @@ pub fn replace_keeper_with_external_mounts(
     validate_persistent_backing().map_err(|e| (ErrorCode::RuntimeUnavailable, e))?;
     if !rootfs_looks_valid(HOST_ROOTFS) {
         return Err((
-            ErrorCode::RuntimeUnavailable,
+            ErrorCode::RootfsInvalid,
             format!("rootfs not installed at {HOST_ROOTFS}"),
         ));
     }

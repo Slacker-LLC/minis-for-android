@@ -52,7 +52,7 @@ fn parse_args() -> Result<Args, String> {
                 );
                 eprintln!("minisd --helper keep --rootfs PATH");
                 eprintln!(
-                    "minisd --helper exec --pid N --rootfs PATH [--session-root PATH] --uid N --gid N --cwd PATH -- ARGV"
+                    "minisd --helper exec --pid N --rootfs PATH [--session-root PATH] --uid N --gid N --cwd PATH [--retain-root-capabilities] -- ARGV"
                 );
                 std::process::exit(0);
             }
@@ -694,6 +694,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
     let mut proxy = String::new();
     let mut app_uid = minisd::layout::GUEST_UID;
     let mut external_mounts_json = String::new();
+    let mut retain_root_capabilities = false;
     let mut extra_env: std::collections::BTreeMap<String, String> =
         std::collections::BTreeMap::new();
     let mut guest_argv: Vec<String> = Vec::new();
@@ -810,6 +811,10 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
                 proxy = args.get(i + 1).cloned().unwrap_or_default();
                 i += 2;
             }
+            "--retain-root-capabilities" => {
+                retain_root_capabilities = true;
+                i += 1;
+            }
             "--env" => {
                 let kv = args.get(i + 1).ok_or((8u8, "--env needs KEY=VAL".into()))?;
                 let (k, v) = kv
@@ -824,6 +829,12 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
             }
             other => return Err((8, format!("unknown helper arg: {other}"))),
         }
+    }
+    if retain_root_capabilities && (kind != "exec" || uid != 0) {
+        return Err((
+            8,
+            "--retain-root-capabilities requires exec with uid=0".into(),
+        ));
     }
     match kind {
         "keep" => helper_keep(
@@ -844,6 +855,7 @@ fn helper_unix(args: &[String]) -> Result<(), (u8, String)> {
             &cwd,
             &tz,
             &proxy,
+            retain_root_capabilities,
             &extra_env,
             &guest_argv,
         ),
@@ -900,6 +912,7 @@ fn helper_exec(
     cwd: &str,
     tz: &str,
     proxy: &str,
+    retain_root_capabilities: bool,
     extra_env: &std::collections::BTreeMap<String, String>,
     argv: &[String],
 ) -> Result<(), (u8, String)> {
@@ -927,7 +940,9 @@ fn helper_exec(
         let _ = std::env::set_current_dir("/");
     }
     if uid == 0 {
-        ns::lockdown_no_privs().map_err(|e| (6u8, e))?;
+        if !retain_root_capabilities {
+            ns::lockdown_no_privs().map_err(|e| (6u8, e))?;
+        }
     } else {
         ns::drop_privs(uid, gid).map_err(|e| (6u8, e))?;
     }
@@ -1004,5 +1019,18 @@ mod ipc_tests {
                 .await
                 .is_err());
         });
+    }
+
+    #[test]
+    fn retain_root_capabilities_requires_root_exec() {
+        let args = vec![
+            "exec".to_string(),
+            "--retain-root-capabilities".to_string(),
+            "--".to_string(),
+            "/bin/true".to_string(),
+        ];
+        let error = helper_unix(&args).unwrap_err();
+        assert_eq!(error.0, 8);
+        assert!(error.1.contains("requires exec with uid=0"));
     }
 }

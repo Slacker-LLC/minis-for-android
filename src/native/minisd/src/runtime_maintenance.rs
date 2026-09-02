@@ -1443,11 +1443,15 @@ fn validate_archive_entries() -> Result<(), (ErrorCode, String)> {
         .lines()
         .filter(|line| !line.trim().is_empty())
         .collect::<Vec<_>>();
+    // Toybox includes a link target in `tar -tzf` output (for example,
+    // `./bin -> usr/bin`), while GNU tar commonly emits only the entry name.
+    // Keep the raw listing until the verbose line tells us whether the entry
+    // is a link; otherwise a valid Ubuntu symlink would be treated as a path
+    // whose final component contains ` -> ...`.
     let names = names
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(normalize_archive_path)
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Vec<_>>();
     if verbose_lines.len() != names.len() {
         return Err((
             ErrorCode::RootfsInvalid,
@@ -1457,8 +1461,21 @@ fn validate_archive_entries() -> Result<(), (ErrorCode, String)> {
 
     let mut entries = Vec::with_capacity(names.len());
     let mut seen = std::collections::HashSet::new();
-    for (line, name) in verbose_lines.into_iter().zip(names) {
-        let Some(name) = name else {
+    for (line, raw_name) in verbose_lines.into_iter().zip(names) {
+        let kind = line.as_bytes().first().copied().ok_or((
+            ErrorCode::RootfsInvalid,
+            "staged rootfs archive has an empty verbose entry".into(),
+        ))?;
+        // Toybox prints hardlinks with a regular-file mode and a "link to"
+        // suffix (or "->" on older Android), unlike GNU tar's leading `h`.
+        let hardlink_separator = match kind {
+            b'h' => Some(" link to "),
+            b'-' if line.contains(" link to ") => Some(" link to "),
+            b'-' if line.contains(" -> ") => Some(" -> "),
+            _ => None,
+        };
+        let hardlink = hardlink_separator.is_some();
+        let Some(name) = normalize_archive_listing_name(raw_name, kind == b'l' || hardlink)? else {
             if line.as_bytes().first() != Some(&b'd') {
                 return Err((
                     ErrorCode::RootfsInvalid,
@@ -1473,19 +1490,6 @@ fn validate_archive_entries() -> Result<(), (ErrorCode, String)> {
                 format!("staged rootfs archive contains duplicate entry: {name}"),
             ));
         }
-        let kind = line.as_bytes().first().copied().ok_or((
-            ErrorCode::RootfsInvalid,
-            format!("staged rootfs archive has an empty verbose entry: {name}"),
-        ))?;
-        // Toybox prints hardlinks with a regular-file mode and a "link to"
-        // suffix (or "->" on older Android), unlike GNU tar's leading `h`.
-        let hardlink_separator = match kind {
-            b'h' => Some(" link to "),
-            b'-' if line.contains(" link to ") => Some(" link to "),
-            b'-' if line.contains(" -> ") => Some(" -> "),
-            _ => None,
-        };
-        let hardlink = hardlink_separator.is_some();
         if kind != b'd' && kind != b'-' && kind != b'l' && !hardlink {
             return Err((
                 ErrorCode::RootfsInvalid,
@@ -1659,6 +1663,37 @@ fn normalize_archive_path(raw: &str) -> Result<Option<String>, (ErrorCode, Strin
         parts.push(part);
     }
     Ok(Some(parts.join("/")))
+}
+
+#[cfg(unix)]
+fn normalize_archive_listing_name(
+    raw: &str,
+    is_link: bool,
+) -> Result<Option<String>, (ErrorCode, String)> {
+    let path = if is_link {
+        if let Some((path, target)) = raw.rsplit_once(" -> ") {
+            if target.trim().is_empty() {
+                return Err((
+                    ErrorCode::RootfsInvalid,
+                    format!("staged rootfs archive link target is missing: {raw}"),
+                ));
+            }
+            path
+        } else if let Some((path, target)) = raw.rsplit_once(" link to ") {
+            if target.trim().is_empty() {
+                return Err((
+                    ErrorCode::RootfsInvalid,
+                    format!("staged rootfs archive link target is missing: {raw}"),
+                ));
+            }
+            path
+        } else {
+            raw
+        }
+    } else {
+        raw
+    };
+    normalize_archive_path(path)
 }
 
 #[cfg(unix)]
@@ -2213,6 +2248,15 @@ mod tests {
         assert_eq!(
             normalize_archive_path("./etc/minis/").unwrap(),
             Some("etc/minis".into())
+        );
+        assert_eq!(
+            normalize_archive_listing_name("./etc/alternatives/awk -> /usr/bin/mawk", true)
+                .unwrap(),
+            Some("etc/alternatives/awk".into())
+        );
+        assert_eq!(
+            normalize_archive_listing_name("./etc/passwd", false).unwrap(),
+            Some("etc/passwd".into())
         );
         assert!(normalize_archive_path("/data/adb/minis").is_err());
         assert!(normalize_archive_path("etc/../outside").is_err());
