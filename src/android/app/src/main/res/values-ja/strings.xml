@@ -1330,4 +1330,8 @@
     <string name="reply_speech_reading">読み上げ中</string>
     <string name="reply_speech_paused">一時停止中</string>
     <string name="reply_speech_completed">読み上げ完了</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">メッセージを削除</string>
+    <string name="chat_delete_single_message_body">この AI の返信を削除してもよろしいですか？この操作は取り消せません。</string>
+    <string name="chat_delete_single_message_confirm">削除</string>
 </resources>

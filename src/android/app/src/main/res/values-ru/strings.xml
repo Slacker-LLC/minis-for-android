@@ -1572,4 +1572,8 @@
     <string name="reply_speech_reading">Чтение</string>
     <string name="reply_speech_paused">Приостановлено</string>
     <string name="reply_speech_completed">Завершено</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Удалить сообщение</string>
+    <string name="chat_delete_single_message_body">Вы уверены, что хотите удалить этот ответ ИИ? Это действие нельзя отменить.</string>
+    <string name="chat_delete_single_message_confirm">Удалить</string>
 </resources>

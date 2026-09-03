@@ -1322,4 +1322,8 @@
     <string name="reply_speech_reading">읽는 중</string>
     <string name="reply_speech_paused">일시 중지됨</string>
     <string name="reply_speech_completed">완료됨</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">메시지 삭제</string>
+    <string name="chat_delete_single_message_body">이 AI 답변을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.</string>
+    <string name="chat_delete_single_message_confirm">삭제</string>
 </resources>

@@ -1723,4 +1723,8 @@
     <string name="reply_speech_reading">Reading</string>
     <string name="reply_speech_paused">Paused</string>
     <string name="reply_speech_completed">Completed</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Delete Message</string>
+    <string name="chat_delete_single_message_body">Are you sure you want to delete this AI reply? This cannot be undone.</string>
+    <string name="chat_delete_single_message_confirm">Delete</string>
 </resources>

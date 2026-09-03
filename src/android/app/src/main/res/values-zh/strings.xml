@@ -1577,4 +1577,8 @@
     <string name="reply_speech_reading">正在朗读</string>
     <string name="reply_speech_paused">已暂停</string>
     <string name="reply_speech_completed">已读完</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">删除消息</string>
+    <string name="chat_delete_single_message_body">确定要删除这条 AI 回复吗？此操作无法撤销。</string>
+    <string name="chat_delete_single_message_confirm">删除</string>
 </resources>

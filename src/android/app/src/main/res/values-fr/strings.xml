@@ -1214,4 +1214,8 @@
     <string name="reply_speech_reading">Lecture en cours</string>
     <string name="reply_speech_paused">En pause</string>
     <string name="reply_speech_completed">Terminé</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Supprimer le message</string>
+    <string name="chat_delete_single_message_body">Voulez-vous vraiment supprimer cette réponse IA ? Cette action est irréversible.</string>
+    <string name="chat_delete_single_message_confirm">Supprimer</string>
 </resources>

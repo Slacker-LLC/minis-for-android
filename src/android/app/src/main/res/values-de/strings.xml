@@ -1324,4 +1324,8 @@
     <string name="reply_speech_reading">Wird vorgelesen</string>
     <string name="reply_speech_paused">Pausiert</string>
     <string name="reply_speech_completed">Vorgelesen</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Nachricht löschen</string>
+    <string name="chat_delete_single_message_body">Sind Sie sicher, dass Sie diese KI-Antwort löschen möchten? Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="chat_delete_single_message_confirm">Löschen</string>
 </resources>
