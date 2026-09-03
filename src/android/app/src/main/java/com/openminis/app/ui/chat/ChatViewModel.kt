@@ -5564,6 +5564,28 @@ class ChatViewModel(
     }
 
     /**
+     * [T-android-chat-branch-message] Fork the session at [messageId], creating
+     * a new independent conversation from the prefix up to that assistant message.
+     */
+    fun forkSessionAtMessage(messageId: String, onForkSuccess: (String) -> Unit) {
+        if (_isStreaming.value) return
+        val sid = activeSessionId ?: return
+        val sessionForkManager = com.openminis.app.data.SessionForkManager(
+            chatRepository = chatRepository,
+            skillRepository = skillRepository,
+            filesDir = context.filesDir,
+        )
+        viewModelScope.launch {
+            val newSessionId = sessionForkManager.forkSessionAtMessage(sid, messageId)
+            if (newSessionId != null) {
+                withContext(Dispatchers.Main) {
+                    onForkSuccess(newSessionId)
+                }
+            }
+        }
+    }
+
+    /**
      * T187: drop the message at [messageId] *and* every later message
      * (in UI, in agentHistory, and on disk) so the new sendMessage()
      * call below this can persist the edited text as a fresh user

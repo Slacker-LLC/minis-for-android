@@ -4067,6 +4067,11 @@ fun ChatScreen(
                                     onCopyMarkdown = {
                                         MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
                                     },
+                                    onBranch = {
+                                        viewModel.forkSessionAtMessage(item.messageId) { newId ->
+                                            onMoveToSession(newId)
+                                        }
+                                    },
                                 )
                             }
                         }
