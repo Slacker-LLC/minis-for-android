@@ -823,6 +823,40 @@ class ChatRepository(
     }
 
     companion object {
+        fun extractTextPreview(partsJson: String): String? {
+            return try {
+                val array = org.json.JSONArray(partsJson)
+                var hasMedia = false
+                var lastToolUse: org.json.JSONObject? = null
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val type = obj.optString("type")
+                    if (type == "text") {
+                        val text = obj.optString("value", "")
+                        if (text.isNotBlank()) {
+                            return cleanPreview(text)
+                        }
+                    } else if (type == "mediaRef") {
+                        hasMedia = true
+                    } else if (type == "toolUse") {
+                        val v = obj.optJSONObject("value")
+                        if (v != null) lastToolUse = v
+                    }
+                }
+                if (hasMedia) return "[Image]"
+                if (lastToolUse != null) {
+                    val toolName = lastToolUse.optString("name", "")
+                    val description = lastToolUse.optString("description", "").trim()
+                    if (description.isNotEmpty()) return description
+                    val shortName = toolName.removePrefix("android_").removePrefix("minis_")
+                    return if (shortName.isNotEmpty()) "🛠️ $shortName" else "🛠️ Tool"
+                }
+                null
+            } catch (_: Exception) {
+                if (partsJson.isNotBlank()) cleanPreview(partsJson) else null
+            }
+        }
+
         // <system-reminder>...</system-reminder> blocks are runtime nudges
         // injected into user-role messages by the harness (e.g. task-tracker
         // reminders). They never represent what the user actually typed, so

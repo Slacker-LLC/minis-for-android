@@ -605,11 +605,12 @@ class BackupExporter(
      * Mirrors iOS `BackupSecretsCollector.collect`.
      */
     private fun exportSecrets(staging: File, categories: Set<BackupCategory>) {
-        val providerSecrets =
+        val providerSecrets: List<BackupSecrets.ProviderSecret> =
             if (BackupCategory.PROVIDERS in categories) {
                 val repo = app?.providerRepositoryOrNull
-                repo?.config?.value?.instances.orEmpty()
-                    .mapNotNull { repo?.collectBackupProviderSecret(it) }
+                if (repo != null) {
+                    repo.config.value.instances.mapNotNull { repo.collectBackupProviderSecret(it) }
+                } else emptyList()
             } else emptyList()
 
         val envSecrets =

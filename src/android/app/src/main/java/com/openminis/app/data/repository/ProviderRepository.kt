@@ -2717,4 +2717,95 @@ class ProviderRepository(private val context: Context) {
         val bits = obj.optInt("modalityOverride", 0)
         return modalityListsFromBitfield(bits)
     }
+
+    fun collectBackupProviderSecret(instance: ProviderInstance): com.openminis.app.backup.BackupSecrets.ProviderSecret? {
+        val apiKey = getApiKey(instance.id)
+        val mgr = com.openminis.app.auth.OAuthManager.forInstance(context, instance) ?: oauthManagerFor(instance)
+        val manualToken = mgr?.loadManualBearerToken()
+        val tokenJson = mgr?.exportStoredTokensJson()
+        val email = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("email") else null
+        val gcpProject = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("gcp_project") else null
+        val sec = com.openminis.app.backup.BackupSecrets.ProviderSecret(
+            instanceId = instance.id,
+            label = instance.label,
+            providerType = instance.providerType.name,
+            apiKey = apiKey?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+            manualOAuthToken = manualToken?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+            oauthToken = tokenJson?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+            oauthEmail = email?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+            oauthGcpProject = gcpProject?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+        )
+        return if (sec.isEmpty) null else sec
+    }
+
+    fun mergeBackupProviderConfig(config: com.openminis.app.data.model.ProviderConfig): Pair<Int, Int> {
+        ensureConfigLoaded()
+        val before = _config.value.instances.size
+        val existingIds = _config.value.instances.map { it.id }.toSet()
+        val newInstances = config.instances.filter { it.id !in existingIds }
+        for (inst in newInstances) {
+            addInstance(inst)
+        }
+        val after = _config.value.instances.size
+        return Pair(before, after)
+    }
+
+    fun restoreBackupThinkingRules(rules: List<com.openminis.app.backup.BackupThinkingRuleRecord>): Pair<Int, Int> {
+        var written = 0
+        var skipped = 0
+        for (r in rules) {
+            val existing = thinkingRules(r.instanceId).any { it.id == r.id }
+            if (existing) {
+                skipped++
+            } else {
+                val scope = if (r.scope == "allModels") {
+                    ThinkingRule.Scope.AllModels
+                } else {
+                    ThinkingRule.Scope.ModelPattern(r.pattern.orEmpty())
+                }
+                val rule = ThinkingRule(
+                    id = r.id,
+                    name = r.name,
+                    scope = scope,
+                    budget = com.openminis.app.provider.thinking.ThinkingBudget.Fixed(r.budget ?: 0),
+                    systemPrompt = r.prompt,
+                )
+                saveThinkingRule(r.instanceId, rule, r.id)
+                written++
+            }
+        }
+        return Pair(written, skipped)
+    }
+
+    fun restoreBackupProviderSecret(secret: com.openminis.app.backup.BackupSecrets.ProviderSecret): Boolean {
+        val instance = _config.value.instances.firstOrNull { it.id == secret.instanceId } ?: return false
+        var changed = false
+        secret.apiKey?.let { b64 ->
+            val key = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            saveApiKey(instance.id, key)
+            changed = true
+        }
+        val mgr = com.openminis.app.auth.OAuthManager.forInstance(context, instance) ?: oauthManagerFor(instance)
+        secret.manualOAuthToken?.let { b64 ->
+            val token = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.saveManualBearerToken(token)
+            changed = true
+        }
+        secret.oauthToken?.let { b64 ->
+            val tokenJson = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importStoredTokensJson(tokenJson)
+            changed = true
+        }
+        secret.oauthEmail?.let { b64 ->
+            val email = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importOAuthString("email", email)
+            changed = true
+        }
+        secret.oauthGcpProject?.let { b64 ->
+            val proj = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importOAuthString("gcp_project", proj)
+            changed = true
+        }
+        return changed
+    }
 }
