@@ -23,7 +23,7 @@ object AndroidAgentTools {
             name = CAPABILITIES,
             description = "Read the actual Android capability matrix without silently triggering Root authorization. " +
                 "Use action=get first. action=active_root_probe is the only path that may ask the user for su authorization. " +
-                "action=probe_native_chroot runs isolated chroot/mount/namespace probes after Root is authorized; native chroot remains experimental and never replaces PRoot.",
+                "action=probe_native_chroot runs isolated chroot/mount/namespace probes after Root is authorized; guest runtime runs in a managed chroot under minisd.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam("string", "get (passive), active_root_probe, or probe_native_chroot", listOf("get", "active_root_probe", "probe_native_chroot")),
             ),
@@ -109,9 +109,9 @@ object AndroidAgentTools {
         AgentToolDefinition(
             name = DEPLOY,
             description = "Inspect, install, and launch a real APK artifact. Actions: inspect_apk, install, launch, install_and_launch. " +
-                "Builds remain in shell_execute/PRoot (for example ./gradlew assembleDebug); this tool does not create a parallel Gradle executor. " +
+                "Builds remain in shell_execute (for example ./gradlew assembleDebug under the Ubuntu 24.04 guest runtime); this tool does not create a parallel Gradle executor. " +
                 "Provide artifactPath, or searchRoot to discover actual APKs only under Gradle build/outputs/apk metadata. Never assumes app/build/outputs/apk/debug/app-debug.apk. " +
-                "Installing OpenMinis over itself is UNSUPPORTED because it kills the current Agent process.",
+                "Continuous self-update of Minis for Android is UNSUPPORTED: replacing this APK kills the current Agent process.",
             parameters = commonParams() + packageParams() + artifactParams() + mapOf(
                 "action" to AgentToolParam("string", "Deploy action", listOf("inspect_apk", "install", "launch", "install_and_launch")),
                 "activity" to AgentToolParam("string", "Optional explicit launch Activity"),

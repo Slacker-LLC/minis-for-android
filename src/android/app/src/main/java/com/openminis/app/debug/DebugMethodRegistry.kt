@@ -130,9 +130,9 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "debug.ls",
-            description = "List directory contents inside the proot-mounted Linux filesystem.",
+            description = "List directory contents inside the guest Linux filesystem.",
             params = listOf(
-                ParamSpec("path", "string", required = false, default = "/", description = "Linux path under the proot rootfs."),
+                ParamSpec("path", "string", required = false, default = "/", description = "Linux path under the guest rootfs."),
                 ParamSpec("recursive", "bool", required = false, default = false, description = "Recurse into subdirectories."),
                 ParamSpec("maxDepth", "int", required = false, default = 3, description = "Max recursion depth when recursive=true."),
             ),
@@ -141,9 +141,9 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "debug.readFile",
-            description = "Read a file from the proot rootfs with optional offset/limit slicing.",
+            description = "Read a file from the guest rootfs with optional offset/limit slicing.",
             params = listOf(
-                ParamSpec("path", "string", required = true, description = "Linux path under the proot rootfs."),
+                ParamSpec("path", "string", required = true, description = "Linux path under the guest rootfs."),
                 ParamSpec("offset", "long", required = false, default = 0, description = "Byte offset to start reading from."),
                 ParamSpec("limit", "int", required = false, default = 524288, description = "Maximum bytes to read (default 512KB)."),
                 ParamSpec("base64", "bool", required = false, default = false, description = "Force base64 encoding (otherwise detected from content)."),
@@ -328,9 +328,9 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "debug.writeFile",
-            description = "Write a file into the app's filesDir-rooted Linux-path namespace (resolved through PRoot bind mounts). Intended for staging test fixtures before debug.shellExecute.",
+            description = "Write a file into the app's filesDir-rooted Linux-path namespace (resolved through guest bind mounts). Intended for staging test fixtures before debug.shellExecute.",
             params = listOf(
-                ParamSpec("path", "string", required = true, description = "Linux path under the proot rootfs (e.g. /tmp/test.sh, /var/minis/skills/example.md)."),
+                ParamSpec("path", "string", required = true, description = "Linux path under the guest rootfs (e.g. /tmp/test.sh, /var/minis/skills/example.md)."),
                 ParamSpec("content", "string", required = true, description = "File content. Encoded per the 'encoding' field."),
                 ParamSpec("encoding", "string", required = false, default = "utf8", description = "'utf8' or 'base64'."),
                 ParamSpec("overwrite", "bool", required = false, default = true, description = "Whether to overwrite an existing file."),

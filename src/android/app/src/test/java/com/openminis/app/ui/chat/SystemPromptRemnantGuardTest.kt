@@ -47,4 +47,28 @@ class SystemPromptRemnantGuardTest {
         assertTrue("Prompt must guide to apt", prompt.contains("apt"))
         assertTrue("Prompt must frame shell as Ubuntu 24.04 / Bash", prompt.contains("Ubuntu 24.04"))
     }
+
+    @Test
+    fun androidAgentToolsPurgesObsoleteProotAndOpenMinis() {
+        val defs = com.openminis.app.tools.android.AndroidAgentTools.definitions()
+        for (tool in defs) {
+            assertFalse("Tool ${tool.name} must not reference PRoot: ${tool.description}", tool.description.contains("PRoot", ignoreCase = true))
+            assertFalse("Tool ${tool.name} must not reference OpenMinis: ${tool.description}", tool.description.contains("OpenMinis", ignoreCase = true))
+        }
+        val deployTool = defs.first { it.name == com.openminis.app.tools.android.AndroidAgentTools.DEPLOY }
+        assertTrue("Deploy tool must reference Ubuntu 24.04", deployTool.description.contains("Ubuntu 24.04"))
+        val capTool = defs.first { it.name == com.openminis.app.tools.android.AndroidAgentTools.CAPABILITIES }
+        assertTrue("Capabilities tool must reference minisd", capTool.description.contains("minisd"))
+    }
+
+    @Test
+    fun debugMethodRegistryPurgesObsoleteProotRemnants() {
+        val methods = com.openminis.app.debug.DebugMethodRegistry.methods
+        for (m in methods) {
+            assertFalse("Debug method ${m.name} description must not contain proot: ${m.description}", m.description.contains("proot", ignoreCase = true))
+            for (p in m.params) {
+                assertFalse("Debug method ${m.name} param ${p.name} description must not contain proot: ${p.description}", p.description.contains("proot", ignoreCase = true))
+            }
+        }
+    }
 }
