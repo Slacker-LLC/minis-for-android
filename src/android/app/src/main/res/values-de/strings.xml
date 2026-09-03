@@ -1292,4 +1292,21 @@
     <string name="split_no_conversation_title">Keine Unterhaltung ausgewählt</string>
     <string name="split_no_conversation_subtitle">Wählen Sie eine Unterhaltung oder beginnen Sie eine neue</string>
     <string name="chat_input_placeholder_hint_5">Minis kann die ↩︎-Taste auf Senden oder Zeilenumbruch stellen</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">Von Anfang an vorlesen</string>
+    <string name="read_aloud_group">Vorlesen</string>
+    <string name="selection_copy_full_markdown">Gesamtes Markdown kopieren</string>
+    <string name="selection_copy_full_rich_text">Gesamten Rich Text kopieren</string>
+    <string name="selection_copy_full_plain_text">Gesamten Klartext kopieren</string>
+    <string name="selection_copied_as_plain_text_toast">Als Klartext kopiert</string>
+    <string name="chat_longpress_delete_from_here">Ab hier löschen</string>
+    <string name="chat_delete_from_here_confirm">Löschen</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachricht. Dies kann nicht rückgängig gemacht werden.</item>
+        <item quantity="other">Diese Nachricht und alles danach wird gelöscht. Insgesamt %d Nachrichten. Dies kann nicht rückgängig gemacht werden.</item>
+    </plurals>
+    <string name="selection_copy_full_text">Gesamten Text kopieren</string>
+    <string name="selection_copy_as_markdown">Als Markdown kopieren</string>
+    <string name="selection_copy_as_rich_text">Als formatierten Text kopieren</string>
+    <string name="selection_copy_as_plain_text">Als reinen Text kopieren</string>
 </resources>

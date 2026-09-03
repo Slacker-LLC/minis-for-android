@@ -839,4 +839,20 @@
     <string name="split_no_conversation_title">未選擇對話</string>
     <string name="split_no_conversation_subtitle">請選擇一段對話，或開始新的對話</string>
     <string name="chat_input_placeholder_hint_5">Minis 可以把 ↩︎ 鍵設為傳送或換行</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">從頭朗讀</string>
+    <string name="read_aloud_group">朗讀</string>
+    <string name="selection_copy_full_markdown">複製完整 Markdown</string>
+    <string name="selection_copy_full_rich_text">複製完整富文本</string>
+    <string name="selection_copy_full_plain_text">複製完整純文本</string>
+    <string name="selection_copied_as_plain_text_toast">已複製為純文本</string>
+    <string name="chat_longpress_delete_from_here">從此處刪除</string>
+    <string name="chat_delete_from_here_confirm">刪除</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="other">將刪除本則訊息及其之後的全部內容，共 %d 則訊息。此操作無法復原。</item>
+    </plurals>
+    <string name="selection_copy_full_text">複製全文</string>
+    <string name="selection_copy_as_markdown">以 Markdown 複製</string>
+    <string name="selection_copy_as_rich_text">以格式化文字複製</string>
+    <string name="selection_copy_as_plain_text">以純文字複製</string>
 </resources>

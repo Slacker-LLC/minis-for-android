@@ -1220,17 +1220,27 @@
     <string name="notif_config_confirm_body_multi">%d changes need your review — open Minis to approve or reject.</string>
     <string name="notif_task_failed_body">Task ended with an error. Tap to open the chat.</string>
 
-    <!-- T-selection-add-to-input — long-press text selection menu action -->
-    <string name="selection_add_to_chat_input">Add to Chat Input</string>
-    <string name="selection_read_aloud">Read Aloud</string>
-    <!-- T-minis-textkit selection menu actions (Copy / Copy Markdown / Copy Rich Text) -->
-    <string name="selection_copy">Copy</string>
-    <string name="selection_copy_markdown">Copy Markdown</string>
-    <string name="selection_copy_rich_text">Copy Rich Text</string>
-    <!-- Toast messages shown after a selection-menu Copy action fires. %1$s = preview of copied text. -->
-    <string name="selection_copied_toast">Copied: %1$s</string>
-    <string name="selection_copied_as_markdown_toast">Copied as Markdown</string>
-    <string name="selection_copied_as_rich_text_toast">Copied as Rich Text</string>
+   <!-- T-selection-add-to-input — long-press text selection menu action -->
+   <string name="selection_add_to_chat_input">Add to Chat Input</string>
+    <string name="selection_read_aloud">Read Selection</string>
+    <string name="selection_read_from_start">Read from Start</string>
+    <string name="read_aloud_group">Read Aloud</string>
+   <!-- T-minis-textkit selection menu actions (Copy / Copy Markdown / Copy Rich Text) -->
+   <string name="selection_copy">Copy</string>
+   <string name="selection_copy_markdown">Copy Markdown</string>
+   <string name="selection_copy_rich_text">Copy Rich Text</string>
+    <string name="selection_copy_full_markdown">Copy Full Markdown</string>
+    <string name="selection_copy_full_rich_text">Copy Full Rich Text</string>
+    <string name="selection_copy_full_plain_text">Copy Full Plain Text</string>
+    <string name="selection_copied_as_plain_text_toast">Copied as Plain Text</string>
+   <!-- Toast messages shown after a selection-menu Copy action fires. %1$s = preview of copied text. -->
+   <string name="selection_copied_toast">Copied: %1$s</string>
+   <string name="selection_copied_as_markdown_toast">Copied as Markdown</string>
+   <string name="selection_copied_as_rich_text_toast">Copied as Rich Text</string>
+    <string name="selection_copy_full_text">Copy Full Text</string>
+    <string name="selection_copy_as_markdown">Copy as Markdown</string>
+    <string name="selection_copy_as_rich_text">Copy as Rich Text</string>
+    <string name="selection_copy_as_plain_text">Copy as Plain Text</string>
     <!-- [T-markdown-table-copy-actions] Long-press menu actions and toasts on rendered markdown tables. -->
     <string name="markdown_table_copy_table">Copy Table</string>
     <string name="markdown_table_copy_table_image">Copy Table Image</string>
@@ -1294,6 +1304,12 @@
 
    <!-- T187 — user-bubble long-press Edit + Exit Edit Mode + Clear Chat dialog -->
    <string name="chat_longpress_edit">Edit</string>
+    <string name="chat_longpress_delete_from_here">Delete From Here</string>
+    <string name="chat_delete_from_here_confirm">Delete</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">This message and everything after it will be deleted. %d message in total. This cannot be undone.</item>
+        <item quantity="other">This message and everything after it will be deleted. %d messages in total. This cannot be undone.</item>
+    </plurals>
    <string name="chat_edit_exit_button">Exit Edit Mode</string>
     <string name="chat_show_sidebar">Show session list</string>
     <string name="chat_hide_sidebar">Hide session list</string>
