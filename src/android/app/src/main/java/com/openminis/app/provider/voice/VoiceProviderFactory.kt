@@ -35,7 +35,10 @@ object VoiceProviderFactory {
 
         return when (instance.providerType) {
             // OpenAI-compatible families -------------------------------------
-            ProviderType.openAI, ProviderType.openRouter -> {
+            // [T-android-provider-type-parity] openAIResponses shares the
+            // OpenAI voice endpoints (/v1/audio/*) — only the text
+            // completion path differs, which voice never uses.
+            ProviderType.openAI, ProviderType.openRouter, ProviderType.openAIResponses -> {
                 if (instance.providerType == ProviderType.openRouter) {
                     // OpenRouter. TTS goes through chat.completions + the audio
                     // modality, NOT /v1/audio/speech — that endpoint does not
@@ -106,6 +109,9 @@ object VoiceProviderFactory {
 
             // [T-kimi-oauth] Kimi Coding Plan serves no voice models.
             ProviderType.kimiCode -> null
+
+            // [T-android-provider-type-parity] Decode-only provider types.
+            ProviderType.antigravity, ProviderType.unsupported -> null
         }
     }
 

@@ -1303,7 +1303,7 @@ class ModelUseOffloadHandler(
                   {"messages":[{"role":"user","content":"<prompt>"}],
                    "generation_config":{"aspect_ratio":"16:9","image_size":"2K"}}
             """.trimIndent()
-            ProviderType.openAI, ProviderType.openRouter -> """
+            ProviderType.openAI, ProviderType.openRouter, ProviderType.openAIResponses -> """
                 Hint — ${entry.model.displayName} is an OpenAI-compatible image model. Pass image params at the top level of the input JSON (matches /v1/images/generations):
                   n         integer, number of images (default 1)
                   size      "1024x1024" | "1792x1024" | "1024x1792" | etc.
@@ -1323,7 +1323,12 @@ class ModelUseOffloadHandler(
             """.trimIndent()
             // xAI (Grok) / Kimi Coding have no image-output models in the
             // current catalog — fall through to empty hint like Anthropic.
-            ProviderType.anthropic, ProviderType.xAI, ProviderType.kimiCode, null -> ""
+            ProviderType.anthropic,
+            ProviderType.xAI,
+            ProviderType.kimiCode,
+            ProviderType.antigravity,
+            ProviderType.unsupported,
+            null -> ""
         }
     }
 

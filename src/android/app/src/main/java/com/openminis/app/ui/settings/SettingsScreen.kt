@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BatteryFull
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Description
@@ -127,6 +128,7 @@ fun SettingsScreen(
     // T219-2: Mount External Folders entry. Default no-op for any caller
     // that hasn't wired the route yet.
     onMountedFoldersClick: () -> Unit = {},
+    onBackupClick: () -> Unit = {},
     // T235: Shared Folders entry (Shared / Skills / Memory). Default no-op
     // for back-compat with callers wired before T235.
     onSharedFoldersClick: () -> Unit = {},
@@ -346,6 +348,14 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_mount_external_folders),
                     subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
                     onClick = onMountedFoldersClick,
+                    showDivider = true,
+                )
+                SettingsItem(
+                    icon = Icons.Outlined.Backup,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.settings_backup_restore),
+                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
+                    onClick = onBackupClick,
                     showDivider = false,
                 )
             }

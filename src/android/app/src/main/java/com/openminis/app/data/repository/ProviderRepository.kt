@@ -2139,7 +2139,11 @@ class ProviderRepository(private val context: Context) {
                     )
                     ProviderType.gemini -> GeminiModelsApi.fetchModels(apiKey)
                     // [T-provider-custom-user-agent] models-list UA override.
-                    ProviderType.openAI -> OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
+                    // [T-android-provider-type-parity] openAIResponses lists
+                    // models from the same /v1/models endpoint — only the
+                    // completion endpoint differs.
+                    ProviderType.openAI, ProviderType.openAIResponses ->
+                        OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
                     ProviderType.openRouter -> OpenRouterModelsApi.fetchModels(apiKey)
                     // xAI: the OAuth model list is fixed (no /v1/models gating
                     // call needed — XAIModelsApi exposes the spec-mandated set).
@@ -2157,6 +2161,10 @@ class ProviderRepository(private val context: Context) {
                         baseURL ?: "${com.openminis.app.auth.KimiDeviceFlow.CODING_API_BASE}/v1",
                         customUserAgent = instance.customUserAgent,
                     )
+                    // [T-android-provider-type-parity] No models endpoint to
+                    // query for a type this build cannot drive; the instance
+                    // keeps whatever entries the restore brought with it.
+                    ProviderType.antigravity, ProviderType.unsupported -> emptyList()
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ProviderRepo", "refreshModels fetch error: ${e.message}", e)
@@ -2276,10 +2284,15 @@ class ProviderRepository(private val context: Context) {
         return when (instance.providerType) {
             ProviderType.anthropic -> "https://api.anthropic.com/v1"
             ProviderType.gemini -> "https://generativelanguage.googleapis.com"
-            ProviderType.openAI -> "https://api.openai.com/v1"
+            // [T-android-provider-type-parity] Responses API instances point at
+            // the same OpenAI host; only the completion path differs.
+            ProviderType.openAI, ProviderType.openAIResponses -> "https://api.openai.com/v1"
             ProviderType.openRouter -> "https://openrouter.ai/api/v1"
             ProviderType.xAI -> "https://api.x.ai/v1"
             ProviderType.kimiCode -> "${com.openminis.app.auth.KimiDeviceFlow.CODING_API_BASE}/v1"
+            // No canonical host for a type this build cannot drive. Callers
+            // reaching here have already exhausted effectiveBaseURL.
+            ProviderType.antigravity, ProviderType.unsupported -> "https://api.openai.com/v1"
         }
     }
 
@@ -2716,5 +2729,95 @@ class ProviderRepository(private val context: Context) {
         if (!obj.has("modalityOverride")) return null to null
         val bits = obj.optInt("modalityOverride", 0)
         return modalityListsFromBitfield(bits)
+    }
+
+    fun collectBackupProviderSecret(instance: ProviderInstance): com.openminis.app.backup.BackupSecrets.ProviderSecret? {
+        val apiKey = loadApiKey(instance.id)
+        val mgr = oauthManagerFor(instance) ?: com.openminis.app.auth.OAuthManager.forInstance(context, instance)
+        val manualToken = mgr?.loadManualBearerToken()
+        val tokenJson = mgr?.exportStoredTokensJson()
+        val email = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("email") else null
+        val gcpProject = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("gcp_project") else null
+        val sec = com.openminis.app.backup.BackupSecrets.ProviderSecret(
+            instanceId = instance.id,
+            label = instance.label,
+            providerType = instance.providerType.name,
+            apiKey = if (apiKey != null) Base64.encodeToString(apiKey.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            manualOAuthToken = if (manualToken != null) Base64.encodeToString(manualToken.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthToken = if (tokenJson != null) Base64.encodeToString(tokenJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthEmail = if (email != null) Base64.encodeToString(email.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthGcpProject = if (gcpProject != null) Base64.encodeToString(gcpProject.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+        )
+        return if (sec.isEmpty) null else sec
+    }
+
+    fun mergeBackupProviderConfig(config: com.openminis.app.data.model.ProviderConfig): Pair<Int, Int> {
+        ensureConfigLoaded()
+        val before = _config.value.instances.size
+        val existingIds = _config.value.instances.map { it.id }.toSet()
+        val newInstances = config.instances.filter { it.id !in existingIds }
+        for (inst in newInstances) {
+            addInstance(inst)
+        }
+        val after = _config.value.instances.size
+        return Pair(before, after)
+    }
+
+    fun restoreBackupThinkingRules(rules: List<com.openminis.app.backup.BackupThinkingRuleRecord>): Pair<Int, Int> {
+        var written = 0
+        var skipped = 0
+        for (r in rules) {
+            val existing = thinkingRules(r.instanceId).any { it.id == r.id }
+            if (existing) {
+                skipped++
+            } else {
+                val entity = ProviderThinkingRuleEntity(
+                    id = r.id,
+                    providerInstanceId = r.instanceId,
+                    label = r.label,
+                    scopeKind = r.scopeKind,
+                    scopePattern = r.scopePattern,
+                    wireFormatJson = r.wireFormatJson,
+                    reasoningEchoJson = r.echoField,
+                    sortOrder = r.sortOrder,
+                )
+                val rule = ThinkingRuleCoding.toRule(entity)
+                saveThinkingRule(r.instanceId, rule, r.id)
+                written++
+            }
+        }
+        return Pair(written, skipped)
+    }
+
+    fun restoreBackupProviderSecret(secret: com.openminis.app.backup.BackupSecrets.ProviderSecret): Boolean {
+        val instance = _config.value.instances.firstOrNull { it.id == secret.instanceId } ?: return false
+        var changed = false
+        secret.apiKey?.let { b64 ->
+            val key = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            saveApiKey(instance.id, key)
+            changed = true
+        }
+        val mgr = com.openminis.app.auth.OAuthManager.forInstance(context, instance) ?: oauthManagerFor(instance)
+        secret.manualOAuthToken?.let { b64 ->
+            val token = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.saveManualBearerToken(token)
+            changed = true
+        }
+        secret.oauthToken?.let { b64 ->
+            val tokenJson = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importStoredTokensJson(tokenJson)
+            changed = true
+        }
+        secret.oauthEmail?.let { b64 ->
+            val email = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importOAuthString("email", email)
+            changed = true
+        }
+        secret.oauthGcpProject?.let { b64 ->
+            val proj = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
+            mgr?.importOAuthString("gcp_project", proj)
+            changed = true
+        }
+        return changed
     }
 }

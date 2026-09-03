@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,6 +136,34 @@ fun SettingsScaffold(
         Column(
             modifier = if (scrollable) baseMod.verticalScroll(rememberScrollState()) else baseMod,
             content = content,
+        )
+    }
+}
+
+// ─── Switch ────────────────────────────────────────────────────────────────────
+
+/**
+ * Match the upstream settings-row switch measurement. The whole row is the
+ * touch target, so the switch does not need to impose Material's extra
+ * 48dp minimum on the surrounding row.
+ */
+@Composable
+fun SettingsSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: androidx.compose.material3.SwitchColors = SwitchDefaults.colors(),
+) {
+    CompositionLocalProvider(
+        LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
+    ) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier,
+            enabled = enabled,
+            colors = colors,
         )
     }
 }
@@ -336,7 +366,7 @@ fun SettingsSwitchRow(
         showChevron = false,
         showDivider = showDivider,
         trailing = {
-            Switch(
+            SettingsSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = enabled,
