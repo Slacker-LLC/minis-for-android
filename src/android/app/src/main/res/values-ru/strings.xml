@@ -1528,4 +1528,14 @@
     <string name="backup_dest_create">Создать</string>
     <string name="backup_dest_backend_label">%1$s — %2$s</string>
     <string name="backup_dest_row_subtitle">%1$s · /%2$s</string>
+    <!-- [T-android-composer-placeholder-rotation & tablet-split] -->
+    <string name="chat_input_placeholder_hint_1">Используйте @, чтобы упомянуть файлы для чтения %1$s</string>
+    <string name="chat_input_placeholder_hint_2">Введите /, чтобы открыть SKILL и быстрые команды</string>
+    <string name="chat_input_placeholder_hint_3">Перетащите текст в чат, чтобы отправить его</string>
+    <string name="chat_input_placeholder_hint_4">Удерживайте ответ, чтобы выделить и скопировать его целиком</string>
+    <string name="chat_show_sidebar">Показать список сессий</string>
+    <string name="chat_hide_sidebar">Скрыть список сессий</string>
+    <string name="split_no_conversation_title">Беседа не выбрана</string>
+    <string name="split_no_conversation_subtitle">Выберите беседу или начните новую</string>
+    <string name="chat_input_placeholder_hint_5">Minis может назначить клавише ↩︎ отправку или перенос строки</string>
 </resources>

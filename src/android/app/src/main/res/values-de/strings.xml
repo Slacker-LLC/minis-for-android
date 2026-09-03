@@ -1282,4 +1282,14 @@
     <string name="backup_dest_create">Erstellen</string>
     <string name="backup_dest_backend_label">%1$s — %2$s</string>
     <string name="backup_dest_row_subtitle">%1$s · /%2$s</string>
+    <!-- [T-android-composer-placeholder-rotation & tablet-split] -->
+    <string name="chat_input_placeholder_hint_1">Mit @ Dateien erwähnen, die %1$s lesen soll</string>
+    <string name="chat_input_placeholder_hint_2">/ eingeben für SKILLs und Schnellbefehle</string>
+    <string name="chat_input_placeholder_hint_3">Text in den Chat ziehen, um ihn zu senden</string>
+    <string name="chat_input_placeholder_hint_4">Lange auf eine Antwort tippen, um alles auszuwählen und zu kopieren</string>
+    <string name="chat_show_sidebar">Sitzungsliste anzeigen</string>
+    <string name="chat_hide_sidebar">Sitzungsliste ausblenden</string>
+    <string name="split_no_conversation_title">Keine Unterhaltung ausgewählt</string>
+    <string name="split_no_conversation_subtitle">Wählen Sie eine Unterhaltung oder beginnen Sie eine neue</string>
+    <string name="chat_input_placeholder_hint_5">Minis kann die ↩︎-Taste auf Senden oder Zeilenumbruch stellen</string>
 </resources>
