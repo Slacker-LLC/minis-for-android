@@ -18,7 +18,17 @@ const MAX_CONCURRENT: usize = 64;
 /// Reject private / loopback targets. The proxy only serves outbound
 /// Internet traffic from the guest; allowing 127.0.0.1 / RFC1918 would let
 /// the guest loop-amplify through the root proxy or probe the LAN (B8).
+fn is_fake_ip(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    octets[0] == 198 && (octets[1] == 18 || octets[1] == 19)
+}
+
 fn is_forbidden_target(ip: Ipv4Addr) -> bool {
+    // Fake-IP range (198.18.0.0/15) is used by VPN/TUN clients (Clash/Sing-box)
+    // for DNS routing and must always be allowed through.
+    if is_fake_ip(ip) {
+        return false;
+    }
     ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_broadcast()
 }
 
@@ -179,12 +189,26 @@ fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
             upstream.write_all(&buffered).map_err(|e| e.to_string())?;
         }
     }
+    // Clear read/write timeouts before data streaming / large file downloads
+    peer.set_read_timeout(None).ok();
+    peer.set_write_timeout(None).ok();
+    upstream.set_read_timeout(None).ok();
+    upstream.set_write_timeout(None).ok();
     pump(peer, upstream)
 }
 
 fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
     if let Ok(ip) = host.parse::<Ipv4Addr>() {
         return Ok(ip);
+    }
+    // Try system resolver first (libc getaddrinfo) which natively honors
+    // Android's Private DNS (DoT), system routing, and VPN/Clash Fake-IP mappings.
+    if let Ok(iter) = std::net::ToSocketAddrs::to_socket_addrs(&(host, 0)) {
+        for addr in iter {
+            if let SocketAddr::V4(v4) = addr {
+                return Ok(*v4.ip());
+            }
+        }
     }
     let mut last = String::new();
     let mut tried = 0usize;
@@ -203,7 +227,12 @@ fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
         }
     }
     if tried == 0 {
-        for dns in ["8.8.8.8:53", "1.1.1.1:53"] {
+        for dns in [
+            "223.5.5.5:53",
+            "119.29.29.29:53",
+            "8.8.8.8:53",
+            "1.1.1.1:53",
+        ] {
             match dns_query_a(host, dns) {
                 Ok(ip) => return Ok(ip),
                 Err(e) => last = format!("{dns}: {e}"),
@@ -282,7 +311,7 @@ fn pump(a: TcpStream, b: TcpStream) -> Result<(), String> {
 }
 
 fn copy(mut r: TcpStream, mut w: TcpStream) {
-    let mut buf = [0u8; 16 * 1024];
+    let mut buf = [0u8; 64 * 1024];
     loop {
         match r.read(&mut buf) {
             Ok(0) | Err(_) => break,
@@ -318,6 +347,8 @@ mod tests {
         assert!(is_forbidden_target(Ipv4Addr::new(169, 254, 1, 1))); // link-local
         assert!(!is_forbidden_target(Ipv4Addr::new(8, 8, 8, 8))); // public OK
         assert!(!is_forbidden_target(Ipv4Addr::new(185, 199, 108, 153))); // public OK
+        assert!(!is_forbidden_target(Ipv4Addr::new(198, 18, 0, 1))); // Fake-IP / VPN OK
+        assert!(!is_forbidden_target(Ipv4Addr::new(198, 19, 255, 254))); // Fake-IP / VPN OK
     }
 
     #[test]
