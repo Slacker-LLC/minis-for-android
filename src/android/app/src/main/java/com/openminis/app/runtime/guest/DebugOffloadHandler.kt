@@ -321,12 +321,12 @@ SUBCOMMANDS:
   appInfo                            Show platform / SDK / build info (debug.appInfo)
   screenshot [--scale N]             Capture foreground Activity (debug.screenshot)
 
-  ls [path] [--recursive] [--maxDepth N]
-                                     List a path inside the PRoot rootfs (debug.ls)
+ ls [path] [--recursive] [--maxDepth N]
+                                     List a path inside the guest rootfs (debug.ls)
   read <path> [--offset N] [--limit N] [--base64]
-                                     Read a file from PRoot rootfs (debug.readFile)
+                                     Read a file from guest rootfs (debug.readFile)
   write <path> --content <text> [--encoding utf8|base64]
-                                     Write a file inside PRoot rootfs (debug.writeFile)
+                                     Write a file inside guest rootfs (debug.writeFile)
   exec <command...>                  Run a shell command via debug.shellExecute
 
 Android-only (DEBUG_ONLY_METHODS in DebugMethodRegistry):
