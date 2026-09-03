@@ -69,17 +69,22 @@ class ChatRepository(
      * over a raw `parts_json` string, matching ChatViewModel.loadSession's
      * AgentContentPart-based logic:
      *   - role USER + ALL parts are tool_result (tools ran, next model call never
-     *     fired), OR the single synthetic "Continue" reminder text part, OR
+     *     fired), OR the single synthetic "Continue" reminder text part, OR a
+     *     non-empty user turn with no assistant reply,
      *   - role ASSISTANT + any tool_use part (model asked for tools that never ran)
      * Part type discriminator is the JSON "type" field — the @SerialName values
      * from [com.openminis.app.data.model.ContentPart]: "toolUse" / "toolResult"
-     * / "text" (camelCase, NOT snake_case); text payload is the "value" field.
+     * / "text" / "mediaRef" (camelCase, NOT snake_case); text payload is the
+     * "value" field.
      */
     private fun isInterruptedTail(role: String, partsJson: String): Boolean {
         val arr = runCatching { org.json.JSONArray(partsJson) }.getOrNull() ?: return false
         val types = ArrayList<String>(arr.length())
         for (i in 0 until arr.length()) {
             arr.optJSONObject(i)?.let { types.add(it.optString("type")) }
+        }
+        val hasRecognizedParts = types.any {
+            it == "text" || it == "toolUse" || it == "toolResult" || it == "mediaRef"
         }
         return when (role.uppercase()) {
             "USER" -> {
@@ -88,7 +93,8 @@ class ChatRepository(
                     arr.optJSONObject(0)?.takeIf { it.optString("type") == "text" }
                         ?.optString("value")
                         ?.contains("The user stopped the previous response") == true
-                allToolResults || isContinueReminder
+                allToolResults || isContinueReminder ||
+                    (hasRecognizedParts && !allToolResults && !isContinueReminder)
             }
             "ASSISTANT" -> types.any { it == "toolUse" }
             else -> false
