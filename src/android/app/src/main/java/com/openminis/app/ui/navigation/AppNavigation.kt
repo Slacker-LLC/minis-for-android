@@ -109,6 +109,7 @@ object Routes {
     const val MODEL_ENTRY_DETAIL = "model_entry/{instanceId}/{entryId}"
     const val ADD_CUSTOM_MODEL = "add_custom_model/{instanceId}"
     const val STORAGE = "storage"
+    const val BACKUP_AND_RESTORE = "backup_and_restore"
     const val SESSION_STORAGE_DETAIL = "session_storage/{sessionId}"
     const val ROOTFS_MANAGEMENT = "rootfs_management"
     const val MIRROR_CATEGORY_DETAIL = "mirror_category/{categoryKey}"
@@ -513,6 +514,9 @@ fun AppNavigation(
                 onRootfsClick = {
                     navController.safeNavigate(Routes.ROOTFS_MANAGEMENT)
                 },
+                onBackupClick = {
+                    navController.safeNavigate(Routes.BACKUP_AND_RESTORE)
+                },
                 onScheduledTasksClick = {
                     navController.safeNavigate(Routes.SCHEDULED_TASKS)
                 },
@@ -844,6 +848,12 @@ fun AppNavigation(
                 onSessionClick = { sessionId ->
                     navController.safeNavigate(Routes.sessionStorageDetail(sessionId))
                 },
+            )
+        }
+
+        composable(Routes.BACKUP_AND_RESTORE) {
+            com.openminis.app.ui.settings.backup.BackupAndRestoreScreen(
+                onBack = { navController.safePopBackStack() },
             )
         }
 
