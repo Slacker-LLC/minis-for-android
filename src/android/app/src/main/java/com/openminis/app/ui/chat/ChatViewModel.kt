@@ -28,8 +28,10 @@ import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.ThumbUp
 import com.openminis.app.data.BPETokenizer
+import com.openminis.app.data.CompactBudget
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.data.ContextPolicy
+import com.openminis.app.data.CompactSplitPredicate
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.db.CompactMarkerEntity
@@ -71,6 +73,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,10 +87,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 // [T-android-split-chat] StreamingDelta / ChatMessage / QueuedPrompt /
 // ToolBlockStatus / SlashCommand / AssistantBlock moved verbatim to ChatModels.kt.
@@ -104,6 +109,41 @@ class ChatViewModel(
 
     companion object {
         internal const val TAG = "ChatViewModel"
+
+        // [T-android-compact-runaway] Keep these names in the ViewModel for
+        // compatibility with the upstream JVM contract; the values themselves
+        // live in CompactBudget so the runtime and tests share one source.
+        internal const val MAX_COMPACT_LLM_CALLS = CompactBudget.MAX_LLM_CALLS
+        internal const val COMPACT_TIMEOUT_BASE_MS = CompactBudget.TIMEOUT_BASE_MS
+        internal const val COMPACT_TIMEOUT_PER_10K_CHARS_MS =
+            CompactBudget.TIMEOUT_PER_10K_CHARS_MS
+        internal const val COMPACT_TIMEOUT_MAX_MS = CompactBudget.TIMEOUT_MAX_MS
+
+        internal fun compactTimeoutMsFor(transcriptChars: Int): Long =
+            CompactBudget.timeoutMsFor(transcriptChars)
+
+        /**
+         * Decide whether reducing the request size could plausibly fix an
+         * unsuccessful summary call. Quota, authentication, transport and
+         * cancellation failures are independent of payload size and must not
+         * fan one failure out into a long sequence of smaller calls.
+         */
+        internal fun shouldSplitOnError(error: Throwable): Boolean {
+            if (error is CancellationException) return false
+            if (error is LLMError) {
+                return when (error) {
+                    is LLMError.Cancelled,
+                    is LLMError.NetworkError,
+                    is LLMError.RateLimited,
+                    is LLMError.TransientError,
+                    is LLMError.InvalidApiKey,
+                    -> false
+                    else -> true
+                }
+            }
+            if (error is java.io.IOException) return false
+            return true
+        }
 
         /**
          * [T-android-auto-grouping-injection] Strip the characters that would let
@@ -796,6 +836,17 @@ class ChatViewModel(
     /** True when a compact-summary LLM call is in flight (UI disables further sends). */
     private val _isCompacting = MutableStateFlow(false)
     val isCompacting: StateFlow<Boolean> = _isCompacting.asStateFlow()
+
+    /**
+     * Number of summary requests issued by the current compaction run. The
+     * splitter suspends between calls, so the counter must remain correct even
+     * when coroutines resume on different IO threads.
+     */
+    private val compactCallsIssued = AtomicInteger(0)
+
+    private class CompactCallBudgetExceeded : IllegalStateException(
+        "Compaction call budget exhausted",
+    )
 
     /** Current auto-retry attempt number (0 = not retrying, 1..MAX = nth retry in flight). */
     private val _autoRetryAttempt = MutableStateFlow(0)
@@ -1886,6 +1937,10 @@ class ChatViewModel(
         // onFinished callback.
         markStarted()
         _isCompacting.value = true
+        compactCallsIssued.set(0)
+        val compactTimeoutMs = compactTimeoutMsFor(
+            buildConversationTextForSummary(toCompact).length,
+        )
         viewModelScope.launch(Dispatchers.IO) {
             // [T-android-compact-queued-drain] Only a SUCCESSFUL compact kicks
             // the queued-prompt drain below; failure/cancel/empty-summary paths
@@ -1894,14 +1949,16 @@ class ChatViewModel(
             try {
                 val existing = _compactSummary.value
                 // Mirrors iOS `generateCompactSummaryWithSplitting` — when the
-                // joined transcript exceeds the model's context window, halve
-                // the message list and summarize each half independently, then
-                // merge. depth cap=3 prevents pathological recursion.
-                val rawSummary = generateCompactSummaryWithSplitting(
-                    messages = toCompact,
-                    previousSummary = existing,
-                    depth = 0,
-                ).trim()
+                // joined transcript exceeds the model's context window, split
+                // at a safe message boundary and summarize each half
+                // independently. depth cap=3 prevents pathological recursion.
+                val rawSummary = withTimeout(compactTimeoutMs) {
+                    generateCompactSummaryWithSplitting(
+                        messages = toCompact,
+                        previousSummary = existing,
+                        depth = 0,
+                    ).trim()
+                }
                 val summary = appendAuthoritativeFileActivity(
                     summary = rawSummary,
                     previousSummary = existing,
@@ -2049,6 +2106,14 @@ class ChatViewModel(
                     )
                 }
                 compactSucceeded = true
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "Compact timed out after ${compactTimeoutMs}ms", e)
+                withContext(Dispatchers.Main) {
+                    appendSystemInfo(
+                        text = "Compaction timed out after ${compactTimeoutMs / 1_000}s. Try again later.",
+                        iconKind = "compact",
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -2953,15 +3018,24 @@ class ChatViewModel(
      *
      * Depth cap = 3 (matches iOS) so a pathologically large conversation
      * still terminates instead of fanning out indefinitely. At each split we
-     * halve by message count, summarize each half independently, then ask the
-     * LLM to merge the two partial summaries into one — prioritizing Part 2
-     * (more recent) when space is tight, again matching iOS behavior.
+     * choose a structurally safe message boundary, summarize each half
+     * independently, and join the partial summaries locally. The call budget
+     * and outer timeout bound the total work even when a provider keeps
+     * returning size-related failures.
      */
     private suspend fun generateCompactSummaryWithSplitting(
         messages: List<LLMMessage>,
         previousSummary: String? = null,
         depth: Int = 0,
     ): String {
+        val callNumber = compactCallsIssued.incrementAndGet()
+        if (callNumber > MAX_COMPACT_LLM_CALLS) {
+            throw CompactCallBudgetExceeded()
+        }
+        AppLogger.info(
+            TAG,
+            "[Compact] summary call $callNumber/$MAX_COMPACT_LLM_CALLS (messages=${messages.size}, depth=$depth)",
+        )
         val transcript = buildConversationTextForSummary(messages)
         val conversationText = if (previousSummary.isNullOrBlank()) {
             transcript
@@ -2974,35 +3048,31 @@ class ChatViewModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (!isSegmentRetryableError(e) || messages.size < 2 || depth >= 3) {
+            if (
+                e is CompactCallBudgetExceeded ||
+                !isSegmentRetryableError(e) ||
+                messages.size < 2 ||
+                depth >= 3 ||
+                compactCallsIssued.get() + 2 > MAX_COMPACT_LLM_CALLS
+            ) {
                 throw e
             }
-            val mid = messages.size / 2
-            val firstHalf = messages.subList(0, mid).toList()
-            val secondHalf = messages.subList(mid, messages.size).toList()
+            val split = CompactSplitPredicate.findSafeSplit(messages, messages.size / 2)
+                ?: throw e
+            val firstHalf = messages.subList(0, split).toList()
+            val secondHalf = messages.subList(split, messages.size).toList()
             AppLogger.info(
                 TAG,
-                "[Compact] Splitting ${messages.size} messages into ${firstHalf.size} + ${secondHalf.size} (depth=$depth)",
+                "[Compact] Splitting ${messages.size} messages at $split into " +
+                    "${firstHalf.size} + ${secondHalf.size} (depth=$depth)",
             )
             val summary1 = generateCompactSummaryWithSplitting(firstHalf, null, depth + 1)
             val summary2 = generateCompactSummaryWithSplitting(secondHalf, null, depth + 1)
-            val mergeInput = buildString {
-                append("Merge these partial summaries into a single cohesive context summary. ")
-                append("Frame everything as past events (what was asked, what was done) rather than as ")
-                append("ongoing goals or todos — the user's next message will set the current task.\n\n")
-                append("MUST PRESERVE:\n")
-                append("- What was done and what was tried, with outcomes (record as past events)\n")
-                append("- The last thing the user requested in this conversation, and how it was handled\n")
-                append("- All file paths, identifiers, URLs — copy verbatim\n")
-                append("- Decisions made and their rationale\n")
-                append("- Constraints, rules, and user preferences mentioned\n\n")
-                append("Do NOT carry forward \"pending\" or \"todo\" lists that imply standing work — if the user ")
-                append("still wants those, they will say so in their next message.\n\n")
-                append("PRIORITIZE Part 2 (more recent) over Part 1 (older) when space is tight.\n\n")
-                append("Part 1:\n").append(summary1).append("\n\n")
-                append("Part 2:\n").append(summary2)
-            }
-            generateCompactSummary(mergeInput)
+            // A third LLM merge request was the source of another hidden
+            // multiplier in the old implementation. Both partial summaries
+            // already obey the same system prompt, so preserving them in
+            // chronological order is deterministic and stays within budget.
+            summary1 + "\n\n" + summary2
         }
     }
 
@@ -3082,18 +3152,7 @@ class ChatViewModel(
      * burden of proof is inverted — retry unless retrying is provably pointless.
      */
     private fun isSegmentRetryableError(error: Throwable): Boolean {
-        if (error is CancellationException) return false
-        if (error is LLMError) {
-            return when (error) {
-                is LLMError.Cancelled, is LLMError.NetworkError -> false
-                else -> true
-            }
-        }
-        // Raw OkHttp/socket failures are the Android equivalent of iOS's
-        // NSURLErrorDomain bail-out: offline / DNS / TLS / timeout, all
-        // payload-size independent.
-        if (error is java.io.IOException) return false
-        return true
+        return shouldSplitOnError(error)
     }
 
     /**
