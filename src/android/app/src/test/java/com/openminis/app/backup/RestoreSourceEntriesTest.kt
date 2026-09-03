@@ -71,12 +71,16 @@ class RestoreSourceEntriesTest {
     @Test
     fun `its strings are gone from every locale`() {
         val dead = listOf("backup_choose_shared", "backup_shared_title", "backup_shared_empty")
-        for (locale in listOf("values", "values-zh", "values-es")) {
-            val f = File("src/main/res/$locale/strings.xml")
-            assertTrue("missing $locale/strings.xml", f.isFile)
+        val resourceRoot = File("src/main/res")
+        val localeFiles = resourceRoot.listFiles().orEmpty()
+            .filter { it.isDirectory && (it.name == "values" || it.name.startsWith("values-")) }
+            .map { File(it, "strings.xml") }
+            .filter { it.isFile }
+        assertTrue("expected at least one locale strings.xml", localeFiles.isNotEmpty())
+        for (f in localeFiles) {
             val xml = f.readText()
             for (key in dead) {
-                assertFalse("$locale still declares $key", xml.contains("\"$key\""))
+                assertFalse("${f.parentFile.name} still declares $key", xml.contains("\"$key\""))
             }
         }
     }

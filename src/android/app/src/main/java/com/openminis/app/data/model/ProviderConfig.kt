@@ -208,6 +208,11 @@ data class ProviderInstance(
     val providerType: ProviderType,
     val credentialType: ProviderCredential,
     var isEnabled: Boolean = true,
+    /**
+     * Keep the provider backup wire format compatible with iOS while accepting
+     * legacy Android epoch-millis values on import.
+     */
+    @Serializable(with = com.openminis.app.backup.Iso8601MillisSerializer::class)
     val createdAt: Long = System.currentTimeMillis(),
     var customBaseURL: String? = null,
     // Canonical HTTP origin explicitly approved on this device. null means no
