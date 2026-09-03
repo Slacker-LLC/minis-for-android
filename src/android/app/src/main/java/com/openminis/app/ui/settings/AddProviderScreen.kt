@@ -739,6 +739,9 @@ private fun ColumnScope.OAuthConfigSection(
         ProviderType.openRouter -> "Sign in with OpenRouter"
         ProviderType.xAI -> "Sign in with xAI"
         ProviderType.kimiCode -> "Sign in with Kimi Code"
+        ProviderType.openAIResponses -> "Sign in with OpenAI"
+        ProviderType.antigravity,
+        ProviderType.unsupported -> "Sign in"
     }
 
     // [T-kimi-oauth] Device-code dialog state: non-null while a Kimi login is
