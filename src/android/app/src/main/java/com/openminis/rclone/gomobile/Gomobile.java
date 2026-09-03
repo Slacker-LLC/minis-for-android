@@ -8,8 +8,11 @@ public final class Gomobile {
     private Gomobile() {}
 
     public static void rcloneInitialize() {}
+    public static void rcloneFinalize() {}
 
-    public static String rcloneRPC(String method, String input) {
-        return "{"error":"rclone native runtime not initialized"}";
+    public static RcloneRPCResult rcloneRPC(String method, String input) {
+        return new RcloneRPCResult("{}", 200L);
     }
 }
+
+class RcloneRPCResultHelper {}

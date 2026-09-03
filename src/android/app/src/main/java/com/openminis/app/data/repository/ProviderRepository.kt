@@ -2719,8 +2719,8 @@ class ProviderRepository(private val context: Context) {
     }
 
     fun collectBackupProviderSecret(instance: ProviderInstance): com.openminis.app.backup.BackupSecrets.ProviderSecret? {
-        val apiKey = getApiKey(instance.id)
-        val mgr = com.openminis.app.auth.OAuthManager.forInstance(context, instance) ?: oauthManagerFor(instance)
+        val apiKey = loadApiKey(instance.id)
+        val mgr = oauthManagerFor(instance) ?: com.openminis.app.auth.OAuthManager.forInstance(context, instance)
         val manualToken = mgr?.loadManualBearerToken()
         val tokenJson = mgr?.exportStoredTokensJson()
         val email = if (instance.providerType == ProviderType.gemini && mgr != null) mgr.exportOAuthString("email") else null
@@ -2729,11 +2729,11 @@ class ProviderRepository(private val context: Context) {
             instanceId = instance.id,
             label = instance.label,
             providerType = instance.providerType.name,
-            apiKey = apiKey?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
-            manualOAuthToken = manualToken?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
-            oauthToken = tokenJson?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
-            oauthEmail = email?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
-            oauthGcpProject = gcpProject?.let { Base64.encodeToString(it.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) },
+            apiKey = if (apiKey != null) Base64.encodeToString(apiKey.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            manualOAuthToken = if (manualToken != null) Base64.encodeToString(manualToken.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthToken = if (tokenJson != null) Base64.encodeToString(tokenJson.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthEmail = if (email != null) Base64.encodeToString(email.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
+            oauthGcpProject = if (gcpProject != null) Base64.encodeToString(gcpProject.toByteArray(Charsets.UTF_8), Base64.NO_WRAP) else null,
         )
         return if (sec.isEmpty) null else sec
     }
@@ -2758,18 +2758,17 @@ class ProviderRepository(private val context: Context) {
             if (existing) {
                 skipped++
             } else {
-                val scope = if (r.scope == "allModels") {
-                    ThinkingRule.Scope.AllModels
-                } else {
-                    ThinkingRule.Scope.ModelPattern(r.pattern.orEmpty())
-                }
-                val rule = ThinkingRule(
+                val entity = ProviderThinkingRuleEntity(
                     id = r.id,
-                    name = r.name,
-                    scope = scope,
-                    budget = com.openminis.app.provider.thinking.ThinkingBudget.Fixed(r.budget ?: 0),
-                    systemPrompt = r.prompt,
+                    providerInstanceId = r.instanceId,
+                    label = r.label,
+                    scopeKind = r.scopeKind,
+                    scopePattern = r.scopePattern,
+                    wireFormatJson = r.wireFormatJson,
+                    reasoningEchoJson = r.echoField,
+                    sortOrder = r.sortOrder,
                 )
+                val rule = ThinkingRuleCoding.toRule(entity)
                 saveThinkingRule(r.instanceId, rule, r.id)
                 written++
             }
