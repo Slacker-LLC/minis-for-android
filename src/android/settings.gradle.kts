@@ -17,6 +17,9 @@ dependencyResolutionManagement {
         // uses, so both platforms segment speech with the same model and the
         // same tunables.
         maven { url = uri("https://jitpack.io") }
+        // rclone.aar is generated from deps/rclone-mobile by
+        // deps/build_rclone_android.sh and is supplied to Gradle from app/libs.
+        flatDir { dirs("app/libs") }
     }
 }
 

@@ -906,10 +906,9 @@ class BackupImporter(
          * Two independent layers, because the enum fix alone is not enough — the
          * next iOS-only type would reproduce it exactly:
          *
-         *  1. `providerType` values this build doesn't know are rewritten to
-         *     `unsupported` BEFORE decoding, so the instance survives as a visible
-         *     (unusable) row rather than taking the file down. Mirrors iOS's
-         *     `ProviderType.decoded`, which has always been forgiving here.
+         *  1. `providerType` values this build doesn't know are dropped BEFORE
+         *     decoding, so they cannot take down the rest of the file. The
+         *     instance remains counted in the restore report.
          *  2. Anything still undecodable — a genuinely malformed object, a missing
          *     required field — is dropped individually and counted, leaving every
          *     sibling instance intact.
@@ -940,18 +939,16 @@ class BackupImporter(
                 val obj = element as? JsonObject ?: run { dropped++; null } ?: continue
                 val rawType = (obj["providerType"] as? kotlinx.serialization.json.JsonPrimitive)
                     ?.contentOrNull
-                val normalized = if (rawType != null && rawType !in knownTypes) {
+                if (rawType != null && rawType !in knownTypes) {
                     AppLogger.warning(
                         TAG,
                         "[Restore] provider instance ${obj["id"]?.jsonPrimitive?.contentOrNull}: " +
-                            "unknown providerType '$rawType' — importing as unsupported",
+                            "unknown providerType '$rawType' — dropping instance",
                     )
-                    JsonObject(
-                        obj + ("providerType" to kotlinx.serialization.json.JsonPrimitive(
-                            com.openminis.app.data.model.ProviderType.unsupported.name,
-                        )),
-                    )
-                } else obj
+                    dropped++
+                    continue
+                }
+                val normalized = obj
                 // Prove it decodes before keeping it, so a malformed sibling is
                 // rejected here rather than at the whole-document decode below.
                 val decodes = runCatching {

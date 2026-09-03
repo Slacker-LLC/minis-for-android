@@ -380,6 +380,10 @@ dependencies {
     // Silero v5 VAD (ONNX Runtime + WebRTC APM).
     implementation("com.github.helloooideeeeea:RealTimeCutVADLibraryForAndroid:1.0.5@aar")
 
+    // rclone, via the upstream gomobile binding, for backup destinations.
+    // The AAR is built in CI from deps/rclone-mobile before Gradle runs.
+    implementation(group = "", name = "rclone", ext = "aar")
+
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")

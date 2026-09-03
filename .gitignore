@@ -45,6 +45,7 @@ src/android/app/src/debug/assets/debug-skill/
 # Generated Android/shared assets
 src/android/app/src/main/assets/bashism/
 src/android/app/src/main/assets/minis-runtime/*.tar.gz
+src/android/app/libs/rclone.aar
 
 # Native build products
 src/android/app/src/main/jniLibs/**/*.so

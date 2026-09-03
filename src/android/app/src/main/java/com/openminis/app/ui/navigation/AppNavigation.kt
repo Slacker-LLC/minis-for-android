@@ -109,7 +109,12 @@ object Routes {
     const val MODEL_ENTRY_DETAIL = "model_entry/{instanceId}/{entryId}"
     const val ADD_CUSTOM_MODEL = "add_custom_model/{instanceId}"
     const val STORAGE = "storage"
-    const val BACKUP_AND_RESTORE = "backup_and_restore"
+    const val BACKUP = "backup"
+    const val BACKUP_DESTINATIONS = "backup_destinations"
+    const val BACKUP_HISTORY_DETAIL = "backup_history_detail"
+    const val BACKUP_DESTINATION_BROWSE = "backup_destination_browse"
+    const val RESTORE_BROWSE = "restore_browse"
+    const val RESTORE_SERVERS = "restore_servers"
     const val SESSION_STORAGE_DETAIL = "session_storage/{sessionId}"
     const val ROOTFS_MANAGEMENT = "rootfs_management"
     const val MIRROR_CATEGORY_DETAIL = "mirror_category/{categoryKey}"
@@ -514,9 +519,6 @@ fun AppNavigation(
                 onRootfsClick = {
                     navController.safeNavigate(Routes.ROOTFS_MANAGEMENT)
                 },
-                onBackupClick = {
-                    navController.safeNavigate(Routes.BACKUP_AND_RESTORE)
-                },
                 onScheduledTasksClick = {
                     navController.safeNavigate(Routes.SCHEDULED_TASKS)
                 },
@@ -593,6 +595,7 @@ fun AppNavigation(
                 onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
                 onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                 onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
+                onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
             )
         }
 
@@ -851,8 +854,117 @@ fun AppNavigation(
             )
         }
 
-        composable(Routes.BACKUP_AND_RESTORE) {
+        composable(Routes.BACKUP) {
             com.openminis.app.ui.settings.backup.BackupAndRestoreScreen(
+                onBack = { navController.safePopBackStack() },
+                onManageDestinations = { navController.safeNavigate(Routes.BACKUP_DESTINATIONS) },
+                onChooseRestoreServer = { navController.safeNavigate(Routes.RESTORE_SERVERS) },
+                onOpenHistoryRecord = { id ->
+                    navController.safeNavigate("${Routes.BACKUP_HISTORY_DETAIL}/$id")
+                },
+                onBrowseDestination = { name ->
+                    navController.safeNavigate(
+                        "${Routes.RESTORE_BROWSE}/" + android.net.Uri.encode(name),
+                    )
+                },
+            )
+        }
+
+        composable(
+            "${Routes.BACKUP_HISTORY_DETAIL}/{recordId}",
+            arguments = listOf(navArgument("recordId") { type = NavType.StringType }),
+        ) { entry ->
+            val id = entry.arguments?.getString("recordId").orEmpty()
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val history = remember { com.openminis.app.backup.BackupHistory.get(ctx) }
+            val record = remember(id) { history.records().firstOrNull { it.id == id } }
+            if (record == null) {
+                LaunchedEffect(Unit) { navController.safePopBackStack() }
+            } else {
+                val vm: com.openminis.app.ui.settings.backup.BackupViewModel =
+                    androidx.lifecycle.viewmodel.compose.viewModel()
+                com.openminis.app.ui.settings.backup.BackupHistoryDetailScreen(
+                    record = record,
+                    onBack = { navController.safePopBackStack() },
+                    onRemove = {
+                        history.remove(id)
+                        navController.safePopBackStack()
+                    },
+                    onRemoveWithFiles = {
+                        vm.removeHistoryRecordWithFiles(id)
+                        navController.safePopBackStack()
+                    },
+                    onOpenDestination = { name ->
+                        navController.safeNavigate(
+                            "${Routes.BACKUP_DESTINATION_BROWSE}/" +
+                                android.net.Uri.encode(name),
+                        )
+                    },
+                )
+            }
+        }
+
+        composable(
+            "${Routes.BACKUP_DESTINATION_BROWSE}/{remoteName}",
+            arguments = listOf(navArgument("remoteName") { type = NavType.StringType }),
+        ) { entry ->
+            val name = entry.arguments?.getString("remoteName").orEmpty()
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val remote = remember(name) {
+                com.openminis.app.backup.remote.RcloneRemoteStore(ctx).remote(name)
+            }
+            if (remote == null) {
+                LaunchedEffect(Unit) { navController.safePopBackStack() }
+            } else {
+                val vm: com.openminis.app.ui.settings.backup.BackupViewModel =
+                    androidx.lifecycle.viewmodel.compose.viewModel()
+                com.openminis.app.ui.settings.backup.BackupDestinationBrowseScreen(
+                    remote = remote,
+                    vm = vm,
+                    onBack = { navController.safePopBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.RESTORE_SERVERS) {
+            com.openminis.app.ui.settings.backup.RestoreServersScreen(
+                onBack = { navController.safePopBackStack() },
+                onPickServer = { name ->
+                    navController.safeNavigate(
+                        "${Routes.RESTORE_BROWSE}/" + android.net.Uri.encode(name),
+                    )
+                },
+            )
+        }
+
+        composable(
+            "${Routes.RESTORE_BROWSE}/{remoteName}",
+            arguments = listOf(navArgument("remoteName") { type = NavType.StringType }),
+        ) { entry ->
+            val name = entry.arguments?.getString("remoteName").orEmpty()
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val remote = remember(name) {
+                com.openminis.app.backup.remote.RcloneRemoteStore(ctx).remote(name)
+            }
+            if (remote == null) {
+                LaunchedEffect(Unit) { navController.safePopBackStack() }
+            } else {
+                val parent = remember(entry) { navController.getBackStackEntry(Routes.BACKUP) }
+                val vm: com.openminis.app.ui.settings.backup.BackupViewModel =
+                    androidx.lifecycle.viewmodel.compose.viewModel(parent)
+                com.openminis.app.ui.settings.backup.RestoreBrowseScreen(
+                    remote = remote,
+                    vm = vm,
+                    onBack = { navController.safePopBackStack() },
+                    onPicked = {
+                        navController.safePopBackStack(route = Routes.BACKUP, inclusive = false)
+                    },
+                )
+            }
+        }
+
+        composable(Routes.BACKUP_DESTINATIONS) {
+            com.openminis.app.ui.settings.backup.RcloneDestinationsScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }

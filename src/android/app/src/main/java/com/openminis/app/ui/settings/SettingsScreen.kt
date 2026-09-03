@@ -36,7 +36,6 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BatteryFull
 import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Extension
@@ -351,10 +350,10 @@ fun SettingsScreen(
                     showDivider = true,
                 )
                 SettingsItem(
-                    icon = Icons.Outlined.CloudUpload,
-                    iconColor = Color(0xFF5856D6),
-                    title = stringResource(R.string.backup_title),
-                    subtitle = stringResource(R.string.backup_restore_footer),
+                    icon = Icons.Outlined.Backup,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.settings_backup_restore),
+                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
                     onClick = onBackupClick,
                     showDivider = false,
                 )
