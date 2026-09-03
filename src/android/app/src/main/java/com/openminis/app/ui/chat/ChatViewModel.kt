@@ -700,6 +700,9 @@ class ChatViewModel(
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming: StateFlow<Boolean> = _isStreaming.asStateFlow()
 
+    private val _generatingMessageId = MutableStateFlow<String?>(null)
+    val generatingMessageId: StateFlow<String?> = _generatingMessageId.asStateFlow()
+
     /**
      * T261: tool detail sheet visibility, persistent across LazyColumn
      * recomposition / item disposal so a streaming tool's sheet doesn't
@@ -3535,6 +3538,13 @@ class ChatViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            _isStreaming.collect { streaming ->
+                if (!streaming) {
+                    _generatingMessageId.value = null
+                }
+            }
+        }
         // Existing sessions need their durable event high-water mark before
         // any event can be framed. A send racing this small IO read simply
         // queues unsequenced intents inside SessionEventHub; activation drains
@@ -5156,6 +5166,28 @@ class ChatViewModel(
             }
         }
         return true
+    }
+
+    /**
+     * [T-android-regenerate-assistant-message] Resolve [messageId] to its
+     * preceding user turn and trigger retryFromMessage, reusing the entire
+     * existing Agent retry / truncation / streaming execution pipeline.
+     */
+    fun regenerateAssistantMessage(messageId: String) {
+        if (_isStreaming.value || _generatingMessageId.value != null) return
+        val messages = _messages.value
+        val asstIndex = messages.indexOfFirst { it.id == messageId }
+        if (asstIndex < 0) return
+        val asstMsg = messages[asstIndex]
+        if (asstMsg.role != "assistant") return
+
+        val userIndex = messages.subList(0, asstIndex).indexOfLast { it.role == "user" }
+        if (userIndex < 0) return
+        val userMsg = messages[userIndex]
+
+        _generatingMessageId.value = messageId
+        _forceScrollToBottom.tryEmit(Unit)
+        retryFromMessage(userMsg.id)
     }
 
     /**

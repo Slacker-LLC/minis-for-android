@@ -493,6 +493,7 @@ fun ChatScreen(
     val messages by viewModel.uiMessages.collectAsState()
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val generatingMessageId by viewModel.generatingMessageId.collectAsState()
     val canResume by viewModel.canResume.collectAsState()
     val error by viewModel.error.collectAsState()
     val modelName by viewModel.modelName.collectAsState()
@@ -4059,10 +4060,14 @@ fun ChatScreen(
                                     messageId = item.messageId,
                                     rawText = item.messageMarkdown,
                                     isStreaming = item.isStreaming,
+                                    isGenerating = generatingMessageId == item.messageId,
                                     onCopy = {
                                         val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
                                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
+                                    },
+                                    onRegenerate = {
+                                        viewModel.regenerateAssistantMessage(item.messageId)
                                     },
                                     onCopyMarkdown = {
                                         MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
