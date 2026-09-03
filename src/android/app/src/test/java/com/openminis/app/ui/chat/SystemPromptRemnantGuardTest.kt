@@ -71,4 +71,22 @@ class SystemPromptRemnantGuardTest {
             }
         }
     }
+
+    @Test
+    fun mirrorSettingsPurgesAlpineAndAdoptsUbuntuApt() {
+        val categories = com.openminis.app.ui.sandbox.MirrorCategory.entries
+        assertFalse("MirrorCategory must not contain Alpine", categories.any { it.name.contains("ALPINE", ignoreCase = true) })
+        assertTrue("MirrorCategory must contain UBUNTU_APT", categories.any { it == com.openminis.app.ui.sandbox.MirrorCategory.UBUNTU_APT })
+
+        val aptCat = com.openminis.app.ui.sandbox.MirrorCategory.UBUNTU_APT
+        assertTrue("Ubuntu APT config path must target apt sources", aptCat.configPath.contains("sources"))
+
+        // Backward compatibility
+        val legacyResolved = com.openminis.app.ui.sandbox.MirrorCatalog.categoryFromKey("alpine")
+        assertTrue("Legacy 'alpine' key must map to UBUNTU_APT", legacyResolved == aptCat)
+
+        val aptMirrors = com.openminis.app.ui.sandbox.MirrorCatalog.aptMirrors
+        assertTrue("Must include official Ubuntu ports mirror", aptMirrors.any { it.baseURL.contains("ubuntu-ports") })
+        assertTrue("Must include Tsinghua TUNA mirror", aptMirrors.any { it.id.contains("tuna") })
+    }
 }

@@ -18,9 +18,9 @@
     <!-- Browser download preview copies; canonical guest bytes remain behind
          minisd and are mirrored here for ACTION_VIEW. -->
     <cache-path name="browser-downloads" path="browser_downloads/" />
-    <!-- PRoot rootfs — expose so inline video/audio cards can hand the host
+    <!-- Guest rootfs — expose so inline video/audio cards can hand the host
          file to the system player via ACTION_VIEW. -->
-    <files-path name="rootfs" path="alpine-rootfs/" />
+    <files-path name="rootfs" path="rootfs/" />
     <files-path name="sessions" path="minis-sessions/" />
     <files-path name="global" path="minis-global/" />
     <!-- Downloaded update APKs (UpdateChecker → PendingUpdateStore). Moved
