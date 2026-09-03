@@ -1572,4 +1572,9 @@
     <string name="assistant_menu_copy_markdown">复制 Markdown</string>
     <string name="assistant_menu_share">分享</string>
     <string name="assistant_menu_delete">删除消息</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI 回复 %1$d</string>
+    <string name="reply_speech_reading">正在朗读</string>
+    <string name="reply_speech_paused">已暂停</string>
+    <string name="reply_speech_completed">已读完</string>
 </resources>

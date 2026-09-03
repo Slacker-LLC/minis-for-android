@@ -3540,7 +3540,9 @@ class ChatViewModel(
     init {
         viewModelScope.launch {
             _isStreaming.collect { streaming ->
-                if (!streaming) {
+                if (streaming) {
+                    stopReplySpeech()
+                } else {
                     _generatingMessageId.value = null
                 }
             }
@@ -5190,6 +5192,113 @@ class ChatViewModel(
         retryFromMessage(userMsg.id)
     }
 
+    val replySpeechState: StateFlow<com.openminis.app.speech.ReplySpeechState> =
+        com.openminis.app.speech.VoiceOutputState.replySpeechState.asStateFlow()
+
+    private var replySpeechJob: Job? = null
+
+    fun toggleReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
+        val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
+        if (cur.activeMessageId == messageId) {
+            when (cur.status) {
+                com.openminis.app.speech.ReplySpeechState.Status.READING -> {
+                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
+                }
+                com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
+                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
+                }
+                com.openminis.app.speech.ReplySpeechState.Status.COMPLETED,
+                com.openminis.app.speech.ReplySpeechState.Status.IDLE -> {
+                    startReplySpeech(messageId, displayIndex, rawMarkdown)
+                }
+            }
+        } else {
+            startReplySpeech(messageId, displayIndex, rawMarkdown)
+        }
+    }
+
+    fun toggleReplySpeechPause() {
+        val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
+        if (!cur.isActive) return
+        when (cur.status) {
+            com.openminis.app.speech.ReplySpeechState.Status.READING -> {
+                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
+            }
+            com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
+                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun startReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
+        replySpeechJob?.cancel()
+        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        val plainText = MarkdownClipboard.markdownToPlainText(rawMarkdown).trim()
+        if (plainText.isEmpty()) {
+            com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+            return
+        }
+
+        val sentences = com.openminis.app.speech.SpeechSentenceSplitter
+            .extractCompleteSentences(StringBuilder(plainText), streaming = false)
+            .ifEmpty { listOf(plainText) }
+
+        com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+            com.openminis.app.speech.ReplySpeechState(
+                activeMessageId = messageId,
+                displayIndex = displayIndex,
+                status = com.openminis.app.speech.ReplySpeechState.Status.READING,
+                currentSentence = 1,
+                totalSentences = sentences.size,
+            )
+
+        replySpeechJob = viewModelScope.launch {
+            val player = com.openminis.app.speech.VoiceOutputState.activePlayer
+            if (player == null) {
+                com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+                return@launch
+            }
+            for ((idx, sentence) in sentences.withIndex()) {
+                if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId != messageId) break
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value.copy(
+                        currentSentence = idx + 1,
+                        status = com.openminis.app.speech.ReplySpeechState.Status.READING,
+                    )
+                player.speakSentence(sentence)
+                while (player.isSpeaking.value && com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                    kotlinx.coroutines.delay(100)
+                }
+            }
+            if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value.copy(
+                        status = com.openminis.app.speech.ReplySpeechState.Status.COMPLETED,
+                    )
+                kotlinx.coroutines.delay(3000)
+                if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.status == com.openminis.app.speech.ReplySpeechState.Status.COMPLETED) {
+                    com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+                }
+            }
+        }
+    }
+
+    fun stopReplySpeech() {
+        replySpeechJob?.cancel()
+        replySpeechJob = null
+        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+    }
+
     /**
      * Retry from a specific user message: truncate all messages after it
      * (including the assistant response), rebuild agent history, and resend.
@@ -5535,6 +5644,9 @@ class ChatViewModel(
         }
 
         revokeMemoryWritesInDeletedMessages(deletedMessages)
+        if (deletedMessages.any { it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId }) {
+            stopReplySpeech()
+        }
 
         val sid = activeSessionId ?: return
         viewModelScope.launch {

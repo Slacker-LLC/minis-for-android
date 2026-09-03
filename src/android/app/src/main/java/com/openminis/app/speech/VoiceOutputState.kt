@@ -201,4 +201,31 @@ object VoiceOutputState {
 
     fun speedLabel(s: Float = _speed.value): String =
         if (s == s.toInt().toFloat()) "${s.toInt()}×" else "$s×"
+
+    val replySpeechState = MutableStateFlow(ReplySpeechState())
+
+    fun resetReplySpeech() {
+        replySpeechState.value = ReplySpeechState()
+    }
+}
+
+/**
+ * [T-android-reply-speech-state] Message-level TTS playback state, tracking the
+ * active AI reply, reading status, and sentence-level progress.
+ */
+data class ReplySpeechState(
+    val activeMessageId: String? = null,
+    val displayIndex: Int = 0,
+    val status: Status = Status.IDLE,
+    val currentSentence: Int = 0,
+    val totalSentences: Int = 0,
+) {
+    enum class Status {
+        IDLE,
+        READING,
+        PAUSED,
+        COMPLETED
+    }
+
+    val isActive: Boolean get() = activeMessageId != null && status != Status.IDLE
 }

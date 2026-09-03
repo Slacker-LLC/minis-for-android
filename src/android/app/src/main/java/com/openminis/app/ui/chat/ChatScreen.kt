@@ -494,6 +494,7 @@ fun ChatScreen(
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
     val generatingMessageId by viewModel.generatingMessageId.collectAsState()
+    val replySpeechState by viewModel.replySpeechState.collectAsState()
     val canResume by viewModel.canResume.collectAsState()
     val error by viewModel.error.collectAsState()
     val modelName by viewModel.modelName.collectAsState()
@@ -4056,11 +4057,17 @@ fun ChatScreen(
                                 }
                             }
                             is FlatChatItem.AssistantActions -> {
+                                val assistantDisplayIndex = remember(item.messageId, messages) {
+                                    messages.filter { it.role == "assistant" }.indexOfFirst { it.id == item.messageId } + 1
+                                }
+                                val isSpeakingThis = replySpeechState.activeMessageId == item.messageId &&
+                                    replySpeechState.status == com.openminis.app.speech.ReplySpeechState.Status.READING
                                 AssistantMessageActionBar(
                                     messageId = item.messageId,
                                     rawText = item.messageMarkdown,
                                     isStreaming = item.isStreaming,
                                     isGenerating = generatingMessageId == item.messageId,
+                                    isSpeaking = isSpeakingThis,
                                     onCopy = {
                                         val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
                                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -4068,6 +4075,9 @@ fun ChatScreen(
                                     },
                                     onRegenerate = {
                                         viewModel.regenerateAssistantMessage(item.messageId)
+                                    },
+                                    onToggleSpeak = {
+                                        viewModel.toggleReplySpeech(item.messageId, assistantDisplayIndex, item.messageMarkdown)
                                     },
                                     onCopyMarkdown = {
                                         MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
@@ -4459,7 +4469,15 @@ fun ChatScreen(
                 )
             }
 
-           // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+            // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+            ReplySpeechControlBar(
+                state = replySpeechState,
+                onTogglePause = { viewModel.toggleReplySpeechPause() },
+                onClose = { viewModel.stopReplySpeech() },
+                modifier = Modifier
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = CHAT_MAX_CONTENT_WIDTH),
+            )
             var composerWidthPx by remember { mutableStateOf(0) }
             Column(
                 modifier = Modifier
