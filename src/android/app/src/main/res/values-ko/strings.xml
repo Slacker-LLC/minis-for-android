@@ -1307,4 +1307,14 @@
     <string name="selection_copy_as_markdown">Markdown으로 복사</string>
     <string name="selection_copy_as_rich_text">서식 있는 텍스트로 복사</string>
     <string name="selection_copy_as_plain_text">일반 텍스트로 복사</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">복사</string>
+    <string name="assistant_action_regenerate">다시 생성</string>
+    <string name="assistant_action_read_aloud">소리내어 읽기</string>
+    <string name="assistant_action_branch">브랜치 생성</string>
+    <string name="assistant_action_more">더보기</string>
+    <string name="assistant_menu_select_text">텍스트 선택</string>
+    <string name="assistant_menu_copy_markdown">Markdown 복사</string>
+    <string name="assistant_menu_share">공유</string>
+    <string name="assistant_menu_delete">메시지 삭제</string>
 </resources>

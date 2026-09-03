@@ -1708,4 +1708,14 @@
     <string name="browser_downloads_open">Open</string>
     <string name="provider_no_key_required">No key required</string>
 
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Copy</string>
+    <string name="assistant_action_regenerate">Regenerate</string>
+    <string name="assistant_action_read_aloud">Read Aloud</string>
+    <string name="assistant_action_branch">Branch</string>
+    <string name="assistant_action_more">More</string>
+    <string name="assistant_menu_select_text">Select Text</string>
+    <string name="assistant_menu_copy_markdown">Copy Markdown</string>
+    <string name="assistant_menu_share">Share</string>
+    <string name="assistant_menu_delete">Delete Message</string>
 </resources>

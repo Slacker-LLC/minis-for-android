@@ -1199,4 +1199,14 @@
     <string name="selection_copy_as_markdown">Copier au format Markdown</string>
     <string name="selection_copy_as_rich_text">Copier en texte enrichi</string>
     <string name="selection_copy_as_plain_text">Copier en texte brut</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Copier</string>
+    <string name="assistant_action_regenerate">Régénérer</string>
+    <string name="assistant_action_read_aloud">Lecture vocale</string>
+    <string name="assistant_action_branch">Créer une branche</string>
+    <string name="assistant_action_more">Plus</string>
+    <string name="assistant_menu_select_text">Sélectionner le texte</string>
+    <string name="assistant_menu_copy_markdown">Copier en Markdown</string>
+    <string name="assistant_menu_share">Partager</string>
+    <string name="assistant_menu_delete">Supprimer le message</string>
 </resources>

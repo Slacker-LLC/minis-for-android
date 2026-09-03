@@ -1557,4 +1557,14 @@
     <string name="selection_copy_as_markdown">Скопировать как Markdown</string>
     <string name="selection_copy_as_rich_text">Скопировать как форматированный текст</string>
     <string name="selection_copy_as_plain_text">Скопировать как обычный текст</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Копировать</string>
+    <string name="assistant_action_regenerate">Перегенерировать</string>
+    <string name="assistant_action_read_aloud">Озвучить</string>
+    <string name="assistant_action_branch">Создать ветку</string>
+    <string name="assistant_action_more">Ещё</string>
+    <string name="assistant_menu_select_text">Выбрать текст</string>
+    <string name="assistant_menu_copy_markdown">Копировать Markdown</string>
+    <string name="assistant_menu_share">Поделиться</string>
+    <string name="assistant_menu_delete">Удалить сообщение</string>
 </resources>

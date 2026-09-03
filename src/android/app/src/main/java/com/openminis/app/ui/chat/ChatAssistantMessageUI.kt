@@ -32,6 +32,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -76,6 +79,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -134,10 +138,16 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.openminis.app.BuildConfig
 import com.openminis.app.R
+import androidx.compose.ui.draw.rotate
+import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.components.MinisAlertDialog
@@ -1123,6 +1133,266 @@ private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AssistantMessageActionBar(
+    messageId: String,
+    rawText: String,
+    isStreaming: Boolean,
+    isGenerating: Boolean = false,
+    isSpeaking: Boolean = false,
+    onCopy: () -> Unit = {},
+    onRegenerate: () -> Unit = {},
+    onToggleSpeak: () -> Unit = {},
+    onBranch: () -> Unit = {},
+    onSelectText: () -> Unit = {},
+    onCopyMarkdown: () -> Unit = {},
+    onShare: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    var isCopied by remember { mutableStateOf(false) }
+    var isRegenAnimating by remember { mutableStateOf(false) }
+    var isBranchAnimating by remember { mutableStateOf(false) }
+    var moreMenuExpanded by remember { mutableStateOf(false) }
+
+    val copyOffset by animateDpAsState(
+        targetValue = if (isCopied) (-2).dp else 0.dp,
+        animationSpec = tween(durationMillis = 180),
+        finishedListener = {
+            if (isCopied) isCopied = false
+        },
+        label = "copyOffset",
+    )
+
+    val regenSpec: AnimationSpec<Float> = if (isRegenAnimating || isGenerating) {
+        infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        )
+    } else {
+        tween(durationMillis = 200)
+    }
+    val regenRotation by animateFloatAsState(
+        targetValue = if (isRegenAnimating || isGenerating) 360f else 0f,
+        animationSpec = regenSpec,
+        label = "regenRotation",
+    )
+
+    val branchOffset by animateDpAsState(
+        targetValue = if (isBranchAnimating) 2.dp else 0.dp,
+        animationSpec = tween(durationMillis = 200),
+        finishedListener = {
+            if (isBranchAnimating) isBranchAnimating = false
+        },
+        label = "branchOffset",
+    )
+
+    val waveTransition = rememberInfiniteTransition(label = "ttsWave")
+    val waveAlpha by waveTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "waveAlpha",
+    )
+
+    Row(
+        modifier = modifier
+            .padding(start = 12.dp, top = 4.dp, bottom = 8.dp)
+            .wrapContentWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 1. Copy
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(enabled = !isStreaming && rawText.isNotEmpty()) {
+                    isCopied = true
+                    onCopy()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.ContentCopy,
+                contentDescription = stringResource(R.string.assistant_action_copy),
+                tint = if (isStreaming || rawText.isEmpty()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                },
+                modifier = Modifier
+                    .size(20.dp)
+                    .offset(x = copyOffset, y = copyOffset),
+            )
+        }
+
+        // 2. Regenerate
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(enabled = !isStreaming && !isGenerating) {
+                    isRegenAnimating = true
+                    onRegenerate()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = stringResource(R.string.assistant_action_regenerate),
+                tint = if (isStreaming || isGenerating) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                },
+                modifier = Modifier
+                    .size(20.dp)
+                    .rotate(regenRotation),
+            )
+        }
+
+        // 3. Speak
+        val speakBg = if (isSpeaking) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(speakBg)
+                .clickable(enabled = !isStreaming && rawText.isNotEmpty()) {
+                    onToggleSpeak()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.VolumeUp,
+                contentDescription = stringResource(R.string.assistant_action_read_aloud),
+                tint = if (isSpeaking) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = waveAlpha)
+                } else if (isStreaming || rawText.isEmpty()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                },
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        // 4. Branch
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(enabled = !isStreaming) {
+                    isBranchAnimating = true
+                    onBranch()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.AccountTree,
+                contentDescription = stringResource(R.string.assistant_action_branch),
+                tint = if (isStreaming) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                },
+                modifier = Modifier
+                    .size(20.dp)
+                    .offset(x = branchOffset),
+            )
+        }
+
+        // 5. More
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { moreMenuExpanded = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.MoreHoriz,
+                contentDescription = stringResource(R.string.assistant_action_more),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                modifier = Modifier.size(20.dp),
+            )
+
+            MinisMenu(
+                expanded = moreMenuExpanded,
+                onDismissRequest = { moreMenuExpanded = false },
+                modifier = Modifier.widthIn(min = 210.dp),
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_select_text)) },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onSelectText()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.SelectAll,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_copy_markdown)) },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onCopyMarkdown()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_share)) },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onShare()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(R.string.assistant_menu_delete),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    onClick = {
+                        moreMenuExpanded = false
+                        onDelete()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
                 )
             }
         }

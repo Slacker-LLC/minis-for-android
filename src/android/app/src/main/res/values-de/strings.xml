@@ -1309,4 +1309,14 @@
     <string name="selection_copy_as_markdown">Als Markdown kopieren</string>
     <string name="selection_copy_as_rich_text">Als formatierten Text kopieren</string>
     <string name="selection_copy_as_plain_text">Als reinen Text kopieren</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Kopieren</string>
+    <string name="assistant_action_regenerate">Neu generieren</string>
+    <string name="assistant_action_read_aloud">Vorlesen</string>
+    <string name="assistant_action_branch">Zweig erstellen</string>
+    <string name="assistant_action_more">Mehr</string>
+    <string name="assistant_menu_select_text">Text auswählen</string>
+    <string name="assistant_menu_copy_markdown">Markdown kopieren</string>
+    <string name="assistant_menu_share">Teilen</string>
+    <string name="assistant_menu_delete">Nachricht löschen</string>
 </resources>

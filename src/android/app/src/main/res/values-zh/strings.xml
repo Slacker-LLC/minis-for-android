@@ -1562,4 +1562,14 @@
     <string name="model_picker_quick_test">快速测试</string>
     <string name="provider_no_key_required">无需密钥</string>
 
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">复制</string>
+    <string name="assistant_action_regenerate">重新生成</string>
+    <string name="assistant_action_read_aloud">朗读</string>
+    <string name="assistant_action_branch">创建分支</string>
+    <string name="assistant_action_more">更多</string>
+    <string name="assistant_menu_select_text">选择文本</string>
+    <string name="assistant_menu_copy_markdown">复制 Markdown</string>
+    <string name="assistant_menu_share">分享</string>
+    <string name="assistant_menu_delete">删除消息</string>
 </resources>

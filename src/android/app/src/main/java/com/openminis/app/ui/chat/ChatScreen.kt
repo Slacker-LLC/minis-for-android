@@ -3468,11 +3468,12 @@ fun ChatScreen(
                     is FlatChatItem.AssistantThinking -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantToolUse -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
-                    is FlatChatItem.AssistantTyping -> false
-                    is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
-                    is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true
-                }
-                // SelectionContainer must wrap the WHOLE LazyColumn — placing
+                     is FlatChatItem.AssistantTyping -> false
+                     is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
+                     is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true
+                      is FlatChatItem.AssistantActions -> grayedMap[originalMessageId(messageId)] == true
+                 }
+                 // SelectionContainer must wrap the WHOLE LazyColumn — placing
                 // it per-item breaks long-press because items get disposed
                 // when scrolled out and the selection registrar/detector goes
                 // with them. One outer SelectionContainer registers each Text
@@ -4052,6 +4053,21 @@ fun ChatScreen(
                                         ),
                                     )
                                 }
+                            }
+                            is FlatChatItem.AssistantActions -> {
+                                AssistantMessageActionBar(
+                                    messageId = item.messageId,
+                                    rawText = item.messageMarkdown,
+                                    isStreaming = item.isStreaming,
+                                    onCopy = {
+                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
+                                    },
+                                    onCopyMarkdown = {
+                                        MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
+                                    },
+                                )
                             }
                         }
                         } // Box (alpha wrapper)

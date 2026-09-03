@@ -855,4 +855,14 @@
     <string name="selection_copy_as_markdown">以 Markdown 複製</string>
     <string name="selection_copy_as_rich_text">以格式化文字複製</string>
     <string name="selection_copy_as_plain_text">以純文字複製</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">複製</string>
+    <string name="assistant_action_regenerate">重新生成</string>
+    <string name="assistant_action_read_aloud">朗讀</string>
+    <string name="assistant_action_branch">建立分支</string>
+    <string name="assistant_action_more">更多</string>
+    <string name="assistant_menu_select_text">選取文字</string>
+    <string name="assistant_menu_copy_markdown">複製 Markdown</string>
+    <string name="assistant_menu_share">分享</string>
+    <string name="assistant_menu_delete">刪除訊息</string>
 </resources>
