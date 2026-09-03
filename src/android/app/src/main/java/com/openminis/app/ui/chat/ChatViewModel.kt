@@ -10,6 +10,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.lazy.LazyListState
 import com.openminis.app.agent.Level
+import com.openminis.app.agent.InterruptedTailDetector
+import com.openminis.app.agent.InterruptedTailShape
 import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserTabPool
@@ -4161,7 +4163,7 @@ class ChatViewModel(
             }
 
             // Cold-start interrupt detection: an agent loop that was killed by
-            // the OS (or app force-quit) leaves agentHistory in one of three
+            // the OS (or app force-quit) leaves agentHistory in one of four
             // tell-tale shapes. Detecting any of them lets the user tap
             // Resume to pick up where the model left off — the in-memory
             // [_canResume] flag set by [handleUserCancelledCleanup] is lost
@@ -4174,26 +4176,15 @@ class ChatViewModel(
             //   Case C: last entry is user with the synthetic "Continue"
             //           reminder text — text-cancel handler committed it
             //           but [resume] never re-entered the agent loop.
+            //   Case D: last entry is a non-empty user turn with no reply —
+            //           the process died after persisting the prompt.
             val lastEntry = agentHistory.lastOrNull()
-            if (lastEntry != null && !_isStreaming.value) {
-                val isInterrupted = when (lastEntry.role) {
-                    LLMMessage.Role.USER -> {
-                        val parts = lastEntry.contentParts
-                        val allToolResults = parts.isNotEmpty() &&
-                            parts.all { it is AgentContentPart.ToolResult }
-                        val isContinueReminder = parts.size == 1 &&
-                            (parts.first() as? AgentContentPart.Text)?.text
-                                ?.contains("The user stopped the previous response") == true
-                        allToolResults || isContinueReminder
-                    }
-                    LLMMessage.Role.ASSISTANT -> {
-                        lastEntry.contentParts.any { it is AgentContentPart.ToolUse }
-                    }
-                    else -> false
-                }
-                if (isInterrupted) {
+            val trackerActive = SessionActivityTracker.isActive(activeSessionId)
+            if (lastEntry != null && !_isStreaming.value && !trackerActive) {
+                val shape = InterruptedTailDetector.classify(lastEntry)
+                if (shape != InterruptedTailShape.NONE) {
                     _canResume.value = true
-                    Log.i(TAG, "loadSession: detected interrupted agent loop, canResume=true (lastRole=${lastEntry.role})")
+                    Log.i(TAG, "loadSession: detected interrupted agent loop, canResume=true (shape=$shape)")
                 }
             }
             } finally {
