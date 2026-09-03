@@ -342,7 +342,9 @@ fun AppNavigation(
             com.openminis.app.crash.CrashFrequencyDetector.shouldForceHomeOnLaunch(context) ||
             com.openminis.app.diagnostics.LaunchCycleBeacon.shouldForceHomeOnLaunch()
         ) 3 else rawMode
-        val autoThresholdMs = 15L * 60 * 1000
+       val autoThresholdMs = 15L * 60 * 1000
+        val hasAnySession = chatRepository.dao.listSessions().isNotEmpty()
+        val hasAnyProvider = providerRepository.instances.isNotEmpty()
         val target: String? = when {
             // T185: if a system share is buffered and the configured launch
             // mode would leave us on the session list (mode 3 = Home), the
@@ -350,13 +352,15 @@ fun AppNavigation(
             // exactly the symptom from the bug report. Force a new draft
             // chat so the share lands in a composer.
             hasPendingShare && mode == 3 -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
+            !hasAnySession && !hasAnyProvider -> null
             mode == 1 -> chatRepository.dao.listSessions().firstOrNull()?.let { Routes.chat(it.id) }
             mode == 2 -> Routes.chat("__new__${java.util.UUID.randomUUID()}")
             mode == 3 -> null
             else -> {
                 val latest = chatRepository.dao.listSessions().firstOrNull()
-                val fresh = latest != null && System.currentTimeMillis() - latest.updatedAt < autoThresholdMs
-                if (fresh) Routes.chat(latest!!.id) else Routes.chat("__new__${java.util.UUID.randomUUID()}")
+                    ?: return@LaunchedEffect
+                val fresh = System.currentTimeMillis() - latest.updatedAt < autoThresholdMs
+                if (fresh) Routes.chat(latest.id) else Routes.chat("__new__${java.util.UUID.randomUUID()}")
             }
         }
         if (target != null) {
@@ -494,34 +498,15 @@ fun AppNavigation(
             ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
         },
     ) {
-        composable(Routes.SESSION_LIST) {
-            SessionListScreen(
+       composable(Routes.SESSION_LIST) {
+            ChatSplitScaffoldRoute(
+                initialSessionId = null,
+                navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,
-                onSessionClick = { sessionId ->
-                    navController.safeNavigate(Routes.chat(sessionId))
-                },
-                onNewChat = { sessionId ->
-                    navController.safeNavigate(Routes.chat(sessionId))
-                },
-                onSettingsClick = {
-                    navController.safeNavigate(Routes.SETTINGS)
-                },
-                onAddProviderClick = {
-                    navController.safeNavigate(Routes.ADD_PROVIDER)
-                },
-                onSelectModelsClick = {
-                    navController.safeNavigate(Routes.ONBOARDING_MODELS)
-                },
-                onTerminalClick = {
-                    navController.safeNavigate(Routes.terminal())
-                },
-                onRootfsClick = {
-                    navController.safeNavigate(Routes.ROOTFS_MANAGEMENT)
-                },
-                onScheduledTasksClick = {
-                    navController.safeNavigate(Routes.SCHEDULED_TASKS)
-                },
+                memoryRepository = memoryRepository,
+                skillRepository = skillRepository,
+                mcpRepository = mcpRepository,
             )
         }
 
@@ -530,48 +515,14 @@ fun AppNavigation(
             arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-            ChatScreen(
-                sessionId = sessionId,
+            ChatSplitScaffoldRoute(
+                initialSessionId = sessionId,
+                navController = navController,
                 chatRepository = chatRepository,
                 providerRepository = providerRepository,
                 memoryRepository = memoryRepository,
                 skillRepository = skillRepository,
                 mcpRepository = mcpRepository,
-                onBack = { navController.safePopBackStack() },
-                // [T-new-chat-menu-entry] Chat-menu "New Chat": same draft-id
-                // funnel as the session list / NewChat deep link — a fresh
-                // "__new__" route whose DB record is only created on first
-                // send, so abandoning it leaves no empty session. popUpTo
-                // removes the current chat from the stack (back → list) and
-                // a double-fire just replaces one unpersisted draft with
-                // another instead of stacking two chats.
-                onNewChat = {
-                    navController.safeNavigate(Routes.chat("__new__${java.util.UUID.randomUUID()}")) {
-                        popUpTo(Routes.SESSION_LIST) { inclusive = false }
-                        launchSingleTop = true
-                    }
-                },
-                onOpenTerminal = {
-                    navController.safeNavigate(Routes.terminal(sessionId = sessionId))
-                },
-                onOpenTerminalWithCommand = { command ->
-                    navController.safeNavigate(
-                        Routes.terminal(initCommand = command, sessionId = sessionId),
-                    )
-                },
-                onMoveToSession = { targetId ->
-                    navController.safeNavigate(Routes.chat(targetId)) {
-                        popUpTo(Routes.SESSION_LIST) { inclusive = false }
-                    }
-                },
-                onBrowseChatFiles = {
-                    navController.safeNavigate(Routes.chatFiles(sessionId))
-                },
-                onPreviewAttachment = { item ->
-                    FilePreviewHolder.currentItem = item
-                    navController.safeNavigate(Routes.FILE_PREVIEW)
-                },
-                onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
             )
         }
 

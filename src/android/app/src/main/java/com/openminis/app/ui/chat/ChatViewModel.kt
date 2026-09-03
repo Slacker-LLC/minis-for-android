@@ -109,8 +109,22 @@ class ChatViewModel(
     val mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
 ) : ViewModel() {
 
-    companion object {
-        internal const val TAG = "ChatViewModel"
+   companion object {
+       internal const val TAG = "ChatViewModel"
+
+        /**
+         * [T-android-append-to-input-eats-draft] Core snippet joiner.
+         *
+         * Pure and side-effect free so it can be unit-tested without an
+         * Android runtime; see `AppendToInputTest`.
+         */
+        internal fun joinDraftWithSnippet(draft: String, snippet: String): String? {
+            val cleaned = snippet.trim()
+            if (cleaned.isEmpty()) return null
+            if (draft.isBlank()) return "$cleaned "
+            val separator = if (draft.last().isWhitespace()) "" else " "
+            return draft + separator + cleaned + " "
+        }
 
         // [T-android-compact-runaway] Keep these names in the ViewModel for
         // compatibility with the upstream JVM contract; the values themselves
@@ -678,17 +692,10 @@ class ChatViewModel(
      * single space so we never produce `"foo  bar "` when the user's
      * draft happens to end in a trailing space already.
      */
-    fun appendToInputText(snippet: String) {
-        val cleaned = snippet.trim()
-        if (cleaned.isEmpty()) return
-        val current = _inputText.value
-        val joined = if (current.isBlank()) {
-            "$cleaned "
-        } else {
-            current.trimEnd() + " " + cleaned + " "
-        }
+   fun appendToInputText(snippet: String) {
+        val joined = joinDraftWithSnippet(_inputText.value, snippet) ?: return
         _inputText.value = joined
-    }
+   }
 
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming: StateFlow<Boolean> = _isStreaming.asStateFlow()

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -37,6 +38,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.Schedule
@@ -173,6 +175,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -234,6 +237,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -338,6 +342,29 @@ private const val STREAM_END_ARM_GRACE_MS = 1_500L
  * blank space at the bottom.
  */
 private val SLASH_PICKER_FIXED_HEIGHT: Dp = 176.dp
+private val SLASH_PICKER_MAX_HEIGHT: Dp = 280.dp
+private const val SLASH_PICKER_VISIBLE_ROWS = 4
+
+private val CHAT_MAX_CONTENT_WIDTH = 900.dp
+
+@Composable
+private fun slashPickerHeight(
+    titleSp: TextUnit = 14.sp,
+    subtitleSp: TextUnit = 11.sp,
+    verticalPadding: Dp = 7.dp,
+    iconSize: Dp = 18.dp,
+): Dp {
+    val fontScale = LocalDensity.current.fontScale
+    if (fontScale <= 1f) return SLASH_PICKER_FIXED_HEIGHT
+
+    val density = LocalDensity.current
+    return with(density) {
+        val textHeight = (titleSp.toDp() + subtitleSp.toDp()) * 1.2f
+        val rowHeight = maxOf(textHeight, iconSize) + verticalPadding * 2
+        (rowHeight * SLASH_PICKER_VISIBLE_ROWS + 8.dp)
+            .coerceIn(SLASH_PICKER_FIXED_HEIGHT, SLASH_PICKER_MAX_HEIGHT)
+    }
+}
 
 /**
  * Draw a thin scroll thumb on the right edge of a [LazyColumn] (or any
@@ -410,6 +437,9 @@ fun ChatScreen(
     skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
     onBack: () -> Unit,
+    isTwoPane: Boolean = false,
+    onToggleSidebar: (() -> Unit)? = null,
+    sidebarCollapsed: Boolean = false,
     /** [T-new-chat-menu-entry] "New Chat" from the chat "..." menu: caller
      *  navigates to a fresh draft chat (same funnel as the session list's
      *  new-chat button), replacing this chat on the back stack. */
@@ -1465,19 +1495,31 @@ fun ChatScreen(
         }.collect { AppLogger.debug("ScrollFAB2", it) }
     }
 
-    // T-drag-send-queue: shared send-or-enqueue handler used by BOTH the
-    // send-button tap and the swipe-up-to-send drag. Routes through
-    // `viewModel.sendMessage(...)` which internally dispatches to
-    // `enqueuePrompt()` when `_isStreaming.value` is true, so the message is
-    // queued rather than dropped when the agent loop is mid-flight. Slash-
-    // command input short-circuits to the command runner (mirrors the tap
-    // path). Caller decides whether to invoke this — gating (canActivate,
-    // armFraction, swipedUp) stays at the call site.
+   // T-drag-send-queue: shared send-or-enqueue handler used by BOTH the
+   // send-button tap and the swipe-up-to-send drag. Routes through
+   // `viewModel.sendMessage(...)` which internally dispatches to
+   // `enqueuePrompt()` when `_isStreaming.value` is true, so the message is
+   // queued rather than dropped when the agent loop is mid-flight. Slash-
+   // command input short-circuits to the command runner (mirrors the tap
+   // path). Caller decides whether to invoke this — gating (canActivate,
+   // armFraction, swipedUp) stays at the call site.
+    val configuration = LocalConfiguration.current
+    val hasHardwareKeyboard = configuration.keyboard ==
+        android.content.res.Configuration.KEYBOARD_QWERTY &&
+        configuration.hardKeyboardHidden ==
+        android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO
+
+    val releaseComposerAfterSend: () -> Unit = {
+        if (!hasHardwareKeyboard) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
+
     val performSendOrEnqueue: (String) -> Unit = handler@{ rawText ->
         if (viewModel.tryExecuteInputAsSlashCommand(rawText)) {
             viewModel.setInputText("")
-            keyboardController?.hide()
-            focusManager.clearFocus()
+            releaseComposerAfterSend()
             return@handler
         }
         lastSendTimeMs = System.currentTimeMillis()
@@ -1496,8 +1538,7 @@ fun ChatScreen(
         // command-row paths keep their own restore behaviour untouched.
         viewModel.endSlashSessionForSend()
         viewModel.setInputText("")
-        keyboardController?.hide()
-        focusManager.clearFocus()
+        releaseComposerAfterSend()
         viewModel.sendMessage(rawText)
         noteSendForInputModePref()
         userScrolledAway = false
@@ -2577,8 +2618,27 @@ fun ChatScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (!isTwoPane) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    } else if (onToggleSidebar != null) {
+                        IconButton(
+                            onClick = onToggleSidebar,
+                            modifier = Modifier.offset(y = (-2).dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Menu,
+                                contentDescription = stringResource(
+                                    if (sidebarCollapsed) {
+                                        R.string.chat_show_sidebar
+                                    } else {
+                                        R.string.chat_hide_sidebar
+                                    },
+                                ),
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -2914,13 +2974,15 @@ fun ChatScreen(
                 expandedHeight = 68.dp,
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
+       snackbarHost = { SnackbarHost(snackbarHostState) },
+   ) { padding ->
+        var chatPaneWidthPx by remember { mutableStateOf(0) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding(),
+                .imePadding()
+                .onGloballyPositioned { chatPaneWidthPx = it.size.width },
         ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -3539,14 +3601,16 @@ fun ChatScreen(
                     // the bubble's 4dp = 8dp (≈22px), tighter but still a clear
                     // breath under the title bar. Bottom padding and inter-
                     // message spacing are untouched.
-                    contentPadding = PaddingValues(
-                        top = 4.dp,
-                        bottom = if (bottomReserve == 0.dp) 12.dp else bottomReserve,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .onGloballyPositioned {
+                   contentPadding = PaddingValues(
+                       top = 4.dp,
+                       bottom = if (bottomReserve == 0.dp) 12.dp else bottomReserve,
+                   ),
+                   modifier = Modifier
+                       .fillMaxWidth()
+                        .wrapContentWidth(Alignment.CenterHorizontally)
+                        .widthIn(max = CHAT_MAX_CONTENT_WIDTH)
+                       .padding(horizontal = 16.dp)
+                       .onGloballyPositioned {
                             listRootCoords = it
                             if (perfFirstLayoutFired.compareAndSet(false, true)) {
                                 val info = listState.layoutInfo
@@ -4114,13 +4178,14 @@ fun ChatScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 92.dp),
                 )
-                if (lastToolBlocks.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .onGloballyPositioned { toolBarHeightPx = it.size.height }
-                            .padding(horizontal = 12.dp)
+               if (lastToolBlocks.isNotEmpty()) {
+                   Box(
+                       modifier = Modifier
+                           .align(Alignment.BottomCenter)
+                            .widthIn(max = CHAT_MAX_CONTENT_WIDTH)
+                           .fillMaxWidth()
+                           .onGloballyPositioned { toolBarHeightPx = it.size.height }
+                           .padding(horizontal = 12.dp)
                             .padding(bottom = 6.dp),
                     ) {
                         FloatingToolStatusBar(
@@ -4223,6 +4288,11 @@ fun ChatScreen(
                 // anchor, extra bottom padding = down-button height 36dp + 10dp
                 // spacing). Tapping walks BACK one user turn at a time rather
                 // than jumping to the oldest message.
+                val fabEndInset = with(LocalDensity.current) {
+                    val leftover = chatPaneWidthPx.toDp() - CHAT_MAX_CONTENT_WIDTH
+                    if (leftover > 0.dp) leftover / 2 else 0.dp
+                }
+
                 if (messages.isNotEmpty() && !isNearBottom.value) {
                     val upBaseBottom = if (lastToolBlocks.isNotEmpty()) 80.dp else 8.dp
                     androidx.compose.material3.FilledIconButton(
@@ -4245,7 +4315,7 @@ fun ChatScreen(
                         },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 12.dp, bottom = upBaseBottom + 46.dp)
+                            .padding(end = 12.dp + fabEndInset, bottom = upBaseBottom + 46.dp)
                             .then(
                                 if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
                                     shape = CircleShape,
@@ -4305,7 +4375,7 @@ fun ChatScreen(
                         },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 12.dp, bottom = fabBottomPadding)
+                            .padding(end = 12.dp + fabEndInset, bottom = fabBottomPadding)
                             .then(
                                 if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
                                     shape = CircleShape,
@@ -4356,11 +4426,15 @@ fun ChatScreen(
                 )
             }
 
-            // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+           // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+            var composerWidthPx by remember { mutableStateOf(0) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = CHAT_MAX_CONTENT_WIDTH)
+                    .onGloballyPositioned { composerWidthPx = it.size.width }
                     .padding(horizontal = 12.dp)
                     .padding(top = 2.dp, bottom = 8.dp),
             ) {
@@ -4432,10 +4506,18 @@ fun ChatScreen(
                         // visible scroll indicator. Prevents installed
                         // Skills + built-ins from pushing the menu past
                         // the input bar / off the top of the screen.
-                        val slashListState = androidx.compose.foundation.lazy.rememberLazyListState()
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
+                       val slashListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                       Box(
+                           modifier = Modifier
+                                .then(
+                                    if (composerWidthPx > 0) {
+                                        Modifier.width(
+                                            with(LocalDensity.current) { composerWidthPx.toDp() },
+                                        )
+                                    } else {
+                                        Modifier.fillMaxWidth()
+                                    },
+                                )
                                 .padding(horizontal = 12.dp)
                                 // T240: keep a thin visible border instead of the
                                 // diffuse 8dp halo that bled out past the panel edge.
@@ -4447,7 +4529,7 @@ fun ChatScreen(
                                 state = slashListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(SLASH_PICKER_FIXED_HEIGHT)
+                                    .height(slashPickerHeight())
                                     .verticalScrollbar(slashListState),
                             ) {
                             itemsIndexed(filteredSlashCommands, key = { _, c -> c.id }) { index, cmd ->
@@ -4607,9 +4689,17 @@ fun ChatScreen(
                             dismissOnClickOutside = false,
                         ),
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
+                       Column(
+                           modifier = Modifier
+                                .then(
+                                    if (composerWidthPx > 0) {
+                                        Modifier.width(
+                                            with(LocalDensity.current) { composerWidthPx.toDp() },
+                                        )
+                                    } else {
+                                        Modifier.fillMaxWidth()
+                                    },
+                                )
                                 .padding(horizontal = 12.dp)
                                 .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp))
                                 .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
@@ -4655,13 +4745,13 @@ fun ChatScreen(
                                         mentionListState.animateScrollToItem(idx)
                                     }
                                 }
-                                LazyColumn(
-                                    state = mentionListState,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(SLASH_PICKER_FIXED_HEIGHT)
-                                        .verticalScrollbar(mentionListState),
-                                ) {
+                               LazyColumn(
+                                   state = mentionListState,
+                                   modifier = Modifier
+                                       .fillMaxWidth()
+                                       .height(slashPickerHeight())
+                                       .verticalScrollbar(mentionListState),
+                               ) {
                                     itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
                                         val isSelected = i == mentionSelectedIndex
                                         Row(
@@ -5186,9 +5276,14 @@ fun ChatScreen(
                             }
                         }
                     } else
-                    // Text field (iOS: placeholder "Message Minis", no border)
-                    run {
-                        val interactionSource = remember { MutableInteractionSource() }
+                   // Text field (iOS: placeholder "Message Minis", no border)
+                   run {
+                       val interactionSource = remember { MutableInteractionSource() }
+                        var placeholderIndex by rememberSaveable {
+                            mutableIntStateOf(ComposerPlaceholderRotation.DEFAULT_INDEX)
+                        }
+                        var composerHasFocusedBefore by rememberSaveable { mutableStateOf(false) }
+                        val screenReaderEnabled = rememberScreenReaderEnabled()
                         val mergedTextStyle = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 16.5.sp * chatInputFontScale,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -5217,24 +5312,22 @@ fun ChatScreen(
                             // Intercept slash commands so "/compact" et al.
                             // run locally instead of being sent as a chat
                             // turn. Mirrors iOS performSend().
-                            if (viewModel.tryExecuteInputAsSlashCommand(inputText)) {
-                                viewModel.setInputText("")
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                                return@handler true
-                            }
-                            // T160: snapshot → clear state + IME →
-                            // sendMessage. Same ordering as the send-
-                            // button click; finishComposingText fires
-                            // when focus drops so any IME composing
-                            // buffer is committed/dropped before the
-                            // empty inputText becomes visible.
-                            val toSend = inputText
-                            lastSendTimeMs = System.currentTimeMillis()
-                            viewModel.setInputText("")
-                            keyboardController?.hide()
-                            focusManager.clearFocus()
-                            viewModel.sendMessage(toSend)
+                           if (viewModel.tryExecuteInputAsSlashCommand(inputText)) {
+                               viewModel.setInputText("")
+                               releaseComposerAfterSend()
+                               return@handler true
+                           }
+                           // T160: snapshot → clear state + IME →
+                           // sendMessage. Same ordering as the send-
+                           // button click; finishComposingText fires
+                           // when focus drops so any IME composing
+                           // buffer is committed/dropped before the
+                           // empty inputText becomes visible.
+                           val toSend = inputText
+                           lastSendTimeMs = System.currentTimeMillis()
+                           viewModel.setInputText("")
+                           releaseComposerAfterSend()
+                           viewModel.sendMessage(toSend)
                             noteSendForInputModePref()
                             userScrolledAway = false
                             coroutineScope.launch {
@@ -5328,12 +5421,39 @@ fun ChatScreen(
                                     caret = tfv.selection.end,
                                 )
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 25.dp)
-                                .focusRequester(inputFocusRequester)
-                                .onFocusChanged { inputFocused = it.isFocused }
+                           modifier = Modifier
+                               .fillMaxWidth()
+                               .heightIn(min = 25.dp)
+                               .focusRequester(inputFocusRequester)
+                               .onFocusChanged {
+                                   if (it.isFocused && !inputFocused) {
+                                       placeholderIndex = ComposerPlaceholderRotation.nextIndex(
+                                           current = placeholderIndex,
+                                           hasFocusedBefore = composerHasFocusedBefore,
+                                           sessionHasMessages = messages.isNotEmpty(),
+                                           screenReaderOn = screenReaderEnabled,
+                                           randomIndex = { bound -> kotlin.random.Random.nextInt(bound) },
+                                       )
+                                       composerHasFocusedBefore = true
+                                   }
+                                   inputFocused = it.isFocused
+                               }
                                 .onKeyEvent { event ->
+                                    if (showSlashMenu &&
+                                        event.type == KeyEventType.KeyDown &&
+                                        event.key == Key.Tab
+                                    ) {
+                                        val first = filteredSlashCommands.firstOrNull()
+                                        if (first != null) {
+                                            val newText = viewModel.executeSlashCommand(first, inputText)
+                                            viewModel.setInputText(newText)
+                                            inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                                text = newText,
+                                                selection = androidx.compose.ui.text.TextRange(newText.length),
+                                            )
+                                            return@onKeyEvent true
+                                        }
+                                    }
                                     // T-at-filepicker-keyboard: while the @-mention
                                     // menu is open, hardware Up/Down navigates the
                                     // list and Return commits the highlighted entry.
@@ -5350,7 +5470,7 @@ fun ChatScreen(
                                                 viewModel.mentionMenuDown()
                                                 return@onKeyEvent true
                                             }
-                                            Key.Enter -> {
+                                            Key.Enter, Key.Tab -> {
                                                 val result = viewModel.executeSelectedMention(
                                                     currentText = inputFieldValue.text,
                                                     currentCaret = inputFieldValue.selection.end,
@@ -5364,6 +5484,7 @@ fun ChatScreen(
                                                     )
                                                     return@onKeyEvent true
                                                 }
+                                                if (event.key == Key.Tab) return@onKeyEvent true
                                                 // Menu open but no candidates → fall
                                                 // through to Return-send / newline.
                                             }
@@ -5434,16 +5555,20 @@ fun ChatScreen(
                                         // here live.
                                         val soulName by com.openminis.app.agent.SoulStore
                                             .cachedMetadata.collectAsState()
-                                        Text(
-                                            stringResource(
-                                                R.string.chat_input_placeholder,
-                                                soulName.name,
-                                            ),
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                                            fontSize = 16.5.sp * chatInputFontScale,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
+                                        val fadeMs = if (animationsDisabled(context)) 0 else 220
+                                        Crossfade(
+                                            targetState = placeholderIndex,
+                                            animationSpec = tween(durationMillis = fadeMs),
+                                            label = "composerPlaceholder",
+                                        ) { idx ->
+                                            Text(
+                                                composerPlaceholderText(idx, soulName.name),
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                                                fontSize = 16.5.sp * chatInputFontScale,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
                                     },
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = Color.Transparent,
