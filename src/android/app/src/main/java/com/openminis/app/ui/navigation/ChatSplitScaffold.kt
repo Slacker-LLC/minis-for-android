@@ -39,7 +39,14 @@ import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +54,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.openminis.app.ui.chat.SessionDrawerContent
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
@@ -841,86 +850,193 @@ fun ChatSplitScaffoldRoute(
     skillRepository: com.openminis.app.data.repository.SkillRepository?,
     mcpRepository: com.openminis.app.data.repository.MCPRepository?,
 ) {
-    ChatSplitScaffold(
-        initialSessionId = initialSessionId,
-        listPane = { selectedSessionId, draftPlaceholderId, onSessionSelected ->
-            com.openminis.app.ui.sessions.SessionListScreen(
-                chatRepository = chatRepository,
-                providerRepository = providerRepository,
-                // Selecting a session drives the PANE navigator, not the
-                // NavHost: in two-pane mode a push would replace the whole
-                // screen instead of swapping the detail column. In single-pane
-                // the pane navigator performs the equivalent push itself, so
-                // phone behaviour is unchanged.
-                onSessionClick = onSessionSelected,
-                onNewChat = onSessionSelected,
-                onSettingsClick = { navController.safeNavigate(Routes.SETTINGS) },
-                onAddProviderClick = { navController.safeNavigate(Routes.ADD_PROVIDER) },
-                onSelectModelsClick = { navController.safeNavigate(Routes.ONBOARDING_MODELS) },
-                onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
-                onRootfsClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
-                onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
-                selectedSessionId = selectedSessionId,
-                // [T-android-draft-placeholder-row] Synthetic "New Chat" row,
-                // never persisted — see the listPane param docs.
-                draftPlaceholderId = draftPlaceholderId,
-            )
+    if (shouldUseTwoPane()) {
+        ChatSplitScaffold(
+            initialSessionId = initialSessionId,
+            listPane = { selectedSessionId, draftPlaceholderId, onSessionSelected ->
+                com.openminis.app.ui.sessions.SessionListScreen(
+                    chatRepository = chatRepository,
+                    providerRepository = providerRepository,
+                    onSessionClick = onSessionSelected,
+                    onNewChat = onSessionSelected,
+                    onSettingsClick = { navController.safeNavigate(Routes.SETTINGS) },
+                    onAddProviderClick = { navController.safeNavigate(Routes.ADD_PROVIDER) },
+                    onSelectModelsClick = { navController.safeNavigate(Routes.ONBOARDING_MODELS) },
+                    onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
+                    onRootfsClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
+                    onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
+                    selectedSessionId = selectedSessionId,
+                    draftPlaceholderId = draftPlaceholderId,
+                )
+            },
+            detailPane = { sessionId, onBackInPane, onNewChatInPane, onMoveToInPane,
+                onToggleSidebar, sidebarCollapsed ->
+                com.openminis.app.ui.chat.ChatScreen(
+                    sessionId = sessionId,
+                    chatRepository = chatRepository,
+                    providerRepository = providerRepository,
+                    memoryRepository = memoryRepository,
+                    skillRepository = skillRepository,
+                    mcpRepository = mcpRepository,
+                    onBack = onBackInPane,
+                    isTwoPane = true,
+                    onToggleSidebar = onToggleSidebar,
+                    sidebarCollapsed = sidebarCollapsed,
+                    onNewChat = onNewChatInPane,
+                    onOpenTerminal = {
+                        navController.safeNavigate(Routes.terminal(sessionId = sessionId))
+                    },
+                    onOpenTerminalWithCommand = { command ->
+                        navController.safeNavigate(
+                            Routes.terminal(initCommand = command, sessionId = sessionId),
+                        )
+                    },
+                    onMoveToSession = { targetId -> onMoveToInPane(targetId) },
+                    onBrowseChatFiles = { navController.safeNavigate(Routes.chatFiles(sessionId)) },
+                    onPreviewAttachment = { item ->
+                        FilePreviewHolder.currentItem = item
+                        navController.safeNavigate(Routes.FILE_PREVIEW)
+                    },
+                    onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
+                )
+            },
+        )
+    } else {
+        ChatPhoneDrawerScaffold(
+            initialSessionId = initialSessionId,
+            navController = navController,
+            chatRepository = chatRepository,
+            providerRepository = providerRepository,
+            memoryRepository = memoryRepository,
+            skillRepository = skillRepository,
+            mcpRepository = mcpRepository,
+        )
+    }
+}
+
+@Composable
+private fun ChatPhoneDrawerScaffold(
+    initialSessionId: String?,
+    navController: androidx.navigation.NavHostController,
+    chatRepository: com.openminis.app.data.repository.ChatRepository,
+    providerRepository: com.openminis.app.data.repository.ProviderRepository,
+    memoryRepository: com.openminis.app.data.repository.MemoryRepository?,
+    skillRepository: com.openminis.app.data.repository.SkillRepository?,
+    mcpRepository: com.openminis.app.data.repository.MCPRepository?,
+) {
+    val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
+    var currentSessionId by rememberSaveable(initialSessionId) {
+        mutableStateOf(initialSessionId ?: newDraftSessionId())
+    }
+
+    LaunchedEffect(initialSessionId) {
+        if (initialSessionId == null) {
+            val latest = chatRepository.dao.listSessions().firstOrNull()
+            if (latest != null) {
+                currentSessionId = latest.id
+            }
+        } else {
+            currentSessionId = initialSessionId
+        }
+    }
+
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val drawerWidth = minOf(300.dp, screenWidth * 0.84f)
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = true,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = ChatColors.background,
+                drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
+                modifier = Modifier.width(drawerWidth),
+            ) {
+                SessionDrawerContent(
+                    chatRepository = chatRepository,
+                    selectedSessionId = currentSessionId,
+                    onSelectSession = { sid ->
+                        currentSessionId = sid
+                        scope.launch { drawerState.close() }
+                    },
+                    onNewChat = {
+                        currentSessionId = newDraftSessionId()
+                        scope.launch { drawerState.close() }
+                    },
+                    onOpenSettings = {
+                        scope.launch { drawerState.close() }
+                        navController.safeNavigate(Routes.SETTINGS)
+                    },
+                    onOpenScheduledTasks = {
+                        scope.launch { drawerState.close() }
+                        navController.safeNavigate(Routes.SCHEDULED_TASKS)
+                    },
+                    onOpenTerminal = {
+                        scope.launch { drawerState.close() }
+                        navController.safeNavigate(Routes.terminal())
+                    },
+                    onOpenStorage = {
+                        scope.launch { drawerState.close() }
+                        navController.safeNavigate(Routes.STORAGE)
+                    },
+                )
+            }
         },
-        detailPane = { sessionId, onBackInPane, onNewChatInPane, onMoveToInPane,
-            onToggleSidebar, sidebarCollapsed ->
-            com.openminis.app.ui.chat.ChatScreen(
-                // The pane navigator's contentKey IS the session id, so a
-                // draft ("__new__…") flows through unchanged and ChatScreen's
-                // existing draft handling applies untouched.
-                sessionId = sessionId,
-                chatRepository = chatRepository,
-                providerRepository = providerRepository,
-                memoryRepository = memoryRepository,
-                skillRepository = skillRepository,
-                mcpRepository = mcpRepository,
-                // Back inside the pair is the pane navigator's job (it knows
-                // whether that means "hide the detail" or "pop to the list").
-                onBack = onBackInPane,
-                // [T-android-tablet-split] Suppress the detail pane's back
-                // arrow while the list is beside it. shouldUseTwoPane() is the
-                // same window-size predicate the scaffold itself uses, so the
-                // two cannot disagree.
-                isTwoPane = shouldUseTwoPane(),
-                // [T-android-tablet-sidebar-collapse] Reuses the slot the back
-                // arrow vacates in two-pane, which is where the user already
-                // looks for "get me back to the list".
-                onToggleSidebar = onToggleSidebar,
-                sidebarCollapsed = sidebarCollapsed,
-                // Draft handling: the pane navigator gets a fresh `__new__…`
-                // key, so the list keeps its scroll position and simply stops
-                // highlighting a row (no persisted id matches a draft) — the
-                // two-pane equivalent of the old popUpTo(SESSION_LIST) push.
-                onNewChat = onNewChatInPane,
-                // Everything below leaves the list/detail pair entirely and so
-                // stays on the OUTER NavHost as a full-screen push.
-                onOpenTerminal = {
-                    navController.safeNavigate(Routes.terminal(sessionId = sessionId))
-                },
-                onOpenTerminalWithCommand = { command ->
-                    navController.safeNavigate(
-                        Routes.terminal(initCommand = command, sessionId = sessionId),
-                    )
-                },
-                // Move-to targets another chat, which is still inside the
-                // list/detail pair — so it swaps the detail pane rather than
-                // pushing. (The old popUpTo(SESSION_LIST) existed to avoid
-                // stacking chats on the back stack; the pane navigator has no
-                // such stack to pollute.) The target may be a `__new__…` draft
-                // from the Move-to sheet's New Chat row, which works here for
-                // the same reason onNewChat does.
-                onMoveToSession = { targetId -> onMoveToInPane(targetId) },
-                onBrowseChatFiles = { navController.safeNavigate(Routes.chatFiles(sessionId)) },
-                onPreviewAttachment = { item ->
-                    FilePreviewHolder.currentItem = item
-                    navController.safeNavigate(Routes.FILE_PREVIEW)
-                },
-                onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
-            )
-        },
-    )
+    ) {
+        com.openminis.app.ui.chat.ChatScreen(
+            sessionId = currentSessionId,
+            chatRepository = chatRepository,
+            providerRepository = providerRepository,
+            memoryRepository = memoryRepository,
+            skillRepository = skillRepository,
+            mcpRepository = mcpRepository,
+            onBack = {
+                scope.launch {
+                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                }
+            },
+            isTwoPane = false,
+            onOpenDrawer = {
+                keyboardController?.hide()
+                focusManager.clearFocus()
+                scope.launch { drawerState.open() }
+            },
+            onNewChat = {
+                currentSessionId = newDraftSessionId()
+            },
+            onMoveToSession = { targetId ->
+                currentSessionId = targetId
+            },
+            onOpenTerminal = {
+                navController.safeNavigate(Routes.terminal(sessionId = currentSessionId))
+            },
+            onOpenTerminalWithCommand = { command ->
+                navController.safeNavigate(
+                    Routes.terminal(initCommand = command, sessionId = currentSessionId),
+                )
+            },
+            onBrowseChatFiles = { navController.safeNavigate(Routes.chatFiles(currentSessionId)) },
+            onPreviewAttachment = { item ->
+                FilePreviewHolder.currentItem = item
+                navController.safeNavigate(Routes.FILE_PREVIEW)
+            },
+            onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
+        )
+    }
 }

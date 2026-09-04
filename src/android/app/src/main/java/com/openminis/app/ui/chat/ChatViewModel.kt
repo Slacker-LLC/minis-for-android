@@ -3782,8 +3782,15 @@ class ChatViewModel(
     }
 
     /** Ensure the session exists in the database. Called before first message. */
-    private suspend fun ensureSession(): String {
-        if (realSessionId.isNotEmpty()) return realSessionId
+    private suspend fun ensureSession(): String = withContext(Dispatchers.IO) {
+        android.util.Log.e("PROMPT_DEBUG", "ensureSession called: sessionId='$sessionId', realSessionId='$realSessionId', isDraft=$isDraft")
+        if (realSessionId.isNotEmpty()) {
+            val existing = chatRepository.dao.getSession(realSessionId)
+            android.util.Log.e("PROMPT_DEBUG", "Checking realSessionId='$realSessionId' in DB: existing=${existing != null}")
+            if (existing != null) {
+                return@withContext realSessionId
+            }
+        }
         val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
         // [T-memory-global-toggle-settings-ui-android] Snapshot the
         // current in-memory `_memoryEnabled` into the new row. For a
@@ -3799,9 +3806,7 @@ class ChatViewModel(
         // and allocate sequence numbers only after Room's high-water mark is
         // known, so a process restart cannot collide with old rows.
         SessionEventHub.rename(sessionId, session.id)
-        withContext(Dispatchers.IO) {
-            SessionEventHub.activateSession(chatRepository.dao, session.id)
-        }
+        SessionEventHub.activateSession(chatRepository.dao, session.id)
         // "New Chat in Group": file the just-promoted draft into its folder.
         // Unconditional (vs iOS setFolderIfUnfiled) — the session is seconds
         // old and nothing else can have filed it yet.
@@ -3848,7 +3853,7 @@ class ChatViewModel(
         if (binding != null) {
             chatRepository.updateSessionBinding(realSessionId, binding, modelId)
         }
-        return realSessionId
+        return@withContext realSessionId
     }
 
     /**
@@ -6627,8 +6632,12 @@ class ChatViewModel(
      *   - Sync the DB: if we popped a trailing assistant, drop just its
      *     persisted row so a re-load doesn't resurrect the failed turn.
      */
+    private var lastRetryTimestamp = 0L
+
     fun retryLast() {
-        if (_isStreaming.value) return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (_isStreaming.value || now - lastRetryTimestamp < 800L) return
+        lastRetryTimestamp = now
         // T-streaming-side-channel: belt-and-suspenders flush in case any
         // delta survived an earlier abnormal exit; retryLast is gated on
         // !isStreaming so this is normally a no-op.
@@ -6640,19 +6649,26 @@ class ChatViewModel(
         _forceScrollToBottom.tryEmit(Unit)
 
         // 1. Keep the assistant message; clear error + streaming flags + drop
-        //    in-flight tool blocks (STREAMING args / PENDING dispatch /
-        //    RUNNING execution all have no tool_result, so they'd orphan).
+        //    in-flight tool blocks. Clean any preceding empty ghost assistant messages.
         val lastMsg = msgs[lastAssistantIdx]
+        val targetAssistantId = lastMsg.id
         val keptToolBlocks = lastMsg.toolBlocks.filter { block ->
             block.toolStatus !in IN_FLIGHT_TOOL_STATUSES
         }
-        msgs[lastAssistantIdx] = lastMsg.copy(
-            error = null,
-            isStreaming = false,
-            isAwaitingModelResponse = false,
-            toolBlocks = keptToolBlocks,
-        )
-        _messages.value = msgs
+        val cleanedMsgs = msgs.filterIndexed { index, m ->
+            index == lastAssistantIdx || !(m.role == "assistant" && m.content.isBlank() && m.toolBlocks.isEmpty() && m.error == null && !m.isStreaming)
+        }.toMutableList()
+        val updatedIdx = cleanedMsgs.indexOfFirst { it.id == targetAssistantId }
+        if (updatedIdx >= 0) {
+            cleanedMsgs[updatedIdx] = lastMsg.copy(
+                content = "",
+                error = null,
+                isStreaming = true,
+                isAwaitingModelResponse = true,
+                toolBlocks = keptToolBlocks,
+            )
+        }
+        _messages.value = cleanedMsgs
         // [T-error-persist-android] Clear the persisted error sticker on the last
         // assistant row up-front. The DB-sync below only DELETES the trailing
         // assistant row when a trailing assistant was popped (Case A); in the
@@ -6780,6 +6796,7 @@ class ChatViewModel(
                             systemPrompt = systemPrompt,
                             fallbackProviders = fallbackProviders,
                             fallbackStrategy = activeFallbackStrategy,
+                            reusingAssistantId = targetAssistantId,
                         )
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
                         drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
@@ -7242,6 +7259,7 @@ class ChatViewModel(
         systemPrompt: String?,
         fallbackProviders: List<FallbackCandidate> = emptyList(),
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
+        reusingAssistantId: String? = null,
     ) {
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
 
@@ -7328,8 +7346,12 @@ class ChatViewModel(
         // `accumulatedText` are also reset at that point so the new bubble
         // starts empty and `buildTurnParts(allToolBlocks, turnStartBlockIndex,
         // toolInputMap)` continues to slice only the current turn's blocks
-        // (turnStartBlockIndex is captured at iteration start to 0 after reset).
-        var assistantId = "assistant_${System.currentTimeMillis()}"
+        var assistantId = reusingAssistantId
+            ?: if (_messages.value.lastOrNull()?.let { it.role == "assistant" && it.content.isBlank() && it.toolBlocks.isEmpty() } == true) {
+                _messages.value.last().id
+            } else {
+                "assistant_${System.currentTimeMillis()}"
+            }
         val allToolBlocks = mutableListOf<AssistantBlock>()
         // Per-tool ring of the most recent `accumulated` JSON snapshots emitted
         // by `LLMStreamChunk.ToolInputDelta`. Capped at TOOL_INPUT_CHUNK_RING_MAX
@@ -7402,13 +7424,29 @@ class ChatViewModel(
         // forced-reasoning model still streams reasoning_content.
         val turnThinkingLevel = _thinkingLevel.value
         withContext(Dispatchers.Main) {
-            val assistantPlaceholder = ChatMessage(
-                id = assistantId, role = "assistant", content = "", isStreaming = true,
-                isAwaitingModelResponse = true,
-                thinkingLevel = turnThinkingLevel,
-            )
-            _messages.value = _messages.value + assistantPlaceholder
-            sessionEventEmitter.messageCreated(assistantPlaceholder)
+            val currentList = _messages.value
+            val existingIdx = currentList.indexOfFirst { it.id == assistantId }
+            if (existingIdx >= 0) {
+                val updated = currentList.toMutableList()
+                val existing = updated[existingIdx]
+                updated[existingIdx] = existing.copy(
+                    content = "",
+                    isStreaming = true,
+                    isAwaitingModelResponse = true,
+                    toolBlocks = emptyList(),
+                    error = null,
+                    thinkingLevel = turnThinkingLevel,
+                )
+                _messages.value = updated
+            } else {
+                val assistantPlaceholder = ChatMessage(
+                    id = assistantId, role = "assistant", content = "", isStreaming = true,
+                    isAwaitingModelResponse = true,
+                    thinkingLevel = turnThinkingLevel,
+                )
+                _messages.value = currentList + assistantPlaceholder
+                sessionEventEmitter.messageCreated(assistantPlaceholder)
+            }
         }
 
         // Tracks whether the loop was exited via a `break` (any reason — no
@@ -7594,7 +7632,7 @@ class ChatViewModel(
             val turnTools = if (chatOnlyForNextTurn) {
                 emptyList()
             } else {
-                sessionOverrides.filterTools(agentTools)
+                agentTools
             }
             val turnToolNames = turnTools.mapTo(hashSetOf()) { it.name }
             val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args
@@ -8484,17 +8522,22 @@ class ChatViewModel(
                 // repair, permission/status updates, or execution. This also
                 // makes chatOnlyForNextTurn fail closed.
                 if (name !in turnToolNames) {
-                    val blockedMessage = "Error: Tool '$name' is disabled for this session."
+                    val blockedMessage = if (chatOnlyForNextTurn) {
+                        "Error: Tools are disabled in chat-only mode."
+                    } else {
+                        "Error: Tool '$name' is not available."
+                    }
                     AppLogger.warning(
                         "ToolPreflight",
-                        "BLOCKED session-disabled tool=$name id=$id session=$activeSessionId",
+                        "BLOCKED tool=$name id=$id chatOnly=$chatOnlyForNextTurn session=$activeSessionId",
                     )
                     val blockIdx = allToolBlocks.indexOfFirst { it.id == id }
+                    val failContent = if (chatOnlyForNextTurn) "Disabled in chat-only mode" else "Tool not available"
                     if (blockIdx >= 0) {
                         val elapsed = System.currentTimeMillis() - allToolBlocks[blockIdx].startTimeMs
                         allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
                             toolStatus = ToolBlockStatus.FAILED,
-                            content = "Blocked by this session's tool allow-list",
+                            content = failContent,
                             durationMs = elapsed,
                         )
                         sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])

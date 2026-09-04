@@ -50,9 +50,12 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
+import com.openminis.app.tools.android.PrivilegedAccessMode
+import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -147,6 +151,7 @@ fun SettingsScreen(
     var showSubagentLimits by remember { mutableStateOf(false) }
     var roleHeld by remember { mutableStateOf(false) }
     var roleAvailable by remember { mutableStateOf(false) }
+    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
 
     fun refreshAssistantRole() {
         val manager = roleManager
@@ -225,6 +230,19 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_token_usage),
                     subtitle = stringResource(R.string.settings_token_usage_subtitle),
                     onClick = onUsageClick,
+                    showDivider = true,
+                )
+                var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
+                SettingsToggleItem(
+                    icon = Icons.Outlined.AutoAwesome,
+                    iconColor = Color(0xFF5856D6),
+                    title = "自动压缩上下文",
+                    subtitle = "Token 达到阈值时自动压缩历史记录",
+                    checked = autoCompactState,
+                    onCheckedChange = { checked ->
+                        autoCompactState = checked
+                        com.openminis.app.data.AutoCompactPrefs.setEnabled(context, checked)
+                    },
                     showDivider = false,
                 )
             }
@@ -364,9 +382,17 @@ fun SettingsScreen(
             SettingsSection(title = stringResource(R.string.settings_section_permissions)) {
                 SettingsItem(
                     icon = Icons.Outlined.Shield,
-                    iconColor = Color(0xFF007AFF),
+                    iconColor = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        Color(0xFF007AFF)
+                    },
                     title = stringResource(R.string.settings_section_permissions),
-                    subtitle = stringResource(R.string.settings_permissions_subtitle),
+                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                        "完全访问已开启 (高危) · 控制 Agent 权限"
+                    } else {
+                        stringResource(R.string.settings_permissions_subtitle)
+                    },
                     onClick = onPermissionsClick,
                     showDivider = false,
                 )
@@ -752,6 +778,79 @@ private fun SettingsItem(
         }
 
         // Divider between items (inset to match icon alignment)
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 58.dp, end = 14.dp)
+                    .height(0.5.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleItem(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    showDivider: Boolean = true,
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(
+                        color = iconColor,
+                        shape = CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            androidx.compose.material3.Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+            )
+        }
+
         if (showDivider) {
             Box(
                 modifier = Modifier

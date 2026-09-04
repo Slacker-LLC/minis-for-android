@@ -379,7 +379,7 @@ internal fun InputCircleButton(
 ) {
     Box(
         modifier = Modifier
-            .size(38.dp)
+            .size(36.dp)
             .background(ChatColors.inputIconBg, CircleShape)
             .border(0.5.dp, ChatColors.inputIconBorder, CircleShape)
             .clip(CircleShape)

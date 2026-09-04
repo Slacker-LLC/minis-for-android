@@ -17,6 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.R
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.ui.components.MinisButton
@@ -48,6 +52,9 @@ fun OffloadPermissionDialog() {
         onDismissRequest = {
             OffloadPermissionManager.respondToRequest(OffloadPermissionManager.Response.DENY_SESSION)
         },
+        containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(16.dp),
         title = {
             Text(
                 stringResource(R.string.offload_perm_dialog_title),
@@ -61,18 +68,26 @@ fun OffloadPermissionDialog() {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    req.toolTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.offload_perm_dialog_tool_label, req.toolName),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F1EC),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(10.dp)) {
+                        Text(
+                            req.toolTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            stringResource(R.string.offload_perm_dialog_tool_label, req.toolName),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 Text(
                     req.description,

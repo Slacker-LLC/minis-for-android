@@ -103,7 +103,7 @@ class AssistantMessageActionBarTest {
     }
 
     @Test
-    fun `streaming state propagates to actions row`() {
+    fun `actions row is not emitted while streaming or when in error`() {
         val streamingMsg = ChatMessage(
             id = "asst-stream",
             role = "assistant",
@@ -113,8 +113,16 @@ class AssistantMessageActionBarTest {
                 AssistantBlock(id = "blk-s", kind = "text", content = "Streaming..."),
             ),
         )
-        val flatItems = buildFlatChatItems(listOf(streamingMsg))
-        val actionItem = flatItems.filterIsInstance<FlatChatItem.AssistantActions>().single()
-        assertTrue(actionItem.isStreaming)
+        val errorMsg = ChatMessage(
+            id = "asst-err",
+            role = "assistant",
+            content = "",
+            error = "Invalid API key",
+        )
+        val flatItemsStreaming = buildFlatChatItems(listOf(streamingMsg))
+        assertTrue(flatItemsStreaming.filterIsInstance<FlatChatItem.AssistantActions>().isEmpty())
+
+        val flatItemsError = buildFlatChatItems(listOf(errorMsg))
+        assertTrue(flatItemsError.filterIsInstance<FlatChatItem.AssistantActions>().isEmpty())
     }
 }

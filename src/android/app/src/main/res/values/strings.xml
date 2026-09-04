@@ -1748,4 +1748,11 @@
     <string name="soul_icon_error_too_large">That image is too large to store. Try a simpler one.</string>
     <string name="external_link_blocked">Blocked link to external app (%1$s)</string>
     <string name="external_link_no_app">No app available to open this link.</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">Preview</string>
+    <string name="chat_attachment_open_action">Open</string>
+    <string name="chat_attachment_full_view">Full View</string>
+    <string name="chat_attachment_expand_preview">Expand Preview</string>
+    <string name="chat_attachment_collapse_preview">Collapse Preview</string>
+    <string name="chat_attachment_card_mode">Collapse to Card</string>
 </resources>

@@ -259,21 +259,19 @@ fun FilePreviewScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            // Order matters: markdown / html before generic text — both are
-            // technically text but warrant richer renderers.
-            when {
-                item.isMarkdownFile -> MarkdownPreview(item)
-                item.isHtmlFile -> HtmlPreview(item)
-                item.isImageFile -> ImagePreview(item)
-                item.isAudioFile -> AudioPreview(item)
-                item.isVideoFile -> VideoPreview(item)
-                item.isPdfFile -> PdfPreview(item)
-                item.isCsvFile -> CsvPreview(item)
-                item.isJsonFile -> JsonPreview(item)
-                item.isArchiveFile -> ArchivePreview(item)
-                item.isOfficeFile -> OfficeOpenExternal(item)
-                item.isTextFile -> TextPreview(item)
-                else -> FileInfoView(item)
+            when (item.category) {
+                FileCategory.MARKDOWN -> MarkdownPreview(item)
+                FileCategory.HTML -> HtmlPreview(item)
+                FileCategory.IMAGE, FileCategory.GIF -> ImagePreview(item)
+                FileCategory.AUDIO -> AudioPreview(item)
+                FileCategory.VIDEO -> VideoPreview(item)
+                FileCategory.PDF -> PdfPreview(item)
+                FileCategory.CSV -> CsvPreview(item)
+                FileCategory.JSON -> JsonPreview(item)
+                FileCategory.CODE, FileCategory.TEXT -> TextPreview(item)
+                FileCategory.ARCHIVE -> ArchivePreview(item)
+                FileCategory.OFFICE -> OfficeOpenExternal(item)
+                FileCategory.UNKNOWN -> FileInfoView(item)
             }
         }
     }
@@ -408,26 +406,11 @@ private fun TextPreview(item: FileItem) {
                     HorizontalDivider()
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    Box(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    ) {
-                        Text(
-                            text = content!!,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
-                                lineHeight = 18.sp,
-                            ),
-                            softWrap = false,
-                            modifier = Modifier.padding(12.dp),
-                        )
-                    }
-                }
+                TextContentPreview(
+                    content = content!!,
+                    modifier = Modifier.fillMaxSize(),
+                    isMonospace = true,
+                )
             }
         }
 
@@ -705,50 +688,13 @@ private fun CsvPreview(item: FileItem) {
                     )
                     HorizontalDivider()
                 }
-                LazyColumn(modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState())) {
-                    items(table.size) { rowIdx ->
-                        val cols = table[rowIdx]
-                        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            cols.forEach { cell ->
-                                Text(
-                                    text = cell,
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (rowIdx == 0) FontWeight.Bold else FontWeight.Normal,
-                                    ),
-                                    modifier = Modifier.padding(end = 16.dp).width(140.dp),
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                        if (rowIdx == 0) HorizontalDivider()
-                    }
-                }
+                CsvContentPreview(
+                    rows = table,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
-}
-
-private fun parseCsvLine(line: String, sep: Char): List<String> {
-    val out = mutableListOf<String>()
-    val cur = StringBuilder()
-    var inQuotes = false
-    var i = 0
-    while (i < line.length) {
-        val c = line[i]
-        when {
-            inQuotes && c == '"' && i + 1 < line.length && line[i + 1] == '"' -> {
-                cur.append('"'); i += 2; continue
-            }
-            c == '"' -> inQuotes = !inQuotes
-            c == sep && !inQuotes -> { out.add(cur.toString()); cur.clear() }
-            else -> cur.append(c)
-        }
-        i++
-    }
-    out.add(cur.toString())
-    return out
 }
 
 // ==================== JSON pretty-print ====================
@@ -797,26 +743,11 @@ private fun JsonPreview(item: FileItem) {
                 )
                 HorizontalDivider()
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Box(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                ) {
-                    Text(
-                        text = pretty!!,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                        ),
-                        softWrap = false,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            }
+            JsonContentPreview(
+                jsonString = pretty!!,
+                modifier = Modifier.fillMaxSize(),
+                showCopyButton = false,
+            )
         }
     }
 }

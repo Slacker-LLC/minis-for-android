@@ -1,5 +1,8 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +22,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.theme.ChatColors
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,85 +102,122 @@ fun AskUserQuestionDialog(sessionId: String) {
 
     Dialog(
         onDismissRequest = { submit(skip = true) },
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { submit(skip = true) },
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "模型在等你回答",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
-                )
-                Spacer(Modifier.height(8.dp))
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
+                shape = RoundedCornerShape(18.dp),
+                color = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
+                tonalElevation = 0.dp,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                shadowElevation = 10.dp,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = q.prompt,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "模型在等你回答",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 19.sp),
                         color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
                     )
-                    Spacer(Modifier.height(12.dp))
-                    q.options.forEach { opt ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                        ) {
-                            if (q.multiple) {
-                                Checkbox(
-                                    checked = opt.value in selected,
-                                    onCheckedChange = { on ->
-                                        selected = if (on) selected + opt.value else selected - opt.value
-                                    },
-                                )
-                            } else {
-                                RadioButton(
-                                    selected = opt.value in selected,
-                                    onClick = {
-                                        selected = setOf(opt.value)
-                                        submit(skip = false)
-                                    },
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        Text(
+                            text = q.prompt,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        q.options.forEach { opt ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selected = if (q.multiple) {
+                                            if (opt.value in selected) selected - opt.value else selected + opt.value
+                                        } else {
+                                            if (opt.value in selected) emptySet() else setOf(opt.value)
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp),
+                            ) {
+                                if (q.multiple) {
+                                    Checkbox(
+                                        checked = opt.value in selected,
+                                        onCheckedChange = { checked ->
+                                            selected = if (checked) selected + opt.value else selected - opt.value
+                                        },
+                                    )
+                                } else {
+                                    RadioButton(
+                                        selected = opt.value in selected,
+                                        onClick = { selected = setOf(opt.value) },
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = opt.label + if (opt.recommended) "（推荐）" else "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
-                            Text(
-                                text = opt.label + if (opt.recommended) "（推荐）" else "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(start = 4.dp),
+                        }
+                        if (q.allowCustom) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = custom,
+                                onValueChange = { custom = it },
+                                placeholder = { Text("其他（输入你自己的答案）") },
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 3,
                             )
                         }
                     }
-                    if (q.allowCustom) {
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = custom,
-                            onValueChange = { custom = it.take(2000) },
-                            label = { Text("自定义答案") },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 3,
-                        )
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        MinisTextButton(onClick = { submit(skip = true) }) {
+                            Text("跳过", color = ChatColors.secondaryText, fontSize = 14.sp)
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        MinisTextButton(
+                            onClick = { submit(skip = false) },
+                            enabled = q.multiple || selected.isNotEmpty() || custom.isNotBlank(),
+                        ) {
+                            Text("提交", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
                     }
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    MinisTextButton(onClick = { submit(skip = true) }) { Text("跳过") }
-                    MinisTextButton(
-                        onClick = { submit(skip = false) },
-                        enabled = q.multiple || selected.isNotEmpty() || custom.isNotBlank(),
-                    ) { Text("提交") }
                 }
             }
         }
@@ -206,50 +249,84 @@ fun DangerousOperationApprovalDialog(sessionId: String) {
 
     Dialog(
         onDismissRequest = { decide(allowed = false) },
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { decide(allowed = false) },
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-                Text(
-                    text = "需要你的批准",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Agent 想执行一项可能造成破坏的操作。请先核对以下内容：",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(
-                            text = pending.toolName,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = pending.summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
+                shape = RoundedCornerShape(18.dp),
+                color = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
+                tonalElevation = 0.dp,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                shadowElevation = 10.dp,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                    Text(
+                        text = "需要你的批准",
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Agent 想执行一项可能造成破坏的操作。请先核对以下内容：",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+                        color = ChatColors.secondaryText,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F1EC),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                text = pending.toolName,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = pending.summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    MinisTextButton(onClick = { decide(allowed = false) }) { Text("拒绝") }
-                    MinisTextButton(onClick = { decide(allowed = true) }) { Text("仅此一次允许") }
+                    Spacer(Modifier.height(18.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        MinisTextButton(onClick = { decide(allowed = false) }) {
+                            Text("拒绝", color = ChatColors.secondaryText, fontSize = 14.sp)
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        MinisTextButton(onClick = { decide(allowed = true) }) {
+                            Text("仅此一次允许", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+                    }
                 }
             }
         }

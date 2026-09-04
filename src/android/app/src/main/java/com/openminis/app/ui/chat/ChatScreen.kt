@@ -36,10 +36,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.AudioFile
@@ -118,6 +120,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.CameraAlt
@@ -135,8 +138,8 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
@@ -146,8 +149,6 @@ import com.openminis.app.BuildConfig
 import com.openminis.app.R
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.tools.android.PrivilegedAccessMode
-import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisMenuDivider
@@ -440,6 +441,7 @@ fun ChatScreen(
     isTwoPane: Boolean = false,
     onToggleSidebar: (() -> Unit)? = null,
     sidebarCollapsed: Boolean = false,
+    onOpenDrawer: (() -> Unit)? = null,
     /** [T-new-chat-menu-entry] "New Chat" from the chat "..." menu: caller
      *  navigates to a fresh draft chat (same funnel as the session list's
      *  new-chat button), replacing this chat on the back stack. */
@@ -463,7 +465,6 @@ fun ChatScreen(
     onModelGroupsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     // Scoped to a process-level per-session ViewModelStore (ChatViewModelStore)
@@ -755,12 +756,15 @@ fun ChatScreen(
     // AIChatView.showThinkingLevelSheet.
     var showThinkingLevelSheet by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
+    var showModelQuickMenu by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showAgentPresetSheet by remember { mutableStateOf(false) }
     var showSkillsSheet by remember { mutableStateOf(false) }
     // [T-mcp-integration-android] MCPs-in-Session sheet visibility.
     var showMcpsSheet by remember { mutableStateOf(false) }
     // GH#32/#35: session-local prompt/model/tool overrides.
+    var showSessionConfigSheet by remember { mutableStateOf(false) }
+    var showSessionInfoSheet by remember { mutableStateOf(false) }
     var showSessionAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
@@ -2395,237 +2399,17 @@ fun ChatScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = {
-                    // iOS-style centered layout: "Minis" + group row + provider·model row
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val noFontPad = androidx.compose.ui.text.TextStyle(
-                            platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false),
-                        )
-                        // Fallback pulse animation (iOS: 3× red pulse on model switch)
-                        val fallbackTrigger by viewModel.fallbackTrigger.collectAsState()
-                        val fallbackPulseAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
-                        LaunchedEffect(fallbackTrigger) {
-                            if (fallbackTrigger == 0) return@LaunchedEffect
-                            repeat(3) {
-                                fallbackPulseAlpha.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(350))
-                                fallbackPulseAlpha.animateTo(0f, animationSpec = androidx.compose.animation.core.tween(350))
-                            }
-                        }
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.Red.copy(alpha = 0.35f * fallbackPulseAlpha.value))
-                                // [T-android-topbar-shrink] vertical 4dp→2dp.
-                                // Combined with the expandedHeight drop below,
-                                // closes the dead-space gap between the model
-                                // name row and the TopAppBar bottom edge that
-                                // T-topbar-model-row-clip's 76dp overshoot left
-                                // behind. Horizontal 32dp keeps the fallback
-                                // pulse highlight comfortably padded around
-                                // the longest title.
-                                .padding(horizontal = 32.dp, vertical = 2.dp),
-                        ) {
-                            // Nav title: current session title when one
-                            // exists and the toggle is on, else fall back to
-                            // the Soul name (matches the input placeholder
-                            // "Message <SoulName>"), then to app_name
-                            // ("Minis") as the terminal fallback.
-                            // Tap opens the same SessionEditSheet used from
-                            // the session list — drafts return null from
-                            // loadSessionEntity so the sheet stays closed.
-                            // SoulStore.cachedMetadata is the same source the
-                            // input placeholder uses (see ~line 3581), so
-                            // soul renames in Soul Settings reflect here live.
-                            val topBarSoul by com.openminis.app.agent.SoulStore
-                                .cachedMetadata.collectAsState()
-                            val displayTitle = when {
-                                showChatTitlePill
-                                    && sessionTitle.isNotBlank()
-                                    && sessionTitle != "New Chat" -> sessionTitle
-                                topBarSoul.name.isNotBlank() -> topBarSoul.name
-                                else -> stringResource(R.string.app_name)
-                            }
-                            Text(
-                                text = displayTitle,
-                                fontSize = 16.sp,
-                                lineHeight = 19.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = ChatColors.primaryText,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = noFontPad,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            editingSession = viewModel.loadSessionEntity()
-                                        }
-                                    }
-                                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                            )
-                            // Model picker subtitle: green dot + group +
-                            // provider/model. Tap opens the model picker —
-                            // separated from the title above so tapping the
-                            // title rows opens the rename sheet instead.
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { showModelPicker = true }
-                                    .padding(horizontal = 4.dp, vertical = 1.dp),
-                            ) {
-                                // Line 1: green dot + group name + dropdown arrow (iOS: "● Default ⌄")
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .background(
-                                                if (modelName.isNotEmpty()) Color(0xFF34C759) else Color(0xFFFF9500),
-                                                CircleShape,
-                                            ),
-                                    )
-                                    // T-android-topbar-group-name-fallback:
-                                    // _selectedGroupName is empty during the
-                                    // brief window before loadSession's group
-                                    // resolve runs, or whenever a binding
-                                    // resolve fails. Falling straight to the
-                                    // "Default" badge string masks the
-                                    // active group's real name (e.g. the
-                                    // onboarding-created "Default Models" or
-                                    // any user-renamed group). Insert a real
-                                    // fallback chain: collected VM value →
-                                    // active/default group name from the live
-                                    // config → terminal badge string. Mirrors
-                                    // the #476 TopBar title fallback pattern
-                                    // (commit b4c88775).
-                                    val groupNameDisplay = selectedGroupName.ifEmpty {
-                                        val defaultGroupId = providerRepository.defaultPrimaryGroupId
-                                        availableGroups.firstOrNull { it.id == defaultGroupId }?.name
-                                            ?: stringResource(R.string.model_picker_default_badge)
-                                    }
-                                    Text(
-                                        text = groupNameDisplay,
-                                        fontSize = 12.sp,
-                                        lineHeight = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = ChatColors.secondaryText,
-                                        maxLines = 1,
-                                        style = noFontPad,
-                                    )
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = ChatColors.tertiaryText,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                }
-                                // Line 2: "provider · model" (iOS: "MiniMax ·
-                                // MiniMax-M2.7") + the thinking-level badge laid
-                                // out as a Row of two SEPARATE tappable siblings
-                                // (mirrors iOS AIChatView row-2 HStack).
-                                //
-                                // [T-android-thinking-badge-navbar] Gesture
-                                // separation: the whole subtitle Column above owns
-                                // `clickable { showModelPicker = true }`, so a tap
-                                // on the model text still opens the model picker.
-                                // The badge declares its OWN `clickable` (see
-                                // ThinkingLevelBadge), and in Compose the innermost
-                                // clickable consumes the down/up events — so a tap
-                                // that lands on the badge opens the thinking sheet
-                                // and never bubbles up to the Column's model-picker
-                                // handler. Two hit targets, zero gesture conflict,
-                                // no pointerInput plumbing needed.
-                                //
-                                // Sizing: the model text takes `weight(1f, fill =
-                                // false)` so it truncates first (Ellipsis) when the
-                                // navbar is narrow; the badge has no weight, so it
-                                // keeps its intrinsic width and always renders in
-                                // full — the level label never gets clipped.
-                                if (providerName.isNotEmpty() || modelName.isNotEmpty()) {
-                                    val thinkingLevelBadgeState by viewModel.thinkingLevel.collectAsState()
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        // [T-codex-fast-mode] ⚡ badge ahead of the
-                                        // resolved model name — small orange circle
-                                        // + white bolt, shown only while Fast Mode
-                                        // is enabled AND the active model is
-                                        // eligible (iOS 9e3c76ef row-3 placement,
-                                        // 09944220 9pt sizing).
-                                        val fastBadgeEligible by viewModel.showFastModeToggle.collectAsState()
-                                        val fastBadgeOn by viewModel.fastModeEnabled.collectAsState()
-                                        if (fastBadgeEligible && fastBadgeOn) {
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier
-                                                    .size(11.dp)
-                                                    .background(Color(0xFFFF9500), CircleShape),
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Bolt,
-                                                    contentDescription = null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(9.dp),
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = if (providerName.isNotEmpty() && modelName.isNotEmpty()) {
-                                                "$providerName · $modelName"
-                                            } else {
-                                                modelName.ifEmpty { providerName }
-                                            },
-                                            fontSize = 11.sp,
-                                            lineHeight = 13.sp,
-                                            color = ChatColors.tertiaryText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            style = noFontPad,
-                                            // Yield first when space is tight; the
-                                            // badge to the right stays intrinsic.
-                                            modifier = Modifier.weight(1f, fill = false),
-                                        )
-                                        // Show the badge whenever thinking is on,
-                                        // and ALSO when it's Off but the active
-                                        // model supports deep thinking (iOS
-                                        // parity, e6bd75efc): the icon + "Off"
-                                        // pill is then a discoverable tap target
-                                        // for enabling thinking via the level
-                                        // sheet. The Off pill is gated on
-                                        // currentModelSupportsReasoning so
-                                        // non-reasoning models don't grow a dead
-                                        // toggle; an enabled level still shows
-                                        // unconditionally (user may have opted in
-                                        // on an unknown-capability model).
-                                        if (viewModel.availableThinkingLevels.isNotEmpty() &&
-                                            (
-                                                thinkingLevelBadgeState.isEnabled ||
-                                                    viewModel.currentModelSupportsReasoning
-                                            )
-                                        ) {
-                                            ThinkingLevelBadge(
-                                                level = thinkingLevelBadgeState,
-                                                onClick = { showThinkingLevelSheet = true },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
+                title = {},
                 navigationIcon = {
                     if (!isTwoPane) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        if (onOpenDrawer != null) {
+                            IconButton(onClick = onOpenDrawer) {
+                                Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                            }
+                        } else {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
                         }
                     } else if (onToggleSidebar != null) {
                         IconButton(
@@ -2655,56 +2439,31 @@ fun ChatScreen(
                         MinisMenu(
                             expanded = showChatMenu,
                             onDismissRequest = { showChatMenu = false },
+                            shape = RoundedCornerShape(14.dp),
                         ) {
-                            // [T-android-memory-enabled-minisconfig] Gate the
-                            // "Memories in Session" item below on the session's
-                            // live memoryEnabled — when memory is off the entry
-                            // disappears, consistent with the per-session gating
-                            // of the memory_get / memory_write tools and the
-                            // system-prompt injection.
-                            val menuMemoryEnabled by viewModel.memoryEnabled.collectAsState()
-                            // [T-new-chat-menu-entry] New Chat — first item
-                            // (iOS parity: square.and.pencil at the top of the
-                            // "..." menu). Streaming sessions confirm first.
+                            // 会话配置 (提示词、技能、MCP、记忆)
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_new_chat)) },
+                                text = { Text("会话配置") },
                                 onClick = {
                                     showChatMenu = false
-                                    if (isStreaming) {
-                                        showNewChatStopDialog = true
-                                    } else {
-                                        onNewChat()
-                                    }
+                                    showSessionConfigSheet = true
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Outlined.Forum, contentDescription = null)
+                                    Icon(Icons.Default.Settings, contentDescription = null)
                                 },
                             )
-                            MinisMenuDivider()
-                            // Clear Chat (iOS parity, red)
+                            // Token 用量 (直达 Token 用量面板)
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_clear_chat), color = MaterialTheme.colorScheme.error) },
+                                text = { Text("Token 用量") },
                                 onClick = {
                                     showChatMenu = false
-                                    showClearChatDialog = true
+                                    showTokenUsageSheet = true
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Outlined.BarChart, contentDescription = null)
                                 },
                             )
-                            MinisMenuDivider()
-                            // Open Terminal (iOS parity) — session-bound, starts in /var/minis
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_open_terminal)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    onOpenTerminal()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Terminal, contentDescription = null)
-                                },
-                            )
-                            // Open Browser (iOS parity)
+                            // 打开浏览器
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_open_browser)) },
                                 onClick = {
@@ -2715,222 +2474,19 @@ fun ChatScreen(
                                     Icon(Icons.Default.Language, contentDescription = null)
                                 },
                             )
-                            // Browse Chat Files (iOS parity) — opens file browser at /var/minis
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_browse_chat_files)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    onBrowseChatFiles()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Description, contentDescription = null)
-                                },
-                            )
                             MinisMenuDivider()
-                            // Session Skills (iOS parity)
-                            if (skillRepository != null) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.session_skills_title)) },
-                                    onClick = {
-                                        showChatMenu = false
-                                        showSkillsSheet = true
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Build, contentDescription = null)
-                                    },
-                                )
-                            }
-                            // [T-mcp-integration-android] MCPs in Session, next to Skills.
-                            if (mcpRepository != null) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.session_mcps_title)) },
-                                    onClick = {
-                                        showChatMenu = false
-                                        showMcpsSheet = true
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Extension, contentDescription = null)
-                                    },
-                                )
-                            }
-                            // GH#32/#35: first-class editor for session-local overrides.
+                            // 清空对话 (destructive, placed at bottom for safety)
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.session_advanced_settings_menu)) },
+                                text = { Text(stringResource(R.string.chat_menu_clear_chat), color = MaterialTheme.colorScheme.error) },
                                 onClick = {
                                     showChatMenu = false
-                                    showSessionAdvancedSettings = true
+                                    showClearChatDialog = true
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Settings, contentDescription = null)
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                                 },
                             )
-                            // Session Memory (iOS parity)
-                            if (memoryRepository != null && menuMemoryEnabled) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.session_memory_title)) },
-                                    onClick = {
-                                        showChatMenu = false
-                                        viewModel.toggleMemorySheet()
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Psychology, contentDescription = null)
-                                    },
-                                )
-                            }
-                            // Plan mode (soft) — same AgentStateStore as Web Remote
-                            val planModeOn = AgentStateStore.planGet(sessionId).mode == "plan"
-                            DropdownMenuItem(
-                                text = { Text(if (planModeOn) "退出计划模式" else "计划模式") },
-                                onClick = {
-                                    showChatMenu = false
-                                    val target = if (planModeOn) "off" else "plan"
-                                    AgentStateStore.planSet(sessionId, target)
-                                    // Same journal event the Web `/plan`
-                                    // handler emits: Android is the one plan
-                                    // state, the browser chip folds this
-                                    // frame. Without it the App→Web direction
-                                    // is silent while the Web chip keeps the
-                                    // old value until an unrelated event.
-                                    com.openminis.app.ui.chat.SessionEventHub.append(
-                                        sessionId, "plan/mode",
-                                        org.json.JSONObject().put("active", target == "plan"),
-                                    )
-                                    Toast.makeText(
-                                        context,
-                                        if (target == "off") "已退出计划模式" else "已进入计划模式",
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Schedule, contentDescription = null)
-                                },
-                            )
-                            MinisMenuDivider()
-                            // Agent Preset（Android-authoritative；与 Web 首页/设置
-                            // 共用 AgentPresetRegistry，切换立即作用于当前会话）
-                            val presetId by remember(sessionId) {
-                                mutableStateOf(
-                                    com.openminis.app.remote.AgentPresetRegistry
-                                        .presetForSession(context, sessionId).id,
-                                )
-                            }
-                            val currentPreset = com.openminis.app.remote.AgentPresetRegistry
-                                .get(presetId)
-                            DropdownMenuItem(
-                                text = { Text("Agent 预设：${currentPreset?.name ?: presetId}") },
-                                onClick = {
-                                    showChatMenu = false
-                                    showAgentPresetSheet = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Outlined.Person, contentDescription = null)
-                                },
-                            )
-                            MinisMenuDivider()
-                            // Token Usage (iOS parity)
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.settings_token_usage)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    showTokenUsageSheet = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.DataUsage, contentDescription = null)
-                                },
-                            )
-                            // Enhanced Cache (iOS parity, commit 57aaf122):
-                            // 1-hour Anthropic cache TTL. Only shown for the
-                            // official Anthropic API (not relays / other
-                            // providers) — showEnhancedCacheToggle recomputes on
-                            // model/provider switch. First enable prompts a
-                            // one-time extra-billing confirmation.
-                            val showEnhancedCache by viewModel.showEnhancedCacheToggle.collectAsState()
-                            val enhancedCacheOn by viewModel.enhancedCacheEnabled.collectAsState()
-                            if (showEnhancedCache) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.chat_menu_enhanced_cache)) },
-                                    onClick = {
-                                        if (enhancedCacheOn) {
-                                            viewModel.setEnhancedCacheEnabled(false)
-                                        } else if (viewModel.isEnhancedCacheConfirmed()) {
-                                            viewModel.setEnhancedCacheEnabled(true)
-                                        } else {
-                                            showChatMenu = false
-                                            showEnhancedCacheDialog = true
-                                        }
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Bolt, contentDescription = null)
-                                    },
-                                    trailingIcon = {
-                                        Switch(
-                                            checked = enhancedCacheOn,
-                                            onCheckedChange = {
-                                                if (enhancedCacheOn) {
-                                                    viewModel.setEnhancedCacheEnabled(false)
-                                                } else if (viewModel.isEnhancedCacheConfirmed()) {
-                                                    viewModel.setEnhancedCacheEnabled(true)
-                                                } else {
-                                                    showChatMenu = false
-                                                    showEnhancedCacheDialog = true
-                                                }
-                                            },
-                                        )
-                                    },
-                                )
-                            }
-                            // [T-codex-fast-mode] Fast Mode (iOS parity,
-                            // fb671083 + 838ba929): shown when the active model
-                            // is a gpt-family model served through the
-                            // Responses path (useResponsesAPI instance or Codex
-                            // OAuth). App-level persisted toggle; while on, the
-                            // Responses body carries service_tier="priority"
-                            // (≈1.5x faster at 2x credit burn on the ChatGPT
-                            // subscription) and the nav model row shows a ⚡
-                            // badge. Sits next to Enhanced Cache — both are
-                            // model-invocation controls (iOS 09944220 grouping).
-                            val showFastMode by viewModel.showFastModeToggle.collectAsState()
-                            val fastModeOn by viewModel.fastModeEnabled.collectAsState()
-                            if (showFastMode) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.chat_menu_fast_mode)) },
-                                    onClick = { viewModel.setFastModeEnabled(!fastModeOn) },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Bolt, contentDescription = null)
-                                    },
-                                    trailingIcon = {
-                                        Switch(
-                                            checked = fastModeOn,
-                                            onCheckedChange = { viewModel.setFastModeEnabled(it) },
-                                        )
-                                    },
-                                )
-                            }
-                            // Auto Compact: app-level persisted toggle mirroring
-                            // iOS `autoCompactEnabled`. On → crossing the
-                            // compact threshold before a send compacts silently
-                            // and sends; off → the user is asked first. Lives
-                            // beside Fast Mode because both are model-invocation
-                            // controls the user flips mid-conversation.
-                            val autoCompactOn by viewModel.autoCompactEnabled.collectAsState()
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_auto_compact)) },
-                                onClick = { viewModel.setAutoCompactEnabled(!autoCompactOn) },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Compress, contentDescription = null)
-                                },
-                                trailingIcon = {
-                                    Switch(
-                                        checked = autoCompactOn,
-                                        onCheckedChange = { viewModel.setAutoCompactEnabled(it) },
-                                    )
-                                },
-                            )
-                            // T287: debug-only crash trigger so the user can verify
-                            // ACRA/native crash log generation (T283). Throws a
-                            // RuntimeException from the click handler — the
-                            // uncaught-exception handler catches it and writes
-                            // a crash-<stamp>.log under filesDir/logs/.
+                            // T287: debug-only crash trigger
                             if (BuildConfig.DEBUG) {
                                 MinisMenuDivider()
                                 DropdownMenuItem(
@@ -3004,19 +2560,6 @@ fun ChatScreen(
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 }
-            }
-
-            if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                Text(
-                    text = "⚠ Root 完全访问已开启：Agent 命令不会逐条询问",
-                    color = Color(0xFFB00020),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFFE5E5))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
             }
 
             // Messages + scroll-to-bottom button
@@ -3647,19 +3190,22 @@ fun ChatScreen(
                         // handler. We close the menu on the very first finger
                         // down anywhere inside the chat list, exactly like
                         // tapping outside an iOS popover.
-                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy) {
-                            if (!slashMenuOpen && !mentionMenuOpenForSpy) return@pointerInput
+                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy, showAttachMenu) {
                             awaitEachGesture {
                                 awaitFirstDown(
                                     requireUnconsumed = false,
                                     pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial,
                                 )
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
                                 if (slashMenuOpen) {
                                     viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
                                 }
                                 if (mentionMenuOpenForSpy) {
                                     viewModel.dismissMentionMenu()
                                 }
+                                showAttachMenu = false
+                                showModelQuickMenu = false
                             }
                         },
                     // T303: anchor items to the visual bottom so a newly
@@ -4033,6 +3579,7 @@ fun ChatScreen(
                                     coroutineScope.launch { tracedScrollToItem("INLINE-RETRY-LAST", 0, 0) }
                                     safeMutate { viewModel.retryLast() }
                                 },
+                                isRetrying = isStreaming,
                             )
                             is FlatChatItem.AssistantLegacyContent -> BoundsTrackedBlock(
                                 messageId = item.messageId,
@@ -4598,7 +4145,7 @@ fun ChatScreen(
                                 state = slashListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(slashPickerHeight())
+                                    .heightIn(max = 220.dp)
                                     .verticalScrollbar(slashListState),
                             ) {
                             itemsIndexed(filteredSlashCommands, key = { _, c -> c.id }) { index, cmd ->
@@ -4818,7 +4365,7 @@ fun ChatScreen(
                                    state = mentionListState,
                                    modifier = Modifier
                                        .fillMaxWidth()
-                                       .height(slashPickerHeight())
+                                       .heightIn(max = 220.dp)
                                        .verticalScrollbar(mentionListState),
                                ) {
                                     itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
@@ -5725,10 +5272,16 @@ fun ChatScreen(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Left: + button (iOS: 34×34 circle, secondary bg)
+                        // Left: + button (36x36 circle, secondary bg)
                         Box {
                             InputCircleButton(
-                                onClick = { showAttachMenu = true },
+                                onClick = {
+                                    if (viewModel.showSlashMenu.value) {
+                                        viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                    }
+                                    showModelQuickMenu = false
+                                    showAttachMenu = !showAttachMenu
+                                },
                             ) {
                                 Icon(
                                     Icons.Default.Add,
@@ -5740,11 +5293,30 @@ fun ChatScreen(
                             MinisMenu(
                                 expanded = showAttachMenu,
                                 onDismissRequest = { showAttachMenu = false },
+                                shape = RoundedCornerShape(14.dp),
+                                minWidth = 160.dp,
+                                tonalElevation = 0.dp,
+                                containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
                             ) {
-                                // iOS parity: Take Photo / Choose Photos & Videos / Add File
+                                // 拍照
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.chat_attach_take_photo)) },
-                                    leadingIcon = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.chat_attach_take_photo),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ChatColors.primaryText,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.CameraAlt,
+                                            contentDescription = null,
+                                            tint = ChatColors.secondaryText,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    },
+                                    modifier = Modifier.heightIn(min = 40.dp),
                                     onClick = {
                                         showAttachMenu = false
                                         val granted = ContextCompat.checkSelfPermission(
@@ -5758,9 +5330,25 @@ fun ChatScreen(
                                         }
                                     },
                                 )
+                                // 选择照片和视频
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.chat_attach_choose_photos_videos)) },
-                                    leadingIcon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.chat_attach_choose_photos_videos),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ChatColors.primaryText,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.PhotoLibrary,
+                                            contentDescription = null,
+                                            tint = ChatColors.secondaryText,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    },
+                                    modifier = Modifier.heightIn(min = 40.dp),
                                     onClick = {
                                         showAttachMenu = false
                                         mediaPickerLauncher.launch(
@@ -5770,13 +5358,27 @@ fun ChatScreen(
                                         )
                                     },
                                 )
+                                // 添加文件
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.chat_attach_add_file)) },
-                                    leadingIcon = { Icon(Icons.Default.Description, contentDescription = null) },
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.chat_attach_add_file),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ChatColors.primaryText,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Description,
+                                            contentDescription = null,
+                                            tint = ChatColors.secondaryText,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    },
+                                    modifier = Modifier.heightIn(min = 40.dp),
                                     onClick = {
                                         showAttachMenu = false
-                                        // OpenMultipleDocuments takes a mime-
-                                        // type array; "*/*" stays the wildcard.
                                         filePickerLauncher.launch(arrayOf("*/*"))
                                     },
                                 )
@@ -5785,30 +5387,292 @@ fun ChatScreen(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Left: "/" slash command button (iOS: italic /, bold)
-                        InputCircleButton(onClick = {
-                            if (viewModel.showSlashMenu.value) {
-                                viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                            } else {
-                                viewModel.setInputText(viewModel.showSlashMenuOverInput(inputText))
+                        // Middle: Model selection & status pills - ONLY COMPRESSIBLE REGION
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val editingId by viewModel.editingMessageId.collectAsState()
+                            var expandedGroupId by remember(selectedGroupId) { mutableStateOf<String?>(selectedGroupId) }
+                            Box(
+                                modifier = Modifier.weight(1f, fill = false),
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.5.dp,
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                    ),
+                                    modifier = Modifier
+                                        .height(36.dp)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .clickable {
+                                            showAttachMenu = false
+                                            if (viewModel.showSlashMenu.value) {
+                                                viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                            }
+                                            expandedGroupId = selectedGroupId
+                                            showModelQuickMenu = !showModelQuickMenu
+                                        },
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(7.dp)
+                                                .background(
+                                                    if (modelName.isNotEmpty()) Color(0xFF34C759) else Color(0xFFFF9500),
+                                                    CircleShape,
+                                                ),
+                                        )
+                                        val rawModel = modelName.ifEmpty { selectedGroupName.ifEmpty { "选择模型" } }
+                                        val displayModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
+                                        Text(
+                                            text = displayModel,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = ChatColors.primaryText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = ChatColors.secondaryText,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
                             }
-                        }) {
-                            Text(
-                                "/",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontStyle = FontStyle.Italic,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+
+                            // Model selection floating menu (styled identically to Image 1: compact, clean, single-line)
+                            MinisMenu(
+                                expanded = showModelQuickMenu,
+                                onDismissRequest = { showModelQuickMenu = false },
+                                shape = RoundedCornerShape(16.dp),
+                                minWidth = 175.dp,
+                                tonalElevation = 0.dp,
+                                containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
+                            ) {
+                                val currentConfig by providerRepository.config.collectAsState()
+                                val activeEntryId by viewModel.activeEntryId.collectAsState()
+
+                                if (availableGroups.size > 1) {
+                                    // Multiple groups: show clean single-line group rows and expandable members
+                                    availableGroups.forEach { group ->
+                                        val isGroupSelected = group.id == selectedGroupId
+                                        val isExpanded = expandedGroupId == group.id
+                                        val memberEntries = group.memberEntryIds.mapNotNull { id ->
+                                            currentConfig.modelEntries.firstOrNull { it.id == id }
+                                        }
+
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = group.name,
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = if (isGroupSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    color = ChatColors.primaryText,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.Layers,
+                                                    contentDescription = null,
+                                                    tint = if (isGroupSelected) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                Icon(
+                                                    if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = null,
+                                                    tint = ChatColors.secondaryText,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            },
+                                            modifier = Modifier.heightIn(min = 40.dp),
+                                            onClick = {
+                                                if (isExpanded) {
+                                                    expandedGroupId = null
+                                                } else {
+                                                    expandedGroupId = group.id
+                                                    if (!isGroupSelected) {
+                                                        viewModel.selectGroup(group.id)
+                                                    }
+                                                }
+                                            },
+                                        )
+
+                                        if (isExpanded) {
+                                            memberEntries.forEach { entry ->
+                                                val isEntrySelected = isGroupSelected && entry.id == activeEntryId
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = entry.model.displayName,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                            color = ChatColors.primaryText,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                        )
+                                                    },
+                                                    leadingIcon = {
+                                                        Icon(
+                                                            Icons.Default.AutoAwesome,
+                                                            contentDescription = null,
+                                                            tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText.copy(alpha = 0.5f),
+                                                            modifier = Modifier.size(16.dp),
+                                                        )
+                                                    },
+                                                    trailingIcon = if (isEntrySelected) {
+                                                        {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(16.dp),
+                                                            )
+                                                        }
+                                                    } else null,
+                                                    modifier = Modifier
+                                                        .heightIn(min = 38.dp)
+                                                        .padding(start = 12.dp),
+                                                    onClick = {
+                                                        showModelQuickMenu = false
+                                                        viewModel.selectGroupEntry(group.id, entry.id)
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else if (availableGroups.size == 1) {
+                                    // Single group (e.g. "Default Models"): directly list its member models in sleek single-line items!
+                                    val group = availableGroups.first()
+                                    val memberEntries = group.memberEntryIds.mapNotNull { id ->
+                                        currentConfig.modelEntries.firstOrNull { it.id == id }
+                                    }
+                                    memberEntries.forEach { entry ->
+                                        val isEntrySelected = (group.id == selectedGroupId || selectedGroupId == null) && entry.id == activeEntryId
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = entry.model.displayName,
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    color = ChatColors.primaryText,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            },
+                                            trailingIcon = if (isEntrySelected) {
+                                                {
+                                                    Icon(
+                                                        Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            } else null,
+                                            modifier = Modifier.heightIn(min = 40.dp),
+                                            onClick = {
+                                                showModelQuickMenu = false
+                                                viewModel.selectGroupEntry(group.id, entry.id)
+                                            },
+                                        )
+                                    }
+                                } else {
+                                    // No groups: list enabled model entries directly
+                                    val enabledEntries = currentConfig.modelEntries.filter { !it.isHidden }.take(6)
+                                    enabledEntries.forEach { entry ->
+                                        val isEntrySelected = entry.id == activeEntryId
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = entry.model.displayName,
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                    color = ChatColors.primaryText,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            },
+                                            trailingIcon = if (isEntrySelected) {
+                                                {
+                                                    Icon(
+                                                        Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            } else null,
+                                            modifier = Modifier.heightIn(min = 40.dp),
+                                            onClick = {
+                                                showModelQuickMenu = false
+                                                viewModel.selectEntry(entry.id)
+                                            },
+                                        )
+                                    }
+                                }
+
+                                MinisMenuDivider()
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "全部模型与分组...",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ChatColors.primaryText,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = null,
+                                            tint = ChatColors.secondaryText,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    },
+                                    modifier = Modifier.heightIn(min = 40.dp),
+                                    onClick = {
+                                        showModelQuickMenu = false
+                                        showModelPicker = true
+                                    },
+                                )
+                            }
                         }
 
                         // T187: Exit Edit Mode pill, only while editingMessageId
                         // is non-null. Tap clears the edit flag + composer text
                         // without truncating history. iOS parity:
                         // AIChatView.swift L1586 editExitButton.
-                        val editingId by viewModel.editingMessageId.collectAsState()
                         if (editingId != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
                                 color = ChatColors.inputBg,
@@ -5826,116 +5690,6 @@ fun ChatScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Right: Mic button — only renders when a speech engine
-                        // is actually available on this device (handles the
-                        // AOSP / HarmonyOS / GMS-free case).
-                        val sttAvailable by com.openminis.app.speech.SpeechRecognitionManager
-                            .isAvailable.collectAsState()
-                        val sttState by com.openminis.app.speech.SpeechRecognitionManager
-                            .state.collectAsState()
-                        val sttLocale by com.openminis.app.speech.SpeechRecognitionManager
-                            .locale.collectAsState()
-                        var showLangSheet by remember { mutableStateOf(false) }
-                        // While recording, a tappable 2-letter language pill
-                        // appears to the left of the mic button. Outside a
-                        // session the mic button's own badge stays hidden and
-                        // the pill is not rendered — matches iOS.
-                        if (sttAvailable && !com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive &&
-                            (sttState == com.openminis.app.speech.RecognitionState.RECORDING ||
-                                sttState == com.openminis.app.speech.RecognitionState.STARTING)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .background(ChatColors.inputIconBg, CircleShape)
-                                    .border(0.5.dp, ChatColors.inputIconBorder, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable { showLangSheet = true },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = sttLocale.language.uppercase().take(2),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ChatColors.primaryText,
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        if (showLangSheet) {
-                            SpeechLanguagePickerSheet(onDismiss = { showLangSheet = false })
-                        }
-                        // Extracted so the app-icon "voice chat" quick action
-                        // (DeepLinkCoordinator.ChatAction.START_VOICE) can
-                        // fire the same flow on first compose without
-                        // duplicating the 3-stage permission dance.
-                        val triggerVoiceInput: () -> Unit = lambda@{
-                            // [T-android-voice-panel] The mic button now toggles
-                            // the INLINE VOICE PANEL (mirrors iOS MicButton →
-                            // voiceInputActive). Capture start/stop lives inside
-                            // the panel; this button only enters/exits the mode.
-                            if (com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive) {
-                                // Exit voice → keyboard. Keep the transcript: the
-                                // composer mirrors it (iOS keyboard-text-carry).
-                                if (com.openminis.app.speech.SpeechRecognitionManager.state.value !=
-                                    com.openminis.app.speech.RecognitionState.IDLE
-                                ) {
-                                    com.openminis.app.speech.SpeechRecognitionManager.stopRecording()
-                                }
-                                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = false
-                                ComposerInputModePrefs.save(context, voice = false)
-                                voiceUsedSinceClear = false
-                            } else {
-                                // [T-android-voice-entry-always-available]
-                                // Entering voice mode is an explicit retry — give
-                                // every engine a fresh start so a past transient
-                                // failure (mic was busy, permission since granted,
-                                // provider since configured) doesn't keep the
-                                // feature dead for the rest of the process.
-                                com.openminis.app.speech.SpeechRecognitionManager
-                                    .clearDegradationAndRefresh()
-                                voiceUsedSinceClear = true
-                                com.openminis.app.ui.chat.voice.VoiceModePrefs.enteredFromText = true
-                                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = true
-                            }
-                        }
-
-                        // App-icon quick action: when the user launched via
-                        // `minis://action/voice_chat`, auto-fire the mic on
-                        // first compose. Consumed exactly once so re-entering
-                        // the chat later does NOT re-trigger.
-                        //
-                        // [T-android-voice-entry-always-available] Gated on the
-                        // STRUCTURAL check, not the sttAvailable runtime probe.
-                        // The probe is false on ROMs without a system speech
-                        // service (ColorOS et al.), which made this shortcut a
-                        // silent no-op there — while the mic button itself had
-                        // already moved to hasMicrophoneHardware. Entering the
-                        // panel without a live engine is fine: the panel owns
-                        // the "no engine → here's how to configure one" story.
-                        LaunchedEffect(Unit) {
-                            if (!com.openminis.app.speech.SpeechRecognitionManager
-                                    .hasMicrophoneHardware
-                            ) {
-                                return@LaunchedEffect
-                            }
-                            val pending = com.openminis.app.deeplink.DeepLinkCoordinator
-                                .pendingChatAction.value
-                            if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
-                                    .ChatAction.START_VOICE
-                            ) {
-                                com.openminis.app.deeplink.DeepLinkCoordinator
-                                    .consumePendingChatAction()
-                                triggerVoiceInput()
-                            }
-                        }
-
-                        // [T-android-remove-auto-enter-voice] Auto-enter-voice on
-                        // cold launch / new chat removed (was ec95451a). The
-                        // composer now always starts in text mode; voice is only
-                        // entered when the user taps the mic button below.
                         // [T-android-voice-panel] "Read replies" TTS toggle —
                         // shown only while the voice panel is active (mirrors
                         // iOS readAloudToolbarToggle, 2-state on Android).
@@ -5945,6 +5699,7 @@ fun ChatScreen(
                         // overflow the constrained width and render overlapped
                         // (iOS af9f3d3e parity).
                         if (com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive && editingId == null) {
+                            Spacer(modifier = Modifier.width(6.dp))
                             // [T-android-tts-capsule] Source of truth is the
                             // GLOBAL VoiceOutputState (same "readReplies" pref
                             // key as before), shared with the floating
@@ -6202,15 +5957,117 @@ fun ChatScreen(
                                     if (!streamingNow && live == null) replyTts.flush()
                                 }
                             }
-                            // [T-android-read-replies-pill-metrics] Balancing
-                            // spacer. There is a weight(1f) spacer BEFORE the
-                            // pill but the trailing side only had a fixed 8dp,
-                            // so all the row's slack collected on the left and
-                            // pushed the pill right of the bar's centre (measured
-                            // +59px on a 1080px screen). Matching weights on both
-                            // sides centre it between the leading (+, /) and
-                            // trailing (keyboard, mic/send) button groups.
-                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Right: Fixed group — "Voice + Send" (never squeezed or pushed out)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Right: Mic button — only renders when a speech engine
+                        // is actually available on this device (handles the
+                        // AOSP / HarmonyOS / GMS-free case).
+                        val sttAvailable by com.openminis.app.speech.SpeechRecognitionManager
+                            .isAvailable.collectAsState()
+                        val sttState by com.openminis.app.speech.SpeechRecognitionManager
+                            .state.collectAsState()
+                        val sttLocale by com.openminis.app.speech.SpeechRecognitionManager
+                            .locale.collectAsState()
+                        var showLangSheet by remember { mutableStateOf(false) }
+                        // While recording, a tappable 2-letter language pill
+                        // appears to the left of the mic button. Outside a
+                        // session the mic button's own badge stays hidden and
+                        // the pill is not rendered — matches iOS.
+                        if (sttAvailable && !com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive &&
+                            (sttState == com.openminis.app.speech.RecognitionState.RECORDING ||
+                                sttState == com.openminis.app.speech.RecognitionState.STARTING)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(ChatColors.inputIconBg, CircleShape)
+                                    .border(0.5.dp, ChatColors.inputIconBorder, CircleShape)
+                                    .clip(CircleShape)
+                                    .clickable { showLangSheet = true },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = sttLocale.language.uppercase().take(2),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ChatColors.primaryText,
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        if (showLangSheet) {
+                            SpeechLanguagePickerSheet(onDismiss = { showLangSheet = false })
+                        }
+                        // Extracted so the app-icon "voice chat" quick action
+                        // (DeepLinkCoordinator.ChatAction.START_VOICE) can
+                        // fire the same flow on first compose without
+                        // duplicating the 3-stage permission dance.
+                        val triggerVoiceInput: () -> Unit = lambda@{
+                            // [T-android-voice-panel] The mic button now toggles
+                            // the INLINE VOICE PANEL (mirrors iOS MicButton →
+                            // voiceInputActive). Capture start/stop lives inside
+                            // the panel; this button only enters/exits the mode.
+                            if (com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive) {
+                                // Exit voice → keyboard. Keep the transcript: the
+                                // composer mirrors it (iOS keyboard-text-carry).
+                                if (com.openminis.app.speech.SpeechRecognitionManager.state.value !=
+                                    com.openminis.app.speech.RecognitionState.IDLE
+                                ) {
+                                    com.openminis.app.speech.SpeechRecognitionManager.stopRecording()
+                                }
+                                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = false
+                                ComposerInputModePrefs.save(context, voice = false)
+                                voiceUsedSinceClear = false
+                            } else {
+                                // [T-android-voice-entry-always-available]
+                                // Entering voice mode is an explicit retry — give
+                                // every engine a fresh start so a past transient
+                                // failure (mic was busy, permission since granted,
+                                // provider since configured) doesn't keep the
+                                // feature dead for the rest of the process.
+                                com.openminis.app.speech.SpeechRecognitionManager
+                                    .clearDegradationAndRefresh()
+                                voiceUsedSinceClear = true
+                                com.openminis.app.ui.chat.voice.VoiceModePrefs.enteredFromText = true
+                                com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive = true
+                            }
+                        }
+
+                        // App-icon quick action: when the user launched via
+                        // `minis://action/voice_chat`, auto-fire the mic on
+                        // first compose. Consumed exactly once so re-entering
+                        // the chat later does NOT re-trigger.
+                        //
+                        // [T-android-voice-entry-always-available] Gated on the
+                        // STRUCTURAL check, not the sttAvailable runtime probe.
+                        // The probe is false on ROMs without a system speech
+                        // service (ColorOS et al.), which made this shortcut a
+                        // silent no-op there — while the mic button itself had
+                        // already moved to hasMicrophoneHardware. Entering the
+                        // panel without a live engine is fine: the panel owns
+                        // the "no engine → here's how to configure one" story.
+                        LaunchedEffect(Unit) {
+                            if (!com.openminis.app.speech.SpeechRecognitionManager
+                                    .hasMicrophoneHardware
+                            ) {
+                                return@LaunchedEffect
+                            }
+                            val pending = com.openminis.app.deeplink.DeepLinkCoordinator
+                                .pendingChatAction.value
+                            if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
+                                    .ChatAction.START_VOICE
+                            ) {
+                                com.openminis.app.deeplink.DeepLinkCoordinator
+                                    .consumePendingChatAction()
+                                triggerVoiceInput()
+                            }
                         }
 
                         // [T-android-voice-entry-always-available] The voice /
@@ -6238,9 +6095,8 @@ fun ChatScreen(
                                 onLongClick = { showLangSheet = true },
                                 isVoiceActive = com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive,
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
-
-                        Spacer(modifier = Modifier.width(8.dp))
 
                         // Right: 3-state Send / Enqueue / Stop button (mirrors iOS sendButton).
                         //   • streaming + hasText  → SEND (routes through viewModel.sendMessage,
@@ -6314,6 +6170,7 @@ fun ChatScreen(
                     }
                 }
             }
+        }
                 // --- Swipe-to-send floating hint (extracted helper) ---
                 SwipeToSendHint(
                     progress = sendSwipeProgress,
@@ -6568,6 +6425,26 @@ fun ChatScreen(
             skillRepository = skillRepository,
             sessionId = sessionId,
             onDismiss = { showSkillsSheet = false },
+        )
+    }
+
+    // Session Config Sheet (grouping prompt, skills, mcps, memory)
+    if (showSessionConfigSheet) {
+        SessionConfigSheet(
+            onDismiss = { showSessionConfigSheet = false },
+            onOpenPrompt = { showSessionAdvancedSettings = true },
+            onOpenSkills = { showSkillsSheet = true },
+            onOpenMcps = { showMcpsSheet = true },
+            onOpenMemory = { viewModel.toggleMemorySheet() },
+        )
+    }
+
+    // Session Info Sheet (token usage, auto compact, fast mode)
+    if (showSessionInfoSheet) {
+        SessionInfoSheet(
+            viewModel = viewModel,
+            onDismiss = { showSessionInfoSheet = false },
+            onOpenTokenUsage = { showTokenUsageSheet = true },
         )
     }
 

@@ -126,8 +126,13 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += "-std=c++17"
-                arguments += "-DANDROID_STL=c++_shared"
+                cFlags += "-Wl,-z,max-page-size=16384"
+                cppFlags += listOf("-std=c++17", "-Wl,-z,max-page-size=16384")
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                )
             }
         }
     }
@@ -395,8 +400,9 @@ dependencies {
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
-    // Coil (image loading)
+    // Coil (image loading & GIF playback)
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-gif:2.7.0")
 
     // Markdown rendering
     implementation("com.mikepenz:multiplatform-markdown-renderer-android:0.33.0")

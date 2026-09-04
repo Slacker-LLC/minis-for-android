@@ -608,6 +608,17 @@ internal fun buildFlatChatItems(
                 .joinToString("\n\n") { it.content }
             if (parts.isNotEmpty()) parts else message.content
         }
+
+        // Skip phantom empty assistant messages that have no visible content,
+        // no tool blocks, no error, and are not streaming.
+        if (message.role == "assistant" &&
+            joinedMarkdown.isBlank() &&
+            message.toolBlocks.isEmpty() &&
+            message.error == null &&
+            !message.isStreaming
+        ) {
+            continue
+        }
         // T83: when Resume creates a fresh assistant bubble after the user
         // stopped a streaming turn, the previous (cancelled) assistant
         // message is right before this one in the list. Visually they should
@@ -789,12 +800,17 @@ internal fun buildFlatChatItems(
            out.add(dedupe(FlatChatItem.AssistantError(message.id, it)))
        }
 
-        if (!isSystem) {
+        val showActionBar = !isSystem &&
+            !message.isStreaming &&
+            message.error == null &&
+            joinedMarkdown.isNotBlank()
+
+        if (showActionBar) {
             out.add(dedupe(FlatChatItem.AssistantActions(
                 messageId = message.id,
-                messageMarkdown = joinedMarkdown.ifEmpty { message.content },
-                isStreaming = message.isStreaming,
-                isError = message.error != null,
+                messageMarkdown = joinedMarkdown,
+                isStreaming = false,
+                isError = false,
             )))
         }
    }

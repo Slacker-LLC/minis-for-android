@@ -71,12 +71,12 @@ private val TealDarkOutline = Color(0xFF899390)
 // Neutral grouped-card surfaces (iOS-style system-grouped background).
 // Override Material3's tonal `surfaceContainer*` so cards don't pick up the
 // teal primary tint.
-// Light: page = #F2F2F7 gray, card = white
+// Light: page = #FFFFFF milky white, card = soft light #F7F7F9
 // Dark:  page = #000, card = #1C1C1E
-private val NeutralGroupedBg = Color(0xFFF2F2F7)
-private val NeutralGroupedCard = Color(0xFFFFFFFF)
-private val NeutralGroupedCardElevated = Color(0xFFF7F7FA)
-private val NeutralOutline = Color(0xFFD1D1D6)
+private val NeutralGroupedBg = Color(0xFFFFFFFF)
+private val NeutralGroupedCard = Color(0xFFF7F7F9)
+private val NeutralGroupedCardElevated = Color(0xFFEFEFF2)
+private val NeutralOutline = Color(0xFFE5E5EA)
 
 private val NeutralDarkGroupedBg = Color(0xFF000000)
 private val NeutralDarkGroupedCard = Color(0xFF1C1C1E)
@@ -139,7 +139,7 @@ private val DarkColorScheme = darkColorScheme(
 // in sync with Theme.kt's NeutralGroupedBg / NeutralDarkGroupedBg (which are
 // private to Theme.kt).
 fun minisPageBackground(darkTheme: Boolean): Color =
-    if (darkTheme) Color(0xFF000000) else Color(0xFFF2F2F7)
+    if (darkTheme) Color(0xFF000000) else Color(0xFFFFFFFF)
 
 // Two parallel UI styles, switchable live in 设置 → 外观. Both share the same
 // palette and shapes; the difference lives in the surface treatment (glass

@@ -100,6 +100,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.openminis.app.ui.DisplayBitmapLimits.limitDisplaySize
 import com.openminis.app.runtime.RuntimePathRegistry
@@ -112,6 +114,9 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import com.openminis.app.ui.sandbox.FileCategory
+import com.openminis.app.ui.sandbox.FileItem
+import com.openminis.app.ui.sandbox.fileCategoryFor
 import java.io.File
 
 // ─── MinisTextKit hook ────────────────────────────────────────────────────────
@@ -1103,41 +1108,57 @@ private sealed class MdBlock(val raw: String) {
     class Audio(raw: String, val alt: String, val url: String) : MdBlock(raw)
     /** T155: display-mode LaTeX rendered via KaTeX (`$$…$$` or `\[…\]`). */
     class MathDisplay(raw: String, val latex: String) : MdBlock(raw)
+    /** Chat file attachment (compact card or inline preview) */
+    class FileAttachment(raw: String, val title: String, val url: String) : MdBlock(raw)
 }
 
-private val nativeVideoExts = setOf("mp4", "mov", "m4v", "avi", "mkv", "webm")
-private val nativeAudioExts = setOf("mp3", "m4a", "wav", "aac", "ogg", "flac")
+/** Check if a URL points to a local or sandbox file rather than a standard web URL */
+private fun isSandboxOrLocalUrl(rawUrl: String): Boolean {
+    val trimmed = rawUrl.trim()
+    if (trimmed.isEmpty()) return false
+    val lower = trimmed.lowercase()
+    if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("ftp://")) {
+        return false
+    }
+    if (lower.startsWith("file://") || lower.startsWith("minis://")) {
+        if (lower.startsWith("minis://")) {
+            val uri = runCatching { android.net.Uri.parse(trimmed) }.getOrNull()
+            if (uri != null) {
+                val action = com.openminis.app.deeplink.DeepLinkHandler.parse(uri)
+                if (action !is com.openminis.app.deeplink.DeepLinkAction.Unknown) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+    val guestRoots = listOf("/var/minis", "/workspace", "/root", "/memory", "/skills", "/shared", "/home/minis")
+    return guestRoots.any { trimmed == it || trimmed.startsWith("$it/") }
+}
 
 private fun mediaBlockFrom(raw: String, alt: String, url: String): MdBlock {
-    // Classify by the last path segment's extension. Decoding first means a
-    // filename like `foo%23China.mp4` or `foo#China.mp4` still resolves to
-    // `.mp4` instead of being swallowed by `substringBefore('#')`.
     val lastSeg = url.substringAfterLast('/')
     val decoded = runCatching { java.net.URLDecoder.decode(lastSeg, "UTF-8") }.getOrDefault(lastSeg)
-    val ext = decoded.substringAfterLast('.', "").lowercase()
-    return when (ext) {
-        in nativeVideoExts -> MdBlock.Video(raw, alt, url)
-        in nativeAudioExts -> MdBlock.Audio(raw, alt, url)
-        else -> MdBlock.Image(raw, alt, url)
+    val category = fileCategoryFor(decoded)
+    return when (category) {
+        FileCategory.VIDEO -> MdBlock.Video(raw, alt, url)
+        FileCategory.AUDIO -> MdBlock.Audio(raw, alt, url)
+        FileCategory.IMAGE, FileCategory.GIF -> MdBlock.Image(raw, alt, url)
+        else -> MdBlock.FileAttachment(raw, alt.ifEmpty { decoded }, url)
     }
 }
 
 /** Matches any `![alt](url)` anywhere in a line. Non-greedy to handle multiple per line. */
 private val inlineMediaRegex = Regex("""!\[([^\]\n]*)]\(([^)\s]+)\)""")
 
+/** Matches any `[text](url)` anywhere in a line (negative lookbehind for `!`). */
+private val inlineFileLinkRegex = Regex("""(?<!\!)\[([^\]\n]+)]\(([^)\s]+)\)""")
+
 // ─── Hoisted block-parser regexes ─────────────────────────────────────────────
-//
-// parseMarkdownBlocks runs on every recompose during streaming — once per
-// chunk, often dozens of times a second. Constructing each Regex inline
-// triggered Pattern.compile (an ICU JNI call) on the main thread for every
-// pattern, every chunk, on every block; long markdown documents pinned the
-// main thread inside Pattern.compile long enough that the OS posted ANRs
-// (>5 s waited for input). Hoisting to file-level vals compiles each pattern
-// exactly once, at class init, so the streaming hot path is allocation-free
-// for these matches.
 private val thematicBreakRegex = Regex("^[-*_]{3,}\\s*$")
 private val standaloneImageLineRegex = Regex("^!\\[.*]\\(.*\\)\\s*$")
 private val imageMatchRegex = Regex("^!\\[(.*)\\]\\((.*)\\)")
+private val standaloneFileLinkRegex = Regex("""^\[([^\]\n]+)]\(([^)\s]+)\)\s*$""")
 private val tableSeparatorRegex = Regex("^\\|?[\\s\\-:|]+\\|?$")
 private val taskListItemRegex = Regex("^[-*+]\\s+\\[[ xX]\\]\\s+.*")
 private val taskListPrefixRegex = Regex("^[-*+]\\s+\\[[ xX]\\]\\s+")
@@ -1160,46 +1181,49 @@ private fun isBlockquoteLine(trimmed: String): Boolean {
 }
 
 /**
- * Split a paragraph's raw text at inline `![alt](url)` occurrences, extracting
- * video/audio references into standalone MdBlock.Video/Audio blocks. Image
- * references stay inline (Compose doesn't render inline bitmap attachments in
- * text here, but the `[alt]` link fallback is acceptable for images).
- *
- * Why: LLMs very commonly emit `"Here's the video: ![robot](minis://attachments/x.mp4)"`
- * on a single line alongside explanatory text. Without this split, the line
- * becomes one Paragraph and the video markdown is rendered as just a blue
- * `[alt]` link — no preview card, no tap-to-play.
+ * Split a paragraph's raw text at inline media (`![alt](url)`) and local/sandbox
+ * file links (`[title](url)`), extracting them into dedicated preview blocks.
+ * Plain web URLs (`https://...`) are preserved inline as clickable text.
  */
-private fun splitParagraphOnInlineMedia(text: String): List<MdBlock> {
-    val matches = inlineMediaRegex.findAll(text).toList()
-    if (matches.isEmpty()) return listOf(MdBlock.Paragraph(text))
+private fun splitParagraphOnMediaAndFiles(text: String): List<MdBlock> {
+    data class SplitTarget(val range: IntRange, val block: MdBlock)
 
-    // Pre-check: only split when at least one match is a media (video/audio)
-    // that we can render as a card. Plain image-extension matches stay inline.
-    val hasMediaExt = matches.any { m ->
+    val targets = mutableListOf<SplitTarget>()
+    for (m in inlineMediaRegex.findAll(text)) {
+        val alt = m.groupValues[1]
         val url = m.groupValues[2]
         val lastSeg = url.substringAfterLast('/')
         val decoded = runCatching { java.net.URLDecoder.decode(lastSeg, "UTF-8") }.getOrDefault(lastSeg)
-        val ext = decoded.substringAfterLast('.', "").lowercase()
-        ext in nativeVideoExts || ext in nativeAudioExts
+        val category = fileCategoryFor(decoded)
+        if (category == FileCategory.VIDEO ||
+            category == FileCategory.AUDIO ||
+            category == FileCategory.IMAGE ||
+            category == FileCategory.GIF ||
+            isSandboxOrLocalUrl(url)
+        ) {
+            targets.add(SplitTarget(m.range, mediaBlockFrom(m.value, alt, url)))
+        }
     }
-    if (!hasMediaExt) return listOf(MdBlock.Paragraph(text))
+    for (m in inlineFileLinkRegex.findAll(text)) {
+        val title = m.groupValues[1]
+        val url = m.groupValues[2]
+        if (isSandboxOrLocalUrl(url)) {
+            targets.add(SplitTarget(m.range, MdBlock.FileAttachment(m.value, title, url)))
+        }
+    }
+
+    if (targets.isEmpty()) return listOf(MdBlock.Paragraph(text))
+
+    targets.sortBy { it.range.first }
 
     val result = mutableListOf<MdBlock>()
     var cursor = 0
-    for (m in matches) {
-        val url = m.groupValues[2]
-        val lastSeg = url.substringAfterLast('/')
-        val decoded = runCatching { java.net.URLDecoder.decode(lastSeg, "UTF-8") }.getOrDefault(lastSeg)
-        val ext = decoded.substringAfterLast('.', "").lowercase()
-        val isMedia = ext in nativeVideoExts || ext in nativeAudioExts
-        if (!isMedia) continue
-
-        val preceding = text.substring(cursor, m.range.first).trim('\n', ' ', '\t')
+    for (target in targets) {
+        if (target.range.first < cursor) continue
+        val preceding = text.substring(cursor, target.range.first).trim('\n', ' ', '\t')
         if (preceding.isNotBlank()) result.add(MdBlock.Paragraph(preceding))
-        val alt = m.groupValues[1]
-        result.add(mediaBlockFrom(m.value, alt, url))
-        cursor = m.range.last + 1
+        result.add(target.block)
+        cursor = target.range.last + 1
     }
     val tail = text.substring(cursor).trim('\n', ' ', '\t')
     if (tail.isNotBlank()) result.add(MdBlock.Paragraph(tail))
@@ -1489,6 +1513,23 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                 i++
             }
 
+            // File attachment: [title](url) on its own line — routed to FileAttachment if sandbox/local url
+            trimmed.matches(standaloneFileLinkRegex) -> {
+                val match = standaloneFileLinkRegex.find(trimmed)
+                if (match != null) {
+                    val title = match.groupValues[1]
+                    val url = match.groupValues[2]
+                    if (isSandboxOrLocalUrl(url)) {
+                        blocks.add(MdBlock.FileAttachment(line, title, url))
+                    } else {
+                        blocks.add(MdBlock.Paragraph(line))
+                    }
+                } else {
+                    blocks.add(MdBlock.Paragraph(line))
+                }
+                i++
+            }
+
             // Table (line contains | and next line is separator)
             trimmed.contains('|') && i + 1 < lines.size &&
                 lines[i + 1].trim().matches(tableSeparatorRegex) -> {
@@ -1600,6 +1641,7 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                         isBlockquoteLine(t) || t.matches(thematicBreakRegex) ||
                         t.matches(bulletListItemRegex) || t.matches(numberedListItemRegex) ||
                         t.matches(standaloneImageLineRegex) ||
+                        t.matches(standaloneFileLinkRegex) ||
                         (t.contains('|') && i + 1 < lines.size &&
                             lines[i + 1].trim().matches(tableSeparatorRegex))
                     ) break
@@ -1609,10 +1651,8 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                 val text = paraLines.joinToString("\n")
                 if (text.isNotBlank()) {
                     // Split out inline media (`![alt](url)` that's a .mp4/.mp3/etc)
-                    // so videos/audio that the LLM emits adjacent to text still
-                    // get their dedicated preview card. Image extensions stay
-                    // inline (rendered as `[alt]` link) since Compose's inline
-                    // text-image attachment path isn't implemented here.
+                    // and local file attachments (`[title](url)`) so they get dedicated cards.
+                    // Plain web URLs remain inline as text links.
                     //
                     // T208-4 part 3: after the media split, run a second pass
                     // that promotes "wide" inline math (matrices, multi-row
@@ -1622,7 +1662,7 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                     // scale to unreadable. Splitting at parse time lets each
                     // wide span render at its natural display-mode size on
                     // its own line; short inline math (`$x_i$`) stays inline.
-                    val mediaBlocks = splitParagraphOnInlineMedia(text)
+                    val mediaBlocks = splitParagraphOnMediaAndFiles(text)
                     for (b in mediaBlocks) {
                         if (b is MdBlock.Paragraph) {
                             blocks.addAll(splitParagraphOnWideMath(b.raw))
@@ -1953,6 +1993,13 @@ private fun RenderBlock(block: MdBlock) {
             val imageRequest = remember(imageData) {
                 ImageRequest.Builder(context)
                     .data(imageData)
+                    .decoderFactory(
+                        if (android.os.Build.VERSION.SDK_INT >= 28) {
+                            ImageDecoderDecoder.Factory()
+                        } else {
+                            GifDecoder.Factory()
+                        }
+                    )
                     .limitDisplaySize()
                     .build()
             }
@@ -1985,6 +2032,14 @@ private fun RenderBlock(block: MdBlock) {
 
         is MdBlock.MathDisplay -> {
             RenderMathDisplay(block.latex)
+        }
+
+        is MdBlock.FileAttachment -> {
+            android.util.Log.d("MdStream", "render FileAttachment title=${block.title} url=${block.url}")
+            ChatFileAttachmentView(
+                title = block.title,
+                url = block.url,
+            )
         }
     }
 }
@@ -2305,7 +2360,7 @@ internal fun resolveMdMediaFile(context: Context, url: String, sessionId: String
 }
 
 @Composable
-private fun rememberMdMediaFile(url: String, sessionId: String?): File? {
+internal fun rememberMdMediaFile(url: String, sessionId: String?): File? {
     val context = LocalContext.current
     val file by produceState<File?>(initialValue = null, key1 = url, key2 = sessionId) {
         value = withContext(Dispatchers.IO) {
@@ -2471,38 +2526,44 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
     val file = rememberMdMediaFile(block.url, sessionId)
     val filename = remember(block.url) { filenameFromMdUrl(block.url) }
 
-    val player = remember(file?.absolutePath) {
-        if (file == null) null else try {
-            MediaPlayer().apply { setDataSource(file.absolutePath); prepare() }
-        } catch (t: Throwable) {
-            android.util.Log.w("MdStream", "audio prepare failed: ${t.message}")
-            null
-        }
-    }
-    DisposableEffect(player) {
-        onDispose { try { player?.release() } catch (_: Throwable) {} }
-    }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var positionMs by remember { mutableStateOf(0) }
-    val durationMs = player?.duration ?: 0
+    var durationMs by remember { mutableStateOf(0) }
 
-    LaunchedEffect(isPlaying) {
-        while (isPlaying && player != null) {
-            positionMs = try { player.currentPosition } catch (_: Throwable) { 0 }
-            if (!player.isPlaying) { isPlaying = false; break }
+    val initialDurationMs by produceState(initialValue = 0, key1 = file?.absolutePath) {
+        val f = file ?: return@produceState
+        value = withContext(Dispatchers.IO) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(f.absolutePath)
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toIntOrNull() ?: 0
+            } catch (_: Throwable) {
+                0
+            } finally {
+                try { retriever.release() } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    DisposableEffect(player) {
+        onDispose {
+            try { player?.release() } catch (_: Throwable) {}
+        }
+    }
+
+    LaunchedEffect(isPlaying, player) {
+        val p = player
+        while (isPlaying && p != null) {
+            positionMs = try { p.currentPosition } catch (_: Throwable) { 0 }
+            if (!p.isPlaying) { isPlaying = false; break }
             delay(200)
         }
     }
-    DisposableEffect(player) {
-        player?.setOnCompletionListener {
-            isPlaying = false
-            positionMs = 0
-            try { player.seekTo(0) } catch (_: Throwable) {}
-        }
-        onDispose { try { player?.setOnCompletionListener(null) } catch (_: Throwable) {} }
-    }
 
+    val totalDurationMs = if (durationMs > 0) durationMs else initialDurationMs
     val tint = colors.link
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2511,11 +2572,37 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
             .background(colors.inlineCodeBg)
             .border(0.5.dp, colors.tableBorder, RoundedCornerShape(10.dp))
             .clickable(enabled = file != null) {
+                val f = file ?: return@clickable
                 if (player == null) {
-                    file?.let { openMdMediaExternally(context, it, "audio/*") }
+                    try {
+                        val p = MediaPlayer().apply {
+                            setDataSource(f.absolutePath)
+                            prepare()
+                            setOnCompletionListener {
+                                isPlaying = false
+                                positionMs = 0
+                                try { seekTo(0) } catch (_: Throwable) {}
+                            }
+                        }
+                        durationMs = p.duration
+                        player = p
+                        p.start()
+                        isPlaying = true
+                    } catch (t: Throwable) {
+                        android.util.Log.w("MdStream", "audio prepare/play failed: ${t.message}")
+                        openMdMediaExternally(context, f, "audio/*")
+                    }
                 } else {
-                    if (isPlaying) { try { player.pause() } catch (_: Throwable) {} ; isPlaying = false }
-                    else { try { player.start(); isPlaying = true } catch (_: Throwable) {} }
+                    val p = player ?: return@clickable
+                    if (isPlaying) {
+                        try { p.pause() } catch (_: Throwable) {}
+                        isPlaying = false
+                    } else {
+                        try {
+                            p.start()
+                            isPlaying = true
+                        } catch (_: Throwable) {}
+                    }
                 }
             }
             .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -2538,7 +2625,7 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
                 color = colors.text,
                 maxLines = 1,
             )
-            val progress = if (durationMs > 0) positionMs.toFloat() / durationMs else 0f
+            val progress = if (totalDurationMs > 0) positionMs.toFloat() / totalDurationMs else 0f
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
@@ -2548,9 +2635,9 @@ private fun RenderMdAudio(block: MdBlock.Audio) {
                 color = tint,
                 trackColor = tint.copy(alpha = 0.2f),
             )
-            if (durationMs > 0) {
+            if (totalDurationMs > 0) {
                 MdText(
-                    text = AnnotatedString("${formatMdMediaMs(positionMs)} / ${formatMdMediaMs(durationMs)}"),
+                    text = AnnotatedString("${formatMdMediaMs(positionMs)} / ${formatMdMediaMs(totalDurationMs)}"),
                     fontSize = 11.sp,
                     color = colors.blockquote,
                 )
