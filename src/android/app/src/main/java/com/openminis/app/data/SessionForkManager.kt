@@ -178,6 +178,110 @@ class SessionForkManager(
     }
 
     /**
+     * [T-android-chat-branch-message] Fork a session at [messageId]: creates a
+     * new independent session copying context from the beginning of the session
+     * up to and including [messageId]. Target message must be an assistant turn.
+     */
+    suspend fun forkSessionAtMessage(sessionId: String, messageId: String): String? {
+        val source = chatRepository.getSession(sessionId) ?: run {
+            AppLogger.warning(TAG, "forkSessionAtMessage: session $sessionId not found")
+            return null
+        }
+        val allMessages = chatRepository.loadMessages(sessionId)
+        val targetIdx = allMessages.indexOfFirst { it.id == messageId }
+        if (targetIdx < 0) {
+            AppLogger.warning(TAG, "forkSessionAtMessage: message $messageId not found in session $sessionId")
+            return null
+        }
+        val targetMsg = allMessages[targetIdx]
+        if (targetMsg.role != "assistant") {
+            AppLogger.warning(TAG, "forkSessionAtMessage: target message $messageId has role ${targetMsg.role}, expected assistant")
+            return null
+        }
+
+        val prefixMessages = allMessages.subList(0, targetIdx + 1)
+        val forkTitle = "${source.title ?: "Chat"} (Branch)"
+        val newSession = chatRepository.createSession(
+            modelId = source.modelId,
+            title = forkTitle,
+        )
+        if (source.category != null) {
+            chatRepository.updateSessionTitleAndCategory(newSession.id, forkTitle, source.category)
+        }
+        if (source.modelBinding != null) {
+            chatRepository.updateSessionBinding(newSession.id, source.modelBinding, source.modelId)
+        }
+        if (source.memoryEnabled == 0) {
+            chatRepository.dao.updateMemoryEnabled(newSession.id, 0)
+        }
+        source.sessionOverrides?.let { overrides ->
+            chatRepository.dao.updateSessionOverrides(newSession.id, overrides)
+        }
+        source.thinkingOverride?.let { override ->
+            chatRepository.dao.updateThinkingOverride(newSession.id, override)
+        }
+
+        val oldToNewId = HashMap<String, String>()
+        val oldToNewSort = HashMap<String, Int>()
+        for (msg in prefixMessages) {
+            val newMsg = chatRepository.appendMessage(
+                sessionId = newSession.id,
+                role = msg.role,
+                partsJson = msg.partsJson,
+                tokenUsage = msg.tokenUsage,
+                reasoningContent = msg.reasoningContent,
+            )
+            oldToNewId[msg.id] = newMsg.id
+            oldToNewSort[msg.id] = newMsg.sortOrder
+        }
+
+        val markers = chatRepository.dao.listCompactMarkers(sessionId)
+        if (markers.isNotEmpty()) {
+            fun remapId(id: String?): String? = id?.let { oldToNewId[it] }
+            fun remapSort(msgId: String?, original: Int): Int =
+                msgId?.let { oldToNewSort[it] } ?: original
+
+            var copied = 0
+            for (marker in markers) {
+                if (marker.firstKeptMessageId != null && !oldToNewId.containsKey(marker.firstKeptMessageId)) {
+                    continue
+                }
+                if (marker.lastCompactedMessageId != null && !oldToNewId.containsKey(marker.lastCompactedMessageId)) {
+                    continue
+                }
+                if (marker.boundaryMessageId != null && !oldToNewId.containsKey(marker.boundaryMessageId)) {
+                    continue
+                }
+
+                val firstKeptNew = remapId(marker.firstKeptMessageId)
+                val lastCompactedNew = remapId(marker.lastCompactedMessageId)
+                val boundaryNew = remapId(marker.boundaryMessageId)
+
+                val copy = marker.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    sessionId = newSession.id,
+                    firstKeptSortOrder = remapSort(marker.firstKeptMessageId, marker.firstKeptSortOrder),
+                    uiBoundarySortOrder = marker.uiBoundarySortOrder?.let {
+                        remapSort(marker.boundaryMessageId, it)
+                    },
+                    boundaryMessageId = boundaryNew,
+                    firstKeptMessageId = firstKeptNew,
+                    lastCompactedMessageId = lastCompactedNew,
+                )
+                chatRepository.dao.insertCompactMarker(copy)
+                copied++
+            }
+            AppLogger.info(TAG, "forkSessionAtMessage: copied $copied/${markers.size} compact marker(s) to ${newSession.id}")
+        }
+
+        AppLogger.info(
+            TAG,
+            "forked session $sessionId at msg $messageId -> ${newSession.id} (${prefixMessages.size} msgs)",
+        )
+        return newSession.id
+    }
+
+    /**
      * Clone a skill into the local library. When [skillRepository] is wired,
      * reuses `importFromContent` so the skill lands in DB + `SKILL.md` just
      * like a fresh import. Returns whether the import succeeded.
