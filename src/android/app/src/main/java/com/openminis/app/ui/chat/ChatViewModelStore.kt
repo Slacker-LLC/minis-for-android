@@ -28,13 +28,26 @@ object ChatViewModelStore {
     /**
      * Draft → canonical mapping. When a draft ("__new__...") session is
      * persisted, we add `draftKey -> realId` here so lookups via the old key
-     * (from a ChatScreen whose `sessionId` parameter is still the draft)
-     * continue to hit the same live store.
-     */
-    private val aliases = mutableMapOf<String, String>()
+    * (from a ChatScreen whose `sessionId` parameter is still the draft)
+    * continue to hit the same live store.
+    */
+   private val aliases = mutableMapOf<String, String>()
+
+    private val aliasGeneration = androidx.compose.runtime.mutableIntStateOf(0)
 
     private fun resolveKey(sessionId: String): String =
         aliases[sessionId] ?: sessionId
+
+    @Synchronized
+    fun resolvePersistedId(sessionId: String): String = resolveKey(sessionId)
+
+    @androidx.compose.runtime.Composable
+    fun rememberPersistedId(sessionId: String): String {
+        val generation = aliasGeneration.intValue
+        return androidx.compose.runtime.remember(sessionId, generation) {
+            resolveKey(sessionId)
+        }
+    }
 
     @Synchronized
     fun ownerFor(sessionId: String): ViewModelStoreOwner {
@@ -57,6 +70,7 @@ object ChatViewModelStore {
     fun release(sessionId: String) {
         val key = resolveKey(sessionId)
         aliases.entries.removeAll { it.value == key }
+        aliasGeneration.intValue++
         stores.remove(key)?.let {
             it.clear()
             Log.d(TAG, "release store for $key (remaining=${stores.size})")
@@ -97,6 +111,7 @@ object ChatViewModelStore {
             stores[toSessionId] = store
         }
         aliases[fromSessionId] = toSessionId
+        aliasGeneration.intValue++
         Log.d(TAG, "rename store $fromSessionId -> $toSessionId (alias kept)")
     }
 

@@ -1289,4 +1289,14 @@
     <string name="backup_dest_create">作成</string>
     <string name="backup_dest_backend_label">%1$s — %2$s</string>
     <string name="backup_dest_row_subtitle">%1$s · /%2$s</string>
+    <!-- [T-android-composer-placeholder-rotation & tablet-split] -->
+    <string name="chat_input_placeholder_hint_1">@ でファイルを指定すると %1$s が読み取れます</string>
+    <string name="chat_input_placeholder_hint_2">/ を入力すると SKILL とクイックコマンドを使えます</string>
+    <string name="chat_input_placeholder_hint_3">テキストをチャットにドラッグして送信できます</string>
+    <string name="chat_input_placeholder_hint_4">返信を長押しすると全体を選択してコピーできます</string>
+    <string name="chat_show_sidebar">セッション一覧を表示</string>
+    <string name="chat_hide_sidebar">セッション一覧を非表示</string>
+    <string name="split_no_conversation_title">会話が選択されていません</string>
+    <string name="split_no_conversation_subtitle">会話を選ぶか、新しく始めてください</string>
+    <string name="chat_input_placeholder_hint_5">Minis なら ↩︎ キーを送信か改行かに変更できます</string>
 </resources>

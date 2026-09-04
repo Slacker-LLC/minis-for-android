@@ -789,9 +789,14 @@
     <string name="voice_panel_no_engine_body">语音输入需要一个识别引擎。请开启设备的语音服务，或在 Minis 中配置一个转录服务商。</string>
     <string name="voice_panel_no_engine_open_system">设备设置</string>
     <string name="voice_panel_no_engine_open_providers">Minis 服务商</string>
-    <string name="chat_error_stream_dropped_partial">连接中断，此回复可能不完整。点击重试以继续。</string>
-    <string name="chat_input_placeholder">发消息给 %1$s（@ 提及文件）</string>
-    <string name="browser_takeover">接管</string>
+   <string name="chat_error_stream_dropped_partial">连接中断，此回复可能不完整。点击重试以继续。</string>
+   <string name="chat_input_placeholder">发消息给 %1$s（@ 提及文件）</string>
+    <string name="chat_input_placeholder_hint_1">试试用 @ 提及文件，让 %1$s 读取</string>
+    <string name="chat_input_placeholder_hint_2">输入 / 使用技能和快捷命令</string>
+    <string name="chat_input_placeholder_hint_3">试试把文本拖进对话即可发送</string>
+    <string name="chat_input_placeholder_hint_4">长按回复的任意位置，可全选并复制</string>
+    <string name="chat_input_placeholder_hint_5">Minis 可以把 ↩︎ 键设为发送或换行</string>
+   <string name="browser_takeover">接管</string>
     <string name="browser_settings_done">完成</string>
     <string name="browser_settings_user_agent">用户代理</string>
     <string name="browser_settings_ua_mobile_chrome">移动 Chrome (Android)</string>
@@ -1108,9 +1113,13 @@
     <string name="add_models_to_group_no_match">没有匹配的模型。</string>
 
     <!-- T187 — user-bubble long-press Edit + Exit Edit + Clear Chat dialog -->
-    <string name="chat_longpress_edit">编辑</string>
-    <string name="chat_edit_exit_button">退出编辑</string>
-    <string name="chat_clear_dialog_body">删除此会话的所有消息？工作区文件、附件和卸载内容会保留。</string>
+   <string name="chat_longpress_edit">编辑</string>
+   <string name="chat_edit_exit_button">退出编辑</string>
+    <string name="chat_show_sidebar">显示会话列表</string>
+    <string name="chat_hide_sidebar">隐藏会话列表</string>
+    <string name="split_no_conversation_title">未选择会话</string>
+    <string name="split_no_conversation_subtitle">选择一个会话，或开始新对话</string>
+   <string name="chat_clear_dialog_body">删除此会话的所有消息？工作区文件、附件和卸载内容会保留。</string>
     <string name="chat_clear_dialog_confirm">清除</string>
 
     <!-- T235 — 共享文件夹（固定: 共享 / 技能 / 记忆） -->

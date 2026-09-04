@@ -179,6 +179,7 @@ import com.openminis.app.ui.theme.minisFabColor
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.ProviderRepository
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -411,8 +412,10 @@ fun SessionListScreen(
     onSelectModelsClick: () -> Unit = {},
     onTerminalClick: () -> Unit = {},
     onRootfsClick: () -> Unit = {},
-    // [T-android-scheduled-tasks-design] Entry to the scheduled-tasks list.
-    onScheduledTasksClick: () -> Unit = {},
+   // [T-android-scheduled-tasks-design] Entry to the scheduled-tasks list.
+   onScheduledTasksClick: () -> Unit = {},
+    selectedSessionId: String? = null,
+    draftPlaceholderId: String? = null,
 ) {
     val context = LocalContext.current
     // T46: hoist VM ownership to the NavBackStackEntry's ViewModelStore so
@@ -424,7 +427,25 @@ fun SessionListScreen(
     val viewModel: SessionListViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
         factory = SessionListViewModel.factory(chatRepository, providerRepository, context),
     )
-    val sessions by viewModel.displayedSessions.collectAsState()
+    val persistedSessions by viewModel.displayedSessions.collectAsState()
+    val sessions = remember(persistedSessions, draftPlaceholderId) {
+        val draftId = draftPlaceholderId
+        if (draftId == null || persistedSessions.any { it.id == draftId }) {
+            persistedSessions
+        } else {
+            val now = System.currentTimeMillis()
+            listOf(
+                com.openminis.app.data.db.ChatSessionEntity(
+                    id = draftId,
+                    title = null,
+                    modelId = "",
+                    createdAt = now,
+                    updatedAt = now,
+                    folderId = null,
+                ),
+            ) + persistedSessions
+        }
+    }
     val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -467,6 +488,12 @@ fun SessionListScreen(
     // when the interruption is actually resolved (Resume tapped / new message
     // sent / loop completed), and the ChatViewModel re-asserts it on load if the
     // session is still interrupted. Clearing here just caused a flicker.
+    val searchRequests = com.openminis.app.ui.navigation.SessionSearchRequest.requests
+    LaunchedEffect(Unit) {
+        searchRequests.drop(1).collect {
+            viewModel.isSearchActive.value = true
+        }
+    }
     val onSessionClickGuarded: (String) -> Unit = { id ->
         exitSearchIfQueryBlank()
         onSessionClick(id)
@@ -907,7 +934,12 @@ fun SessionListScreen(
                                     searchSnippet = searchSnippets[session.id],
                                     // Transparent so the folder container's
                                     // surface shows through member rows.
-                                    rowBackground = if (inFolder) Color.Transparent else null,
+                                    rowBackground = when {
+                                        session.id == selectedSessionId ->
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        inFolder -> Color.Transparent
+                                        else -> null
+                                    },
                                 )
                                 }
                             }
@@ -3077,4 +3109,3 @@ private fun exportSession(
         }
     }
 }
-

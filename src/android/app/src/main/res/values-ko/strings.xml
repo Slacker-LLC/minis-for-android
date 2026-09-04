@@ -1281,4 +1281,14 @@
     <string name="backup_dest_create">만들기</string>
     <string name="backup_dest_backend_label">%1$s — %2$s</string>
     <string name="backup_dest_row_subtitle">%1$s · /%2$s</string>
+    <!-- [T-android-composer-placeholder-rotation & tablet-split] -->
+    <string name="chat_input_placeholder_hint_1">@로 파일을 언급하면 %1$s이(가) 읽을 수 있습니다</string>
+    <string name="chat_input_placeholder_hint_2">/를 입력해 SKILL과 빠른 명령을 사용하세요</string>
+    <string name="chat_input_placeholder_hint_3">텍스트를 대화로 끌어다 놓아 보내 보세요</string>
+    <string name="chat_input_placeholder_hint_4">답변을 길게 누르면 전체를 선택해 복사할 수 있습니다</string>
+    <string name="chat_show_sidebar">세션 목록 표시</string>
+    <string name="chat_hide_sidebar">세션 목록 숨기기</string>
+    <string name="split_no_conversation_title">선택된 대화가 없습니다</string>
+    <string name="split_no_conversation_subtitle">대화를 선택하거나 새로 시작하세요</string>
+    <string name="chat_input_placeholder_hint_5">Minis에서 ↩︎ 키를 전송 또는 줄바꿈으로 바꿀 수 있습니다</string>
 </resources>

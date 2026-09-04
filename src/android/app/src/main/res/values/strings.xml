@@ -556,9 +556,14 @@
     <string name="chat_typing_indicator">%1$s is thinking</string>
     <string name="read_aloud_unavailable">Read aloud failed: no usable voice engine. Check Voice Output settings or install a system speech engine.</string>
     <string name="chat_error_stream_dropped_partial">The connection dropped — this reply may be incomplete. Tap Retry to continue.</string>
-    <!-- Composer placeholder. %1$s is the Soul-customized assistant name (default "Minis"). The parenthetical is an inline hint reminding the user that typing '@' opens the file-mention picker. T-android-placeholder-single-line collapses the prior two-row (title + hint) layout into a single line, matching iOS 19e1d61f. -->
-    <string name="chat_input_placeholder">Message %1$s (@ to mention files)</string>
-    <string name="browser_takeover">Takeover</string>
+   <!-- Composer placeholder. %1$s is the Soul-customized assistant name (default "Minis"). The parenthetical is an inline hint reminding the user that typing '@' opens the file-mention picker. T-android-placeholder-single-line collapses the prior two-row (title + hint) layout into a single line, matching iOS 19e1d61f. -->
+   <string name="chat_input_placeholder">Message %1$s (@ to mention files)</string>
+    <string name="chat_input_placeholder_hint_1">Try @ to mention files for %1$s to read</string>
+    <string name="chat_input_placeholder_hint_2">Type / for SKILLs and quick commands</string>
+    <string name="chat_input_placeholder_hint_3">Try dragging text into the chat to send it</string>
+    <string name="chat_input_placeholder_hint_4">Long-press anywhere in a reply to select and copy it all</string>
+    <string name="chat_input_placeholder_hint_5">Minis can make the Return key send or insert a newline</string>
+   <string name="browser_takeover">Takeover</string>
     <string name="browser_settings_done">Done</string>
     <string name="browser_settings_user_agent">User Agent</string>
     <string name="browser_settings_ua_mobile_chrome">Mobile Chrome (Android)</string>
@@ -1287,10 +1292,14 @@
     <string name="add_models_to_group_all_in_group">All models are already in this group.</string>
     <string name="add_models_to_group_no_match">No matching models found.</string>
 
-    <!-- T187 — user-bubble long-press Edit + Exit Edit Mode + Clear Chat dialog -->
-    <string name="chat_longpress_edit">Edit</string>
-    <string name="chat_edit_exit_button">Exit Edit Mode</string>
-    <string name="chat_clear_dialog_body">Remove all messages from this session? Files in workspace, attachments, and offloads are kept.</string>
+   <!-- T187 — user-bubble long-press Edit + Exit Edit Mode + Clear Chat dialog -->
+   <string name="chat_longpress_edit">Edit</string>
+   <string name="chat_edit_exit_button">Exit Edit Mode</string>
+    <string name="chat_show_sidebar">Show session list</string>
+    <string name="chat_hide_sidebar">Hide session list</string>
+    <string name="split_no_conversation_title">No Conversation Selected</string>
+    <string name="split_no_conversation_subtitle">Select a conversation or start a new one</string>
+   <string name="chat_clear_dialog_body">Remove all messages from this session? Files in workspace, attachments, and offloads are kept.</string>
     <string name="chat_clear_dialog_confirm">Clear</string>
 
     <!-- T235 — Shared Folders (fixed: Shared / Skills / Memory) -->

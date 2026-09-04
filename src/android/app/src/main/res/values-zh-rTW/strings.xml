@@ -829,4 +829,14 @@
     <string name="usage_detail_attribution">歸因資訊</string>
     <string name="usage_detail_attribution_measured">每則訊息快照</string>
     <string name="usage_detail_attribution_estimated">估算自 %1$d 筆舊資料</string>
+    <!-- [T-android-composer-placeholder-rotation & tablet-split] -->
+    <string name="chat_input_placeholder_hint_1">試試用 @ 提及檔案，讓 %1$s 讀取</string>
+    <string name="chat_input_placeholder_hint_2">輸入 / 使用技能和快捷指令</string>
+    <string name="chat_input_placeholder_hint_3">試試把文字拖進對話即可傳送</string>
+    <string name="chat_input_placeholder_hint_4">長按回覆的任意位置，可全選並複製</string>
+    <string name="chat_show_sidebar">顯示工作階段清單</string>
+    <string name="chat_hide_sidebar">隱藏工作階段清單</string>
+    <string name="split_no_conversation_title">未選擇對話</string>
+    <string name="split_no_conversation_subtitle">請選擇一段對話，或開始新的對話</string>
+    <string name="chat_input_placeholder_hint_5">Minis 可以把 ↩︎ 鍵設為傳送或換行</string>
 </resources>
