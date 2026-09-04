@@ -5210,18 +5210,25 @@ class ChatViewModel(
         com.openminis.app.speech.VoiceOutputState.replySpeechState.asStateFlow()
 
     private var replySpeechJob: Job? = null
+    private var replyPlayer: com.openminis.app.speech.ReadAloudPlayer? = null
+
+    private fun getOrCreateReplyPlayer(): com.openminis.app.speech.ReadAloudPlayer {
+        return com.openminis.app.speech.VoiceOutputState.activePlayer
+            ?: replyPlayer
+            ?: com.openminis.app.speech.ReadAloudPlayer(context).also { replyPlayer = it }
+    }
 
     fun toggleReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
         val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
         if (cur.activeMessageId == messageId) {
             when (cur.status) {
                 com.openminis.app.speech.ReplySpeechState.Status.READING -> {
-                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
                     com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
                         cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
                 }
                 com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
-                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
                     com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
                         cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
                 }
@@ -5240,12 +5247,12 @@ class ChatViewModel(
         if (!cur.isActive) return
         when (cur.status) {
             com.openminis.app.speech.ReplySpeechState.Status.READING -> {
-                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
                 com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
                     cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
             }
             com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
-                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
                 com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
                     cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
             }
@@ -5255,7 +5262,7 @@ class ChatViewModel(
 
     private fun startReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
         replySpeechJob?.cancel()
-        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.stop()
         val plainText = MarkdownClipboard.markdownToPlainText(rawMarkdown).trim()
         if (plainText.isEmpty()) {
             com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
@@ -5276,11 +5283,7 @@ class ChatViewModel(
             )
 
         replySpeechJob = viewModelScope.launch {
-            val player = com.openminis.app.speech.VoiceOutputState.activePlayer
-            if (player == null) {
-                com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
-                return@launch
-            }
+            val player = getOrCreateReplyPlayer()
             for ((idx, sentence) in sentences.withIndex()) {
                 if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId != messageId) break
                 com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
@@ -5289,7 +5292,8 @@ class ChatViewModel(
                         status = com.openminis.app.speech.ReplySpeechState.Status.READING,
                     )
                 player.speakSentence(sentence)
-                while (player.isSpeaking.value && com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                while ((player.isSpeaking.value || com.openminis.app.speech.VoiceOutputState.replySpeechState.value.status == com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
+                    && com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
                     kotlinx.coroutines.delay(100)
                 }
             }
@@ -5309,7 +5313,7 @@ class ChatViewModel(
     fun stopReplySpeech() {
         replySpeechJob?.cancel()
         replySpeechJob = null
-        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.stop()
         com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
     }
 
@@ -11369,6 +11373,10 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
     override fun onCleared() {
         super.onCleared()
+        replySpeechJob?.cancel()
+        replySpeechJob = null
+        replyPlayer?.shutdown()
+        replyPlayer = null
         // Tear down whichever shell was actually serving this VM. Terminate
         // both ids when the rename happened, since a draft shell may still
         // linger if the agent ran a tool before `ensureSession()`.
