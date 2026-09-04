@@ -1322,6 +1322,8 @@
     <string name="assistant_action_branch">ブランチを作成</string>
     <string name="chat_default_title">チャット</string>
     <string name="chat_branch_title">%1$s（ブランチ）</string>
+    <string name="chat_branch_created">ブランチセッションを作成しました</string>
+    <string name="chat_branch_failed">ブランチの作成に失敗しました</string>
     <string name="assistant_action_more">詳細</string>
     <string name="assistant_menu_select_text">テキストを選択</string>
     <string name="assistant_menu_copy_markdown">Markdown をコピー</string>

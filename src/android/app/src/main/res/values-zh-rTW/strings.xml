@@ -862,6 +862,8 @@
     <string name="assistant_action_branch">建立分支</string>
     <string name="chat_default_title">對話</string>
     <string name="chat_branch_title">%1$s（分支）</string>
+    <string name="chat_branch_created">已建立分支對話</string>
+    <string name="chat_branch_failed">建立分支對話失敗</string>
     <string name="assistant_action_more">更多</string>
     <string name="assistant_menu_select_text">選取文字</string>
     <string name="assistant_menu_copy_markdown">複製 Markdown</string>

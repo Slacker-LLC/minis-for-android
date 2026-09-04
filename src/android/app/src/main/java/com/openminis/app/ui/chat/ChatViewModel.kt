@@ -5779,10 +5779,21 @@ class ChatViewModel(
             filesDir = context.filesDir,
         )
         viewModelScope.launch {
-            val newSessionId = sessionForkManager.forkSessionAtMessage(sid, messageId)
-            if (newSessionId != null) {
+            try {
+                val newSessionId = sessionForkManager.forkSessionAtMessage(sid, messageId)
+                if (newSessionId != null) {
+                    withContext(Dispatchers.Main) {
+                        onForkSuccess(newSessionId)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                com.openminis.app.logging.AppLogger.warning("ChatViewModel", "forkSessionAtMessage failed: ${e.message}")
                 withContext(Dispatchers.Main) {
-                    onForkSuccess(newSessionId)
+                    android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
         }
