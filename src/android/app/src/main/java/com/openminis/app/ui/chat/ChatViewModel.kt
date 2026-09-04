@@ -126,6 +126,10 @@ class ChatViewModel(
             return draft + separator + cleaned + " "
         }
 
+        /** A retry can start only for a non-empty user turn with a provider. */
+        internal fun canRetryMessage(message: ChatMessage, hasProvider: Boolean): Boolean =
+            message.role == "user" && message.content.isNotBlank() && hasProvider
+
         // [T-android-compact-runaway] Keep these names in the ViewModel for
         // compatibility with the upstream JVM contract; the values themselves
         // live in CompactBudget so the runtime and tests share one source.
@@ -5189,7 +5193,12 @@ class ChatViewModel(
 
         _generatingMessageId.value = messageId
         _forceScrollToBottom.tryEmit(Unit)
-        retryFromMessage(userMsg.id)
+        if (!retryFromMessage(userMsg.id)) {
+            // retryFromMessage rejects blank/image-only turns and missing
+            // providers before streaming starts. No streaming transition will
+            // arrive to clear this marker, so clear it at the rejection site.
+            _generatingMessageId.value = null
+        }
     }
 
     val replySpeechState: StateFlow<com.openminis.app.speech.ReplySpeechState> =
@@ -5304,23 +5313,24 @@ class ChatViewModel(
      * (including the assistant response), rebuild agent history, and resend.
      * Mirrors iOS's edit/retry behavior — no duplicate user messages.
      */
-    fun retryFromMessage(messageId: String) {
-        if (_isStreaming.value) return
+    fun retryFromMessage(messageId: String): Boolean {
+        if (_isStreaming.value) return false
         _canResume.value = false
         val messages = _messages.value
         val index = messages.indexOfFirst { it.id == messageId }
-        if (index < 0) return
+        if (index < 0) return false
         val message = messages[index]
         // [T-android-tool-autoscroll] Start-of-turn snap — see resume().
         _forceScrollToBottom.tryEmit(Unit)
-        if (message.role != "user" || message.content.isBlank()) return
-
         val initialProvider = currentProvider
-        if (initialProvider == null) {
-            _error.value = "No provider configured"
-            return
+        if (!canRetryMessage(message, initialProvider != null)) {
+            if (message.role == "user" && message.content.isNotBlank() && initialProvider == null) {
+                _error.value = "No provider configured"
+            }
+            return false
         }
-        val provider: LLMProvider = initialProvider
+
+        val provider: LLMProvider = initialProvider ?: return false
         _error.value = null
 
         // T149: snapshot messages about to be truncated so we can revoke any
@@ -5426,6 +5436,7 @@ class ChatViewModel(
                 }
             }
         }
+        return true
     }
 
     /**

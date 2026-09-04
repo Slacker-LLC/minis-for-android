@@ -1157,7 +1157,6 @@ fun AssistantMessageActionBar(
     modifier: Modifier = Modifier,
 ) {
     var isCopied by remember { mutableStateOf(false) }
-    var isRegenAnimating by remember { mutableStateOf(false) }
     var isBranchAnimating by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
 
@@ -1170,7 +1169,7 @@ fun AssistantMessageActionBar(
         label = "copyOffset",
     )
 
-    val regenSpec: AnimationSpec<Float> = if (isRegenAnimating || isGenerating) {
+    val regenSpec: AnimationSpec<Float> = if (isGenerating) {
         infiniteRepeatable(
             animation = tween(durationMillis = 800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
@@ -1179,7 +1178,7 @@ fun AssistantMessageActionBar(
         tween(durationMillis = 200)
     }
     val regenRotation by animateFloatAsState(
-        targetValue = if (isRegenAnimating || isGenerating) 360f else 0f,
+        targetValue = if (isGenerating) 360f else 0f,
         animationSpec = regenSpec,
         label = "regenRotation",
     )
@@ -1242,7 +1241,6 @@ fun AssistantMessageActionBar(
                 .size(42.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(enabled = !isStreaming && !isGenerating) {
-                    isRegenAnimating = true
                     onRegenerate()
                 },
             contentAlignment = Alignment.Center,
