@@ -1204,6 +1204,8 @@
     <string name="assistant_action_regenerate">Régénérer</string>
     <string name="assistant_action_read_aloud">Lecture vocale</string>
     <string name="assistant_action_branch">Créer une branche</string>
+    <string name="chat_default_title">Chat</string>
+    <string name="chat_branch_title">%1$s (branche)</string>
     <string name="assistant_action_more">Plus</string>
     <string name="assistant_menu_select_text">Sélectionner le texte</string>
     <string name="assistant_menu_copy_markdown">Copier en Markdown</string>

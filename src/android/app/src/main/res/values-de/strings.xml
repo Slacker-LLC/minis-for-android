@@ -1314,6 +1314,8 @@
     <string name="assistant_action_regenerate">Neu generieren</string>
     <string name="assistant_action_read_aloud">Vorlesen</string>
     <string name="assistant_action_branch">Zweig erstellen</string>
+    <string name="chat_default_title">Chat</string>
+    <string name="chat_branch_title">%1$s (Zweig)</string>
     <string name="assistant_action_more">Mehr</string>
     <string name="assistant_menu_select_text">Text auswählen</string>
     <string name="assistant_menu_copy_markdown">Markdown kopieren</string>
