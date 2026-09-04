@@ -59,6 +59,7 @@ internal object MinisdBootstrap {
             commands += "sleep 1"
         }
 
+        commands += "if [ -f /data/adb/minis/rootfs/etc/resolv.conf ]; then chmod 644 /data/adb/minis/rootfs/etc/resolv.conf 2>/dev/null || true; fi"
         commands += "(\"\$BIN\" --watchdog --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""
         return commands.joinToString("\n")

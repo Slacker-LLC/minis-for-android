@@ -13,7 +13,14 @@ pub const PROXY_KEYS: &[&str] = &[
     "NO_PROXY",
 ];
 pub const PROXY_NO_PROXY: &str = "localhost,127.0.0.1,::1";
-pub const FALLBACK_DNS: &[&str] = &["8.8.8.8", "8.8.4.4"];
+pub const FALLBACK_DNS: &[&str] = &[
+    "223.5.5.5",
+    "114.114.114.114",
+    "119.29.29.29",
+    "8.8.8.8",
+    "8.8.4.4",
+    "1.1.1.1",
+];
 /// Dynamic-linker keys that a guest could use to escape the sandbox via
 /// preloaded/injected libraries. Filtered at the single chokepoint in
 /// `guest_env`; the filter is case-sensitive (ld.so only honors these exact
@@ -288,6 +295,11 @@ pub fn write_resolv_conf(rootfs: &str, nameservers: &[String]) -> Result<String,
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir resolv parent: {e}"))?;
     }
     std::fs::write(&path, &body).map_err(|e| format!("write resolv.conf: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644));
+    }
     Ok(body)
 }
 
