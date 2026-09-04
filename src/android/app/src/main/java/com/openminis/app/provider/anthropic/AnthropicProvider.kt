@@ -50,6 +50,8 @@ class AnthropicProvider(
 ) : LLMProvider {
     override val name = "Anthropic"
     override val defaultMaxOutputTokens: Int get() = 64_000
+    override val supportsTemperatureOverride: Boolean
+        get() = !modelRejectsTemperature(model.id)
 
     /**
      * [T-android-enhanced-cache] Enhanced Cache toggle — when true, every

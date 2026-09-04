@@ -131,8 +131,8 @@ fun SessionAdvancedSettingsSheet(
         lockedSoulText = persistedSoul
         customInstructions = editableSoul != null
         instructionsText = editableSoul.orEmpty()
-        customTemperature = overrides.temperature != null
-        temperatureText = overrides.temperature?.toString().orEmpty()
+        customTemperature = overrides.temperature != null && viewModel.currentModelSupportsTemperature
+        temperatureText = overrides.temperature?.takeIf { viewModel.currentModelSupportsTemperature }?.toString().orEmpty()
         customMaxTokens = overrides.maxTokens != null
         maxTokensText = overrides.maxTokens?.toString().orEmpty()
         customTools = overrides.enabledTools != null
@@ -157,7 +157,7 @@ fun SessionAdvancedSettingsSheet(
             null
         }
 
-        val temperature = if (customTemperature) {
+        val temperature = if (customTemperature && viewModel.currentModelSupportsTemperature) {
             val value = temperatureText.trim().toDoubleOrNull()
             if (value == null || !value.isFinite() || value !in 0.0..2.0) {
                 errorText = invalidTemperatureMessage
@@ -304,24 +304,32 @@ fun SessionAdvancedSettingsSheet(
                     header = stringResource(R.string.session_advanced_model_section),
                     footer = stringResource(R.string.session_advanced_settings_inherit_help),
                 ) {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.session_advanced_temperature),
-                        subtitle = stringResource(R.string.session_advanced_custom),
-                        checked = customTemperature,
-                        onCheckedChange = { customTemperature = it; errorText = null },
-                        showDivider = true,
-                    )
-                    if (customTemperature) {
-                        OutlinedTextField(
-                            value = temperatureText,
-                            onValueChange = { temperatureText = it; errorText = null },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            label = { Text(stringResource(R.string.session_advanced_temperature)) },
-                            placeholder = { Text(stringResource(R.string.session_advanced_temperature_hint)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    if (viewModel.currentModelSupportsTemperature) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.session_advanced_temperature),
+                            subtitle = stringResource(R.string.session_advanced_custom),
+                            checked = customTemperature,
+                            onCheckedChange = { customTemperature = it; errorText = null },
+                            showDivider = true,
+                        )
+                        if (customTemperature) {
+                            OutlinedTextField(
+                                value = temperatureText,
+                                onValueChange = { temperatureText = it; errorText = null },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                label = { Text(stringResource(R.string.session_advanced_temperature)) },
+                                placeholder = { Text(stringResource(R.string.session_advanced_temperature_hint)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            )
+                        }
+                    } else {
+                        SettingsValueRow(
+                            title = stringResource(R.string.session_advanced_temperature),
+                            value = stringResource(R.string.session_advanced_thinking_not_supported),
+                            showDivider = true,
                         )
                     }
 
