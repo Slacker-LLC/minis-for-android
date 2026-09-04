@@ -1,7 +1,9 @@
 package com.openminis.app.ui.chat
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -80,5 +82,26 @@ class RegenerateAssistantMessageTest {
         )
         assertNull(resolvePrecedingUserMessageId(messages, "not-found"))
     }
-}
 
+    @Test
+    fun `blank user turn is rejected before streaming`() {
+        assertFalse(ChatViewModel.canRetryMessage(ChatMessage("u", "user", "   "), hasProvider = true))
+    }
+
+    @Test
+    fun `image-only user turn is rejected when its text is blank`() {
+        assertFalse(ChatViewModel.canRetryMessage(ChatMessage("u", "user", ""), hasProvider = true))
+    }
+
+    @Test
+    fun `non-empty user turn requires a provider`() {
+        val user = ChatMessage("u", "user", "retry this")
+        assertFalse(ChatViewModel.canRetryMessage(user, hasProvider = false))
+        assertTrue(ChatViewModel.canRetryMessage(user, hasProvider = true))
+    }
+
+    @Test
+    fun `assistant turn is never a retry input`() {
+        assertFalse(ChatViewModel.canRetryMessage(ChatMessage("a", "assistant", "reply"), hasProvider = true))
+    }
+}
