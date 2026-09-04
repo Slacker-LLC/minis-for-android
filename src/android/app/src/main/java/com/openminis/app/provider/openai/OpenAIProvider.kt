@@ -94,6 +94,14 @@ class OpenAIProvider private constructor(
     override val name = "OpenAI"
 
     /**
+     * Reasoning models reject temperature on both supported OpenAI request
+     * shapes; Codex OAuth also uses a fingerprint-sensitive Responses body.
+     * Non-reasoning Responses relays do honor the per-session field.
+     */
+    override val supportsTemperatureOverride: Boolean
+        get() = model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
+
+    /**
      * [T-android-thinking-rules-phase2] Owning provider-instance id, set by
      * ProviderFactory after construction (mirrors how [codexAccountId] is a
      * post-construction var). Lets the thinking resolver look up this instance's
@@ -628,7 +636,7 @@ class OpenAIProvider private constructor(
         } else if (usesChatCompletionsAPI) {
             buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         } else {
-            buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
         // T302: serialize the request body exactly once. Pre-T302 we called
         // body.toString() three times per request (debug log + OAuth byte
@@ -1815,7 +1823,7 @@ class OpenAIProvider private constructor(
         }
         body.put("stream", stream)
 
-        if (temperature != null) {
+        if (temperature != null && supportsTemperatureOverride) {
             body.put("temperature", temperature)
         }
 
@@ -2671,6 +2679,7 @@ class OpenAIProvider private constructor(
         systemPrompt: String?,
         maxTokens: Int,
         stream: Boolean,
+        temperature: Double? = null,
         /**
          * [T-android-responses-toplevel-images] Images passed as the top-level
          * argument rather than on `msg.contentParts`, attached to the LAST user
@@ -2795,6 +2804,15 @@ class OpenAIProvider private constructor(
         // fields the real CLI doesn't send.
         if (maxTokens > 0 && !isOAuth) {
             body.put("max_output_tokens", maxTokens)
+        }
+
+        // [T-android-session-temperature-responses / #35] The session
+        // override was passed to the Chat Completions builder only, so custom
+        // Responses API instances silently ignored it. Reasoning models and
+        // Codex OAuth reject/forbid temperature, hence the same capability
+        // gate used by the settings UI and the OAuth fingerprint guard.
+        if (temperature != null && supportsTemperatureOverride) {
+            body.put("temperature", temperature)
         }
 
         // [T-codex-fast-mode] Fast tier injection (mirrors iOS fb671083 +
