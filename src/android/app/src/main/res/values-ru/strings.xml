@@ -1574,4 +1574,25 @@
     <string name="reply_speech_reading">Чтение</string>
     <string name="reply_speech_paused">Приостановлено</string>
     <string name="reply_speech_completed">Завершено</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Удалить сообщение</string>
+    <string name="chat_delete_single_message_body">Вы уверены, что хотите удалить этот ответ ИИ? Это действие нельзя отменить.</string>
+    <string name="chat_delete_single_message_confirm">Удалить</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Отменить изменения?</string>
+    <string name="soul_discard_confirm_body">Ваши правки персоны не были сохранены.</string>
+    <string name="soul_discard_confirm">ОК, отменить</string>
+    <string name="soul_discard_cancel">Отмена, продолжить правку</string>
+    <string name="soul_icon_choose_emoji">Выбрать эмодзи</string>
+    <string name="soul_icon_choose_image">Выбрать изображение</string>
+    <string name="soul_icon_image_hint">Обрезается до квадрата и скругляется</string>
+    <string name="soul_icon_use_default">Использовать по умолчанию</string>
+    <string name="soul_icon_emoji_title">Значок личности</string>
+    <string name="soul_icon_emoji_field">Или введите эмодзи</string>
+    <string name="soul_icon_set">Задать</string>
+    <string name="soul_icon_error_title">Не удаётся использовать это изображение</string>
+    <string name="soul_icon_error_unreadable">Не удалось прочитать это изображение. Попробуйте другое.</string>
+    <string name="soul_icon_error_too_large">Это изображение слишком велико для сохранения. Попробуйте более простое.</string>
+    <string name="external_link_blocked">Ссылка на внешнее приложение заблокирована (%1$s)</string>
+    <string name="external_link_no_app">Нет приложения для открытия этой ссылки.</string>
 </resources>

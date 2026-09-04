@@ -423,6 +423,22 @@ class SelectionController {
         selection.value = cur.copy(end = pos)
     }
 
+    /**
+     * [T-android-select-message] Select the full text span of a single message.
+     */
+    fun selectMessage(messageId: String) {
+        val matching = shards.keys.filter { it.messageId == messageId }
+        if (matching.isEmpty()) return
+        val firstShard = matching.first()
+        val lastShard = matching.last()
+        val lastLen = shards[lastShard]?.plainText?.length ?: 0
+        selectionFromMouse.value = false
+        selection.value = TextSelection(
+            start = TextPosition(firstShard, 0),
+            end = TextPosition(lastShard, lastLen),
+        )
+    }
+
     fun clearSelection() {
         selection.value = null
         messageMarkdownCache.clear()

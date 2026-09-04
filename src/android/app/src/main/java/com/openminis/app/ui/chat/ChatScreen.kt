@@ -769,6 +769,7 @@ fun ChatScreen(
     // backing state without needing fragile scope wiring.
     var showMoveSheet by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
+    var deleteSingleMessageTargetId by remember { mutableStateOf<String?>(null) }
     var deleteFromHereTargetId by remember { mutableStateOf<String?>(null) }
     // [T-new-chat-menu-entry] Confirmation gate for "New Chat" while the
     // current session is still streaming — stopping the running task needs
@@ -4087,6 +4088,22 @@ fun ChatScreen(
                                             onMoveToSession(newId)
                                         }
                                     },
+                                    onSelectText = {
+                                        selectionController.selectMessage(item.messageId)
+                                    },
+                                    onShare = {
+                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, plain)
+                                            putExtra(Intent.EXTRA_TITLE, sessionTitle)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                    },
+                                    onDelete = {
+                                        deleteSingleMessageTargetId = item.messageId
+                                    },
                                 )
                             }
                         }
@@ -6429,6 +6446,19 @@ fun ChatScreen(
                         viewModel.clearChat()
                         viewModel.setInputText("")
                         showClearChatDialog = false
+                    },
+                )
+            }
+            deleteSingleMessageTargetId?.let { targetId ->
+                MinisAlertDialog(
+                    onDismissRequest = { deleteSingleMessageTargetId = null },
+                    title = stringResource(R.string.chat_delete_single_message_title),
+                    text = stringResource(R.string.chat_delete_single_message_body),
+                    confirmText = stringResource(R.string.chat_delete_single_message_confirm),
+                    isDestructive = true,
+                    onConfirm = {
+                        viewModel.deleteSingleAssistantMessage(targetId)
+                        deleteSingleMessageTargetId = null
                     },
                 )
             }

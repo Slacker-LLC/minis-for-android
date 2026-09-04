@@ -1326,4 +1326,25 @@
     <string name="reply_speech_reading">Wird vorgelesen</string>
     <string name="reply_speech_paused">Pausiert</string>
     <string name="reply_speech_completed">Vorgelesen</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Nachricht löschen</string>
+    <string name="chat_delete_single_message_body">Sind Sie sicher, dass Sie diese KI-Antwort löschen möchten? Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="chat_delete_single_message_confirm">Löschen</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Änderungen verwerfen?</string>
+    <string name="soul_discard_confirm_body">Ihre Änderungen an der Persona wurden nicht gesichert.</string>
+    <string name="soul_discard_confirm">OK, verwerfen</string>
+    <string name="soul_discard_cancel">Abbrechen, weiter bearbeiten</string>
+    <string name="soul_icon_choose_emoji">Emoji wählen</string>
+    <string name="soul_icon_choose_image">Bild wählen</string>
+    <string name="soul_icon_image_hint">Wird quadratisch zugeschnitten und abgerundet</string>
+    <string name="soul_icon_use_default">Standard verwenden</string>
+    <string name="soul_icon_emoji_title">Identitätssymbol</string>
+    <string name="soul_icon_emoji_field">Oder ein Emoji eingeben</string>
+    <string name="soul_icon_set">Festlegen</string>
+    <string name="soul_icon_error_title">Dieses Bild kann nicht verwendet werden</string>
+    <string name="soul_icon_error_unreadable">Dieses Bild konnte nicht gelesen werden. Versuchen Sie ein anderes.</string>
+    <string name="soul_icon_error_too_large">Dieses Bild ist zu groß zum Speichern. Versuchen Sie ein einfacheres.</string>
+    <string name="external_link_blocked">Link zu externer App blockiert (%1$s)</string>
+    <string name="external_link_no_app">Keine App zum Öffnen dieses Links verfügbar.</string>
 </resources>

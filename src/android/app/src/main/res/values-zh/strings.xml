@@ -1579,4 +1579,25 @@
     <string name="reply_speech_reading">正在朗读</string>
     <string name="reply_speech_paused">已暂停</string>
     <string name="reply_speech_completed">已读完</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">删除消息</string>
+    <string name="chat_delete_single_message_body">确定要删除这条 AI 回复吗？此操作无法撤销。</string>
+    <string name="chat_delete_single_message_confirm">删除</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">放弃修改？</string>
+    <string name="soul_discard_confirm_body">你对人格设定的修改尚未保存。</string>
+    <string name="soul_discard_confirm">OK，放弃修改</string>
+    <string name="soul_discard_cancel">取消，继续修改</string>
+    <string name="soul_icon_choose_emoji">选择表情</string>
+    <string name="soul_icon_choose_image">选择图片</string>
+    <string name="soul_icon_image_hint">会裁剪为方形并做圆角</string>
+    <string name="soul_icon_use_default">恢复默认</string>
+    <string name="soul_icon_emoji_title">身份图标</string>
+    <string name="soul_icon_emoji_field">或输入一个表情</string>
+    <string name="soul_icon_set">设置</string>
+    <string name="soul_icon_error_title">无法使用该图片</string>
+    <string name="soul_icon_error_unreadable">无法读取该图片，请换一张试试。</string>
+    <string name="soul_icon_error_too_large">该图片过大，无法存储。请换一张更简单的。</string>
+    <string name="external_link_blocked">已拦截跳转到外部应用的链接（%1$s）</string>
+    <string name="external_link_no_app">没有可以打开此链接的应用。</string>
 </resources>

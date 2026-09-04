@@ -761,10 +761,26 @@ private fun NoConversationSelected(
             // behave identically here (that shared-renderer rule is what keeps
             // image icons from silently failing on one surface).
             val soulMeta by com.openminis.app.agent.SoulStore.cachedMetadata.collectAsState()
-            Text(
-                text = com.openminis.app.agent.SoulMetadata.DISPLAY_EMOJI,
-                style = MaterialTheme.typography.displayMedium,
-                textAlign = TextAlign.Center,
+            val density = LocalDensity.current
+            val iconBitmap = remember(soulMeta.icon) {
+                com.openminis.app.agent.SoulIcon.decode(soulMeta.icon)
+            }
+            val iconSize = remember(iconBitmap, density) {
+                if (iconBitmap == null) EMPTY_STATE_ICON_SIZE
+                else with(density) {
+                    minOf(EMPTY_STATE_ICON_SIZE, iconBitmap.width.toDp())
+                }
+            }
+            com.openminis.app.ui.settings.SoulIconGlyph(
+                icon = soulMeta.icon,
+                sizeDp = iconSize,
+                emojiSp = with(density) { EMPTY_STATE_ICON_SIZE.toSp() * 0.82f },
+                sparkleTint = Brush.linearGradient(
+                    colors = listOf(
+                        com.openminis.app.ui.chat.SparkleColor1,
+                        com.openminis.app.ui.chat.SparkleColor2,
+                    ),
+                ),
             )
             Spacer(Modifier.height(10.dp))
             Text(
@@ -906,4 +922,3 @@ fun ChatSplitScaffoldRoute(
         },
     )
 }
-

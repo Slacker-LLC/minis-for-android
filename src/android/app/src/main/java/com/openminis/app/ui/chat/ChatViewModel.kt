@@ -5631,6 +5631,44 @@ class ChatViewModel(
         _editingMessageId.value = null
     }
 
+    /**
+     * [T-android-delete-single-assistant-message] Delete exactly one assistant
+     * message without truncating the subsequent messages, updating DB, agent
+     * history, speech and memory writes.
+     */
+    fun deleteSingleAssistantMessage(messageId: String) {
+        if (_isStreaming.value) return
+        val messages = _messages.value
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return
+        val target = messages[index]
+        if (target.role != "assistant") return
+
+        revokeMemoryWritesInDeletedMessages(listOf(target))
+
+        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+            stopReplySpeech()
+        }
+
+        _messages.value = messages.filterNot { it.id == messageId }
+
+        val sid = activeSessionId ?: return
+        viewModelScope.launch {
+            chatRepository.deleteSingleMessage(messageId)
+
+            agentHistory.clear()
+            toolLoopDetector.reset()
+            val remaining = chatRepository.loadMessages(sid)
+            for (entity in remaining) {
+                agentHistory.add(entity.toLLMMessage())
+            }
+            runCatching {
+                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
+            }
+            AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
+        }
+    }
+
     fun deleteFromMessage(messageId: String) {
         if (_isStreaming.value) return
         _canResume.value = false
