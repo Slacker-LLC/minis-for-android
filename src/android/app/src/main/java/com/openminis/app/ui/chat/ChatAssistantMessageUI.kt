@@ -140,7 +140,6 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -1330,20 +1329,6 @@ fun AssistantMessageActionBar(
                 onDismissRequest = { moreMenuExpanded = false },
                 modifier = Modifier.widthIn(min = 210.dp),
             ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.assistant_menu_select_text)) },
-                    onClick = {
-                        moreMenuExpanded = false
-                        onSelectText()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.SelectAll,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.assistant_menu_copy_markdown)) },
                     onClick = {
