@@ -358,9 +358,14 @@ fun AppNavigation(
             mode == 3 -> null
             else -> {
                 val latest = chatRepository.dao.listSessions().firstOrNull()
-                    ?: return@LaunchedEffect
-                val fresh = System.currentTimeMillis() - latest.updatedAt < autoThresholdMs
-                if (fresh) Routes.chat(latest.id) else Routes.chat("__new__${java.util.UUID.randomUUID()}")
+                val sessionId = resolveAutoLaunchSessionId(
+                    latestSessionId = latest?.id,
+                    latestSessionUpdatedAt = latest?.updatedAt,
+                    nowMillis = System.currentTimeMillis(),
+                    autoThresholdMs = autoThresholdMs,
+                    newDraftSessionId = { "__new__${java.util.UUID.randomUUID()}" },
+                )
+                Routes.chat(sessionId)
             }
         }
         if (target != null) {
