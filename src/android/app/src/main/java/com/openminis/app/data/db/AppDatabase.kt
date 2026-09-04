@@ -298,6 +298,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Return the already-open singleton used by the app repositories. */
+        internal fun getInitializedInstance(): AppDatabase =
+            checkNotNull(INSTANCE) { "AppDatabase is not initialized" }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
