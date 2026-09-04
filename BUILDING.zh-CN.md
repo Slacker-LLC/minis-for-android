@@ -73,6 +73,8 @@ cd src/android
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Debug APK 使用本机持久化的固定调试签名，不会把签名材料提交到仓库。首次构建时会自动生成一次：Windows 与 WSL 共用 `C:\Users\<用户名>\.minis\debug.keystore`；其他 Linux 环境使用 `~/.minis/debug.keystore`。也可以通过 `MINIS_DEBUG_KEYSTORE` 指定路径。该签名只用于 Debug，Release 仍必须使用显式的正式签名配置。
+
 安装：
 
 ```bash
