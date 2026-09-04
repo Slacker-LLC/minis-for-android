@@ -15,6 +15,13 @@ interface LLMProvider {
     var model: LLMModel
 
     /**
+     * Whether the current provider/model route honors a per-session temperature.
+     * Providers may hide the advanced-settings control when their wire contract
+     * rejects or ignores the field.
+     */
+    val supportsTemperatureOverride: Boolean get() = true
+
+    /**
      * Effective max output tokens ceiling for the given model.
      * Priority: model.maxOutputTokens > provider-level default.
      * Used as the upper bound in dynamicMaxTokens().
