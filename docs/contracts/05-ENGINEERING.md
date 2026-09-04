@@ -1,36 +1,55 @@
 # 05 — 工程规范
 
-## 权威顺序
+## 怎么判断“当前事实”
 
 ```text
-源码与测试
-  > AGENTS.md 与 docs/contracts/*（中文合同）
-  > README.zh-CN.md 与 CONTRIBUTING.zh-CN.md
-  > 英文 README / CHANGELOG / 英文 docs
-  > docs/archive/ 与 PROVENANCE.md
+最终 master 源码与测试 → 当前实现事实
+AGENTS.md + docs/contracts/* → 应保持的长期行为边界
+06-CURRENT-GAPS.md → 当前实现与合同的已确认差异
+README / 专题 docs → 面向读者的说明
+历史 Issue/PR/计划/archive → 历史证据，不是当前事实
 ```
 
-合同描述目标。`06-CURRENT-GAPS.md` 描述现状。禁止把 Gaps 里的未完成项写成已实现。
+已经合并过的 PR 不能证明某个修复今天仍存在；集成、stacked PR 或后续 merge 可能让代码回归。审查和修复都必须读取最终目标分支实际代码。
+
+合同也不能因为陈旧就凌驾于当前事实：发现合同与代码冲突时，先确认当前实现与维护者意图。若代码是缺陷，修代码并更新 gap；若合同已过时，更新合同，不要把正确代码改回旧阶段。
 
 ## 分支与 PR
 
-- 默认基于 `master`。
-- **冻结**：不要平行 Draft 同时改 runtime / 身份 / 发行管线。
-- 存储真源已对齐合同。已存在的 Draft 不要整包硬合；下一优先 G2 自举或 G4 Root 旁路。
-- 一次 PR 只碰一条合同。不要在同一 PR 里改包名又改 minisd 又改文档叙事。
+- 默认基于最新 `master`；stacked PR 按明确 base/head 工作。
+- 一次 PR 只解决一个问题或一条可独立验收边界。
+- 不把 namespace 重命名、runtime、存储、MCP、网络等无关变化混在一个修复中。
+- 不 force-push、不重写历史，除非维护者对该具体操作明确授权。
+- 合并前核对最终 diff；合并后需要验证最终 `master` 的关键行为，而不是只看 PR 页面曾显示通过。
 
-## 身份迁移
+## 当前 Android 身份
 
-目标包名已在 `00-IDENTITY.md` 冻结为 `llc.slacker.minis`。实施必须单独立项：含旧安装是否放弃、数据是否导出。禁止全库盲替换。
+- `applicationId = llc.slacker.minis` 已经是当前实现。
+- `namespace = com.openminis.app` 仍是当前实现。
+- 两者不同不是 bug；全库 Kotlin/Java package 重命名必须作为明确独立任务，不得在日常修复中顺手进行。
+
+## Runtime 边界
+
+- 产品 runtime：Root + `minisd` + Ubuntu 24.04 chroot。
+- 不恢复 PRoot/Alpine 兼容层，除非产品范围被明确重新定义。
+- 持久化真源：`/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。
+- UID/GID 动态取得，禁止固定 `10000`。
+- Session 相关入口必须保持 session workspace/namespace 语义。
+- 新 Root 执行只走结构化 `minisd` 边界；bootstrap/recovery 中的受控静态特权动作不得变成模型可控 shell。
+
+## 外部实现参考
+
+其它实现只能按功能选择性参考，不能整体替换本仓库已经明确分叉的 runtime/storage/PTY/network 架构。共享 UI、Chat、Provider、Markdown、语音等修复可以在核对本仓库实际代码后移植；Root/runtime 方案必须服从本仓库 contracts。
 
 ## 文档
 
-- 新增/变更行为：先改对应中文合同，再改代码，再改测试。
-- 产品入口：`README.zh-CN.md`。
-- 法律入口：`PROVENANCE.md`（允许出现来源项目名；其它现行文档不允许把来源项目当产品身份）。
-- Issue/PR 用中文把问题说清楚；不要用空标题当远程排障工单。
+- 行为或长期边界改变时，同步更新对应中文合同。
+- 当前已确认缺陷进入 `06-CURRENT-GAPS.md`；修复合并并在最终 master 验证后再删除。
+- 历史 Issue/PR 实施文档保留历史语境，不承担动态状态列表职责。
+- `DEVELOPMENT-STATUS.md` 若带 SHA，只代表该 SHA 的快照；master 前进后要重新核对。
+- 法律来源只在 `PROVENANCE.md` 维护。
 
-## 验证（按改动范围取最小集）
+## 验证（按改动范围取最小充分集）
 
 文档：
 
@@ -47,6 +66,8 @@ cd src/android
 ./gradlew :app:lintDebug --no-daemon
 ```
 
+Release/R8/JNI 敏感改动还必须跑对应 Release 构建/检查；Debug 通过不能替代 Release 证据。
+
 `minisd`：
 
 ```bash
@@ -55,10 +76,11 @@ cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets
 cargo test --locked --manifest-path src/native/minisd/Cargo.toml
 ```
 
-真机测试只在明确授权的设备上跑。
+Root、mount、SELinux、VPN/DNS、OEM 生命周期等设备行为，只有在明确设备上实际验证后才能声称通过。
 
 ## Agent 工作方式
 
-- 先读 `AGENTS.md` 与相关合同，再改代码。
-- 发现合同与代码不符：更新 `06-CURRENT-GAPS.md`，不要偷偷改合同去迁就错误实现（除非维护者明确废弃该合同）。
-- 不要提交密钥、APK、或一次性「one-shot」workflow 当常设 CI。
+- 先读当前目标分支代码、测试和相关合同，再决定方案。
+- 优先最小修复；不要为理论风险自动建立大型基础设施。
+- 复现与真实用户影响优先于架构洁癖。
+- 已修问题如果在最终 master 回归，按当前代码重新修复并补能防止再次回归的最窄测试。

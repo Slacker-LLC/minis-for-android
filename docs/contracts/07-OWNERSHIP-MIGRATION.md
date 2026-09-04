@@ -1,49 +1,96 @@
-# 07 — 六阶段事务级属主迁移协议 (Ownership Migration Contract)
+# 07 — 属主校正与身份恢复合同
 
-> 规范依据：`docs/contracts/00-IDENTITY.md` 与 `docs/contracts/03-STORAGE-CONTRACT.md`
+> 关联：`00-IDENTITY.md`、`03-STORAGE-CONTRACT.md`
 
-## 背景与问题
+本文件保留原文件名以避免旧链接失效，但当前合同不再要求“六阶段事务级属主迁移”。`applicationId = llc.slacker.minis` 已经是当前事实；这里解决的是 `/data/adb/minis` 用户数据 owner 与当前 App identity 不一致时，如何安全恢复。
 
-当 Android 包名（`applicationId`）从 `dev.openminispet.android` 切换至 `llc.slacker.minis` 时，Android 系统会将新应用视为一个**全新的应用身份**，并由底层分配全新的 Linux UID 与 GID（例如旧包为 `10100`，新包为 `10245`）。
+## 目标
 
-而 Minis for Android 的核心持久化真源固定在 `/data/adb/minis`。粗暴的 `chown -R` 存在非原子性、并发符号链接逃逸漏洞，且在断电或异常中止时无法得知哪些文件被修改，导致不可逆的不可控损坏。
+需要满足四件事：
 
-## 六阶段事务协议
+1. 只修改 Minis canonical 用户数据；
+2. 使用当前设备真实 App UID/GID；
+3. 不跟随符号链接、不逃出允许根；
+4. 中断后可以重新运行并继续收敛，不要求逆向回滚已经成功的 `chown`。
+
+## 允许处理的用户数据根
+
+只允许：
 
 ```text
-1. PREPARE ──► 2. FREEZE ──► 3. FD-MIGRATION ──► 4. FSYNC ──► 5. COMMIT ──► 6. CLEANUP
- (动态查 UID)   (加排他锁)    (openat+fchown+WAL) (落盘元数据) (写Commit标记)  (释放锁/解冻)
+/data/adb/minis/workspace
+/data/adb/minis/sessions
+/data/adb/minis/memory
+/data/adb/minis/skills
+/data/adb/minis/shared
+/data/adb/minis/home
 ```
 
-### 1. Stage 1: Prepare (环境预检与 UID/GID 动态获取)
-- 通过内核文件系统对新包私有目录执行 `stat -c "%u %g" /data/user/0/llc.slacker.minis` 获取真实分配的 UID 与 GID，杜绝硬编码或仅依赖 `pm list packages -U`（后者不提供 GID 证明）；
-- 校验 `/data/adb/minis` 分区剩余磁盘空间（大于当前数据量 20%）。
+`rootfs`、`run`、`log` 使用各自 runtime 权限，不得因为用户数据 owner reconcile 被整体递归改成 App UID/GID。
 
-### 2. Stage 2: Freeze Old Access (冻结访问与排他锁)
-- 停止旧应用服务并终止 guest `minisd` 守护进程；
-- 创建 `/data/adb/minis/.migration_in_progress` 排他锁文件，包含源包名、目标包名、分配 UID/GID 和时间戳元数据。
+## 当前 App UID/GID
 
-### 3. Stage 3: FD-Based Ownership Migration (基于文件描述符的递归迁移与 WAL 日志)
-- 使用 `openat` / `openat2` 配合 `O_NOFOLLOW` 递归打开目录与文件；
-- 对已打开的实体文件描述符调用 `fchown`，杜绝 TOCTOU 路径替换逃逸；
-- 记录逐项迁移日志 WAL（`.migration_journal.log`）：
-  ```text
-  relative_path 	 old_uid 	 old_gid 	 new_uid 	 new_gid 	 status
-  ```
+必须从当前安装/runtime 的真实身份取得 UID/GID，并验证结果有效。任何文档示例数字都不是合同值；禁止写死 `10000`、旧安装 UID 或假定 UID/GID 恒定。
 
-### 4. Stage 4: Fsync (元数据强制落盘)
-- 对 `/data/adb/minis` 及其所有子目录调用 `fsync()`，确保文件系统元数据与 WAL 日志持久化到物理介质。
+具体获取方式应优先复用现有 minisd/Android runtime 已经验证的 identity 来源，而不是再建立一套独立包名→UID 推断逻辑。
 
-### 5. Stage 5: Commit Marker (事务提交标记)
-- 原子写入并 `fsync` 标记文件 `/data/adb/minis/.migration_committed`。
+## 幂等前向校正
 
-### 6. Stage 6: Cleanup & Release (收尾与解冻)
-- 移除 `.migration_in_progress` 锁文件与 `.migration_journal.log`；拉起新包 `llc.slacker.minis`。
+推荐流程：
 
-## 断电自愈回滚机制 (Crash Self-Healing & Reversible Rollback)
+```text
+resolve current App UID/GID
+  ↓
+validate canonical allowed roots
+  ↓
+walk without following symlinks
+  ↓
+for each allowed entry:
+  owner already correct → skip
+  owner mismatch        → fchown/chown through safe existing primitive
+  invalid/symlink/escape/error → fail closed
+  ↓
+optional completion/version marker
+```
 
-若在 Stage 5 之前发生任何异常、崩溃或设备掉电：
-1. 系统启动时检测到存在 `.migration_in_progress` 但**缺少** `.migration_committed`；
-2. 读取 `.migration_journal.log`，提取所有标记为 `MIGRATED` 的条目；
-3. 按逆序（自底向上）对已修改文件执行精确的 `fchown(fd, old_uid, old_gid)` 逆向回滚；
-4. 回滚全部成功后清理未完成锁，向用户明确报告迁移中断并维持 fail-closed 安全边界。
+只修改 owner 不匹配项。已经正确的条目不需要重复写。
+
+中途崩溃、断电或进程死亡后，下次启动从允许根重新扫描即可：之前已修好的条目会被跳过，未修好的继续处理。算法通过“重复执行得到同一最终状态”实现恢复。
+
+## 路径安全
+
+- 不跟随 symlink；
+- 不接受 `..`、NUL 或 canonical escape；
+- 递归遍历必须始终锚定在允许根；
+- 如现有 native 层已有 fd-relative/openat 类安全遍历能力，应复用；
+- 任一无法证明安全包含的条目必须失败关闭，而不是跳出 root 后继续 `chown`。
+
+## 并发
+
+属主校正期间不得让 guest 同时依赖一半旧 owner、一半新 owner 的不确定状态。可以复用现有 runtime startup/recovery 串行化或最窄排他锁，目标只是避免并发访问，不要求建立新的跨文件事务引擎。
+
+## 可选完成标记
+
+如果启动成本需要优化，可以保存一个简单的 layout/ownership version 或 completion marker。标记只能作为“已完成该版本检查”的优化，不能代替真实路径/owner 校验，也不能让错误 owner 永久跳过修复。
+
+## 明确不要求
+
+当前没有证据支持默认引入以下复杂机制：
+
+- 六阶段 PREPARE/FREEZE/FD-MIGRATION/FSYNC/COMMIT/CLEANUP 状态机；
+- 每个文件记录 old/new UID/GID 的 WAL；
+- 逐项逆向 owner rollback；
+- 为 owner 迁移预留 20% 数据量磁盘空间；
+- 为一次 ownership reconcile 建立跨 Room/filesystem 事务框架。
+
+如果未来出现明确需求，例如必须在两个 Android 应用身份之间**可逆**迁移同一份数据，再单独设计迁移协议并给出真实恢复测试；不要提前把该复杂度放进日常 runtime。
+
+## 验收
+
+- owner 已正确：重复执行不改变数据；
+- 部分 owner 错误：只修不匹配项；
+- 中途被终止：再次执行能收敛到正确 owner；
+- symlink/escape：拒绝且不修改允许根外文件；
+- session 深层目录：保持在 sessions root 内并完成校正；
+- rootfs/run/log：不被用户数据 reconcile 错误递归 chown；
+- 最终 UID/GID 来自当前实际 App identity，而不是固定数字。

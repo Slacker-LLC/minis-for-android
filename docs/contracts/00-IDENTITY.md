@@ -5,38 +5,44 @@
 - 产品：Minis for Android
 - 维护者：Slacker-LLC
 - 域名：slacker.llc
-- 仓库：https://github.com/Slacker-LLC/minis-for-android
+- 仓库：`Slacker-LLC/minis-for-android`
 - 许可证：GPL-3.0
 
-这是独立产品。架构、发布、包名与开发决策只由本仓库定义。不与任何外部仓库持续同步。
+这是独立产品。产品身份、架构、发布和运行时边界只由本仓库当前代码与合同定义。
 
-## 目标 Android 身份（已落地为 `llc.slacker.minis`）
+## 当前 Android 身份
 
-| 项 | 目标值 |
+`master` 当前 Gradle 身份：
+
+| 项 | 当前值 |
 |---|---|
 | `applicationId` | `llc.slacker.minis` |
-| 未来 Java/Kotlin 包根 | `llc.slacker.minis` |
-| FileProvider / 其它 authority | 随 `applicationId` 派生为 `llc.slacker.minis.documents` 等 |
+| `namespace` | `com.openminis.app` |
+| Kotlin/Java 现有包根 | `com.openminis.app` |
 
-已落地 `applicationId` 迁移与六阶段事务级属主迁移规范（详见 `07-OWNERSHIP-MIGRATION.md`）。
+`applicationId` 已经完成迁移，不再是未来目标。Android 安装身份与源码 namespace 可以不同；当前没有全库搬迁 Java/Kotlin package 的默认要求。
 
-遗留安装将被视为另一款应用；升级与数据迁移策略在身份迁移时单独规定。
+FileProvider 等 authority 应优先从当前 `applicationId`/manifest placeholder 派生，不在文档里写死旧应用身份。
 
-## GitHub About（需在仓库设置里手工粘贴）
+## Linux guest identity
+
+Guest 文件与进程需要使用设备实际分配给当前 App 的 UID/GID。禁止将 `10000` 或任何示例 UID/GID 当成固定合同。
+
+`/data/adb/minis` 的用户数据若存在属主不匹配，应按 `07-OWNERSHIP-MIGRATION.md` 做受限、可重复的前向校正；当前合同不要求逐文件 WAL、逆向回滚或六阶段事务迁移。
+
+## GitHub About 建议
 
 ```text
 面向 Root 设备的 Android AI Agent Runtime（minisd + Ubuntu 24.04）。独立项目，源码分发。
 ```
 
-不要再使用桌面宠物、远程工作台、已废弃沙箱后端等过时描述。
+不要再使用旧沙箱、远程工作台、桌面宠物或其它已经不代表当前产品主线的描述作为仓库身份。
 
-## 与外部项目的关系
+## 法律与来源
 
-法律与著作权：只看 [PROVENANCE.md](../../PROVENANCE.md)。
-
-产品文档、README、架构合同、Issue/PR 模板 **不要** 把本项目定义成外部项目的分支、对比表或同步下游。读者不需要了解任何上游产品也能理解 Minis for Android。
+法律与著作权只看 [PROVENANCE.md](../../PROVENANCE.md)。产品文档不要把来源关系写成当前产品身份或实现依赖。
 
 ## 语言
 
 - 行为与工程规范：中文（`AGENTS.md`、`docs/contracts/`、`README.zh-CN.md`、`CONTRIBUTING.zh-CN.md`）
-- 英文 README / 部分 `docs/*.md`：摘要或实现备忘，不得另立行为
+- 英文 README / 部分 `docs/*.md`：摘要或实现说明，不得另立冲突行为
