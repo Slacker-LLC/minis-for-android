@@ -2,6 +2,7 @@ package com.openminis.app.data
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.openminis.app.R
 import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.SkillRepository
@@ -40,6 +41,7 @@ internal class SessionForkCreationGuard {
  * divider/shadow is preserved on the copy.
  */
 class SessionForkManager(
+    private val context: Context,
     private val chatRepository: ChatRepository,
     private val skillRepository: SkillRepository? = null,
     private val filesDir: File,
@@ -240,7 +242,10 @@ class SessionForkManager(
         }
 
         val prefixMessages = allMessages.subList(0, targetIdx + 1)
-        val forkTitle = "${source.title ?: "Chat"} (Branch)"
+        val forkTitle = context.getString(
+            R.string.chat_branch_title,
+            source.title ?: context.getString(R.string.chat_default_title),
+        )
         val newSession = chatRepository.createSession(
             modelId = source.modelId,
             title = forkTitle,
@@ -368,6 +373,7 @@ fun SessionForkManager(
     chatRepository: ChatRepository,
     skillRepository: SkillRepository? = null,
 ): SessionForkManager = SessionForkManager(
+    context = context,
     chatRepository = chatRepository,
     skillRepository = skillRepository,
     filesDir = context.filesDir,
