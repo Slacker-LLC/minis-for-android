@@ -1064,6 +1064,12 @@ private fun buildFileAttributes(item: FileItem): List<Pair<String, String>> {
  */
 private fun shareFile(context: Context, item: FileItem) {
     try {
+        if (!item.file.exists()) {
+            val msg = "File does not exist: ${item.file.name}"
+            AppLogger.warning("FilePreview", "share failed: $msg")
+            Toast.makeText(context, context.getString(R.string.file_share_failed_toast, msg), Toast.LENGTH_SHORT).show()
+            return
+        }
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, item.file)
         val mime = MimeTypeMap.getSingleton()

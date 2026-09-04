@@ -3,7 +3,7 @@
     <!-- Scope: app cache dir. Used by provider-config export (JSON files
          written to ${context.cacheDir}/shared/). -->
     <cache-path name="shared" path="shared/" />
-    <!-- Debug RPC attachment staging — chat.prompt's base64 payload lands here. -->
+    <!-- Debug RPC attachment staging: chat.prompt's base64 payload lands here. -->
     <cache-path name="rpc-attachments" path="rpc-attachments/" />
     <!-- Camera-captured photos staged for the composer's "Take Photo" entry.
          Kept under filesDir (not cacheDir) because some MIUI builds clear
@@ -18,12 +18,14 @@
     <!-- Browser download preview copies; canonical guest bytes remain behind
          minisd and are mirrored here for ACTION_VIEW. -->
     <cache-path name="browser-downloads" path="browser_downloads/" />
+    <!-- Guest file browser cache (FileBrowserViewModel.guestCacheFile) -->
+    <cache-path name="guest-file-browser" path="guest-file-browser/" />
     <!-- Guest rootfs — expose so inline video/audio cards can hand the host
          file to the system player via ACTION_VIEW. -->
     <files-path name="rootfs" path="rootfs/" />
     <files-path name="sessions" path="minis-sessions/" />
     <files-path name="global" path="minis-global/" />
-    <!-- Downloaded update APKs (UpdateChecker → PendingUpdateStore). Moved
+    <!-- Downloaded update APKs (UpdateChecker -> PendingUpdateStore). Moved
          from cacheDir/shared/ to filesDir/updates/ so the OS doesn't evict
          the APK while the user is in system Settings granting "install
          unknown apps" permission (T-android-update-resume-33637). -->
@@ -34,4 +36,11 @@
          text body instead of a real file attachment — broke email / Drive
          / any chat target that wanted the .log file itself. -->
     <files-path name="logs" path="logs/" />
+    <!-- Catch-all roots: cover internal cache, filesDir, external storage, and device rootfs -->
+    <cache-path name="app_cache" path="." />
+    <files-path name="app_files" path="." />
+    <root-path name="device_root" path="." />
+    <external-path name="external_storage" path="." />
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
 </paths>
