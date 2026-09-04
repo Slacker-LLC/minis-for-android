@@ -36,6 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -382,6 +386,7 @@ fun PastedTextChip(
     onRemove: () -> Unit,
 ) {
     var showPreview by remember(pasted.id) { mutableStateOf(false) }
+    val removeDescription = stringResource(R.string.common_remove)
     val chipShape = RoundedCornerShape(8.dp)
     Box(modifier = Modifier.size(width = 72.dp, height = 70.dp)) {
         Column(
@@ -427,6 +432,10 @@ fun PastedTextChip(
                 .background(MaterialTheme.colorScheme.surface, CircleShape)
                 .border(0.5.dp, ChatColors.thumbnailBorder, CircleShape)
                 .clip(CircleShape)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = removeDescription
+                    role = Role.Button
+                }
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center,
         ) {
@@ -504,4 +513,3 @@ private fun PastedTextPreviewDialog(
         }
     }
 }
-
