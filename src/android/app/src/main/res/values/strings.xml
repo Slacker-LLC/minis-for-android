@@ -1727,4 +1727,21 @@
     <string name="chat_delete_single_message_title">Delete Message</string>
     <string name="chat_delete_single_message_body">Are you sure you want to delete this AI reply? This cannot be undone.</string>
     <string name="chat_delete_single_message_confirm">Delete</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Discard changes?</string>
+    <string name="soul_discard_confirm_body">Your edits to the persona have not been saved.</string>
+    <string name="soul_discard_confirm">OK, Discard</string>
+    <string name="soul_discard_cancel">Cancel, Keep Editing</string>
+    <string name="soul_icon_choose_emoji">Choose Emoji</string>
+    <string name="soul_icon_choose_image">Choose Image</string>
+    <string name="soul_icon_image_hint">Cropped to a square and rounded</string>
+    <string name="soul_icon_use_default">Use Default</string>
+    <string name="soul_icon_emoji_title">Identity icon</string>
+    <string name="soul_icon_emoji_field">Or type an emoji</string>
+    <string name="soul_icon_set">Set</string>
+    <string name="soul_icon_error_title">Can\'t use that image</string>
+    <string name="soul_icon_error_unreadable">That image couldn\'t be read. Try a different one.</string>
+    <string name="soul_icon_error_too_large">That image is too large to store. Try a simpler one.</string>
+    <string name="external_link_blocked">Blocked link to external app (%1$s)</string>
+    <string name="external_link_no_app">No app available to open this link.</string>
 </resources>
