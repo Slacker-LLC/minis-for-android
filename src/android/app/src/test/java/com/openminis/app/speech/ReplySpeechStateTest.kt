@@ -77,6 +77,20 @@ class ReplySpeechStateTest {
     }
 
     @Test
+    fun `paused state holds current sentence and does not complete`() {
+        val paused = ReplySpeechState(
+            activeMessageId = "msg-1",
+            displayIndex = 1,
+            status = ReplySpeechState.Status.PAUSED,
+            currentSentence = 2,
+            totalSentences = 5,
+        )
+        assertTrue(paused.isActive)
+        assertEquals(ReplySpeechState.Status.PAUSED, paused.status)
+        assertEquals(2, paused.currentSentence)
+    }
+
+    @Test
     fun `completion state transitions to completed`() {
         val completed = ReplySpeechState(
             activeMessageId = "msg-1",
