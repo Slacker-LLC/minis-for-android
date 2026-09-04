@@ -11,6 +11,71 @@ plugins {
 
 subprojects {
     pluginManager.withPlugin("com.android.application") {
+        // Keep debug installs upgradeable across Windows, WSL, and repeated
+        // checkouts without committing signing material to the repository.
+        val sharedWindowsDebugKeystore = file(
+            "/mnt/c/Users/${System.getProperty("user.name")}/.minis/debug.keystore",
+        )
+        val defaultDebugKeystore = if (sharedWindowsDebugKeystore.parentFile?.parentFile?.isDirectory == true) {
+            sharedWindowsDebugKeystore
+        } else {
+            file("${System.getProperty("user.home")}/.minis/debug.keystore")
+        }
+        val debugKeystore = System.getenv("MINIS_DEBUG_KEYSTORE")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::file)
+            ?: defaultDebugKeystore
+        val debugStorePassword = "minis-debug"
+        val debugKeyAlias = "minis-debug"
+
+        val ensureStableDebugSigningKeystore = tasks.register("ensureStableDebugSigningKeystore") {
+            group = "build setup"
+            description = "Creates the persistent local debug keystore when it is missing."
+            outputs.file(debugKeystore)
+            doLast {
+                if (debugKeystore.isFile) return@doLast
+
+                debugKeystore.parentFile?.mkdirs()
+                val keytool = sequenceOf(
+                    file("${System.getProperty("java.home")}/bin/keytool"),
+                    file("${System.getProperty("java.home")}/bin/keytool.exe"),
+                ).firstOrNull { it.isFile }
+                    ?: throw GradleException("keytool was not found under java.home.")
+
+                project.exec {
+                    commandLine(
+                        keytool.absolutePath,
+                        "-genkeypair",
+                        "-noprompt",
+                        "-keystore",
+                        debugKeystore.absolutePath,
+                        "-storetype",
+                        "JKS",
+                        "-storepass",
+                        debugStorePassword,
+                        "-keypass",
+                        debugStorePassword,
+                        "-alias",
+                        debugKeyAlias,
+                        "-dname",
+                        "CN=Minis Debug, O=Slacker-LLC, C=US",
+                        "-keyalg",
+                        "RSA",
+                        "-keysize",
+                        "2048",
+                        "-sigalg",
+                        "SHA256withRSA",
+                        "-validity",
+                        "10000",
+                    )
+                }
+
+                if (!debugKeystore.isFile) {
+                    throw GradleException("Failed to create stable debug keystore: $debugKeystore")
+                }
+            }
+        }
+
         val keystorePath = System.getenv("RELEASE_KEYSTORE")?.takeIf { it.isNotBlank() }
         val storePassword = System.getenv("RELEASE_STORE_PASSWORD")?.takeIf { it.isNotBlank() }
         val keyAlias = System.getenv("RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
@@ -27,6 +92,15 @@ subprojects {
         // but signing/lint/build-type objects are still mutable.
         val androidComponents = extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
         androidComponents.finalizeDsl { android ->
+            val debug = android.buildTypes.getByName("debug")
+            val debugSigning = android.signingConfigs.findByName("stableDebug")
+                ?: android.signingConfigs.create("stableDebug")
+            debugSigning.storeFile = debugKeystore
+            debugSigning.storePassword = debugStorePassword
+            debugSigning.keyAlias = debugKeyAlias
+            debugSigning.keyPassword = debugStorePassword
+            debug.signingConfig = debugSigning
+
             val release = android.buildTypes.getByName("release")
 
             if (signingConfigured) {
@@ -66,11 +140,21 @@ subprojects {
         }
 
         tasks.matching {
-            it.name == "assembleRelease" ||
+            it.name == "assembleDebug" ||
+                it.name == "packageDebug" ||
+                it.name == "validateSigningDebug" ||
+                it.name == "assembleRelease" ||
                 it.name == "bundleRelease" ||
                 it.name == "packageRelease"
         }.configureEach {
-            dependsOn(requireReleaseSigning)
+            if (name == "assembleDebug" ||
+                name == "packageDebug" ||
+                name == "validateSigningDebug"
+            ) {
+                dependsOn(ensureStableDebugSigningKeystore)
+            } else {
+                dependsOn(requireReleaseSigning)
+            }
         }
     }
 }

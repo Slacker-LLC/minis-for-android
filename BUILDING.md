@@ -89,6 +89,8 @@ Output:
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Debug APKs use a persistent local debug keystore so repeated builds and Windows/WSL builds remain upgradeable. The keystore is generated once at `C:\Users\<username>\.minis\debug.keystore` on Windows/WSL or `~/.minis/debug.keystore` on other Linux hosts, and is never committed. Set `MINIS_DEBUG_KEYSTORE` to override the path. This key is Debug-only; Release still requires explicit production signing credentials.
+
 Install on an authorized device:
 
 ```bash
