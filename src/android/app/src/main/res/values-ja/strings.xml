@@ -1299,4 +1299,58 @@
     <string name="split_no_conversation_title">会話が選択されていません</string>
     <string name="split_no_conversation_subtitle">会話を選ぶか、新しく始めてください</string>
     <string name="chat_input_placeholder_hint_5">Minis なら ↩︎ キーを送信か改行かに変更できます</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">最初から読み上げ</string>
+    <string name="read_aloud_group">読み上げ</string>
+    <string name="selection_copy_full_markdown">Markdown 全文をコピー</string>
+    <string name="selection_copy_full_rich_text">リッチテキスト全文をコピー</string>
+    <string name="selection_copy_full_plain_text">プレーンテキスト全文をコピー</string>
+    <string name="selection_copied_as_plain_text_toast">プレーンテキストとしてコピーしました</string>
+    <string name="chat_longpress_delete_from_here">ここから削除</string>
+    <string name="chat_delete_from_here_confirm">削除</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="other">このメッセージと以降のすべてを削除します（計 %d 件）。この操作は元に戻せません。</item>
+    </plurals>
+    <string name="selection_copy_full_text">全文をコピー</string>
+    <string name="selection_copy_as_markdown">Markdown としてコピー</string>
+    <string name="selection_copy_as_rich_text">リッチテキストとしてコピー</string>
+    <string name="selection_copy_as_plain_text">プレーンテキストとしてコピー</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">コピー</string>
+    <string name="assistant_action_regenerate">再生成</string>
+    <string name="assistant_action_read_aloud">読み上げ</string>
+    <string name="assistant_action_branch">ブランチを作成</string>
+    <string name="chat_default_title">チャット</string>
+    <string name="chat_branch_title">%1$s（ブランチ）</string>
+    <string name="assistant_action_more">詳細</string>
+    <string name="assistant_menu_select_text">テキストを選択</string>
+    <string name="assistant_menu_copy_markdown">Markdown をコピー</string>
+    <string name="assistant_menu_share">共有</string>
+    <string name="assistant_menu_delete">メッセージを削除</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI の返信 %1$d</string>
+    <string name="reply_speech_reading">読み上げ中</string>
+    <string name="reply_speech_paused">一時停止中</string>
+    <string name="reply_speech_completed">読み上げ完了</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">メッセージを削除</string>
+    <string name="chat_delete_single_message_body">この AI の返信を削除してもよろしいですか？この操作は取り消せません。</string>
+    <string name="chat_delete_single_message_confirm">削除</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">変更を破棄しますか？</string>
+    <string name="soul_discard_confirm_body">ペルソナへの変更はまだ保存されていません。</string>
+    <string name="soul_discard_confirm">破棄する</string>
+    <string name="soul_discard_cancel">キャンセルして編集を続ける</string>
+    <string name="soul_icon_choose_emoji">絵文字を選択</string>
+    <string name="soul_icon_choose_image">画像を選択</string>
+    <string name="soul_icon_image_hint">正方形に切り抜かれ、角が丸められます</string>
+    <string name="soul_icon_use_default">デフォルトを使用</string>
+    <string name="soul_icon_emoji_title">アイデンティティのアイコン</string>
+    <string name="soul_icon_emoji_field">または絵文字を入力</string>
+    <string name="soul_icon_set">設定</string>
+    <string name="soul_icon_error_title">この画像は使用できません</string>
+    <string name="soul_icon_error_unreadable">この画像を読み込めませんでした。別の画像をお試しください。</string>
+    <string name="soul_icon_error_too_large">この画像は大きすぎて保存できません。よりシンプルな画像をお試しください。</string>
+    <string name="external_link_blocked">外部アプリへのリンクをブロックしました（%1$s）</string>
+    <string name="external_link_no_app">このリンクを開けるアプリがありません。</string>
 </resources>

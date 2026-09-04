@@ -126,6 +126,10 @@ class ChatViewModel(
             return draft + separator + cleaned + " "
         }
 
+        /** A retry can start only for a non-empty user turn with a provider. */
+        internal fun canRetryMessage(message: ChatMessage, hasProvider: Boolean): Boolean =
+            message.role == "user" && message.content.isNotBlank() && hasProvider
+
         // [T-android-compact-runaway] Keep these names in the ViewModel for
         // compatibility with the upstream JVM contract; the values themselves
         // live in CompactBudget so the runtime and tests share one source.
@@ -700,6 +704,9 @@ class ChatViewModel(
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming: StateFlow<Boolean> = _isStreaming.asStateFlow()
 
+    private val _generatingMessageId = MutableStateFlow<String?>(null)
+    val generatingMessageId: StateFlow<String?> = _generatingMessageId.asStateFlow()
+
     /**
      * T261: tool detail sheet visibility, persistent across LazyColumn
      * recomposition / item disposal so a streaming tool's sheet doesn't
@@ -758,8 +765,49 @@ class ChatViewModel(
     private val _sessionCategory = MutableStateFlow<String?>(null)
     val sessionCategory: StateFlow<String?> = _sessionCategory.asStateFlow()
 
-    internal val _attachments = MutableStateFlow<List<InputAttachment>>(emptyList())
-    val attachments: StateFlow<List<InputAttachment>> = _attachments.asStateFlow()
+   internal val _attachments = MutableStateFlow<List<InputAttachment>>(emptyList())
+   val attachments: StateFlow<List<InputAttachment>> = _attachments.asStateFlow()
+
+    private val _pastedTexts = MutableStateFlow<List<PastedText>>(emptyList())
+    val pastedTexts: StateFlow<List<PastedText>> = _pastedTexts.asStateFlow()
+    private var nextPasteId: Int = 1
+
+    fun stashPastedText(text: String): String {
+        val entry = PastedText(id = nextPasteId++, text = text)
+        _pastedTexts.value = _pastedTexts.value + entry
+        AppLogger.info(TAG, "[Paste] stashed #${entry.id} (${text.length} chars)")
+        return entry.placeholder
+    }
+
+    fun stashPastedTextAsFile(text: String): InputAttachment? {
+        val dir = java.io.File(context.cacheDir, "pasted_text").apply { mkdirs() }
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+            .format(java.util.Date())
+        val name = "Pasted_$stamp-${java.util.UUID.randomUUID().toString().take(8)}.txt"
+        val file = java.io.File(dir, name)
+        return try {
+            file.writeText(text)
+            val attachment = InputAttachment(
+                fileName = name,
+                uri = android.net.Uri.fromFile(file),
+                mimeType = "text/plain",
+                kind = InputAttachment.Kind.DOCUMENT,
+            )
+            addAttachment(attachment)
+            AppLogger.info(
+                TAG,
+                "[Paste] oversize paste -> file attachment $name (${text.length} chars)",
+            )
+            attachment
+        } catch (e: Exception) {
+            AppLogger.warning(TAG, "[Paste] failed to write oversize paste: ${e.message}")
+            null
+        }
+    }
+
+    fun removePastedText(id: Int) {
+        _pastedTexts.value = _pastedTexts.value.filterNot { it.id == id }
+    }
 
     /**
      * One-shot composer-side image-budget events (T-imgsize). Emitted by
@@ -3499,6 +3547,15 @@ class ChatViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            _isStreaming.collect { streaming ->
+                if (streaming) {
+                    stopReplySpeech()
+                } else {
+                    _generatingMessageId.value = null
+                }
+            }
+        }
         // Existing sessions need their durable event high-water mark before
         // any event can be framed. A send racing this small IO read simply
         // queues unsequenced intents inside SessionEventHub; activation drains
@@ -5123,27 +5180,162 @@ class ChatViewModel(
     }
 
     /**
+     * [T-android-regenerate-assistant-message] Resolve [messageId] to its
+     * preceding user turn and trigger retryFromMessage, reusing the entire
+     * existing Agent retry / truncation / streaming execution pipeline.
+     */
+    fun regenerateAssistantMessage(messageId: String) {
+        if (_isStreaming.value || _generatingMessageId.value != null) return
+        val messages = _messages.value
+        val asstIndex = messages.indexOfFirst { it.id == messageId }
+        if (asstIndex < 0) return
+        val asstMsg = messages[asstIndex]
+        if (asstMsg.role != "assistant") return
+
+        val userIndex = messages.subList(0, asstIndex).indexOfLast { it.role == "user" }
+        if (userIndex < 0) return
+        val userMsg = messages[userIndex]
+
+        _generatingMessageId.value = messageId
+        _forceScrollToBottom.tryEmit(Unit)
+        if (!retryFromMessage(userMsg.id)) {
+            // retryFromMessage rejects blank/image-only turns and missing
+            // providers before streaming starts. No streaming transition will
+            // arrive to clear this marker, so clear it at the rejection site.
+            _generatingMessageId.value = null
+        }
+    }
+
+    val replySpeechState: StateFlow<com.openminis.app.speech.ReplySpeechState> =
+        com.openminis.app.speech.VoiceOutputState.replySpeechState.asStateFlow()
+
+    private var replySpeechJob: Job? = null
+
+    fun toggleReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
+        val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
+        if (cur.activeMessageId == messageId) {
+            when (cur.status) {
+                com.openminis.app.speech.ReplySpeechState.Status.READING -> {
+                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
+                }
+                com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
+                    com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
+                }
+                com.openminis.app.speech.ReplySpeechState.Status.COMPLETED,
+                com.openminis.app.speech.ReplySpeechState.Status.IDLE -> {
+                    startReplySpeech(messageId, displayIndex, rawMarkdown)
+                }
+            }
+        } else {
+            startReplySpeech(messageId, displayIndex, rawMarkdown)
+        }
+    }
+
+    fun toggleReplySpeechPause() {
+        val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
+        if (!cur.isActive) return
+        when (cur.status) {
+            com.openminis.app.speech.ReplySpeechState.Status.READING -> {
+                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
+            }
+            com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
+                com.openminis.app.speech.VoiceOutputState.activePlayer?.togglePause()
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun startReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
+        replySpeechJob?.cancel()
+        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        val plainText = MarkdownClipboard.markdownToPlainText(rawMarkdown).trim()
+        if (plainText.isEmpty()) {
+            com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+            return
+        }
+
+        val sentences = com.openminis.app.speech.SpeechSentenceSplitter
+            .extractCompleteSentences(StringBuilder(plainText), streaming = false)
+            .ifEmpty { listOf(plainText) }
+
+        com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+            com.openminis.app.speech.ReplySpeechState(
+                activeMessageId = messageId,
+                displayIndex = displayIndex,
+                status = com.openminis.app.speech.ReplySpeechState.Status.READING,
+                currentSentence = 1,
+                totalSentences = sentences.size,
+            )
+
+        replySpeechJob = viewModelScope.launch {
+            val player = com.openminis.app.speech.VoiceOutputState.activePlayer
+            if (player == null) {
+                com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+                return@launch
+            }
+            for ((idx, sentence) in sentences.withIndex()) {
+                if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId != messageId) break
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value.copy(
+                        currentSentence = idx + 1,
+                        status = com.openminis.app.speech.ReplySpeechState.Status.READING,
+                    )
+                player.speakSentence(sentence)
+                while (player.isSpeaking.value && com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                    kotlinx.coroutines.delay(100)
+                }
+            }
+            if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
+                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value.copy(
+                        status = com.openminis.app.speech.ReplySpeechState.Status.COMPLETED,
+                    )
+                kotlinx.coroutines.delay(3000)
+                if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.status == com.openminis.app.speech.ReplySpeechState.Status.COMPLETED) {
+                    com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+                }
+            }
+        }
+    }
+
+    fun stopReplySpeech() {
+        replySpeechJob?.cancel()
+        replySpeechJob = null
+        com.openminis.app.speech.VoiceOutputState.activePlayer?.stop()
+        com.openminis.app.speech.VoiceOutputState.resetReplySpeech()
+    }
+
+    /**
      * Retry from a specific user message: truncate all messages after it
      * (including the assistant response), rebuild agent history, and resend.
      * Mirrors iOS's edit/retry behavior — no duplicate user messages.
      */
-    fun retryFromMessage(messageId: String) {
-        if (_isStreaming.value) return
+    fun retryFromMessage(messageId: String): Boolean {
+        if (_isStreaming.value) return false
         _canResume.value = false
         val messages = _messages.value
         val index = messages.indexOfFirst { it.id == messageId }
-        if (index < 0) return
+        if (index < 0) return false
         val message = messages[index]
         // [T-android-tool-autoscroll] Start-of-turn snap — see resume().
         _forceScrollToBottom.tryEmit(Unit)
-        if (message.role != "user" || message.content.isBlank()) return
-
         val initialProvider = currentProvider
-        if (initialProvider == null) {
-            _error.value = "No provider configured"
-            return
+        if (!canRetryMessage(message, initialProvider != null)) {
+            if (message.role == "user" && message.content.isNotBlank() && initialProvider == null) {
+                _error.value = "No provider configured"
+            }
+            return false
         }
-        val provider: LLMProvider = initialProvider
+
+        val provider: LLMProvider = initialProvider ?: return false
         _error.value = null
 
         // T149: snapshot messages about to be truncated so we can revoke any
@@ -5249,6 +5441,7 @@ class ChatViewModel(
                 }
             }
         }
+        return true
     }
 
     /**
@@ -5393,9 +5586,41 @@ class ChatViewModel(
                 text.substring(0, startIdx).trim()
             }
         }
+        val restored = mutableListOf<InputAttachment>()
+        msg.imageUris.forEachIndexed { i, uri ->
+            val name = msg.attachmentNames.getOrNull(i) ?: uri.lastPathSegment ?: "image"
+            restored.add(
+                InputAttachment(
+                    fileName = name,
+                    uri = uri,
+                    mimeType = guessMimeType(name, fallback = "image/*"),
+                    kind = InputAttachment.Kind.IMAGE,
+                ),
+            )
+        }
+        msg.attachmentUris.forEachIndexed { i, uri ->
+            val name = msg.attachmentNames.getOrNull(msg.imageUris.size + i)
+                ?: uri.lastPathSegment ?: "file"
+            restored.add(
+                InputAttachment(
+                    fileName = name,
+                    uri = uri,
+                    mimeType = guessMimeType(name, fallback = "application/octet-stream"),
+                    kind = InputAttachment.Kind.DOCUMENT,
+                ),
+            )
+        }
+        _attachments.value = restored
         _editingMessageId.value = messageId
-        AppLogger.info(TAG_STREAM, "✏️ editMessage id=${messageId.take(8)} text=${text.length}ch")
+        AppLogger.info(TAG_STREAM, "✏️ editMessage id=${messageId.take(8)} text=${text.length}ch attachments=${restored.size}")
         return text
+    }
+
+    private fun guessMimeType(fileName: String, fallback: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        if (ext.isEmpty()) return fallback
+        return android.webkit.MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(ext) ?: fallback
     }
 
     /**
@@ -5405,9 +5630,158 @@ class ChatViewModel(
      */
     fun cancelEdit() {
         if (_editingMessageId.value != null) {
+            _attachments.value = emptyList()
             AppLogger.info(TAG_STREAM, "✏️ cancelEdit")
         }
         _editingMessageId.value = null
+    }
+
+    /**
+     * [T-android-delete-single-assistant-message] Delete exactly one assistant
+     * message without truncating the subsequent messages, updating DB, agent
+     * history, speech and memory writes.
+     */
+    fun deleteSingleAssistantMessage(messageId: String) {
+        if (_isStreaming.value) return
+        val messages = _messages.value
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return
+        val target = messages[index]
+        if (target.role != "assistant") return
+
+        revokeMemoryWritesInDeletedMessages(listOf(target))
+
+        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+            stopReplySpeech()
+        }
+
+        _messages.value = messages.filterNot { it.id == messageId }
+
+        val sid = activeSessionId ?: return
+        viewModelScope.launch {
+            chatRepository.deleteSingleMessage(messageId)
+
+            agentHistory.clear()
+            toolLoopDetector.reset()
+            val remaining = chatRepository.loadMessages(sid)
+            for (entity in remaining) {
+                agentHistory.add(entity.toLLMMessage())
+            }
+            runCatching {
+                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
+            }
+            AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
+        }
+    }
+
+    fun deleteFromMessage(messageId: String) {
+        if (_isStreaming.value) return
+        _canResume.value = false
+        val messages = _messages.value
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return
+
+        val deletedMessages = messages.subList(index, messages.size).toList()
+
+        val retainedHead = messages.subList(0, index)
+        for (m in deletedMessages) {
+            m.queuedPromptId?.let { pid ->
+                _promptQueue.value = _promptQueue.value.filterNot { it.id == pid }
+            }
+        }
+        _messages.value = retainedHead
+
+        val keptIds = retainedHead.mapTo(mutableSetOf()) { it.id }
+        retainStreamFlushStates(keptIds)
+        if (_streamingById.value.isNotEmpty()) {
+            _streamingById.value = _streamingById.value.filterKeys { it in keptIds }
+        }
+
+        revokeMemoryWritesInDeletedMessages(deletedMessages)
+        if (deletedMessages.any { it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId }) {
+            stopReplySpeech()
+        }
+
+        val sid = activeSessionId ?: return
+        viewModelScope.launch {
+            val target = messages[index]
+            val cutoffSortOrder = resolveDeleteCutoffSortOrder(sid, messages, index, target)
+            if (cutoffSortOrder >= 0) {
+                chatRepository.deleteMessagesAfter(sid, cutoffSortOrder)
+            }
+
+            agentHistory.clear()
+            toolLoopDetector.reset()
+            val remaining = chatRepository.loadMessages(sid)
+            for (entity in remaining) {
+                agentHistory.add(entity.toLLMMessage())
+            }
+            runCatching {
+                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
+            }
+            AppLogger.info(
+                TAG,
+                "deleteFromMessage: cut at sortOrder=$cutoffSortOrder, " +
+                    "${deletedMessages.size} message(s) removed, ${remaining.size} remain",
+            )
+        }
+    }
+
+    private suspend fun resolveDeleteCutoffSortOrder(
+        sid: String,
+        messages: List<ChatMessage>,
+        index: Int,
+        target: ChatMessage,
+    ): Int {
+        val dbMessages = chatRepository.loadMessages(sid)
+        val visibleUserIndex = messages.subList(0, index + 1).count { it.role == "user" } - 1
+        if (visibleUserIndex < 0) return 0
+        var visibleUserCount = 0
+        for (entity in dbMessages) {
+            if (entity.role != "user") continue
+            val hasText = try {
+                val arr = org.json.JSONArray(entity.partsJson)
+                (0 until arr.length()).any { i ->
+                    val o = arr.getJSONObject(i)
+                    val v = o.optString("value", "")
+                    o.optString("type") == "text" && v.isNotBlank() &&
+                        !v.trimStart().startsWith("<system-reminder>")
+                }
+            } catch (_: Exception) { true }
+            if (!hasText) continue
+            if (visibleUserCount == visibleUserIndex) {
+                return if (target.role == "user") {
+                    entity.sortOrder
+                } else {
+                    entity.sortOrder + 1
+                }
+            }
+            visibleUserCount++
+        }
+        return -1
+    }
+
+    /**
+     * [T-android-chat-branch-message] Fork the session at [messageId], creating
+     * a new independent conversation from the prefix up to that assistant message.
+     */
+    fun forkSessionAtMessage(messageId: String, onForkSuccess: (String) -> Unit) {
+        if (_isStreaming.value) return
+        val sid = activeSessionId ?: return
+        val sessionForkManager = com.openminis.app.data.SessionForkManager(
+            context = context,
+            chatRepository = chatRepository,
+            skillRepository = skillRepository,
+            filesDir = context.filesDir,
+        )
+        viewModelScope.launch {
+            val newSessionId = sessionForkManager.forkSessionAtMessage(sid, messageId)
+            if (newSessionId != null) {
+                withContext(Dispatchers.Main) {
+                    onForkSuccess(newSessionId)
+                }
+            }
+        }
     }
 
     /**
@@ -5647,15 +6021,24 @@ class ChatViewModel(
             ),
         )
 
-        // Persist the queued user message as its own DB row + append to
-        // agentHistory so the next API call carries it.
-        val userText = combinedText.toString()
-        val userPartsJson = buildUserPartsJson(userText, prepared.mediaRefPartsJson, prepared.attachedFilesXml)
+       // Persist the queued user message as its own DB row + append to
+       // agentHistory so the next API call carries it.
+       val userText = combinedText.toString()
+        val queuedPaste = buildPastedParts(userText, sid)
+        if (queuedPaste != null) {
+            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
+        }
+        val userPartsJson = buildUserPartsJson(
+            userText,
+            prepared.mediaRefPartsJson,
+            prepared.attachedFilesXml,
+            bodyPartsJson = queuedPaste?.partsJson,
+        )
         val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
         agentHistory.add(
             LLMMessage(
                 role = LLMMessage.Role.USER,
-                content = userText,
+                content = queuedPaste?.modelText ?: userText,
                 imageParts = prepared.imageParts,
                 contentParts = combinedParts,
                 dbMessageId = userEntity.id,
@@ -5770,15 +6153,25 @@ class ChatViewModel(
                 if (path != null) combinedParts.add(AgentContentPart.Text("[attached image: $path]"))
                 combinedParts.add(AgentContentPart.ImageData(part.data, part.mimeType, linuxPath = path, noVisionPlaceholder = visionPlaceholderFor(path)))
             }
-            prepared.attachedFilesXml?.let { combinedParts.add(AgentContentPart.Text(it)) }
+           prepared.attachedFilesXml?.let { combinedParts.add(AgentContentPart.Text(it)) }
 
-            val userText = combinedText.toString()
-            val userPartsJson = buildUserPartsJson(userText, prepared.mediaRefPartsJson, prepared.attachedFilesXml)
+           val userText = combinedText.toString()
+            val drainPaste = buildPastedParts(userText, sid)
+            if (drainPaste != null) {
+                _pastedTexts.value =
+                    _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
+            }
+            val userPartsJson = buildUserPartsJson(
+                userText,
+                prepared.mediaRefPartsJson,
+                prepared.attachedFilesXml,
+                bodyPartsJson = drainPaste?.partsJson,
+            )
             chatRepository.appendMessage(sid, "user", userPartsJson)
 
             agentHistory.add(LLMMessage(
                 role = LLMMessage.Role.USER,
-                content = userText,
+                content = drainPaste?.modelText ?: userText,
                 imageParts = prepared.imageParts,
                 contentParts = combinedParts,
             ))
@@ -5919,10 +6312,19 @@ class ChatViewModel(
 
             val prepared = prepareUserAttachments(currentAttachments, activeSessionId)
 
-            // Save user message — text + persisted mediaRef parts so images survive
-            // a session reload (T128). Non-image attachments still only contribute
-            // their name (rendered as a file tile) and are not persisted.
-            val userPartsJson = buildUserPartsJson(trimmed, prepared.mediaRefPartsJson, prepared.attachedFilesXml)
+           // Save user message — text + persisted mediaRef parts so images survive
+           // a session reload (T128). Non-image attachments still only contribute
+           // their name (rendered as a file tile) and are not persisted.
+            val pasted = buildPastedParts(trimmed, activeSessionId)
+            if (pasted != null) {
+                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
+            }
+            val userPartsJson = buildUserPartsJson(
+                trimmed,
+                prepared.mediaRefPartsJson,
+                prepared.attachedFilesXml,
+                bodyPartsJson = pasted?.partsJson,
+            )
             val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
 
             val userMsg = ChatMessage(
@@ -5931,8 +6333,8 @@ class ChatViewModel(
                 content = trimmed,
                 imageUris = prepared.imageUris,
                 imageRefs = prepared.imageRefs,
-                attachmentNames = prepared.attachmentNames,
-                attachmentUris = prepared.nonImageUris,
+                attachmentNames = prepared.attachmentNames + (pasted?.uiNames ?: emptyList()),
+                attachmentUris = prepared.nonImageUris + (pasted?.uiUris ?: emptyList()),
             )
             _messages.value = _messages.value + userMsg
             sessionEventEmitter.messageCreated(userMsg)
@@ -5955,13 +6357,13 @@ class ChatViewModel(
             }
             prepared.attachedFilesXml?.let { userContentParts.add(AgentContentPart.Text(it)) }
 
-            agentHistory.add(LLMMessage(
-                role = LLMMessage.Role.USER,
-                content = trimmed,
-                imageParts = imageParts,
-                contentParts = userContentParts,
-                dbMessageId = persistedUser.id,
-            ))
+           agentHistory.add(LLMMessage(
+               role = LLMMessage.Role.USER,
+                content = pasted?.modelText ?: trimmed,
+               imageParts = imageParts,
+               contentParts = userContentParts,
+               dbMessageId = persistedUser.id,
+           ))
 
             // Refresh OAuth token if needed before sending (mirrors iOS validAccessToken)
             if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
@@ -9930,8 +10332,64 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // its original linuxPath. Restored images that miss this field
         // (older rows written before this column existed) get linuxPath=null
         // and fall back to spillover at budget-elide time.
-        if (linuxPath != null) value.put("linuxPath", linuxPath)
-        return JSONObject().put("type", "mediaRef").put("value", value).toString()
+       if (linuxPath != null) value.put("linuxPath", linuxPath)
+       return JSONObject().put("type", "mediaRef").put("value", value).toString()
+   }
+
+    private data class PastedParts(
+        val partsJson: List<String>,
+        val modelText: String,
+        val uiNames: List<String>,
+        val uiUris: List<Uri>,
+        val consumedIds: Set<Int>,
+    )
+
+    private fun buildPastedParts(text: String, sessionId: String): PastedParts? {
+        val (chunks, consumed) = splitPastePlaceholders(text, _pastedTexts.value)
+        if (consumed.isEmpty()) return null
+        val byId = _pastedTexts.value.associateBy { it.id }
+
+        val parts = mutableListOf<String>()
+        val model = StringBuilder()
+        val names = mutableListOf<String>()
+        val uris = mutableListOf<Uri>()
+        for (chunk in chunks) {
+            when (chunk) {
+                is PasteChunk.Text -> {
+                    parts.add("""{"type":"text","value":${escapeJson(chunk.value)}}""")
+                    model.append(chunk.value)
+                }
+                is PasteChunk.Pasted -> {
+                    val entry = byId[chunk.id] ?: continue
+                    val ref = try {
+                        mediaStore.saveMedia(
+                            data = entry.text.toByteArray(Charsets.UTF_8),
+                            mimeType = PastedMedia.MIME,
+                            sessionId = sessionId,
+                            originalFileName = PastedMedia.fileNameFor(chunk.id),
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.warning(
+                            TAG,
+                            "[Paste] saveMedia failed for #${chunk.id}, inlining: ${e.message}",
+                        )
+                        parts.add("""{"type":"text","value":${escapeJson(entry.text)}}""")
+                        model.append(entry.text)
+                        continue
+                    }
+                    parts.add(buildMediaRefPartJson(ref))
+                    model.append(entry.text)
+                    names.add(ref.originalFileName ?: PastedMedia.fileNameFor(chunk.id))
+                    uris.add(Uri.fromFile(java.io.File(mediaStore.mediaBaseDir, ref.relativePath)))
+                }
+            }
+        }
+        AppLogger.info(
+            TAG,
+            "[Paste] ${consumed.size} placeholder(s) -> mediaRef: " +
+                "${text.length} chars in bubble, ${model.length} chars to model",
+        )
+        return PastedParts(parts, model.toString(), names, uris, consumed)
     }
 
     /**
@@ -9953,9 +10411,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // Persist it here as a text part (iOS parity); toLLMMessage restores
         // it via the plain "text" case with zero special-casing.
         attachedFilesXml: String? = null,
+        bodyPartsJson: List<String>? = null,
     ): String {
         val parts = mutableListOf<String>()
-        if (text.isNotEmpty() || mediaRefPartsJson.isEmpty()) {
+        if (bodyPartsJson != null) {
+            parts.addAll(bodyPartsJson)
+        } else if (text.isNotEmpty() || mediaRefPartsJson.isEmpty()) {
             parts.add("""{"type":"text","value":${escapeJson(text)}}""")
         }
         parts.addAll(mediaRefPartsJson)

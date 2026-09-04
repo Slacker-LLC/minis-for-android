@@ -1291,4 +1291,58 @@
     <string name="split_no_conversation_title">선택된 대화가 없습니다</string>
     <string name="split_no_conversation_subtitle">대화를 선택하거나 새로 시작하세요</string>
     <string name="chat_input_placeholder_hint_5">Minis에서 ↩︎ 키를 전송 또는 줄바꿈으로 바꿀 수 있습니다</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">처음부터 읽기</string>
+    <string name="read_aloud_group">소리내어 읽기</string>
+    <string name="selection_copy_full_markdown">전체 Markdown 복사</string>
+    <string name="selection_copy_full_rich_text">전체 서식 있는 텍스트 복사</string>
+    <string name="selection_copy_full_plain_text">전체 일반 텍스트 복사</string>
+    <string name="selection_copied_as_plain_text_toast">일반 텍스트로 복사됨</string>
+    <string name="chat_longpress_delete_from_here">여기서부터 삭제</string>
+    <string name="chat_delete_from_here_confirm">삭제</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="other">이 메시지와 이후의 모든 내용을 삭제합니다. 총 %d개입니다. 이 작업은 되돌릴 수 없습니다.</item>
+    </plurals>
+    <string name="selection_copy_full_text">전체 텍스트 복사</string>
+    <string name="selection_copy_as_markdown">Markdown으로 복사</string>
+    <string name="selection_copy_as_rich_text">서식 있는 텍스트로 복사</string>
+    <string name="selection_copy_as_plain_text">일반 텍스트로 복사</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">복사</string>
+    <string name="assistant_action_regenerate">다시 생성</string>
+    <string name="assistant_action_read_aloud">소리내어 읽기</string>
+    <string name="assistant_action_branch">브랜치 생성</string>
+    <string name="chat_default_title">채팅</string>
+    <string name="chat_branch_title">%1$s (브랜치)</string>
+    <string name="assistant_action_more">더보기</string>
+    <string name="assistant_menu_select_text">텍스트 선택</string>
+    <string name="assistant_menu_copy_markdown">Markdown 복사</string>
+    <string name="assistant_menu_share">공유</string>
+    <string name="assistant_menu_delete">메시지 삭제</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI 답변 %1$d</string>
+    <string name="reply_speech_reading">읽는 중</string>
+    <string name="reply_speech_paused">일시 중지됨</string>
+    <string name="reply_speech_completed">완료됨</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">메시지 삭제</string>
+    <string name="chat_delete_single_message_body">이 AI 답변을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.</string>
+    <string name="chat_delete_single_message_confirm">삭제</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">변경사항을 취소할까요?</string>
+    <string name="soul_discard_confirm_body">페르소나에 대한 변경사항이 저장되지 않았습니다.</string>
+    <string name="soul_discard_confirm">예, 취소합니다</string>
+    <string name="soul_discard_cancel">아니요, 계속 편집합니다</string>
+    <string name="soul_icon_choose_emoji">이모지 선택</string>
+    <string name="soul_icon_choose_image">이미지 선택</string>
+    <string name="soul_icon_image_hint">정사각형으로 잘리고 모서리가 둥글게 처리됩니다</string>
+    <string name="soul_icon_use_default">기본값 사용</string>
+    <string name="soul_icon_emoji_title">정체성 아이콘</string>
+    <string name="soul_icon_emoji_field">또는 이모지를 입력하세요</string>
+    <string name="soul_icon_set">설정</string>
+    <string name="soul_icon_error_title">이 이미지는 사용할 수 없습니다</string>
+    <string name="soul_icon_error_unreadable">이 이미지를 읽지 못했습니다. 다른 이미지를 사용해 보세요.</string>
+    <string name="soul_icon_error_too_large">이 이미지는 너무 커서 저장할 수 없습니다. 더 단순한 이미지를 사용해 보세요.</string>
+    <string name="external_link_blocked">외부 앱으로 이동하는 링크를 차단했습니다(%1$s)</string>
+    <string name="external_link_no_app">이 링크를 열 수 있는 앱이 없습니다.</string>
 </resources>

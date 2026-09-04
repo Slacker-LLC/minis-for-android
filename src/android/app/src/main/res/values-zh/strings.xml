@@ -1042,16 +1042,26 @@
     <string name="notif_config_confirm_body_single">有一项变更需要你确认 —— 打开 Minis 批准或拒绝。</string>
     <string name="notif_config_confirm_body_multi">有 %d 项变更需要你确认 —— 打开 Minis 批准或拒绝。</string>
     <string name="notif_task_failed_body">任务执行失败。点击打开聊天。</string>
-    <!-- T-selection-add-to-input — 长按选择菜单"添加到输入框"动作 -->
-    <string name="selection_add_to_chat_input">添加到输入框</string>
-    <string name="selection_read_aloud">朗读</string>
-    <!-- T-minis-textkit 选择菜单按钮 -->
-    <string name="selection_copy">复制</string>
-    <string name="selection_copy_markdown">复制 Markdown</string>
-    <string name="selection_copy_rich_text">复制富文本</string>
-    <string name="selection_copied_toast">已复制：%1$s</string>
-    <string name="selection_copied_as_markdown_toast">已复制为 Markdown</string>
-    <string name="selection_copied_as_rich_text_toast">已复制为富文本</string>
+   <!-- T-selection-add-to-input — 长按选择菜单"添加到输入框"动作 -->
+   <string name="selection_add_to_chat_input">添加到输入框</string>
+    <string name="selection_read_aloud">朗读选中内容</string>
+    <string name="selection_read_from_start">从头朗读</string>
+    <string name="read_aloud_group">朗读</string>
+   <!-- T-minis-textkit 选择菜单按钮 -->
+   <string name="selection_copy">复制</string>
+   <string name="selection_copy_markdown">复制 Markdown</string>
+   <string name="selection_copy_rich_text">复制富文本</string>
+    <string name="selection_copy_full_markdown">复制完整 Markdown</string>
+    <string name="selection_copy_full_rich_text">复制完整富文本</string>
+    <string name="selection_copy_full_plain_text">复制完整纯文本</string>
+    <string name="selection_copied_as_plain_text_toast">已复制为纯文本</string>
+   <string name="selection_copied_toast">已复制：%1$s</string>
+   <string name="selection_copied_as_markdown_toast">已复制为 Markdown</string>
+   <string name="selection_copied_as_rich_text_toast">已复制为富文本</string>
+    <string name="selection_copy_full_text">复制全文</string>
+    <string name="selection_copy_as_markdown">复制为 Markdown</string>
+    <string name="selection_copy_as_rich_text">复制为富文本</string>
+    <string name="selection_copy_as_plain_text">复制为纯文本</string>
     <!-- [T-android-markdown-table-copy-actions] 长按表格上下文菜单 -->
     <string name="markdown_table_copy_table">复制表格</string>
     <string name="markdown_table_copy_table_image">复制表格图片</string>
@@ -1114,6 +1124,11 @@
 
     <!-- T187 — user-bubble long-press Edit + Exit Edit + Clear Chat dialog -->
    <string name="chat_longpress_edit">编辑</string>
+    <string name="chat_longpress_delete_from_here">从此处删除</string>
+    <string name="chat_delete_from_here_confirm">删除</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="other">将删除本条消息及其之后的全部内容，共 %d 条消息。此操作无法撤销。</item>
+    </plurals>
    <string name="chat_edit_exit_button">退出编辑</string>
     <string name="chat_show_sidebar">显示会话列表</string>
     <string name="chat_hide_sidebar">隐藏会话列表</string>
@@ -1547,4 +1562,42 @@
     <string name="model_picker_quick_test">快速测试</string>
     <string name="provider_no_key_required">无需密钥</string>
 
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">复制</string>
+    <string name="assistant_action_regenerate">重新生成</string>
+    <string name="assistant_action_read_aloud">朗读</string>
+    <string name="assistant_action_branch">创建分支</string>
+    <string name="chat_default_title">对话</string>
+    <string name="chat_branch_title">%1$s（分支）</string>
+    <string name="assistant_action_more">更多</string>
+    <string name="assistant_menu_select_text">选择文本</string>
+    <string name="assistant_menu_copy_markdown">复制 Markdown</string>
+    <string name="assistant_menu_share">分享</string>
+    <string name="assistant_menu_delete">删除消息</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI 回复 %1$d</string>
+    <string name="reply_speech_reading">正在朗读</string>
+    <string name="reply_speech_paused">已暂停</string>
+    <string name="reply_speech_completed">已读完</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">删除消息</string>
+    <string name="chat_delete_single_message_body">确定要删除这条 AI 回复吗？此操作无法撤销。</string>
+    <string name="chat_delete_single_message_confirm">删除</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">放弃修改？</string>
+    <string name="soul_discard_confirm_body">你对人格设定的修改尚未保存。</string>
+    <string name="soul_discard_confirm">OK，放弃修改</string>
+    <string name="soul_discard_cancel">取消，继续修改</string>
+    <string name="soul_icon_choose_emoji">选择表情</string>
+    <string name="soul_icon_choose_image">选择图片</string>
+    <string name="soul_icon_image_hint">会裁剪为方形并做圆角</string>
+    <string name="soul_icon_use_default">恢复默认</string>
+    <string name="soul_icon_emoji_title">身份图标</string>
+    <string name="soul_icon_emoji_field">或输入一个表情</string>
+    <string name="soul_icon_set">设置</string>
+    <string name="soul_icon_error_title">无法使用该图片</string>
+    <string name="soul_icon_error_unreadable">无法读取该图片，请换一张试试。</string>
+    <string name="soul_icon_error_too_large">该图片过大，无法存储。请换一张更简单的。</string>
+    <string name="external_link_blocked">已拦截跳转到外部应用的链接（%1$s）</string>
+    <string name="external_link_no_app">没有可以打开此链接的应用。</string>
 </resources>

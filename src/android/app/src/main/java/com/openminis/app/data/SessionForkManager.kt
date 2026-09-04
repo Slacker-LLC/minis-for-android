@@ -1,6 +1,9 @@
 package com.openminis.app.data
 
 import android.content.Context
+import androidx.room.withTransaction
+import com.openminis.app.R
+import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.logging.AppLogger
@@ -8,6 +11,22 @@ import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Process-wide non-blocking gate for user-triggered session forks.
+ * ChatViewModel creates a fresh SessionForkManager for each click, so the gate
+ * must live above a manager instance to reject overlapping duplicate clicks.
+ */
+internal class SessionForkCreationGuard {
+    private val inProgress = AtomicBoolean(false)
+
+    fun tryEnter(): Boolean = inProgress.compareAndSet(false, true)
+
+    fun exit() {
+        inProgress.set(false)
+    }
+}
 
 /**
  * Clone a session (or its skill/memory artifacts) into a fresh local session.
@@ -22,12 +41,14 @@ import java.io.File
  * divider/shadow is preserved on the copy.
  */
 class SessionForkManager(
+    private val context: Context,
     private val chatRepository: ChatRepository,
     private val skillRepository: SkillRepository? = null,
     private val filesDir: File,
 ) {
     companion object {
         private const val TAG = "SessionForkManager"
+        private val forkCreationGuard = SessionForkCreationGuard()
     }
 
     /**
@@ -178,6 +199,134 @@ class SessionForkManager(
     }
 
     /**
+     * [T-android-chat-branch-message] Fork a session at [messageId]: creates a
+     * new independent session copying context from the beginning of the session
+     * up to and including [messageId]. Target message must be an assistant turn.
+     *
+     * All database reads/writes in one fork run inside the already-open app
+     * Room database transaction. Any exception therefore rolls back the new
+     * session row, metadata, messages, and compact markers as one unit.
+     * Overlapping user-triggered forks are rejected by a process-wide gate;
+     * this is process-wide because ChatViewModel constructs a new manager per
+     * click, so an instance-local mutex would not protect duplicate clicks.
+     */
+    suspend fun forkSessionAtMessage(sessionId: String, messageId: String): String? {
+        if (!forkCreationGuard.tryEnter()) {
+            AppLogger.info(TAG, "forkSessionAtMessage: fork already in progress; ignoring duplicate request")
+            return null
+        }
+        return try {
+            AppDatabase.getInitializedInstance().withTransaction {
+                forkSessionAtMessageInTransaction(sessionId, messageId)
+            }
+        } finally {
+            forkCreationGuard.exit()
+        }
+    }
+
+    private suspend fun forkSessionAtMessageInTransaction(sessionId: String, messageId: String): String? {
+        val source = chatRepository.getSession(sessionId) ?: run {
+            AppLogger.warning(TAG, "forkSessionAtMessage: session $sessionId not found")
+            return null
+        }
+        val allMessages = chatRepository.loadMessages(sessionId)
+        val targetIdx = allMessages.indexOfFirst { it.id == messageId }
+        if (targetIdx < 0) {
+            AppLogger.warning(TAG, "forkSessionAtMessage: message $messageId not found in session $sessionId")
+            return null
+        }
+        val targetMsg = allMessages[targetIdx]
+        if (targetMsg.role != "assistant") {
+            AppLogger.warning(TAG, "forkSessionAtMessage: target message $messageId has role ${targetMsg.role}, expected assistant")
+            return null
+        }
+
+        val prefixMessages = allMessages.subList(0, targetIdx + 1)
+        val forkTitle = context.getString(
+            R.string.chat_branch_title,
+            source.title ?: context.getString(R.string.chat_default_title),
+        )
+        val newSession = chatRepository.createSession(
+            modelId = source.modelId,
+            title = forkTitle,
+        )
+        if (source.category != null) {
+            chatRepository.updateSessionTitleAndCategory(newSession.id, forkTitle, source.category)
+        }
+        if (source.modelBinding != null) {
+            chatRepository.updateSessionBinding(newSession.id, source.modelBinding, source.modelId)
+        }
+        if (source.memoryEnabled == 0) {
+            chatRepository.dao.updateMemoryEnabled(newSession.id, 0)
+        }
+        source.sessionOverrides?.let { overrides ->
+            chatRepository.dao.updateSessionOverrides(newSession.id, overrides)
+        }
+        source.thinkingOverride?.let { override ->
+            chatRepository.dao.updateThinkingOverride(newSession.id, override)
+        }
+
+        val oldToNewId = HashMap<String, String>()
+        val oldToNewSort = HashMap<String, Int>()
+        for (msg in prefixMessages) {
+            val newMsg = chatRepository.appendMessage(
+                sessionId = newSession.id,
+                role = msg.role,
+                partsJson = msg.partsJson,
+                tokenUsage = msg.tokenUsage,
+                reasoningContent = msg.reasoningContent,
+            )
+            oldToNewId[msg.id] = newMsg.id
+            oldToNewSort[msg.id] = newMsg.sortOrder
+        }
+
+        val markers = chatRepository.dao.listCompactMarkers(sessionId)
+        if (markers.isNotEmpty()) {
+            fun remapId(id: String?): String? = id?.let { oldToNewId[it] }
+            fun remapSort(msgId: String?, original: Int): Int =
+                msgId?.let { oldToNewSort[it] } ?: original
+
+            var copied = 0
+            for (marker in markers) {
+                if (marker.firstKeptMessageId != null && !oldToNewId.containsKey(marker.firstKeptMessageId)) {
+                    continue
+                }
+                if (marker.lastCompactedMessageId != null && !oldToNewId.containsKey(marker.lastCompactedMessageId)) {
+                    continue
+                }
+                if (marker.boundaryMessageId != null && !oldToNewId.containsKey(marker.boundaryMessageId)) {
+                    continue
+                }
+
+                val firstKeptNew = remapId(marker.firstKeptMessageId)
+                val lastCompactedNew = remapId(marker.lastCompactedMessageId)
+                val boundaryNew = remapId(marker.boundaryMessageId)
+
+                val copy = marker.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    sessionId = newSession.id,
+                    firstKeptSortOrder = remapSort(marker.firstKeptMessageId, marker.firstKeptSortOrder),
+                    uiBoundarySortOrder = marker.uiBoundarySortOrder?.let {
+                        remapSort(marker.boundaryMessageId, it)
+                    },
+                    boundaryMessageId = boundaryNew,
+                    firstKeptMessageId = firstKeptNew,
+                    lastCompactedMessageId = lastCompactedNew,
+                )
+                chatRepository.dao.insertCompactMarker(copy)
+                copied++
+            }
+            AppLogger.info(TAG, "forkSessionAtMessage: copied $copied/${markers.size} compact marker(s) to ${newSession.id}")
+        }
+
+        AppLogger.info(
+            TAG,
+            "forked session $sessionId at msg $messageId -> ${newSession.id} (${prefixMessages.size} msgs)",
+        )
+        return newSession.id
+    }
+
+    /**
      * Clone a skill into the local library. When [skillRepository] is wired,
      * reuses `importFromContent` so the skill lands in DB + `SKILL.md` just
      * like a fresh import. Returns whether the import succeeded.
@@ -224,6 +373,7 @@ fun SessionForkManager(
     chatRepository: ChatRepository,
     skillRepository: SkillRepository? = null,
 ): SessionForkManager = SessionForkManager(
+    context = context,
     chatRepository = chatRepository,
     skillRepository = skillRepository,
     filesDir = context.filesDir,

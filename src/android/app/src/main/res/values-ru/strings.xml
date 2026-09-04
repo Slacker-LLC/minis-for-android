@@ -1538,4 +1538,61 @@
     <string name="split_no_conversation_title">Беседа не выбрана</string>
     <string name="split_no_conversation_subtitle">Выберите беседу или начните новую</string>
     <string name="chat_input_placeholder_hint_5">Minis может назначить клавише ↩︎ отправку или перенос строки</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">Читать сначала</string>
+    <string name="read_aloud_group">Прочитать вслух</string>
+    <string name="selection_copy_full_markdown">Копировать весь Markdown</string>
+    <string name="selection_copy_full_rich_text">Копировать весь форматированный текст</string>
+    <string name="selection_copy_full_plain_text">Копировать весь обычный текст</string>
+    <string name="selection_copied_as_plain_text_toast">Скопировано как обычный текст</string>
+    <string name="chat_longpress_delete_from_here">Удалить отсюда</string>
+    <string name="chat_delete_from_here_confirm">Удалить</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">Это сообщение и всё после него будет удалено. Всего %d сообщение. Отменить будет нельзя.</item>
+        <item quantity="few">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>
+        <item quantity="many">Это сообщение и всё после него будет удалено. Всего %d сообщений. Отменить будет нельзя.</item>
+        <item quantity="other">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>
+    </plurals>
+    <string name="selection_copy_full_text">Скопировать весь текст</string>
+    <string name="selection_copy_as_markdown">Скопировать как Markdown</string>
+    <string name="selection_copy_as_rich_text">Скопировать как форматированный текст</string>
+    <string name="selection_copy_as_plain_text">Скопировать как обычный текст</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Копировать</string>
+    <string name="assistant_action_regenerate">Перегенерировать</string>
+    <string name="assistant_action_read_aloud">Озвучить</string>
+    <string name="assistant_action_branch">Создать ветку</string>
+    <string name="chat_default_title">Чат</string>
+    <string name="chat_branch_title">%1$s (ветка)</string>
+    <string name="assistant_action_more">Ещё</string>
+    <string name="assistant_menu_select_text">Выбрать текст</string>
+    <string name="assistant_menu_copy_markdown">Копировать Markdown</string>
+    <string name="assistant_menu_share">Поделиться</string>
+    <string name="assistant_menu_delete">Удалить сообщение</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">Ответ ИИ %1$d</string>
+    <string name="reply_speech_reading">Чтение</string>
+    <string name="reply_speech_paused">Приостановлено</string>
+    <string name="reply_speech_completed">Завершено</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Удалить сообщение</string>
+    <string name="chat_delete_single_message_body">Вы уверены, что хотите удалить этот ответ ИИ? Это действие нельзя отменить.</string>
+    <string name="chat_delete_single_message_confirm">Удалить</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Отменить изменения?</string>
+    <string name="soul_discard_confirm_body">Ваши правки персоны не были сохранены.</string>
+    <string name="soul_discard_confirm">ОК, отменить</string>
+    <string name="soul_discard_cancel">Отмена, продолжить правку</string>
+    <string name="soul_icon_choose_emoji">Выбрать эмодзи</string>
+    <string name="soul_icon_choose_image">Выбрать изображение</string>
+    <string name="soul_icon_image_hint">Обрезается до квадрата и скругляется</string>
+    <string name="soul_icon_use_default">Использовать по умолчанию</string>
+    <string name="soul_icon_emoji_title">Значок личности</string>
+    <string name="soul_icon_emoji_field">Или введите эмодзи</string>
+    <string name="soul_icon_set">Задать</string>
+    <string name="soul_icon_error_title">Не удаётся использовать это изображение</string>
+    <string name="soul_icon_error_unreadable">Не удалось прочитать это изображение. Попробуйте другое.</string>
+    <string name="soul_icon_error_too_large">Это изображение слишком велико для сохранения. Попробуйте более простое.</string>
+    <string name="external_link_blocked">Ссылка на внешнее приложение заблокирована (%1$s)</string>
+    <string name="external_link_no_app">Нет приложения для открытия этой ссылки.</string>
 </resources>

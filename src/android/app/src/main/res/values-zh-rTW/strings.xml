@@ -839,4 +839,58 @@
     <string name="split_no_conversation_title">未選擇對話</string>
     <string name="split_no_conversation_subtitle">請選擇一段對話，或開始新的對話</string>
     <string name="chat_input_placeholder_hint_5">Minis 可以把 ↩︎ 鍵設為傳送或換行</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">從頭朗讀</string>
+    <string name="read_aloud_group">朗讀</string>
+    <string name="selection_copy_full_markdown">複製完整 Markdown</string>
+    <string name="selection_copy_full_rich_text">複製完整富文本</string>
+    <string name="selection_copy_full_plain_text">複製完整純文本</string>
+    <string name="selection_copied_as_plain_text_toast">已複製為純文本</string>
+    <string name="chat_longpress_delete_from_here">從此處刪除</string>
+    <string name="chat_delete_from_here_confirm">刪除</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="other">將刪除本則訊息及其之後的全部內容，共 %d 則訊息。此操作無法復原。</item>
+    </plurals>
+    <string name="selection_copy_full_text">複製全文</string>
+    <string name="selection_copy_as_markdown">以 Markdown 複製</string>
+    <string name="selection_copy_as_rich_text">以格式化文字複製</string>
+    <string name="selection_copy_as_plain_text">以純文字複製</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">複製</string>
+    <string name="assistant_action_regenerate">重新生成</string>
+    <string name="assistant_action_read_aloud">朗讀</string>
+    <string name="assistant_action_branch">建立分支</string>
+    <string name="chat_default_title">對話</string>
+    <string name="chat_branch_title">%1$s（分支）</string>
+    <string name="assistant_action_more">更多</string>
+    <string name="assistant_menu_select_text">選取文字</string>
+    <string name="assistant_menu_copy_markdown">複製 Markdown</string>
+    <string name="assistant_menu_share">分享</string>
+    <string name="assistant_menu_delete">刪除訊息</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI 回覆 %1$d</string>
+    <string name="reply_speech_reading">正在朗讀</string>
+    <string name="reply_speech_paused">已暫停</string>
+    <string name="reply_speech_completed">已讀完</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">刪除訊息</string>
+    <string name="chat_delete_single_message_body">確定要刪除這條 AI 回覆嗎？此操作無法撤銷。</string>
+    <string name="chat_delete_single_message_confirm">刪除</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">要捨棄變更嗎？</string>
+    <string name="soul_discard_confirm_body">您對人格的修改尚未儲存。</string>
+    <string name="soul_discard_confirm">好，捨棄</string>
+    <string name="soul_discard_cancel">取消，繼續編輯</string>
+    <string name="soul_icon_choose_emoji">選擇表情符號</string>
+    <string name="soul_icon_choose_image">選擇圖片</string>
+    <string name="soul_icon_image_hint">會裁切成正方形並加上圓角</string>
+    <string name="soul_icon_use_default">使用預設值</string>
+    <string name="soul_icon_emoji_title">身分圖示</string>
+    <string name="soul_icon_emoji_field">或輸入一個表情符號</string>
+    <string name="soul_icon_set">設定</string>
+    <string name="soul_icon_error_title">無法使用這張圖片</string>
+    <string name="soul_icon_error_unreadable">無法讀取這張圖片，請換一張試試。</string>
+    <string name="soul_icon_error_too_large">這張圖片太大，無法儲存，請換一張較簡單的。</string>
+    <string name="external_link_blocked">已攔截跳轉到外部應用程式的連結（%1$s）</string>
+    <string name="external_link_no_app">沒有可以開啟此連結的應用程式。</string>
 </resources>

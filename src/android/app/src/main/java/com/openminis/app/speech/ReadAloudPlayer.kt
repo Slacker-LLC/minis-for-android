@@ -190,6 +190,20 @@ class ReadAloudPlayer(context: Context) {
     }
 
     /**
+     * [T-android-reply-speech-sentence] Speak a single sentence without
+     * dropping queued utterances, used by message-level sequential TTS.
+     */
+    fun speakSentence(text: String) {
+        val sanitized = VoiceTextSanitizer.sanitize(text, linkPhrases)
+        if (sanitized.isNotBlank()) {
+            pending.incrementAndGet()
+            _isSpeaking.value = true
+            if (ownsCapsule()) VoiceOutputState.isSpeaking.value = true
+            queue.trySend(sanitized)
+        }
+    }
+
+    /**
      * Speak a turn that explicitly came from voice conversation.
      *
      * The user pressing the microphone is already opting into audio for this
@@ -324,6 +338,28 @@ class ReadAloudPlayer(context: Context) {
         if (ownsCapsule()) {
             VoiceOutputState.isSpeaking.value = false
             if (ownsCapsule()) VoiceOutputState.isSynthesizing.value = false
+        }
+    }
+
+    /**
+     * [T-android-tts-toggle-pause] Toggles pause/resume on the active playback
+     * channel (MediaPlayer for remote provider audio, TextToSpeechManager for
+     * system engine).
+     */
+    fun togglePause() {
+        val currentMediaplayer = player
+        if (currentMediaplayer != null) {
+            if (currentMediaplayer.isPlaying) {
+                currentMediaplayer.pause()
+                _isSpeaking.value = false
+                if (ownsCapsule()) VoiceOutputState.isSpeaking.value = false
+            } else {
+                currentMediaplayer.start()
+                _isSpeaking.value = true
+                if (ownsCapsule()) VoiceOutputState.isSpeaking.value = true
+            }
+        } else {
+            system.togglePause()
         }
     }
 

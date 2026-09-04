@@ -1182,4 +1182,59 @@
     <string name="split_no_conversation_title">Aucune conversation sélectionnée</string>
     <string name="split_no_conversation_subtitle">Sélectionnez une conversation ou démarrez-en une nouvelle</string>
     <string name="chat_input_placeholder_hint_5">Minis peut régler la touche ↩︎ sur envoyer ou saut de ligne</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">Lire depuis le début</string>
+    <string name="read_aloud_group">Lire à voix haute</string>
+    <string name="selection_copy_full_markdown">Copier tout en Markdown</string>
+    <string name="selection_copy_full_rich_text">Copier tout en texte enrichi</string>
+    <string name="selection_copy_full_plain_text">Copier tout en texte brut</string>
+    <string name="selection_copied_as_plain_text_toast">Copié en texte brut</string>
+    <string name="chat_longpress_delete_from_here">Supprimer à partir d’ici</string>
+    <string name="chat_delete_from_here_confirm">Supprimer</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">Ce message et tout ce qui suit seront supprimés. %d message au total. Cette action est irréversible.</item>
+        <item quantity="other">Ce message et tout ce qui suit seront supprimés. %d messages au total. Cette action est irréversible.</item>
+    </plurals>
+    <string name="selection_copy_full_text">Copier tout le texte</string>
+    <string name="selection_copy_as_markdown">Copier au format Markdown</string>
+    <string name="selection_copy_as_rich_text">Copier en texte enrichi</string>
+    <string name="selection_copy_as_plain_text">Copier en texte brut</string>
+    <!-- [T-android-assistant-action-bar] -->
+    <string name="assistant_action_copy">Copier</string>
+    <string name="assistant_action_regenerate">Régénérer</string>
+    <string name="assistant_action_read_aloud">Lecture vocale</string>
+    <string name="assistant_action_branch">Créer une branche</string>
+    <string name="chat_default_title">Chat</string>
+    <string name="chat_branch_title">%1$s (branche)</string>
+    <string name="assistant_action_more">Plus</string>
+    <string name="assistant_menu_select_text">Sélectionner le texte</string>
+    <string name="assistant_menu_copy_markdown">Copier en Markdown</string>
+    <string name="assistant_menu_share">Partager</string>
+    <string name="assistant_menu_delete">Supprimer le message</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">Réponse IA %1$d</string>
+    <string name="reply_speech_reading">Lecture en cours</string>
+    <string name="reply_speech_paused">En pause</string>
+    <string name="reply_speech_completed">Terminé</string>
+    <!-- [T-android-delete-single-message] -->
+    <string name="chat_delete_single_message_title">Supprimer le message</string>
+    <string name="chat_delete_single_message_body">Voulez-vous vraiment supprimer cette réponse IA ? Cette action est irréversible.</string>
+    <string name="chat_delete_single_message_confirm">Supprimer</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Abandonner les modifications ?</string>
+    <string name="soul_discard_confirm_body">Vos modifications du personnage n\'ont pas été enregistrées.</string>
+    <string name="soul_discard_confirm">OK, abandonner</string>
+    <string name="soul_discard_cancel">Annuler, continuer à modifier</string>
+    <string name="soul_icon_choose_emoji">Choisir un emoji</string>
+    <string name="soul_icon_choose_image">Choisir une image</string>
+    <string name="soul_icon_image_hint">Recadrée en carré et arrondie</string>
+    <string name="soul_icon_use_default">Utiliser celle par défaut</string>
+    <string name="soul_icon_emoji_title">Icône d\'identité</string>
+    <string name="soul_icon_emoji_field">Ou saisissez un emoji</string>
+    <string name="soul_icon_set">Définir</string>
+    <string name="soul_icon_error_title">Impossible d\'utiliser cette image</string>
+    <string name="soul_icon_error_unreadable">Cette image n\'a pas pu être lue. Essayez-en une autre.</string>
+    <string name="soul_icon_error_too_large">Cette image est trop volumineuse pour être stockée. Essayez-en une plus simple.</string>
+    <string name="external_link_blocked">Lien vers une application externe bloqué (%1$s)</string>
+    <string name="external_link_no_app">Aucune application disponible pour ouvrir ce lien.</string>
 </resources>

@@ -274,6 +274,8 @@ private fun datePeriod(timestamp: Long): DatePeriod {
  * `ids` is EMPTY while collapsed, but [totalCount] keeps the real number so the
  * card can still say "5 chats".
  */
+private const val GROUP_BADGE_FRESH_WINDOW_MS = 24L * 60L * 60L * 1000L
+
 data class FolderGroupBlock(
     val folder: FolderEntity,
     val ids: List<String>,
@@ -284,6 +286,8 @@ data class FolderGroupBlock(
     val summaryTitle: String? = null,
     /** Newest member's category — tints the composed folder icon like iOS FolderComposedIcon. */
     val firstCategory: String? = null,
+    val anyPaused: Boolean = false,
+    val anyActive: Boolean = false,
 )
 
 /**
@@ -305,10 +309,12 @@ data class FolderGroupBlock(
  *  - Empty groups still render — a group that disappears when its last session
  *    moves out reads as data loss.
  */
-private fun partitionByFolder(
+internal fun partitionByFolder(
     sessions: List<ChatSessionEntity>,
     folders: List<FolderEntity>,
     collapsedIds: Set<String>,
+    freshBadgedIds: Set<String> = emptySet(),
+    activeSessionIds: Set<String> = emptySet(),
 ): Pair<List<FolderGroupBlock>, List<ChatSessionEntity>> {
     if (folders.isEmpty()) return emptyList<FolderGroupBlock>() to sessions
 
@@ -331,10 +337,12 @@ private fun partitionByFolder(
     val ordered = members.keys.toMutableList()
     for (f in folders) if (f.id !in members) ordered.add(f.id)
 
+    val openId = ordered.firstOrNull { it !in collapsedIds }
+
     val blocks = ordered.mapNotNull { fid ->
         val folder = byId[fid] ?: return@mapNotNull null
         val m = members[fid].orEmpty()
-        val collapsed = fid in collapsedIds
+        val collapsed = fid != openId
         // Pinned members first, stable partition — the pin is a display
         // affordance inside the group, not a reason to leave it.
         val displayOrdered = m.filter { it.pinnedAt != null } + m.filter { it.pinnedAt == null }
@@ -347,6 +355,8 @@ private fun partitionByFolder(
             latestUpdatedAt = m.firstOrNull()?.updatedAt ?: folder.updatedAt,
             summaryTitle = m.firstOrNull()?.title,
             firstCategory = m.firstOrNull()?.category,
+            anyPaused = freshBadgedIds.isNotEmpty() && m.any { it.id in freshBadgedIds },
+            anyActive = activeSessionIds.isNotEmpty() && m.any { it.id in activeSessionIds },
         )
     }
 
@@ -525,9 +535,21 @@ fun SessionListScreen(
     // While searching, group cards are suppressed: padding a result set with
     // every non-matching group is noise, not structure.
     val showFolderBlock = !isSearchActive || searchQuery.isBlank()
-    val folderPartition = remember(sessions, folders, collapsedFolderIds, showFolderBlock) {
-        if (showFolderBlock) partitionByFolder(sessions, folders, collapsedFolderIds)
-        else emptyList<FolderGroupBlock>() to sessions
+    val sessionBadges by com.openminis.app.service.SessionBadgeStore.byId.collectAsState()
+    val badgeRevision by com.openminis.app.service.SessionBadgeStore.revision.collectAsState()
+    val freshBadgedIds = remember(sessionBadges, badgeRevision) {
+        com.openminis.app.service.SessionBadgeStore
+            .freshCornerBadgeSessionIds(GROUP_BADGE_FRESH_WINDOW_MS)
+    }
+    val activeSessionIds by SessionActivityTracker.activeSessions.collectAsState()
+    val folderPartition = remember(
+        sessions, folders, collapsedFolderIds, showFolderBlock, freshBadgedIds, activeSessionIds,
+    ) {
+        if (showFolderBlock) {
+            partitionByFolder(
+                sessions, folders, collapsedFolderIds, freshBadgedIds, activeSessionIds,
+            )
+        } else emptyList<FolderGroupBlock>() to sessions
     }
     val folderBlocks = folderPartition.first
     val groupedSessions = remember(folderPartition) { groupSessionsByDate(folderPartition.second) }

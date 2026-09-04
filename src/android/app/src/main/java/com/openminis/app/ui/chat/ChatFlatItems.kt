@@ -448,12 +448,22 @@ internal sealed class FlatChatItem {
         override val contentType = "typing"
     }
 
-    data class AssistantError(val messageId: String, val error: String) : FlatChatItem() {
-        override val key = "error:$messageId"
-        override val contentType = "error"
+   data class AssistantError(val messageId: String, val error: String) : FlatChatItem() {
+       override val key = "error:$messageId"
+       override val contentType = "error"
+   }
+
+    data class AssistantActions(
+        val messageId: String,
+        val messageMarkdown: String,
+        val isStreaming: Boolean = false,
+        val isError: Boolean = false,
+    ) : FlatChatItem() {
+        override val key = "actions:$messageId"
+        override val contentType = "assistant_actions"
     }
 
-    /**
+   /**
      * See [AssistantText] — same cheap-equals rationale.
      */
     class AssistantLegacyContent(
@@ -562,6 +572,7 @@ internal fun buildFlatChatItems(
                 isStreaming = item.isStreaming,
                 messageMarkdown = item.messageMarkdown,
             )
+            is FlatChatItem.AssistantActions -> item.copy(messageId = "${item.messageId}#$n")
         }
     }
     for (idx in fromIndex until messages.size) {
@@ -773,10 +784,19 @@ internal fun buildFlatChatItems(
             )))
         }
 
-        // Inline error banner
-        message.error?.let {
-            out.add(dedupe(FlatChatItem.AssistantError(message.id, it)))
+       // Inline error banner
+       message.error?.let {
+           out.add(dedupe(FlatChatItem.AssistantError(message.id, it)))
+       }
+
+        if (!isSystem) {
+            out.add(dedupe(FlatChatItem.AssistantActions(
+                messageId = message.id,
+                messageMarkdown = joinedMarkdown.ifEmpty { message.content },
+                isStreaming = message.isStreaming,
+                isError = message.error != null,
+            )))
         }
-    }
-    return out
+   }
+   return out
 }

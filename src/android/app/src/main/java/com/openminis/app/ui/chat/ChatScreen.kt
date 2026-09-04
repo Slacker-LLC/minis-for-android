@@ -493,14 +493,17 @@ fun ChatScreen(
     val messages by viewModel.uiMessages.collectAsState()
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val generatingMessageId by viewModel.generatingMessageId.collectAsState()
+    val replySpeechState by viewModel.replySpeechState.collectAsState()
     val canResume by viewModel.canResume.collectAsState()
     val error by viewModel.error.collectAsState()
     val modelName by viewModel.modelName.collectAsState()
-    val sessionTitle by viewModel.sessionTitle.collectAsState()
-    val sessionCategory by viewModel.sessionCategory.collectAsState()
-    val attachments by viewModel.attachments.collectAsState()
-    val availableGroups by viewModel.availableGroups.collectAsState()
-    val selectedGroupId by viewModel.selectedGroupId.collectAsState()
+   val sessionTitle by viewModel.sessionTitle.collectAsState()
+   val sessionCategory by viewModel.sessionCategory.collectAsState()
+   val attachments by viewModel.attachments.collectAsState()
+    val pastedTexts by viewModel.pastedTexts.collectAsState()
+   val availableGroups by viewModel.availableGroups.collectAsState()
+   val selectedGroupId by viewModel.selectedGroupId.collectAsState()
     val showBrowserSheet by viewModel.showBrowserSheet.collectAsState()
     val showMemorySheet by viewModel.showMemorySheet.collectAsState()
     val memoryToolRecords by viewModel.memoryToolRecords.collectAsState()
@@ -766,6 +769,8 @@ fun ChatScreen(
     // backing state without needing fragile scope wiring.
     var showMoveSheet by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
+    var deleteSingleMessageTargetId by remember { mutableStateOf<String?>(null) }
+    var deleteFromHereTargetId by remember { mutableStateOf<String?>(null) }
     // [T-new-chat-menu-entry] Confirmation gate for "New Chat" while the
     // current session is still streaming — stopping the running task needs
     // an explicit confirm; idle sessions skip the dialog entirely.
@@ -3466,11 +3471,12 @@ fun ChatScreen(
                     is FlatChatItem.AssistantThinking -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantToolUse -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
-                    is FlatChatItem.AssistantTyping -> false
-                    is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
-                    is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true
-                }
-                // SelectionContainer must wrap the WHOLE LazyColumn — placing
+                     is FlatChatItem.AssistantTyping -> false
+                     is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
+                     is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true
+                      is FlatChatItem.AssistantActions -> grayedMap[originalMessageId(messageId)] == true
+                 }
+                 // SelectionContainer must wrap the WHOLE LazyColumn — placing
                 // it per-item breaks long-press because items get disposed
                 // when scrolled out and the selection registrar/detector goes
                 // with them. One outer SelectionContainer registers each Text
@@ -3528,8 +3534,10 @@ fun ChatScreen(
                             }
                             keyboardController?.show()
                         },
-                        onReadAloud = { snippet -> selectionReader.speak(snippet) },
-                        selectionController = selectionController,
+                         onReadAloud = { snippet -> selectionReader.speak(snippet) },
+                          onReadFromStart = { fullText -> selectionReader.speak(fullText) },
+                          isStreamingNow = { viewModel.isStreaming.value },
+                         selectionController = selectionController,
                     )
                 }
                 // Wrap any callback that truncates / replaces / removes rows from
@@ -3842,6 +3850,9 @@ fun ChatScreen(
                                     }
                                     safeMutate { viewModel.retryFromMessage(item.message.id) }
                                 }),
+                                onDeleteFromHere = if (isStreaming || item.message.isQueued) null else ({
+                                    deleteFromHereTargetId = item.message.id
+                                }),
                                 // T187: long-press → Edit pulls the user message
                                 // text into the composer; the next send truncates
                                 // from this turn (inclusive) before persisting
@@ -4045,6 +4056,55 @@ fun ChatScreen(
                                         ),
                                     )
                                 }
+                            }
+                            is FlatChatItem.AssistantActions -> {
+                                val assistantDisplayIndex = remember(item.messageId, messages) {
+                                    messages.filter { it.role == "assistant" }.indexOfFirst { it.id == item.messageId } + 1
+                                }
+                                val isSpeakingThis = replySpeechState.activeMessageId == item.messageId &&
+                                    replySpeechState.status == com.openminis.app.speech.ReplySpeechState.Status.READING
+                                AssistantMessageActionBar(
+                                    messageId = item.messageId,
+                                    rawText = item.messageMarkdown,
+                                    isStreaming = item.isStreaming,
+                                    isGenerating = generatingMessageId == item.messageId,
+                                    isSpeaking = isSpeakingThis,
+                                    onCopy = {
+                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
+                                    },
+                                    onRegenerate = {
+                                        viewModel.regenerateAssistantMessage(item.messageId)
+                                    },
+                                    onToggleSpeak = {
+                                        viewModel.toggleReplySpeech(item.messageId, assistantDisplayIndex, item.messageMarkdown)
+                                    },
+                                    onCopyMarkdown = {
+                                        MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
+                                    },
+                                    onBranch = {
+                                        viewModel.forkSessionAtMessage(item.messageId) { newId ->
+                                            onMoveToSession(newId)
+                                        }
+                                    },
+                                    onSelectText = {
+                                        selectionController.selectMessage(item.messageId)
+                                    },
+                                    onShare = {
+                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, plain)
+                                            putExtra(Intent.EXTRA_TITLE, sessionTitle)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                    },
+                                    onDelete = {
+                                        deleteSingleMessageTargetId = item.messageId
+                                    },
+                                )
                             }
                         }
                         } // Box (alpha wrapper)
@@ -4426,7 +4486,15 @@ fun ChatScreen(
                 )
             }
 
-           // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+            // ─── Input area (iOS-style: rounded box with text + buttons below) ───
+            ReplySpeechControlBar(
+                state = replySpeechState,
+                onTogglePause = { viewModel.toggleReplySpeechPause() },
+                onClose = { viewModel.stopReplySpeech() },
+                modifier = Modifier
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = CHAT_MAX_CONTENT_WIDTH),
+            )
             var composerWidthPx by remember { mutableStateOf(0) }
             Column(
                 modifier = Modifier
@@ -4975,7 +5043,7 @@ fun ChatScreen(
                                 )
                             },
                         )
-                        .padding(top = if (attachments.isNotEmpty()) 8.dp else 4.dp),
+                        .padding(top = if (attachments.isNotEmpty() || pastedTexts.isNotEmpty()) 8.dp else 4.dp),
                 ) {
                     // T185: Move-to capsule lives INSIDE the composer card,
                     // pinned 8dp from the top-right corner, mirroring iOS
@@ -5064,6 +5132,38 @@ fun ChatScreen(
                                         color = ChatColors.secondaryText,
                                     )
                                 }
+                            }
+                        }
+                    }
+                    if (pastedTexts.isNotEmpty()) {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(pastedTexts, key = { it.id }) { pasted ->
+                                PastedTextChip(
+                                    pasted = pasted,
+                                    onRemove = {
+                                        val marker = pasted.placeholder
+                                        val cur = inputFieldValue.text
+                                        val at = cur.indexOf(marker)
+                                        if (at >= 0) {
+                                            val stripped =
+                                                cur.substring(0, at) +
+                                                    cur.substring(at + marker.length)
+                                            inputFieldValue =
+                                                androidx.compose.ui.text.input.TextFieldValue(
+                                                    text = stripped,
+                                                    selection =
+                                                        androidx.compose.ui.text.TextRange(at),
+                                                )
+                                            viewModel.setInputText(stripped)
+                                        }
+                                        viewModel.removePastedText(pasted.id)
+                                    },
+                                )
                             }
                         }
                     }
@@ -5405,10 +5505,25 @@ fun ChatScreen(
                                         }
                                     }
                                 }
-                                inputFieldValue = tfv
-                                if (inputText != tfv.text) {
-                                    viewModel.setInputText(tfv.text)
-                                    viewModel.updateSlashMenuState(tfv.text)
+                                val value = foldLongPasteIfNeeded(
+                                    old = inputFieldValue,
+                                    new = tfv,
+                                    stash = { pasted ->
+                                        if (pasted.length > PASTE_AS_FILE_THRESHOLD) {
+                                            if (viewModel.stashPastedTextAsFile(pasted) != null) {
+                                                ""
+                                            } else {
+                                                viewModel.stashPastedText(pasted)
+                                            }
+                                        } else {
+                                            viewModel.stashPastedText(pasted)
+                                        }
+                                    },
+                                )
+                                inputFieldValue = value
+                                if (inputText != value.text) {
+                                    viewModel.setInputText(value.text)
+                                    viewModel.updateSlashMenuState(value.text)
                                 }
                                 // Drive the @ mention picker on every keystroke
                                 // and selection change — caret position alone
@@ -5417,8 +5532,8 @@ fun ChatScreen(
                                 // the slash-menu-priority case and any
                                 // non-mention caret state.
                                 viewModel.updateMentionMenuState(
-                                    text = tfv.text,
-                                    caret = tfv.selection.end,
+                                    text = value.text,
+                                    caret = value.selection.end,
                                 )
                             },
                            modifier = Modifier
@@ -6331,6 +6446,40 @@ fun ChatScreen(
                         viewModel.clearChat()
                         viewModel.setInputText("")
                         showClearChatDialog = false
+                    },
+                )
+            }
+            deleteSingleMessageTargetId?.let { targetId ->
+                MinisAlertDialog(
+                    onDismissRequest = { deleteSingleMessageTargetId = null },
+                    title = stringResource(R.string.chat_delete_single_message_title),
+                    text = stringResource(R.string.chat_delete_single_message_body),
+                    confirmText = stringResource(R.string.chat_delete_single_message_confirm),
+                    isDestructive = true,
+                    onConfirm = {
+                        viewModel.deleteSingleAssistantMessage(targetId)
+                        deleteSingleMessageTargetId = null
+                    },
+                )
+            }
+            deleteFromHereTargetId?.let { targetId ->
+                val affected = remember(targetId, messages) {
+                    val idx = messages.indexOfFirst { it.id == targetId }
+                    if (idx < 0) 0 else messages.size - idx
+                }
+                MinisAlertDialog(
+                    onDismissRequest = { deleteFromHereTargetId = null },
+                    title = stringResource(R.string.chat_longpress_delete_from_here),
+                    text = pluralStringResource(
+                        R.plurals.chat_delete_from_here_dialog_body,
+                        affected,
+                        affected,
+                    ),
+                    confirmText = stringResource(R.string.chat_delete_from_here_confirm),
+                    isDestructive = true,
+                    onConfirm = {
+                        viewModel.deleteFromMessage(targetId)
+                        deleteFromHereTargetId = null
                     },
                 )
             }
