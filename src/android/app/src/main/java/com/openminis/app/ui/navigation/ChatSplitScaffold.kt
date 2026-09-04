@@ -583,7 +583,8 @@ fun ChatSplitScaffold(
                         sidebarCollapsed = listCollapsed,
                     )
                 } else {
-                    detailPane(
+                    key(sessionId) {
+                        detailPane(
                         sessionId,
                         {
                             selectedSessionId = null
@@ -619,6 +620,7 @@ fun ChatSplitScaffold(
                         },
                         listCollapsed,
                     )
+                    }
                 }
                     }
                 }

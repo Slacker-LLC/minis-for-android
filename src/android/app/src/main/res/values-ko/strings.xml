@@ -1314,6 +1314,8 @@
     <string name="assistant_action_branch">브랜치 생성</string>
     <string name="chat_default_title">채팅</string>
     <string name="chat_branch_title">%1$s (브랜치)</string>
+    <string name="chat_branch_created">분기 대화가 생성되었습니다</string>
+    <string name="chat_branch_failed">분기 생성失败</string>
     <string name="assistant_action_more">더보기</string>
     <string name="assistant_menu_select_text">텍스트 선택</string>
     <string name="assistant_menu_copy_markdown">Markdown 복사</string>
