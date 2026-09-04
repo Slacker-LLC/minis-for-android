@@ -5539,12 +5539,6 @@ class ChatViewModel(
                         }.onFailure { error ->
                             Log.e(TAG, "deleteFromMessage: memory revoke failed after DB commit", error)
                         }
-                        if (deletedMessages.any {
-                                it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId
-                            }) {
-                            stopReplySpeech()
-                        }
-
                         agentHistory.clear()
                         toolLoopDetector.reset()
                         for (entity in remaining) {

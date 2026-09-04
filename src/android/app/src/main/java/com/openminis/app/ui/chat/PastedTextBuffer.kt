@@ -45,6 +45,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.openminis.app.R
 
 /**
  * [T-android-paste-placeholder] A long block of text the user pasted, held out
