@@ -1319,4 +1319,9 @@
     <string name="assistant_menu_copy_markdown">Markdown kopieren</string>
     <string name="assistant_menu_share">Teilen</string>
     <string name="assistant_menu_delete">Nachricht löschen</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">KI-Antwort %1$d</string>
+    <string name="reply_speech_reading">Wird vorgelesen</string>
+    <string name="reply_speech_paused">Pausiert</string>
+    <string name="reply_speech_completed">Vorgelesen</string>
 </resources>

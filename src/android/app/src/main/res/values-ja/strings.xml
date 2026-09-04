@@ -1325,4 +1325,9 @@
     <string name="assistant_menu_copy_markdown">Markdown をコピー</string>
     <string name="assistant_menu_share">共有</string>
     <string name="assistant_menu_delete">メッセージを削除</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI の返信 %1$d</string>
+    <string name="reply_speech_reading">読み上げ中</string>
+    <string name="reply_speech_paused">一時停止中</string>
+    <string name="reply_speech_completed">読み上げ完了</string>
 </resources>

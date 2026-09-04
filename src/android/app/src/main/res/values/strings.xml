@@ -1718,4 +1718,9 @@
     <string name="assistant_menu_copy_markdown">Copy Markdown</string>
     <string name="assistant_menu_share">Share</string>
     <string name="assistant_menu_delete">Delete Message</string>
+    <!-- [T-android-reply-speech] -->
+    <string name="reply_speech_title">AI Reply %1$d</string>
+    <string name="reply_speech_reading">Reading</string>
+    <string name="reply_speech_paused">Paused</string>
+    <string name="reply_speech_completed">Completed</string>
 </resources>
