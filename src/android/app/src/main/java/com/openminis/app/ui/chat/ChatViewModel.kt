@@ -5715,6 +5715,7 @@ class ChatViewModel(
         if (_isStreaming.value) return
         val sid = activeSessionId ?: return
         val sessionForkManager = com.openminis.app.data.SessionForkManager(
+            context = context,
             chatRepository = chatRepository,
             skillRepository = skillRepository,
             filesDir = context.filesDir,

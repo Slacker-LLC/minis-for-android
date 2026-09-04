@@ -1562,6 +1562,8 @@
     <string name="assistant_action_regenerate">Перегенерировать</string>
     <string name="assistant_action_read_aloud">Озвучить</string>
     <string name="assistant_action_branch">Создать ветку</string>
+    <string name="chat_default_title">Чат</string>
+    <string name="chat_branch_title">%1$s (ветка)</string>
     <string name="assistant_action_more">Ещё</string>
     <string name="assistant_menu_select_text">Выбрать текст</string>
     <string name="assistant_menu_copy_markdown">Копировать Markdown</string>

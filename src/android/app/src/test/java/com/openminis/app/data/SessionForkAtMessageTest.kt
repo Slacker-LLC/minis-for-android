@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * [T-android-chat-branch-message] Contract and prefix slice tests for
- * forkSessionAtMessage.
+ * [T-android-chat-branch-message] Contract, prefix slice, and duplicate-create
+ * guard tests for forkSessionAtMessage.
  */
 class SessionForkAtMessageTest {
 
@@ -108,5 +108,22 @@ class SessionForkAtMessageTest {
         val defaultForkTitle = "${nullTitle ?: "Chat"} (Branch)"
         assertEquals("Chat (Branch)", defaultForkTitle)
     }
-}
 
+    @Test
+    fun `overlapping fork creation is accepted only once`() {
+        val guard = SessionForkCreationGuard()
+        var created = 0
+
+        assertTrue(guard.tryEnter())
+        try {
+            created++
+            assertFalse(guard.tryEnter())
+        } finally {
+            guard.exit()
+        }
+
+        assertEquals(1, created)
+        assertTrue(guard.tryEnter())
+        guard.exit()
+    }
+}

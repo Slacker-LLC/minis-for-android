@@ -1713,6 +1713,8 @@
     <string name="assistant_action_regenerate">Regenerate</string>
     <string name="assistant_action_read_aloud">Read Aloud</string>
     <string name="assistant_action_branch">Branch</string>
+    <string name="chat_default_title">Chat</string>
+    <string name="chat_branch_title">%1$s (Branch)</string>
     <string name="assistant_action_more">More</string>
     <string name="assistant_menu_select_text">Select Text</string>
     <string name="assistant_menu_copy_markdown">Copy Markdown</string>

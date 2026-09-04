@@ -1320,6 +1320,8 @@
     <string name="assistant_action_regenerate">再生成</string>
     <string name="assistant_action_read_aloud">読み上げ</string>
     <string name="assistant_action_branch">ブランチを作成</string>
+    <string name="chat_default_title">チャット</string>
+    <string name="chat_branch_title">%1$s（ブランチ）</string>
     <string name="assistant_action_more">詳細</string>
     <string name="assistant_menu_select_text">テキストを選択</string>
     <string name="assistant_menu_copy_markdown">Markdown をコピー</string>

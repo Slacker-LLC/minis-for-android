@@ -1,6 +1,9 @@
 package com.openminis.app.data
 
 import android.content.Context
+import androidx.room.withTransaction
+import com.openminis.app.R
+import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.logging.AppLogger
@@ -8,6 +11,22 @@ import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * Process-wide non-blocking gate for user-triggered session forks.
+ * ChatViewModel creates a fresh SessionForkManager for each click, so the gate
+ * must live above a manager instance to reject overlapping duplicate clicks.
+ */
+internal class SessionForkCreationGuard {
+    private val inProgress = AtomicBoolean(false)
+
+    fun tryEnter(): Boolean = inProgress.compareAndSet(false, true)
+
+    fun exit() {
+        inProgress.set(false)
+    }
+}
 
 /**
  * Clone a session (or its skill/memory artifacts) into a fresh local session.
@@ -22,12 +41,14 @@ import java.io.File
  * divider/shadow is preserved on the copy.
  */
 class SessionForkManager(
+    private val context: Context,
     private val chatRepository: ChatRepository,
     private val skillRepository: SkillRepository? = null,
     private val filesDir: File,
 ) {
     companion object {
         private const val TAG = "SessionForkManager"
+        private val forkCreationGuard = SessionForkCreationGuard()
     }
 
     /**
@@ -181,8 +202,29 @@ class SessionForkManager(
      * [T-android-chat-branch-message] Fork a session at [messageId]: creates a
      * new independent session copying context from the beginning of the session
      * up to and including [messageId]. Target message must be an assistant turn.
+     *
+     * All database reads/writes in one fork run inside the already-open app
+     * Room database transaction. Any exception therefore rolls back the new
+     * session row, metadata, messages, and compact markers as one unit.
+     * Overlapping user-triggered forks are rejected by a process-wide gate;
+     * this is process-wide because ChatViewModel constructs a new manager per
+     * click, so an instance-local mutex would not protect duplicate clicks.
      */
     suspend fun forkSessionAtMessage(sessionId: String, messageId: String): String? {
+        if (!forkCreationGuard.tryEnter()) {
+            AppLogger.info(TAG, "forkSessionAtMessage: fork already in progress; ignoring duplicate request")
+            return null
+        }
+        return try {
+            AppDatabase.getInitializedInstance().withTransaction {
+                forkSessionAtMessageInTransaction(sessionId, messageId)
+            }
+        } finally {
+            forkCreationGuard.exit()
+        }
+    }
+
+    private suspend fun forkSessionAtMessageInTransaction(sessionId: String, messageId: String): String? {
         val source = chatRepository.getSession(sessionId) ?: run {
             AppLogger.warning(TAG, "forkSessionAtMessage: session $sessionId not found")
             return null
@@ -200,7 +242,10 @@ class SessionForkManager(
         }
 
         val prefixMessages = allMessages.subList(0, targetIdx + 1)
-        val forkTitle = "${source.title ?: "Chat"} (Branch)"
+        val forkTitle = context.getString(
+            R.string.chat_branch_title,
+            source.title ?: context.getString(R.string.chat_default_title),
+        )
         val newSession = chatRepository.createSession(
             modelId = source.modelId,
             title = forkTitle,
@@ -328,6 +373,7 @@ fun SessionForkManager(
     chatRepository: ChatRepository,
     skillRepository: SkillRepository? = null,
 ): SessionForkManager = SessionForkManager(
+    context = context,
     chatRepository = chatRepository,
     skillRepository = skillRepository,
     filesDir = context.filesDir,
