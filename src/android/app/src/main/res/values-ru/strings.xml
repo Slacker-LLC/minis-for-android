@@ -1538,4 +1538,23 @@
     <string name="split_no_conversation_title">Беседа не выбрана</string>
     <string name="split_no_conversation_subtitle">Выберите беседу или начните новую</string>
     <string name="chat_input_placeholder_hint_5">Minis может назначить клавише ↩︎ отправку или перенос строки</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">Читать сначала</string>
+    <string name="read_aloud_group">Прочитать вслух</string>
+    <string name="selection_copy_full_markdown">Копировать весь Markdown</string>
+    <string name="selection_copy_full_rich_text">Копировать весь форматированный текст</string>
+    <string name="selection_copy_full_plain_text">Копировать весь обычный текст</string>
+    <string name="selection_copied_as_plain_text_toast">Скопировано как обычный текст</string>
+    <string name="chat_longpress_delete_from_here">Удалить отсюда</string>
+    <string name="chat_delete_from_here_confirm">Удалить</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">Это сообщение и всё после него будет удалено. Всего %d сообщение. Отменить будет нельзя.</item>
+        <item quantity="few">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>
+        <item quantity="many">Это сообщение и всё после него будет удалено. Всего %d сообщений. Отменить будет нельзя.</item>
+        <item quantity="other">Это сообщение и всё после него будет удалено. Всего %d сообщения. Отменить будет нельзя.</item>
+    </plurals>
+    <string name="selection_copy_full_text">Скопировать весь текст</string>
+    <string name="selection_copy_as_markdown">Скопировать как Markdown</string>
+    <string name="selection_copy_as_rich_text">Скопировать как форматированный текст</string>
+    <string name="selection_copy_as_plain_text">Скопировать как обычный текст</string>
 </resources>

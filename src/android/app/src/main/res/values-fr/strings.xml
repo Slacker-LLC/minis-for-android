@@ -1182,4 +1182,21 @@
     <string name="split_no_conversation_title">Aucune conversation sélectionnée</string>
     <string name="split_no_conversation_subtitle">Sélectionnez une conversation ou démarrez-en une nouvelle</string>
     <string name="chat_input_placeholder_hint_5">Minis peut régler la touche ↩︎ sur envoyer ou saut de ligne</string>
+    <!-- [T-android-paste-edit-delete & textkit] -->
+    <string name="selection_read_from_start">Lire depuis le début</string>
+    <string name="read_aloud_group">Lire à voix haute</string>
+    <string name="selection_copy_full_markdown">Copier tout en Markdown</string>
+    <string name="selection_copy_full_rich_text">Copier tout en texte enrichi</string>
+    <string name="selection_copy_full_plain_text">Copier tout en texte brut</string>
+    <string name="selection_copied_as_plain_text_toast">Copié en texte brut</string>
+    <string name="chat_longpress_delete_from_here">Supprimer à partir d’ici</string>
+    <string name="chat_delete_from_here_confirm">Supprimer</string>
+    <plurals name="chat_delete_from_here_dialog_body">
+        <item quantity="one">Ce message et tout ce qui suit seront supprimés. %d message au total. Cette action est irréversible.</item>
+        <item quantity="other">Ce message et tout ce qui suit seront supprimés. %d messages au total. Cette action est irréversible.</item>
+    </plurals>
+    <string name="selection_copy_full_text">Copier tout le texte</string>
+    <string name="selection_copy_as_markdown">Copier au format Markdown</string>
+    <string name="selection_copy_as_rich_text">Copier en texte enrichi</string>
+    <string name="selection_copy_as_plain_text">Copier en texte brut</string>
 </resources>

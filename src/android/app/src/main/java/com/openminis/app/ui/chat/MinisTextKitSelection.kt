@@ -122,6 +122,12 @@ class SelectionController {
     val selection = mutableStateOf<TextSelection?>(null)
 
     /**
+     * [T-android-mouse-text-selection] True when the active selection was made
+     * with a mouse, which suppresses the draggable handle dots.
+     */
+    val selectionFromMouse = mutableStateOf(false)
+
+    /**
      * Message-level markdown snapshots captured at selection time so the
      * "Copy Markdown / Copy Rich Text" actions stay available even after
      * the originating shard scrolls out of viewport (the
@@ -420,8 +426,33 @@ class SelectionController {
     fun clearSelection() {
         selection.value = null
         messageMarkdownCache.clear()
+        contextMenuRequest.value = null
     }
 
+    val contextMenuRequest = mutableStateOf<Offset?>(null)
+
+    fun requestContextMenu(windowPoint: Offset) {
+        contextMenuRequest.value = windowPoint
+    }
+
+    fun dismissContextMenu() {
+        contextMenuRequest.value = null
+    }
+
+    fun selectionContains(pos: TextPosition): Boolean {
+        val sel = selection.value ?: return false
+        val (first, last) = orderedEndpoints(sel) ?: return false
+        if (first.shard == last.shard) {
+            return pos.shard == first.shard &&
+                pos.charOffset >= first.charOffset &&
+                pos.charOffset <= last.charOffset
+        }
+        return when (pos.shard) {
+            first.shard -> pos.charOffset >= first.charOffset
+            last.shard -> pos.charOffset <= last.charOffset
+            else -> isShardBetween(first.shard, last.shard, pos.shard)
+        }
+    }
     /**
      * Return the messageId common to BOTH endpoints of the active selection,
      * or null when the selection spans multiple messages (or there's no
@@ -1178,4 +1209,3 @@ fun buildTextShard(
     renderedToRawOffset = renderedToRawOffset,
     rawMarkdown = rawMarkdown,
 )
-
