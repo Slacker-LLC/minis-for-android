@@ -1,59 +1,82 @@
-# 06 — 现状缺口
+# 06 — 当前已确认缺口
 
-本文记录 **master 代码尚未对齐合同** 的事实。允许出现遗留包名、旧路径与已废弃实现的名字，供排障与迁移使用。其它现行产品文档不得把下列缺口写成「已经如此」。
+本文只记录**当前 `master` 已有代码证据或可复现故障支持的修复项**。它不是理论安全清单，也不保存已经完成的旧阶段任务。
 
-## G1 存储真源 — 核心路径已迁移，App 侧仍有直接访问
+审计基线：`master` `6f10d1b3f413d37aca5c21465e8e71ef3eb12120`，2026-09-04。master 前进后必须重新核对最终代码；历史 PR 曾经合并过某项修复，不等于该修复今天仍存在。
 
-minisd、`ubuntu.start` 和核心 `linux.file.*`/`file_*` 工具均使用
-`/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。新的
-`workspace.file` RPC 负责受限 guest 文件读写；旧 `Context.filesDir/minis*`
-只做一次迁移，IPC 仍可使用 filesDir 上的 app-socket。
+## 已经是当前事实，不再列为缺口
 
-当前拆分堆栈已将 Soul/Memory/Skill repository、文件浏览器及 Markdown/媒体预览
-的 canonical 文件访问改为 RPC；WebApp/APK 检查、部分调试/存储管理路径仍需
-继续审计，明确区分 RPC 与 App-local cache。`/var/minis/mounts` 的 SAF 映射保持
-独立，不属于 canonical workspace RPC。
+- `applicationId = llc.slacker.minis`；namespace/Kotlin 包仍为 `com.openminis.app`。
+- 产品 runtime 为 Root + `minisd` + Ubuntu 24.04 chroot，不使用 PRoot/Alpine 作为产品后端。
+- canonical 用户数据根为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。
+- Ubuntu rootfs 是可替换 runtime state，用户数据不随 rootfs 事务替换。
+- Guest UID/GID 的合同是真实 App identity，不是固定 `10000`。
 
-仍待验证：broker 文件 RPC 的真实 App UID/GID 与 SELinux 边界、symlink/TOCTOU
-行为、首装/升级/强停后的持久化、`df` 非 tmpfs，以及真机上的完整文件流转。
+下面只列仍需修复的确认问题。
 
-## G2 发行自举 — App 已消费 manifest 并按版本执行原子 rootfs 事务
+## #182 — Release VAD 的 R8/JNI keep 缺失
 
-CI 使用固定 NDK 构建 arm64 PIE `minisd`，并把它与可复现 rootfs、schema-v2 摘要 manifest 一起打入 Debug/Release APK；缺失、部分载荷或 APK 内摘要不匹配均失败关闭。
+当前 `proguard-rules.pro` 没有 RealTimeCutVAD JNI 回调所需的 keep 规则。Release minify 可能重命名/移除 JNI 通过名称查找的回调，造成语音检测在 Release 崩溃或失效。
 
-App 启动时读取并严格校验 APK 内 `runtime-manifest.json`，验证 `nativeLibraryDir/libminisd.so` 与 rootfs 载荷的 SHA-256 和 rootfs 布局。首次安装、版本变化或 rootfs 损坏时，经 `/data/adb/minis/runtime/`（`staging/`、`previous/`、`pending.json`、`deployed.json`）执行唯一运行时分发事务：停 keeper → 解压到 staging 并校验 → 原子切换 canonical `/data/adb/minis/rootfs` → 启动 keeper 并执行 provision → 失败回滚 previous → 全部成功后写入 deployed identity 并清除 pending。App 被杀可从 pending 恢复或回滚；用户数据目录不参与任何替换。
+修复边界：同步最窄 keep 规则，并用 Release/minified 构建验证；Debug 通过不能替代。
 
-仍待：真机验收首装、升级、中断恢复、provision（python3/git/curl）、SELinux enforcing 与持久化非 tmpfs。
+## #183 — `minis://` 路径解码容错不足
 
-## G3 身份未迁
+当前聊天文件链接解析对双重 percent encoding 与字面 `+` 的处理不够稳健，可能把合法 guest 路径解成错误路径。
 
-- 现行 `applicationId`：`dev.openminispet.android`
-- 现行 `namespace` / Java 包：`com.openminis.app`
-- 目标：`llc.slacker.minis`（见 `00-IDENTITY.md`）
+修复边界：采用不把 `+` 隐式当空格的 percent decode，并在需要时根据实际存在性尝试第二次 decode；畸形 `%` 必须安全失败/降级。
 
-本轮文档框架不改 Gradle。
+## #184 — 消息删除 DB/UI 原子性回归
 
-## G4 Root 模式 — Agent 执行路径已对齐合同，剩余 bootstrap/recovery 缺口
+最终 master 的 `ChatViewModel.deleteSingleAssistantMessage` / `deleteFromMessage` 会先修改 UI、prompt/stream 状态和 memory，再异步删除 Room 数据。DAO 异常、协程取消或生命周期结束可造成 UI/memory 与数据库不一致。
 
-Agent 发起的 Root 命令、`root.shell` 与主动 Root 探针已统一通过 `MinisdClient`；标准模式使用 `root.exec` 白名单，越权请求通过完整 `method + params` 绑定的一次性 `root.fullExec` 确认票重放。完全访问由 App 设置持有，Agent 请求不能切换，并在聊天页持续警告。
+修复边界：沿现有 Repository/Room 边界做 DB-first；数据库删除成功后再提交 UI、agentHistory、memory 等状态。不要为此建立两阶段提交或事件溯源框架。
 
-仍保留的直接 `su -c` 仅位于可信 bootstrap/recovery 路径：安装/启动/探测 minisd、minisd `--call` 传输回退，以及安装或修复 rootfs。这些路径执行 App-owned 静态命令，不承载 Agent 提供的命令；后续 G2/G5 重构应继续缩小并审计该范围。
+## #185 — SOUL 默认内容可能覆盖用户编辑
 
-## G5 恢复语义
+`SoulStore.ensureExistsSuspending` 把 `WorkspaceFileClient.info` 的任意失败都折叠成“文件不存在”。如果读取因 broker、权限、网络式 IPC/运行时异常失败，而后续写入成功，可能用默认内容覆盖现有 `SOUL.md`。
 
-Helper 退出码 4/5/6 是 execve 前的基础设施失败。部分路径仍可能被当成普通 shell 退出码。Rust `rootfs_looks_valid()` 仍然偏弱。`health.get` 曾把 SELinux enforcing 写死为 true。
+修复边界：只有明确 NotFound/ENOENT 才 seed；超时、权限、broker/runtime、取消等错误不得写默认内容。若现有 RPC 支持 create-if-absent/no-overwrite，应优先复用。
 
-## G6 平台技巧与权限债
+## #186 — Terminal PTY 没有遵守真实 guest identity/session workspace
 
-- Agent 长任务 FGS 类型曾用 `mediaPlayback` 躲避 `dataSync` 时限，语义不匹配。
-- Manifest 仍含宽存储权限与遗留 external-storage 标志，注释仍可能描述已废弃的 bind 模型。
-- `usesCleartextTraffic` / NSC 在平台层全开，真实约束必须落在应用策略，不能假装平台已收紧。
-- 目标 guest UID 必须是真实 App UID；写死 `10000` 会 chown 到错误用户。
+当前 Terminal PTY 路径仍存在固定 `--uid 10000 --gid 10000`、忽略 `sessionId`、使用全局 `/workspace` 的行为，与普通 `ubuntu.exec` 的动态 identity/session root 模型不一致。
 
-## G7 产品叙事
+修复边界：复用现有 minisd/runtime identity 与 session 准备能力，让同一 session 的 Terminal 与 Agent shell 看到一致 workspace；不恢复 PRoot，不新建第二套执行架构。
 
-GitHub About 可能仍展示过时能力（宠物、远程工作台、旧沙箱名）。以 `00-IDENTITY.md` 中的 About 文案为准，需在 GitHub 设置里手工更新。
+## #187 — ChatLink 文件 staging 可能阻塞主线程
 
-## 使用规则
+聊天文件链接解析/staging 最终可进入 blocking broker/file copy，而调用方位于 Compose 主线程协程路径，存在 UI 卡顿/ANR 风险。
 
-修缺口时：改代码与测试，使行为贴近 00–05；然后从本文删除已关闭条目。不要反过来改合同去承认错误实现，除非明确废弃该合同条款。
+修复边界：路径解析可保持同步；实际 broker/file I/O 必须 suspend 或切到 `Dispatchers.IO`，并正确响应取消。与 #183 的路径解码逻辑分开处理。
+
+## #188 — 粘贴内容在消息落库前被消费
+
+部分发送路径在 `chatRepository.appendMessage` 成功前就从 `_pastedTexts` 移除已消费项。持久化失败/取消时，消息没落库但 composer 粘贴状态已丢失；生成的 staging/mediaRef 也可能留下残余。
+
+修复边界：消息持久化成功后再消费 pasted IDs；失败/取消保留 composer 状态，并清理或延后不可达 staging 产物。覆盖主发送、queued/drain 等实际调用链。
+
+## #189 — PTY 子进程退出后缺少稳定 reap
+
+Native PTY 通过 `forkpty` 创建子进程，并已有 `waitpid`/`waitFor` 能力，但 Kotlin Terminal 生命周期没有稳定调用它。反复打开/关闭终端可能累积 zombie。
+
+修复边界：在不阻塞 Main 的前提下回收对应 PID，并处理正常退出、主动关闭和重复关闭竞态。可与 #186 同模块实现，但验收边界保持独立。
+
+## #190 — VPN 开启时 Ubuntu guest DNS 不可用
+
+实际可复现：Android 开启 VPN 后，Ubuntu sandbox/chroot 可能没有可用 DNS，域名解析失败。核心问题是当前有效 Android/VPN resolver 没有被正确继承或在网络切换后刷新。
+
+修复边界：优先读取并同步当前实际生效网络（含 VPN）的 DNS；无 VPN→VPN、VPN A→VPN B、VPN→无 VPN 都应刷新 guest resolver，不依赖重启 App/minisd。公共 DNS fallback 的隐私/策略权衡是独立问题，本项不通过删除 fallback 来“修复”。
+
+## 不在本表自动升级为必修的事项
+
+仅有理论风险、没有当前复现或属于明确产品取舍的项目，不写进“确认缺口”。例如 namespace 统一、恢复 PRoot、完整 ownership WAL、图片-only regenerate 的媒体重放架构，以及尚未证明实际影响的 FileProvider/WebView/proxy/rclone/DNS fallback 策略讨论。
+
+它们可以保留历史讨论，但除非出现新证据或维护者明确立项，不应驱动主线重构。
+
+## 维护规则
+
+1. 新增本表条目必须有当前代码证据或可复现行为。
+2. 修复 PR 合并后，先核对最终 `master` 实际代码/测试；确认仍保留修复后再删除条目。
+3. 如果只是某个历史 PR“曾修过”，但最终 master 又回归，条目继续保留。
+4. 不把设备未验证行为写成已通过；不把理论 hardening 写成已确认用户故障。

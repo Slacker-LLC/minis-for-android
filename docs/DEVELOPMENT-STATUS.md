@@ -1,25 +1,26 @@
 # Development Status
 
-> 行为以中文合同为准：`docs/contracts/`。实现缺口见 `docs/contracts/06-CURRENT-GAPS.md`。本文是能力备忘，不能覆盖合同，也不能把 Gaps 写成已完成。
-
-This document describes the current engineering state of Minis for Android at the architecture/capability level.
+> Baseline: `master` at `6f10d1b3f413d37aca5c21465e8e71ef3eb12120` (2026-09-04). For newer commits, re-check source/tests before relying on this snapshot. Intended behavior is defined by the Chinese contracts; confirmed current deviations are listed in `docs/contracts/06-CURRENT-GAPS.md`.
 
 ## Project state
 
 - Repository: `Slacker-LLC/minis-for-android`
 - Primary branch: `master`
-- Platform: Android
-- Public distribution: source-first; no production APK release is promised by the repository at this time
+- Platform: rooted Android
+- Runtime: native Android app + Rust `minisd` + Ubuntu 24.04 chroot
+- `applicationId`: `llc.slacker.minis`
+- Android/Kotlin namespace: `com.openminis.app`
+- Public distribution: source-first; no production APK release is promised by the repository
 
-Build metadata such as `versionName` and `versionCode` lives in `src/android/app/build.gradle.kts`.
+Build metadata remains in `src/android/app/build.gradle.kts`.
 
 ## Active architecture
 
 ```text
 Android app
-├─ Agent runtime / sessions / application persistence
+├─ Agent runtime / sessions / Room persistence
 ├─ Provider and model runtime
-├─ Tool runtime / permission gates
+├─ Tool registry / permission / approval / checkpoints
 ├─ Android-native tools
 ├─ jobs / goals / todos / subagents
 ├─ MCP client + local MCP server
@@ -28,56 +29,59 @@ Android app
    ↓
 minisd root broker
    ├─ canonical /data/adb/minis persistent layout
-   └─ private mount namespace + bind mounts + chroot
+   └─ private mount namespace + explicit bind mounts + chroot
       ↓
 Ubuntu 24.04 userspace
 ```
 
-## Implemented areas
+The active product runtime is Root-only. PRoot/Alpine compatibility is not an active runtime requirement.
 
-- multi-provider/model support, OAuth/API-key flows, image input, streaming, and tool calls;
-- persistent sessions, goals, todos, jobs, subagents, structured questions, memory, and skills;
-- loopback MCP server with bearer authentication and external MCP integration;
-- Compose UI, Room-backed application state, Accessibility and Android-native system tools;
-- voice, assistant, overlay, ASR/TTS integrations;
-- Rust `minisd`, verified Ubuntu 24.04 rootfs, private mount namespace, explicit bind mounts, chroot entry, and guest execution under the app UID;
-- user-owned Standard/Full Root access modes, structured `root.exec`/`root.fullExec`, exact one-shot confirmation binding, and a persistent Full Access warning;
-- fixed Linux guest-data sources under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`, prepared before keeper startup and rejected if non-canonical or tmpfs-backed.
+## Persistent runtime contract
+
+Canonical user data is rooted at `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`. The rootfs is replaceable runtime state. Guest ownership uses the actual App UID/GID rather than a fixed numeric ID. Session execution is expected to use the selected session backing and remain contained below the sessions root.
+
+Runtime distribution consumes the packaged runtime manifest, verifies minisd/rootfs digests, and uses staging/previous/pending/deployed state for rootfs replacement and recovery without replacing user-data roots.
+
+## Confirmed current gaps
+
+The current confirmed repair queue is intentionally narrow:
+
+- #182 — Release/R8 can break RealTimeCutVAD JNI callbacks without the required keep rule.
+- #183 — `minis://` path decoding needs double-encoding and literal `+` tolerance.
+- #184 — chat message deletion has regressed to UI/memory mutation before durable DB deletion.
+- #185 — SOUL default seeding can treat a transient `info` failure as “not found” and overwrite user content.
+- #186 — terminal PTY still uses fixed `10000:10000`, ignores `sessionId`, and can bypass session workspace semantics.
+- #187 — chat link staging can perform broker/file I/O on the main thread.
+- #188 — pasted content can be consumed before the user message is durably persisted.
+- #189 — exited PTY children are not consistently reaped by the Kotlin terminal lifecycle.
+- #190 — with VPN enabled, the Ubuntu guest can lose usable DNS because the active Android/VPN resolver is not inherited/refreshed correctly.
+
+Speculative hardening and architecture cleanup that lack a demonstrated failure are not mixed into this list. See `06-CURRENT-GAPS.md` for scope and acceptance boundaries.
 
 ## CI and release engineering
 
-Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs checksum and reproducibility, Android arm64 minisd cross-compilation, bound runtime-manifest generation, Android unit tests, Debug/Release lint, verified Debug/Release runtime packaging, fail-closed release signing, and release APK verification.
+Repository CI covers documentation provenance checks, Rust formatting/Clippy/tests/release build, rootfs verification, Android minisd cross-compilation, runtime-manifest generation, Android unit tests, lint, runtime packaging, release-signing gates, and APK verification according to the workflow at the referenced commit.
 
-Runtime distribution on device consumes the APK schema-v2 manifest, verifies the packaged minisd/rootfs digests, and runs a single atomic rootfs transaction (`staging`/`previous`/`pending.json`/`deployed.json`) with interrupted-upgrade recovery and rollback, while the canonical guest rootfs stays at `/data/adb/minis/rootfs`.
-
-## Current risk areas
-
-Priorities include provider/network transport boundaries, foreground-service lifecycle correctness, explicit capability state, process-death recovery, root/SELinux/device-specific compatibility, and reduction of historical lint debt.
-
-Use the live [GitHub Issues](https://github.com/Slacker-LLC/minis-for-android/issues) list for current issue state.
+A passing CI run does not replace device verification for Root, SELinux, VPN/DNS, mount, namespace, or OEM lifecycle behavior.
 
 ## Platform limitations
 
-- OEM background restrictions may freeze network/CPU when background execution is restricted.
+- OEM background restrictions may freeze or kill background work.
 - Assistant role, Accessibility, overlay, SAF, microphone, battery exemptions, Shizuku, and root require separate user/system authorization.
 - Root availability does not imply unrestricted SELinux or Linux capability access.
-- Long-running work must tolerate Android process/service termination and recover from persisted state.
+- Ubuntu chroot shares the Android kernel and is not a VM or strong isolation boundary.
 
 ## Primary source locations
 
 | Area | Path |
 |---|---|
 | Android app | `src/android/` |
-| Android tools | `src/android/app/src/main/java/com/openminis/app/tools/android/` |
-| Tool runtime | `src/android/app/src/main/java/com/openminis/app/tools/runtime/` |
-| MCP | `src/android/app/src/main/java/com/openminis/app/mcp/` |
 | Ubuntu runtime | `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/` |
 | Root broker | `src/native/minisd/` |
-| Persistent layout contract | `src/native/minisd/src/layout.rs` |
-| Persistent Ubuntu runtime | `src/native/minisd/src/ubuntu_persistent.rs` |
+| Persistent layout | `src/native/minisd/src/layout.rs` |
 | Rootfs build | `scripts/build-ubuntu-rootfs.sh` |
 | CI | `.github/workflows/ci.yml` |
 
 ## Documentation rule
 
-If this document conflicts with source code or tests, update this document. Historical explanations belong in `docs/archive/`; source lineage belongs in `PROVENANCE.md`.
+If this status document conflicts with final source/tests, source/tests win for current implementation facts and this file must be updated. If implementation violates an intended contract, record the deviation in `06-CURRENT-GAPS.md` rather than silently redefining the contract.
