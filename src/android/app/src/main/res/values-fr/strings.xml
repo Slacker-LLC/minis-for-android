@@ -1218,4 +1218,21 @@
     <string name="chat_delete_single_message_title">Supprimer le message</string>
     <string name="chat_delete_single_message_body">Voulez-vous vraiment supprimer cette réponse IA ? Cette action est irréversible.</string>
     <string name="chat_delete_single_message_confirm">Supprimer</string>
+    <!-- [T-android-peripheral-strings] -->
+    <string name="soul_discard_confirm_title">Abandonner les modifications ?</string>
+    <string name="soul_discard_confirm_body">Vos modifications du personnage n\'ont pas été enregistrées.</string>
+    <string name="soul_discard_confirm">OK, abandonner</string>
+    <string name="soul_discard_cancel">Annuler, continuer à modifier</string>
+    <string name="soul_icon_choose_emoji">Choisir un emoji</string>
+    <string name="soul_icon_choose_image">Choisir une image</string>
+    <string name="soul_icon_image_hint">Recadrée en carré et arrondie</string>
+    <string name="soul_icon_use_default">Utiliser celle par défaut</string>
+    <string name="soul_icon_emoji_title">Icône d\'identité</string>
+    <string name="soul_icon_emoji_field">Ou saisissez un emoji</string>
+    <string name="soul_icon_set">Définir</string>
+    <string name="soul_icon_error_title">Impossible d\'utiliser cette image</string>
+    <string name="soul_icon_error_unreadable">Cette image n\'a pas pu être lue. Essayez-en une autre.</string>
+    <string name="soul_icon_error_too_large">Cette image est trop volumineuse pour être stockée. Essayez-en une plus simple.</string>
+    <string name="external_link_blocked">Lien vers une application externe bloqué (%1$s)</string>
+    <string name="external_link_no_app">Aucune application disponible pour ouvrir ce lien.</string>
 </resources>
