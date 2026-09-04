@@ -1282,6 +1282,11 @@ class ChatViewModel(
     val currentModelSupportsReasoning: Boolean
         get() = currentModel?.supportsReasoning == true
 
+    /** Whether the active provider/model honors a session temperature override. */
+    val currentModelSupportsTemperature: Boolean
+        get() = currentProvider?.supportsTemperatureOverride
+            ?: (currentModel?.supportsReasoning != true)
+
     /**
      * [T-android-thinking-level-arch] The thinking ceiling the currently-bound
      * model actually supports. Prefers the active ModelEntry's
