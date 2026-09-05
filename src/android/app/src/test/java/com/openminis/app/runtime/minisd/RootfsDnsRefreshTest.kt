@@ -1,7 +1,6 @@
-package com.openminis.app.sandbox
+package com.openminis.app.runtime.minisd
 
-import com.openminis.app.runtime.minisd.MinisdBootstrap
-import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.sandbox.RootfsManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,12 +37,13 @@ class RootfsDnsRefreshTest {
         assertTrue(cmd.contains("chmod 644 /data/adb/minis/rootfs/etc/resolv.conf"))
         assertTrue(cmd.contains("223.5.5.5"))
 
-        // Checklist D: minis-config & opt parent directory 755 permissions
+        // Checklist D: minis-config & minis-model-use & opt parent directory 755 permissions
         assertTrue(cmd.contains("chmod 755 /data/adb/minis/rootfs/opt /data/adb/minis/rootfs/opt/minis /data/adb/minis/rootfs/opt/minis/bin"))
-        assertTrue(cmd.contains("chmod 755 /data/adb/minis/rootfs/opt/minis/bin/minis-config"))
+        assertTrue(cmd.contains("chmod 755 /data/adb/minis/rootfs/opt/minis/bin/minis-config /data/adb/minis/rootfs/opt/minis/bin/minis-model-use"))
 
-        // Checklist E: /data/adb/minis/home recursive ownership by appUid
-        assertTrue(cmd.contains("chown -R 10392:10392 /data/adb/minis/home"))
+        // Checklist E: /data/adb/minis/home fast-path ownership by appUid
+        assertTrue(cmd.contains("chown 10392:10392 /data/adb/minis/home"))
+        assertTrue(cmd.contains("for d in .cache .local .config; do [ -d \"/data/adb/minis/home/\$d\" ] && chown -R 10392:10392 \"/data/adb/minis/home/\$d\""))
         assertTrue(cmd.contains("chmod 755 /data/adb/minis/home"))
     }
 
@@ -56,7 +56,7 @@ class RootfsDnsRefreshTest {
             appUid = 0,
         )
 
-        assertFalse(cmd.contains("chown -R 0:0 /data/adb/minis/home"))
+        assertFalse(cmd.contains("chown 0:0 /data/adb/minis/home"))
     }
 
     @Test

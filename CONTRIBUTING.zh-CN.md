@@ -12,7 +12,7 @@
 
 ## Pull Request
 
-默认基于当前 `master`。一次 PR 只解决一个明确问题或一条合同边界；如果是 stacked PR，必须明确 base/head 与依赖，不要把其它分支的改动混入。
+默认基于当前 `main`。一次 PR 只解决一个明确问题或一条合同边界；如果是 stacked PR，必须明确 base/head 与依赖，不要把其它分支的改动混入。
 
 必须遵守：
 
@@ -38,7 +38,7 @@ MCP 必须进入同一套工具注册与权限。普通 Android API、无障碍�
 
 ## 当前事实与历史记录
 
-判断“当前实现是什么”时，以最终 `master` 源码和测试为准；GitHub 已合并 PR、历史 Issue 文档和旧执行计划只能解释历史。确认的现状缺口写入 [`docs/contracts/06-CURRENT-GAPS.md`](docs/contracts/06-CURRENT-GAPS.md)。
+判断“当前实现是什么”时，以最终 `main` 源码和测试为准；GitHub 已合并 PR、历史 Issue 文档和旧执行计划只能解释历史。确认的现状缺口写入 [`docs/contracts/06-CURRENT-GAPS.md`](docs/contracts/06-CURRENT-GAPS.md)。
 
 ## 验证
 

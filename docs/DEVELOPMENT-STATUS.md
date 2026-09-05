@@ -5,7 +5,7 @@
 ## Project state
 
 - Repository: `Slacker-LLC/minis-for-android`
-- Primary branch: `master`
+- Primary branch: `main`
 - Platform: rooted Android
 - Runtime: native Android app + Rust `minisd` + Ubuntu 24.04 chroot
 - `applicationId`: `llc.slacker.minis`

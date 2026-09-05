@@ -292,7 +292,9 @@ pub fn provision(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
 
 pub fn refresh_dns(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode, String)> {
     let nameservers = if let Some(arr) = params.get("nameservers").and_then(|v| v.as_array()) {
-        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>()
+        arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect::<Vec<_>>()
     } else {
         crate::env::discover_dns()
     };
@@ -327,7 +329,6 @@ pub fn refresh_dns(state: &mut AppState, params: &Value) -> Result<Value, (Error
         }))
     }
 }
-
 
 #[cfg(unix)]
 pub fn prepare_session_root(

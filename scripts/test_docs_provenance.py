@@ -67,10 +67,24 @@ class ProvenanceGuardTests(unittest.TestCase):
                 "README.md",
                 "# Minis for Android\n"
                 + required_text(guard.REQUIRED_README_TERMS)
-                + "Current project differs from OpenMinis and PRoot.\n",
+                + "Using OpenMinis here.\n",
             )
             errors = guard.check_tree(root)
             self.assertTrue(any("README.md" in error for error in errors))
+
+    def test_negative_context_allows_prohibitive_framing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_fixture(root)
+            write(
+                root,
+                "README.md",
+                "# Minis for Android\n"
+                + required_text(guard.REQUIRED_README_TERMS)
+                + "禁止 PRoot 和 Alpine 运行时；PRoot removed, without Alpine.\n",
+            )
+            errors = guard.check_tree(root)
+            self.assertEqual([], errors)
 
     def test_provenance_and_archive_are_allowlisted(self):
         with tempfile.TemporaryDirectory() as tmp:

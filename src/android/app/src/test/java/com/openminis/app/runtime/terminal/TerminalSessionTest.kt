@@ -1,4 +1,6 @@
-package com.openminis.app.sandbox
+package com.openminis.app.runtime.terminal
+
+import com.openminis.app.sandbox.TerminalSession
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,6 +21,7 @@ class TerminalSessionTest {
     fun `buildLaunchScript includes session root when sessionId is provided`() {
         val script = TerminalSession.buildLaunchScript(guestUid = 10347, guestGid = 10347, sessionId = "test-session-42")
         assertTrue(script.contains("--session-root /data/adb/minis/sessions/test-session-42"))
+        assertTrue(script.contains("mkdir -p /data/adb/minis/sessions/test-session-42"))
         assertTrue(script.contains("--uid 10347 --gid 10347"))
     }
 

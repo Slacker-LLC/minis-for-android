@@ -204,6 +204,12 @@ interface ChatDao {
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     suspend fun loadMessages(sessionId: String): List<MessageEntity>
 
+    @Query("SELECT COUNT(*) FROM messages WHERE session_id = :sessionId")
+    suspend fun countMessages(sessionId: String): Int
+
+    @Query("SELECT * FROM (SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order DESC LIMIT :limit) ORDER BY sort_order ASC")
+    suspend fun loadRecentMessages(sessionId: String, limit: Int): List<MessageEntity>
+
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     fun observeMessages(sessionId: String): Flow<List<MessageEntity>>
 

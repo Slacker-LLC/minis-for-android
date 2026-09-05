@@ -1500,6 +1500,14 @@ class OpenAIProvider private constructor(
         size: String? = null,
         quality: String? = null,
     ): LLMResponse = withContext(Dispatchers.IO) {
+        if (isCodexImageModel) {
+            return@withContext sendMessage(
+                messages = listOf(LLMMessage(role = LLMMessage.Role.USER, content = prompt)),
+                systemPrompt = null,
+                maxTokens = 1024,
+                temperature = null,
+            )
+        }
         val token = getToken()
         // [T-android-model-use-image-passthrough GH#62] Honor an explicit
         // endpoint-path override (non-standard providers); default otherwise.

@@ -1,6 +1,6 @@
 # Minis for Android — Agent 宪法
 
-中文合同定义应保持的行为边界；**当前源码与测试定义 `master` 实际已经实现了什么**。发现两者不一致时，先确认当前代码与测试，再把差异记录到 `docs/contracts/06-CURRENT-GAPS.md`；不要仅凭过时文档把已经正确的实现改回旧阶段。
+中文合同定义应保持的行为边界；**当前源码与测试定义 `main` 实际已经实现了什么**。发现两者不一致时，先确认当前代码与测试，再把差异记录到 `docs/contracts/06-CURRENT-GAPS.md`；不要仅凭过时文档把已经正确的实现改回旧阶段。
 
 完整工程规则见 `docs/contracts/05-ENGINEERING.md`。
 
@@ -29,7 +29,7 @@
 | `docs/contracts/03-STORAGE-CONTRACT.md` | `/data/adb/minis` 持久化真源 |
 | `docs/contracts/04-SECURITY-CONTRACT.md` | Root / MCP / 网络 / 密钥边界 |
 | `docs/contracts/05-ENGINEERING.md` | 工程流程、验证与上游参考边界 |
-| `docs/contracts/06-CURRENT-GAPS.md` | 当前 `master` 已确认缺口 |
+| `docs/contracts/06-CURRENT-GAPS.md` | 当前 `main` 已确认缺口 |
 | `docs/contracts/07-OWNERSHIP-MIGRATION.md` | 中断安全的属主校正规则 |
 
 改行为前先读对应合同。改存储/runtime 前必须读 `03`、`06`、`07`。
@@ -51,7 +51,7 @@
 
 - 直接阅读相关代码、测试和配置，不基于搜索片段或历史 PR 猜测当前行为。
 - 明确结果、非目标、最小文件集和验证方式。
-- 当前 `master` 的最终代码比“某个 PR 曾经合并过什么”更能证明现状。
+- 当前 `main` 的最终代码比“某个 PR 曾经合并过什么”更能证明现状。
 
 ## 编辑中
 

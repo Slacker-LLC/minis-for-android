@@ -125,8 +125,9 @@ object MinisdConfigBridgeServer {
             require(!arg.contains('\u0000')) { "NUL in argv[$i]" }
             argv += arg
         }
-        require(argv.first().substringAfterLast('/') == "minis-config") {
-            "unsupported bridge command"
+        val cmdName = argv.first().substringAfterLast('/')
+        require(cmdName == "minis-config" || cmdName == "minis-model-use") {
+            "unsupported bridge command: $cmdName"
         }
 
         val session = request.optString("session", "").takeIf { it.isNotBlank() }
@@ -137,15 +138,20 @@ object MinisdConfigBridgeServer {
             mapOf("MINIS_CHAT_SESSION_ID" to session)
         }
 
-        val result = handler.handle(
-            NativeOffloadRequest(
-                pid = peer.pid,
-                argv = argv,
-                env = env,
-                cwd = cwd,
-                sessionId = session,
-            ),
+        val offloadRequest = NativeOffloadRequest(
+            pid = peer.pid,
+            argv = argv,
+            env = env,
+            cwd = cwd,
+            sessionId = session,
         )
+        val result = if (cmdName == "minis-config") {
+            handler.handle(offloadRequest)
+        } else {
+            val modelUse = com.openminis.app.runtime.guest.NativeOffloadServer.getHandler("minis-model-use")
+                ?: error("minis-model-use handler not registered")
+            modelUse.handle(offloadRequest)
+        }
         writeResponse(
             client,
             JSONObject()

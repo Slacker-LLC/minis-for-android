@@ -61,9 +61,9 @@ internal object MinisdBootstrap {
         }
 
         commands += "if [ -d /data/adb/minis/rootfs/etc ]; then if [ ! -s /data/adb/minis/rootfs/etc/resolv.conf ]; then printf 'nameserver 223.5.5.5\\nnameserver 1.1.1.1\\nnameserver 8.8.8.8\\n' > /data/adb/minis/rootfs/etc/resolv.conf 2>/dev/null || true; fi; chmod 644 /data/adb/minis/rootfs/etc/resolv.conf 2>/dev/null || true; fi"
-        commands += "if [ -d /data/adb/minis/rootfs/opt/minis/bin ]; then chmod 755 /data/adb/minis/rootfs/opt /data/adb/minis/rootfs/opt/minis /data/adb/minis/rootfs/opt/minis/bin 2>/dev/null || true; chmod 755 /data/adb/minis/rootfs/opt/minis/bin/minis-config 2>/dev/null || true; fi"
+        commands += "if [ -d /data/adb/minis/rootfs/opt/minis/bin ]; then chmod 755 /data/adb/minis/rootfs/opt /data/adb/minis/rootfs/opt/minis /data/adb/minis/rootfs/opt/minis/bin 2>/dev/null || true; chmod 755 /data/adb/minis/rootfs/opt/minis/bin/minis-config /data/adb/minis/rootfs/opt/minis/bin/minis-model-use 2>/dev/null || true; fi"
         if (appUid > 0) {
-            commands += "if [ -d /data/adb/minis/home ]; then chown -R $appUid:$appUid /data/adb/minis/home 2>/dev/null || true; chmod 755 /data/adb/minis/home 2>/dev/null || true; fi"
+            commands += "if [ -d /data/adb/minis/home ]; then chown $appUid:$appUid /data/adb/minis/home 2>/dev/null || true; chmod 755 /data/adb/minis/home 2>/dev/null || true; for d in .cache .local .config; do [ -d \"/data/adb/minis/home/\$d\" ] && chown -R $appUid:$appUid \"/data/adb/minis/home/\$d\" 2>/dev/null || true; done; fi"
         }
         commands += "(\"\$BIN\" --watchdog --policy \"\$POLICY\" --app-socket \"\$APP_SOCKET\" >/dev/null 2>&1 &)"
         commands += "echo \"minisd watchdog spawn requested\""

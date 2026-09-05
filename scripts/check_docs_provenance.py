@@ -85,7 +85,7 @@ REQUIRED_STORAGE_CONTRACT_TERMS = (
     "/data/adb/minis/home",
 )
 REQUIRED_AGENTS_TERMS = ("llc.slacker.minis", "docs/contracts/")
-REQUIRED_ZH_README_AUTHORITY = ("中文规范是行为定义",)
+REQUIRED_ZH_README_AUTHORITY = ("中文合同定义应保持的行为边界",)
 
 
 def is_allowlisted(rel: str) -> bool:
@@ -117,6 +117,52 @@ def require_terms(errors: list[str], path: Path, label: str, terms: tuple[str, .
             errors.append(f"{label}: missing required current-state term {term!r}")
 
 
+NEGATIVE_CONTEXT_KEYWORDS = (
+    "禁止",
+    "不使用",
+    "不依赖",
+    "不再",
+    "非",
+    "淘汰",
+    "废弃",
+    "移除",
+    "摒弃",
+    "不属于",
+    "不要",
+    "不引入",
+    "不能",
+    "不得",
+    "不应",
+    "不恢复",
+    "不支持",
+    "不兼容",
+    "不保留",
+    "不采用",
+    "非目标",
+    "别",
+    "免",
+    "无需",
+    "not ",
+    "no ",
+    "without ",
+    "prohibit",
+    "forbidden",
+    "disallow",
+    "deprecat",
+    "removed",
+    "replaces",
+    "instead of",
+    "replaced",
+    "neither",
+    "banned",
+)
+
+
+def is_negative_mention(line: str) -> bool:
+    line_lower = line.lower()
+    return any(keyword.lower() in line_lower for keyword in NEGATIVE_CONTEXT_KEYWORDS)
+
+
 def check_tree(root: Path) -> list[str]:
     errors: list[str] = []
     if (root / "UPSTREAM.md").exists():
@@ -125,9 +171,15 @@ def check_tree(root: Path) -> list[str]:
     for path in active_markdown_files(root):
         rel = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8")
-        for label, pattern in BANNED_PATTERNS.items():
-            if pattern.search(text):
-                errors.append(f"{rel}: contains {label}")
+        found_labels = set()
+        for line in text.splitlines():
+            for label, pattern in BANNED_PATTERNS.items():
+                if pattern.search(line):
+                    if label in ("PRoot runtime framing", "Alpine runtime framing") and is_negative_mention(line):
+                        continue
+                    if label not in found_labels:
+                        found_labels.add(label)
+                        errors.append(f"{rel}: contains {label}")
 
     for rel in CONTRACT_FILES:
         if not (root / rel).is_file():

@@ -306,6 +306,19 @@ class ChatRepository(
         return out
     }
 
+    suspend fun messageCountForSession(sessionId: String): Int = dao.messageCountForSession(sessionId)
+
+    suspend fun loadRecentMessages(sessionId: String, limit: Int): List<MessageEntity> {
+        if (com.openminis.app.crash.CrashFrequencyDetector.isSafeMode()) {
+            return emptyList()
+        }
+        return try {
+            dao.loadRecentMessages(sessionId, limit)
+        } catch (e: Exception) {
+            loadMessages(sessionId).takeLast(limit)
+        }
+    }
+
     private suspend fun loadPageRowByRow(
         sessionId: String,
         baseOffset: Int,

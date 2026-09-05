@@ -4080,7 +4080,13 @@ class ChatViewModel(
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "db.query.begin")
             val loaded = withContext(Dispatchers.IO) {
                 val tIoBeforeLoad = System.currentTimeMillis()
-                val rows = chatRepository.loadMessages(sessionId)
+                val totalCount = chatRepository.messageCountForSession(sessionId)
+                val window = SessionMessageWindowing.calculateInitialWindow(totalCount)
+                val rows = if (window.isWindowed) {
+                    chatRepository.loadRecentMessages(sessionId, window.limit)
+                } else {
+                    chatRepository.loadMessages(sessionId)
+                }
                 val tIoAfterLoad = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
@@ -6090,7 +6096,12 @@ class ChatViewModel(
             prepared.attachedFilesXml,
             bodyPartsJson = queuedPaste?.partsJson,
         )
-        val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
+        val userEntity = try {
+            chatRepository.appendMessage(sid, "user", userPartsJson)
+        } catch (e: Exception) {
+            PastedTextProcessor.cleanupFiles(queuedPaste)
+            throw e
+        }
         // Issue #188: consume pasted texts only after DB append succeeds
         if (queuedPaste != null) {
             _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
@@ -6217,17 +6228,22 @@ class ChatViewModel(
 
            val userText = combinedText.toString()
             val drainPaste = buildPastedParts(userText, sid)
-            if (drainPaste != null) {
-                _pastedTexts.value =
-                    _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
-            }
             val userPartsJson = buildUserPartsJson(
                 userText,
                 prepared.mediaRefPartsJson,
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            chatRepository.appendMessage(sid, "user", userPartsJson)
+            try {
+                chatRepository.appendMessage(sid, "user", userPartsJson)
+                if (drainPaste != null) {
+                    _pastedTexts.value =
+                        _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
+                }
+            } catch (e: Exception) {
+                PastedTextProcessor.cleanupFiles(drainPaste)
+                throw e
+            }
 
             agentHistory.add(LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6382,7 +6398,12 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = pasted?.partsJson,
             )
-            val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            val persistedUser = try {
+                chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            } catch (e: Exception) {
+                PastedTextProcessor.cleanupFiles(pasted)
+                throw e
+            }
             // Issue #188: consume pasted texts only after DB append succeeds
             if (pasted != null) {
                 _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
@@ -8123,18 +8144,37 @@ class ChatViewModel(
                         // the thinking panel is driven by ThinkingDelta events above.
                         turnReasoningBlob = chunk.content
                     }
+                    is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.Finished -> {
                         // T321: stash for empty-turn diagnostic logging below.
                         turnFinishReason = chunk.stopReason
                     }
-                    is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.MediaAttachment -> {
-                        // [T-codex-gpt-image2-oauth-android] Model-generated
-                        // media (gpt-image-2 image). Inline chat display is out
-                        // of scope for this change — the image is delivered via
-                        // sendMessage→LLMResponse.mediaAttachments for the
-                        // minis-model-use CLI path. No-op here so the chat agent
-                        // loop compiles with the new chunk variant.
+                        val ref = try {
+                            mediaStore.saveMedia(
+                                data = chunk.attachment.data,
+                                mimeType = chunk.attachment.mimeType,
+                                sessionId = activeSessionId,
+                                originalFileName = "generated_image.png",
+                            )
+                        } catch (e: Exception) {
+                            AppLogger.warning(TAG_STREAM, "Failed to save generated media: ${e.message}")
+                            null
+                        }
+                        if (ref != null) {
+                            val file = java.io.File(mediaStore.mediaBaseDir, ref.relativePath)
+                            val blockId = "img_${System.currentTimeMillis()}"
+                            val block = AssistantBlock(
+                                id = blockId,
+                                kind = "media",
+                                toolTitle = ref.originalFileName ?: "Generated Image",
+                                imageFilePath = file.absolutePath,
+                            )
+                            allToolBlocks.add(block)
+                            withContext(Dispatchers.Main) {
+                                updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
+                            }
+                        }
                     }
                 }
                     }  // end collect
@@ -8446,7 +8486,7 @@ class ChatViewModel(
                 // attaches + persists onto the (empty) assistant row so the hint
                 // survives a reload too.
                 val hasVisibleContent = accumulatedText.isNotBlank() ||
-                    allToolBlocks.any { it.kind == "tool_use" || (it.kind == "text" && it.content.isNotBlank()) }
+                    allToolBlocks.any { it.kind == "tool_use" || (it.kind == "text" && it.content.isNotBlank()) || it.imageFilePath != null }
 
                 // [T-android-silent-stream-drop] A turn's stopReason comes ONLY
                 // from the SSE terminal event, which always carries a concrete
@@ -10455,61 +10495,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
        return JSONObject().put("type", "mediaRef").put("value", value).toString()
    }
 
-    private data class PastedParts(
-        val partsJson: List<String>,
-        val modelText: String,
-        val uiNames: List<String>,
-        val uiUris: List<Uri>,
-        val consumedIds: Set<Int>,
-    )
-
-    private fun buildPastedParts(text: String, sessionId: String): PastedParts? {
-        val (chunks, consumed) = splitPastePlaceholders(text, _pastedTexts.value)
-        if (consumed.isEmpty()) return null
-        val byId = _pastedTexts.value.associateBy { it.id }
-
-        val parts = mutableListOf<String>()
-        val model = StringBuilder()
-        val names = mutableListOf<String>()
-        val uris = mutableListOf<Uri>()
-        for (chunk in chunks) {
-            when (chunk) {
-                is PasteChunk.Text -> {
-                    parts.add("""{"type":"text","value":${escapeJson(chunk.value)}}""")
-                    model.append(chunk.value)
-                }
-                is PasteChunk.Pasted -> {
-                    val entry = byId[chunk.id] ?: continue
-                    val ref = try {
-                        mediaStore.saveMedia(
-                            data = entry.text.toByteArray(Charsets.UTF_8),
-                            mimeType = PastedMedia.MIME,
-                            sessionId = sessionId,
-                            originalFileName = PastedMedia.fileNameFor(chunk.id),
-                        )
-                    } catch (e: Exception) {
-                        AppLogger.warning(
-                            TAG,
-                            "[Paste] saveMedia failed for #${chunk.id}, inlining: ${e.message}",
-                        )
-                        parts.add("""{"type":"text","value":${escapeJson(entry.text)}}""")
-                        model.append(entry.text)
-                        continue
-                    }
-                    parts.add(buildMediaRefPartJson(ref))
-                    model.append(entry.text)
-                    names.add(ref.originalFileName ?: PastedMedia.fileNameFor(chunk.id))
-                    uris.add(Uri.fromFile(java.io.File(mediaStore.mediaBaseDir, ref.relativePath)))
-                }
-            }
-        }
-        AppLogger.info(
-            TAG,
-            "[Paste] ${consumed.size} placeholder(s) -> mediaRef: " +
-                "${text.length} chars in bubble, ${model.length} chars to model",
-        )
-        return PastedParts(parts, model.toString(), names, uris, consumed)
-    }
+    private suspend fun buildPastedParts(text: String, sessionId: String): PastedParts? =
+        PastedTextProcessor.processPastedParts(text, _pastedTexts.value, sessionId, mediaStore)
 
     /**
      * Build the parts_json array for a user message: a `text` part (omitted
