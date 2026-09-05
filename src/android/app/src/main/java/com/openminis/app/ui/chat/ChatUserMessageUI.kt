@@ -646,18 +646,9 @@ private fun FileAttachmentTile(
     }
 }
 
-/** Map a filename extension to a Material icon. Mirrors iOS fileIconName(for:). */
+/** Map a filename to a Material icon via unified FileCategory. Mirrors iOS fileIconName(for:). */
 private fun fileIconFor(fileName: String): androidx.compose.ui.graphics.vector.ImageVector {
-    val ext = fileName.substringAfterLast('.', "").lowercase()
-    return when (ext) {
-        "pdf" -> Icons.Default.PictureAsPdf
-        "doc", "docx", "pages" -> Icons.AutoMirrored.Filled.Article
-        "txt", "log", "csv", "md", "markdown" -> Icons.AutoMirrored.Filled.Article
-        "mp4", "mov", "avi", "mkv" -> Icons.Default.VideoFile
-        "mp3", "wav", "m4a", "aac" -> Icons.Default.AudioFile
-        "zip", "tar", "gz", "7z" -> Icons.Default.FolderZip
-        else -> Icons.AutoMirrored.Filled.InsertDriveFile
-    }
+    return com.openminis.app.ui.sandbox.fileCategoryFor(fileName).icon
 }
 
 /** Fullscreen image preview dialog with pager across all image attachments. */

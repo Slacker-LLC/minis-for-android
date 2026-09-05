@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -186,7 +186,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973"
       - name: Build upstream rclone gomobile AAR
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gomobile@f98cc9b
           export PATH="$(go env GOPATH)/bin:$PATH"
           gomobile init
           bash deps/build_rclone_android.sh
@@ -200,7 +200,7 @@ jobs:
 
   android-checks:
     name: Android ${{ matrix.name }}
-    needs: [changes, runtime-payload, rclone-android]
+    needs: [changes, rclone-android]
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     strategy:
@@ -209,16 +209,10 @@ jobs:
         include:
           - name: unit tests
             task: :app:testDebugUnitTest
-            payload: false
           - name: debug lint
             task: :app:lintDebug
-            payload: false
           - name: release lint
             task: :app:lintRelease
-            payload: false
-          - name: debug build
-            task: :app:assembleDebug
-            payload: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -229,7 +223,32 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - uses: actions/download-artifact@v8.0.1
-        if: matrix.payload
+        with:
+          name: rclone-android-aar
+          path: src/android/app/libs
+      - name: Prepare Gradle wrapper
+        run: chmod +x src/android/gradlew
+      - name: Run ${{ matrix.name }}
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '0'
+        working-directory: src/android
+        run: ./gradlew ${{ matrix.task }} --max-workers=4 --stacktrace
+
+  android-debug-build:
+    name: Android debug build
+    needs: [changes, runtime-payload, rclone-android]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
         with:
           name: android-runtime-payload
           path: dist
@@ -239,13 +258,12 @@ jobs:
           path: src/android/app/libs
       - name: Prepare Gradle wrapper
         run: chmod +x src/android/gradlew
-      - name: Run ${{ matrix.name }}
+      - name: Run debug build
         env:
-          MINIS_REQUIRE_RUNTIME_PAYLOAD: ${{ matrix.payload && '1' || '0' }}
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '1'
         working-directory: src/android
-        run: ./gradlew ${{ matrix.task }} --max-workers=4 --stacktrace
+        run: ./gradlew :app:assembleDebug --max-workers=4 --stacktrace
       - name: Verify debug APK runtime payload
-        if: matrix.payload
         run: bash scripts/verify-runtime-payload.sh src/android/app/build/outputs/apk/debug/app-debug.apk
 
   android-release:
@@ -314,7 +332,7 @@ jobs:
   android:
     name: Android build, test and release checks
     if: always()
-    needs: [changes, runtime-payload, android-checks, android-release]
+    needs: [changes, runtime-payload, android-checks, android-debug-build, android-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify Android check results
@@ -323,6 +341,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           PAYLOAD_RESULT: ${{ needs.runtime-payload.result }}
           CHECKS_RESULT: ${{ needs.android-checks.result }}
+          BUILD_RESULT: ${{ needs.android-debug-build.result }}
           RELEASE_RESULT: ${{ needs.android-release.result }}
         run: |
           if [[ "$CHANGES_RESULT" != "success" ]]; then
@@ -333,8 +352,8 @@ jobs:
             echo "No Android-related files changed; Android checks were skipped."
             exit 0
           fi
-          if [[ "$PAYLOAD_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
-            echo "Android checks failed: payload=$PAYLOAD_RESULT checks=$CHECKS_RESULT release=$RELEASE_RESULT" >&2
+          if [[ "$PAYLOAD_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$BUILD_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
+            echo "Android checks failed: payload=$PAYLOAD_RESULT checks=$CHECKS_RESULT build=$BUILD_RESULT release=$RELEASE_RESULT" >&2
             exit 1
           fi
           echo "All Android checks passed."

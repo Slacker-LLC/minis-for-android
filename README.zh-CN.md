@@ -2,7 +2,7 @@
 
 面向 **已 Root 的 Android 设备** 的 AI Agent Runtime。原生 Android App + Rust `minisd` + Ubuntu 24.04 userspace，共用 Android 内核，不是虚拟机。
 
-**中文合同定义应保持的行为边界；当前源码和测试定义 `master` 实际已经实现了什么。** Agent 先读 [`AGENTS.md`](AGENTS.md) 与 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)，当前实现与合同的已确认差异统一记录在 [`06-CURRENT-GAPS.md`](docs/contracts/06-CURRENT-GAPS.md)。
+**中文合同定义应保持的行为边界；当前源码和测试定义 `main` 实际已经实现了什么。** Agent 先读 [`AGENTS.md`](AGENTS.md) 与 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)，当前实现与合同的已确认差异统一记录在 [`06-CURRENT-GAPS.md`](docs/contracts/06-CURRENT-GAPS.md)。
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](BUILDING.md)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)

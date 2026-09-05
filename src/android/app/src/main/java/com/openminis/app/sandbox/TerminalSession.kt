@@ -79,6 +79,18 @@ class TerminalSession(private val context: Context) {
 
         /** Kept for receivers; no live PTY to update. */
         fun broadcastProxy(env: Map<String, String>) = Unit
+
+        /** Pure script builder for unit tests and session initialization (Issues #186 & #189). */
+        internal fun buildLaunchScript(guestUid: Int, guestGid: Int, sessionId: String?): String {
+            val sessionPrep = if (!sessionId.isNullOrBlank()) {
+                val cleanId = sessionId.trim()
+                if (cleanId.all { it.code < 128 && (it.isLetterOrDigit() || it == '-' || it == '_' || it == '.') }) {
+                    "mkdir -p /data/adb/minis/sessions/$cleanId 2>/dev/null || true; "
+                } else ""
+            } else ""
+            val sessionArg = if (!sessionId.isNullOrBlank()) " --session-root /data/adb/minis/sessions/$sessionId" else ""
+            return "${sessionPrep}PID=\$(cat /data/adb/minis/run/ubuntu.pid 2>/dev/null); if [ -n \"\$PID\" ] && [ -d \"/proc/\$PID\" ] && [ -x /data/adb/minis/bin/minisd ]; then exec /data/adb/minis/bin/minisd --helper exec --pid \"\$PID\" --rootfs /data/adb/minis/rootfs$sessionArg --uid $guestUid --gid $guestGid --cwd /workspace -- /bin/bash -l; else echo -e \"\\r\\n[minis] Ubuntu container not running. Starting host shell...\\r\\n\"; exec /system/bin/sh; fi"
+        }
     }
 
     enum class State { IDLE, BOOTING, RUNNING, STOPPED }
@@ -117,11 +129,17 @@ class TerminalSession(private val context: Context) {
             return
         }
 
+        sessionId?.takeIf { it.isNotBlank() }?.let {
+            runCatching { com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(it) }
+        }
+
         val outPid = IntArray(1)
         val suPaths = listOf("/system/bin/su", "/system/xbin/su", "/sbin/su")
         val suBinary = suPaths.firstOrNull { File(it).exists() } ?: "su"
 
-        val script = "PID=\$(cat /data/adb/minis/run/ubuntu.pid 2>/dev/null); if [ -n \"\$PID\" ] && [ -d \"/proc/\$PID\" ] && [ -x /data/adb/minis/bin/minisd ]; then exec /data/adb/minis/bin/minisd --helper exec --pid \"\$PID\" --rootfs /data/adb/minis/rootfs --uid 10000 --gid 10000 --cwd /workspace -- /bin/bash -l; else echo -e \"\\r\\n[minis] Ubuntu container not running. Starting host shell...\\r\\n\"; exec /system/bin/sh; fi"
+        val appUid = runCatching { context.applicationInfo.uid }.getOrDefault(10000)
+        val guestUid = if (appUid > 0) appUid else 10000
+        val script = buildLaunchScript(guestUid, guestUid, sessionId)
 
         val hasSu = File(suBinary).exists()
         val cmd = if (hasSu) suBinary else "/system/bin/sh"
@@ -224,6 +242,10 @@ class TerminalSession(private val context: Context) {
         if (pid > 0) {
             childPid = -1
             PtyBridge.sendSignal(pid, 15) // SIGTERM
+            // Issue #189: reap child process so it doesn't accumulate as a zombie
+            scope.launch {
+                runCatching { PtyBridge.waitFor(pid) }
+            }
         }
     }
 

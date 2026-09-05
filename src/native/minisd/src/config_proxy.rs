@@ -5,11 +5,13 @@ use std::time::Duration;
 
 const HOST_ROOTFS: &str = "/data/adb/minis/rootfs";
 const GUEST_CONFIG_BIN: &str = "/opt/minis/bin/minis-config";
+const GUEST_MODEL_USE_BIN: &str = "/opt/minis/bin/minis-model-use";
 const MAX_ARGC: usize = 128;
 const MAX_ARG_BYTES: usize = 64 * 1024;
 const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BRIDGE_BYTES: usize = 2 * 1024 * 1024;
 const MAGIC: &str = "MINISCFG1";
+const MAGIC_V2: &str = "MINISCFG2";
 
 struct ProxyConfig {
     port: u16,
@@ -113,18 +115,25 @@ fn handle_guest(
     let mut reader = BufReader::new(reader_stream);
 
     let magic = read_line_limited(&mut reader, 32)?;
-    if magic != MAGIC {
-        return write_cli_response(&mut stream, 1, "minis-config: invalid proxy protocol\n");
-    }
-    let got_token = read_line_limited(&mut reader, 256)?;
+    let (cmd, got_token) = if magic == MAGIC {
+        let got_token = read_line_limited(&mut reader, 256)?;
+        ("minis-config".to_string(), got_token)
+    } else if magic == MAGIC_V2 {
+        let got_token = read_line_limited(&mut reader, 256)?;
+        let cmd = read_line_limited(&mut reader, 64)?;
+        (cmd, got_token)
+    } else {
+        return write_cli_response(&mut stream, 1, "minis-proxy: invalid proxy protocol\n");
+    };
+
     if !constant_time_eq(expected_token.as_bytes(), got_token.as_bytes()) {
-        return write_cli_response(&mut stream, 126, "minis-config: proxy permission denied\n");
+        return write_cli_response(&mut stream, 126, "minis-proxy: proxy permission denied\n");
     }
     let argc: usize = read_line_limited(&mut reader, 16)?
         .parse()
         .map_err(|_| "invalid argc".to_string())?;
     if argc > MAX_ARGC {
-        return write_cli_response(&mut stream, 1, "minis-config: too many arguments\n");
+        return write_cli_response(&mut stream, 1, "minis-proxy: too many arguments\n");
     }
 
     let mut args = Vec::with_capacity(argc);
@@ -133,7 +142,7 @@ fn handle_guest(
         let bytes = hex_decode(&line, MAX_ARG_BYTES)?;
         let arg = String::from_utf8(bytes).map_err(|_| "argument is not utf-8".to_string())?;
         if arg.contains('\0') {
-            return write_cli_response(&mut stream, 1, "minis-config: NUL in argument\n");
+            return write_cli_response(&mut stream, 1, "minis-proxy: NUL in argument\n");
         }
         args.push(arg);
     }
@@ -156,17 +165,17 @@ fn handle_guest(
             let line = read_line_limited(&mut reader, MAX_FILE_BYTES * 2 + 2)?;
             Some(hex_decode(&line, MAX_FILE_BYTES)?)
         }
-        _ => return write_cli_response(&mut stream, 1, "minis-config: invalid file marker\n"),
+        _ => return write_cli_response(&mut stream, 1, "minis-proxy: invalid file marker\n"),
     };
 
     let args = match rewrite_file_argument(args, file_payload) {
         Ok(v) => v,
-        Err(e) => return write_cli_response(&mut stream, 1, &format!("minis-config: {e}\n")),
+        Err(e) => return write_cli_response(&mut stream, 1, &format!("minis-proxy: {e}\n")),
     };
 
-    let (exit_code, output) = match forward_to_android(bridge_name, &args, &cwd, &session) {
+    let (exit_code, output) = match forward_to_android(bridge_name, &cmd, &args, &cwd, &session) {
         Ok(v) => v,
-        Err(e) => (1, format!("minis-config bridge unavailable: {e}\n")),
+        Err(e) => (1, format!("minis-proxy bridge unavailable: {e}\n")),
     };
     write_cli_response(&mut stream, exit_code, &output)
 }
@@ -191,13 +200,14 @@ fn rewrite_file_argument(
 
 fn forward_to_android(
     bridge_name: &str,
+    cmd: &str,
     args: &[String],
     cwd: &str,
     session: &str,
 ) -> Result<(i32, String), String> {
     #[cfg(not(unix))]
     {
-        let _ = (bridge_name, args, cwd, session);
+        let _ = (bridge_name, cmd, args, cwd, session);
         Err("Android config bridge requires unix".into())
     }
     #[cfg(unix)]
@@ -207,7 +217,7 @@ fn forward_to_android(
         let _ = stream.set_write_timeout(Some(Duration::from_secs(15)));
 
         let mut argv = Vec::with_capacity(args.len() + 1);
-        argv.push("minis-config".to_string());
+        argv.push(cmd.to_string());
         argv.extend(args.iter().cloned());
         let request = serde_json::json!({
             "argv": argv,
@@ -309,12 +319,24 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
     let script_path = bin_dir.join("minis-config");
     std::fs::write(&script_path, script)
         .map_err(|e| format!("write {}: {e}", script_path.display()))?;
+    let model_use_path = bin_dir.join("minis-model-use");
+    std::fs::write(&model_use_path, script)
+        .map_err(|e| format!("write {}: {e}", model_use_path.display()))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::{symlink, PermissionsExt};
+        let _ = std::fs::set_permissions(root.join("opt"), std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::set_permissions(
+            root.join("opt/minis"),
+            std::fs::Permissions::from_mode(0o755),
+        );
+        let _ = std::fs::set_permissions(&bin_dir, std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::set_permissions(&etc_dir, std::fs::Permissions::from_mode(0o755));
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755))
             .map_err(|e| format!("chmod {}: {e}", script_path.display()))?;
+        std::fs::set_permissions(&model_use_path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("chmod {}: {e}", model_use_path.display()))?;
         let cfg_path = etc_dir.join("minis-config-proxy");
         std::fs::set_permissions(&cfg_path, std::fs::Permissions::from_mode(0o644))
             .map_err(|e| format!("chmod {}: {e}", cfg_path.display()))?;
@@ -325,6 +347,14 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
                 .map_err(|e| format!("remove stale {}: {e}", link.display()))?;
         }
         symlink(GUEST_CONFIG_BIN, &link).map_err(|e| format!("symlink {}: {e}", link.display()))?;
+
+        let model_use_link = usr_local_bin.join("minis-model-use");
+        if model_use_link.symlink_metadata().is_ok() {
+            std::fs::remove_file(&model_use_link)
+                .map_err(|e| format!("remove stale {}: {e}", model_use_link.display()))?;
+        }
+        symlink(GUEST_MODEL_USE_BIN, &model_use_link)
+            .map_err(|e| format!("symlink {}: {e}", model_use_link.display()))?;
     }
     Ok(())
 }
@@ -332,21 +362,22 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
 fn wrapper_script() -> &'static str {
     r#"#!/bin/bash
 set -u
+cmd="$(basename "$0")"
 CFG=/etc/minis/minis-config-proxy
 if [ ! -r "$CFG" ]; then
-  echo "minis-config: minisd proxy is not initialized" >&2
+  echo "$cmd: minisd proxy is not initialized" >&2
   exit 127
 fi
 . "$CFG"
 if [ -z "${MINIS_CONFIG_PROXY_PORT:-}" ] || [ -z "${MINIS_CONFIG_PROXY_TOKEN:-}" ]; then
-  echo "minis-config: invalid minisd proxy configuration" >&2
+  echo "$cmd: invalid minisd proxy configuration" >&2
   exit 127
 fi
 exec 3<>"/dev/tcp/127.0.0.1/${MINIS_CONFIG_PROXY_PORT}" || {
-  echo "minis-config: cannot connect to minisd proxy" >&2
+  echo "$cmd: cannot connect to minisd proxy" >&2
   exit 127
 }
-printf 'MINISCFG1\n%s\n%s\n' "$MINIS_CONFIG_PROXY_TOKEN" "$#" >&3
+printf 'MINISCFG2\n%s\n%s\n%s\n' "$MINIS_CONFIG_PROXY_TOKEN" "$cmd" "$#" >&3
 for arg in "$@"; do
   printf '%s' "$arg" | od -An -v -tx1 | tr -d ' \n' >&3
   printf '\n' >&3
@@ -366,7 +397,7 @@ for arg in "$@"; do
 done
 if [ -n "$file_path" ]; then
   if [ ! -r "$file_path" ] || [ ! -f "$file_path" ]; then
-    echo "minis-config: --file cannot read '$file_path'" >&2
+    echo "$cmd: --file cannot read '$file_path'" >&2
     exit 1
   fi
   printf '1\n' >&3
@@ -376,7 +407,7 @@ else
   printf '0\n' >&3
 fi
 if ! IFS= read -r exit_code <&3; then
-  echo "minis-config: minisd proxy closed without a response" >&2
+  echo "$cmd: minisd proxy closed without a response" >&2
   exit 1
 fi
 cat <&3
@@ -510,5 +541,6 @@ mod tests {
         assert!(!script.contains("root.exec"));
         assert!(!script.contains("ubuntu.adminExec"));
         assert_eq!(GUEST_CONFIG_BIN, "/opt/minis/bin/minis-config");
+        assert_eq!(GUEST_MODEL_USE_BIN, "/opt/minis/bin/minis-model-use");
     }
 }

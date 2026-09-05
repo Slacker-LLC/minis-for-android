@@ -87,6 +87,8 @@ object NativeOffloadServer {
 
     val registeredHandlers: Set<String> get() = handlers.keys.toSet()
 
+    fun getHandler(name: String): NativeOffloadHandler? = handlers[name]
+
     fun register(name: String, handler: NativeOffloadHandler) {
         require(name.isNotEmpty())
         handlers[name] = handler

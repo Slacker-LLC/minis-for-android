@@ -427,7 +427,7 @@ internal fun AssistantMessageView(message: ChatMessage, onRetry: (() -> Unit)? =
 
         // Inline error banner (iOS: red exclamation + error text + Retry button)
         if (message.error != null) {
-            InlineErrorBanner(error = message.error, onRetry = onRetry)
+            InlineErrorBanner(error = message.error, onRetry = onRetry, isRetrying = message.isStreaming)
         }
 
         // 👍/👎 feedback (same MessageFeedbackStore as the Web Remote)
@@ -464,8 +464,15 @@ internal fun BoundsTrackedBlock(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
+internal fun InlineErrorBanner(
+    error: String,
+    onRetry: (() -> Unit)? = null,
+    isRetrying: Boolean = false,
+) {
     val clipboard = LocalClipboardManager.current
+    var localRetrying by remember(error) { mutableStateOf(false) }
+    val canRetry = onRetry != null && !isRetrying && !localRetrying
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -502,19 +509,27 @@ internal fun InlineErrorBanner(error: String, onRetry: (() -> Unit)? = null) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFFF3B30).copy(alpha = 0.15f))
-                    .clickable(onClick = onRetry)
+                    .background(Color(0xFFFF3B30).copy(alpha = if (canRetry) 0.15f else 0.05f))
+                    .clickable(enabled = canRetry) {
+                        localRetrying = true
+                        onRetry()
+                    }
                     .padding(horizontal = 10.dp, vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    tint = Color(0xFFFF3B30),
+                    tint = Color(0xFFFF3B30).copy(alpha = if (canRetry) 1f else 0.4f),
                     modifier = Modifier.size(10.dp),
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(stringResource(R.string.chat_longpress_retry), color = Color(0xFFFF3B30), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.chat_longpress_retry),
+                    color = Color(0xFFFF3B30).copy(alpha = if (canRetry) 1f else 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

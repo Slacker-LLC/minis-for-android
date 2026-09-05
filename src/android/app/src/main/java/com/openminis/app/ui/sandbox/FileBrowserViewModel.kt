@@ -66,57 +66,51 @@ data class FileItem(
     val formattedSize: String
         get() = Formatter.formatFileSize(null, size)
 
+    val category: FileCategory
+        get() = fileCategoryFor(name.ifEmpty { file.name })
+
     /** Whether this file can be previewed inline (text, image, etc.) */
     val isPreviewable: Boolean
         get() = isTextFile || isImageFile
 
     val isTextFile: Boolean
-        get() {
-            val ext = file.extension.lowercase()
-            return ext in setOf(
-                "txt", "md", "json", "xml", "yaml", "yml", "conf", "cfg", "ini",
-                "log", "csv", "sh", "bash", "zsh", "fish",
-                "py", "js", "ts", "kt", "java", "c", "cpp", "h", "m", "swift",
-                "rs", "go", "rb", "php", "lua", "pl", "html", "css", "scss",
-                "toml", "env", "gitignore", "dockerfile", "makefile",
-            ) || ext.isEmpty() // extensionless files treated as text
-        }
+        get() = category == FileCategory.TEXT || category == FileCategory.CODE ||
+            category == FileCategory.MARKDOWN || category == FileCategory.JSON ||
+            category == FileCategory.CSV || category == FileCategory.HTML
 
     val isImageFile: Boolean
-        get() {
-            val ext = file.extension.lowercase()
-            return ext in setOf("png", "jpg", "jpeg", "gif", "bmp", "webp", "ico")
-        }
+        get() = category == FileCategory.IMAGE || category == FileCategory.GIF
+
+    val isGifFile: Boolean
+        get() = category == FileCategory.GIF
 
     val isMarkdownFile: Boolean
-        get() = file.extension.lowercase() in setOf("md", "markdown", "mdown", "mkd")
+        get() = category == FileCategory.MARKDOWN
 
     val isHtmlFile: Boolean
-        get() = file.extension.lowercase() in setOf("html", "htm", "xhtml")
+        get() = category == FileCategory.HTML
 
     val isAudioFile: Boolean
-        get() = file.extension.lowercase() in setOf("mp3", "wav", "aac", "flac", "ogg", "m4a")
+        get() = category == FileCategory.AUDIO
 
     val isVideoFile: Boolean
-        get() = file.extension.lowercase() in setOf("mp4", "mov", "avi", "mkv", "webm")
+        get() = category == FileCategory.VIDEO
 
     val isPdfFile: Boolean
-        get() = file.extension.lowercase() == "pdf"
+        get() = category == FileCategory.PDF
 
     // T144 — file-type flags driving FilePreviewScreen renderers.
     val isCsvFile: Boolean
-        get() = file.extension.lowercase() in setOf("csv", "tsv")
+        get() = category == FileCategory.CSV
 
     val isJsonFile: Boolean
-        get() = file.extension.lowercase() == "json"
+        get() = category == FileCategory.JSON
 
     val isArchiveFile: Boolean
-        get() = file.extension.lowercase() in setOf("zip", "jar", "apk", "aar")
+        get() = category == FileCategory.ARCHIVE
 
     val isOfficeFile: Boolean
-        get() = file.extension.lowercase() in setOf(
-            "xlsx", "xls", "docx", "doc", "pptx", "ppt", "odt", "ods", "odp",
-        )
+        get() = category == FileCategory.OFFICE
 
     /** Mirrors iOS FileItem.formattedDate: today=time, yesterday="Yesterday", <7d=weekday, else short date. */
     val formattedDate: String

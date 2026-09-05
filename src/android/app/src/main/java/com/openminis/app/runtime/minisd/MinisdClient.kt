@@ -95,6 +95,9 @@ class MinisdClient(
     suspend fun ubuntuProvision(timeoutMs: Long = 600_000): MinisdResponse =
         call(MinisdProtocol.ubuntuProvision(nextId()), timeoutMs + 5_000)
 
+    suspend fun ubuntuRefreshDns(nameservers: List<String> = emptyList()): MinisdResponse =
+        call(MinisdProtocol.ubuntuRefreshDns(nextId(), nameservers))
+
     suspend fun runtimeMaintenance(
         operation: String,
         params: JSONObject = JSONObject(),

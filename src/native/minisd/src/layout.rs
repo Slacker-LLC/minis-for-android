@@ -207,6 +207,12 @@ impl PersistentLayout {
             )?;
         }
 
+        for sub in &[".local", ".cache", ".config"] {
+            let p = self.home().join(sub);
+            ensure_directory(&p, data_uid, data_gid, 0o755)?;
+            set_owner_mode_recursive(&p, data_uid, data_gid);
+        }
+
         let readme = self.workspace().join("README");
         if !readme.exists() {
             std::fs::write(&readme, workspace_readme())
@@ -333,6 +339,25 @@ fn set_owner_mode(path: &Path, uid: u32, gid: u32, mode: u32) -> Result<(), Stri
     Ok(())
 }
 
+#[cfg(unix)]
+fn set_owner_mode_recursive(path: &Path, uid: u32, gid: u32) {
+    if let Ok(meta) = std::fs::symlink_metadata(path) {
+        if meta.file_type().is_symlink() {
+            return;
+        }
+        if meta.is_dir() {
+            let _ = set_owner_mode(path, uid, gid, 0o755);
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    set_owner_mode_recursive(&entry.path(), uid, gid);
+                }
+            }
+        } else if meta.is_file() {
+            let _ = set_owner_mode(path, uid, gid, 0o644);
+        }
+    }
+}
+
 #[cfg(not(unix))]
 fn set_owner_mode(path: &Path, _uid: u32, _gid: u32, _mode: u32) -> Result<(), String> {
     if path.exists() {
@@ -341,6 +366,9 @@ fn set_owner_mode(path: &Path, _uid: u32, _gid: u32, _mode: u32) -> Result<(), S
         Err(format!("path missing: {}", path.display()))
     }
 }
+
+#[cfg(not(unix))]
+fn set_owner_mode_recursive(_path: &Path, _uid: u32, _gid: u32) {}
 
 #[cfg(unix)]
 fn ensure_non_tmpfs_directory(label: &str, path: &Path) -> Result<(), String> {

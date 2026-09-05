@@ -270,6 +270,10 @@ pub fn dispatch_authorized(state: &mut AppState, req: &Request) -> Response {
             Ok(v) => Response::ok(req.id, v),
             Err((code, detail)) => Response::err(req.id, code, detail),
         },
+        "ubuntu.refreshDns" => match crate::ubuntu::refresh_dns(state, &req.params) {
+            Ok(v) => Response::ok(req.id, v),
+            Err((code, detail)) => Response::err(req.id, code, detail),
+        },
         "proc.killTree" => kill_tree(state, req),
         "mount.list" => {
             if !state.mock {

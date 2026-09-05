@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(minis_native CXX C)
 
+# Android 15/16 16 KB page-size ELF alignment
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+
 add_library(pty_bridge SHARED pty_bridge.c)
 
 # T283: NDK signal handler for native crashes (SIGSEGV/SIGABRT/...).
@@ -22,3 +25,8 @@ find_library(log-lib log)
 target_link_libraries(pty_bridge ${log-lib})
 target_link_libraries(minis_crash_handler ${log-lib})
 target_link_libraries(jieba_jni ${log-lib})
+
+target_link_options(pty_bridge PRIVATE "-Wl,-z,max-page-size=16384")
+target_link_options(minis_crash_handler PRIVATE "-Wl,-z,max-page-size=16384")
+target_link_options(jieba_jni PRIVATE "-Wl,-z,max-page-size=16384")
+

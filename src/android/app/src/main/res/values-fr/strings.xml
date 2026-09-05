@@ -1239,4 +1239,11 @@
     <string name="soul_icon_error_too_large">Cette image est trop volumineuse pour être stockée. Essayez-en une plus simple.</string>
     <string name="external_link_blocked">Lien vers une application externe bloqué (%1$s)</string>
     <string name="external_link_no_app">Aucune application disponible pour ouvrir ce lien.</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">Aperçu</string>
+    <string name="chat_attachment_open_action">Ouvrir</string>
+    <string name="chat_attachment_full_view">Vue complète</string>
+    <string name="chat_attachment_expand_preview">Agrandir l\'aperçu</string>
+    <string name="chat_attachment_collapse_preview">Réduire l\'aperçu</string>
+    <string name="chat_attachment_card_mode">Réduire en carte</string>
 </resources>

@@ -99,6 +99,19 @@ import java.util.concurrent.atomic.AtomicInteger
 // [T-android-split-chat] StreamingDelta / ChatMessage / QueuedPrompt /
 // ToolBlockStatus / SlashCommand / AssistantBlock moved verbatim to ChatModels.kt.
 
+/**
+ * Run state updates only after the database mutation has completed
+ * successfully. Keeping this ordering explicit prevents a failed or
+ * cancelled delete from leaving the in-memory conversation ahead of Room.
+ */
+internal suspend fun runAfterDatabaseDelete(
+    delete: suspend () -> Unit,
+    afterCommit: suspend () -> Unit,
+) {
+    delete()
+    afterCommit()
+}
+
 class ChatViewModel(
     internal val sessionId: String,
     private val chatRepository: ChatRepository,
@@ -3782,8 +3795,15 @@ class ChatViewModel(
     }
 
     /** Ensure the session exists in the database. Called before first message. */
-    private suspend fun ensureSession(): String {
-        if (realSessionId.isNotEmpty()) return realSessionId
+    private suspend fun ensureSession(): String = withContext(Dispatchers.IO) {
+        android.util.Log.e("PROMPT_DEBUG", "ensureSession called: sessionId='$sessionId', realSessionId='$realSessionId', isDraft=$isDraft")
+        if (realSessionId.isNotEmpty()) {
+            val existing = chatRepository.dao.getSession(realSessionId)
+            android.util.Log.e("PROMPT_DEBUG", "Checking realSessionId='$realSessionId' in DB: existing=${existing != null}")
+            if (existing != null) {
+                return@withContext realSessionId
+            }
+        }
         val modelId = currentModel?.id ?: providerRepository.allVisibleEntries().firstOrNull()?.model?.id ?: "unknown"
         // [T-memory-global-toggle-settings-ui-android] Snapshot the
         // current in-memory `_memoryEnabled` into the new row. For a
@@ -3799,9 +3819,7 @@ class ChatViewModel(
         // and allocate sequence numbers only after Room's high-water mark is
         // known, so a process restart cannot collide with old rows.
         SessionEventHub.rename(sessionId, session.id)
-        withContext(Dispatchers.IO) {
-            SessionEventHub.activateSession(chatRepository.dao, session.id)
-        }
+        SessionEventHub.activateSession(chatRepository.dao, session.id)
         // "New Chat in Group": file the just-promoted draft into its folder.
         // Unconditional (vs iOS setFolderIfUnfiled) — the session is seconds
         // old and nothing else can have filed it yet.
@@ -3848,7 +3866,7 @@ class ChatViewModel(
         if (binding != null) {
             chatRepository.updateSessionBinding(realSessionId, binding, modelId)
         }
-        return realSessionId
+        return@withContext realSessionId
     }
 
     /**
@@ -4062,7 +4080,13 @@ class ChatViewModel(
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "db.query.begin")
             val loaded = withContext(Dispatchers.IO) {
                 val tIoBeforeLoad = System.currentTimeMillis()
-                val rows = chatRepository.loadMessages(sessionId)
+                val totalCount = chatRepository.messageCountForSession(sessionId)
+                val window = SessionMessageWindowing.calculateInitialWindow(totalCount)
+                val rows = if (window.isWindowed) {
+                    chatRepository.loadRecentMessages(sessionId, window.limit)
+                } else {
+                    chatRepository.loadMessages(sessionId)
+                }
                 val tIoAfterLoad = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
@@ -5680,54 +5704,80 @@ class ChatViewModel(
 
     fun deleteFromMessage(messageId: String) {
         if (_isStreaming.value) return
-        _canResume.value = false
         val messages = _messages.value
         val index = messages.indexOfFirst { it.id == messageId }
         if (index < 0) return
 
         val deletedMessages = messages.subList(index, messages.size).toList()
-
         val retainedHead = messages.subList(0, index)
-        for (m in deletedMessages) {
-            m.queuedPromptId?.let { pid ->
-                _promptQueue.value = _promptQueue.value.filterNot { it.id == pid }
-            }
-        }
-        _messages.value = retainedHead
-
-        val keptIds = retainedHead.mapTo(mutableSetOf()) { it.id }
-        retainStreamFlushStates(keptIds)
-        if (_streamingById.value.isNotEmpty()) {
-            _streamingById.value = _streamingById.value.filterKeys { it in keptIds }
-        }
-
-        revokeMemoryWritesInDeletedMessages(deletedMessages)
-        if (deletedMessages.any { it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId }) {
-            stopReplySpeech()
-        }
-
         val sid = activeSessionId ?: return
         viewModelScope.launch {
-            val target = messages[index]
-            val cutoffSortOrder = resolveDeleteCutoffSortOrder(sid, messages, index, target)
-            if (cutoffSortOrder >= 0) {
-                chatRepository.deleteMessagesAfter(sid, cutoffSortOrder)
-            }
+            try {
+                val target = messages[index]
+                val cutoffSortOrder = resolveDeleteCutoffSortOrder(sid, messages, index, target)
+                if (cutoffSortOrder < 0) {
+                    AppLogger.warning(TAG, "deleteFromMessage: could not resolve cutoff for $messageId")
+                    return@launch
+                }
 
-            agentHistory.clear()
-            toolLoopDetector.reset()
-            val remaining = chatRepository.loadMessages(sid)
-            for (entity in remaining) {
-                agentHistory.add(entity.toLLMMessage())
+                runAfterDatabaseDelete(
+                    delete = { chatRepository.deleteMessagesAfter(sid, cutoffSortOrder) },
+                    afterCommit = {
+                        // Read the committed database state before publishing
+                        // any in-memory changes. If this read fails, the old
+                        // UI remains intact and the next session load can
+                        // reconcile from Room.
+                        val remaining = chatRepository.loadMessages(sid)
+                        _canResume.value = false
+                        for (m in deletedMessages) {
+                            m.queuedPromptId?.let { pid ->
+                                _promptQueue.value = _promptQueue.value.filterNot { it.id == pid }
+                            }
+                        }
+                        _messages.value = retainedHead
+
+                        val keptIds = retainedHead.mapTo(mutableSetOf()) { it.id }
+                        retainStreamFlushStates(keptIds)
+                        if (_streamingById.value.isNotEmpty()) {
+                            _streamingById.value = _streamingById.value.filterKeys { it in keptIds }
+                        }
+
+                        // Memory is an external side effect, so it follows the
+                        // committed Room delete instead of preceding it.
+                        runCatching {
+                            revokeMemoryWritesInDeletedMessages(deletedMessages)
+                        }.onFailure { error ->
+                            Log.e(TAG, "deleteFromMessage: memory revoke failed after DB commit", error)
+                        }
+                        if (deletedMessages.any {
+                                it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId
+                            }) {
+                            stopReplySpeech()
+                        }
+
+                        agentHistory.clear()
+                        toolLoopDetector.reset()
+                        for (entity in remaining) {
+                            agentHistory.add(entity.toLLMMessage())
+                        }
+                        runCatching {
+                            chatRepository.updateSessionPreview(
+                                sid,
+                                remaining.lastOrNull()?.partsJson ?: "[]",
+                            )
+                        }
+                        AppLogger.info(
+                            TAG,
+                            "deleteFromMessage: cut at sortOrder=$cutoffSortOrder, " +
+                                "${deletedMessages.size} message(s) removed, ${remaining.size} remain",
+                        )
+                    },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.e(TAG, "deleteFromMessage: database delete failed; state unchanged", error)
             }
-            runCatching {
-                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
-            }
-            AppLogger.info(
-                TAG,
-                "deleteFromMessage: cut at sortOrder=$cutoffSortOrder, " +
-                    "${deletedMessages.size} message(s) removed, ${remaining.size} remain",
-            )
         }
     }
 
@@ -6040,16 +6090,22 @@ class ChatViewModel(
        // agentHistory so the next API call carries it.
        val userText = combinedText.toString()
         val queuedPaste = buildPastedParts(userText, sid)
-        if (queuedPaste != null) {
-            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
-        }
         val userPartsJson = buildUserPartsJson(
             userText,
             prepared.mediaRefPartsJson,
             prepared.attachedFilesXml,
             bodyPartsJson = queuedPaste?.partsJson,
         )
-        val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
+        val userEntity = try {
+            chatRepository.appendMessage(sid, "user", userPartsJson)
+        } catch (e: Exception) {
+            PastedTextProcessor.cleanupFiles(queuedPaste)
+            throw e
+        }
+        // Issue #188: consume pasted texts only after DB append succeeds
+        if (queuedPaste != null) {
+            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
+        }
         agentHistory.add(
             LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6172,17 +6228,22 @@ class ChatViewModel(
 
            val userText = combinedText.toString()
             val drainPaste = buildPastedParts(userText, sid)
-            if (drainPaste != null) {
-                _pastedTexts.value =
-                    _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
-            }
             val userPartsJson = buildUserPartsJson(
                 userText,
                 prepared.mediaRefPartsJson,
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            chatRepository.appendMessage(sid, "user", userPartsJson)
+            try {
+                chatRepository.appendMessage(sid, "user", userPartsJson)
+                if (drainPaste != null) {
+                    _pastedTexts.value =
+                        _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
+                }
+            } catch (e: Exception) {
+                PastedTextProcessor.cleanupFiles(drainPaste)
+                throw e
+            }
 
             agentHistory.add(LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6331,16 +6392,22 @@ class ChatViewModel(
            // a session reload (T128). Non-image attachments still only contribute
            // their name (rendered as a file tile) and are not persisted.
             val pasted = buildPastedParts(trimmed, activeSessionId)
-            if (pasted != null) {
-                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
-            }
             val userPartsJson = buildUserPartsJson(
                 trimmed,
                 prepared.mediaRefPartsJson,
                 prepared.attachedFilesXml,
                 bodyPartsJson = pasted?.partsJson,
             )
-            val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            val persistedUser = try {
+                chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            } catch (e: Exception) {
+                PastedTextProcessor.cleanupFiles(pasted)
+                throw e
+            }
+            // Issue #188: consume pasted texts only after DB append succeeds
+            if (pasted != null) {
+                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
+            }
 
             val userMsg = ChatMessage(
                 id = persistedUser.id,
@@ -6627,8 +6694,12 @@ class ChatViewModel(
      *   - Sync the DB: if we popped a trailing assistant, drop just its
      *     persisted row so a re-load doesn't resurrect the failed turn.
      */
+    private var lastRetryTimestamp = 0L
+
     fun retryLast() {
-        if (_isStreaming.value) return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (_isStreaming.value || now - lastRetryTimestamp < 800L) return
+        lastRetryTimestamp = now
         // T-streaming-side-channel: belt-and-suspenders flush in case any
         // delta survived an earlier abnormal exit; retryLast is gated on
         // !isStreaming so this is normally a no-op.
@@ -6640,19 +6711,26 @@ class ChatViewModel(
         _forceScrollToBottom.tryEmit(Unit)
 
         // 1. Keep the assistant message; clear error + streaming flags + drop
-        //    in-flight tool blocks (STREAMING args / PENDING dispatch /
-        //    RUNNING execution all have no tool_result, so they'd orphan).
+        //    in-flight tool blocks. Clean any preceding empty ghost assistant messages.
         val lastMsg = msgs[lastAssistantIdx]
+        val targetAssistantId = lastMsg.id
         val keptToolBlocks = lastMsg.toolBlocks.filter { block ->
             block.toolStatus !in IN_FLIGHT_TOOL_STATUSES
         }
-        msgs[lastAssistantIdx] = lastMsg.copy(
-            error = null,
-            isStreaming = false,
-            isAwaitingModelResponse = false,
-            toolBlocks = keptToolBlocks,
-        )
-        _messages.value = msgs
+        val cleanedMsgs = msgs.filterIndexed { index, m ->
+            index == lastAssistantIdx || !(m.role == "assistant" && m.content.isBlank() && m.toolBlocks.isEmpty() && m.error == null && !m.isStreaming)
+        }.toMutableList()
+        val updatedIdx = cleanedMsgs.indexOfFirst { it.id == targetAssistantId }
+        if (updatedIdx >= 0) {
+            cleanedMsgs[updatedIdx] = lastMsg.copy(
+                content = "",
+                error = null,
+                isStreaming = true,
+                isAwaitingModelResponse = true,
+                toolBlocks = keptToolBlocks,
+            )
+        }
+        _messages.value = cleanedMsgs
         // [T-error-persist-android] Clear the persisted error sticker on the last
         // assistant row up-front. The DB-sync below only DELETES the trailing
         // assistant row when a trailing assistant was popped (Case A); in the
@@ -6780,6 +6858,7 @@ class ChatViewModel(
                             systemPrompt = systemPrompt,
                             fallbackProviders = fallbackProviders,
                             fallbackStrategy = activeFallbackStrategy,
+                            reusingAssistantId = targetAssistantId,
                         )
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
                         drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
@@ -7242,6 +7321,7 @@ class ChatViewModel(
         systemPrompt: String?,
         fallbackProviders: List<FallbackCandidate> = emptyList(),
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
+        reusingAssistantId: String? = null,
     ) {
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
 
@@ -7328,8 +7408,12 @@ class ChatViewModel(
         // `accumulatedText` are also reset at that point so the new bubble
         // starts empty and `buildTurnParts(allToolBlocks, turnStartBlockIndex,
         // toolInputMap)` continues to slice only the current turn's blocks
-        // (turnStartBlockIndex is captured at iteration start to 0 after reset).
-        var assistantId = "assistant_${System.currentTimeMillis()}"
+        var assistantId = reusingAssistantId
+            ?: if (_messages.value.lastOrNull()?.let { it.role == "assistant" && it.content.isBlank() && it.toolBlocks.isEmpty() } == true) {
+                _messages.value.last().id
+            } else {
+                "assistant_${System.currentTimeMillis()}"
+            }
         val allToolBlocks = mutableListOf<AssistantBlock>()
         // Per-tool ring of the most recent `accumulated` JSON snapshots emitted
         // by `LLMStreamChunk.ToolInputDelta`. Capped at TOOL_INPUT_CHUNK_RING_MAX
@@ -7402,13 +7486,29 @@ class ChatViewModel(
         // forced-reasoning model still streams reasoning_content.
         val turnThinkingLevel = _thinkingLevel.value
         withContext(Dispatchers.Main) {
-            val assistantPlaceholder = ChatMessage(
-                id = assistantId, role = "assistant", content = "", isStreaming = true,
-                isAwaitingModelResponse = true,
-                thinkingLevel = turnThinkingLevel,
-            )
-            _messages.value = _messages.value + assistantPlaceholder
-            sessionEventEmitter.messageCreated(assistantPlaceholder)
+            val currentList = _messages.value
+            val existingIdx = currentList.indexOfFirst { it.id == assistantId }
+            if (existingIdx >= 0) {
+                val updated = currentList.toMutableList()
+                val existing = updated[existingIdx]
+                updated[existingIdx] = existing.copy(
+                    content = "",
+                    isStreaming = true,
+                    isAwaitingModelResponse = true,
+                    toolBlocks = emptyList(),
+                    error = null,
+                    thinkingLevel = turnThinkingLevel,
+                )
+                _messages.value = updated
+            } else {
+                val assistantPlaceholder = ChatMessage(
+                    id = assistantId, role = "assistant", content = "", isStreaming = true,
+                    isAwaitingModelResponse = true,
+                    thinkingLevel = turnThinkingLevel,
+                )
+                _messages.value = currentList + assistantPlaceholder
+                sessionEventEmitter.messageCreated(assistantPlaceholder)
+            }
         }
 
         // Tracks whether the loop was exited via a `break` (any reason — no
@@ -7594,9 +7694,23 @@ class ChatViewModel(
             val turnTools = if (chatOnlyForNextTurn) {
                 emptyList()
             } else {
-                sessionOverrides.filterTools(agentTools)
+                agentTools
             }
-            val turnToolNames = turnTools.mapTo(hashSetOf()) { it.name }
+            val turnToolNames = buildSet {
+                for (tool in turnTools) {
+                    add(tool.name)
+                    add(tool.apiName)
+                    val normName = tool.name.lowercase().filter { it.isLetterOrDigit() }
+                    if (normName.isNotEmpty()) add(normName)
+                    val normApi = tool.apiName.lowercase().filter { it.isLetterOrDigit() }
+                    if (normApi.isNotEmpty()) add(normApi)
+                    com.openminis.app.tools.runtime.ToolRegistry.aliasesFor(tool.name).forEach { alias ->
+                        add(alias)
+                        val normAlias = alias.lowercase().filter { it.isLetterOrDigit() }
+                        if (normAlias.isNotEmpty()) add(normAlias)
+                    }
+                }
+            }
             val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args
             // [T-android-gemini3-thoughtsig / #179] toolCallId -> Gemini 3.x
             // thoughtSignature for this turn's calls (null for other providers).
@@ -8030,18 +8144,37 @@ class ChatViewModel(
                         // the thinking panel is driven by ThinkingDelta events above.
                         turnReasoningBlob = chunk.content
                     }
+                    is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.Finished -> {
                         // T321: stash for empty-turn diagnostic logging below.
                         turnFinishReason = chunk.stopReason
                     }
-                    is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.MediaAttachment -> {
-                        // [T-codex-gpt-image2-oauth-android] Model-generated
-                        // media (gpt-image-2 image). Inline chat display is out
-                        // of scope for this change — the image is delivered via
-                        // sendMessage→LLMResponse.mediaAttachments for the
-                        // minis-model-use CLI path. No-op here so the chat agent
-                        // loop compiles with the new chunk variant.
+                        val ref = try {
+                            mediaStore.saveMedia(
+                                data = chunk.attachment.data,
+                                mimeType = chunk.attachment.mimeType,
+                                sessionId = activeSessionId,
+                                originalFileName = "generated_image.png",
+                            )
+                        } catch (e: Exception) {
+                            AppLogger.warning(TAG_STREAM, "Failed to save generated media: ${e.message}")
+                            null
+                        }
+                        if (ref != null) {
+                            val file = java.io.File(mediaStore.mediaBaseDir, ref.relativePath)
+                            val blockId = "img_${System.currentTimeMillis()}"
+                            val block = AssistantBlock(
+                                id = blockId,
+                                kind = "media",
+                                toolTitle = ref.originalFileName ?: "Generated Image",
+                                imageFilePath = file.absolutePath,
+                            )
+                            allToolBlocks.add(block)
+                            withContext(Dispatchers.Main) {
+                                updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
+                            }
+                        }
                     }
                 }
                     }  // end collect
@@ -8353,7 +8486,7 @@ class ChatViewModel(
                 // attaches + persists onto the (empty) assistant row so the hint
                 // survives a reload too.
                 val hasVisibleContent = accumulatedText.isNotBlank() ||
-                    allToolBlocks.any { it.kind == "tool_use" || (it.kind == "text" && it.content.isNotBlank()) }
+                    allToolBlocks.any { it.kind == "tool_use" || (it.kind == "text" && it.content.isNotBlank()) || it.imageFilePath != null }
 
                 // [T-android-silent-stream-drop] A turn's stopReason comes ONLY
                 // from the SSE terminal event, which always carries a concrete
@@ -8483,18 +8616,28 @@ class ChatViewModel(
                 // name a tool that was not offered this turn. Reject it before
                 // repair, permission/status updates, or execution. This also
                 // makes chatOnlyForNextTurn fail closed.
-                if (name !in turnToolNames) {
-                    val blockedMessage = "Error: Tool '$name' is disabled for this session."
+                val isTurnTool = name in turnToolNames ||
+                    turnTools.any { it.matchesName(name) } ||
+                    com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name)?.let { canonical ->
+                        canonical in turnToolNames || turnTools.any { it.matchesName(canonical) }
+                    } == true
+                if (!isTurnTool) {
+                    val blockedMessage = if (chatOnlyForNextTurn) {
+                        "Error: Tools are disabled in chat-only mode."
+                    } else {
+                        "Error: Tool '$name' is not available."
+                    }
                     AppLogger.warning(
                         "ToolPreflight",
-                        "BLOCKED session-disabled tool=$name id=$id session=$activeSessionId",
+                        "BLOCKED tool=$name id=$id chatOnly=$chatOnlyForNextTurn session=$activeSessionId",
                     )
                     val blockIdx = allToolBlocks.indexOfFirst { it.id == id }
+                    val failContent = if (chatOnlyForNextTurn) "Disabled in chat-only mode" else "Tool not available"
                     if (blockIdx >= 0) {
                         val elapsed = System.currentTimeMillis() - allToolBlocks[blockIdx].startTimeMs
                         allToolBlocks[blockIdx] = allToolBlocks[blockIdx].copy(
                             toolStatus = ToolBlockStatus.FAILED,
-                            content = "Blocked by this session's tool allow-list",
+                            content = failContent,
                             durationMs = elapsed,
                         )
                         sessionEventEmitter.toolResult(assistantId, allToolBlocks[blockIdx])
@@ -9051,9 +9194,10 @@ class ChatViewModel(
         // P3: tools registered in ToolRegistry (D12 names + old aliases) go
         // through the new runtime gate. Unregistered tools fall through to
         // the legacy dispatch table below.
-        if (com.openminis.app.tools.runtime.ToolRegistry.contains(name)) {
+        val canonical = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name) ?: name
+        if (com.openminis.app.tools.runtime.ToolRegistry.contains(canonical)) {
             return com.openminis.app.tools.runtime.ToolExecutor.execute(
-                name = name,
+                name = canonical,
                 argsJson = argsJson,
                 sessionId = activeSessionId,
                 context = context,
@@ -10351,61 +10495,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
        return JSONObject().put("type", "mediaRef").put("value", value).toString()
    }
 
-    private data class PastedParts(
-        val partsJson: List<String>,
-        val modelText: String,
-        val uiNames: List<String>,
-        val uiUris: List<Uri>,
-        val consumedIds: Set<Int>,
-    )
-
-    private fun buildPastedParts(text: String, sessionId: String): PastedParts? {
-        val (chunks, consumed) = splitPastePlaceholders(text, _pastedTexts.value)
-        if (consumed.isEmpty()) return null
-        val byId = _pastedTexts.value.associateBy { it.id }
-
-        val parts = mutableListOf<String>()
-        val model = StringBuilder()
-        val names = mutableListOf<String>()
-        val uris = mutableListOf<Uri>()
-        for (chunk in chunks) {
-            when (chunk) {
-                is PasteChunk.Text -> {
-                    parts.add("""{"type":"text","value":${escapeJson(chunk.value)}}""")
-                    model.append(chunk.value)
-                }
-                is PasteChunk.Pasted -> {
-                    val entry = byId[chunk.id] ?: continue
-                    val ref = try {
-                        mediaStore.saveMedia(
-                            data = entry.text.toByteArray(Charsets.UTF_8),
-                            mimeType = PastedMedia.MIME,
-                            sessionId = sessionId,
-                            originalFileName = PastedMedia.fileNameFor(chunk.id),
-                        )
-                    } catch (e: Exception) {
-                        AppLogger.warning(
-                            TAG,
-                            "[Paste] saveMedia failed for #${chunk.id}, inlining: ${e.message}",
-                        )
-                        parts.add("""{"type":"text","value":${escapeJson(entry.text)}}""")
-                        model.append(entry.text)
-                        continue
-                    }
-                    parts.add(buildMediaRefPartJson(ref))
-                    model.append(entry.text)
-                    names.add(ref.originalFileName ?: PastedMedia.fileNameFor(chunk.id))
-                    uris.add(Uri.fromFile(java.io.File(mediaStore.mediaBaseDir, ref.relativePath)))
-                }
-            }
-        }
-        AppLogger.info(
-            TAG,
-            "[Paste] ${consumed.size} placeholder(s) -> mediaRef: " +
-                "${text.length} chars in bubble, ${model.length} chars to model",
-        )
-        return PastedParts(parts, model.toString(), names, uris, consumed)
-    }
+    private suspend fun buildPastedParts(text: String, sessionId: String): PastedParts? =
+        PastedTextProcessor.processPastedParts(text, _pastedTexts.value, sessionId, mediaStore)
 
     /**
      * Build the parts_json array for a user message: a `text` part (omitted

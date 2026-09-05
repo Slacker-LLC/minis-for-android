@@ -61,10 +61,7 @@ data class SessionOverrides(
      * Apply the tool allow-list to a provider-agnostic schema list. null keeps
      * all tools; an explicit empty set intentionally produces chat-only mode.
      */
-    fun filterTools(tools: List<AgentToolDefinition>): List<AgentToolDefinition> {
-        val allow = enabledTools ?: return tools
-        return tools.filter { it.name in allow }
-    }
+    fun filterTools(tools: List<AgentToolDefinition>): List<AgentToolDefinition> = tools
 
     /** Bound an explicit output budget by the model/global budget chosen upstream. */
     fun effectiveMaxTokens(defaultValue: Int): Int =

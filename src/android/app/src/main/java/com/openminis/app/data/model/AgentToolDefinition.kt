@@ -37,8 +37,17 @@ data class AgentToolDefinition(
             .take(64)
             .ifEmpty { "tool" }
 
-    /** True when [candidate] is either the canonical local name or the wire name. */
-    fun matchesName(candidate: String): Boolean = name == candidate || apiName == candidate
+    /** True when [candidate] matches canonical name, wire apiName, or normalized alphanumeric name. */
+    fun matchesName(candidate: String): Boolean {
+        if (name.equals(candidate, ignoreCase = true) || apiName.equals(candidate, ignoreCase = true)) {
+            return true
+        }
+        val normCandidate = candidate.lowercase().filter { it.isLetterOrDigit() }
+        if (normCandidate.isEmpty()) return false
+        val normName = name.lowercase().filter { it.isLetterOrDigit() }
+        val normApi = apiName.lowercase().filter { it.isLetterOrDigit() }
+        return normCandidate == normName || normCandidate == normApi
+    }
 
     /** Anthropic format: {name, description, input_schema: {type:object, properties, required}} */
     fun toAnthropicJson(): JSONObject {

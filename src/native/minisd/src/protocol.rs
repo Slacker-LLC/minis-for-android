@@ -274,6 +274,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "ubuntu.exec",
     "ubuntu.adminExec",
     "ubuntu.provision",
+    "ubuntu.refreshDns",
     "exec.cancel",
     "proc.killTree",
     "mount.list",

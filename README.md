@@ -1,6 +1,6 @@
 # Minis for Android
 
-**Chinese contracts define intended behavior. Current source and tests define what `master` actually implements.** Start with [README.zh-CN.md](README.zh-CN.md), [AGENTS.md](AGENTS.md), and [docs/contracts/](docs/contracts/00-IDENTITY.md). Current implementation gaps are tracked in [06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md).
+**Chinese contracts define intended behavior. Current source and tests define what `main` currently implements.** Start with [README.zh-CN.md](README.zh-CN.md), [AGENTS.md](AGENTS.md), and [docs/contracts/](docs/contracts/00-IDENTITY.md). Current implementation gaps are tracked in [06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md).
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](BUILDING.md)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
@@ -22,5 +22,14 @@ Current Android identity:
 - Android/Kotlin namespace: `com.openminis.app`
 
 The namespace is intentionally allowed to differ from the installed application identity; a mass package rename is not an implicit requirement.
+
+Current main branch status:
+
+- Sandbox DNS refresh flow implemented through `ubuntu.refreshDns` RPC and runtime DNS discovery.
+- Tool routing improved with normalized tool names and alias resolution.
+- Runtime permission handling updated for config paths and guest home directories.
+- Message deletion and pasted text handling updated to preserve database/UI consistency.
+- Terminal session handling updated for guest identity, workspace binding, and process cleanup.
+- Automated coverage added for the above fixes.
 
 Source-first. No production APK release is promised by the repository. Build instructions: [BUILDING.md](BUILDING.md). Legal lineage: [PROVENANCE.md](PROVENANCE.md).

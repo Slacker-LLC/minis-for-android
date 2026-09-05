@@ -1,9 +1,15 @@
 package com.openminis.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -13,11 +19,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.openminis.app.R
@@ -26,15 +35,13 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.glass.minisGlassBlurAvailable
 import com.openminis.app.ui.glass.minisGlassScrim
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 
 /**
- * App-wide confirmation dialog. Tighter than the Material 3 default
- * (16 dp radius, titleLarge instead of headlineSmall) so small
- * confirmation prompts don't read as oversized cards. The destructive
- * variant tints the confirm button with `colorScheme.error`, matching
- * the pattern iOS uses for `UIAlertActionStyle.destructive`.
+ * App-wide confirmation dialog. Refined milky-white card styling with
+ * a guaranteed semi-transparent scrim mask backdrop across all devices.
  */
 @Composable
 fun MinisAlertDialog(
@@ -48,95 +55,118 @@ fun MinisAlertDialog(
     onDismiss: () -> Unit = onDismissRequest,
     /**
      * Optional third action, rendered between dismiss and confirm. When set,
-     * the buttons stack vertically instead of sitting in a row: three labels
-     * of real length (the pre-send compact prompt's "Compact & Enable
-     * Auto-Compact" is 29 chars, and its zh translations are similar) do not
-     * fit side by side on a phone, and a Row would either clip them or shrink
-     * the text. Callers that pass nothing keep the original two-button row.
+     * the buttons stack vertically instead of sitting in a row.
      */
     neutralText: String? = null,
     onNeutral: (() -> Unit)? = null,
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true),
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
-        // Glass style: dialogs are their own window — platform window blur +
-        // a near-opaque tinted scrim (dialogs need more opacity than sheets
-        // for readability over arbitrary content).
-        GlassSheetWindowBlur(radius = 40.dp)
-        val isGlass = LocalUiStyle.current == UiStyle.GLASS
-        val blurredGlass = isGlass && minisGlassBlurAvailable()
-        val dialogShape = RoundedCornerShape(16.dp)
-        Surface(
-            modifier = if (isGlass && !blurredGlass) {
-                Modifier.glassSheetSurface(dialogShape)
-            } else {
-                Modifier
-            },
-            shape = dialogShape,
-            color = when {
-                blurredGlass -> minisGlassScrim().copy(alpha = 0.85f)
-                isGlass -> Color.Transparent
-                else -> MaterialTheme.colorScheme.surface
-            },
-            tonalElevation = if (isGlass) 0.dp else 6.dp,
+        // Full-screen backdrop mask: guarantees a visible dark scrim across all OEM ROMs
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismissRequest,
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
-                )
-                if (text != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+            GlassSheetWindowBlur(radius = 40.dp)
+            val isGlass = LocalUiStyle.current == UiStyle.GLASS
+            val blurredGlass = isGlass && minisGlassBlurAvailable()
+            val dialogShape = RoundedCornerShape(18.dp)
+
+            Surface(
+                modifier = (if (isGlass && !blurredGlass) {
+                    Modifier.glassSheetSurface(dialogShape)
+                } else {
+                    Modifier
+                })
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}, // Prevent taps on dialog from dismissing
+                    ),
+                shape = dialogShape,
+                color = when {
+                    blurredGlass -> minisGlassScrim().copy(alpha = 0.85f)
+                    isGlass -> Color.Transparent
+                    ChatColors.isDark -> MaterialTheme.colorScheme.surface
+                    else -> Color(0xFFFAF9F6)
+                },
+                tonalElevation = 0.dp,
+                border = if (!isGlass) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)) else null,
+                shadowElevation = 10.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp),
+                ) {
                     Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 19.sp,
+                        ),
+                        color = ChatColors.primaryText,
                     )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                val confirmColor = if (isDestructive) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-                if (neutralText != null && onNeutral != null) {
-                    // Stacked layout. Order runs least-committal first
-                    // (dismiss) down to the most specific action, so the
-                    // primary choice sits closest to the thumb.
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.End,
-                    ) {
-                        MinisTextButton(onClick = onDismiss) {
-                            Text(dismissText)
-                        }
-                        MinisTextButton(onClick = onConfirm) {
-                            Text(text = confirmText, color = confirmColor)
-                        }
-                        MinisTextButton(onClick = onNeutral) {
-                            Text(text = neutralText, color = confirmColor)
-                        }
+                    if (text != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 14.5.sp,
+                                lineHeight = 21.sp,
+                            ),
+                            color = ChatColors.secondaryText,
+                        )
                     }
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        MinisTextButton(onClick = onDismiss) {
-                            Text(dismissText)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    val confirmColor = if (isDestructive) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                    if (neutralText != null && onNeutral != null) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.End,
+                        ) {
+                            MinisTextButton(onClick = onDismiss) {
+                                Text(dismissText, color = ChatColors.secondaryText, fontSize = 14.sp)
+                            }
+                            MinisTextButton(onClick = onConfirm) {
+                                Text(text = confirmText, color = confirmColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
+                            MinisTextButton(onClick = onNeutral) {
+                                Text(text = neutralText, color = confirmColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        MinisTextButton(onClick = onConfirm) {
-                            Text(text = confirmText, color = confirmColor)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            MinisTextButton(onClick = onDismiss) {
+                                Text(dismissText, color = ChatColors.secondaryText, fontSize = 14.sp)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            MinisTextButton(onClick = onConfirm) {
+                                Text(text = confirmText, color = confirmColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
                         }
                     }
                 }

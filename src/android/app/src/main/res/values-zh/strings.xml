@@ -1602,4 +1602,11 @@
     <string name="soul_icon_error_too_large">该图片过大，无法存储。请换一张更简单的。</string>
     <string name="external_link_blocked">已拦截跳转到外部应用的链接（%1$s）</string>
     <string name="external_link_no_app">没有可以打开此链接的应用。</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">预览</string>
+    <string name="chat_attachment_open_action">打开</string>
+    <string name="chat_attachment_full_view">完整查看</string>
+    <string name="chat_attachment_expand_preview">展开预览</string>
+    <string name="chat_attachment_collapse_preview">收起预览</string>
+    <string name="chat_attachment_card_mode">收起为卡片</string>
 </resources>

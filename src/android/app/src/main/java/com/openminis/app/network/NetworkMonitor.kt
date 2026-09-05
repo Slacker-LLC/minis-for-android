@@ -2,6 +2,7 @@ package com.openminis.app.network
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -96,10 +97,6 @@ class NetworkMonitor {
         // callback is async and can lag by hundreds of ms on cold start.
         refreshSandboxDns("initial")
 
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-
         val callback = object : ConnectivityManager.NetworkCallback() {
 
             override fun onAvailable(network: Network) {
@@ -110,7 +107,7 @@ class NetworkMonitor {
                     evictConnectionPool()
                 }
                 // Always refresh sandbox DNS on availability — an interface
-                // swap (Wi-Fi → cellular) can fire onAvailable without a
+                // swap (Wi-Fi → cellular/VPN) can fire onAvailable without a
                 // prior onLost, and the new interface carries new DNS servers.
                 refreshSandboxDns("onAvailable")
             }
@@ -140,11 +137,30 @@ class NetworkMonitor {
                     refreshSandboxDns("onCapabilitiesChanged")
                 }
             }
+
+            override fun onLinkPropertiesChanged(
+                network: Network,
+                linkProperties: LinkProperties
+            ) {
+                val dns = linkProperties.dnsServers.mapNotNull { it.hostAddress }
+                Log.d(TAG, "LinkProperties changed (network=$network, dns=$dns)")
+                refreshSandboxDns("onLinkPropertiesChanged")
+            }
         }
 
         networkCallback = callback
-        cm.registerNetworkCallback(request, callback)
-        Log.d(TAG, "Network monitoring started")
+        try {
+            cm.registerDefaultNetworkCallback(callback)
+            Log.d(TAG, "Network monitoring started (default network callback)")
+        } catch (t: Throwable) {
+            Log.w(TAG, "registerDefaultNetworkCallback failed, falling back: ${t.message}")
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build()
+            cm.registerNetworkCallback(request, callback)
+            Log.d(TAG, "Network monitoring started (fallback network request)")
+        }
     }
 
     /**
@@ -192,8 +208,12 @@ class NetworkMonitor {
         val ctx = appContext ?: return
         scope.launch {
             try {
-                RootfsManager.getInstance(ctx).refreshDns()
-                Log.d(TAG, "[DNS] sandbox resolv.conf refreshed ($reason)")
+                val ok = RootfsManager.getInstance(ctx).refreshDns()
+                if (ok) {
+                    Log.d(TAG, "[DNS] sandbox resolv.conf refreshed ($reason)")
+                } else {
+                    Log.w(TAG, "[DNS] sandbox resolv.conf refresh returned false ($reason)")
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "[DNS] refresh failed ($reason): ${t.message}")
             }

@@ -12,11 +12,15 @@ object ToolRegistry {
     private val handlers = linkedMapOf<String, ToolHandler>()
     private val aliases = linkedMapOf<String, String>()
 
+    internal fun normalize(name: String): String =
+        name.lowercase().filter { it.isLetterOrDigit() }
+
     fun register(handler: ToolHandler, aliasNames: List<String> = emptyList()) {
-        handlers[handler.definition.name] = handler
+        val defName = handler.definition.name
+        handlers[defName] = handler
         val apiName = handler.definition.apiName
-        if (apiName != handler.definition.name) aliases[apiName] = handler.definition.name
-        for (a in aliasNames) aliases[a] = handler.definition.name
+        if (apiName != defName) aliases[apiName] = defName
+        for (a in aliasNames) aliases[a] = defName
     }
 
     fun unregister(name: String) {
@@ -25,7 +29,43 @@ object ToolRegistry {
         aliases.filterValues { it == canonical }.keys.toList().forEach { aliases.remove(it) }
     }
 
-    fun canonicalName(name: String): String? = if (handlers.containsKey(name)) name else aliases[name]
+    fun canonicalName(name: String): String? {
+        if (handlers.containsKey(name)) return name
+        aliases[name]?.let { return it }
+
+        // Case-insensitive lookup
+        for ((k, _) in handlers) {
+            if (k.equals(name, ignoreCase = true)) return k
+        }
+        for ((k, v) in aliases) {
+            if (k.equals(name, ignoreCase = true)) return v
+        }
+
+        // Normalized (strip '.', '_', '-') alphanumeric lookup
+        val norm = normalize(name)
+        if (norm.isEmpty()) return null
+        for (k in handlers.keys) {
+            if (normalize(k) == norm) return k
+        }
+        for ((k, v) in aliases) {
+            if (normalize(k) == norm) return v
+        }
+        return null
+    }
+
+    fun aliasesFor(canonicalName: String): List<String> =
+        aliases.filterValues { it == canonicalName }.keys.toList()
+
+    fun allKnownNames(canonicalName: String): Set<String> {
+        val canonical = canonicalName(canonicalName) ?: canonicalName
+        val result = mutableSetOf(canonical)
+        definition(canonical)?.let {
+            result.add(it.apiName)
+        }
+        result.addAll(aliasesFor(canonical))
+        return result
+    }
+
     fun definition(name: String): AgentToolDefinition? = canonicalName(name)?.let { handlers[it]?.definition }
     fun definitions(): List<AgentToolDefinition> = handlers.values.map { it.definition }
     fun handler(name: String): ToolHandler? = canonicalName(name)?.let { handlers[it] }

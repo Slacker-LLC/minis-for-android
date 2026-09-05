@@ -3,7 +3,7 @@
 当前事实与长期合同分开判断：
 
 ```text
-当前实现事实：最终 master 源码与测试
+当前实现事实：最终 main 源码与测试
 长期行为边界：AGENTS.md + docs/contracts/*
 已确认差异：docs/contracts/06-CURRENT-GAPS.md
 产品入口：README.zh-CN.md / CONTRIBUTING.zh-CN.md
@@ -11,7 +11,7 @@
 法律来源：PROVENANCE.md
 ```
 
-历史 PR、Issue 实施稿或阶段计划可以解释“当时为什么这样改”，但不能证明今天 `master` 仍然如此。
+历史 PR、Issue 实施稿或阶段计划可以解释“当时为什么这样改”，但不能证明今天 `main` 仍然如此。
 
 ## 合同（先读这些）
 
@@ -24,7 +24,7 @@
 | [`contracts/03-STORAGE-CONTRACT.md`](contracts/03-STORAGE-CONTRACT.md) | `/data/adb/minis` 持久化真源 |
 | [`contracts/04-SECURITY-CONTRACT.md`](contracts/04-SECURITY-CONTRACT.md) | 安全边界 |
 | [`contracts/05-ENGINEERING.md`](contracts/05-ENGINEERING.md) | 工程、PR、验证与参考边界 |
-| [`contracts/06-CURRENT-GAPS.md`](contracts/06-CURRENT-GAPS.md) | 当前 `master` 已确认缺口 |
+| [`contracts/06-CURRENT-GAPS.md`](contracts/06-CURRENT-GAPS.md) | 当前 `main` 已确认缺口 |
 | [`contracts/07-OWNERSHIP-MIGRATION.md`](contracts/07-OWNERSHIP-MIGRATION.md) | 属主校正/恢复规则 |
 
 ## 入口与当前状态

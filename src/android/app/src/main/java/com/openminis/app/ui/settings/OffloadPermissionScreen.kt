@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
+import com.openminis.app.tools.android.PrivilegedAccessMode
+import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +45,7 @@ fun OffloadPermissionScreen(
     // [T-android-privileged-backend] Navigate to the multi-backend
     // (Shizuku + AXManager) screen from the privileged-backend integration row.
     onOpenPrivilegedBackend: () -> Unit = {},
+    onOpenSystemPermissions: () -> Unit = {},
 ) {
     val grouped = OffloadPermissionManager.toolRegistry
         .filter { it.showInSettings }
@@ -52,10 +57,12 @@ fun OffloadPermissionScreen(
         .filter { it.key != OffloadPermissionManager.PermissionCategory.INTEGRATIONS }
 
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showFullAccessConfirm by remember { mutableStateOf(false) }
 
     val configEnabled by com.openminis.app.config.MinisConfigPermissionStore.enabled.collectAsState()
 
     val context = LocalContext.current
+    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
 
     var a11yEnabled by remember { mutableStateOf(isA11yServiceEnabled(context)) }
     LaunchedEffect(Unit) {
@@ -77,6 +84,51 @@ fun OffloadPermissionScreen(
             }
         },
     ) {
+        // Root 权限模式 (标准模式 / 完全访问)
+        SettingsSection(
+            header = "Root 权限模式",
+            footer = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                "完全访问已开启：Agent 的 Root 请求不再逐条弹窗，请仅在明确需要时使用。"
+            } else {
+                "标准模式仅自动执行受控的只读命令；超出白名单或参数规则时，每次都需要你的确认。"
+            },
+        ) {
+            SettingsRow(
+                icon = Icons.Outlined.Security,
+                iconColor = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) {
+                    Color(0xFF34C759)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                title = "标准模式",
+                subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "白名单直通，越权逐次确认",
+                onClick = {
+                    PrivilegedAccessModeStore.setFromUserSettings(
+                        context,
+                        PrivilegedAccessMode.STANDARD,
+                    )
+                },
+                showDivider = true,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Security,
+                iconColor = MaterialTheme.colorScheme.error,
+                title = "完全访问",
+                titleColor = MaterialTheme.colorScheme.error,
+                subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
+                    "当前模式；Agent Root 请求自动完成内部确认"
+                } else {
+                    "高风险：开启前需要确认"
+                },
+                onClick = {
+                    if (privilegedAccessMode != PrivilegedAccessMode.FULL_ACCESS) {
+                        showFullAccessConfirm = true
+                    }
+                },
+                showDivider = false,
+            )
+        }
+
         // T-config: master switch for the minis-config CLI surface.
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
@@ -144,7 +196,53 @@ fun OffloadPermissionScreen(
             onStatusRowClick = onOpenPrivilegedBackend,
         )
 
+        // Additional System Permissions (Overlay, Voice Correction)
+        SettingsSection(
+            header = "更多系统特权",
+            footer = "查看桌面宠物悬浮窗权限、系统无障碍守护与语音学习设置。",
+        ) {
+            SettingsRow(
+                icon = Icons.Outlined.Layers,
+                iconColor = Color(0xFF007AFF),
+                title = "系统特权详情",
+                subtitle = "悬浮窗、无障碍保活与语音纠错",
+                onClick = onOpenSystemPermissions,
+                showDivider = false,
+            )
+        }
+
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (showFullAccessConfirm) {
+        AlertDialog(
+            onDismissRequest = { showFullAccessConfirm = false },
+            title = { Text("开启 Root 完全访问？") },
+            text = {
+                Text(
+                    "开启后，Agent 发起的结构化 Root 命令将不再逐条询问。" +
+                        "这可能修改系统设置、应用与设备数据；Agent 本身不能切换此模式。",
+                )
+            },
+            confirmButton = {
+                MinisTextButton(
+                    onClick = {
+                        PrivilegedAccessModeStore.setFromUserSettings(
+                            context,
+                            PrivilegedAccessMode.FULL_ACCESS,
+                        )
+                        showFullAccessConfirm = false
+                    },
+                ) {
+                    Text("确认开启", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                MinisTextButton(onClick = { showFullAccessConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 
     if (showResetConfirm) {
