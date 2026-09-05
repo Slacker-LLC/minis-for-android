@@ -313,6 +313,10 @@ fn install_guest_cli(port: u16, token: &str) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{symlink, PermissionsExt};
+        let _ = std::fs::set_permissions(root.join("opt"), std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::set_permissions(root.join("opt/minis"), std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::set_permissions(&bin_dir, std::fs::Permissions::from_mode(0o755));
+        let _ = std::fs::set_permissions(&etc_dir, std::fs::Permissions::from_mode(0o755));
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755))
             .map_err(|e| format!("chmod {}: {e}", script_path.display()))?;
         let cfg_path = etc_dir.join("minis-config-proxy");

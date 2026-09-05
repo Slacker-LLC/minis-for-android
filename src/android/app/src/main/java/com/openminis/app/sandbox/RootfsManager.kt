@@ -107,7 +107,37 @@ class RootfsManager private constructor(private val context: Context) {
         com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
     }
 
-    fun refreshDns() = Unit
+    fun getSystemDnsServers(): List<String> {
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                ?: return FALLBACK_DNS_SERVERS
+            val activeNetwork = cm.activeNetwork ?: return FALLBACK_DNS_SERVERS
+            val linkProps = cm.getLinkProperties(activeNetwork) ?: return FALLBACK_DNS_SERVERS
+            val servers = linkProps.dnsServers.mapNotNull { it.hostAddress }.filter { it.isNotBlank() }
+            if (servers.isEmpty()) FALLBACK_DNS_SERVERS else servers
+        } catch (t: Throwable) {
+            Log.w(TAG, "failed to get system DNS servers: ${t.message}")
+            FALLBACK_DNS_SERVERS
+        }
+    }
+
+    suspend fun refreshDns(servers: List<String>? = null): Boolean = withContext(Dispatchers.IO) {
+        val nameservers = servers ?: getSystemDnsServers()
+        val resolvFile = File(rootfsDir, "etc/resolv.conf")
+        if (resolvFile.exists() && resolvFile.canWrite()) {
+            try {
+                resolvFile.writeText(formatResolvConf(nameservers))
+                resolvFile.setReadable(true, false)
+            } catch (t: Throwable) {
+                Log.d(TAG, "direct write to resolv.conf: ${t.message}")
+            }
+        }
+        if (UbuntuRuntime.isInitialized) {
+            UbuntuRuntime.refreshDns(nameservers)
+        } else {
+            true
+        }
+    }
 
     suspend fun applyDefaultMountOverlay() = withContext(Dispatchers.IO) { Unit }
 
@@ -208,6 +238,13 @@ class RootfsManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "RootfsManager"
+        val FALLBACK_DNS_SERVERS = listOf("223.5.5.5", "1.1.1.1", "8.8.8.8")
+
+        fun formatResolvConf(nameservers: List<String>): String {
+            val servers = if (nameservers.isEmpty()) FALLBACK_DNS_SERVERS else nameservers
+            return servers.joinToString(separator = "\n", postfix = "\n") { "nameserver $it" }
+        }
+
         internal const val STAGED_ROOTFS_ARCHIVE =
             com.openminis.app.runtime.ubuntu.RuntimeProvision.STAGED_ROOTFS_ARCHIVE
         private val REQUIRED_LAYOUT = listOf(

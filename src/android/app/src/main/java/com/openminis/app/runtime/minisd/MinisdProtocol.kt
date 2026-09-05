@@ -255,6 +255,16 @@ object MinisdProtocol {
     fun ubuntuProvision(id: Long = 1): MinisdRequest =
         MinisdRequest(id = id, method = "ubuntu.provision")
 
+    fun ubuntuRefreshDns(id: Long = 1, nameservers: List<String> = emptyList()): MinisdRequest {
+        val params = JSONObject()
+        if (nameservers.isNotEmpty()) {
+            val arr = JSONArray()
+            nameservers.forEach { arr.put(it) }
+            params.put("nameservers", arr)
+        }
+        return MinisdRequest(id = id, method = "ubuntu.refreshDns", params = params)
+    }
+
     fun mountReconcile(mounts: JSONArray, id: Long = 1): MinisdRequest =
         MinisdRequest(
             id = id,

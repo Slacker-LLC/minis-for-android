@@ -8,6 +8,9 @@ import com.openminis.app.deeplink.DeepLinkHandler
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.sandbox.FileItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -77,6 +80,32 @@ object ChatLinkResolver {
         return ChatLinkAction.Web(trimmed)
     }
 
+    suspend fun resolveAsync(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction =
+        withContext(Dispatchers.IO) {
+            resolve(rawUrl, sessionId, context)
+        }
+
+    /**
+     * Decode URL-encoded paths safely. Protects '+' from being decoded to spaces
+     * (since '+' is valid in file names and only represents space in form queries),
+     * and handles double percent-encoding (%2520 -> %20 -> ' ').
+     */
+    internal fun decodePath(rawPath: String): String {
+        // Protect '+' so URLDecoder doesn't convert it into a space (Issue #183)
+        val protected = rawPath.replace("+", "%2B")
+        var decoded = runCatching { java.net.URLDecoder.decode(protected, "UTF-8") }.getOrDefault(rawPath)
+        // Check for double percent-encoding (%25xx or %xx remaining)
+        if (decoded.contains("%25") || (decoded.contains('%') && Regex("%[0-9a-fA-F]{2}").containsMatchIn(decoded))) {
+            val secondPass = runCatching {
+                java.net.URLDecoder.decode(decoded.replace("+", "%2B"), "UTF-8")
+            }.getOrNull()
+            if (secondPass != null && secondPass != decoded) {
+                decoded = secondPass
+            }
+        }
+        return decoded
+    }
+
     /**
      * Map a chat link to a host File when it points into the sandbox, else null.
      * Accepts:
@@ -106,16 +135,17 @@ object ChatLinkResolver {
                 // `minis://` URLs don't use fragments, so stripping at '#'
                 // would truncate filenames like `foo #China.mp4`.
                 val stripped = raw.removePrefix("minis://").substringBefore('?')
-                val decoded = runCatching { java.net.URLDecoder.decode(stripped, "UTF-8") }.getOrDefault(stripped)
+                val decoded = decodePath(stripped)
                 val linuxPath = if (decoded.startsWith("/")) decoded else "/var/minis/$decoded"
                 lookup(linuxPath)
             }
             "file" -> {
                 val path = raw.removePrefix("file://").substringBefore('?')
-                if (path.isEmpty()) null else File(java.net.URLDecoder.decode(path, "UTF-8"))
+                if (path.isEmpty()) null else File(decodePath(path))
             }
             null -> {
-                if (raw.startsWith("/")) lookup(raw) else null
+                val decoded = decodePath(raw)
+                if (decoded.startsWith("/")) lookup(decoded) else null
             }
             else -> null
         }
@@ -125,11 +155,13 @@ object ChatLinkResolver {
         val path = when (scheme) {
             "minis" -> {
                 val stripped = raw.removePrefix("minis://").substringBefore('?')
-                val decoded = runCatching { java.net.URLDecoder.decode(stripped, "UTF-8") }
-                    .getOrDefault(stripped)
+                val decoded = decodePath(stripped)
                 if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
             }
-            null -> raw.takeIf { it.startsWith('/') }
+            null -> {
+                val decoded = decodePath(raw)
+                if (decoded.startsWith('/')) decoded else null
+            }
             else -> null
         } ?: return null
         return path.takeIf(::isCanonicalGuestPath)
@@ -143,7 +175,10 @@ object ChatLinkResolver {
             .joinToString("") { "%02x".format(java.util.Locale.US, it) }
         val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
         return runCatching {
-            WorkspaceFileClient.readToFileBlocking(sessionId.orEmpty(), path, cacheFile)
+            // Offload blocking socket / disk I/O to Dispatchers.IO to prevent UI ANR (Issue #187)
+            runBlocking(Dispatchers.IO) {
+                WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)
+            }
             cacheFile.takeIf { it.isFile }
         }.getOrNull()
     }

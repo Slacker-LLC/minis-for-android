@@ -290,6 +290,45 @@ pub fn provision(state: &mut AppState) -> Result<Value, (ErrorCode, String)> {
     }
 }
 
+pub fn refresh_dns(state: &mut AppState, params: &Value) -> Result<Value, (ErrorCode, String)> {
+    let nameservers = if let Some(arr) = params.get("nameservers").and_then(|v| v.as_array()) {
+        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>()
+    } else {
+        crate::env::discover_dns()
+    };
+    if state.mock {
+        return Ok(json!({
+            "success": true,
+            "mock": true,
+            "nameservers": nameservers,
+            "resolv_conf": crate::env::build_resolv_conf(&nameservers, None)
+        }));
+    }
+    #[cfg(not(unix))]
+    {
+        return Err((
+            ErrorCode::RuntimeUnavailable,
+            "ubuntu runtime requires unix".into(),
+        ));
+    }
+    #[cfg(unix)]
+    {
+        let rootfs = if !state.ubuntu.rootfs.is_empty() {
+            state.ubuntu.rootfs.as_str()
+        } else {
+            HOST_ROOTFS
+        };
+        let body = crate::env::write_resolv_conf(rootfs, &nameservers)
+            .map_err(|e| (ErrorCode::Internal, e))?;
+        Ok(json!({
+            "success": true,
+            "nameservers": nameservers,
+            "resolv_conf": body
+        }))
+    }
+}
+
+
 #[cfg(unix)]
 pub fn prepare_session_root(
     sessions_root: &str,
@@ -1601,5 +1640,16 @@ mod tests {
     fn fixed_session_api_rejects_noncanonical_root() {
         #[cfg(unix)]
         assert!(prepare_session_root("/tmp/minis-sessions", "a", 1, 1).is_err());
+    }
+
+    #[test]
+    fn refresh_dns_mock_and_params() {
+        let mut state = AppState::new(true, crate::policy::PolicyFile::default_policy());
+        let res = refresh_dns(&mut state, &json!({"nameservers": ["1.1.1.1", "8.8.8.8"]})).unwrap();
+        assert_eq!(res["success"], true);
+        assert_eq!(res["mock"], true);
+        let resolv = res["resolv_conf"].as_str().unwrap();
+        assert!(resolv.contains("nameserver 1.1.1.1"));
+        assert!(resolv.contains("nameserver 8.8.8.8"));
     }
 }

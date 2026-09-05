@@ -113,6 +113,17 @@ object UbuntuRuntime {
 
     suspend fun refresh(): Snapshot = apply(client.ubuntuStatus())
 
+    suspend fun refreshDns(nameservers: List<String> = emptyList()): Boolean {
+        if (!isInitialized) return false
+        return try {
+            val res = client.ubuntuRefreshDns(nameservers)
+            res.ok
+        } catch (t: Throwable) {
+            Log.w(TAG, "refreshDns failed", t)
+            false
+        }
+    }
+
     /** Read each runtime component independently without starting Ubuntu or keeper. */
     suspend fun diagnostics(): RuntimeDiagnostics {
         val ping = client.ping()
@@ -631,6 +642,7 @@ object UbuntuRuntime {
                 policyJson = policy,
                 forceRestart = forceRestart,
                 packagedBroker = packagedBroker,
+                appUid = ctx.applicationInfo.uid,
             )
 
             val proc = try {

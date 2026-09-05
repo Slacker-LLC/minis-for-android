@@ -10,7 +10,7 @@ use std::time::Duration;
 
 #[cfg(unix)]
 pub use crate::ubuntu_legacy::prepare_session_root;
-pub use crate::ubuntu_legacy::{UbuntuExec, BASE_PACKAGES};
+pub use crate::ubuntu_legacy::{refresh_dns, UbuntuExec, BASE_PACKAGES};
 
 const MAX_CAPTURE: usize = 256 * 1024;
 

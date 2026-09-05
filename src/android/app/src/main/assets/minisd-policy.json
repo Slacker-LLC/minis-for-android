@@ -20,6 +20,7 @@
     "ubuntu.exec": { "mode": "allow" },
     "ubuntu.adminExec": { "mode": "confirm", "ratePerMin": 3 },
     "ubuntu.provision": { "mode": "allow" },
+    "ubuntu.refreshDns": { "mode": "allow" },
     "exec.cancel": { "mode": "allow", "ratePerMin": 120 },
     "proc.killTree": { "mode": "allow" },
     "mount.list": { "mode": "allow" },

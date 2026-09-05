@@ -247,12 +247,29 @@ lang: "auto"
      * Create SOUL.md with [DEFAULT_CONTENT] iff it does not exist yet.
      * Safe to call on every launch — never overwrites existing user edits.
      */
+    internal fun isMissingFileNotFound(error: Throwable): Boolean {
+        if (error !is WorkspaceFileClient.Failure) return false
+        val msg = error.message.orEmpty().lowercase()
+        return msg.contains("no such file") || msg.contains("not_found") || msg.contains("notfound") || msg.contains("os error 2")
+    }
+
+    /**
+     * Create SOUL.md with [DEFAULT_CONTENT] iff it does not exist yet.
+     * Safe to call on every launch — never overwrites existing user edits.
+     */
     fun ensureExists(context: Context) {
         try {
-            val existing = runBlocking(Dispatchers.IO) {
-                runCatching { WorkspaceFileClient.info("", GUEST_PATH) }.getOrNull()
+            val isNotFound = runBlocking(Dispatchers.IO) {
+                try {
+                    val info = WorkspaceFileClient.info("", GUEST_PATH)
+                    info.optString("type") != "file"
+                } catch (t: Throwable) {
+                    // Issue #185: seed default content ONLY on true ENOENT/NotFound,
+                    // NEVER on timeout, network error, or daemon failure!
+                    isMissingFileNotFound(t)
+                }
             }
-            if (existing?.optString("type") == "file") return
+            if (!isNotFound) return
             runBlocking(Dispatchers.IO) {
                 WorkspaceFileClient.writeBytes("", GUEST_PATH, DEFAULT_CONTENT.toByteArray(Charsets.UTF_8))
             }

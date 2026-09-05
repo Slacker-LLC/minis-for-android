@@ -99,6 +99,19 @@ import java.util.concurrent.atomic.AtomicInteger
 // [T-android-split-chat] StreamingDelta / ChatMessage / QueuedPrompt /
 // ToolBlockStatus / SlashCommand / AssistantBlock moved verbatim to ChatModels.kt.
 
+/**
+ * Run state updates only after the database mutation has completed
+ * successfully. Keeping this ordering explicit prevents a failed or
+ * cancelled delete from leaving the in-memory conversation ahead of Room.
+ */
+internal suspend fun runAfterDatabaseDelete(
+    delete: suspend () -> Unit,
+    afterCommit: suspend () -> Unit,
+) {
+    delete()
+    afterCommit()
+}
+
 class ChatViewModel(
     internal val sessionId: String,
     private val chatRepository: ChatRepository,
@@ -5685,54 +5698,80 @@ class ChatViewModel(
 
     fun deleteFromMessage(messageId: String) {
         if (_isStreaming.value) return
-        _canResume.value = false
         val messages = _messages.value
         val index = messages.indexOfFirst { it.id == messageId }
         if (index < 0) return
 
         val deletedMessages = messages.subList(index, messages.size).toList()
-
         val retainedHead = messages.subList(0, index)
-        for (m in deletedMessages) {
-            m.queuedPromptId?.let { pid ->
-                _promptQueue.value = _promptQueue.value.filterNot { it.id == pid }
-            }
-        }
-        _messages.value = retainedHead
-
-        val keptIds = retainedHead.mapTo(mutableSetOf()) { it.id }
-        retainStreamFlushStates(keptIds)
-        if (_streamingById.value.isNotEmpty()) {
-            _streamingById.value = _streamingById.value.filterKeys { it in keptIds }
-        }
-
-        revokeMemoryWritesInDeletedMessages(deletedMessages)
-        if (deletedMessages.any { it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId }) {
-            stopReplySpeech()
-        }
-
         val sid = activeSessionId ?: return
         viewModelScope.launch {
-            val target = messages[index]
-            val cutoffSortOrder = resolveDeleteCutoffSortOrder(sid, messages, index, target)
-            if (cutoffSortOrder >= 0) {
-                chatRepository.deleteMessagesAfter(sid, cutoffSortOrder)
-            }
+            try {
+                val target = messages[index]
+                val cutoffSortOrder = resolveDeleteCutoffSortOrder(sid, messages, index, target)
+                if (cutoffSortOrder < 0) {
+                    AppLogger.warning(TAG, "deleteFromMessage: could not resolve cutoff for $messageId")
+                    return@launch
+                }
 
-            agentHistory.clear()
-            toolLoopDetector.reset()
-            val remaining = chatRepository.loadMessages(sid)
-            for (entity in remaining) {
-                agentHistory.add(entity.toLLMMessage())
+                runAfterDatabaseDelete(
+                    delete = { chatRepository.deleteMessagesAfter(sid, cutoffSortOrder) },
+                    afterCommit = {
+                        // Read the committed database state before publishing
+                        // any in-memory changes. If this read fails, the old
+                        // UI remains intact and the next session load can
+                        // reconcile from Room.
+                        val remaining = chatRepository.loadMessages(sid)
+                        _canResume.value = false
+                        for (m in deletedMessages) {
+                            m.queuedPromptId?.let { pid ->
+                                _promptQueue.value = _promptQueue.value.filterNot { it.id == pid }
+                            }
+                        }
+                        _messages.value = retainedHead
+
+                        val keptIds = retainedHead.mapTo(mutableSetOf()) { it.id }
+                        retainStreamFlushStates(keptIds)
+                        if (_streamingById.value.isNotEmpty()) {
+                            _streamingById.value = _streamingById.value.filterKeys { it in keptIds }
+                        }
+
+                        // Memory is an external side effect, so it follows the
+                        // committed Room delete instead of preceding it.
+                        runCatching {
+                            revokeMemoryWritesInDeletedMessages(deletedMessages)
+                        }.onFailure { error ->
+                            Log.e(TAG, "deleteFromMessage: memory revoke failed after DB commit", error)
+                        }
+                        if (deletedMessages.any {
+                                it.id == com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId
+                            }) {
+                            stopReplySpeech()
+                        }
+
+                        agentHistory.clear()
+                        toolLoopDetector.reset()
+                        for (entity in remaining) {
+                            agentHistory.add(entity.toLLMMessage())
+                        }
+                        runCatching {
+                            chatRepository.updateSessionPreview(
+                                sid,
+                                remaining.lastOrNull()?.partsJson ?: "[]",
+                            )
+                        }
+                        AppLogger.info(
+                            TAG,
+                            "deleteFromMessage: cut at sortOrder=$cutoffSortOrder, " +
+                                "${deletedMessages.size} message(s) removed, ${remaining.size} remain",
+                        )
+                    },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.e(TAG, "deleteFromMessage: database delete failed; state unchanged", error)
             }
-            runCatching {
-                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
-            }
-            AppLogger.info(
-                TAG,
-                "deleteFromMessage: cut at sortOrder=$cutoffSortOrder, " +
-                    "${deletedMessages.size} message(s) removed, ${remaining.size} remain",
-            )
         }
     }
 
@@ -6045,9 +6084,6 @@ class ChatViewModel(
        // agentHistory so the next API call carries it.
        val userText = combinedText.toString()
         val queuedPaste = buildPastedParts(userText, sid)
-        if (queuedPaste != null) {
-            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
-        }
         val userPartsJson = buildUserPartsJson(
             userText,
             prepared.mediaRefPartsJson,
@@ -6055,6 +6091,10 @@ class ChatViewModel(
             bodyPartsJson = queuedPaste?.partsJson,
         )
         val userEntity = chatRepository.appendMessage(sid, "user", userPartsJson)
+        // Issue #188: consume pasted texts only after DB append succeeds
+        if (queuedPaste != null) {
+            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
+        }
         agentHistory.add(
             LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6336,9 +6376,6 @@ class ChatViewModel(
            // a session reload (T128). Non-image attachments still only contribute
            // their name (rendered as a file tile) and are not persisted.
             val pasted = buildPastedParts(trimmed, activeSessionId)
-            if (pasted != null) {
-                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
-            }
             val userPartsJson = buildUserPartsJson(
                 trimmed,
                 prepared.mediaRefPartsJson,
@@ -6346,6 +6383,10 @@ class ChatViewModel(
                 bodyPartsJson = pasted?.partsJson,
             )
             val persistedUser = chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
+            // Issue #188: consume pasted texts only after DB append succeeds
+            if (pasted != null) {
+                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
+            }
 
             val userMsg = ChatMessage(
                 id = persistedUser.id,
@@ -7634,7 +7675,21 @@ class ChatViewModel(
             } else {
                 agentTools
             }
-            val turnToolNames = turnTools.mapTo(hashSetOf()) { it.name }
+            val turnToolNames = buildSet {
+                for (tool in turnTools) {
+                    add(tool.name)
+                    add(tool.apiName)
+                    val normName = tool.name.lowercase().filter { it.isLetterOrDigit() }
+                    if (normName.isNotEmpty()) add(normName)
+                    val normApi = tool.apiName.lowercase().filter { it.isLetterOrDigit() }
+                    if (normApi.isNotEmpty()) add(normApi)
+                    com.openminis.app.tools.runtime.ToolRegistry.aliasesFor(tool.name).forEach { alias ->
+                        add(alias)
+                        val normAlias = alias.lowercase().filter { it.isLetterOrDigit() }
+                        if (normAlias.isNotEmpty()) add(normAlias)
+                    }
+                }
+            }
             val toolCalls = mutableListOf<Triple<String, String, JSONObject>>() // id, name, args
             // [T-android-gemini3-thoughtsig / #179] toolCallId -> Gemini 3.x
             // thoughtSignature for this turn's calls (null for other providers).
@@ -8521,7 +8576,12 @@ class ChatViewModel(
                 // name a tool that was not offered this turn. Reject it before
                 // repair, permission/status updates, or execution. This also
                 // makes chatOnlyForNextTurn fail closed.
-                if (name !in turnToolNames) {
+                val isTurnTool = name in turnToolNames ||
+                    turnTools.any { it.matchesName(name) } ||
+                    com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name)?.let { canonical ->
+                        canonical in turnToolNames || turnTools.any { it.matchesName(canonical) }
+                    } == true
+                if (!isTurnTool) {
                     val blockedMessage = if (chatOnlyForNextTurn) {
                         "Error: Tools are disabled in chat-only mode."
                     } else {
@@ -9094,9 +9154,10 @@ class ChatViewModel(
         // P3: tools registered in ToolRegistry (D12 names + old aliases) go
         // through the new runtime gate. Unregistered tools fall through to
         // the legacy dispatch table below.
-        if (com.openminis.app.tools.runtime.ToolRegistry.contains(name)) {
+        val canonical = com.openminis.app.tools.runtime.ToolRegistry.canonicalName(name) ?: name
+        if (com.openminis.app.tools.runtime.ToolRegistry.contains(canonical)) {
             return com.openminis.app.tools.runtime.ToolExecutor.execute(
-                name = name,
+                name = canonical,
                 argsJson = argsJson,
                 sessionId = activeSessionId,
                 context = context,
