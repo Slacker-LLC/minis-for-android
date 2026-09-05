@@ -1349,4 +1349,11 @@
     <string name="soul_icon_error_too_large">Dieses Bild ist zu groß zum Speichern. Versuchen Sie ein einfacheres.</string>
     <string name="external_link_blocked">Link zu externer App blockiert (%1$s)</string>
     <string name="external_link_no_app">Keine App zum Öffnen dieses Links verfügbar.</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">Vorschau</string>
+    <string name="chat_attachment_open_action">Öffnen</string>
+    <string name="chat_attachment_full_view">Vollansicht</string>
+    <string name="chat_attachment_expand_preview">Vorschau erweitern</string>
+    <string name="chat_attachment_collapse_preview">Vorschau einklappen</string>
+    <string name="chat_attachment_card_mode">Als Karte einklappen</string>
 </resources>

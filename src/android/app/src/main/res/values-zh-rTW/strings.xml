@@ -895,4 +895,11 @@
     <string name="soul_icon_error_too_large">這張圖片太大，無法儲存，請換一張較簡單的。</string>
     <string name="external_link_blocked">已攔截跳轉到外部應用程式的連結（%1$s）</string>
     <string name="external_link_no_app">沒有可以開啟此連結的應用程式。</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">預覽</string>
+    <string name="chat_attachment_open_action">開啟</string>
+    <string name="chat_attachment_full_view">完整檢視</string>
+    <string name="chat_attachment_expand_preview">展開預覽</string>
+    <string name="chat_attachment_collapse_preview">收起預覽</string>
+    <string name="chat_attachment_card_mode">收起為卡片</string>
 </resources>

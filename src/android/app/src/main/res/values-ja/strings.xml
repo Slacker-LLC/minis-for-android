@@ -1355,4 +1355,11 @@
     <string name="soul_icon_error_too_large">この画像は大きすぎて保存できません。よりシンプルな画像をお試しください。</string>
     <string name="external_link_blocked">外部アプリへのリンクをブロックしました（%1$s）</string>
     <string name="external_link_no_app">このリンクを開けるアプリがありません。</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">プレビュー</string>
+    <string name="chat_attachment_open_action">開く</string>
+    <string name="chat_attachment_full_view">全体表示</string>
+    <string name="chat_attachment_expand_preview">プレビューを展開</string>
+    <string name="chat_attachment_collapse_preview">プレビューを折りたたむ</string>
+    <string name="chat_attachment_card_mode">カードに折りたたむ</string>
 </resources>

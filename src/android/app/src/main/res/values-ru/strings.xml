@@ -1597,4 +1597,11 @@
     <string name="soul_icon_error_too_large">Это изображение слишком велико для сохранения. Попробуйте более простое.</string>
     <string name="external_link_blocked">Ссылка на внешнее приложение заблокирована (%1$s)</string>
     <string name="external_link_no_app">Нет приложения для открытия этой ссылки.</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">Предпросмотр</string>
+    <string name="chat_attachment_open_action">Открыть</string>
+    <string name="chat_attachment_full_view">Полный просмотр</string>
+    <string name="chat_attachment_expand_preview">Развернуть предпросмотр</string>
+    <string name="chat_attachment_collapse_preview">Свернуть предпросмотр</string>
+    <string name="chat_attachment_card_mode">Свернуть в карточку</string>
 </resources>

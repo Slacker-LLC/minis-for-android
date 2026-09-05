@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Minis for Android</string>
     <string name="new_chat">New Chat</string>
     <string name="settings">Settings</string>
@@ -1749,10 +1749,10 @@
     <string name="external_link_blocked">Blocked link to external app (%1$s)</string>
     <string name="external_link_no_app">No app available to open this link.</string>
     <!-- Chat attachment card & preview strings -->
-    <string name="chat_attachment_preview_action">Preview</string>
-    <string name="chat_attachment_open_action">Open</string>
-    <string name="chat_attachment_full_view">Full View</string>
-    <string name="chat_attachment_expand_preview">Expand Preview</string>
-    <string name="chat_attachment_collapse_preview">Collapse Preview</string>
-    <string name="chat_attachment_card_mode">Collapse to Card</string>
+    <string name="chat_attachment_preview_action" tools:ignore="MissingTranslation">Preview</string>
+    <string name="chat_attachment_open_action" tools:ignore="MissingTranslation">Open</string>
+    <string name="chat_attachment_full_view" tools:ignore="MissingTranslation">Full View</string>
+    <string name="chat_attachment_expand_preview" tools:ignore="MissingTranslation">Expand Preview</string>
+    <string name="chat_attachment_collapse_preview" tools:ignore="MissingTranslation">Collapse Preview</string>
+    <string name="chat_attachment_card_mode" tools:ignore="MissingTranslation">Collapse to Card</string>
 </resources>

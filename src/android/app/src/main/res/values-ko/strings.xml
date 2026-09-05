@@ -1347,4 +1347,11 @@
     <string name="soul_icon_error_too_large">이 이미지는 너무 커서 저장할 수 없습니다. 더 단순한 이미지를 사용해 보세요.</string>
     <string name="external_link_blocked">외부 앱으로 이동하는 링크를 차단했습니다(%1$s)</string>
     <string name="external_link_no_app">이 링크를 열 수 있는 앱이 없습니다.</string>
+    <!-- Chat attachment card & preview strings -->
+    <string name="chat_attachment_preview_action">미리보기</string>
+    <string name="chat_attachment_open_action">열기</string>
+    <string name="chat_attachment_full_view">전체 보기</string>
+    <string name="chat_attachment_expand_preview">미리보기 펼치기</string>
+    <string name="chat_attachment_collapse_preview">미리보기 접기</string>
+    <string name="chat_attachment_card_mode">카드로 접기</string>
 </resources>
