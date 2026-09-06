@@ -233,6 +233,9 @@ jobs:
           MINIS_REQUIRE_RUNTIME_PAYLOAD: '0'
         working-directory: src/android
         run: ./gradlew ${{ matrix.task }} --max-workers=4 --stacktrace
+      - name: Verify PTY JNI lifecycle on Linux
+        if: matrix.name == 'unit tests'
+        run: python3 scripts/test_pty_bridge.py
 
   android-debug-build:
     name: Android debug build

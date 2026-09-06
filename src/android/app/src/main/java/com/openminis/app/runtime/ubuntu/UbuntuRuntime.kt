@@ -42,6 +42,7 @@ object UbuntuRuntime {
         val version: String? = null,
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
+        val guestGid: Int? = null,
         val sessionsRoot: String? = null,
         val layoutKnown: Boolean = false,
         val hostWorkspace: String? = null,
@@ -518,7 +519,7 @@ object UbuntuRuntime {
         return if (ok && result.has("uid") && !result.isNull("uid")) result.optInt("uid") else null
     }
 
-    private fun findSu(): String? = listOf(
+    internal fun findSu(): String? = listOf(
         "/system/bin/su",
         "/system/xbin/su",
         "/sbin/su",
@@ -920,6 +921,11 @@ object UbuntuRuntime {
                     result.optInt("uid")
                 } else {
                     previous.guestUid
+                },
+                guestGid = if (result.has("gid") && !result.isNull("gid")) {
+                    result.optInt("gid")
+                } else {
+                    previous.guestGid
                 },
                 sessionsRoot = result.optString("sessions_root")
                     .ifEmpty { previous.sessionsRoot.orEmpty() }
