@@ -9,7 +9,7 @@ import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.ui.sandbox.FileItem
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -31,7 +31,7 @@ sealed class ChatLinkAction {
 
 object ChatLinkResolver {
 
-    fun resolve(rawUrl: String, sessionId: String? = null, context: Context? = null): ChatLinkAction {
+    private suspend fun resolve(rawUrl: String, sessionId: String?, context: Context?): ChatLinkAction {
         val trimmed = rawUrl.trim()
         if (trimmed.isEmpty()) return ChatLinkAction.Web(rawUrl)
 
@@ -167,20 +167,21 @@ object ChatLinkResolver {
         return path.takeIf(::isCanonicalGuestPath)
     }
 
-    private fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
+    private suspend fun stageGuestFile(context: Context, path: String, sessionId: String?): File? {
         if (sessionId == null && isSessionScopedGuestPath(path)) return null
         val fileName = path.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
         val digest = java.security.MessageDigest.getInstance("SHA-256")
             .digest("${sessionId.orEmpty()}:$path".toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(java.util.Locale.US, it) }
         val cacheFile = File(File(context.cacheDir, "chat-link-media"), "$digest-$fileName")
-        return runCatching {
-            // Offload blocking socket / disk I/O to Dispatchers.IO to prevent UI ANR (Issue #187)
-            runBlocking(Dispatchers.IO) {
-                WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)
-            }
+        return try {
+            WorkspaceFileClient.readToFile(sessionId.orEmpty(), path, cacheFile)
             cacheFile.takeIf { it.isFile }
-        }.getOrNull()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun isCanonicalGuestPath(path: String): Boolean {

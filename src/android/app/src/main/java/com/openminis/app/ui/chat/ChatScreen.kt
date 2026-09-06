@@ -2252,7 +2252,7 @@ fun ChatScreen(
                 // against this chat's session directory rather than whichever
                 // session booted its PRoot shell most recently (which is what
                 // the global bindMounts map would answer).
-                when (val action = ChatLinkResolver.resolve(url, viewModel.currentSessionId, context)) {
+                when (val action = ChatLinkResolver.resolveAsync(url, viewModel.currentSessionId, context)) {
                     is ChatLinkAction.DeepLink -> ChatLinkResolver.dispatchDeepLink(context, url)
                     is ChatLinkAction.SandboxFile -> {
                         when {
