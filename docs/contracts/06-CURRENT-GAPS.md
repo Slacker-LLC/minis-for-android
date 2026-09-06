@@ -2,14 +2,14 @@
 
 本文记录已核验源码与合同之间的差异，不用历史 Issue 的标题代替当前调用链证据。
 
-核验基线：`main` `be357f3b5330baa6eea9cc158644daf0535fd87c`，2026-09-06。下列合并状态仅对应此 SHA；后续合并须重新核对最终源码和检查结果。
+核验基线：`main` `5e6ea531197f7c230d145b35d3d2f16c5df03188`，2026-09-06。下列合并状态仅对应此 SHA；后续合并须重新核对最终源码和检查结果。
 
 ## 已在基线中核验的实现
 
 - `applicationId = llc.slacker.minis`，namespace 为 `com.openminis.app`。
 - Root + `minisd` + Ubuntu 24.04 chroot；canonical 数据根仍为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`，rootfs 是可替换运行时。
 - `proguard-rules.pro` 已保留 RealTimeCutVAD JNI 类。Release 构建验证与真实语音检测是两层证据。
-- `deleteFromMessage` 已采用数据库删除成功后提交 UI/历史/记忆的顺序；单条删除仍有下述缺口。
+- `deleteFromMessage` 已采用数据库删除成功后提交 UI/历史/记忆的顺序；单条删除也已在 #203 复用此顺序。
 
 | 已合并 PR | 最终代码行为 | 已有验证及边界 |
 |---|---|---|
@@ -20,28 +20,15 @@
 | [#198](https://github.com/Slacker-LLC/minis-for-android/pull/198) | `gpt-6-astra` 目录与发现、OAuth/API Responses 路由、推理档位和请求参数约束 | OAuth fixture 和 API MockWebServer；未证明具体账号权限或真实服务调用成功 |
 | [#199](https://github.com/Slacker-LLC/minis-for-android/pull/199) | Terminal 复用 runtime/session 准备和真实 UID/GID，拒绝宿主回退；PTY 单协程管理读写关闭及 reap | Kotlin 生命周期、生产 C 的 Linux JVM/子进程检查、Debug/Release CI；Android root/终端交互未验收 |
 | [#201](https://github.com/Slacker-LLC/minis-for-android/pull/201) | DNS 刷新锁在读取当前 resolver 之前取得，避免旧刷新最终覆盖新配置 | 并发顺序、失败、取消测试；VPN 切换的设备行为未验收 |
+| [#202](https://github.com/Slacker-LLC/minis-for-android/pull/202) | 粘贴文件准备持有清理责任，提交后不删附件；消息序号、内容与摘要使用 Room 事务 | 61 项局部测试；Room 回滚/并发仪器测试已编译，设备执行待验收 |
+| [#203](https://github.com/Slacker-LLC/minis-for-android/pull/203) | 单条助手消息删除复用数据库提交后更新 UI、历史、记忆和朗读 | 3 项提交顺序/失败/取消测试 |
+| [#204](https://github.com/Slacker-LLC/minis-for-android/pull/204) | ChatScreen 点击实际接入 resolveAsync，staging 移除 runBlocking 并传播取消 | 原有 4 项路径测试和 Android CI；设备交互延迟未测 |
 
 以上 PR 的对应提交 CI 已通过。合并、构建和单测不替代设备验收。
 
 ## 基线中仍存在的确认缺口
 
-### 粘贴附件的取消清理与消息部分提交
-
-`PastedTextProcessor` 在 IO 返回时可能因取消丢失已创建文件的清理责任。三个发送入口在 `appendMessage` 抛异常时直接删除附件，而 Repository 的消息插入和摘要更新分两步完成，可能留下引用已删除文件的数据库行。
-
-修复：[#202](https://github.com/Slacker-LLC/minis-for-android/pull/202)。准备阶段持有文件所有权；未提交才回滚附件；消息序号、内容与摘要使用既有 Room 事务，提交和粘贴状态消费共用取消边界。61 项局部测试通过；新增 Room 回滚/并发仪器测试已编译，尚未在设备执行。
-
-### 单条助手消息删除仍先改 UI 和记忆
-
-`deleteSingleAssistantMessage` 尚未复用 `deleteFromMessage` 的数据库提交顺序：UI 移除、记忆撤销和朗读停止发生在删除落库之前。
-
-修复：[#203](https://github.com/Slacker-LLC/minis-for-android/pull/203)。复用 `runAfterDatabaseDelete`，失败与取消不提交这些副作用；现有 3 项提交顺序测试通过。
-
-### 聊天文件点击遗漏异步入口
-
-`ChatScreen` 点击仍调用同步 `ChatLinkResolver.resolve`。内部 `runBlocking(Dispatchers.IO)` 会让调用方主线程继续等待，新增但未调用的 `resolveAsync` 没有解决真实入口的阻塞。
-
-修复：[#204](https://github.com/Slacker-LLC/minis-for-android/pull/204)。点击接入 `resolveAsync`，staging 直接使用挂起 RPC 并传播取消；原有 4 项路径测试和编译通过。
+以下两个修复 PR 的对应提交 CI 均已通过，基线尚未包含它们。
 
 ### SOUL 异步启动仍把读取故障当成缺失
 
@@ -53,11 +40,11 @@
 
 `decodePath` 无条件二次解码 `my%2520file.txt`，即使目标 `my%20file.txt` 存在也会选成 `my file.txt`。
 
-修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，基于 #204。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
+修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，复用已合并的 #204，目标分支为 main。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
 
 ## 本轮集成检查
 
-在上述基线与 #202～#206 的本地集成提交 `f7ea80989ff7dfa474bfd880f80a65fd8d6ba8b9` 上，所有修复无冲突合并；完整 Android 单元测试统计 1,640 项，其中 1,638 项通过、2 项跳过，0 失败、0 错误。Room 仪器测试编译、runtime 包边界 guard、生产 PTY C 的 Linux JVM/子进程测试均通过。该提交仅用于本地集成核验，没有将其推送或合并到 `main`。
+在从 `be357f3b` 集成 #202～#206 得到的本地提交 `f7ea80989ff7dfa474bfd880f80a65fd8d6ba8b9` 上，所有修复无冲突合并；完整 Android 单元测试统计 1,640 项，其中 1,638 项通过、2 项跳过，0 失败、0 错误。Room 仪器测试编译、runtime 包边界 guard、生产 PTY C 的 Linux JVM/子进程测试均通过。该提交仅用于本地集成核验，没有将其推送或合并到 `main`。
 
 ## 待设备验收
 
