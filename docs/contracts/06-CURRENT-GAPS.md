@@ -55,6 +55,10 @@
 
 修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，基于 #204。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
 
+## 本轮集成检查
+
+在上述基线与 #202～#206 的本地集成提交 `f7ea80989ff7dfa474bfd880f80a65fd8d6ba8b9` 上，所有修复无冲突合并；完整 Android 单元测试统计 1,640 项，其中 1,638 项通过、2 项跳过，0 失败、0 错误。Room 仪器测试编译、runtime 包边界 guard、生产 PTY C 的 Linux JVM/子进程测试均通过。该提交仅用于本地集成核验，没有将其推送或合并到 `main`。
+
 ## 待设备验收
 
 - ChatGPT OAuth 与 API key 的真实 GPT-6 请求，以及真实生图后的停止、重试、重启恢复和后续图片问答。
