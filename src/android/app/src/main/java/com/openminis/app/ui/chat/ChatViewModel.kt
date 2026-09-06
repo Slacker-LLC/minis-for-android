@@ -5671,28 +5671,38 @@ class ChatViewModel(
         val target = messages[index]
         if (target.role != "assistant") return
 
-        revokeMemoryWritesInDeletedMessages(listOf(target))
-
-        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
-            stopReplySpeech()
-        }
-
-        _messages.value = messages.filterNot { it.id == messageId }
-
         val sid = activeSessionId ?: return
         viewModelScope.launch {
-            chatRepository.deleteSingleMessage(messageId)
-
-            agentHistory.clear()
-            toolLoopDetector.reset()
-            val remaining = chatRepository.loadMessages(sid)
-            for (entity in remaining) {
-                agentHistory.add(entity.toLLMMessage())
+            try {
+                runAfterDatabaseDelete(
+                    delete = { chatRepository.deleteSingleMessage(messageId) },
+                    afterCommit = {
+                        val remaining = chatRepository.loadMessages(sid)
+                        _messages.value = _messages.value.filterNot { it.id == messageId }
+                        agentHistory.clear()
+                        toolLoopDetector.reset()
+                        for (entity in remaining) {
+                            agentHistory.add(entity.toLLMMessage())
+                        }
+                        runCatching {
+                            revokeMemoryWritesInDeletedMessages(listOf(target))
+                        }.onFailure { error ->
+                            Log.e(TAG, "deleteSingleAssistantMessage: memory revoke failed after DB commit", error)
+                        }
+                        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                            stopReplySpeech()
+                        }
+                        runCatching {
+                            chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
+                        }
+                        AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
+                    },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.e(TAG, "deleteSingleAssistantMessage: database delete failed; state unchanged", error)
             }
-            runCatching {
-                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
-            }
-            AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
         }
     }
 
