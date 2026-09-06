@@ -435,6 +435,14 @@ internal sealed class FlatChatItem {
         override val contentType = "tool"
     }
 
+    data class AssistantMedia(
+        val messageId: String,
+        val block: AssistantBlock,
+    ) : FlatChatItem() {
+        override val key = "media:$messageId:${block.id}"
+        override val contentType = "media"
+    }
+
     data class AssistantInfo(
         val messageId: String,
         val block: AssistantBlock,
@@ -563,6 +571,7 @@ internal fun buildFlatChatItems(
             )
             is FlatChatItem.AssistantThinking -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantToolUse -> item.copy(messageId = "${item.messageId}#$n")
+            is FlatChatItem.AssistantMedia -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantInfo -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantTyping -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantError -> item.copy(messageId = "${item.messageId}#$n")
@@ -742,6 +751,10 @@ internal fun buildFlatChatItems(
                     messageIsStreaming = message.isStreaming,
                     messageThinkingLevel = message.thinkingLevel,
                     isLastBlockOverall = block.id == lastBlockId,
+                )))
+                "media" -> out.add(dedupe(FlatChatItem.AssistantMedia(
+                    messageId = message.id,
+                    block = block,
                 )))
                 "info" -> out.add(dedupe(FlatChatItem.AssistantInfo(
                     messageId = message.id,

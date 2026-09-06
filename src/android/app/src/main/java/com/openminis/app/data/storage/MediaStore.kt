@@ -9,9 +9,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
-class MediaStore(context: Context) {
-
-    val mediaBaseDir: File = File(context.filesDir, "media")
+class MediaStore internal constructor(val mediaBaseDir: File) {
+    constructor(context: Context) : this(File(context.filesDir, "media"))
 
     fun saveMedia(
         data: ByteArray,
@@ -29,7 +28,12 @@ class MediaStore(context: Context) {
         val relativePath = "$dateDir/$sessionId/$id.$ext"
         val file = File(mediaBaseDir, relativePath)
         file.parentFile?.mkdirs()
-        file.writeBytes(data)
+        try {
+            file.writeBytes(data)
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        }
         return MediaRef(
             id = id,
             relativePath = relativePath,

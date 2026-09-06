@@ -3013,6 +3013,7 @@ fun ChatScreen(
                     is FlatChatItem.AssistantMarkdownBlock -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantThinking -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantToolUse -> grayedMap[originalMessageId(messageId)] == true
+                    is FlatChatItem.AssistantMedia -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
                      is FlatChatItem.AssistantTyping -> false
                      is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
@@ -3514,6 +3515,33 @@ fun ChatScreen(
                                         block = item.block,
                                         isStreaming = item.isLastBlockOverall && item.messageIsStreaming,
                                         isLast = item.isLast,
+                                    )
+                                }
+                            }
+                            is FlatChatItem.AssistantMedia -> {
+                                val path = item.block.imageFilePath
+                                if (path != null && item.block.mediaRef?.mimeType?.startsWith("image/") == true) {
+                                    AsyncImage(
+                                        model = java.io.File(path),
+                                        contentDescription = item.block.toolTitle,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 360.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                val siblings = messages.flatMap { it.toolBlocks }
+                                                    .filter { it.kind == "media" && it.mediaRef?.mimeType?.startsWith("image/") == true && it.imageFilePath != null }
+                                                val media = if (siblings.any { it.id == item.block.id }) siblings else siblings + item.block
+                                                val items = media.map {
+                                                    com.openminis.app.ui.components.ImageGalleryItem(java.io.File(it.imageFilePath!!), it.toolTitle)
+                                                }
+                                                previewImageGallery = items to media.indexOfFirst { it.id == item.block.id }.coerceAtLeast(0)
+                                            },
+                                    )
+                                } else if (path != null) {
+                                    UserAttachmentList(
+                                        imageUris = emptyList(), allFileNames = listOf(item.block.toolTitle),
+                                        nonImageUris = listOf(android.net.Uri.fromFile(java.io.File(path))),
+                                        onPreviewFile = { uri, _ -> urlClickHandler(uri.toString()) },
                                     )
                                 }
                             }
