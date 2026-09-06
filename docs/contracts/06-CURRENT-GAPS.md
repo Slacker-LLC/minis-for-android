@@ -1,82 +1,72 @@
 # 06 — 当前已确认缺口
 
-本文只记录**当前 `master` 已有代码证据或可复现故障支持的修复项**。它不是理论安全清单，也不保存已经完成的旧阶段任务。
+本文记录已核验源码与合同之间的差异，不用历史 Issue 的标题代替当前调用链证据。
 
-审计基线：`master` `6f10d1b3f413d37aca5c21465e8e71ef3eb12120`，2026-09-04。master 前进后必须重新核对最终代码；历史 PR 曾经合并过某项修复，不等于该修复今天仍存在。
+核验基线：`main` `be357f3b5330baa6eea9cc158644daf0535fd87c`，2026-09-06。下列合并状态仅对应此 SHA；后续合并须重新核对最终源码和检查结果。
 
-## 已经是当前事实，不再列为缺口
+## 已在基线中核验的实现
 
-- `applicationId = llc.slacker.minis`；namespace/Kotlin 包仍为 `com.openminis.app`。
-- 产品 runtime 为 Root + `minisd` + Ubuntu 24.04 chroot，不使用 PRoot/Alpine 作为产品后端。
-- canonical 用户数据根为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。
-- Ubuntu rootfs 是可替换 runtime state，用户数据不随 rootfs 事务替换。
-- Guest UID/GID 的合同是真实 App identity，不是固定 `10000`。
+- `applicationId = llc.slacker.minis`，namespace 为 `com.openminis.app`。
+- Root + `minisd` + Ubuntu 24.04 chroot；canonical 数据根仍为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`，rootfs 是可替换运行时。
+- `proguard-rules.pro` 已保留 RealTimeCutVAD JNI 类。Release 构建验证与真实语音检测是两层证据。
+- `deleteFromMessage` 已采用数据库删除成功后提交 UI/历史/记忆的顺序；单条删除仍有下述缺口。
 
-下面只列仍需修复的确认问题。
+| 已合并 PR | 最终代码行为 | 已有验证及边界 |
+|---|---|---|
+| [#194](https://github.com/Slacker-LLC/minis-for-android/pull/194) | `SessionHistoryLoader` 经 Repository 分页恢复完整历史，去除最近 100 条截断 | 405 条历史、跨页工具配对及取消测试；没有宣称实现数据库懒加载 |
+| [#195](https://github.com/Slacker-LLC/minis-for-android/pull/195) | home 初始化保留既有文件权限，bootstrap 不再递归改权 | Rust 权限回归和 Kotlin 测试；不会自动恢复旧版本已丢失的执行位 |
+| [#196](https://github.com/Slacker-LLC/minis-for-android/pull/196)、[#200](https://github.com/Slacker-LLC/minis-for-android/pull/200) | 图片持久化、重载、展示；正常/中断提交去重，重试清理，OpenAI 后续请求回传图片 | 文件与请求 fixture 测试；真实账号生图未验收 |
+| [#197](https://github.com/Slacker-LLC/minis-for-android/pull/197) | `minis-model-use run` 保留有界 stdin，原 guest 文件输入路径继续复用 | Bash→native→测试 Android endpoint 往返、分发拒绝用例、Rust 测试 |
+| [#198](https://github.com/Slacker-LLC/minis-for-android/pull/198) | `gpt-6-astra` 目录与发现、OAuth/API Responses 路由、推理档位和请求参数约束 | OAuth fixture 和 API MockWebServer；未证明具体账号权限或真实服务调用成功 |
+| [#199](https://github.com/Slacker-LLC/minis-for-android/pull/199) | Terminal 复用 runtime/session 准备和真实 UID/GID，拒绝宿主回退；PTY 单协程管理读写关闭及 reap | Kotlin 生命周期、生产 C 的 Linux JVM/子进程检查、Debug/Release CI；Android root/终端交互未验收 |
+| [#201](https://github.com/Slacker-LLC/minis-for-android/pull/201) | DNS 刷新锁在读取当前 resolver 之前取得，避免旧刷新最终覆盖新配置 | 并发顺序、失败、取消测试；VPN 切换的设备行为未验收 |
 
-## #182 — Release VAD 的 R8/JNI keep 缺失
+以上 PR 的对应提交 CI 已通过。合并、构建和单测不替代设备验收。
 
-当前 `proguard-rules.pro` 没有 RealTimeCutVAD JNI 回调所需的 keep 规则。Release minify 可能重命名/移除 JNI 通过名称查找的回调，造成语音检测在 Release 崩溃或失效。
+## 基线中仍存在的确认缺口
 
-修复边界：同步最窄 keep 规则，并用 Release/minified 构建验证；Debug 通过不能替代。
+### 粘贴附件的取消清理与消息部分提交
 
-## #183 — `minis://` 路径解码容错不足
+`PastedTextProcessor` 在 IO 返回时可能因取消丢失已创建文件的清理责任。三个发送入口在 `appendMessage` 抛异常时直接删除附件，而 Repository 的消息插入和摘要更新分两步完成，可能留下引用已删除文件的数据库行。
 
-当前聊天文件链接解析对双重 percent encoding 与字面 `+` 的处理不够稳健，可能把合法 guest 路径解成错误路径。
+修复：[#202](https://github.com/Slacker-LLC/minis-for-android/pull/202)。准备阶段持有文件所有权；未提交才回滚附件；消息序号、内容与摘要使用既有 Room 事务，提交和粘贴状态消费共用取消边界。61 项局部测试通过；新增 Room 回滚/并发仪器测试已编译，尚未在设备执行。
 
-修复边界：采用不把 `+` 隐式当空格的 percent decode，并在需要时根据实际存在性尝试第二次 decode；畸形 `%` 必须安全失败/降级。
+### 单条助手消息删除仍先改 UI 和记忆
 
-## #184 — 消息删除 DB/UI 原子性回归
+`deleteSingleAssistantMessage` 尚未复用 `deleteFromMessage` 的数据库提交顺序：UI 移除、记忆撤销和朗读停止发生在删除落库之前。
 
-最终 master 的 `ChatViewModel.deleteSingleAssistantMessage` / `deleteFromMessage` 会先修改 UI、prompt/stream 状态和 memory，再异步删除 Room 数据。DAO 异常、协程取消或生命周期结束可造成 UI/memory 与数据库不一致。
+修复：[#203](https://github.com/Slacker-LLC/minis-for-android/pull/203)。复用 `runAfterDatabaseDelete`，失败与取消不提交这些副作用；现有 3 项提交顺序测试通过。
 
-修复边界：沿现有 Repository/Room 边界做 DB-first；数据库删除成功后再提交 UI、agentHistory、memory 等状态。不要为此建立两阶段提交或事件溯源框架。
+### 聊天文件点击遗漏异步入口
 
-## #185 — SOUL 默认内容可能覆盖用户编辑
+`ChatScreen` 点击仍调用同步 `ChatLinkResolver.resolve`。内部 `runBlocking(Dispatchers.IO)` 会让调用方主线程继续等待，新增但未调用的 `resolveAsync` 没有解决真实入口的阻塞。
 
-`SoulStore.ensureExistsSuspending` 把 `WorkspaceFileClient.info` 的任意失败都折叠成“文件不存在”。如果读取因 broker、权限、网络式 IPC/运行时异常失败，而后续写入成功，可能用默认内容覆盖现有 `SOUL.md`。
+修复：[#204](https://github.com/Slacker-LLC/minis-for-android/pull/204)。点击接入 `resolveAsync`，staging 直接使用挂起 RPC 并传播取消；原有 4 项路径测试和编译通过。
 
-修复边界：只有明确 NotFound/ENOENT 才 seed；超时、权限、broker/runtime、取消等错误不得写默认内容。若现有 RPC 支持 create-if-absent/no-overwrite，应优先复用。
+### SOUL 异步启动仍把读取故障当成缺失
 
-## #186 — Terminal PTY 没有遵守真实 guest identity/session workspace
+`initializeAsync` 调用的 `ensureExistsSuspending` 对 `info` 失败使用 `getOrNull`，随后写默认内容。同步入口的 ENOENT 判断没有覆盖实际异步启动，且过宽的错误文本匹配会混淆目标文件缺失和 daemon/backing 不可用。
 
-当前 Terminal PTY 路径仍存在固定 `--uid 10000 --gid 10000`、忽略 `sessionId`、使用全局 `/workspace` 的行为，与普通 `ubuntu.exec` 的动态 identity/session root 模型不一致。
+修复：[#205](https://github.com/Slacker-LLC/minis-for-android/pull/205)。两个入口共用明确缺失判断，已有条目不写、读取故障/取消传播；10 项 SOUL 测试通过。现有 RPC 没有原子 create-if-absent，本修复不保证检查与写入之间的跨进程并发编辑安全。
 
-修复边界：复用现有 minisd/runtime identity 与 session 准备能力，让同一 session 的 Terminal 与 Agent shell 看到一致 workspace；不恢复 PRoot，不新建第二套执行架构。
+### 文件链接无条件二次解码可选错文件
 
-## #187 — ChatLink 文件 staging 可能阻塞主线程
+`decodePath` 无条件二次解码 `my%2520file.txt`，即使目标 `my%20file.txt` 存在也会选成 `my file.txt`。
 
-聊天文件链接解析/staging 最终可进入 blocking broker/file copy，而调用方位于 Compose 主线程协程路径，存在 UI 卡顿/ANR 风险。
+修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，基于 #204。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
 
-修复边界：路径解析可保持同步；实际 broker/file I/O 必须 suspend 或切到 `Dispatchers.IO`，并正确响应取消。与 #183 的路径解码逻辑分开处理。
+## 待设备验收
 
-## #188 — 粘贴内容在消息落库前被消费
+- ChatGPT OAuth 与 API key 的真实 GPT-6 请求，以及真实生图后的停止、重试、重启恢复和后续图片问答。
+- Android 终端首次启动、root 授权、session workspace 一致性和反复关闭后的进程回收。
+- 无 VPN→VPN、VPN A→VPN B、VPN→无 VPN 时 guest 域名解析。
+- Room 回滚仪器测试、真实文件链接 staging、删除失败和 SOUL 读取故障注入。
 
-部分发送路径在 `chatRepository.appendMessage` 成功前就从 `_pastedTexts` 移除已消费项。持久化失败/取消时，消息没落库但 composer 粘贴状态已丢失；生成的 staging/mediaRef 也可能留下残余。
-
-修复边界：消息持久化成功后再消费 pasted IDs；失败/取消保留 composer 状态，并清理或延后不可达 staging 产物。覆盖主发送、queued/drain 等实际调用链。
-
-## #189 — PTY 子进程退出后缺少稳定 reap
-
-Native PTY 通过 `forkpty` 创建子进程，并已有 `waitpid`/`waitFor` 能力，但 Kotlin Terminal 生命周期没有稳定调用它。反复打开/关闭终端可能累积 zombie。
-
-修复边界：在不阻塞 Main 的前提下回收对应 PID，并处理正常退出、主动关闭和重复关闭竞态。可与 #186 同模块实现，但验收边界保持独立。
-
-## #190 — VPN 开启时 Ubuntu guest DNS 不可用
-
-实际可复现：Android 开启 VPN 后，Ubuntu sandbox/chroot 可能没有可用 DNS，域名解析失败。核心问题是当前有效 Android/VPN resolver 没有被正确继承或在网络切换后刷新。
-
-修复边界：优先读取并同步当前实际生效网络（含 VPN）的 DNS；无 VPN→VPN、VPN A→VPN B、VPN→无 VPN 都应刷新 guest resolver，不依赖重启 App/minisd。公共 DNS fallback 的隐私/策略权衡是独立问题，本项不通过删除 fallback 来“修复”。
-
-## 不在本表自动升级为必修的事项
-
-仅有理论风险、没有当前复现或属于明确产品取舍的项目，不写进“确认缺口”。例如 namespace 统一、恢复 PRoot、完整 ownership WAL、图片-only regenerate 的媒体重放架构，以及尚未证明实际影响的 FileProvider/WebView/proxy/rclone/DNS fallback 策略讨论。
-
-它们可以保留历史讨论，但除非出现新证据或维护者明确立项，不应驱动主线重构。
+没有上述设备证据时，交付必须写明未验证。构建产物、fixture、CI 或宿主 Linux 测试都不能替代。
 
 ## 维护规则
 
-1. 新增本表条目必须有当前代码证据或可复现行为。
-2. 修复 PR 合并后，先核对最终 `master` 实际代码/测试；确认仍保留修复后再删除条目。
-3. 如果只是某个历史 PR“曾修过”，但最终 master 又回归，条目继续保留。
-4. 不把设备未验证行为写成已通过；不把理论 hardening 写成已确认用户故障。
+1. 新条目必须有当前代码或可复现行为支持；检查实际入口，不能只确认 helper 存在。
+2. 修复合并后核对最终 `main` 的代码和测试，再更新基线、移出确认缺口。
+3. 不把 namespace 统一、另一套运行时、未证实的理论 hardening 自动升级为修复任务。
+4. CI 按改动范围复用现有任务，保留 Release/JNI 检查和设备验证边界。
