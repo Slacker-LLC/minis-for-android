@@ -39,6 +39,7 @@ data class NativeOffloadRequest(
      * to `OFFLOAD_GLOBAL_SESSION_ID` in that case.
      */
     val sessionId: String? = null,
+    val stdin: String? = null,
 )
 
 data class NativeOffloadResult(

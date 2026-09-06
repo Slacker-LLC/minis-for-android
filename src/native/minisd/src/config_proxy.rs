@@ -12,6 +12,7 @@ const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BRIDGE_BYTES: usize = 2 * 1024 * 1024;
 const MAGIC: &str = "MINISCFG1";
 const MAGIC_V2: &str = "MINISCFG2";
+const MAGIC_V3: &str = "MINISCFG3";
 
 struct ProxyConfig {
     port: u16,
@@ -118,7 +119,7 @@ fn handle_guest(
     let (cmd, got_token) = if magic == MAGIC {
         let got_token = read_line_limited(&mut reader, 256)?;
         ("minis-config".to_string(), got_token)
-    } else if magic == MAGIC_V2 {
+    } else if magic == MAGIC_V2 || magic == MAGIC_V3 {
         let got_token = read_line_limited(&mut reader, 256)?;
         let cmd = read_line_limited(&mut reader, 64)?;
         (cmd, got_token)
@@ -128,6 +129,9 @@ fn handle_guest(
 
     if !constant_time_eq(expected_token.as_bytes(), got_token.as_bytes()) {
         return write_cli_response(&mut stream, 126, "minis-proxy: proxy permission denied\n");
+    }
+    if cmd != "minis-config" && cmd != "minis-model-use" {
+        return write_cli_response(&mut stream, 126, "minis-proxy: unsupported command\n");
     }
     let argc: usize = read_line_limited(&mut reader, 16)?
         .parse()
@@ -167,16 +171,26 @@ fn handle_guest(
         }
         _ => return write_cli_response(&mut stream, 1, "minis-proxy: invalid file marker\n"),
     };
+    let stdin = if magic == MAGIC_V3 {
+        String::from_utf8(hex_decode(
+            &read_line_limited(&mut reader, MAX_FILE_BYTES * 2 + 2)?,
+            MAX_FILE_BYTES,
+        )?)
+        .map_err(|_| "stdin is not utf-8".to_string())?
+    } else {
+        String::new()
+    };
 
     let args = match rewrite_file_argument(args, file_payload) {
         Ok(v) => v,
         Err(e) => return write_cli_response(&mut stream, 1, &format!("minis-proxy: {e}\n")),
     };
 
-    let (exit_code, output) = match forward_to_android(bridge_name, &cmd, &args, &cwd, &session) {
-        Ok(v) => v,
-        Err(e) => (1, format!("minis-proxy bridge unavailable: {e}\n")),
-    };
+    let (exit_code, output) =
+        match forward_to_android(bridge_name, &cmd, &args, &cwd, &session, &stdin) {
+            Ok(v) => v,
+            Err(e) => (1, format!("minis-proxy bridge unavailable: {e}\n")),
+        };
     write_cli_response(&mut stream, exit_code, &output)
 }
 
@@ -204,16 +218,18 @@ fn forward_to_android(
     args: &[String],
     cwd: &str,
     session: &str,
+    stdin: &str,
 ) -> Result<(i32, String), String> {
     #[cfg(not(unix))]
     {
-        let _ = (bridge_name, cmd, args, cwd, session);
+        let _ = (bridge_name, cmd, args, cwd, session, stdin);
         Err("Android config bridge requires unix".into())
     }
     #[cfg(unix)]
     {
         let mut stream = connect_abstract(bridge_name)?;
-        let _ = stream.set_read_timeout(Some(Duration::from_secs(130)));
+        let timeout = if cmd == "minis-model-use" { 660 } else { 130 };
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(timeout)));
         let _ = stream.set_write_timeout(Some(Duration::from_secs(15)));
 
         let mut argv = Vec::with_capacity(args.len() + 1);
@@ -223,6 +239,7 @@ fn forward_to_android(
             "argv": argv,
             "cwd": if cwd.is_empty() { "/workspace" } else { cwd },
             "session": session,
+            "stdin": stdin,
         });
         let body =
             serde_json::to_vec(&request).map_err(|e| format!("encode bridge request: {e}"))?;
@@ -373,11 +390,23 @@ if [ -z "${MINIS_CONFIG_PROXY_PORT:-}" ] || [ -z "${MINIS_CONFIG_PROXY_TOKEN:-}"
   echo "$cmd: invalid minisd proxy configuration" >&2
   exit 127
 fi
+stdin_hex=''
+has_input=false
+for arg in "$@"; do
+  case "$arg" in --input|--input=*) has_input=true ;; esac
+done
+if [ "$cmd" = 'minis-model-use' ] && [ "${1:-}" = 'run' ] && [ "$has_input" = false ] && [ ! -t 0 ]; then
+  stdin_hex="$(head -c 2097153 | od -An -v -tx1 | tr -d ' \n')"
+  if [ "${#stdin_hex}" -gt 4194304 ]; then
+    echo "$cmd: stdin exceeds 2 MiB" >&2
+    exit 1
+  fi
+fi
 exec 3<>"/dev/tcp/127.0.0.1/${MINIS_CONFIG_PROXY_PORT}" || {
   echo "$cmd: cannot connect to minisd proxy" >&2
   exit 127
 }
-printf 'MINISCFG2\n%s\n%s\n%s\n' "$MINIS_CONFIG_PROXY_TOKEN" "$cmd" "$#" >&3
+printf 'MINISCFG3\n%s\n%s\n%s\n' "$MINIS_CONFIG_PROXY_TOKEN" "$cmd" "$#" >&3
 for arg in "$@"; do
   printf '%s' "$arg" | od -An -v -tx1 | tr -d ' \n' >&3
   printf '\n' >&3
@@ -389,7 +418,7 @@ printf '\n' >&3
 file_path=''
 prev=''
 for arg in "$@"; do
-  if [ "$prev" = '--file' ]; then
+  if [ "$cmd" = 'minis-config' ] && [ "$prev" = '--file' ]; then
     file_path="$arg"
     break
   fi
@@ -400,12 +429,17 @@ if [ -n "$file_path" ]; then
     echo "$cmd: --file cannot read '$file_path'" >&2
     exit 1
   fi
+  if [ "$(wc -c < "$file_path")" -gt 2097152 ]; then
+    echo "$cmd: --file exceeds 2 MiB" >&2
+    exit 1
+  fi
   printf '1\n' >&3
   od -An -v -tx1 -- "$file_path" | tr -d ' \n' >&3
   printf '\n' >&3
 else
   printf '0\n' >&3
 fi
+printf '%s\n' "$stdin_hex" >&3
 if ! IFS= read -r exit_code <&3; then
   echo "$cmd: minisd proxy closed without a response" >&2
   exit 1
@@ -542,5 +576,117 @@ mod tests {
         assert!(!script.contains("ubuntu.adminExec"));
         assert_eq!(GUEST_CONFIG_BIN, "/opt/minis/bin/minis-config");
         assert_eq!(GUEST_MODEL_USE_BIN, "/opt/minis/bin/minis-model-use");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn model_wrapper_roundtrips_stdin_arguments_and_session_through_real_proxy() {
+        use std::os::linux::net::SocketAddrExt;
+        use std::os::unix::net::{SocketAddr, UnixListener};
+        use std::process::{Command, Stdio};
+
+        let token = "fixture-token";
+        let name = format!(
+            "minis-proxy-test-{}-{}",
+            std::process::id(),
+            random_token().unwrap()
+        );
+        let bridge =
+            UnixListener::bind_addr(&SocketAddr::from_abstract_name(&name).unwrap()).unwrap();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let dir = std::env::temp_dir().join(&name);
+        std::fs::create_dir(&dir).unwrap();
+        let config = dir.join("config");
+        std::fs::write(
+            &config,
+            format!("MINIS_CONFIG_PROXY_PORT={port}\nMINIS_CONFIG_PROXY_TOKEN='{token}'\n"),
+        )
+        .unwrap();
+        let script = dir.join("minis-model-use");
+        std::fs::write(
+            &script,
+            wrapper_script().replace(
+                "CFG=/etc/minis/minis-config-proxy",
+                &format!("CFG={}", config.display()),
+            ),
+        )
+        .unwrap();
+
+        let bridge_thread = std::thread::spawn(move || {
+            let (mut socket, _) = bridge.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut header = [0u8; 4];
+            socket.read_exact(&mut header).unwrap();
+            let mut body = vec![0u8; u32::from_be_bytes(header) as usize];
+            socket.read_exact(&mut body).unwrap();
+            let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let reply = br#"{"exit_code":0,"output":"fixture-ok\n"}"#;
+            socket
+                .write_all(&(reply.len() as u32).to_be_bytes())
+                .unwrap();
+            socket.write_all(reply).unwrap();
+            request
+        });
+        let proxy_thread = std::thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            handle_guest(socket, token, &name).unwrap();
+        });
+        let input = "line 1\n中文 quote=\"x\" dollar=$ backtick=` backslash=\\\n";
+        let mut child = Command::new("timeout")
+            .args(["15", "bash"])
+            .arg(&script)
+            .args(["run", "--model", "model with $ and `"])
+            .env("MINIS_CHAT_SESSION_ID", "session-42")
+            .current_dir(&dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), "fixture-ok\n");
+        proxy_thread.join().unwrap();
+        let request = bridge_thread.join().unwrap();
+        assert_eq!(
+            request["argv"],
+            serde_json::json!(["minis-model-use", "run", "--model", "model with $ and `"])
+        );
+        assert_eq!(request["stdin"], input);
+        assert_eq!(request["session"], "session-42");
+        assert_eq!(request["cwd"], dir.to_str().unwrap());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn unsupported_command_is_rejected_before_android_connection() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let worker = std::thread::spawn(move || {
+            let (socket, _) = listener.accept().unwrap();
+            handle_guest(socket, "token", "must-not-connect").unwrap();
+        });
+        client.write_all(b"MINISCFG3\ntoken\nroot.exec\n").unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("126\n"));
+        assert!(response.contains("unsupported command"));
+        worker.join().unwrap();
     }
 }
