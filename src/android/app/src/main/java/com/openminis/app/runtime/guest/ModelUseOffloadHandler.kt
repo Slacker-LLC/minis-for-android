@@ -192,14 +192,8 @@ class ModelUseOffloadHandler(
         }
 
         // Parse input messages: --input <path> | stdin
-        val inputText = when {
-            args.get("input") != null -> readLinuxPath(args.get("input")!!, request.sessionId)
-                ?: return NativeOffloadResult(
-                    2,
-                    "minis-model-use run: cannot read --input '${args.get("input")}'\n",
-                )
-            else -> ""
-        }
+        val inputText = resolveInput(args, request, ::readLinuxPath)
+            ?: return NativeOffloadResult(2, "minis-model-use run: cannot read --input '${args.get("input")}'\n")
         val parsed = try {
             parseMessages(inputText, request.sessionId)
         } catch (e: ImageInputError) {
@@ -1673,6 +1667,16 @@ class ModelUseOffloadHandler(
     }
 
     companion object {
+        internal fun resolveInput(
+            args: OffloadArgs,
+            request: NativeOffloadRequest,
+            readPath: (String, String?) -> String?,
+        ): String? = when {
+            args.get("input") != null -> readPath(args.get("input")!!, request.sessionId)
+            args.hasFlag("input") -> null
+            else -> request.stdin.orEmpty()
+        }
+
         private const val TAG = "ModelUseOffload"
         private const val NO_MODELS_HINT =
             "No models available. Go to Settings > Model Groups to add models that the agent can use."

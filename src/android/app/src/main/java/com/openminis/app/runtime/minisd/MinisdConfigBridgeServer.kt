@@ -6,6 +6,10 @@ import android.net.LocalSocket
 import android.util.Log
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.ConfigOffloadHandler
+import com.openminis.app.runtime.guest.NativeOffloadHandler
+import com.openminis.app.runtime.guest.NativeOffloadResult
+import com.openminis.app.runtime.guest.NativeOffloadServer
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.DataInputStream
@@ -111,17 +115,34 @@ object MinisdConfigBridgeServer {
         }
 
         val input = DataInputStream(client.inputStream)
+        client.soTimeout = 15_000
         val length = input.readInt()
         require(length in 1..MAX_REQUEST_BYTES) { "invalid request length $length" }
         val payload = ByteArray(length)
         input.readFully(payload)
         val request = JSONObject(String(payload, Charsets.UTF_8))
 
+        val result = dispatchRequest(request, peer.pid) { name ->
+            if (name == "minis-config") handler else NativeOffloadServer.getHandler(name)
+        }
+        writeResponse(
+            client,
+            JSONObject().put("exit_code", result.exitCode).put("output", result.output),
+        )
+    }
+
+    internal fun dispatchRequest(
+        request: JSONObject,
+        peerPid: Int,
+        resolveHandler: (String) -> NativeOffloadHandler?,
+    ): NativeOffloadResult {
+
         val rawArgv = request.optJSONArray("argv") ?: JSONArray()
         require(rawArgv.length() in 1..128) { "argv missing or too large" }
         val argv = ArrayList<String>(rawArgv.length())
         for (i in 0 until rawArgv.length()) {
-            val arg = rawArgv.optString(i, null) ?: error("argv[$i] is not a string")
+            val arg = rawArgv.opt(i) as? String ?: error("argv[$i] is not a string")
+            require(arg.toByteArray(Charsets.UTF_8).size <= 64 * 1024) { "argv[$i] too large" }
             require(!arg.contains('\u0000')) { "NUL in argv[$i]" }
             argv += arg
         }
@@ -130,8 +151,15 @@ object MinisdConfigBridgeServer {
             "unsupported bridge command: $cmdName"
         }
 
-        val session = request.optString("session", "").takeIf { it.isNotBlank() }
-        val cwd = request.optString("cwd", "/workspace").ifBlank { "/workspace" }
+        fun stringField(name: String, default: String): String {
+            if (!request.has(name)) return default
+            return request.opt(name) as? String ?: error("$name is not a string")
+        }
+        val session = stringField("session", "").takeIf { it.isNotBlank() }
+        require(session == null || UbuntuPaths.isSafeSessionId(session)) { "invalid session id" }
+        val cwd = stringField("cwd", "/workspace").ifBlank { "/workspace" }
+        require(cwd.startsWith('/') && !cwd.contains('\u0000') && cwd.length <= 4096) { "invalid cwd" }
+        val stdin = stringField("stdin", "")
         val env = if (session == null) {
             emptyMap()
         } else {
@@ -139,25 +167,16 @@ object MinisdConfigBridgeServer {
         }
 
         val offloadRequest = NativeOffloadRequest(
-            pid = peer.pid,
+            pid = peerPid,
             argv = argv,
             env = env,
             cwd = cwd,
             sessionId = session,
+            stdin = stdin,
         )
-        val result = if (cmdName == "minis-config") {
-            handler.handle(offloadRequest)
-        } else {
-            val modelUse = com.openminis.app.runtime.guest.NativeOffloadServer.getHandler("minis-model-use")
-                ?: error("minis-model-use handler not registered")
-            modelUse.handle(offloadRequest)
-        }
-        writeResponse(
-            client,
-            JSONObject()
-                .put("exit_code", result.exitCode)
-                .put("output", result.output),
-        )
+        val resolved = resolveHandler(cmdName)
+            ?: return NativeOffloadResult(127, "$cmdName handler not registered\n")
+        return resolved.handle(offloadRequest)
     }
 
     private fun writeResponse(client: LocalSocket, response: JSONObject) {
