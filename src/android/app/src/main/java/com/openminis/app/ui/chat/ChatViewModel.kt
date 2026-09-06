@@ -6094,16 +6094,11 @@ class ChatViewModel(
             prepared.attachedFilesXml,
             bodyPartsJson = queuedPaste?.partsJson,
         )
-        val userEntity = try {
-            chatRepository.appendMessage(sid, "user", userPartsJson)
-        } catch (e: Exception) {
-            PastedTextProcessor.cleanupFiles(queuedPaste)
-            throw e
-        }
-        // Issue #188: consume pasted texts only after DB append succeeds
-        if (queuedPaste != null) {
-            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
-        }
+        val userEntity = PastedTextProcessor.commitMessage(
+            pastedParts = queuedPaste,
+            persist = { chatRepository.appendMessage(sid, "user", userPartsJson) },
+            consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+        )
         agentHistory.add(
             LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6232,16 +6227,11 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            try {
-                chatRepository.appendMessage(sid, "user", userPartsJson)
-                if (drainPaste != null) {
-                    _pastedTexts.value =
-                        _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
-                }
-            } catch (e: Exception) {
-                PastedTextProcessor.cleanupFiles(drainPaste)
-                throw e
-            }
+            PastedTextProcessor.commitMessage(
+                pastedParts = drainPaste,
+                persist = { chatRepository.appendMessage(sid, "user", userPartsJson) },
+                consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+            )
 
             agentHistory.add(LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6396,16 +6386,11 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = pasted?.partsJson,
             )
-            val persistedUser = try {
-                chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
-            } catch (e: Exception) {
-                PastedTextProcessor.cleanupFiles(pasted)
-                throw e
-            }
-            // Issue #188: consume pasted texts only after DB append succeeds
-            if (pasted != null) {
-                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
-            }
+            val persistedUser = PastedTextProcessor.commitMessage(
+                pastedParts = pasted,
+                persist = { chatRepository.appendMessage(activeSessionId, "user", userPartsJson) },
+                consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+            )
 
             val userMsg = ChatMessage(
                 id = persistedUser.id,
