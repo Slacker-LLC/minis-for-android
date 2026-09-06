@@ -10,6 +10,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -249,8 +251,13 @@ lang: "auto"
      */
     internal fun isMissingFileNotFound(error: Throwable): Boolean {
         if (error !is WorkspaceFileClient.Failure) return false
+        if (error.code == "NOT_FOUND") return true
         val msg = error.message.orEmpty().lowercase()
-        return msg.contains("no such file") || msg.contains("not_found") || msg.contains("notfound") || msg.contains("os error 2")
+        // Legacy minisd reports path ENOENT as RUNTIME_UNAVAILABLE. A missing
+        // daemon socket or backing root is not evidence that SOUL.md is absent.
+        return error.code == "RUNTIME_UNAVAILABLE" &&
+            msg.startsWith("runtime_unavailable: open path:") &&
+            (msg.contains("no such file") || msg.contains("os error 2"))
     }
 
     /**
@@ -259,21 +266,9 @@ lang: "auto"
      */
     fun ensureExists(context: Context) {
         try {
-            val isNotFound = runBlocking(Dispatchers.IO) {
-                try {
-                    val info = WorkspaceFileClient.info("", GUEST_PATH)
-                    info.optString("type") != "file"
-                } catch (t: Throwable) {
-                    // Issue #185: seed default content ONLY on true ENOENT/NotFound,
-                    // NEVER on timeout, network error, or daemon failure!
-                    isMissingFileNotFound(t)
-                }
-            }
-            if (!isNotFound) return
-            runBlocking(Dispatchers.IO) {
-                WorkspaceFileClient.writeBytes("", GUEST_PATH, DEFAULT_CONTENT.toByteArray(Charsets.UTF_8))
-            }
-            AppLogger.info(TAG, "seeded SOUL.md at $GUEST_PATH")
+            runBlocking(Dispatchers.IO) { ensureExistsSuspending(context) }
+        } catch (error: CancellationException) {
+            throw error
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "ensureExists failed: ${t.message}")
         }
@@ -344,14 +339,28 @@ lang: "auto"
     }
 
     private suspend fun ensureExistsSuspending(context: Context) {
-        val existing = runCatching { WorkspaceFileClient.info("", GUEST_PATH) }.getOrNull()
-        if (existing?.optString("type") == "file") return
-        WorkspaceFileClient.writeBytes(
-            "",
-            GUEST_PATH,
-            DEFAULT_CONTENT.toByteArray(Charsets.UTF_8),
+        val seeded = seedAfterConfirmedMissing(
+            inspect = { WorkspaceFileClient.info("", GUEST_PATH) },
+            seed = { WorkspaceFileClient.writeBytes("", GUEST_PATH, DEFAULT_CONTENT.toByteArray(Charsets.UTF_8)) },
         )
-        AppLogger.info(TAG, "seeded SOUL.md at $GUEST_PATH")
+        if (seeded) AppLogger.info(TAG, "seeded SOUL.md at $GUEST_PATH")
+    }
+
+    internal suspend fun seedAfterConfirmedMissing(
+        inspect: suspend () -> Unit,
+        seed: suspend () -> Unit,
+    ): Boolean {
+        try {
+            inspect()
+            return false // Any existing entry, including a directory, is preserved.
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            if (!isMissingFileNotFound(error)) throw error
+        }
+        currentCoroutineContext().ensureActive()
+        seed()
+        return true
     }
 
     private suspend fun loadSuspending(context: Context): SoulFile? = try {
