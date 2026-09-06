@@ -37,6 +37,9 @@ object ChatLinkResolver {
 
         val uri = runCatching { trimmed.toUri() }.getOrNull()
         val scheme = uri?.scheme?.lowercase()
+        // Strip the URL query before decoding, so an encoded '?' in a filename
+        // cannot become a query delimiter during path resolution.
+        val fileInput = trimmed.substringBefore('?')
 
         // 1. minis:// deep links — only branch out when the URL maps to a known action,
         //    otherwise fall through to sandbox-path handling.
@@ -49,11 +52,12 @@ object ChatLinkResolver {
 
         // 2. Sandbox file resolution — canonical guest files are staged through
         // minisd; only SAF mounts and app-local file:// paths use host files.
-        val guestPath = resolveGuestPath(trimmed, scheme)
-        if (guestPath != null && context != null) {
-            stageGuestFile(context, guestPath, sessionId)?.let { staged ->
-                FileItem.from(staged)?.let { return ChatLinkAction.SandboxFile(it) }
+        if (context != null) {
+            val staged = resolveDecodedPath(fileInput) { candidate ->
+                val guestPath = resolveGuestPath(candidate, scheme) ?: return@resolveDecodedPath null
+                stageGuestFile(context, guestPath, sessionId)?.let { FileItem.from(it) }
             }
+            if (staged != null) return ChatLinkAction.SandboxFile(staged)
         }
 
         // Prefer a session-scoped resolver when we know which chat this link
@@ -61,7 +65,9 @@ object ChatLinkResolver {
         //    `RuntimePathRegistry.bindMounts` is last-writer-wins, so on a device
         //    with multiple sessions the resolver otherwise points at
         //    whichever session booted its shell most recently.
-        val hostFile = resolveSandboxFile(trimmed, scheme, sessionId, context)
+        val hostFile = resolveDecodedPath(fileInput) { candidate ->
+            resolveSandboxFile(candidate, scheme, sessionId, context)?.takeIf { it.isFile }
+        }
         android.util.Log.w("ChatLinkDiag",
             "resolve url=${trimmed.take(200)} sid=$sessionId hostFile=${hostFile?.absolutePath} exists=${hostFile?.exists()}")
         if (hostFile != null && hostFile.exists() && !hostFile.isDirectory) {
@@ -88,22 +94,20 @@ object ChatLinkResolver {
     /**
      * Decode URL-encoded paths safely. Protects '+' from being decoded to spaces
      * (since '+' is valid in file names and only represents space in form queries),
-     * and handles double percent-encoding (%2520 -> %20 -> ' ').
+     * One pass preserves literal percent sequences; a second decode is tried
+     * only if the first path cannot be resolved.
      */
     internal fun decodePath(rawPath: String): String {
         // Protect '+' so URLDecoder doesn't convert it into a space (Issue #183)
         val protected = rawPath.replace("+", "%2B")
-        var decoded = runCatching { java.net.URLDecoder.decode(protected, "UTF-8") }.getOrDefault(rawPath)
-        // Check for double percent-encoding (%25xx or %xx remaining)
-        if (decoded.contains("%25") || (decoded.contains('%') && Regex("%[0-9a-fA-F]{2}").containsMatchIn(decoded))) {
-            val secondPass = runCatching {
-                java.net.URLDecoder.decode(decoded.replace("+", "%2B"), "UTF-8")
-            }.getOrNull()
-            if (secondPass != null && secondPass != decoded) {
-                decoded = secondPass
-            }
-        }
-        return decoded
+        return runCatching { java.net.URLDecoder.decode(protected, "UTF-8") }.getOrDefault(rawPath)
+    }
+
+    internal suspend fun <T> resolveDecodedPath(rawPath: String, lookup: suspend (String) -> T?): T? {
+        val decoded = decodePath(rawPath)
+        lookup(decoded)?.let { return it }
+        val second = decodePath(decoded)
+        return if (second != decoded) lookup(second) else null
     }
 
     /**
@@ -134,33 +138,29 @@ object ChatLinkResolver {
                 // Keep '#' — attachment filenames legitimately contain it.
                 // `minis://` URLs don't use fragments, so stripping at '#'
                 // would truncate filenames like `foo #China.mp4`.
-                val stripped = raw.removePrefix("minis://").substringBefore('?')
-                val decoded = decodePath(stripped)
-                val linuxPath = if (decoded.startsWith("/")) decoded else "/var/minis/$decoded"
+                val stripped = raw.removePrefix("minis://")
+                val linuxPath = if (stripped.startsWith("/")) stripped else "/var/minis/$stripped"
                 lookup(linuxPath)
             }
             "file" -> {
-                val path = raw.removePrefix("file://").substringBefore('?')
-                if (path.isEmpty()) null else File(decodePath(path))
+                val path = raw.removePrefix("file://")
+                if (path.isEmpty()) null else File(path)
             }
             null -> {
-                val decoded = decodePath(raw)
-                if (decoded.startsWith("/")) lookup(decoded) else null
+                if (raw.startsWith("/")) lookup(raw) else null
             }
             else -> null
         }
     }
 
-    private fun resolveGuestPath(raw: String, scheme: String?): String? {
+    internal fun resolveGuestPath(raw: String, scheme: String?): String? {
         val path = when (scheme) {
             "minis" -> {
-                val stripped = raw.removePrefix("minis://").substringBefore('?')
-                val decoded = decodePath(stripped)
-                if (decoded.startsWith('/')) decoded else "/var/minis/$decoded"
+                val stripped = raw.removePrefix("minis://")
+                if (stripped.startsWith('/')) stripped else "/var/minis/$stripped"
             }
             null -> {
-                val decoded = decodePath(raw)
-                if (decoded.startsWith('/')) decoded else null
+                if (raw.startsWith('/')) raw else null
             }
             else -> null
         } ?: return null
