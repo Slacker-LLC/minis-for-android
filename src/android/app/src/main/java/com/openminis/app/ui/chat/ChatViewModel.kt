@@ -4080,29 +4080,23 @@ class ChatViewModel(
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "db.query.begin")
             val loaded = withContext(Dispatchers.IO) {
                 val tIoBeforeLoad = System.currentTimeMillis()
-                val totalCount = chatRepository.messageCountForSession(sessionId)
-                val window = SessionMessageWindowing.calculateInitialWindow(totalCount)
-                val rows = if (window.isWindowed) {
-                    chatRepository.loadRecentMessages(sessionId, window.limit)
-                } else {
-                    chatRepository.loadMessages(sessionId)
-                }
+                val history = SessionHistoryLoader.load(chatRepository, sessionId)
+                val rows = history.rows
                 val tIoAfterLoad = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
                     "db.query.end",
                     "count=${rows.size}",
                 )
-                val chatUi = rows.toChatMessages()
+                val chatUi = rows.toChatMessages(history.parts)
                 val tIoAfterTransform = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
                     "toChatMessages.end",
                     "count=${chatUi.size}",
                 )
-                // Pre-build the LLM history list off-Main too — toLLMMessage
-                // re-parses partsJson for every row, which is the second
-                // contributor to the GC storm. Build into a local list and
+                // Reuse the parsed parts for the LLM history off-Main too.
+                // Build into a local list and
                 // bulk-append to `agentHistory` on Main below; loadSession
                 // runs once at init before any other writer touches
                 // agentHistory, so a bulk addAll is race-free.
@@ -4110,7 +4104,7 @@ class ChatViewModel(
                 var totalPartsChars = 0L
                 for (entity in rows) {
                     totalPartsChars += entity.partsJson.length
-                    llm.add(entity.toLLMMessage())
+                    llm.add(entity.toLLMMessage(history.parts.getValue(entity.id)))
                 }
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
@@ -11595,13 +11589,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
     }
 
-    private fun List<MessageEntity>.toChatMessages(): List<ChatMessage> {
+    private fun List<MessageEntity>.toChatMessages(parsedParts: Map<String, Result<org.json.JSONArray>>): List<ChatMessage> {
         // First pass: extract all toolResult data keyed by toolUseId
         val toolResultMap = mutableMapOf<String, ToolResultData>()
         for (entity in this) {
             if (entity.role != "user") continue
             try {
-                val array = org.json.JSONArray(entity.partsJson)
+                val array = parsedParts.getValue(entity.id).getOrThrow()
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     if (obj.optString("type") == "toolResult") {
@@ -11646,7 +11640,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             }
 
             try {
-                val array = org.json.JSONArray(entity.partsJson)
+                val array = parsedParts.getValue(entity.id).getOrThrow()
                 var textBlockCounter = 0
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
@@ -11828,14 +11822,14 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
     private data class ToolResultData(val output: String, val success: Boolean)
 
-    private fun MessageEntity.toLLMMessage(): LLMMessage {
+    private fun MessageEntity.toLLMMessage(parsedParts: Result<org.json.JSONArray>? = null): LLMMessage {
         val r = if (role == "user") LLMMessage.Role.USER else LLMMessage.Role.ASSISTANT
         val contentParts = mutableListOf<AgentContentPart>()
         val imageParts = mutableListOf<LLMMessage.ImagePart>()
         var textContent = ""
 
         try {
-            val array = org.json.JSONArray(partsJson)
+            val array = parsedParts?.getOrThrow() ?: org.json.JSONArray(partsJson)
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 when (obj.optString("type")) {
