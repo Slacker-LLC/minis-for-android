@@ -209,8 +209,10 @@ impl PersistentLayout {
 
         for sub in &[".local", ".cache", ".config"] {
             let p = self.home().join(sub);
-            ensure_directory(&p, data_uid, data_gid, 0o755)?;
-            set_owner_mode_recursive(&p, data_uid, data_gid);
+            // These are application-owned entry points, not permission
+            // templates for their contents. Packages may contain executable
+            // files and private configuration; never chmod an existing tree.
+            ensure_directory(&p, data_uid, data_gid, PERSISTENT_DATA_MODE)?;
         }
 
         let readme = self.workspace().join("README");
@@ -339,25 +341,6 @@ fn set_owner_mode(path: &Path, uid: u32, gid: u32, mode: u32) -> Result<(), Stri
     Ok(())
 }
 
-#[cfg(unix)]
-fn set_owner_mode_recursive(path: &Path, uid: u32, gid: u32) {
-    if let Ok(meta) = std::fs::symlink_metadata(path) {
-        if meta.file_type().is_symlink() {
-            return;
-        }
-        if meta.is_dir() {
-            let _ = set_owner_mode(path, uid, gid, 0o755);
-            if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries.flatten() {
-                    set_owner_mode_recursive(&entry.path(), uid, gid);
-                }
-            }
-        } else if meta.is_file() {
-            let _ = set_owner_mode(path, uid, gid, 0o644);
-        }
-    }
-}
-
 #[cfg(not(unix))]
 fn set_owner_mode(path: &Path, _uid: u32, _gid: u32, _mode: u32) -> Result<(), String> {
     if path.exists() {
@@ -366,9 +349,6 @@ fn set_owner_mode(path: &Path, _uid: u32, _gid: u32, _mode: u32) -> Result<(), S
         Err(format!("path missing: {}", path.display()))
     }
 }
-
-#[cfg(not(unix))]
-fn set_owner_mode_recursive(_path: &Path, _uid: u32, _gid: u32) {}
 
 #[cfg(unix)]
 fn ensure_non_tmpfs_directory(label: &str, path: &Path) -> Result<(), String> {
@@ -734,6 +714,70 @@ mod tests {
             "stable"
         );
         let _ = std::fs::remove_dir_all(first.root());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restart_preserves_home_executables_private_files_and_link_targets() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let layout = temp_layout("home-modes");
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
+        let bin = layout.home().join(".local/bin");
+        std::fs::create_dir(&bin).unwrap();
+        let executable = bin.join("tool");
+        let secret = layout.home().join(".config/secret");
+        let outside = layout.root().join("outside");
+        for (path, mode) in [(&executable, 0o750), (&secret, 0o600), (&outside, 0o640)] {
+            std::fs::write(path, "keep").unwrap();
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+        }
+        symlink(&outside, layout.home().join(".cache/link")).unwrap();
+
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
+
+        for (path, mode) in [(&executable, 0o750), (&secret, 0o600), (&outside, 0o640)] {
+            assert_eq!(
+                std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                mode
+            );
+            assert_eq!(std::fs::read_to_string(path).unwrap(), "keep");
+        }
+        for sub in [".local", ".cache", ".config"] {
+            assert_eq!(
+                std::fs::metadata(layout.home().join(sub))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                PERSISTENT_DATA_MODE,
+            );
+        }
+        std::fs::remove_dir_all(layout.root()).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn init_rejects_home_subdirectory_symlink_without_changing_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let layout = temp_layout("home-symlink");
+        let uid = unsafe { libc::geteuid() };
+        let gid = unsafe { libc::getegid() };
+        layout.initialize_with_owners(uid, gid, uid, gid).unwrap();
+        let outside = layout.root().join("outside");
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::set_permissions(&outside, std::fs::Permissions::from_mode(0o750)).unwrap();
+        std::fs::remove_dir(layout.home().join(".local")).unwrap();
+        symlink(&outside, layout.home().join(".local")).unwrap();
+
+        assert!(layout.initialize_with_owners(uid, gid, uid, gid).is_err());
+        assert_eq!(
+            std::fs::metadata(outside).unwrap().permissions().mode() & 0o777,
+            0o750
+        );
+        std::fs::remove_dir_all(layout.root()).unwrap();
     }
 
     #[test]
