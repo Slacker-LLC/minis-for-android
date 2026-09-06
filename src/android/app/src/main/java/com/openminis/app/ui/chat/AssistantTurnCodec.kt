@@ -56,6 +56,16 @@ internal object AssistantTurnCodec {
         return json.toString()
     }
 
+    fun interrupted(turn: Turn, userStopped: Boolean = true): Turn {
+        val reason = if (userStopped) "The user stopped this response." else "This response was interrupted by an error."
+        val marker = AgentContentPart.Text("<system-reminder>$reason Content may be incomplete.</system-reminder>")
+        return Turn(turn.parts + marker, JSONArray(turn.partsJson).put(encodePart(marker, emptyMap())).toString())
+    }
+
+    fun discardMedia(blocks: List<AssistantBlock>, mediaBaseDir: File) {
+        for (ref in blocks.mapNotNull { it.mediaRef }) mediaFile(ref, mediaBaseDir).delete()
+    }
+
     private fun encodePart(part: AgentContentPart, metadata: Map<String, AssistantBlock>): JSONObject? = when (part) {
         is AgentContentPart.Text -> JSONObject().put("type", "text").put("value", part.text)
         is AgentContentPart.ToolUse -> if (part.name.isBlank()) null else {

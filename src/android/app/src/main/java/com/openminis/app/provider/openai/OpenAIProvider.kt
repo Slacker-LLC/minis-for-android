@@ -609,6 +609,7 @@ class OpenAIProvider private constructor(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
+        val requestMessages = replayGeneratedImages(messages)
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
             // OpenAI OAuth (Codex) instance is driven through the Codex backend
@@ -632,11 +633,11 @@ class OpenAIProvider private constructor(
                     "url=chatgpt.com/backend-api/codex/responses isOAuth=$isOAuth " +
                     "hasAccountId=${codexAccountId != null}",
             )
-            buildCodexImageBody(messages)
+            buildCodexImageBody(requestMessages)
         } else if (usesChatCompletionsAPI) {
-            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildRequestBody(requestMessages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         } else {
-            buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildResponsesAPIBody(requestMessages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
         // T302: serialize the request body exactly once. Pre-T302 we called
         // body.toString() three times per request (debug log + OAuth byte
