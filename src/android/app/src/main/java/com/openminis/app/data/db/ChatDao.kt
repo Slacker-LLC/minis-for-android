@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
+import androidx.room.Transaction
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
@@ -209,6 +210,15 @@ interface ChatDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
+
+    /** A failed preview update must not leave a row whose media caller rolls back. */
+    @Transaction
+    suspend fun appendMessageWithPreview(message: MessageEntity, preview: String?): MessageEntity {
+        val ordered = message.copy(sortOrder = nextSortOrder(message.sessionId))
+        insertMessage(ordered)
+        updateLastMessage(ordered.sessionId, preview, ordered.createdAt)
+        return ordered
+    }
 
     /**
      * [T-android-voice-correction] User messages newer than [since] (epoch ms),

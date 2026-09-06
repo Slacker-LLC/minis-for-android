@@ -360,7 +360,6 @@ class ChatRepository(
         reasoningContent: String? = null,
         modelSnapshot: ModelAttributionSnapshot? = null,
     ): MessageEntity {
-        val sortOrder = dao.nextSortOrder(sessionId)
         val now = System.currentTimeMillis()
         // Cap the body so a runaway tool_result (e.g. a 13 MB browser_use
         // dump — Issue #17) cannot land an oversize blob into a Room row
@@ -380,17 +379,14 @@ class ChatRepository(
             partsJson = capped,
             createdAt = now,
             tokenUsage = tokenUsage,
-            sortOrder = sortOrder,
+            sortOrder = 0, // Assigned by the DAO inside the append transaction.
             reasoningContent = reasoningContent,
             modelId = modelSnapshot?.modelId,
             modelDisplayName = modelSnapshot?.displayName,
             providerType = modelSnapshot?.providerTypeRaw,
             providerInstanceId = modelSnapshot?.providerInstanceId,
         )
-        dao.insertMessage(message)
-        val preview = extractTextPreview(capped)
-        dao.updateLastMessage(sessionId, preview, now)
-        return message
+        return dao.appendMessageWithPreview(message, extractTextPreview(capped))
     }
 
     /**
