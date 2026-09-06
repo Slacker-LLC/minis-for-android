@@ -28,6 +28,7 @@ object OpenAIModelsApi {
     // so set supportsReasoning = true up front. Without it the Thinking
     // pill in chat is disabled and the user can't pick low/medium/high.
     fun fetchModelsOAuth(): List<LLMModel> = listOf(
+        LLMModel.gpt6Astra,
         // [T-android-thinking-level-arch] GPT-5.6 family — Codex OAuth only
         // (not in LLMModel.allOpenAI, matching iOS). sol/terra reach ULTRA,
         // luna reaches MAX (see ThinkingLevelCatalog).
@@ -154,7 +155,7 @@ object OpenAIModelsApi {
                 // the `reasoning` flag yet, and without this the pill
                 // stays disabled.
                 val idLower = id.lowercase()
-                val knownReasoning = idLower.startsWith("gpt-5") ||
+                val knownReasoning = idLower == "gpt-6-astra" || idLower.startsWith("gpt-5") ||
                     idLower.startsWith("o1") ||
                     idLower.startsWith("o3") ||
                     idLower.startsWith("o4") ||
@@ -168,7 +169,7 @@ object OpenAIModelsApi {
                         inputModalities = inputModalities,
                         outputModalities = outputModalities,
                         supportsReasoning = if (knownReasoning) true else null,
-                    )
+                    ).withKnownOpenAICapabilities()
                 )
             }
             if (parsed.isEmpty()) return@withContext fallback
@@ -188,6 +189,19 @@ object OpenAIModelsApi {
             if (s.isNotEmpty()) out.add(s)
         }
         return out
+    }
+
+    private fun LLMModel.withKnownOpenAICapabilities(): LLMModel {
+        if (!isGpt6Astra) return this
+        val known = LLMModel.gpt6Astra
+        return copy(
+            contextWindow = contextWindow ?: known.contextWindow,
+            maxOutputTokens = maxOutputTokens ?: known.maxOutputTokens,
+            supportsReasoning = supportsReasoning ?: known.supportsReasoning,
+            reasoningEffortValues = reasoningEffortValues ?: known.reasoningEffortValues,
+            inputModalities = inputModalities ?: known.inputModalities,
+            outputModalities = outputModalities ?: known.outputModalities,
+        )
     }
 
     /** Check if a base URL points to official OpenAI endpoints. */

@@ -38,6 +38,8 @@ data class LLMModel(
     val inputModalities: List<String>? = null,
     val outputModalities: List<String>? = null,
 ) {
+    val isGpt6Astra: Boolean get() = id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)
+
     companion object {
         // Anthropic — mirrors iOS LLMTypes.swift allAnthropic.
         // [T-android-claude-opus48-thinking-toggle] (Sow Sow 38845/38850) Every
@@ -92,6 +94,14 @@ data class LLMModel(
         // honours it. Mirrors iOS LLMTypes.swift defaults plus the
         // OpenAIAgentProvider `supportsReasoning ?? true` GPT-5.x
         // assumption (T119).
+        // https://developers.openai.com/api/docs/models/gpt-6-astra
+        val gpt6Astra = LLMModel(
+            "gpt-6-astra", "GPT-6 Astra", "OpenAI",
+            contextWindow = 1_050_000, maxOutputTokens = 128_000,
+            supportsReasoning = true,
+            reasoningEffortValues = listOf("low", "medium", "high", "xhigh", "max"),
+            inputModalities = listOf("text", "image"), outputModalities = listOf("text"),
+        )
         val gpt55 = LLMModel("gpt-5.5", "GPT-5.5", "OpenAI", supportsReasoning = true)
         val gpt53Codex = LLMModel("gpt-5.3-codex", "GPT-5.3 Codex", "OpenAI", supportsReasoning = true)
         val gpt52Codex = LLMModel("gpt-5.2-codex", "GPT-5.2 Codex", "OpenAI", supportsReasoning = true)
@@ -103,7 +113,7 @@ data class LLMModel(
         val o4Mini = LLMModel("o4-mini", "o4 Mini", "OpenAI", supportsReasoning = true)
         val codexMini = LLMModel("codex-mini-latest", "Codex Mini", "OpenAI", supportsReasoning = true)
 
-        val allOpenAI = listOf(gpt55, gpt53Codex, gpt52Codex, gpt51CodexMax, gpt52, gpt4o, gpt4oMini, o3, o4Mini, codexMini)
+        val allOpenAI = listOf(gpt6Astra, gpt55, gpt53Codex, gpt52Codex, gpt51CodexMax, gpt52, gpt4o, gpt4oMini, o3, o4Mini, codexMini)
 
         // OpenRouter (matching iOS built-in set)
         val orClaudeSonnet4 = LLMModel("anthropic/claude-sonnet-4", "Claude Sonnet 4", "OpenRouter")
@@ -230,6 +240,7 @@ data class LLMModel(
     val contextWindowTokens: Int
         get() {
             contextWindow?.let { if (it > 0) return it }
+            if (isGpt6Astra) return gpt6Astra.contextWindow!!
             val lid = id.lowercase()
             // Anthropic Claude — modern Opus/Sonnet 4.x & 5 and Fable/Mythos 5
             // ship 1M; Haiku and legacy 2.x/3.x are 200K.
