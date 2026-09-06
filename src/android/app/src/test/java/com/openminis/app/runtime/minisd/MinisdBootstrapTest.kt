@@ -48,6 +48,8 @@ class MinisdBootstrapTest {
         assertTrue(command.contains("--app-socket"))
         assertFalse(command.contains("ubuntu rootfs missing"))
         assertFalse(command.contains("ROOTFS="))
+        assertFalse(command.contains("chown"))
+        assertFalse(command.contains("/data/adb/minis/home"))
     }
 
     @Test

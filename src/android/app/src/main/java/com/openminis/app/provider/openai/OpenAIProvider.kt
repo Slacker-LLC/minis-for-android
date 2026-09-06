@@ -99,7 +99,7 @@ class OpenAIProvider private constructor(
      * Non-reasoning Responses relays do honor the per-session field.
      */
     override val supportsTemperatureOverride: Boolean
-        get() = model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
+        get() = !model.isGpt6Astra && model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
 
     /**
      * [T-android-thinking-rules-phase2] Owning provider-instance id, set by
@@ -339,7 +339,10 @@ class OpenAIProvider private constructor(
      * Responses API is used when OAuth (Codex) OR when the user explicitly
      * flipped the per-instance `useResponsesAPI` switch.
      */
-    private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions || (!isOAuth && !useResponsesAPI)
+    // Astra function calling requires Responses. Namespaced relay ids retain
+    // their configured transport; the exact OpenAI id uses Responses by default.
+    private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions ||
+        (!isOAuth && !useResponsesAPI && (isAzure || model.id != LLMModel.gpt6Astra.id))
 
     /**
      * [T-android-tool-splits-reply-fix] Chat Completions streams ONE
@@ -609,6 +612,7 @@ class OpenAIProvider private constructor(
         tools: List<AgentToolDefinition>,
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
+        val requestMessages = replayGeneratedImages(messages)
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
             // OpenAI OAuth (Codex) instance is driven through the Codex backend
@@ -632,11 +636,11 @@ class OpenAIProvider private constructor(
                     "url=chatgpt.com/backend-api/codex/responses isOAuth=$isOAuth " +
                     "hasAccountId=${codexAccountId != null}",
             )
-            buildCodexImageBody(messages)
+            buildCodexImageBody(requestMessages)
         } else if (usesChatCompletionsAPI) {
-            buildRequestBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildRequestBody(requestMessages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         } else {
-            buildResponsesAPIBody(messages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
+            buildResponsesAPIBody(requestMessages, systemPrompt, maxTokens, stream = true, temperature = temperature, imageParts = imageParts, tools = tools, thinkingLevel = thinkingLevel)
         }
         // T302: serialize the request body exactly once. Pre-T302 we called
         // body.toString() three times per request (debug log + OAuth byte
@@ -649,6 +653,7 @@ class OpenAIProvider private constructor(
         // this body kill us?" could not be answered from the log. We measure
         // around the call and report the realised length, so an OOM thrown here
         // now arrives with an attributed stack instead of anonymously.
+        applyAstraRequestContract(body)
         val memBefore = com.openminis.app.diagnostics.MemorySnapshot.capture()
         val serStartNs = System.nanoTime()
         val bodyStr = try {
@@ -2161,6 +2166,32 @@ class OpenAIProvider private constructor(
      * keys overwrite; `model` is force-restored last. Skipped for Codex OAuth
      * (its body is part of the client fingerprint and must stay untouched).
      */
+    private fun applyAstraRequestContract(body: JSONObject) {
+        if (!model.isGpt6Astra) return
+        // Enforce after passthrough merging so stale stored parameters cannot
+        // reintroduce fields rejected by Astra. OFF/minimal map to its lowest tier.
+        for (key in listOf("temperature", "top_p", "top_logprobs", "logprobs")) body.remove(key)
+        val allowed = LLMModel.gpt6Astra.reasoningEffortValues
+        if (usesChatCompletionsAPI) {
+            body.put("reasoning_effort", clampEffort(body.optString("reasoning_effort", "low"), allowed))
+        } else {
+            val reasoning = body.optJSONObject("reasoning") ?: JSONObject()
+            reasoning.put("effort", clampEffort(reasoning.optString("effort", "low"), allowed))
+            body.put("reasoning", reasoning)
+            body.optJSONArray("include")?.let { include ->
+                body.put("include", JSONArray().apply {
+                    for (i in 0 until include.length()) {
+                        if (include.optString(i) != "message.output_text.logprobs") put(include.get(i))
+                    }
+                })
+            }
+            if (body.has("prompt_cache_retention")) {
+                body.remove("prompt_cache_retention")
+                if (!body.has("prompt_cache_options")) body.put("prompt_cache_options", JSONObject().put("ttl", "30m"))
+            }
+        }
+    }
+
     private fun mergeChatExtraBody(body: JSONObject) {
         if (chatExtraBody.isEmpty()) return
         if (isOAuth && !forceChatCompletions) return  // Codex OAuth exemption
@@ -2267,7 +2298,7 @@ class OpenAIProvider private constructor(
             return builder.build()
         }
 
-        val endpointPath = if (useResponsesAPI) "/responses" else "/chat/completions"
+        val endpointPath = if (usesChatCompletionsAPI) "/chat/completions" else "/responses"
         // [T-android-azure-openai] Azure routes via the deployments path and
         // auths with the api-key header. azureUrl() returns null when not in
         // Azure mode / no base, so the standard basePath join stays the default.

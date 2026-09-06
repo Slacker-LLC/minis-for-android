@@ -122,22 +122,25 @@ class RootfsManager private constructor(private val context: Context) {
     }
 
     suspend fun refreshDns(servers: List<String>? = null): Boolean = withContext(Dispatchers.IO) {
-        val nameservers = servers ?: getSystemDnsServers()
-        val resolvFile = File(rootfsDir, "etc/resolv.conf")
-        if (resolvFile.exists() && resolvFile.canWrite()) {
-            try {
-                resolvFile.writeText(formatResolvConf(nameservers))
-                resolvFile.setReadable(true, false)
-            } catch (t: Throwable) {
-                Log.d(TAG, "direct write to resolv.conf: ${t.message}")
+        dnsRefreshCoordinator.refresh({ servers ?: getSystemDnsServers() }) { nameservers ->
+            val resolvFile = File(rootfsDir, "etc/resolv.conf")
+            if (resolvFile.exists() && resolvFile.canWrite()) {
+                try {
+                    resolvFile.writeText(formatResolvConf(nameservers))
+                    resolvFile.setReadable(true, false)
+                } catch (t: Throwable) {
+                    Log.d(TAG, "direct write to resolv.conf: ${t.message}")
+                }
+            }
+            if (UbuntuRuntime.isInitialized) {
+                UbuntuRuntime.refreshDns(nameservers)
+            } else {
+                true
             }
         }
-        if (UbuntuRuntime.isInitialized) {
-            UbuntuRuntime.refreshDns(nameservers)
-        } else {
-            true
-        }
     }
+
+    private val dnsRefreshCoordinator = com.openminis.app.runtime.ubuntu.DnsRefreshCoordinator()
 
     suspend fun applyDefaultMountOverlay() = withContext(Dispatchers.IO) { Unit }
 

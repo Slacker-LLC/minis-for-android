@@ -936,6 +936,8 @@ class ChatViewModel(
     // streaming, hiding the Stop button while the new turn was live).
     @Volatile
     private var streamJob: Job? = null
+    @Volatile private var pendingAssistantTurn: PendingAssistantTurn? = null
+    private var pendingMediaCommitJob: Job? = null
     private var currentProvider: LLMProvider? = null
     private var currentModel: LLMModel? = null
 
@@ -3796,6 +3798,7 @@ class ChatViewModel(
 
     /** Ensure the session exists in the database. Called before first message. */
     private suspend fun ensureSession(): String = withContext(Dispatchers.IO) {
+        pendingMediaCommitJob?.join()
         android.util.Log.e("PROMPT_DEBUG", "ensureSession called: sessionId='$sessionId', realSessionId='$realSessionId', isDraft=$isDraft")
         if (realSessionId.isNotEmpty()) {
             val existing = chatRepository.dao.getSession(realSessionId)
@@ -4080,29 +4083,23 @@ class ChatViewModel(
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "db.query.begin")
             val loaded = withContext(Dispatchers.IO) {
                 val tIoBeforeLoad = System.currentTimeMillis()
-                val totalCount = chatRepository.messageCountForSession(sessionId)
-                val window = SessionMessageWindowing.calculateInitialWindow(totalCount)
-                val rows = if (window.isWindowed) {
-                    chatRepository.loadRecentMessages(sessionId, window.limit)
-                } else {
-                    chatRepository.loadMessages(sessionId)
-                }
+                val history = SessionHistoryLoader.load(chatRepository, sessionId)
+                val rows = history.rows
                 val tIoAfterLoad = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
                     "db.query.end",
                     "count=${rows.size}",
                 )
-                val chatUi = rows.toChatMessages()
+                val chatUi = rows.toChatMessages(history.parts)
                 val tIoAfterTransform = System.currentTimeMillis()
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
                     "toChatMessages.end",
                     "count=${chatUi.size}",
                 )
-                // Pre-build the LLM history list off-Main too — toLLMMessage
-                // re-parses partsJson for every row, which is the second
-                // contributor to the GC storm. Build into a local list and
+                // Reuse the parsed parts for the LLM history off-Main too.
+                // Build into a local list and
                 // bulk-append to `agentHistory` on Main below; loadSession
                 // runs once at init before any other writer touches
                 // agentHistory, so a bulk addAll is race-free.
@@ -4110,7 +4107,7 @@ class ChatViewModel(
                 var totalPartsChars = 0L
                 for (entity in rows) {
                     totalPartsChars += entity.partsJson.length
-                    llm.add(entity.toLLMMessage())
+                    llm.add(entity.toLLMMessage(history.parts.getValue(entity.id)))
                 }
                 com.openminis.app.diagnostics.PerfLongCtx.step(
                     sessionId,
@@ -5347,6 +5344,7 @@ class ChatViewModel(
      * Mirrors iOS's edit/retry behavior — no duplicate user messages.
      */
     fun retryFromMessage(messageId: String): Boolean {
+        if (deferUntilMediaCommitted { retryFromMessage(messageId) }) return true
         if (_isStreaming.value) return false
         _canResume.value = false
         val messages = _messages.value
@@ -5677,28 +5675,38 @@ class ChatViewModel(
         val target = messages[index]
         if (target.role != "assistant") return
 
-        revokeMemoryWritesInDeletedMessages(listOf(target))
-
-        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
-            stopReplySpeech()
-        }
-
-        _messages.value = messages.filterNot { it.id == messageId }
-
         val sid = activeSessionId ?: return
         viewModelScope.launch {
-            chatRepository.deleteSingleMessage(messageId)
-
-            agentHistory.clear()
-            toolLoopDetector.reset()
-            val remaining = chatRepository.loadMessages(sid)
-            for (entity in remaining) {
-                agentHistory.add(entity.toLLMMessage())
+            try {
+                runAfterDatabaseDelete(
+                    delete = { chatRepository.deleteSingleMessage(messageId) },
+                    afterCommit = {
+                        val remaining = chatRepository.loadMessages(sid)
+                        _messages.value = _messages.value.filterNot { it.id == messageId }
+                        agentHistory.clear()
+                        toolLoopDetector.reset()
+                        for (entity in remaining) {
+                            agentHistory.add(entity.toLLMMessage())
+                        }
+                        runCatching {
+                            revokeMemoryWritesInDeletedMessages(listOf(target))
+                        }.onFailure { error ->
+                            Log.e(TAG, "deleteSingleAssistantMessage: memory revoke failed after DB commit", error)
+                        }
+                        if (com.openminis.app.speech.VoiceOutputState.replySpeechState.value.activeMessageId == messageId) {
+                            stopReplySpeech()
+                        }
+                        runCatching {
+                            chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
+                        }
+                        AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
+                    },
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.e(TAG, "deleteSingleAssistantMessage: database delete failed; state unchanged", error)
             }
-            runCatching {
-                chatRepository.updateSessionPreview(sid, remaining.lastOrNull()?.partsJson ?: "[]")
-            }
-            AppLogger.info(TAG, "deleteSingleAssistantMessage: removed message $messageId, ${remaining.size} remain")
         }
     }
 
@@ -6096,16 +6104,11 @@ class ChatViewModel(
             prepared.attachedFilesXml,
             bodyPartsJson = queuedPaste?.partsJson,
         )
-        val userEntity = try {
-            chatRepository.appendMessage(sid, "user", userPartsJson)
-        } catch (e: Exception) {
-            PastedTextProcessor.cleanupFiles(queuedPaste)
-            throw e
-        }
-        // Issue #188: consume pasted texts only after DB append succeeds
-        if (queuedPaste != null) {
-            _pastedTexts.value = _pastedTexts.value.filterNot { it.id in queuedPaste.consumedIds }
-        }
+        val userEntity = PastedTextProcessor.commitMessage(
+            pastedParts = queuedPaste,
+            persist = { chatRepository.appendMessage(sid, "user", userPartsJson) },
+            consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+        )
         agentHistory.add(
             LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6234,16 +6237,11 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = drainPaste?.partsJson,
             )
-            try {
-                chatRepository.appendMessage(sid, "user", userPartsJson)
-                if (drainPaste != null) {
-                    _pastedTexts.value =
-                        _pastedTexts.value.filterNot { it.id in drainPaste.consumedIds }
-                }
-            } catch (e: Exception) {
-                PastedTextProcessor.cleanupFiles(drainPaste)
-                throw e
-            }
+            PastedTextProcessor.commitMessage(
+                pastedParts = drainPaste,
+                persist = { chatRepository.appendMessage(sid, "user", userPartsJson) },
+                consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+            )
 
             agentHistory.add(LLMMessage(
                 role = LLMMessage.Role.USER,
@@ -6398,16 +6396,11 @@ class ChatViewModel(
                 prepared.attachedFilesXml,
                 bodyPartsJson = pasted?.partsJson,
             )
-            val persistedUser = try {
-                chatRepository.appendMessage(activeSessionId, "user", userPartsJson)
-            } catch (e: Exception) {
-                PastedTextProcessor.cleanupFiles(pasted)
-                throw e
-            }
-            // Issue #188: consume pasted texts only after DB append succeeds
-            if (pasted != null) {
-                _pastedTexts.value = _pastedTexts.value.filterNot { it.id in pasted.consumedIds }
-            }
+            val persistedUser = PastedTextProcessor.commitMessage(
+                pastedParts = pasted,
+                persist = { chatRepository.appendMessage(activeSessionId, "user", userPartsJson) },
+                consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
+            )
 
             val userMsg = ChatMessage(
                 id = persistedUser.id,
@@ -6697,6 +6690,7 @@ class ChatViewModel(
     private var lastRetryTimestamp = 0L
 
     fun retryLast() {
+        if (deferUntilMediaCommitted { retryLast() }) return
         val now = android.os.SystemClock.uptimeMillis()
         if (_isStreaming.value || now - lastRetryTimestamp < 800L) return
         lastRetryTimestamp = now
@@ -7324,6 +7318,7 @@ class ChatViewModel(
         reusingAssistantId: String? = null,
     ) {
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
+        pendingMediaCommitJob?.join()
 
         // GH#32: resolve the sparse session payload once per agent-loop run.
         // Settings changed while a loop is already in flight intentionally take
@@ -7644,6 +7639,8 @@ class ChatViewModel(
             // only the NEW parts from this turn (not the full accumulated history).
             // Matches iOS's per-turn RawMessage persistence.
             val turnStartBlockIndex = allToolBlocks.size
+            val pendingTurn = PendingAssistantTurn(assistantId, activeSessionId, turnStartBlockIndex)
+            pendingAssistantTurn = pendingTurn
             // T307: per-delta StringBuilder for the running turn text + the
             // currently-open trailing text block. `turnText` snapshots are
             // taken (via .toString()) at flush boundaries only, never per
@@ -7762,6 +7759,21 @@ class ChatViewModel(
             // so we catch at collect level and unwrap.
             var collectDone = false
             var retryAttempt = 0  // per-turn auto-retry counter (resets on each new turn)
+            suspend fun discardAttemptBlocks() {
+                val discarded = allToolBlocks.drop(turnStartBlockIndex)
+                var removed = false
+                try {
+                    withContext(Dispatchers.Main) {
+                        while (allToolBlocks.size > turnStartBlockIndex) allToolBlocks.removeAt(allToolBlocks.size - 1)
+                        updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
+                        removed = true
+                    }
+                } finally {
+                    if (removed) withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                        AssistantTurnCodec.discardMedia(discarded, mediaStore.mediaBaseDir)
+                    }
+                }
+            }
             while (!collectDone) {
                 try {
                     // [T-android-enhanced-cache] Stamp the per-turn Enhanced
@@ -8150,29 +8162,31 @@ class ChatViewModel(
                         turnFinishReason = chunk.stopReason
                     }
                     is LLMStreamChunk.MediaAttachment -> {
+                        materializeActiveTextBlock()
                         val ref = try {
                             mediaStore.saveMedia(
                                 data = chunk.attachment.data,
                                 mimeType = chunk.attachment.mimeType,
                                 sessionId = activeSessionId,
-                                originalFileName = "generated_image.png",
+                                originalFileName = null,
                             )
                         } catch (e: Exception) {
-                            AppLogger.warning(TAG_STREAM, "Failed to save generated media: ${e.message}")
-                            null
+                            if (e is CancellationException) throw e
+                            throw java.io.IOException("Failed to save generated media", e)
                         }
-                        if (ref != null) {
-                            val file = java.io.File(mediaStore.mediaBaseDir, ref.relativePath)
-                            val blockId = "img_${System.currentTimeMillis()}"
-                            val block = AssistantBlock(
-                                id = blockId,
-                                kind = "media",
-                                toolTitle = ref.originalFileName ?: "Generated Image",
-                                imageFilePath = file.absolutePath,
-                            )
-                            allToolBlocks.add(block)
+                        val block = AssistantTurnCodec.mediaBlock(ref, mediaStore.mediaBaseDir)
+                        var published = false
+                        try {
                             withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
+                                allToolBlocks.add(block)
+                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb, true, allToolBlocks)
+                                published = true
+                            }
+                        } finally {
+                            if (!published) {
+                                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                                    java.io.File(mediaStore.mediaBaseDir, ref.relativePath).delete()
+                                }
                             }
                         }
                     }
@@ -8246,9 +8260,6 @@ class ChatViewModel(
                         // stream's deltas don't double-append on top of stale content. Previous
                         // turns (everything before turnStartBlockIndex) are preserved.
                         if (allToolBlocks.size > turnStartBlockIndex) {
-                            while (allToolBlocks.size > turnStartBlockIndex) {
-                                allToolBlocks.removeAt(allToolBlocks.size - 1)
-                            }
                             // [T-android-fallback-text-rewind] Keep this turn's
                             // already-streamed text on screen across the rollback.
                             // `accumulatedText` only folds in `turnTextSb` after the
@@ -8258,9 +8269,7 @@ class ChatViewModel(
                             // streams into a fresh `turnTextSb` and re-publishes
                             // `accumulatedText + newTurnText`, so this transient
                             // value is overwritten cleanly (no duplication).
-                            withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), true, allToolBlocks)
-                            }
+                            discardAttemptBlocks()
                         }
                         // T307: SB-based per-turn accumulators reset.
                         turnTextSb.setLength(0)
@@ -8365,8 +8374,8 @@ class ChatViewModel(
                             persistBinding("""{"type":"entry","entryId":"${newEntry.id}"}""")
                         }
                         val infoText = fallbackReasons.joinToString("\n") + "\n🔄 Switched to ${currentProvider.model.displayName}"
-                        allToolBlocks.removeAll { it.kind == "info" }
-                        allToolBlocks.add(0, AssistantBlock(
+                        discardAttemptBlocks()
+                        allToolBlocks.add(AssistantBlock(
                             id = "fallback_info_$turn",
                             kind = "info",
                             content = infoText,
@@ -8387,8 +8396,7 @@ class ChatViewModel(
                         turnTextSb.setLength(0)
                         currentTextBlockSb = null
                         // [T-android-tool-splits-reply-fix] Fresh stream from a
-                        // different provider — and the add(0, info) above
-                        // shifted every block index anyway.
+                        // different provider after rolling back this attempt.
                         turnTextBlockIdx = -1
                         turnThinking.clear()
                         toolCalls.clear()
@@ -8400,6 +8408,16 @@ class ChatViewModel(
                         // skipped (disabled / not logged in / hidden) so the
                         // user can see why fallback never reached them —
                         // mirrors iOS streamWithGroupFallback exhausted path.
+                        if (allToolBlocks.drop(turnStartBlockIndex).any { it.mediaRef != null }) {
+                            materializeActiveTextBlock()
+                            pendingTurn.toolInputs = allToolInputs + toolCalls.associate { (id, _, args) -> id to args.toString() }
+                            withContext(Dispatchers.Main) {
+                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb.toString(), false, allToolBlocks)
+                                val interruptedTools = allToolBlocks.drop(turnStartBlockIndex)
+                                    .filter { it.kind == "tool_use" }.map { it.id to it.toolName }
+                                persistInterruptedMediaTurn(pendingTurn, allToolBlocks.toList(), interruptedTools, userStopped = false)
+                            }
+                        }
                         if (shouldFallback) {
                             val skipped = unavailableGroupMembers()
                             if (fallbackReasons.isNotEmpty() || skipped.isNotEmpty()) {
@@ -8421,20 +8439,14 @@ class ChatViewModel(
             // Accumulate text across turns
             accumulatedText += turnText
 
-            // Build assistant contentParts for history
-            val assistantParts = mutableListOf<AgentContentPart>()
-            if (turnText.isNotEmpty()) {
-                assistantParts.add(AgentContentPart.Text(turnText))
-            }
-            for ((id, name, args) in toolCalls) {
-                // [T-android-gemini3-thoughtsig / #179] Attach the captured Gemini
-                // 3.x signature so it round-trips through persistence and replay.
-                assistantParts.add(AgentContentPart.ToolUse(id, name, args, thoughtSignature = toolCallSignatures[id]))
-            }
-
             // Map toolUseId -> input JSON string for persistence (accumulated across turns)
             toolCalls.forEach { (id, _, args) -> allToolInputs[id] = args.toString() }
             val toolInputMap = allToolInputs
+            pendingTurn.toolInputs = toolInputMap.toMap()
+            val turnContent = withContext(Dispatchers.IO) {
+                AssistantTurnCodec.build(allToolBlocks, turnStartBlockIndex, toolInputMap, mediaStore.mediaBaseDir)
+            }
+            val assistantParts = turnContent.parts
             // Prefer the opaque blob from LLMStreamChunk.ReasoningContent when the
             // provider emitted one — that path preserves empty strings (DeepSeek V4
             // `reasoning_content: ""` on non-thinking turns). Fall back to the
@@ -8443,18 +8455,21 @@ class ChatViewModel(
             val turnReasoningContent: String? = turnReasoningBlob
                 ?: turnThinking.toString().takeIf { it.isNotEmpty() }
 
-            agentHistory.add(LLMMessage(
+            val historyMessage = LLMMessage(
                 role = LLMMessage.Role.ASSISTANT,
                 content = turnText,
                 contentParts = assistantParts,
                 reasoningContent = turnReasoningContent,
-            ))
+            )
+            pendingTurn.historyMessage = historyMessage
+            agentHistory.add(historyMessage)
 
             // T321: empty-turn diagnostic — fires when GPT-5.5 (or any other
             // provider) returns a turn with no visible text AND no tool calls.
             // Log only; UI behavior unchanged. Pair with OpenAIProvider SSE
             // logs to triage server-empty vs parser-drop vs swallowed-exception.
-            if (turnText.isEmpty() && toolCalls.isEmpty()) {
+            if (turnText.isEmpty() && toolCalls.isEmpty() &&
+                allToolBlocks.drop(turnStartBlockIndex).none { it.mediaRef != null }) {
                 AppLogger.warning(
                     TAG_STREAM,
                     "empty turn detected: turn=$turn finishReason=$turnFinishReason " +
@@ -8469,13 +8484,11 @@ class ChatViewModel(
                 withContext(Dispatchers.Main) {
                     updateAssistantMessage(assistantId, accumulatedText, false, allToolBlocks)
                 }
-                val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-                val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
                 persistAssistantTurn(
-                    turnParts,
+                    turnContent,
                     lastUsage,
                     turnReasoningContent,
-                    blockMeta,
+                    pendingTurn = pendingTurn,
                     modelSnapshot = modelAttributionSnapshot(currentProvider),
                 )
                 // [T-error-persist-android] Empty-response hint: the model ended a
@@ -8598,12 +8611,10 @@ class ChatViewModel(
             // the list reflects exactly what the model just emitted. Mirrors
             // iOS overlaying the live VM's last message over the DB value.
             run {
-                val livePreviewParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-                val liveMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-                if (livePreviewParts.isNotEmpty()) {
+                if (turnContent.parts.isNotEmpty()) {
                     chatRepository.updateSessionPreview(
                         realSessionId.ifEmpty { sessionId },
-                        buildAssistantPartsJson(livePreviewParts, liveMeta),
+                        turnContent.partsJson,
                     )
                 }
             }
@@ -8965,13 +8976,14 @@ class ChatViewModel(
             // Persist the assistant+tools turn (with full input JSON and thinking).
             // Capture the persisted DB id so we can back-fill agentHistory's last
             // assistant entry — compact-marker boundary resolution depends on it.
-            val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-            val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
+            val completedTurn = withContext(Dispatchers.IO) {
+                AssistantTurnCodec.build(allToolBlocks, turnStartBlockIndex, toolInputMap, mediaStore.mediaBaseDir)
+            }
             val assistantDbId = persistAssistantTurn(
-                turnParts,
+                completedTurn,
                 lastUsage,
                 turnReasoningContent,
-                blockMeta,
+                pendingTurn = pendingTurn,
                 modelSnapshot = modelAttributionSnapshot(currentProvider),
             )
             if (assistantDbId != null) {
@@ -9661,94 +9673,6 @@ class ChatViewModel(
     }
 
     /**
-     * Build the ordered AgentContentPart list for this turn by walking the slice of
-     * `allToolBlocks` that belongs to the current turn (from `turnStartBlockIndex` to
-     * the end). Text blocks become `Text`, tool_use blocks become `ToolUse` — the
-     * original stream order is preserved by the list slice order. Thinking and info
-     * blocks are skipped (they're persisted via `reasoningContent` or not at all).
-     */
-    private fun buildTurnParts(
-        allToolBlocks: List<AssistantBlock>,
-        turnStartBlockIndex: Int,
-        toolCallInputs: Map<String, String>,
-    ): List<AgentContentPart> {
-        if (turnStartBlockIndex >= allToolBlocks.size) return emptyList()
-        val out = mutableListOf<AgentContentPart>()
-        for (i in turnStartBlockIndex until allToolBlocks.size) {
-            val block = allToolBlocks[i]
-            when (block.kind) {
-                "text" -> if (block.content.isNotEmpty()) {
-                    out.add(AgentContentPart.Text(block.content))
-                }
-                "tool_use" -> {
-                    val name = block.toolName
-                    if (name.isBlank()) continue
-                    val inputStr = toolCallInputs[block.id] ?: "{}"
-                    val inputJson = try { JSONObject(inputStr) } catch (_: Exception) { JSONObject() }
-                    // [T-android-gemini3-thoughtsig / #179] Carry the block's
-                    // signature into the persisted/replayed ToolUse.
-                    out.add(AgentContentPart.ToolUse(block.id, name, inputJson, thoughtSignature = block.thoughtSignature))
-                }
-                // "thinking" / "info" → not persisted in parts
-                else -> { /* skip */ }
-            }
-        }
-        return out
-    }
-
-    /**
-     * Persist a single agent turn: the ordered list of AgentContentParts produced
-     * in this turn (text segments and tool_use blocks interleaved in the order they
-     * were emitted). Mirrors iOS's per-turn `persistAgentMessage` — one DB row per
-     * turn, no cross-turn accumulation, preserving `parts` array order.
-     *
-     * This is the right entry point for the agent loop; the legacy
-     * `persistAssistantMessage(text, usage, toolBlocks, ...)` accumulated all history
-     * on every call, which caused:
-     *   - Duplicate tool_use rows across turns (crashed LazyColumn key uniqueness)
-     *   - Orphan tool_result detection thrashing (sanitize injecting placeholders)
-     *   - Lost chronological text ↔ tool_use ordering within a single turn
-     */
-    /**
-     * Serialize a turn's [AgentContentPart] list into the on-disk parts_json
-     * shape (text + toolUse blocks). Shared by [persistAssistantTurn] (the
-     * authoritative per-turn row write) and the live session-list preview
-     * update ([T-android-session-last-message-live-tool-call]) so both produce
-     * an identical payload that [ChatRepository.extractTextPreview] understands.
-     */
-    private fun buildAssistantPartsJson(
-        parts: List<AgentContentPart>,
-        toolBlockMeta: Map<String, AssistantBlock>,
-    ): String = buildString {
-        append("[")
-        parts.forEachIndexed { index, part ->
-            if (index > 0) append(",")
-            when (part) {
-                is AgentContentPart.Text -> {
-                    append("""{"type":"text","value":${escapeJson(part.text)}}""")
-                }
-                is AgentContentPart.ToolUse -> {
-                    // Skip tool_use with blank name — upstream bug guard.
-                    val name = part.name
-                    if (name.isBlank()) return@forEachIndexed
-                    val inputStr = part.input.toString()
-                    val meta = toolBlockMeta[part.id]
-                    val desc = meta?.toolTitle ?: ""
-                    val pageURL = meta?.browserURL ?: ""
-                    val imgPath = meta?.imageFilePath ?: ""
-                    // [T-android-gemini3-thoughtsig / #179] Persist the captured
-                    // signature (null-literal when absent) so it survives a session
-                    // reload and can be replayed on the historical functionCall.
-                    val sigJson = part.thoughtSignature?.let { escapeJson(it) } ?: "null"
-                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}}""")
-                }
-                else -> { /* tool_result is persisted via persistToolResultMessage */ }
-            }
-        }
-        append("]")
-    }
-
-    /**
      * Resolve the immutable identity for the provider that actually emitted
      * this turn. The active entry id is important: model ids are not unique
      * across provider instances, especially after group fallback.
@@ -9768,23 +9692,25 @@ class ChatViewModel(
     }
 
     private suspend fun persistAssistantTurn(
-        parts: List<AgentContentPart>,
+        turn: AssistantTurnCodec.Turn,
         usage: LLMUsage?,
         reasoningContent: String? = null,
-        toolBlockMeta: Map<String, AssistantBlock> = emptyMap(),
         modelSnapshot: ModelAttributionSnapshot? = null,
+        pendingTurn: PendingAssistantTurn? = null,
     ): String? {
-        if (parts.isEmpty()) return null
-        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta)
+        if (turn.parts.isEmpty()) return null
+        val partsJson = turn.partsJson
         val tokenJson = usage?.let {
             """{"inputTokens":${it.inputTokens},"outputTokens":${it.outputTokens},"cacheCreationTokens":${it.cacheCreationInputTokens ?: 0},"cacheReadTokens":${it.cacheReadInputTokens ?: 0},"latestContextTokens":${it.latestContextTokens}}"""
         }
-        val entity = chatRepository.appendMessage(
-            realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
-            reasoningContent = reasoningContent,
-            modelSnapshot = modelSnapshot,
-        )
-        return entity.id
+        val write: suspend () -> String? = {
+            chatRepository.appendMessage(
+                pendingTurn?.sessionId ?: realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
+                reasoningContent = reasoningContent,
+                modelSnapshot = modelSnapshot,
+            ).id
+        }
+        return if (pendingTurn != null) pendingTurn.commit(turn, write) else write()
     }
 
     @Deprecated("Use persistAssistantTurn(parts, ...) for per-turn delta persistence")
@@ -11083,6 +11009,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     private fun resumeQueueAfterCancel() {
         viewModelScope.launch {
             kotlinx.coroutines.delay(200)
+            pendingMediaCommitJob?.join()
             if (_promptQueue.value.isEmpty()) return@launch
             if (_isStreaming.value) return@launch
             // [T-android-compact-queued-drain] Defer while a compact is in
@@ -11247,6 +11174,14 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             } else b
         }
         val hadInflightTools = cancelledIds.isNotEmpty()
+        val pending = pendingAssistantTurn?.takeIf { it.assistantId == last.id }
+        if (pending != null && pending.committed == null && updatedBlocks.drop(pending.startIndex).any { it.mediaRef != null }) {
+            msgs[lastIdx] = last.copy(toolBlocks = updatedBlocks, isStreaming = false)
+            _messages.value = msgs
+            persistInterruptedMediaTurn(pending, updatedBlocks, cancelledIds)
+            _canResume.value = true
+            return
+        }
         if (hadInflightTools) {
             msgs[lastIdx] = last.copy(toolBlocks = updatedBlocks)
             _messages.value = msgs
@@ -11334,18 +11269,61 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * Only emits text parts — tool_use / tool_result paths are handled by
      * the existing persistence code in the agent loop.
      */
-    private fun buildAssistantPartsJson(parts: List<AgentContentPart>): String {
-        val sb = StringBuilder("[")
-        var first = true
-        for (p in parts) {
-            if (p !is AgentContentPart.Text) continue
-            if (!first) sb.append(',') else first = false
-            sb.append("""{"type":"text","value":""")
-            sb.append(escapeJson(p.text))
-            sb.append('}')
+    private fun buildAssistantPartsJson(parts: List<AgentContentPart>): String =
+        AssistantTurnCodec.encodeParts(parts)
+
+    private fun deferUntilMediaCommitted(action: () -> Unit): Boolean {
+        val job = pendingMediaCommitJob?.takeUnless { it.isCompleted } ?: return false
+        viewModelScope.launch { job.join(); action() }
+        return true
+    }
+
+    private fun persistInterruptedMediaTurn(
+        pending: PendingAssistantTurn,
+        blocks: List<AssistantBlock>,
+        cancelledTools: List<Pair<String, String>>,
+        userStopped: Boolean = true,
+    ) {
+        if (pendingMediaCommitJob?.isActive == true) return
+        val history = pending.historyMessage ?: LLMMessage(LLMMessage.Role.ASSISTANT, "").also {
+            pending.historyMessage = it
+            agentHistory.add(it)
         }
-        sb.append(']')
-        return sb.toString()
+        val snapshot = modelAttributionSnapshot(currentProvider)
+        // Start the non-cancellable commit before returning from Stop. A new
+        // send waits at ensureSession, so its row cannot overtake this reply.
+        pendingMediaCommitJob = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                try {
+                    val turn = AssistantTurnCodec.interrupted(
+                        AssistantTurnCodec.build(blocks, pending.startIndex, pending.toolInputs, mediaStore.mediaBaseDir),
+                        userStopped = userStopped,
+                    )
+                    val id = persistAssistantTurn(turn, null, modelSnapshot = snapshot, pendingTurn = pending)
+                    val committed = pending.committed?.turn ?: turn
+                    val results = cancelledTools.map { (toolId, name) ->
+                        AgentContentPart.ToolResult(toolId, name,
+                            if (userStopped) CANCELLED_MARKER else "Response interrupted before tool execution.", isError = true)
+                    }
+                    val resultId = if (results.isNotEmpty()) persistToolResultMessage(results) else null
+                    withContext(Dispatchers.Main) {
+                        val index = agentHistory.indexOfFirst { it === history }
+                        if (index >= 0) {
+                            agentHistory[index] = history.copy(contentParts = committed.parts, dbMessageId = id)
+                            if (results.isNotEmpty()) agentHistory.add(index + 1,
+                                LLMMessage(LLMMessage.Role.USER, "", contentParts = results, dbMessageId = resultId))
+                        }
+                    }
+                } catch (error: Exception) {
+                    AppLogger.error(TAG_STREAM, "Failed to persist stopped media turn: ${error.message}")
+                    withContext(Dispatchers.Main) {
+                        _messages.value = _messages.value.map {
+                            if (it.id == pending.assistantId) it.copy(error = error.message ?: "Failed to save generated media") else it
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -11358,6 +11336,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * Clears [_canResume] on entry so repeated taps don't stack.
      */
     fun resume() {
+        if (deferUntilMediaCommitted { resume() }) return
         if (_isStreaming.value || !_canResume.value) return
         val provider = currentProvider ?: run {
             _error.value = "No provider configured"
@@ -11595,13 +11574,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
     }
 
-    private fun List<MessageEntity>.toChatMessages(): List<ChatMessage> {
+    private fun List<MessageEntity>.toChatMessages(parsedParts: Map<String, Result<org.json.JSONArray>>): List<ChatMessage> {
         // First pass: extract all toolResult data keyed by toolUseId
         val toolResultMap = mutableMapOf<String, ToolResultData>()
         for (entity in this) {
             if (entity.role != "user") continue
             try {
-                val array = org.json.JSONArray(entity.partsJson)
+                val array = parsedParts.getValue(entity.id).getOrThrow()
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     if (obj.optString("type") == "toolResult") {
@@ -11646,7 +11625,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             }
 
             try {
-                val array = org.json.JSONArray(entity.partsJson)
+                val array = parsedParts.getValue(entity.id).getOrThrow()
                 var textBlockCounter = 0
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
@@ -11714,8 +11693,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                             ))
                         }
                         "mediaRef" -> {
-                            if (entity.role != "user") continue
                             val value = obj.optJSONObject("value") ?: continue
+                            if (entity.role == "assistant") {
+                                blocks.add(AssistantTurnCodec.restoreMediaBlock(value, mediaStore.mediaBaseDir))
+                                continue
+                            }
+                            if (entity.role != "user") continue
                             val rel = value.optString("relativePath", "")
                             if (rel.isEmpty()) continue
                             val file = java.io.File(mediaStore.mediaBaseDir, rel)
@@ -11828,14 +11811,14 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
 
     private data class ToolResultData(val output: String, val success: Boolean)
 
-    private fun MessageEntity.toLLMMessage(): LLMMessage {
+    private fun MessageEntity.toLLMMessage(parsedParts: Result<org.json.JSONArray>? = null): LLMMessage {
         val r = if (role == "user") LLMMessage.Role.USER else LLMMessage.Role.ASSISTANT
         val contentParts = mutableListOf<AgentContentPart>()
         val imageParts = mutableListOf<LLMMessage.ImagePart>()
         var textContent = ""
 
         try {
-            val array = org.json.JSONArray(partsJson)
+            val array = parsedParts?.getOrThrow() ?: org.json.JSONArray(partsJson)
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 when (obj.optString("type")) {

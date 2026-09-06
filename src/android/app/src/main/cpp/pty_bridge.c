@@ -1,6 +1,6 @@
 // pty_bridge.c — JNI wrapper around bionic forkpty()/tcsetattr()/ioctl()
 //
-// Enables a real TTY for a spawned proot/sh process so the shell emits its PS1
+// Enables a real TTY for the Ubuntu shell so the shell emits its PS1
 // prompt, echoes characters back as typed, and responds to arrow keys,
 // Ctrl+C as SIGINT, etc. — mirroring iOS ISHKernel behaviour.
 //
@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <poll.h>
 #include <android/log.h>
 
 #define LOG_TAG "PtyBridge"
@@ -139,6 +140,16 @@ Java_com_openminis_app_sandbox_PtyBridge_forkExec(
     (*env)->ReleaseStringUTFChars(env, jCmd, cmd);
     if (jCwd && cwd) (*env)->ReleaseStringUTFChars(env, jCwd, cwd);
 
+    // All IO belongs to one coroutine. Nonblocking writes and bounded reads
+    // let cancellation reach its close/reap finally block even on a quiet PTY.
+    if (fcntl(masterFd, F_SETFD, FD_CLOEXEC) < 0 ||
+        fcntl(masterFd, F_SETFL, O_NONBLOCK) < 0) {
+        int err = errno;
+        close(masterFd);
+        kill(pid, SIGKILL);
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+        return -err;
+    }
     jint pidOut = (jint) pid;
     (*env)->SetIntArrayRegion(env, outPid, 0, 1, &pidOut);
     LOGI("forkpty ok: pid=%d masterFd=%d cols=%d rows=%d", pid, masterFd, cols, rows);
@@ -149,13 +160,17 @@ JNIEXPORT jint JNICALL
 Java_com_openminis_app_sandbox_PtyBridge_readBytes(
     JNIEnv *env, jclass clazz, jint fd, jbyteArray buf, jint off, jint len)
 {
-    if (fd < 0 || len <= 0) return -EINVAL;
+    if (fd < 0 || off < 0 || len <= 0 || off > (*env)->GetArrayLength(env, buf) - len) return -EINVAL;
+    struct pollfd event = { .fd = fd, .events = POLLIN };
+    int ready = poll(&event, 1, 50);
+    if (ready == 0 || (ready < 0 && errno == EINTR)) return -EAGAIN;
+    if (ready < 0) return -errno;
     jbyte *data = (*env)->GetByteArrayElements(env, buf, NULL);
     if (!data) return -ENOMEM;
     ssize_t n = read(fd, data + off, (size_t) len);
     int err = (n < 0) ? errno : 0;
     (*env)->ReleaseByteArrayElements(env, buf, data, 0);
-    if (n < 0) return -err;
+    if (n < 0) return err == EINTR ? -EAGAIN : -err;
     return (jint) n;
 }
 
@@ -163,21 +178,13 @@ JNIEXPORT jint JNICALL
 Java_com_openminis_app_sandbox_PtyBridge_writeBytes(
     JNIEnv *env, jclass clazz, jint fd, jbyteArray buf, jint off, jint len)
 {
-    if (fd < 0 || len <= 0) return -EINVAL;
+    if (fd < 0 || off < 0 || len <= 0 || off > (*env)->GetArrayLength(env, buf) - len) return -EINVAL;
     jbyte *data = (*env)->GetByteArrayElements(env, buf, NULL);
     if (!data) return -ENOMEM;
-    ssize_t written = 0;
-    while (written < len) {
-        ssize_t n = write(fd, data + off + written, (size_t) (len - written));
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            int err = errno;
-            (*env)->ReleaseByteArrayElements(env, buf, data, JNI_ABORT);
-            return -err;
-        }
-        written += n;
-    }
+    ssize_t written = write(fd, data + off, (size_t) len);
+    int err = errno;
     (*env)->ReleaseByteArrayElements(env, buf, data, JNI_ABORT);
+    if (written < 0) return err == EINTR ? -EAGAIN : -err;
     return (jint) written;
 }
 
@@ -204,24 +211,30 @@ Java_com_openminis_app_sandbox_PtyBridge_closeFd(
     return 0;
 }
 
-JNIEXPORT jint JNICALL
-Java_com_openminis_app_sandbox_PtyBridge_sendSignal(
-    JNIEnv *env, jclass clazz, jint pid, jint sig)
-{
-    if (pid <= 0) return -EINVAL;
-    if (kill((pid_t) pid, sig) < 0) return -errno;
-    return 0;
-}
-
-// Blocking wait for the given child pid. Returns the exit status
+// One owner signals and reaps the child, with a bounded SIGTERM grace period.
+// Never signal after reaping: the kernel may reuse the pid immediately.
+// Returns the exit status
 // (WEXITSTATUS) on normal exit, or -(128+sig) on termination by signal.
 // Returns -errno on waitpid() failure.
 JNIEXPORT jint JNICALL
-Java_com_openminis_app_sandbox_PtyBridge_waitFor(
+Java_com_openminis_app_sandbox_PtyBridge_terminateAndWait(
     JNIEnv *env, jclass clazz, jint pid)
 {
     if (pid <= 0) return -EINVAL;
     int status = 0;
+    int attempts = 0;
+    while (1) {
+        pid_t r = waitpid((pid_t) pid, &status, WNOHANG);
+        if (r == pid) goto reaped;
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            return -errno;
+        }
+        if (attempts == 0 && kill((pid_t) pid, SIGTERM) < 0 && errno != ESRCH) return -errno;
+        if (attempts++ >= 100) break;
+        usleep(10000);
+    }
+    if (kill((pid_t) pid, SIGKILL) < 0 && errno != ESRCH) return -errno;
     while (1) {
         pid_t r = waitpid((pid_t) pid, &status, 0);
         if (r < 0) {
@@ -230,6 +243,7 @@ Java_com_openminis_app_sandbox_PtyBridge_waitFor(
         }
         break;
     }
+reaped:
     if (WIFEXITED(status)) return (jint) WEXITSTATUS(status);
     if (WIFSIGNALED(status)) return (jint) -(128 + WTERMSIG(status));
     return -1;

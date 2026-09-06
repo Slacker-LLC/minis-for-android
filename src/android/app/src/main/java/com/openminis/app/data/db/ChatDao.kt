@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
+import androidx.room.Transaction
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
@@ -204,17 +205,20 @@ interface ChatDao {
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     suspend fun loadMessages(sessionId: String): List<MessageEntity>
 
-    @Query("SELECT COUNT(*) FROM messages WHERE session_id = :sessionId")
-    suspend fun countMessages(sessionId: String): Int
-
-    @Query("SELECT * FROM (SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order DESC LIMIT :limit) ORDER BY sort_order ASC")
-    suspend fun loadRecentMessages(sessionId: String, limit: Int): List<MessageEntity>
-
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     fun observeMessages(sessionId: String): Flow<List<MessageEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
+
+    /** A failed preview update must not leave a row whose media caller rolls back. */
+    @Transaction
+    suspend fun appendMessageWithPreview(message: MessageEntity, preview: String?): MessageEntity {
+        val ordered = message.copy(sortOrder = nextSortOrder(message.sessionId))
+        insertMessage(ordered)
+        updateLastMessage(ordered.sessionId, preview, ordered.createdAt)
+        return ordered
+    }
 
     /**
      * [T-android-voice-correction] User messages newer than [since] (epoch ms),
