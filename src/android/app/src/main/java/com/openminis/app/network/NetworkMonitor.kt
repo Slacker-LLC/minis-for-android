@@ -215,6 +215,7 @@ class NetworkMonitor {
                     Log.w(TAG, "[DNS] sandbox resolv.conf refresh returned false ($reason)")
                 }
             } catch (t: Throwable) {
+                if (t is kotlinx.coroutines.CancellationException) throw t
                 Log.w(TAG, "[DNS] refresh failed ($reason): ${t.message}")
             }
         }
