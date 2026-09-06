@@ -2,7 +2,6 @@ package com.openminis.app.runtime.terminal
 
 import com.openminis.app.runtime.minisd.MinisdResponse
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
-import com.openminis.app.sandbox.PtyBackend
 import com.openminis.app.sandbox.TerminalSession
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi

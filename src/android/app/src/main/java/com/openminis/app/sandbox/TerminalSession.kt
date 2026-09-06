@@ -3,6 +3,7 @@ package com.openminis.app.sandbox
 import android.content.Context
 import android.util.Log
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.terminal.PtyBackend
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.CancellationException
@@ -39,16 +40,6 @@ internal object PtyBridge {
     external fun setWindowSize(fd: Int, cols: Int, rows: Int): Int
     external fun closeFd(fd: Int): Int
     external fun terminateAndWait(pid: Int): Int
-}
-
-internal interface PtyBackend {
-    val available: Boolean
-    fun open(launch: TerminalSession.Launch, cols: Int, rows: Int, outPid: IntArray): Int
-    suspend fun read(fd: Int, bytes: ByteArray): Int
-    fun write(fd: Int, bytes: ByteArray, offset: Int): Int
-    fun resize(fd: Int, cols: Int, rows: Int)
-    fun close(fd: Int)
-    fun terminateAndWait(pid: Int)
 }
 
 private object NativePtyBackend : PtyBackend {
