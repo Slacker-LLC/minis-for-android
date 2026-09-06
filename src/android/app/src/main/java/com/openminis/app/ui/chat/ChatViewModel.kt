@@ -8150,29 +8150,31 @@ class ChatViewModel(
                         turnFinishReason = chunk.stopReason
                     }
                     is LLMStreamChunk.MediaAttachment -> {
+                        materializeActiveTextBlock()
                         val ref = try {
                             mediaStore.saveMedia(
                                 data = chunk.attachment.data,
                                 mimeType = chunk.attachment.mimeType,
                                 sessionId = activeSessionId,
-                                originalFileName = "generated_image.png",
+                                originalFileName = null,
                             )
                         } catch (e: Exception) {
-                            AppLogger.warning(TAG_STREAM, "Failed to save generated media: ${e.message}")
-                            null
+                            if (e is CancellationException) throw e
+                            throw java.io.IOException("Failed to save generated media", e)
                         }
-                        if (ref != null) {
-                            val file = java.io.File(mediaStore.mediaBaseDir, ref.relativePath)
-                            val blockId = "img_${System.currentTimeMillis()}"
-                            val block = AssistantBlock(
-                                id = blockId,
-                                kind = "media",
-                                toolTitle = ref.originalFileName ?: "Generated Image",
-                                imageFilePath = file.absolutePath,
-                            )
-                            allToolBlocks.add(block)
+                        val block = AssistantTurnCodec.mediaBlock(ref, mediaStore.mediaBaseDir)
+                        var published = false
+                        try {
                             withContext(Dispatchers.Main) {
-                                updateAssistantMessage(assistantId, accumulatedText, true, allToolBlocks)
+                                allToolBlocks.add(block)
+                                updateAssistantMessage(assistantId, accumulatedText + turnTextSb, true, allToolBlocks)
+                                published = true
+                            }
+                        } finally {
+                            if (!published) {
+                                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                                    java.io.File(mediaStore.mediaBaseDir, ref.relativePath).delete()
+                                }
                             }
                         }
                     }
@@ -8421,20 +8423,13 @@ class ChatViewModel(
             // Accumulate text across turns
             accumulatedText += turnText
 
-            // Build assistant contentParts for history
-            val assistantParts = mutableListOf<AgentContentPart>()
-            if (turnText.isNotEmpty()) {
-                assistantParts.add(AgentContentPart.Text(turnText))
-            }
-            for ((id, name, args) in toolCalls) {
-                // [T-android-gemini3-thoughtsig / #179] Attach the captured Gemini
-                // 3.x signature so it round-trips through persistence and replay.
-                assistantParts.add(AgentContentPart.ToolUse(id, name, args, thoughtSignature = toolCallSignatures[id]))
-            }
-
             // Map toolUseId -> input JSON string for persistence (accumulated across turns)
             toolCalls.forEach { (id, _, args) -> allToolInputs[id] = args.toString() }
             val toolInputMap = allToolInputs
+            val turnContent = withContext(Dispatchers.IO) {
+                AssistantTurnCodec.build(allToolBlocks, turnStartBlockIndex, toolInputMap, mediaStore.mediaBaseDir)
+            }
+            val assistantParts = turnContent.parts
             // Prefer the opaque blob from LLMStreamChunk.ReasoningContent when the
             // provider emitted one — that path preserves empty strings (DeepSeek V4
             // `reasoning_content: ""` on non-thinking turns). Fall back to the
@@ -8454,7 +8449,8 @@ class ChatViewModel(
             // provider) returns a turn with no visible text AND no tool calls.
             // Log only; UI behavior unchanged. Pair with OpenAIProvider SSE
             // logs to triage server-empty vs parser-drop vs swallowed-exception.
-            if (turnText.isEmpty() && toolCalls.isEmpty()) {
+            if (turnText.isEmpty() && toolCalls.isEmpty() &&
+                allToolBlocks.drop(turnStartBlockIndex).none { it.mediaRef != null }) {
                 AppLogger.warning(
                     TAG_STREAM,
                     "empty turn detected: turn=$turn finishReason=$turnFinishReason " +
@@ -8469,13 +8465,10 @@ class ChatViewModel(
                 withContext(Dispatchers.Main) {
                     updateAssistantMessage(assistantId, accumulatedText, false, allToolBlocks)
                 }
-                val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-                val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
                 persistAssistantTurn(
-                    turnParts,
+                    turnContent,
                     lastUsage,
                     turnReasoningContent,
-                    blockMeta,
                     modelSnapshot = modelAttributionSnapshot(currentProvider),
                 )
                 // [T-error-persist-android] Empty-response hint: the model ended a
@@ -8598,12 +8591,10 @@ class ChatViewModel(
             // the list reflects exactly what the model just emitted. Mirrors
             // iOS overlaying the live VM's last message over the DB value.
             run {
-                val livePreviewParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-                val liveMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
-                if (livePreviewParts.isNotEmpty()) {
+                if (turnContent.parts.isNotEmpty()) {
                     chatRepository.updateSessionPreview(
                         realSessionId.ifEmpty { sessionId },
-                        buildAssistantPartsJson(livePreviewParts, liveMeta),
+                        turnContent.partsJson,
                     )
                 }
             }
@@ -8965,13 +8956,13 @@ class ChatViewModel(
             // Persist the assistant+tools turn (with full input JSON and thinking).
             // Capture the persisted DB id so we can back-fill agentHistory's last
             // assistant entry — compact-marker boundary resolution depends on it.
-            val turnParts = buildTurnParts(allToolBlocks, turnStartBlockIndex, toolInputMap)
-            val blockMeta = allToolBlocks.filter { it.kind == "tool_use" }.associateBy { it.id }
+            val completedTurn = withContext(Dispatchers.IO) {
+                AssistantTurnCodec.build(allToolBlocks, turnStartBlockIndex, toolInputMap, mediaStore.mediaBaseDir)
+            }
             val assistantDbId = persistAssistantTurn(
-                turnParts,
+                completedTurn,
                 lastUsage,
                 turnReasoningContent,
-                blockMeta,
                 modelSnapshot = modelAttributionSnapshot(currentProvider),
             )
             if (assistantDbId != null) {
@@ -9661,94 +9652,6 @@ class ChatViewModel(
     }
 
     /**
-     * Build the ordered AgentContentPart list for this turn by walking the slice of
-     * `allToolBlocks` that belongs to the current turn (from `turnStartBlockIndex` to
-     * the end). Text blocks become `Text`, tool_use blocks become `ToolUse` — the
-     * original stream order is preserved by the list slice order. Thinking and info
-     * blocks are skipped (they're persisted via `reasoningContent` or not at all).
-     */
-    private fun buildTurnParts(
-        allToolBlocks: List<AssistantBlock>,
-        turnStartBlockIndex: Int,
-        toolCallInputs: Map<String, String>,
-    ): List<AgentContentPart> {
-        if (turnStartBlockIndex >= allToolBlocks.size) return emptyList()
-        val out = mutableListOf<AgentContentPart>()
-        for (i in turnStartBlockIndex until allToolBlocks.size) {
-            val block = allToolBlocks[i]
-            when (block.kind) {
-                "text" -> if (block.content.isNotEmpty()) {
-                    out.add(AgentContentPart.Text(block.content))
-                }
-                "tool_use" -> {
-                    val name = block.toolName
-                    if (name.isBlank()) continue
-                    val inputStr = toolCallInputs[block.id] ?: "{}"
-                    val inputJson = try { JSONObject(inputStr) } catch (_: Exception) { JSONObject() }
-                    // [T-android-gemini3-thoughtsig / #179] Carry the block's
-                    // signature into the persisted/replayed ToolUse.
-                    out.add(AgentContentPart.ToolUse(block.id, name, inputJson, thoughtSignature = block.thoughtSignature))
-                }
-                // "thinking" / "info" → not persisted in parts
-                else -> { /* skip */ }
-            }
-        }
-        return out
-    }
-
-    /**
-     * Persist a single agent turn: the ordered list of AgentContentParts produced
-     * in this turn (text segments and tool_use blocks interleaved in the order they
-     * were emitted). Mirrors iOS's per-turn `persistAgentMessage` — one DB row per
-     * turn, no cross-turn accumulation, preserving `parts` array order.
-     *
-     * This is the right entry point for the agent loop; the legacy
-     * `persistAssistantMessage(text, usage, toolBlocks, ...)` accumulated all history
-     * on every call, which caused:
-     *   - Duplicate tool_use rows across turns (crashed LazyColumn key uniqueness)
-     *   - Orphan tool_result detection thrashing (sanitize injecting placeholders)
-     *   - Lost chronological text ↔ tool_use ordering within a single turn
-     */
-    /**
-     * Serialize a turn's [AgentContentPart] list into the on-disk parts_json
-     * shape (text + toolUse blocks). Shared by [persistAssistantTurn] (the
-     * authoritative per-turn row write) and the live session-list preview
-     * update ([T-android-session-last-message-live-tool-call]) so both produce
-     * an identical payload that [ChatRepository.extractTextPreview] understands.
-     */
-    private fun buildAssistantPartsJson(
-        parts: List<AgentContentPart>,
-        toolBlockMeta: Map<String, AssistantBlock>,
-    ): String = buildString {
-        append("[")
-        parts.forEachIndexed { index, part ->
-            if (index > 0) append(",")
-            when (part) {
-                is AgentContentPart.Text -> {
-                    append("""{"type":"text","value":${escapeJson(part.text)}}""")
-                }
-                is AgentContentPart.ToolUse -> {
-                    // Skip tool_use with blank name — upstream bug guard.
-                    val name = part.name
-                    if (name.isBlank()) return@forEachIndexed
-                    val inputStr = part.input.toString()
-                    val meta = toolBlockMeta[part.id]
-                    val desc = meta?.toolTitle ?: ""
-                    val pageURL = meta?.browserURL ?: ""
-                    val imgPath = meta?.imageFilePath ?: ""
-                    // [T-android-gemini3-thoughtsig / #179] Persist the captured
-                    // signature (null-literal when absent) so it survives a session
-                    // reload and can be replayed on the historical functionCall.
-                    val sigJson = part.thoughtSignature?.let { escapeJson(it) } ?: "null"
-                    append("""{"type":"toolUse","value":{"toolUseId":${escapeJson(part.id)},"name":${escapeJson(name)},"input":${escapeJson(inputStr)},"description":${escapeJson(desc)},"pageURL":${escapeJson(pageURL)},"imageFilePath":${escapeJson(imgPath)},"thoughtSignature":$sigJson}}""")
-                }
-                else -> { /* tool_result is persisted via persistToolResultMessage */ }
-            }
-        }
-        append("]")
-    }
-
-    /**
      * Resolve the immutable identity for the provider that actually emitted
      * this turn. The active entry id is important: model ids are not unique
      * across provider instances, especially after group fallback.
@@ -9768,14 +9671,13 @@ class ChatViewModel(
     }
 
     private suspend fun persistAssistantTurn(
-        parts: List<AgentContentPart>,
+        turn: AssistantTurnCodec.Turn,
         usage: LLMUsage?,
         reasoningContent: String? = null,
-        toolBlockMeta: Map<String, AssistantBlock> = emptyMap(),
         modelSnapshot: ModelAttributionSnapshot? = null,
     ): String? {
-        if (parts.isEmpty()) return null
-        val partsJson = buildAssistantPartsJson(parts, toolBlockMeta)
+        if (turn.parts.isEmpty()) return null
+        val partsJson = turn.partsJson
         val tokenJson = usage?.let {
             """{"inputTokens":${it.inputTokens},"outputTokens":${it.outputTokens},"cacheCreationTokens":${it.cacheCreationInputTokens ?: 0},"cacheReadTokens":${it.cacheReadInputTokens ?: 0},"latestContextTokens":${it.latestContextTokens}}"""
         }
@@ -11334,19 +11236,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
      * Only emits text parts — tool_use / tool_result paths are handled by
      * the existing persistence code in the agent loop.
      */
-    private fun buildAssistantPartsJson(parts: List<AgentContentPart>): String {
-        val sb = StringBuilder("[")
-        var first = true
-        for (p in parts) {
-            if (p !is AgentContentPart.Text) continue
-            if (!first) sb.append(',') else first = false
-            sb.append("""{"type":"text","value":""")
-            sb.append(escapeJson(p.text))
-            sb.append('}')
-        }
-        sb.append(']')
-        return sb.toString()
-    }
+    private fun buildAssistantPartsJson(parts: List<AgentContentPart>): String =
+        AssistantTurnCodec.encodeParts(parts)
 
     /**
      * Resume an interrupted agent loop. Injects a `<system-reminder>` into
@@ -11714,8 +11605,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                             ))
                         }
                         "mediaRef" -> {
-                            if (entity.role != "user") continue
                             val value = obj.optJSONObject("value") ?: continue
+                            if (entity.role == "assistant") {
+                                blocks.add(AssistantTurnCodec.restoreMediaBlock(value, mediaStore.mediaBaseDir))
+                                continue
+                            }
+                            if (entity.role != "user") continue
                             val rel = value.optString("relativePath", "")
                             if (rel.isEmpty()) continue
                             val file = java.io.File(mediaStore.mediaBaseDir, rel)

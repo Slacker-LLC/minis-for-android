@@ -257,7 +257,7 @@ data class SlashCommand(
 
 data class AssistantBlock(
     val id: String,
-    val kind: String,       // "text", "tool_use", "thinking", "info"
+    val kind: String,       // "text", "tool_use", "thinking", "info", "media"
     val content: String = "",
     val toolStatus: ToolBlockStatus? = null,
     val toolTitle: String = "",
@@ -269,6 +269,7 @@ data class AssistantBlock(
     val browserURL: String? = null,
     /** Local file path to screenshot JPEG (mirrors iOS AssistantBlock.imageFilePath). */
     val imageFilePath: String? = null,
+    val mediaRef: com.openminis.app.data.model.MediaRef? = null,
     /**
      * [T-android-gemini3-thoughtsig / #179] Gemini 3.x thought signature for a
      * tool_use block. Carried here so [buildTurnParts] (the persistence path,
