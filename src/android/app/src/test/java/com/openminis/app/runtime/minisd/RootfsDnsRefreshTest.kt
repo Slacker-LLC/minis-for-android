@@ -2,7 +2,6 @@ package com.openminis.app.runtime.minisd
 
 import com.openminis.app.sandbox.RootfsManager
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,7 +28,6 @@ class RootfsDnsRefreshTest {
             appSocket = "/data/adb/minis/run/minisd.sock",
             policyJson = "{\"methods\":{}}",
             forceRestart = false,
-            appUid = 10392,
         )
 
         // Checklist A: resolv.conf fallback population & 644 permission
@@ -41,22 +39,6 @@ class RootfsDnsRefreshTest {
         assertTrue(cmd.contains("chmod 755 /data/adb/minis/rootfs/opt /data/adb/minis/rootfs/opt/minis /data/adb/minis/rootfs/opt/minis/bin"))
         assertTrue(cmd.contains("chmod 755 /data/adb/minis/rootfs/opt/minis/bin/minis-config /data/adb/minis/rootfs/opt/minis/bin/minis-model-use"))
 
-        // Checklist E: /data/adb/minis/home fast-path ownership by appUid
-        assertTrue(cmd.contains("chown 10392:10392 /data/adb/minis/home"))
-        assertTrue(cmd.contains("for d in .cache .local .config; do [ -d \"/data/adb/minis/home/\$d\" ] && chown -R 10392:10392 \"/data/adb/minis/home/\$d\""))
-        assertTrue(cmd.contains("chmod 755 /data/adb/minis/home"))
-    }
-
-    @Test
-    fun testWatchdogCommandWithoutAppUidSkipsHomeChown() {
-        val cmd = MinisdBootstrap.watchdogCommand(
-            appSocket = "/data/adb/minis/run/minisd.sock",
-            policyJson = "{\"methods\":{}}",
-            forceRestart = false,
-            appUid = 0,
-        )
-
-        assertFalse(cmd.contains("chown 0:0 /data/adb/minis/home"))
     }
 
     @Test
