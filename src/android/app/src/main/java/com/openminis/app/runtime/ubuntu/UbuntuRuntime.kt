@@ -642,7 +642,6 @@ object UbuntuRuntime {
                 policyJson = policy,
                 forceRestart = forceRestart,
                 packagedBroker = packagedBroker,
-                appUid = ctx.applicationInfo.uid,
             )
 
             val proc = try {
