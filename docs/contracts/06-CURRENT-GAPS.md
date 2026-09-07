@@ -42,6 +42,12 @@
 
 修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，复用已合并的 #204，目标分支为 main。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
 
+### Bot 团队 UI 尚未进入远端主线
+
+2026-09-07 补充核验远端 `main` `e602efe53689ec90f0bafcac4cd0d95d1b47fe80`：源码树与仓库代码搜索均未发现 `BotsScreen`、`BotRepository`、`BotTask`、`BotDelegation` 或 `BotTeamExperiencePreview`。因此当前远端基线不存在可按 Android/Material 规范审计和修复的真实 Bot 团队页面，也没有可从主线移除的体验预览入口。
+
+历史 PR #208、#219 均将 Bot orchestration/UI/domain 描述为开发机上的未提交 WIP；远端 `feat/bot-orchestration` 仅包含 2026-06 的 MiniApp/Harmony demo 提交，不能作为该真实 Bot 实现来源。在真实 WIP 恢复为可追溯提交前，不应在 `main` 中重建 Bot UI、伪造 Repository/Room 数据或另建导航。恢复后再沿 `BotsScreen -> BotRepository/Room -> SessionDrawer/ChatScreen` 及 `BotTask`、`BotDelegation`、`Session` 的真实链路做 Android/Material 合规修复。
+
 ## 本轮集成检查
 
 在从 `be357f3b` 集成 #202～#206 得到的本地提交 `f7ea80989ff7dfa474bfd880f80a65fd8d6ba8b9` 上，所有修复无冲突合并；完整 Android 单元测试统计 1,640 项，其中 1,638 项通过、2 项跳过，0 失败、0 错误。Room 仪器测试编译、runtime 包边界 guard、生产 PTY C 的 Linux JVM/子进程测试均通过。该提交仅用于本地集成核验，没有将其推送或合并到 `main`。
