@@ -20,9 +20,20 @@ The build files are authoritative. At the time of writing the repository uses:
 | compileSdk | 36 |
 | targetSdk | 35 |
 | minSdk | 26 |
-| Android NDK | 27.0.12077973 |
+| Android NDK | 28.2.13676358 or newer |
 | CMake | 3.22.1 |
 | Rust | stable + `aarch64-linux-android` target |
+
+Gradle, minisd and rclone default to NDK `28.2.13676358`. Set
+`MINIS_NDK_VERSION` consistently when validating another installed version;
+explicit `ANDROID_NDK_HOME` overrides for shell builds must point to that version.
+Rebuild `deps/build/rclone/rclone.aar` and copy it to `src/android/app/libs/`
+after changing Go dependencies or native build flags. The binding includes both
+arm64-v8a and x86_64; the minisd/Ubuntu runtime remains arm64-only.
+
+After packaging, run `bash scripts/verify-android-16k.sh <apk>` to check ZIP/ELF
+alignment and required JNI ABI coverage. For an AAB, set `BUNDLETOOL_JAR` and run
+`bash scripts/verify-android-bundle.sh <aab>` to validate its generated APK.
 
 The Android module currently includes `arm64-v8a` and `x86_64` in its ABI filters. Rooted-device runtime work primarily targets arm64 Android devices.
 
@@ -40,7 +51,7 @@ No Git submodule initialization is required for the current runtime.
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
@@ -220,7 +231,7 @@ rustup target add aarch64-linux-android
 
 ### Android NDK missing
 
-Set `ANDROID_NDK_HOME` to the pinned NDK `27.0.12077973` directory containing `toolchains/llvm/prebuilt`.
+Set `ANDROID_NDK_HOME` to NDK `28.2.13676358` or newer, with the directory containing `toolchains/llvm/prebuilt`.
 
 ### Ubuntu runtime is unavailable on device
 
