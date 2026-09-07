@@ -10,11 +10,11 @@
 - Android Gradle Plugin 8.10.1；
 - Kotlin 2.1.0；
 - compileSdk 36 / targetSdk 35 / minSdk 26；
-- Android NDK 28.0.12433566 或更高版本；
+- Android NDK 28.2.13676358 或更高版本；
 - CMake 3.22.1；
 - Rust stable + `aarch64-linux-android`。
 
-Gradle、minisd 与 rclone 默认使用 NDK `28.0.12433566`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
+Gradle、minisd 与 rclone 默认使用 NDK `28.2.13676358`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
 
 ## 1. 克隆
 
@@ -30,7 +30,7 @@ cd minis-for-android
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.12433566"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \

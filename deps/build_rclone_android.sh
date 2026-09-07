@@ -26,7 +26,7 @@ command -v gomobile >/dev/null || {
 }
 [ -n "${ANDROID_NDK_HOME:-}${ANDROID_HOME:-}" ] || {
   echo "error: set ANDROID_NDK_HOME (or ANDROID_HOME) first" >&2; exit 1; }
-export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/${MINIS_NDK_VERSION:-28.0.12433566}}"
+export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/${MINIS_NDK_VERSION:-28.2.13676358}}"
 
 mkdir -p "$BUILD"
 cd "$SRC"

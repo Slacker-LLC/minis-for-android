@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
 TARGET="aarch64-linux-android"
 API_LEVEL="${ANDROID_MIN_SDK:-26}"
-NDK_VERSION="${MINIS_NDK_VERSION:-28.0.12433566}"
+NDK_VERSION="${MINIS_NDK_VERSION:-28.2.13676358}"
 
 case "$(uname -s)" in
   Linux) HOST_TAG="linux-x86_64"; TOOL_SUFFIX=""; CLANG_SUFFIX="" ;;
