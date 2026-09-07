@@ -127,6 +127,7 @@ fun SkillsManagementScreen(
     var showAddMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Sort preference — persisted like the file browser's (SharedPreferences,
     // default name ascending). Mirrors iOS skillsList.sortKey/sortAscending.
@@ -154,7 +155,7 @@ fun SkillsManagementScreen(
     // bypasses the SKILL.md file_write hook) is picked up the moment the
     // user opens this list, instead of requiring a process restart.
     LaunchedEffect(Unit) {
-        skillRepository.reloadFromDisk()
+        withContext(Dispatchers.IO) { skillRepository.reloadFromDisk() }
     }
 
     SettingsScaffold(
@@ -372,8 +373,11 @@ fun SkillsManagementScreen(
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
             confirmButton = {
                 MinisTextButton(onClick = {
-                    deleteSkillId?.let { skillRepository.delete(it) }
+                    val id = deleteSkillId
                     deleteSkillId = null
+                    if (id != null) scope.launch {
+                        withContext(Dispatchers.IO) { skillRepository.delete(id) }
+                    }
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -1142,27 +1146,37 @@ fun SkillFileViewerScreen(
 
     // For SKILL.md, reconstruct from the in-memory record (so frontmatter
     // edits stay in sync with DB metadata). For sibling files, read straight
-    // from disk.
-    val initialContent = remember(skillId, relativePath, skill.updatedAt) {
-        if (isSkillMd) {
-            buildString {
-                appendLine("---")
-                appendLine("name: ${skill.name}")
-                appendLine("version: ${skill.version}")
-                if (skill.description.isNotEmpty()) {
-                    appendLine("description: ${skill.description}")
+    // from disk. The latter is a synchronous broker call, so load it from IO
+    // rather than during composition on the main thread.
+    var initialContent by remember(skillId, relativePath, skill.updatedAt) {
+        mutableStateOf("")
+    }
+    LaunchedEffect(skillId, relativePath, skill.updatedAt) {
+        initialContent = withContext(Dispatchers.IO) {
+            if (isSkillMd) {
+                buildString {
+                    appendLine("---")
+                    appendLine("name: ${skill.name}")
+                    appendLine("version: ${skill.version}")
+                    if (skill.description.isNotEmpty()) {
+                        appendLine("description: ${skill.description}")
+                    }
+                    appendLine("---")
+                    appendLine()
+                    append(skill.body)
                 }
-                appendLine("---")
-                appendLine()
-                append(skill.body)
+            } else {
+                skillRepository.readSkillFile(skillId, relativePath) ?: ""
             }
-        } else {
-            skillRepository.readSkillFile(skillId, relativePath) ?: ""
         }
     }
 
     var isEditing by remember { mutableStateOf(false) }
-    var editContent by remember(skillId, relativePath) { mutableStateOf(initialContent) }
+    var editContent by remember(skillId, relativePath) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(initialContent) {
+        if (!isEditing) editContent = initialContent
+    }
 
     Scaffold(
         topBar = {
@@ -1176,15 +1190,20 @@ fun SkillFileViewerScreen(
                 actions = {
                     if (isEditing) {
                         MinisTextButton(onClick = {
-                            if (isSkillMd) {
-                                // SKILL.md edits go through importFromContent so
-                                // YAML frontmatter changes flow back into DB metadata.
-                                skillRepository.importFromContent(editContent, skill.importSource)
-                            } else {
-                                skillRepository.writeSkillFile(skillId, relativePath, editContent)
+                            val pending = editContent
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    if (isSkillMd) {
+                                        // SKILL.md edits go through importFromContent so
+                                        // YAML frontmatter changes flow back into DB metadata.
+                                        skillRepository.importFromContent(pending, skill.importSource)
+                                    } else {
+                                        skillRepository.writeSkillFile(skillId, relativePath, pending)
+                                    }
+                                }
+                                isEditing = false
+                                onBack()
                             }
-                            isEditing = false
-                            onBack()
                         }) { Text(stringResource(R.string.skill_file_save)) }
                     } else {
                         MinisTextButton(onClick = {
