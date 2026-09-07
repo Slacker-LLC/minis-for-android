@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.ui.components.SectionTextField
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.openminis.app.ui.components.MinisTextButton
 
 /**
@@ -104,10 +106,10 @@ fun MountDetailScreen(
                     MinisTextButton(
                         enabled = canSave,
                         onClick = {
-                            scope.launch {
+                            scope.launch(Dispatchers.IO) {
                                 if (nameChanged) store.rename(entry.id, nameTrimmed)
                                 if (allowWriteChanged) store.setUserAllowWrite(entry.id, allowWrite)
-                                onBack()
+                                withContext(Dispatchers.Main.immediate) { onBack() }
                             }
                         },
                     ) {
@@ -216,9 +218,9 @@ fun MountDetailScreen(
             confirmButton = {
                 MinisTextButton(onClick = {
                     showUnmountConfirm = false
-                    scope.launch {
+                    scope.launch(Dispatchers.IO) {
                         store.remove(entry.id)
-                        onBack()
+                        withContext(Dispatchers.Main.immediate) { onBack() }
                     }
                 }) {
                     Text(
