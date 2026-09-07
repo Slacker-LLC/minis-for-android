@@ -18,7 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
@@ -77,6 +79,7 @@ fun MCPIntegrationsScreen(
     envVarRepository: com.openminis.app.data.repository.EnvVarRepository? = null,
 ) {
     val servers by mcpRepository.servers.collectAsState()
+    val ioScope = androidx.compose.runtime.rememberCoroutineScope()
 
     // [T-android-mcp-list-reload-on-appear] MCPRepository reads servers.json
     // only in init() (app launch). A server the agent writes via minis-mcp-cli
@@ -84,7 +87,7 @@ fun MCPIntegrationsScreen(
     // Re-read the file each time the screen appears (mirrors the Skills screen's
     // reloadFromDisk on entry) so CLI-added servers show without an app restart.
     LaunchedEffect(Unit) {
-        mcpRepository.reloadFromDisk()
+        withContext(Dispatchers.IO) { mcpRepository.reloadFromDisk() }
     }
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -154,7 +157,11 @@ fun MCPIntegrationsScreen(
                                 Spacer(Modifier.width(8.dp))
                                 Switch(
                                     checked = server.enabled,
-                                    onCheckedChange = { mcpRepository.setEnabled(server.id, it) },
+                                    onCheckedChange = { enabled ->
+                                        ioScope.launch(Dispatchers.IO) {
+                                            mcpRepository.setEnabled(server.id, enabled)
+                                        }
+                                    },
                                 )
                             }
                         },
@@ -197,8 +204,12 @@ fun MCPIntegrationsScreen(
             text = { Text(stringResource(R.string.mcp_delete_message)) },
             confirmButton = {
                 MinisTextButton(onClick = {
-                    mcpRepository.delete(id)
-                    deleteId = null
+                    ioScope.launch(Dispatchers.IO) {
+                        mcpRepository.delete(id)
+                        withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                            deleteId = null
+                        }
+                    }
                 }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -733,17 +744,19 @@ private fun MCPFormTab(
             MinisTextButton(onClick = onDone) { Text(stringResource(R.string.cancel)) }
             MinisTextButton(onClick = {
                 val server = buildServerFromForm() ?: return@MinisTextButton
-                // [T-android-mcp-oauth] Store the client secret in the encrypted
-                // store (keyed by server id) — it never goes into servers.json.
-                // Cleared when the OAuth section is emptied.
-                if (isUrlTransport) {
-                    com.openminis.app.mcp.oauth.MCPOAuthStore.setClientSecret(
-                        context, server.id,
-                        if (server.oauth != null) oauthClientSecret.trim().ifBlank { null } else null,
-                    )
+                oauthScope.launch(Dispatchers.IO) {
+                    // [T-android-mcp-oauth] Store the client secret in the encrypted
+                    // store (keyed by server id) — it never goes into servers.json.
+                    // Cleared when the OAuth section is emptied.
+                    if (isUrlTransport) {
+                        com.openminis.app.mcp.oauth.MCPOAuthStore.setClientSecret(
+                            context, server.id,
+                            if (server.oauth != null) oauthClientSecret.trim().ifBlank { null } else null,
+                        )
+                    }
+                    if (isEdit) mcpRepository.update(server) else mcpRepository.add(server)
+                    withContext(kotlinx.coroutines.Dispatchers.Main.immediate) { onDone() }
                 }
-                if (isEdit) mcpRepository.update(server) else mcpRepository.add(server)
-                onDone()
             }) { Text(stringResource(R.string.mcp_form_save)) }
         }
     }
@@ -888,6 +901,7 @@ private fun MCPImportTab(
     onDone: () -> Unit,
 ) {
     val context = LocalContext.current
+    val ioScope = androidx.compose.runtime.rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
     val previewCount = remember(text) { if (text.isBlank()) 0 else mcpRepository.previewImport(text) }
@@ -920,9 +934,14 @@ private fun MCPImportTab(
             MinisTextButton(onClick = onDone) { Text(stringResource(R.string.cancel)) }
             MinisTextButton(
                 onClick = {
-                    val imported = mcpRepository.importJSON(text)
-                    if (imported.isEmpty()) errorText = context.getString(R.string.mcp_import_none)
-                    else onDone()
+                    val input = text
+                    ioScope.launch(Dispatchers.IO) {
+                        val imported = mcpRepository.importJSON(input)
+                        withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                            if (imported.isEmpty()) errorText = context.getString(R.string.mcp_import_none)
+                            else onDone()
+                        }
+                    }
                 },
                 enabled = previewCount > 0,
             ) { Text(stringResource(R.string.mcp_import_submit)) }

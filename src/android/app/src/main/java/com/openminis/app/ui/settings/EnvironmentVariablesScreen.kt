@@ -35,8 +35,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -46,6 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.deeplink.DeepLinkCoordinator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Environment Variables \u2014 adopts the SettingsScaffold/SettingsSection
@@ -69,6 +74,8 @@ fun EnvironmentVariablesScreen(
     // sheet so the user only has to paste the value.
     var prefill by remember { mutableStateOf<DeepLinkCoordinator.EnvVarCreate?>(null) }
     val visibleKeys = remember { mutableStateOf(setOf<String>()) }
+    val visibleValues = remember { mutableStateMapOf<String, String>() }
+    val ioScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(Unit) {
@@ -98,7 +105,11 @@ fun EnvironmentVariablesScreen(
             SettingsSwitchRow(
                 title = stringResource(R.string.env_var_privacy_toggle),
                 checked = privacyEnabled,
-                onCheckedChange = { com.openminis.app.data.EnvVarPrivacyStore.setEnabled(it) },
+                onCheckedChange = { enabled ->
+                    ioScope.launch(Dispatchers.IO) {
+                        com.openminis.app.data.EnvVarPrivacyStore.setEnabled(enabled)
+                    }
+                },
                 showDivider = false,
             )
         }
@@ -133,7 +144,7 @@ fun EnvironmentVariablesScreen(
                 entries.forEachIndexed { index, entry ->
                     val isVisible = entry.key in visibleKeys.value
                     val displayValue = if (isVisible) {
-                        envVarRepository.getValue(entry.key) ?: ""
+                        visibleValues[entry.key] ?: ""
                     } else {
                         "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                     }
@@ -155,10 +166,17 @@ fun EnvironmentVariablesScreen(
                         trailing = {
                             Row {
                                 IconButton(onClick = {
-                                    visibleKeys.value = if (isVisible)
-                                        visibleKeys.value - entry.key
-                                    else
-                                        visibleKeys.value + entry.key
+                                    if (isVisible) {
+                                        visibleKeys.value = visibleKeys.value - entry.key
+                                    } else {
+                                        visibleKeys.value = visibleKeys.value + entry.key
+                                        ioScope.launch(Dispatchers.IO) {
+                                            val value = envVarRepository.getValue(entry.key).orEmpty()
+                                            withContext(Dispatchers.Main.immediate) {
+                                                visibleValues[entry.key] = value
+                                            }
+                                        }
+                                    }
                                 }) {
                                     Icon(
                                         if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
@@ -167,8 +185,12 @@ fun EnvironmentVariablesScreen(
                                     )
                                 }
                                 IconButton(onClick = {
-                                    val v = envVarRepository.getValue(entry.key) ?: ""
-                                    clipboardManager.setText(AnnotatedString("${entry.key}=$v"))
+                                    ioScope.launch(Dispatchers.IO) {
+                                        val value = envVarRepository.getValue(entry.key).orEmpty()
+                                        withContext(Dispatchers.Main.immediate) {
+                                            clipboardManager.setText(AnnotatedString("${entry.key}=$value"))
+                                        }
+                                    }
                                 }) {
                                     Icon(
                                         Icons.Default.ContentCopy,
@@ -220,8 +242,13 @@ fun EnvironmentVariablesScreen(
             text = { Text(stringResource(R.string.env_var_delete_confirm_text)) },
             confirmButton = {
                 MinisTextButton(onClick = {
-                    deleteEntryId?.let { envVarRepository.delete(it) }
-                    deleteEntryId = null
+                    val id = deleteEntryId ?: return@MinisTextButton
+                    ioScope.launch(Dispatchers.IO) {
+                        envVarRepository.delete(id)
+                        withContext(Dispatchers.Main.immediate) {
+                            deleteEntryId = null
+                        }
+                    }
                 }) {
                     Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
@@ -248,9 +275,18 @@ private fun EnvVarFormSheet(
     val sheetState = rememberModalBottomSheetState()
     var keyText by remember { mutableStateOf(editEntry?.key ?: prefillKey) }
     var valueText by remember {
-        mutableStateOf(editEntry?.let { envVarRepository.getValue(it.key) } ?: prefillValue)
+        mutableStateOf(if (editEntry == null) prefillValue else "")
     }
     var noteText by remember { mutableStateOf(editEntry?.note ?: prefillNote) }
+    val ioScope = rememberCoroutineScope()
+
+    LaunchedEffect(editEntry?.id) {
+        editEntry?.let { entry ->
+            valueText = withContext(Dispatchers.IO) {
+                envVarRepository.getValue(entry.key).orEmpty()
+            }
+        }
+    }
 
     val isEditing = editEntry != null
     val normalizedKey = keyText.trim().uppercase()
@@ -344,12 +380,20 @@ private fun EnvVarFormSheet(
                 }
                 MinisTextButton(
                     onClick = {
-                        val success = if (isEditing) {
-                            envVarRepository.update(editEntry!!.id, keyText, valueText, noteText)
-                        } else {
-                            envVarRepository.add(keyText, valueText, noteText)
+                        val id = editEntry?.id
+                        val key = keyText
+                        val value = valueText
+                        val note = noteText
+                        ioScope.launch(Dispatchers.IO) {
+                            val success = if (isEditing && id != null) {
+                                envVarRepository.update(id, key, value, note)
+                            } else {
+                                envVarRepository.add(key, value, note)
+                            }
+                            if (success) {
+                                withContext(Dispatchers.Main.immediate) { onDismiss() }
+                            }
                         }
-                        if (success) onDismiss()
                     },
                     enabled = canSave,
                 ) {
