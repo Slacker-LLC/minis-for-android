@@ -58,6 +58,12 @@ if (-not (Test-Path $bash)) {
     throw 'Git Bash is required for the APK native verification.'
 }
 $verifyScript = (Join-Path $RepoRoot 'scripts/verify-android-16k.sh') -replace '\\', '/'
+if (-not $env:ANDROID_SDK_ROOT -and -not $env:ANDROID_HOME) {
+    $standardSdk = Join-Path $env:LOCALAPPDATA 'Android/Sdk'
+    if (Test-Path $standardSdk) {
+        $env:ANDROID_SDK_ROOT = $standardSdk
+    }
+}
 & $bash $verifyScript ($apk -replace '\\', '/')
 if ($LASTEXITCODE -ne 0) {
     throw "APK native verification failed with exit code $LASTEXITCODE"
