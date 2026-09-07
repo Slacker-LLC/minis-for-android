@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${DIST:-$ROOT/dist}"
 TARGET="aarch64-linux-android"
 API_LEVEL="${ANDROID_MIN_SDK:-26}"
-NDK_VERSION="${MINIS_NDK_VERSION:-27.0.12077973}"
+NDK_VERSION="${MINIS_NDK_VERSION:-28.0.12433566}"
 
 case "$(uname -s)" in
   Linux) HOST_TAG="linux-x86_64"; TOOL_SUFFIX=""; CLANG_SUFFIX="" ;;
@@ -56,7 +56,7 @@ if [[ "$HOST_TAG" == "windows-x86_64" ]]; then
 else
   export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
 fi
-export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C relocation-model=pic -C link-arg=-pie -C link-arg=-Wl,-z,max-page-size=16384"
+export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C relocation-model=pic -C link-arg=-pie -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
 
 cargo build \
   --locked \

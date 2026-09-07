@@ -10,9 +10,11 @@
 - Android Gradle Plugin 8.10.1；
 - Kotlin 2.1.0；
 - compileSdk 36 / targetSdk 35 / minSdk 26；
-- Android NDK 27.0.12077973；
+- Android NDK 28.0.12433566 或更高版本；
 - CMake 3.22.1；
 - Rust stable + `aarch64-linux-android`。
+
+Gradle、minisd 与 rclone 默认使用 NDK `28.0.12433566`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
 
 ## 1. 克隆
 
@@ -28,7 +30,7 @@ cd minis-for-android
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.0.12077973"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.12433566"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 cp src/android/app/provider-customization.properties.example \
@@ -38,6 +40,19 @@ cp src/android/app/provider-customization.properties.example \
 不要提交真实 API Key、OAuth token、Provider 私有标识、签名密钥或其他凭据。
 
 ## 3. 构建 `minisd`
+
+打包前还需构建并导入 rclone（包含 arm64-v8a 与 x86_64）：
+
+```bash
+bash deps/build_rclone_android.sh
+mkdir -p src/android/app/libs
+cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
+```
+
+修改 Go 依赖、NDK 或 rclone 构建参数后，需要重新生成 AAR。不要复用旧工作树的 AAR。
+APK 构建完成后运行 `bash scripts/verify-android-16k.sh <apk>`；该检查同时验证 ZIP、ELF 对齐和必需 JNI 库的 ABI 覆盖。
+AAB 使用 `BUNDLETOOL_JAR=<bundletool-all.jar> bash scripts/verify-android-bundle.sh <aab>`，检查由 bundletool 实际生成的 APK。
+x86_64 用于模拟器开发；minisd 与 Ubuntu 运行时仍仅支持 arm64，JNI 库齐全不代表 x86_64 支持完整 Root 运行时。
 
 ```bash
 rustup target add aarch64-linux-android

@@ -51,4 +51,15 @@ if (-not (Test-Path $apk)) {
     throw "Build output not found: $apk"
 }
 
+$gitCommand = Get-Command git.exe -ErrorAction Stop
+$gitRoot = Split-Path (Split-Path $gitCommand.Source -Parent) -Parent
+$bash = Join-Path $gitRoot 'bin/bash.exe'
+if (-not (Test-Path $bash)) {
+    throw 'Git Bash is required for the APK native verification.'
+}
+$verifyScript = (Join-Path $RepoRoot 'scripts/verify-android-16k.sh') -replace '\\', '/'
+& $bash $verifyScript ($apk -replace '\\', '/')
+if ($LASTEXITCODE -ne 0) {
+    throw "APK native verification failed with exit code $LASTEXITCODE"
+}
 Write-Host "OK: $apk"

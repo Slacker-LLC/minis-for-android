@@ -92,6 +92,8 @@ fun sha256(file: File): String {
 
 android {
     namespace = "com.openminis.app"
+    ndkVersion = providers.environmentVariable("MINIS_NDK_VERSION")
+        .getOrElse("28.0.12433566")
     // Compile against Android 16 APIs used by the Live Updates path. targetSdk
     // remains 35; Android 16-only behavior is runtime-gated by SDK level.
     compileSdk = 36
@@ -126,12 +128,10 @@ android {
 
         externalNativeBuild {
             cmake {
-                cFlags += "-Wl,-z,max-page-size=16384"
-                cppFlags += listOf("-std=c++17", "-Wl,-z,max-page-size=16384")
+                cppFlags += "-std=c++17"
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
-                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
-                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
                 )
             }
         }
