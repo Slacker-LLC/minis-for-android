@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,9 @@ import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsValueRow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,7 +76,18 @@ fun SessionMemorySheet(
 ) {
     val context = LocalContext.current
     var mode by remember { mutableStateOf<MemorySheetMode>(MemorySheetMode.List) }
-    val autoItems = remember(memoryRepository, context) { buildAutoInjectedItems(context, memoryRepository) }
+    var autoItems by remember(memoryRepository, context) {
+        mutableStateOf<List<AutoItem>>(emptyList())
+    }
+    val scope = rememberCoroutineScope()
+
+    // MemoryRepository uses synchronous broker calls for agent/tool callers.
+    // Keep those calls off the Compose main thread when opening the sheet.
+    LaunchedEffect(memoryRepository, context) {
+        autoItems = withContext(Dispatchers.IO) {
+            buildAutoInjectedItems(context, memoryRepository)
+        }
+    }
 
     // Editing state for the active detail screen. Lives at the sheet level so
     // a single Save button in the header can read the latest buffer without
@@ -155,20 +170,26 @@ fun SessionMemorySheet(
                     showRevoke = false,
                     onEdit = { isEditing = true; editedContent = m.content },
                     onSave = {
-                        try {
-                            memoryRepository.saveFile(m.name, editedContent)
-                            // SOUL.md drives [SoulStore.cachedMetadata] which
-                            // backs the chat-bubble header name. The raw
-                            // saveFile() path here bypasses SoulStore.save(),
-                            // so refresh the cache manually to keep readers
-                            // in sync after an in-sheet edit.
-                            if (m.name == "SOUL.md") {
-                                com.openminis.app.agent.SoulStore.refreshCache(context)
-                            }
-                            mode = MemorySheetMode.AutoFile(m.name, editedContent, m.editable)
-                            isEditing = false
-                            savedToastVisible = true
-                        } catch (_: Exception) { /* fall through; UI toast omitted on failure */ }
+                        val name = m.name
+                        val pending = editedContent
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    memoryRepository.saveFile(name, pending)
+                                }
+                                // SOUL.md drives [SoulStore.cachedMetadata] which
+                                // backs the chat-bubble header name. The raw
+                                // saveFile() path here bypasses SoulStore.save(),
+                                // so refresh the cache manually to keep readers
+                                // in sync after an in-sheet edit.
+                                if (name == "SOUL.md") {
+                                    com.openminis.app.agent.SoulStore.refreshCache(context)
+                                }
+                                mode = MemorySheetMode.AutoFile(name, pending, m.editable)
+                                isEditing = false
+                                savedToastVisible = true
+                            } catch (_: Exception) { /* fall through; UI toast omitted on failure */ }
+                        }
                     },
                     onRevoke = {},
                 )
@@ -192,17 +213,23 @@ fun SessionMemorySheet(
                         editedContent = m.record.writtenContent ?: ""
                     },
                     onSave = {
-                        val result = onSaveRecord(m.record, editedContent)
-                        if (result is MemoryRepository.EntryMutationResult.Success) {
-                            // Update the displayed record in-place so a follow-up
-                            // revoke targets the new body.
-                            mode = MemorySheetMode.Write(
-                                m.record.copy(writtenContent = editedContent)
-                            )
-                            isEditing = false
-                            savedToastVisible = true
-                        } else {
-                            mutationResult = result
+                        val record = m.record
+                        val pending = editedContent
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                onSaveRecord(record, pending)
+                            }
+                            if (result is MemoryRepository.EntryMutationResult.Success) {
+                                // Update the displayed record in-place so a follow-up
+                                // revoke targets the new body.
+                                mode = MemorySheetMode.Write(
+                                    record.copy(writtenContent = pending)
+                                )
+                                isEditing = false
+                                savedToastVisible = true
+                            } else {
+                                mutationResult = result
+                            }
                         }
                     },
                     onRevoke = { showRevokeConfirm = true },
@@ -225,13 +252,18 @@ fun SessionMemorySheet(
         RevokeConfirmDialog(
             onConfirm = {
                 showRevokeConfirm = false
-                val result = onRevokeRecord(writeMode.record)
-                mutationResult = result
-                // On success the row is removed from toolRecords by the
-                // ViewModel; pop back to list so the user sees the list
-                // re-render without the row.
-                if (result is MemoryRepository.EntryMutationResult.Success) {
-                    mode = MemorySheetMode.List
+                val record = writeMode.record
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        onRevokeRecord(record)
+                    }
+                    mutationResult = result
+                    // On success the row is removed from toolRecords by the
+                    // ViewModel; pop back to list so the user sees the list
+                    // re-render without the row.
+                    if (result is MemoryRepository.EntryMutationResult.Success) {
+                        mode = MemorySheetMode.List
+                    }
                 }
             },
             onDismiss = { showRevokeConfirm = false },
