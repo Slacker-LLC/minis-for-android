@@ -76,7 +76,9 @@ import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.data.SafMountHelper
 import com.openminis.app.ui.components.DialogTextField
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Settings → Mount External Folders. Mirrors iOS MountedFoldersSettingsView.
@@ -134,7 +136,7 @@ fun MountedFoldersScreen(
     ) { grants ->
         if (grants.values.any { it }) {
             hasAllFilesAccess = checkAllFilesAccess(context)
-            scope.launch { store.refreshWritability() }
+            scope.launch(Dispatchers.IO) { store.refreshWritability() }
         }
     }
 
@@ -255,7 +257,7 @@ fun MountedFoldersScreen(
                         val dismissState = rememberSwipeToDismissBoxState()
                         LaunchedEffect(dismissState.currentValue) {
                             if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-                                scope.launch { store.remove(entry.id) }
+                                scope.launch(Dispatchers.IO) { store.remove(entry.id) }
                             }
                         }
                         SwipeToDismissBox(
@@ -310,12 +312,14 @@ fun MountedFoldersScreen(
             initialName = pendingDefaultName,
             onDismiss = { pendingPickedUri = null },
             onConfirm = { name, allowWrite ->
-                scope.launch {
+                scope.launch(Dispatchers.IO) {
                     val added = store.add(pickedUri, name, allowWrite)
-                    if (added == null) {
-                        addError = context.getString(R.string.mount_add_failed)
+                    withContext(Dispatchers.Main.immediate) {
+                        if (added == null) {
+                            addError = context.getString(R.string.mount_add_failed)
+                        }
+                        pendingPickedUri = null
                     }
-                    pendingPickedUri = null
                 }
             },
         )

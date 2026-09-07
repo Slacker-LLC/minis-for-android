@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
  *   - [SoulFile]      – metadata + body pair
  *   - [SoulMDParser]  – lossless-ish parse / serialize
  *   - [SoulStore]     – file I/O, default content, fallback identity,
- *                       cachedMetadata + onChanged listener
+ *                       cachedFile/cachedMetadata + onChanged listener
  *   - [SystemPromptBuilder] – injection-scrubbed identitySection() for the
  *                             agent system prompt
  */
@@ -282,7 +282,7 @@ lang: "auto"
     fun load(context: Context): SoulFile? {
         return try {
             val bytes = WorkspaceFileClient.readAllBlocking("", GUEST_PATH)
-            SoulMDParser.parse(bytes.toString(Charsets.UTF_8))
+            SoulMDParser.parse(bytes.toString(Charsets.UTF_8)).also(::updateCache)
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "SOUL.md load failed: ${t.message}")
             null
@@ -295,17 +295,25 @@ lang: "auto"
         runBlocking(Dispatchers.IO) {
             WorkspaceFileClient.writeBytes("", GUEST_PATH, text.toByteArray(Charsets.UTF_8))
         }
-        _cachedMetadata.value = file.metadata
+        updateCache(file)
     }
 
     /**
-     * Cached metadata for synchronous call sites that cannot re-read the
-     * file every recomposition (chat bubble header in particular). Updated
-     * by [refreshCache] and [save]. Default value is the same fallback
-     * the Settings UI shows when the file is missing.
+     * Complete in-memory snapshot used by the prompt path. The prompt is
+     * assembled synchronously by ChatViewModel, so it must never perform a
+     * broker/RPC read here. initializeAsync() and save()/refreshCache() are
+     * the only paths that replace this snapshot.
      */
+    private val _cachedFile = MutableStateFlow(SoulFile(SoulMetadata.DEFAULT, ""))
+    val cachedFile: StateFlow<SoulFile> = _cachedFile.asStateFlow()
+
     private val _cachedMetadata = MutableStateFlow(SoulMetadata.DEFAULT)
     val cachedMetadata: StateFlow<SoulMetadata> = _cachedMetadata.asStateFlow()
+
+    private fun updateCache(file: SoulFile) {
+        _cachedFile.value = file
+        _cachedMetadata.value = file.metadata
+    }
 
     /**
      * Warm the persistent identity without delaying Application.onCreate.
@@ -318,7 +326,7 @@ lang: "auto"
             try {
                 withTimeout(SOUL_INIT_TIMEOUT_MS) {
                     ensureExistsSuspending(appContext)
-                    _cachedMetadata.value = loadSuspending(appContext)?.metadata ?: SoulMetadata.DEFAULT
+                    loadSuspending(appContext)?.let(::updateCache)
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -331,11 +339,19 @@ lang: "auto"
     /**
      * Re-read SOUL.md into [cachedMetadata]. Call once at app launch
      * (after [ensureExists]) and any time the file is rewritten outside
-     * of [save].
+     * of [save]. The read is asynchronous because this is also called by
+     * UI callbacks after an in-sheet edit.
      */
     fun refreshCache(context: Context) {
-        val parsed = load(context)
-        _cachedMetadata.value = parsed?.metadata ?: SoulMetadata.DEFAULT
+        val appContext = context.applicationContext
+        backgroundScope.launch {
+            val parsed = loadSuspending(appContext)
+            if (parsed != null) {
+                updateCache(parsed)
+            } else {
+                updateCache(SoulFile(SoulMetadata.DEFAULT, ""))
+            }
+        }
     }
 
     private suspend fun ensureExistsSuspending(context: Context) {
@@ -422,7 +438,14 @@ object SystemPromptBuilder {
      * append the user-authored personality body from SOUL.md.
      */
     fun identitySection(context: Context): String {
-        val file = SoulStore.load(context)
+        // Prompt construction runs on the send path and must remain bounded by
+        // local string work. SoulStore.initializeAsync() warms this snapshot
+        // through minisd; reading it here avoids a synchronous RPC/runBlocking
+        // when the broker is stale or unavailable.
+        return identitySection(SoulStore.cachedFile.value)
+    }
+
+    internal fun identitySection(file: SoulFile?): String {
         val name = (file?.metadata?.name ?: SoulMetadata.DEFAULT.name)
             .trim()
             .ifEmpty { "Minis" }

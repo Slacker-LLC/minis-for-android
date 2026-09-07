@@ -9775,7 +9775,7 @@ class ChatViewModel(
         return entity.id
     }
 
-    private fun buildSystemPrompt(): String? {
+    private suspend fun buildSystemPrompt(): String? {
         // Cache-friendly layout: keep `base` byte-stable by stripping out anything
         // that varies per request, then append a "Runtime context" suffix at the
         // very end with all the dynamic bits (date, timezone, locale, configured
@@ -9955,13 +9955,17 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // the file_write hook below) becomes visible on the very next user
         // turn instead of "after kill app". Cheap: loadAll is a SQLite
         // SELECT + listFiles, no network.
-        skillRepository?.reloadFromDisk()
-        val skillFragment = skillRepository?.skillPromptFragment(activeSessionId)
+        val skillFragment = withContext(Dispatchers.IO) {
+            skillRepository?.reloadFromDisk()
+            skillRepository?.skillPromptFragment(activeSessionId)
+        }
         // [T-mcp-integration-android] Re-read servers.json (the CLI / file
         // browser may have changed it out-of-band) then build the Top-20
         // enabled-MCP disclosure, injected right after the skills fragment.
-        mcpRepository?.reloadFromDisk()
-        val mcpFragment = mcpRepository?.mcpPromptFragment(activeSessionId)
+        val mcpFragment = withContext(Dispatchers.IO) {
+            mcpRepository?.reloadFromDisk()
+            mcpRepository?.mcpPromptFragment(activeSessionId)
+        }
         // [T-memory-toggle-gates-injection-and-tools-android] Skip loading
         // GLOBAL.md + recent daily logs entirely when the user has turned
         // memory off for this session. Cheaper (no disk read) and — more
@@ -9970,8 +9974,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // intentionally NOT gated by this toggle: skills are part of the
         // tool surface and SOUL.md is part of identity, both orthogonal
         // to the memory feature.
-        val globalMemoryFragment = if (memoryOn) memoryRepository?.loadGlobalMemoryFragment() else null
-        val dailyMemoryFragment = if (memoryOn) memoryRepository?.loadRecentDailyMemoryFragment() else null
+        val globalMemoryFragment = if (memoryOn) {
+            withContext(Dispatchers.IO) { memoryRepository?.loadGlobalMemoryFragment() }
+        } else null
+        val dailyMemoryFragment = if (memoryOn) {
+            withContext(Dispatchers.IO) { memoryRepository?.loadRecentDailyMemoryFragment() }
+        } else null
 
         return buildString {
             append(base)
