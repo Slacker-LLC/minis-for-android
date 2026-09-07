@@ -2,6 +2,7 @@ import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import java.nio.file.Files
 import java.util.Properties
+import java.util.zip.ZipFile
 import org.gradle.api.GradleException
 
 plugins {
@@ -17,6 +18,99 @@ plugins {
 // affected integration as an explicit disabled capability. Private/production
 // builds opt into strict validation with -PproviderCustomizationRequired=true.
 val providerCustomizationFile = rootProject.file("app/provider-customization.properties")
+
+private fun readU16(bytes: ByteArray, offset: Int): Int =
+    (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
+
+private fun readU32(bytes: ByteArray, offset: Int): Long =
+    (0 until 4).fold(0L) { value, index ->
+        value or ((bytes[offset + index].toLong() and 0xffL) shl (index * 8))
+    }
+
+private fun readU64(bytes: ByteArray, offset: Int): Long =
+    (0 until 8).fold(0L) { value, index ->
+        value or ((bytes[offset + index].toLong() and 0xffL) shl (index * 8))
+    }
+
+private fun loadAlignments(elf: ByteArray): List<Long> {
+    require(elf.size >= 16 && elf.copyOfRange(0, 4).contentEquals(byteArrayOf(0x7f, 'E'.code.toByte(), 'L'.code.toByte(), 'F'.code.toByte()))) {
+        "not an ELF file"
+    }
+    require(elf[5].toInt() == 1) { "only little-endian ELF files are supported" }
+    val elfClass = elf[4].toInt()
+    val phoff: Long
+    val phentsize: Int
+    val phnum: Int
+    val alignOffset: Int
+    val alignSize: Int
+    when (elfClass) {
+        1 -> {
+            phoff = readU32(elf, 28)
+            phentsize = readU16(elf, 42)
+            phnum = readU16(elf, 44)
+            alignOffset = 28
+            alignSize = 4
+        }
+        2 -> {
+            phoff = readU64(elf, 32)
+            phentsize = readU16(elf, 54)
+            phnum = readU16(elf, 56)
+            alignOffset = 48
+            alignSize = 8
+        }
+        else -> error("unsupported ELF class: $elfClass")
+    }
+    require(phentsize >= alignOffset + alignSize) { "invalid program-header size" }
+    return buildList {
+        repeat(phnum) { index ->
+            val entry = Math.addExact(phoff, Math.multiplyExact(index.toLong(), phentsize.toLong())).toInt()
+            require(entry >= 0 && entry + phentsize <= elf.size) { "truncated program headers" }
+            if (readU32(elf, entry) == 1L) {
+                add(if (alignSize == 8) readU64(elf, entry + alignOffset) else readU32(elf, entry + alignOffset))
+            }
+        }
+    }.also { require(it.isNotEmpty()) { "ELF has no PT_LOAD segments" } }
+}
+
+val verifyRcloneAar16k by tasks.registering {
+    group = "verification"
+    description = "Reject stale rclone AARs without 16 KB ELF alignment and both Android ABIs."
+    doLast {
+        val aar = layout.projectDirectory.file("libs/rclone.aar").asFile
+        if (!aar.isFile) {
+            throw GradleException(
+                "Missing ${aar.name}. Run deps/build_rclone_android.sh and copy deps/build/rclone/rclone.aar to app/libs."
+            )
+        }
+        val failures = mutableListOf<String>()
+        ZipFile(aar).use { archive ->
+            for (abi in listOf("arm64-v8a", "x86_64")) {
+                val path = "jni/$abi/libgojni.so"
+                val entry = archive.getEntry(path)
+                if (entry == null) {
+                    failures += "$path is missing"
+                    continue
+                }
+                try {
+                    val alignments = loadAlignments(archive.getInputStream(entry).use { it.readBytes() })
+                    if (alignments.any { it < 0x4000L || it % 0x4000L != 0L }) {
+                        failures += "$path LOAD alignments=${alignments.joinToString(",") { "0x${it.toString(16)}" }}"
+                    }
+                } catch (error: Exception) {
+                    failures += "$path: ${error.message ?: error::class.simpleName}"
+                }
+            }
+        }
+        if (failures.isNotEmpty()) {
+            throw GradleException(
+                "rclone.aar failed the Android 16 KB native check:\n" +
+                    failures.joinToString("\n") { "- $it" } +
+                    "\nRegenerate it with deps/build_rclone_android.sh before building."
+            )
+        }
+    }
+}
+
 val providerCustomizationRequired = providers.gradleProperty("providerCustomizationRequired")
     .orNull
     ?.trim()
@@ -311,6 +405,7 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders"
 tasks.named("preBuild") {
     dependsOn(copyBashismRules)
     dependsOn(stageRuntimePayload)
+    dependsOn(verifyRcloneAar16k)
 }
 
 // Stage optional debug-server skill assets only for debug builds. Local
