@@ -63,4 +63,19 @@ class ChatAppendTransactionTest {
         assertEquals(20, rows.map { it.sortOrder }.toSet().size)
         assertEquals(20, database.chatDao().messageCountForSession(sessionId))
     }
+
+    @Test
+    fun replayingAReceiptKeepsOneRowWithoutMatchingOrdinaryMessageText() = runBlocking {
+        val body = """[{"type":"text","value":"委托 ID：same-task"}]"""
+        repository.appendMessage(sessionId, "assistant", body)
+        val receipts = (1..8).map {
+            async(Dispatchers.IO) {
+                repository.appendMessage(sessionId, "assistant", body, idempotencyKey = "bot-receipt:same-task")
+            }
+        }.awaitAll()
+        assertEquals(1, receipts.map { it.id }.toSet().size)
+        assertEquals(1, receipts.map { it.sortOrder }.toSet().size)
+        assertEquals(2, database.chatDao().messageCountForSession(sessionId))
+        assertEquals(1, receipts.first().sortOrder)
+    }
 }

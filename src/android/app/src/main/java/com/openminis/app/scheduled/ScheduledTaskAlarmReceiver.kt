@@ -64,7 +64,7 @@ class ScheduledTaskAlarmReceiver : BroadcastReceiver() {
                     // [GH#197] waitForCompletion=false is load-bearing, not a
                     // tweak. With the default (true) this call suspends until
                     // the whole agent loop finishes — up to RUN_TIMEOUT_MS
-                    // (10 min) — and because HeadlessChatRunner.prompt/retry
+                    // (10 min) — and because AgentRunner.prompt/retry
                     // are `withContext(Dispatchers.Main)`, that wait also
                     // lands back on the main thread. pending.finish() then
                     // sits behind it, blowing far past the ~10s budget a

@@ -3,7 +3,7 @@ package com.openminis.app.tools
 import android.content.Context
 import android.util.Log
 import com.openminis.app.MinisApp
-import com.openminis.app.debug.HeadlessChatRunner
+import com.openminis.app.agent.AgentRunner
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * child starts fresh and therefore needs a self-contained prompt; it cannot see
  * what the parent has been doing.
  *
- * Execution reuses [HeadlessChatRunner], which is the same ChatViewModel-backed
+ * Execution reuses [AgentRunner], which is the same ChatViewModel-backed
  * loop the app and the debug RPC already drive, so a child has the full tool
  * set, the persistent PRoot shell and streaming — without a second agent
  * implementation to keep in sync.
@@ -76,7 +76,7 @@ object SubagentTool {
             ?: return ToolExecutionResult("subagent: app not initialized", false, toolTitle = title)
 
         return try {
-            val childId = HeadlessChatRunner.ensureSession(context)
+            val childId = AgentRunner.ensureSession(context)
             markChild(childId, depth)
 
             // Label the child so it is recognisable in the session list rather
@@ -88,7 +88,7 @@ object SubagentTool {
 
             Log.i(TAG, "spawn depth=${depth + 1} child=${childId.take(8)} title=$title")
 
-            val result = HeadlessChatRunner.prompt(
+            val result = AgentRunner.prompt(
                 context = context,
                 sessionId = childId,
                 text = prompt,
@@ -103,7 +103,8 @@ object SubagentTool {
                 rawAnswer.take(MAX_ANSWER_CHARS) +
                     "\n\n[truncated: child answer exceeded $MAX_ANSWER_CHARS characters]"
             } else rawAnswer
-            val ok = result.status == "completed" && answer.isNotEmpty() && !result.timedOut
+            val ok = result.status.equals("Completed", ignoreCase = true) &&
+                answer.isNotEmpty() && !result.timedOut
 
             if (ok) {
                 ToolExecutionResult(answer, true, toolTitle = title)

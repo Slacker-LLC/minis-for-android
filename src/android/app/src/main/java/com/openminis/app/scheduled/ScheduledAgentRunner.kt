@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import com.openminis.app.MinisApp
-import com.openminis.app.debug.HeadlessChatRunner
+import com.openminis.app.agent.AgentRunner
 import com.openminis.app.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,11 +19,11 @@ import kotlinx.coroutines.withContext
  * tasks. Mirrors the shape of iOS SendPromptIntent.perform():
  *
  *  - resolve a session id (NEW_SESSION → create row; APPEND_TO → reuse)
- *  - run the prompt through the existing agent loop (via [HeadlessChatRunner])
+ *  - run the prompt through the existing agent loop (via [AgentRunner])
  *  - post a "completed" notification with a deep-link back to the session
  *  - hand the result preview back to [ScheduledTaskManager] for the row
  *
- * Concurrency: serialised per-session by [HeadlessChatRunner]'s VM cache —
+ * Concurrency: serialised per-session by [AgentRunner]'s VM cache —
  * two scheduled prompts hitting the same session id are queued via
  * ChatViewModel.enqueuePrompt.
  */
@@ -52,7 +52,7 @@ object ScheduledAgentRunner {
      *
      *   [GH#197] NEVER pass true from a BroadcastReceiver. Waiting here can
      *   take up to [RUN_TIMEOUT_MS] (10 min) and the wait lands on the main
-     *   thread (HeadlessChatRunner.prompt/retry are
+     *   thread (AgentRunner.prompt/retry are
      *   `withContext(Dispatchers.Main)`), so a receiver that waits blows its
      *   ~10s broadcast budget and gets the whole process ANR-killed. Waiting
      *   is only safe off a broadcast — e.g. the minis-scheduled CLI, which
@@ -120,10 +120,10 @@ object ScheduledAgentRunner {
     /**
      * [T-android-scheduled-tasks-full] Branch on target mode, mirroring the iOS
      * App Intent set:
-     *   NewSession / AppendToSession → HeadlessChatRunner.prompt (the prompt is
+     *   NewSession / AppendToSession → AgentRunner.prompt (the prompt is
      *     sent as a fresh user turn; for append it lands in the existing
      *     session, for new it's the first turn of the freshly-created one).
-     *   RerunMessage → HeadlessChatRunner.retry from the chosen message id (the
+     *   RerunMessage → AgentRunner.retry from the chosen message id (the
      *     message is replayed; task.prompt is ignored, matching iOS
      *     RetryRunIntent which has no prompt param).
      */
@@ -132,10 +132,10 @@ object ScheduledAgentRunner {
         task: ScheduledTask,
         sessionId: String,
         wait: Boolean,
-    ): HeadlessChatRunner.PromptResult = runCatching {
+    ): AgentRunner.PromptResult = runCatching {
         val mode = task.targetMode
         if (mode is ScheduledTargetMode.RerunMessage) {
-            HeadlessChatRunner.retry(
+            AgentRunner.retry(
                 context = app,
                 sessionId = sessionId,
                 messageId = mode.messageId,
@@ -143,7 +143,7 @@ object ScheduledAgentRunner {
                 timeoutMs = RUN_TIMEOUT_MS,
             )
         } else {
-            HeadlessChatRunner.prompt(
+            AgentRunner.prompt(
                 context = app,
                 sessionId = sessionId,
                 text = task.prompt,
@@ -155,7 +155,7 @@ object ScheduledAgentRunner {
         }
     }.getOrElse { t ->
         AppLogger.error(TAG, "task ${task.id} dispatch failed: ${t.message}")
-        HeadlessChatRunner.PromptResult(
+        AgentRunner.PromptResult(
             status = "Error",
             responseText = "Error: ${t.message}",
             timedOut = false,

@@ -849,11 +849,25 @@ fun ChatSplitScaffoldRoute(
     memoryRepository: com.openminis.app.data.repository.MemoryRepository?,
     skillRepository: com.openminis.app.data.repository.SkillRepository?,
     mcpRepository: com.openminis.app.data.repository.MCPRepository?,
+    botRepository: com.openminis.app.data.repository.BotRepository?,
 ) {
+    var showBots by rememberSaveable { mutableStateOf(false) }
     if (shouldUseTwoPane()) {
         ChatSplitScaffold(
             initialSessionId = initialSessionId,
             listPane = { selectedSessionId, draftPlaceholderId, onSessionSelected ->
+                if (showBots && botRepository != null) {
+                    com.openminis.app.ui.bots.BotsScreen(
+                        botRepository = botRepository,
+                        chatRepository = chatRepository,
+                        providerRepository = providerRepository,
+                        onBack = { showBots = false },
+                        onOpenSession = onSessionSelected,
+                        onMemberDetails = { navController.safeNavigate(Routes.botDetails(it)) },
+                        onAddMember = { navController.safeNavigate(Routes.BOTS_ADD) },
+                        onOpenProgress = { navController.safeNavigate(Routes.BOTS_PROGRESS) },
+                    )
+                } else {
                 com.openminis.app.ui.sessions.SessionListScreen(
                     chatRepository = chatRepository,
                     providerRepository = providerRepository,
@@ -865,9 +879,11 @@ fun ChatSplitScaffoldRoute(
                     onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                     onRootfsClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
+                    onBotsClick = { showBots = true },
                     selectedSessionId = selectedSessionId,
                     draftPlaceholderId = draftPlaceholderId,
                 )
+                }
             },
             detailPane = { sessionId, onBackInPane, onNewChatInPane, onMoveToInPane,
                 onToggleSidebar, sidebarCollapsed ->
@@ -876,9 +892,11 @@ fun ChatSplitScaffoldRoute(
                     chatRepository = chatRepository,
                     providerRepository = providerRepository,
                     memoryRepository = memoryRepository,
-                    skillRepository = skillRepository,
-                    mcpRepository = mcpRepository,
+                     skillRepository = skillRepository,
+                     mcpRepository = mcpRepository,
+                     botRepository = botRepository,
                     onBack = onBackInPane,
+                    onBotDetails = { navController.safeNavigate(Routes.botDetails(it)) },
                     isTwoPane = true,
                     onToggleSidebar = onToggleSidebar,
                     sidebarCollapsed = sidebarCollapsed,
@@ -910,6 +928,7 @@ fun ChatSplitScaffoldRoute(
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
+            botRepository = botRepository,
         )
     }
 }
@@ -923,6 +942,7 @@ private fun ChatPhoneDrawerScaffold(
     memoryRepository: com.openminis.app.data.repository.MemoryRepository?,
     skillRepository: com.openminis.app.data.repository.SkillRepository?,
     mcpRepository: com.openminis.app.data.repository.MCPRepository?,
+    botRepository: com.openminis.app.data.repository.BotRepository?,
 ) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -987,6 +1007,10 @@ private fun ChatPhoneDrawerScaffold(
                         scope.launch { drawerState.close() }
                         navController.safeNavigate(Routes.SCHEDULED_TASKS)
                     },
+                    onOpenBots = {
+                        scope.launch { drawerState.close() }
+                        navController.safeNavigate(Routes.BOTS)
+                    },
                     onOpenTerminal = {
                         scope.launch { drawerState.close() }
                         navController.safeNavigate(Routes.terminal())
@@ -1001,11 +1025,13 @@ private fun ChatPhoneDrawerScaffold(
     ) {
         com.openminis.app.ui.chat.ChatScreen(
             sessionId = currentSessionId,
+            onBotDetails = { navController.safeNavigate(Routes.botDetails(it)) },
             chatRepository = chatRepository,
             providerRepository = providerRepository,
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
+            botRepository = botRepository,
             onBack = {
                 scope.launch {
                     if (drawerState.isClosed) drawerState.open() else drawerState.close()

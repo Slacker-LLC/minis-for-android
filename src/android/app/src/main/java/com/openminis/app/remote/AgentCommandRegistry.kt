@@ -2,7 +2,7 @@ package com.openminis.app.remote
 
 import android.content.Context
 import com.openminis.app.debug.ChatMutationMethods
-import com.openminis.app.debug.HeadlessChatRunner
+import com.openminis.app.agent.AgentRunner
 import com.openminis.app.data.repository.MCPRepository
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.tools.AgentStateStore
@@ -247,7 +247,7 @@ object AgentCommandRegistry {
     }
 
     private suspend fun commandCompact(context: Context, sessionId: String): Outcome {
-        val result = HeadlessChatRunner.compact(
+        val result = AgentRunner.compact(
             context, sessionId, wait = false, timeoutMs = 900_000L,
         )
         return when (result.status) {
@@ -257,7 +257,7 @@ object AgentCommandRegistry {
     }
 
     private suspend fun commandClear(context: Context, sessionId: String): Outcome = withContext(Dispatchers.Main) {
-        val vm = HeadlessChatRunner.viewModelForCommand(context, sessionId)
+        val vm = AgentRunner.viewModelForCommand(context, sessionId)
         if (vm != null) {
             vm.clearChat()
             Outcome(true, "会话已清空（工作区文件已保留）")
@@ -268,7 +268,7 @@ object AgentCommandRegistry {
 
     private suspend fun commandMemory(context: Context, sessionId: String): Outcome =
         withContext(Dispatchers.Main) {
-            val vm = HeadlessChatRunner.viewModelForCommand(context, sessionId)
+            val vm = AgentRunner.viewModelForCommand(context, sessionId)
             if (vm != null) {
                 val enabled = vm.toggleMemoryForCommand()
                 Outcome(true, if (enabled) "记忆写入已开启" else "记忆写入已关闭")
@@ -279,7 +279,7 @@ object AgentCommandRegistry {
 
     private suspend fun commandThinking(context: Context, sessionId: String): Outcome =
         withContext(Dispatchers.Main) {
-            val vm = HeadlessChatRunner.viewModelForCommand(context, sessionId)
+            val vm = AgentRunner.viewModelForCommand(context, sessionId)
             if (vm != null) {
                 vm.toggleThinkingForCommand()
                 Outcome(true, "思考强度已切换")
@@ -298,7 +298,7 @@ object AgentCommandRegistry {
 
     private suspend fun commandExport(context: Context, sessionId: String): String {
         val target = java.io.File(context.cacheDir, "session_export_$sessionId.json").apply { parentFile?.mkdirs() }
-        val replay = runCatching { HeadlessChatRunner.sessionEvents(context, sessionId, null) }.getOrNull()
+        val replay = runCatching { AgentRunner.sessionEvents(context, sessionId, null) }.getOrNull()
         val array = JSONArray()
         replay?.events?.forEach { array.put(it.toEventJson()) }
         target.writeText(JSONObject()

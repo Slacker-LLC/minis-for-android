@@ -36,6 +36,7 @@ import com.openminis.app.ui.settings.AddAgentLoopGroupsScreen
 import com.openminis.app.ui.settings.AddAgentLoopModelsScreen
 import com.openminis.app.ui.settings.AddCustomModelScreen
 import com.openminis.app.ui.settings.BackgroundSettingsScreen
+import com.openminis.app.ui.bots.BotsScreen
 import com.openminis.app.ui.settings.AddModelsToGroupScreen
 import com.openminis.app.ui.settings.ShadowVoiceDetailScreen
 import com.openminis.app.ui.settings.AddProviderScreen
@@ -89,6 +90,11 @@ object Routes {
     const val SESSION_LIST = "sessions"
     const val CHAT = "chat/{sessionId}"
     const val SETTINGS = "settings"
+    const val BOTS = "bots"
+    const val BOTS_ADD = "bots_add"
+    const val BOTS_PROGRESS = "bots_progress"
+    const val BOT_DETAILS = "bots/{botId}"
+    fun botDetails(botId: String) = "bots/${android.net.Uri.encode(botId)}"
     const val PROVIDER_LIST = "providers"
     const val ADD_PROVIDER = "add_provider"
     const val PROVIDER_DETAIL = "provider/{instanceId}"
@@ -222,6 +228,7 @@ fun AppNavigation(
     envVarRepository: EnvVarRepository? = null,
     skillRepository: SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
+    botRepository: com.openminis.app.data.repository.BotRepository? = null,
     memoryRepository: MemoryRepository? = null,
     navController: NavHostController = rememberNavController(),
     initialDeepLink: DeepLinkAction? = null,
@@ -512,6 +519,7 @@ fun AppNavigation(
                 memoryRepository = memoryRepository,
                 skillRepository = skillRepository,
                 mcpRepository = mcpRepository,
+                botRepository = botRepository,
             )
         }
 
@@ -528,6 +536,7 @@ fun AppNavigation(
                 memoryRepository = memoryRepository,
                 skillRepository = skillRepository,
                 mcpRepository = mcpRepository,
+                botRepository = botRepository,
             )
         }
 
@@ -553,6 +562,51 @@ fun AppNavigation(
                 onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
                 onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
             )
+        }
+
+        listOf(Routes.BOTS, Routes.BOTS_ADD, Routes.BOTS_PROGRESS).forEach { botRoute ->
+            composable(botRoute) {
+                val bots = botRepository
+                if (bots == null) {
+                    navController.safePopBackStack()
+                } else {
+                    BotsScreen(
+                        botRepository = bots,
+                        chatRepository = chatRepository,
+                        providerRepository = providerRepository,
+                        initialEditing = botRoute == Routes.BOTS_ADD,
+                        initialProgress = botRoute == Routes.BOTS_PROGRESS,
+                        onBack = { navController.safePopBackStack() },
+                        onOpenSession = { sessionId ->
+                            navController.safeNavigate(Routes.chat(sessionId)) {
+                                popUpTo(Routes.SESSION_LIST) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        composable(
+            route = Routes.BOT_DETAILS,
+            arguments = listOf(navArgument("botId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            botRepository?.let { bots ->
+                BotsScreen(
+                    botRepository = bots,
+                    chatRepository = chatRepository,
+                    providerRepository = providerRepository,
+                    initialBotId = backStackEntry.arguments?.getString("botId"),
+                    onBack = { navController.safePopBackStack() },
+                    onOpenSession = { sessionId ->
+                        navController.safeNavigate(Routes.chat(sessionId)) {
+                            popUpTo(Routes.SESSION_LIST) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
         }
 
         composable(Routes.SHARED_FOLDERS) {

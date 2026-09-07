@@ -143,13 +143,17 @@ subprojects {
             it.name == "assembleDebug" ||
                 it.name == "packageDebug" ||
                 it.name == "validateSigningDebug" ||
+                it.name == "packageDebugAndroidTest" ||
+                it.name == "validateSigningDebugAndroidTest" ||
                 it.name == "assembleRelease" ||
                 it.name == "bundleRelease" ||
                 it.name == "packageRelease"
         }.configureEach {
             if (name == "assembleDebug" ||
                 name == "packageDebug" ||
-                name == "validateSigningDebug"
+                name == "validateSigningDebug" ||
+                name == "packageDebugAndroidTest" ||
+                name == "validateSigningDebugAndroidTest"
             ) {
                 dependsOn(ensureStableDebugSigningKeystore)
             } else {

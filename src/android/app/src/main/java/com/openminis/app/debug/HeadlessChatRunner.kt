@@ -1,6 +1,7 @@
 package com.openminis.app.debug
 
 import android.content.Context
+import com.openminis.app.agent.AgentTurnOutcome
 import androidx.lifecycle.ViewModelProvider
 import com.openminis.app.MinisApp
 import com.openminis.app.data.model.ThinkingLevel
@@ -36,6 +37,8 @@ import org.json.JSONObject
  * true, but we still serialize per-session via the cache: a second `wait=true`
  * on the same session can collect the same `isStreaming` Flow.
  */
+/** Compatibility adapter for legacy debug/RPC callers; product code uses AgentRunner. */
+@Deprecated("Use com.openminis.app.agent.AgentRunner for product execution")
 internal object HeadlessChatRunner {
 
     /** sessionId → ViewModelProvider that owns its single ChatViewModel. */
@@ -67,6 +70,7 @@ internal object HeadlessChatRunner {
                 memoryRepository = app.memoryRepository,
                 skillRepository = app.skillRepository,
                 mcpRepository = app.mcpRepository,
+                botRepository = app.botRepository,
             ),
         )
         providers[sessionId] = provider
@@ -230,64 +234,51 @@ internal object HeadlessChatRunner {
                 timedOut = false,
             )
         }
+        if (vm.isStreaming.value) {
+            return@withContext PromptResult("Busy", "session_busy", false, streamExited = false)
+        }
         for (att in attachments) vm.addAttachment(att)
         if (chatOnly) vm.chatOnlyForNextTurn = true
-        vm.sendMessage(text)
-        if (!wait) {
-            // Confirm the stream actually started instead of reporting
-            // accepted-then-silence: sendMessage claims _isStreaming
-            // synchronously, but its early-return guards (no provider,
-            // compact-then-send park, ask-user dialog, already-streaming
-            // enqueue) do not. Poll briefly off-Main so the caller can
-            // distinguish "Running" from "Dropped".
-            val started = withContext(Dispatchers.Default) {
-                withTimeoutOrNull(4000L) {
-                    if (vm.isStreaming.value) {
-                        true
-                    } else {
-                        vm.isStreaming.first { it }
-                    }
-                }
-            }
-            return@withContext PromptResult(
-                status = if (started != null) "Running" else "Dropped",
-                responseText = if (started == null) "message_not_started" else null,
-                timedOut = false,
-            )
+        val request = vm.submitPrompt(text)
+        if (!wait && !request.result.isCompleted) {
+            return@withContext PromptResult("Running", null, false, streamExited = false)
         }
-
-        // Wait for isStreaming to be false (sendMessage flips it true synchronously
-        // before launching its coroutine; if it never flips true the message was
-        // dropped — return immediately as Completed-but-empty).
-        val started = vm.isStreaming.value
-        if (!started) {
-            // Either dropped (e.g. compacting in flight) or completed before we
-            // returned to the suspension point — fall through to drain.
+        val outcome = if (request.result.isCompleted) request.result.await() else {
+            withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { request.result.await() }
         }
-        val finished = withTimeoutOrNull(timeoutMs) {
-            // Skip the initial false (if we were called before sendMessage flipped true)
-            if (vm.isStreaming.value) {
-                // Wait for the next false transition.
-                vm.isStreaming.first { !it }
-            }
+        if (outcome == null) request.cancel()
+        val streamExited = outcome != null || withTimeoutOrNull(5_000L) {
+            request.result.await()
             true
-        } ?: run {
-            // Timeout: cancel the underlying stream so it does not keep running
-            // (and holding the session busy) after the caller gave up waiting.
-            vm.cancelStream()
-            false
+        } == true
+        // Restrict the response to rows after this request's user message.
+        // A rejected/failed send must never return an earlier successful reply.
+        val msgs = app(context).chatRepository.dao.loadMessages(sessionId)
+        val userIndex = request.userMessageId?.let { id -> msgs.indexOfFirst { it.id == id } } ?: -1
+        val responseText = if (userIndex >= 0) {
+            msgs.drop(userIndex + 1).takeWhile { it.role != "user" || extractText(it.partsJson).isNullOrBlank() }
+                .lastOrNull { it.role == "assistant" }?.let { extractText(it.partsJson) }
+        } else null
+        val status = when (outcome) {
+            AgentTurnOutcome.Completed -> "Completed"
+            AgentTurnOutcome.Cancelled -> "Cancelled"
+            is AgentTurnOutcome.Failed -> "Error"
+            is AgentTurnOutcome.NeedsAttention -> "NeedsAttention"
+            is AgentTurnOutcome.Rejected -> "Dropped"
+            null -> "Timeout"
         }
-
-        // Best-effort: read the last assistant text from the DB so we don't
-        // depend on the in-memory UI list (which may not have flushed yet).
-        val app = app(context)
-        val msgs = app.chatRepository.dao.loadMessages(sessionId)
-        val lastAssistant = msgs.lastOrNull { it.role == "assistant" }
-        val responseText = lastAssistant?.let { extractText(it.partsJson) }
+        val reason = when (outcome) {
+            is AgentTurnOutcome.Failed -> outcome.reason
+            is AgentTurnOutcome.NeedsAttention -> outcome.reason
+            is AgentTurnOutcome.Rejected -> outcome.reason
+            else -> null
+        }
+        if (outcome is AgentTurnOutcome.Rejected) vm.chatOnlyForNextTurn = false
         PromptResult(
-            status = if (finished) "Completed" else "Timeout",
-            responseText = responseText,
-            timedOut = !finished,
+            status = status,
+            responseText = reason ?: responseText,
+            timedOut = outcome == null,
+            streamExited = streamExited,
         )
     }
 
@@ -347,8 +338,10 @@ internal object HeadlessChatRunner {
             // Timeout: cancel the underlying stream so it does not keep running
             // after the caller gave up waiting.
             vm.cancelStream()
+            vm.awaitStreamExit(timeoutMs = 5_000L)
             false
         }
+        val streamExited = vm.awaitStreamExit(timeoutMs = 5_000L)
         val msgs = app.chatRepository.dao.loadMessages(sessionId)
         val lastAssistant = msgs.lastOrNull { it.role == "assistant" }
         val responseText = lastAssistant?.let { extractText(it.partsJson) }
@@ -356,6 +349,7 @@ internal object HeadlessChatRunner {
             status = if (finished) "Completed" else "Timeout",
             responseText = responseText,
             timedOut = !finished,
+            streamExited = streamExited,
             deletedMessageCount = deletedCount,
             retriedMessageId = targetMsgId,
         )
@@ -823,6 +817,7 @@ internal object HeadlessChatRunner {
         val status: String,
         val responseText: String?,
         val timedOut: Boolean,
+        val streamExited: Boolean = true,
         val deletedMessageCount: Int = 0,
         val retriedMessageId: String? = null,
     )

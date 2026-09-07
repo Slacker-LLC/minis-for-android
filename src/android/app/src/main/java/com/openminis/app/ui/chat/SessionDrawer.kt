@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -54,11 +55,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.data.db.ChatSessionEntity
+import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +78,7 @@ fun SessionDrawerContent(
     onOpenScheduledTasks: () -> Unit,
     onOpenTerminal: () -> Unit,
     onOpenStorage: () -> Unit,
+    onOpenBots: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val sessions by chatRepository.dao.observeSessions().collectAsState(initial = emptyList())
@@ -189,6 +193,11 @@ fun SessionDrawerContent(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 2.dp),
         ) {
+            DrawerToolRow(
+                icon = Icons.Outlined.Group,
+                title = stringResource(R.string.bots_team),
+                onClick = onOpenBots,
+            )
             DrawerToolRow(
                 icon = Icons.Outlined.Schedule,
                 title = "定时任务",
@@ -462,4 +471,3 @@ private fun DrawerSessionItem(
         }
     }
 }
-

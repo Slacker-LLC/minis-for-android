@@ -591,6 +591,7 @@ class MainActivity : ComponentActivity() {
                     envVarRepository = app.envVarRepository,
                     skillRepository = app.skillRepository,
                     mcpRepository = app.mcpRepository,
+                    botRepository = app.botRepository,
                     memoryRepository = app.memoryRepository,
                     navController = navController,
                     initialDeepLink = launchDeepLink,

@@ -14,7 +14,10 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "sessions",
-    indices = [androidx.room.Index(value = ["folder_id"], name = "index_sessions_folder_id")],
+    indices = [
+        androidx.room.Index(value = ["folder_id"], name = "index_sessions_folder_id"),
+        androidx.room.Index(value = ["bot_id"], name = "index_sessions_bot_id"),
+    ],
 )
 data class ChatSessionEntity(
     @PrimaryKey val id: String,
@@ -60,4 +63,10 @@ data class ChatSessionEntity(
      * in its old section.
      */
     @ColumnInfo(name = "folder_id") val folderId: String? = null,
-)
+    @ColumnInfo(name = "bot_id") val botId: String? = null,
+) {
+    companion object {
+        const val SOURCE_BOT_DELEGATION = "bot_delegation"
+        const val LEGACY_SOURCE_BOT_DELEGATION = "bot-delegation"
+    }
+}

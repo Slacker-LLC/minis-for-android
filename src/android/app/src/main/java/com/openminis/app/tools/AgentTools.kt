@@ -10,6 +10,8 @@ import com.openminis.app.data.model.AgentToolParam
  * Tool definitions aligned with iOS AIChatViewModel.makeAgentTools().
  */
 object AgentTools {
+    private val BOT_COORDINATION_TOOL_NAMES = setOf("delegate_bot", "list_bots", "check_delegation")
+
 
     fun makeAgentTools(
         supportsImageInput: Boolean = true,
@@ -35,12 +37,24 @@ object AgentTools {
          */
         presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
             com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
+        botEnabled: Boolean = false,
     ): List<AgentToolDefinition> = buildList {
         add(shellExecuteDefinition())
         add(FileReadTool.definition())
         add(FileWriteTool.definition())
         add(FileEditTool.definition())
-        if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) return@buildList
+        if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) {
+            // Bot coordination is part of the Bot identity contract, so a
+            // minimal Agent preset must not silently remove list/delegate/check
+            // from a Bot session. Keep every other full-runtime tool hidden.
+            if (botEnabled) {
+                addAll(
+                    com.openminis.app.tools.runtime.ToolRegistry.definitions()
+                        .filter { it.name in BOT_COORDINATION_TOOL_NAMES },
+                )
+            }
+            return@buildList
+        }
         // Android development/debug loop. These high-cohesion tools reuse the
         // existing AccessibilityService, Shizuku, Ubuntu runtime, approval,
         // checkpoint, JobRegistry, and output-spill seams rather than creating
@@ -74,7 +88,7 @@ object AgentTools {
         }.toSet()
         addAll(
             com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
-                it.name !in legacyCanonicals
+                it.name !in legacyCanonicals && (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES)
             },
         )
     }
