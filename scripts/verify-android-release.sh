@@ -31,6 +31,8 @@ if unzip -Z1 "$APK" | grep -Eq '(^|/)debug-skill(/|$)'; then
   exit 1
 fi
 
+bash "$(cd "$(dirname "$0")" && pwd)/verify-android-16k.sh" "$APK"
+
 # R8 should eliminate the debug RPC server because every startup/reference is
 # guarded by BuildConfig.DEBUG=false in release. Scan every DEX for the source
 # descriptor/string as a regression backstop.
