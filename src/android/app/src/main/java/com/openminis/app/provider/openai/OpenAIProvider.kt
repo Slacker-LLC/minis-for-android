@@ -142,11 +142,12 @@ class OpenAIProvider private constructor(
     companion object {
         /**
          * [T-android-thinking-level-arch] Codex OAuth client version advertised
-         * in the Version / User-Agent headers. Bumped 0.142.3 → 0.144.1 to
-         * match the CLIProxyAPI/sub2api upstream (fixes a gpt-5.6-luna 404 seen
-         * on the older client). Shared constant so future bumps touch one place.
+         * in the Version / User-Agent headers. Keep this aligned with the
+         * current upstream Codex client: the Codex backend gates newer models
+         * (including gpt-6-astra) on this value before it validates the body.
+         * Shared constant so future bumps touch one place.
          */
-        private const val CODEX_CLIENT_VERSION = "0.144.1"
+        private const val CODEX_CLIENT_VERSION = "0.153.4"
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte
@@ -155,11 +156,11 @@ class OpenAIProvider private constructor(
          *
          * [T-android-ttfb-upload-split / #188] This window now starts at
          * `requestBodyEnd` (upload complete), NOT at call start — a large
-         * multimodal body over a slow proxy could burn the whole 30s just
+         * multimodal body over a slow proxy could burn the whole 120s just
          * uploading, so a healthy-but-slow server looked like a dead
          * connection. See [STREAM_UPLOAD_CAP_MS] for the upload-phase bound.
          */
-        private const val STREAM_TTFB_TIMEOUT_MS = 30_000L
+        private const val STREAM_TTFB_TIMEOUT_MS = 120_000L
 
         /**
          * [T-android-ttfb-upload-split / #188] Overall ceiling for the UPLOAD
@@ -341,7 +342,14 @@ class OpenAIProvider private constructor(
      */
     // Astra function calling requires Responses. Namespaced relay ids retain
     // their configured transport; the exact OpenAI id uses Responses by default.
+    // DeepSeek's public OpenAI-compatible API supports the Chat Completions
+    // route used by this provider. A stale/imported per-instance Responses
+    // flag should not silently change the route for a direct DeepSeek entry.
+    private val isDeepSeekEndpoint: Boolean
+        get() = basePath.toHttpUrlOrNull()?.host?.equals("api.deepseek.com", ignoreCase = true) == true
+
     private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions ||
+        isDeepSeekEndpoint ||
         (!isOAuth && !useResponsesAPI && (isAzure || model.id != LLMModel.gpt6Astra.id))
 
     /**

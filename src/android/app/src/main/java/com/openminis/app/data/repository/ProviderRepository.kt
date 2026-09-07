@@ -47,6 +47,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
+private fun normalizeStoredCredential(value: String): String {
+    var normalized = value.trim()
+    if (normalized.length >= 2 &&
+        ((normalized.first() == '"' && normalized.last() == '"') ||
+            (normalized.first() == '\'' && normalized.last() == '\''))
+    ) {
+        normalized = normalized.substring(1, normalized.length - 1).trim()
+    }
+    if (normalized.startsWith("Bearer ", ignoreCase = true)) {
+        normalized = normalized.substring("Bearer ".length).trim()
+    }
+    return normalized
+}
+
 // Modality bit layout — must match src/ios/Providers/LLMTypes.swift
 // ModelModality OptionSet rawValue exactly. Used by export/import to
 // transmit modality info as a single Int that iOS can decode.
@@ -2298,11 +2312,16 @@ class ProviderRepository(private val context: Context) {
 
     // API Key management
     fun saveApiKey(instanceId: String, key: String) {
-        encryptedPrefs.edit().putString("apikey_$instanceId", key).apply()
+        // Credentials can also come from imported/debug configuration paths,
+        // where a copied newline or surrounding space must not become part of
+        // the Authorization header sent to an API provider.
+        encryptedPrefs.edit().putString("apikey_$instanceId", normalizeStoredCredential(key)).apply()
     }
 
     fun loadApiKey(instanceId: String): String? {
-        return encryptedPrefs.getString("apikey_$instanceId", null)
+        // Trim on read as well so credentials saved by older/import paths are
+        // repaired without requiring the user to enter them again.
+        return encryptedPrefs.getString("apikey_$instanceId", null)?.let(::normalizeStoredCredential)
     }
 
     /**
