@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.ui.components.DialogTextField
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Settings-level memory file management.
@@ -64,6 +68,7 @@ fun MemoryManagementScreen(
     var files by remember { mutableStateOf<List<MemoryRepository.MemoryFileInfo>>(emptyList()) }
     var deleteFileName by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     // [T-memory-global-toggle-settings-ui-android] Global default for
     // newly-created sessions. Stored separately from per-session
     // memoryEnabled (which lives in the sessions DB row) so toggling
@@ -75,7 +80,7 @@ fun MemoryManagementScreen(
     }
 
     LaunchedEffect(Unit) {
-        files = memoryRepository.listAllFiles()
+        files = withContext(Dispatchers.IO) { memoryRepository.listAllFiles() }
     }
 
     SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack) {
@@ -145,11 +150,14 @@ fun MemoryManagementScreen(
             text = { Text(stringResource(R.string.memory_delete_confirm_text)) },
             confirmButton = {
                 MinisTextButton(onClick = {
-                    deleteFileName?.let {
-                        memoryRepository.deleteFile(it)
-                        files = memoryRepository.listAllFiles()
-                    }
+                    val name = deleteFileName
                     deleteFileName = null
+                    if (name != null) scope.launch {
+                        files = withContext(Dispatchers.IO) {
+                            memoryRepository.deleteFile(name)
+                            memoryRepository.listAllFiles()
+                        }
+                    }
                 }) {
                     Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
@@ -265,6 +273,7 @@ fun MemoryFileEditScreen(
     var content by remember { mutableStateOf("") }
     var saveError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // [T-memory-save-toast-feedback] Confirm Save actually committed by
     // flashing a toast — previously the Save tap silently closed nothing,
     // showed no state change, and the user had no signal that the edit
@@ -274,7 +283,7 @@ fun MemoryFileEditScreen(
     val savedToastText = stringResource(R.string.memory_save_toast)
 
     LaunchedEffect(fileName) {
-        content = memoryRepository.readFile(fileName)
+        content = withContext(Dispatchers.IO) { memoryRepository.readFile(fileName) }
     }
 
     Scaffold(
@@ -290,16 +299,21 @@ fun MemoryFileEditScreen(
                     // [T-global-memory-save-always-visible] Always render Save —
                     // no hasChanges gate (see KDoc above).
                     MinisTextButton(onClick = {
-                        try {
-                            memoryRepository.saveFile(fileName, content)
-                            saveError = null
-                            android.widget.Toast.makeText(
-                                context,
-                                savedToastText,
-                                android.widget.Toast.LENGTH_SHORT,
-                            ).show()
-                        } catch (e: Exception) {
-                            saveError = e.message
+                        val pending = content
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    memoryRepository.saveFile(fileName, pending)
+                                }
+                                saveError = null
+                                android.widget.Toast.makeText(
+                                    context,
+                                    savedToastText,
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            } catch (e: Exception) {
+                                saveError = e.message
+                            }
                         }
                     }) {
                         Text("Save")
