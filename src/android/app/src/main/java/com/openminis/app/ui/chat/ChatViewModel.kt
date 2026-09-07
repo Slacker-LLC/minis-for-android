@@ -356,6 +356,9 @@ class ChatViewModel(
         // can be filtered with `adb logcat -s Minis.ChatVMStream:D`.
         // Removed once the retry-state regression is rooted out.
         private const val TAG_STREAM = "ChatVMStream"
+        // Guest-backed prompt enrichment is best-effort; it must not hold the
+        // provider turn while minisd is starting or recovering.
+        private const val PROMPT_FRAGMENT_TIMEOUT_MS = 2_000L
         /**
          * Hard ceiling on agent loop iterations within a single user turn.
          * Backstop against runaway tool-call cycles that slip past
@@ -10112,15 +10115,11 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // Match iOS order exactly: skills → global memory → recent daily memory.
         // See ios/Agent/Chat/AIChatViewModel.swift:4375-4387. Each fragment is
         // appended only when non-null; absent fragments leave no separator.
-        // T-skillscan: rescan disk before reading the fragment so a skill
-        // that an earlier turn dropped via shell `git clone` (which bypasses
-        // the file_write hook below) becomes visible on the very next user
-        // turn instead of "after kill app". Cheap: loadAll is a SQLite
-        // SELECT + listFiles, no network.
-        val skillFragment = withContext(Dispatchers.IO) {
-            skillRepository?.reloadFromDisk()
-            skillRepository?.skillPromptFragment(activeSessionId)
-        }
+        // Do not rescan the guest skill tree on the critical send path. The
+        // repository already refreshes on startup, Settings entry, and after
+        // skill file writes. A minisd outage must not prevent the provider
+        // request from being launched just because a prompt fragment is stale.
+        val skillFragment = skillRepository?.skillPromptFragment(activeSessionId)
         // [T-mcp-integration-android] Re-read servers.json (the CLI / file
         // browser may have changed it out-of-band) then build the Top-20
         // enabled-MCP disclosure, injected right after the skills fragment.
@@ -10137,10 +10136,14 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // tool surface and SOUL.md is part of identity, both orthogonal
         // to the memory feature.
         val globalMemoryFragment = if (memoryOn) {
-            withContext(Dispatchers.IO) { memoryRepository?.loadGlobalMemoryFragment() }
+            bestEffortPromptFragment("GLOBAL.md") {
+                memoryRepository?.loadGlobalMemoryFragmentAsync()
+            }
         } else null
         val dailyMemoryFragment = if (memoryOn) {
-            withContext(Dispatchers.IO) { memoryRepository?.loadRecentDailyMemoryFragment() }
+            bestEffortPromptFragment("recent memory") {
+                memoryRepository?.loadRecentDailyMemoryFragmentAsync()
+            }
         } else null
 
         return buildString {
@@ -10202,6 +10205,29 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             writtenContent = content,
         )
         return result
+    }
+
+    /**
+     * Prompt enrichment is optional. Keep the model turn independent from the
+     * guest runtime and report a bounded miss instead of leaving the UI in a
+     * permanent streaming state while minisd recovers.
+     */
+    private suspend fun <T> bestEffortPromptFragment(
+        label: String,
+        block: suspend () -> T?,
+    ): T? {
+        return try {
+            withTimeoutOrNull(PROMPT_FRAGMENT_TIMEOUT_MS) { block() }.also { value ->
+                if (value == null) {
+                    Log.w(TAG, "Prompt fragment skipped after ${PROMPT_FRAGMENT_TIMEOUT_MS}ms: $label")
+                }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.w(TAG, "Prompt fragment unavailable: $label (${error.message})")
+            null
+        }
     }
 
     fun executeMemoryGet(argsJson: String): MemoryTools.ToolResult {

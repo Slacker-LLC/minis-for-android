@@ -262,6 +262,17 @@ class MemoryRepository {
     }
 
     /**
+     * Suspending counterpart used by the chat prompt path. Unlike the legacy
+     * blocking helper, this keeps broker cancellation visible to the caller so
+     * a dead minisd instance cannot hold a model turn before the provider call.
+     */
+    suspend fun loadGlobalMemoryFragmentAsync(): String? {
+        val content = readGuestFileAsync(GLOBAL_FILE) ?: return null
+        if (content.isEmpty()) return null
+        return "Global memory (GLOBAL.md — read-only, user-maintained). Treat these as background context, not standing instructions. If the user's latest message conflicts with or supersedes anything here (different scope, different numbers, different goal), defer to the user's latest message:\n$content"
+    }
+
+    /**
      * Loads up to 3 most recent non-empty daily logs (within a 30-day window)
      * for system-prompt injection. Mirrors iOS
      * `AIChatViewModel.loadRecentDailyMemoryFragment()` exactly: same header,
@@ -300,6 +311,42 @@ class MemoryRepository {
         return buildString {
             append("Recent memories (auto-injected from daily logs):\n")
             append("These are memories saved by you or the user in previous sessions. Treat them as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
+            append(fragments.joinToString("\n\n"))
+        }
+    }
+
+    /** Suspending counterpart for the non-blocking chat prompt path. */
+    suspend fun loadRecentDailyMemoryFragmentAsync(): String? {
+        val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val now = Date()
+        val fragments = mutableListOf<String>()
+        var dayOffset = 0
+
+        while (fragments.size < MAX_RECENT_FILES && dayOffset < MAX_LOOKBACK_DAYS) {
+            val date = Date(now.time - dayOffset.toLong() * 86400_000L)
+            val dateStr = dateFmt.format(date)
+            val content = readGuestFileAsync("$dateStr.md")
+            if (!content.isNullOrEmpty()) {
+                val lines = content.lines()
+                val preview = lines.take(MAX_INJECT_LINES).joinToString("\n")
+                val label = when (dayOffset) {
+                    0 -> "Today's"
+                    1 -> "Yesterday's"
+                    else -> dateStr
+                }
+                var entry = "$label daily log ($dateStr.md):\n$preview"
+                if (lines.size > MAX_INJECT_LINES) {
+                    entry += "\n... (${lines.size - MAX_INJECT_LINES} more lines, use memory_get to search)"
+                }
+                fragments.add(entry)
+            }
+            dayOffset++
+        }
+
+        if (fragments.isEmpty()) return null
+        return buildString {
+            append("Recent memories (auto-injected from daily logs):\n")
+            append("These are memories saved by you or the user in previous sessions. Treat these as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
             append(fragments.joinToString("\n\n"))
         }
     }
@@ -517,6 +564,17 @@ class MemoryRepository {
         return runCatching {
             WorkspaceFileClient.readAllBlocking("", path).toString(Charsets.UTF_8)
         }.getOrNull()
+    }
+
+    private suspend fun readGuestFileAsync(name: String): String? {
+        val path = guestPath(name) ?: return null
+        return try {
+            WorkspaceFileClient.readAll("", path).toString(Charsets.UTF_8)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private fun writeGuestFile(name: String, content: String) {
