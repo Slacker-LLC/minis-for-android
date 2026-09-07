@@ -342,14 +342,7 @@ class OpenAIProvider private constructor(
      */
     // Astra function calling requires Responses. Namespaced relay ids retain
     // their configured transport; the exact OpenAI id uses Responses by default.
-    // DeepSeek's public OpenAI-compatible API supports the Chat Completions
-    // route used by this provider. A stale/imported per-instance Responses
-    // flag should not silently change the route for a direct DeepSeek entry.
-    private val isDeepSeekEndpoint: Boolean
-        get() = basePath.toHttpUrlOrNull()?.host?.equals("api.deepseek.com", ignoreCase = true) == true
-
     private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions ||
-        isDeepSeekEndpoint ||
         (!isOAuth && !useResponsesAPI && (isAzure || model.id != LLMModel.gpt6Astra.id))
 
     /**

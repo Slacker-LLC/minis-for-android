@@ -133,17 +133,16 @@ class Gpt6AstraTest {
     }
 
     @Test
-    fun `direct DeepSeek endpoint ignores stale Responses flag`() {
-        // A provider config imported from a Responses-capable relay may carry
-        // this flag even after its base URL is changed to api.deepseek.com.
-        // The direct endpoint supports the OpenAI Chat Completions shape.
+    fun `direct DeepSeek endpoint honors configured Responses flag`() {
+        // Route selection is controlled by the provider setting, even for the
+        // direct DeepSeek endpoint; the app must not override it by hostname.
         val provider = OpenAIProvider(
             apiKey = "fixture",
             model = LLMModel("deepseek-chat", "DeepSeek", "DeepSeek"),
             basePath = "https://api.deepseek.com/v1",
             useResponsesAPI = true,
         )
-        assertTrue(provider.streamTextIsMonolithic)
+        assertFalse(provider.streamTextIsMonolithic)
     }
 
     private fun interceptRequests(provider: OpenAIProvider, requests: MutableList<Request>) {
