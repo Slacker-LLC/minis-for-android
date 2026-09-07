@@ -1,5 +1,6 @@
 package com.openminis.app.tools
 
+import android.app.Application
 import android.content.Context
 import com.openminis.app.data.db.BotDelegationEntity
 import com.openminis.app.data.db.ChatSessionEntity
@@ -24,7 +25,7 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 class BotDelegationCoordinator private constructor(
-    private val context: Context,
+    private val application: Application,
     private val botRepository: BotRepository,
     private val chatRepository: ChatRepository,
     private val providerRepository: ProviderRepository,
@@ -347,7 +348,7 @@ class BotDelegationCoordinator private constructor(
         var releaseLockImmediately = true
         try {
             val result = AgentRunner.prompt(
-                    context = context,
+                    context = application,
                     sessionId = targetSession.id,
                     text = delegation.prompt,
                     wait = true,
@@ -374,18 +375,18 @@ class BotDelegationCoordinator private constructor(
             deliverReceipt(delegationRepository.get(delegation.id))
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             withContext(NonCancellable) {
-                AgentRunner.cancel(context, targetSession.id)
+                AgentRunner.cancel(application, targetSession.id)
                 releaseLockImmediately = withTimeoutOrNull(5_000L) {
-                    AgentRunner.awaitStreamExit(context, targetSession.id)
+                    AgentRunner.awaitStreamExit(application, targetSession.id)
                 } == true
                 delegationRepository.cancel(delegation.id, "delegation worker cancelled")
                 deliverReceipt(delegationRepository.get(delegation.id))
             }
             throw cancelled
         } catch (error: Throwable) {
-            AgentRunner.cancel(context, targetSession.id)
+            AgentRunner.cancel(application, targetSession.id)
             releaseLockImmediately = withTimeoutOrNull(5_000L) {
-                AgentRunner.awaitStreamExit(context, targetSession.id)
+                AgentRunner.awaitStreamExit(application, targetSession.id)
             } == true
             delegationRepository.fail(
                 delegation.id,
@@ -399,7 +400,7 @@ class BotDelegationCoordinator private constructor(
                 BotTurnLockRegistry.releaseExternal(target.id, targetSession.id)
             } else {
                 scope.launch {
-                    AgentRunner.awaitStreamExit(context, targetSession.id)
+                    AgentRunner.awaitStreamExit(application, targetSession.id)
                     BotTurnLockRegistry.releaseExternal(target.id, targetSession.id)
                 }
             }
@@ -441,7 +442,7 @@ class BotDelegationCoordinator private constructor(
             runCatching {
                 val message = chatRepository.appendMessage(current.sourceSessionId, "assistant", parts,
                     idempotencyKey = "bot-receipt:${current.id}")
-                AgentRunner.notifyExternalMessage(context, message)
+                AgentRunner.notifyExternalMessage(application, message)
                 delegationRepository.markDelivered(current.id)
             }
         }
@@ -510,7 +511,7 @@ class BotDelegationCoordinator private constructor(
             inboxRepository: BotInboxRepository,
         ): BotDelegationCoordinator = synchronized(this) {
             instance ?: BotDelegationCoordinator(
-                context.applicationContext,
+                context.applicationContext as Application,
                 botRepository,
                 chatRepository,
                 providerRepository,

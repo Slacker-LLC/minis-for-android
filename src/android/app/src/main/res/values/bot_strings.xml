@@ -2,7 +2,6 @@
     <string name="bots_team">Team</string>
     <string name="bots_member_missing">Member no longer exists</string>
     <string name="bots_member_missing_body">Return to the team and choose another member.</string>
-    <string name="bots_members">Members</string>
     <string name="bots_progress">Work updates</string>
     <string name="bots_add">Add member</string>
     <string name="bots_empty_title">Your team starts here</string>

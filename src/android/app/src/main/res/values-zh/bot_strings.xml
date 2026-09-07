@@ -2,7 +2,6 @@
     <string name="bots_team">团队</string>
     <string name="bots_member_missing">成员已不存在</string>
     <string name="bots_member_missing_body">返回团队，选择另一位成员。</string>
-    <string name="bots_members">成员</string>
     <string name="bots_progress">协作进展</string>
     <string name="bots_add">添加成员</string>
     <string name="bots_empty_title">从第一位成员开始</string>
