@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.lazy.LazyListState
+import com.openminis.app.agent.AgentTurnHandle
+import com.openminis.app.agent.AgentTurnOutcome
 import com.openminis.app.agent.Level
 import com.openminis.app.agent.InterruptedTailDetector
 import com.openminis.app.agent.InterruptedTailShape
@@ -16,6 +18,7 @@ import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.data.db.MessageEntity
+import com.openminis.app.data.db.ChatSessionEntity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Delete
@@ -50,6 +53,7 @@ import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository
+import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ImageBudget
@@ -120,6 +124,7 @@ class ChatViewModel(
     val memoryRepository: MemoryRepository? = null,
     val skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     val mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
+    val botRepository: BotRepository? = null,
 ) : ViewModel() {
 
    companion object {
@@ -423,6 +428,7 @@ class ChatViewModel(
             memoryRepository: MemoryRepository?,
             skillRepository: com.openminis.app.data.repository.SkillRepository?,
             mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
+            botRepository: BotRepository? = null,
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -434,6 +440,7 @@ class ChatViewModel(
                     memoryRepository = memoryRepository,
                     skillRepository = skillRepository,
                     mcpRepository = mcpRepository,
+                    botRepository = botRepository,
                 ) as T
             }
         }
@@ -940,9 +947,37 @@ class ChatViewModel(
     private var pendingMediaCommitJob: Job? = null
     private var currentProvider: LLMProvider? = null
     private var currentModel: LLMModel? = null
+    @Volatile private var sessionBotId: String? = null
+    @Volatile private var sessionSource: String? = null
+    @Volatile private var activeBotRunId: String? = null
 
     /** Structured agent history for the agent loop (contentParts-based). */
     private val agentHistory = mutableListOf<LLMMessage>()
+    private val pendingExternalMessages = java.util.concurrent.ConcurrentLinkedQueue<MessageEntity>()
+
+    internal fun acceptExternalMessage(message: MessageEntity) {
+        require(message.sessionId == activeSessionId)
+        pendingExternalMessages.add(message)
+        viewModelScope.launch {
+            sessionLoaded.first { it }
+            if (_messages.value.none { it.id == message.id }) {
+                val parsed = mapOf(message.id to runCatching { org.json.JSONArray(message.partsJson) })
+                val visible = listOf(message).toChatMessages(parsed)
+                _messages.value = _messages.value + visible
+                visible.forEach { sessionEventEmitter.messageCreated(it) }
+            }
+        }
+    }
+
+    // Called only at serialized history boundaries, never from the receipt worker.
+    private fun mergeExternalHistory() {
+        while (true) {
+            val message = pendingExternalMessages.poll() ?: break
+            if (agentHistory.none { it.dbMessageId == message.id }) {
+                agentHistory.add(message.toLLMMessage())
+            }
+        }
+    }
 
     @Volatile var chatOnlyForNextTurn = false
 
@@ -975,6 +1010,9 @@ class ChatViewModel(
             // default for new sessions) chooses the real tool configuration.
             presetToolset = com.openminis.app.remote.AgentPresetRegistry
                 .presetForSession(context, sessionId).toolset,
+            botEnabled = botRepository != null && sessionBotId != null &&
+                sessionSource != ChatSessionEntity.SOURCE_BOT_DELEGATION &&
+                sessionSource != ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION,
         )
 
     /**
@@ -2201,6 +2239,13 @@ class ChatViewModel(
                         iconKind = "compact",
                     )
                 }
+            } catch (e: com.openminis.app.provider.ProviderTransportPolicy.Violation) {
+                // A stale or revoked cleartext approval remains a provider
+                // configuration error, but must not crash the Application.
+                Log.w(TAG, "provider configuration rejected while loading session: " + e.message)
+                currentProvider = null
+                _activeEntryId.value = null
+                _error.value = e.message ?: "Provider configuration rejected"
             } finally {
                 _isCompacting.value = false
                 // [T-android-auto-compact-inloop] Signal the awaiting in-loop
@@ -3766,6 +3811,18 @@ class ChatViewModel(
     val currentSessionId: String
         get() = activeSessionId
 
+    private suspend fun <T> withBotTurnLock(block: suspend () -> T): T {
+        val botId = sessionBotId ?: chatRepository.getSession(activeSessionId)?.botId
+        return com.openminis.app.tools.BotTurnLockRegistry.withLock(botId, activeSessionId, block)
+    }
+
+    /** Assign one durable source-run key to the whole source stream. */
+    private fun beginBotSourceRun(): String {
+        val runId = "run-${java.util.UUID.randomUUID()}"
+        activeBotRunId = runId
+        return runId
+    }
+
     /**
      * Ensure a durable row exists before a UI edits per-session settings.
      * Draft chats normally materialize on first send; opening Advanced settings
@@ -4006,6 +4063,8 @@ class ChatViewModel(
             val session = chatRepository.getSession(sessionId) ?: return@launch
             _sessionTitle.value = session.title ?: "New Chat"
             _sessionCategory.value = session.category
+            sessionBotId = session.botId
+            sessionSource = session.source
             _memoryEnabled.value = session.memoryEnabled != 0
             // T239: hydrate persisted thinking-mode override. null = unset
             // (use OFF as the legacy default); non-null = explicit user
@@ -4277,6 +4336,13 @@ class ChatViewModel(
                     Log.i(TAG, "loadSession: detected interrupted agent loop, canResume=true (shape=$shape)")
                 }
             }
+            } catch (e: com.openminis.app.provider.ProviderTransportPolicy.Violation) {
+                // Keep transport fail-closed while surfacing stale cleartext
+                // approval as a session error instead of crashing the app.
+                Log.w(TAG, "provider configuration rejected while loading session: " + e.message)
+                currentProvider = null
+                _activeEntryId.value = null
+                _error.value = e.message ?: "Provider configuration rejected"
             } finally {
                 // T201: open the gate even on early `return@launch` (draft path,
                 // missing-session path) and on exception, so the init-time
@@ -4961,7 +5027,7 @@ class ChatViewModel(
      * [T-android-rerun-from-tool-block-position] Resolve the live UI assistant
      * bubble id that currently owns the tool block with [blockId] (== its
      * tool_use id). Returns null when no live bubble holds it. Used by the
-     * debug RPC ([com.openminis.app.debug.HeadlessChatRunner.rerunFromToolBlock])
+     * debug RPC ([com.openminis.app.agent.AgentRunner.rerunFromToolBlock])
      * because the in-memory bubble id is a volatile `assistant_<ts>` runtime id
      * (not the DB row id a caller would read from `chat.messages.list`), so the
      * harness can't supply it directly.
@@ -5519,6 +5585,7 @@ class ChatViewModel(
 
         // _isStreaming was already set synchronously by the caller.
         val launchedProvider = provider
+        val sourceRunId = beginBotSourceRun()
         streamJob = viewModelScope.launch(Dispatchers.IO) {
             AppLogger.info(TAG_STREAM, "$label streamJob ENTER sid=$activeSessionId")
             try {
@@ -5531,14 +5598,18 @@ class ChatViewModel(
                         ?: com.openminis.app.data.model.FallbackStrategy.default
                 }
                 val fallbackProviders = buildFallbackProviders(launchedProvider)
+                var botTurnSucceeded = false
                 try {
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop CALL")
-                    runAgentLoop(
-                        provider = launchedProvider,
-                        systemPrompt = systemPrompt,
-                        fallbackProviders = fallbackProviders,
-                        fallbackStrategy = activeFallbackStrategy,
-                    )
+                    val outcome = withBotTurnLock {
+                        runAgentLoop(
+                            provider = launchedProvider,
+                            systemPrompt = systemPrompt,
+                            fallbackProviders = fallbackProviders,
+                            fallbackStrategy = activeFallbackStrategy,
+                        )
+                    }
+                    botTurnSucceeded = outcome == AgentTurnOutcome.Completed
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop RETURN normal")
                 } catch (e: CancellationException) {
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop CANCELLED")
@@ -5563,11 +5634,16 @@ class ChatViewModel(
                     publishOverlayReplyExcerpt(activeSessionId)
                     SessionActivityTracker.setInactive(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
+                        com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
                 }
             } catch (e: CancellationException) {
                 AppLogger.info(TAG_STREAM, "$label streamJob CANCELLED waiting for slot")
                 Log.d(TAG, "Cancelled while waiting for concurrency slot")
+                // A source Bot turn can be cancelled while waiting for the
+                // global capacity slot. Settle its queued delegations here;
+                // the inner finally is never reached in this path.
+                com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
             }
             // [T-android-stale-streamjob-clears-isstreaming] Only the current
             // streamJob is allowed to flip _isStreaming false. An orphaned
@@ -6185,7 +6261,7 @@ class ChatViewModel(
         systemPrompt: String?,
         fallbackProviders: List<FallbackCandidate>,
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy,
-    ) {
+    ): AgentTurnOutcome {
         while (_promptQueue.value.isNotEmpty()) {
             val queued = _promptQueue.value
             _promptQueue.value = emptyList()
@@ -6251,12 +6327,13 @@ class ChatViewModel(
             ))
 
             try {
-                runAgentLoop(
+                val outcome = runAgentLoop(
                     provider = provider,
                     systemPrompt = systemPrompt,
                     fallbackProviders = fallbackProviders,
                     fallbackStrategy = fallbackStrategy,
                 )
+                if (outcome != AgentTurnOutcome.Completed) return outcome
             } catch (e: CancellationException) {
                 Log.d(TAG, "Agent loop (queued-drain) cancelled")
                 // Cancel mid-drain: cancelStream() will check _promptQueue
@@ -6266,12 +6343,19 @@ class ChatViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Agent loop (queued-drain) error", e)
                 setInlineError(e.message ?: "Unknown error")
-                break
+                return AgentTurnOutcome.Failed(e.message ?: "queued_turn_failed")
             }
         }
+        return AgentTurnOutcome.Completed
     }
 
     fun sendMessage(text: String) = sendMessage(text, skipContextCheck = false)
+
+    internal fun submitPrompt(text: String): AgentTurnHandle {
+        val handle = AgentTurnHandle()
+        sendMessage(text, skipContextCheck = false, request = handle)
+        return handle
+    }
 
     /**
      * @param skipContextCheck set by the pre-send context dialog's own actions,
@@ -6280,18 +6364,22 @@ class ChatViewModel(
      *   chunk) token count and pop the dialog again — iOS guards the identical
      *   re-entry with `skipCompactCheck`.
      */
-    private fun sendMessage(text: String, skipContextCheck: Boolean) {
+    private fun sendMessage(text: String, skipContextCheck: Boolean, request: AgentTurnHandle? = null) {
         val trimmed = text.trim()
         // While streaming, enqueue instead of silently dropping (iOS: send vs enqueuePrompt).
         if (_isStreaming.value) {
-            enqueuePrompt(text)
+            if (request != null) request.reject("session_busy") else enqueuePrompt(text)
             return
         }
         // T180: allow attachments-only sends (no caption). Mirrors iOS, where
         // an empty text + non-empty attachments still produces a valid user
         // message. Without this an image-only "look at this" send dropped.
-        if (trimmed.isBlank() && _attachments.value.isEmpty()) return
+        if (trimmed.isBlank() && _attachments.value.isEmpty()) {
+            request?.reject("empty_prompt")
+            return
+        }
         if (_isCompacting.value) {
+            request?.reject("session_compacting")
             appendSystemInfo(
                 text = "Wait for the current compact to finish before sending.",
                 iconKind = "compact",
@@ -6306,12 +6394,20 @@ class ChatViewModel(
             when (checkContextBeforeSend()) {
                 PreSendContextAction.PROCEED -> {}
                 PreSendContextAction.COMPACT_THEN_SEND -> {
+                    if (request != null) {
+                        request.reject("context_compaction_required")
+                        return
+                    }
                     pendingSendText = text
                     _inputText.value = ""
                     compactAndSendPending()
                     return
                 }
                 PreSendContextAction.ASK_USER -> {
+                    if (request != null) {
+                        request.reject("context_compaction_required")
+                        return
+                    }
                     // Park the text on the VM (not the composer) so the dialog
                     // owns it; cancelCompactBeforeSend puts it back.
                     pendingSendText = text
@@ -6337,6 +6433,7 @@ class ChatViewModel(
         val initialProvider = currentProvider
         if (initialProvider == null) {
             _error.value = "No provider configured"
+            request?.reject("no_provider_configured")
             return
         }
         var provider: LLMProvider = initialProvider
@@ -6374,7 +6471,8 @@ class ChatViewModel(
         val editingId = _editingMessageId.value
         if (editingId != null) _editingMessageId.value = null
 
-        viewModelScope.launch {
+        val acceptedTurn = request ?: AgentTurnHandle()
+        val sendJob = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
             var streamLaunched = false
             try {
             // Ensure session exists in DB (creates on first message for draft sessions)
@@ -6385,6 +6483,7 @@ class ChatViewModel(
             }
 
             val prepared = prepareUserAttachments(currentAttachments, activeSessionId)
+            mergeExternalHistory()
 
            // Save user message — text + persisted mediaRef parts so images survive
            // a session reload (T128). Non-image attachments still only contribute
@@ -6401,6 +6500,7 @@ class ChatViewModel(
                 persist = { chatRepository.appendMessage(activeSessionId, "user", userPartsJson) },
                 consume = { ids -> _pastedTexts.value = _pastedTexts.value.filterNot { it.id in ids } },
             )
+            acceptedTurn.userMessageId = persistedUser.id
 
             val userMsg = ChatMessage(
                 id = persistedUser.id,
@@ -6478,6 +6578,7 @@ class ChatViewModel(
 
             // Start agent loop with fallback. _isStreaming was set synchronously at top.
             streamLaunched = true
+            val sourceRunId = beginBotSourceRun()
             streamJob = launch(Dispatchers.IO) {
                 AppLogger.info(TAG_STREAM, "send streamJob ENTER sid=$activeSessionId")
                 try {
@@ -6496,23 +6597,33 @@ class ChatViewModel(
                     // Build full fallback provider list upfront (mirrors iOS triedEntries approach)
                     val fallbackProviders = buildFallbackProviders(provider)
 
+                    var botTurnSucceeded = false
                     try {
-                        AppLogger.info(TAG_STREAM, "send runAgentLoop CALL")
-                        runAgentLoop(
-                            provider = provider,
-                            systemPrompt = systemPrompt,
-                            fallbackProviders = fallbackProviders,
-                            fallbackStrategy = activeFallbackStrategy,
-                        )
-                        AppLogger.info(TAG_STREAM, "send runAgentLoop RETURN normal")
-                        // Drain any prompts the user queued while this loop was running.
-                        // Skipped on cancel: cancelled job won't reach here.
-                        drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
-                        AppLogger.info(TAG_STREAM, "send drainQueuedPrompts RETURN")
+                        withBotTurnLock {
+                            AppLogger.info(TAG_STREAM, "send runAgentLoop CALL")
+                            val outcome = runAgentLoop(
+                                provider = provider,
+                                systemPrompt = systemPrompt,
+                                fallbackProviders = fallbackProviders,
+                                fallbackStrategy = activeFallbackStrategy,
+                            )
+                            AppLogger.info(TAG_STREAM, "send runAgentLoop RETURN normal")
+                            // Drain any prompts the user queued while this loop was running.
+                            // Skipped on cancel: cancelled job won't reach here.
+                            acceptedTurn.record(outcome)
+                            if (outcome == AgentTurnOutcome.Completed) {
+                                val drained = drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
+                                acceptedTurn.record(drained)
+                                botTurnSucceeded = drained == AgentTurnOutcome.Completed
+                            }
+                            AppLogger.info(TAG_STREAM, "send drainQueuedPrompts RETURN")
+                        }
                     } catch (e: CancellationException) {
+                        acceptedTurn.record(AgentTurnOutcome.Cancelled)
                         AppLogger.info(TAG_STREAM, "send runAgentLoop CANCELLED")
                         Log.d(TAG, "Agent loop cancelled")
                     } catch (e: Exception) {
+                        acceptedTurn.record(AgentTurnOutcome.Failed(e.message ?: "Unknown error"))
                         AppLogger.error(TAG_STREAM, "send runAgentLoop EXCEPTION ${e.javaClass.simpleName}: ${e.message}")
                         Log.e(TAG, "Agent loop error (all fallbacks exhausted)", e)
                         setInlineError(e.message ?: "Unknown error")
@@ -6531,11 +6642,14 @@ class ChatViewModel(
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
+                        com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
                     }
                 } catch (e: CancellationException) {
+                    acceptedTurn.record(AgentTurnOutcome.Cancelled)
                     AppLogger.info(TAG_STREAM, "send streamJob CANCELLED waiting for slot")
                     Log.d(TAG, "Cancelled while waiting for concurrency slot")
+                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
                 }
                 // [T-android-stale-streamjob-clears-isstreaming] guard — see
                 // `var streamJob` KDoc; identical pattern as runRerunStreamTail.
@@ -6547,13 +6661,22 @@ class ChatViewModel(
                 }
                 AppLogger.info(TAG_STREAM, "send streamJob EXIT")
             }
+            } catch (e: CancellationException) {
+                acceptedTurn.record(AgentTurnOutcome.Cancelled)
+                throw e
+            } catch (e: Exception) {
+                acceptedTurn.record(AgentTurnOutcome.Failed(e.message ?: "message_setup_failed"))
+                setInlineError(e.message ?: "message_setup_failed")
             } finally {
-                if (!streamLaunched) {
+                if (!streamLaunched && streamJob === coroutineContext[Job]) {
                     AppLogger.info(TAG_STREAM, "send _isStreaming=false (setup aborted)")
                     _isStreaming.value = false
                 }
             }
         }
+        streamJob = sendJob
+        acceptedTurn.bind(sendJob)
+        sendJob.start()
     }
 
     /** Set error inline on the last assistant message (iOS: message.error).
@@ -6833,6 +6956,7 @@ class ChatViewModel(
 
             // _isStreaming was already set synchronously at the top.
             streamLaunched = true
+            val sourceRunId = beginBotSourceRun()
             streamJob = launch(Dispatchers.IO) {
                 AppLogger.info(TAG_STREAM, "retryLast streamJob ENTER sid=$activeSessionId")
                 try {
@@ -6845,18 +6969,22 @@ class ChatViewModel(
                             ?: com.openminis.app.data.model.FallbackStrategy.default
                     }
                     val fallbackProviders = buildFallbackProviders(provider)
+                    var botTurnSucceeded = false
                     try {
-                        AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CALL")
-                        runAgentLoop(
-                            provider = provider,
-                            systemPrompt = systemPrompt,
-                            fallbackProviders = fallbackProviders,
-                            fallbackStrategy = activeFallbackStrategy,
-                            reusingAssistantId = targetAssistantId,
-                        )
-                        AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
-                        drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
-                        AppLogger.info(TAG_STREAM, "retryLast drainQueuedPrompts RETURN")
+                        withBotTurnLock {
+                            AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CALL")
+                            val outcome = runAgentLoop(
+                                provider = provider,
+                                systemPrompt = systemPrompt,
+                                fallbackProviders = fallbackProviders,
+                                fallbackStrategy = activeFallbackStrategy,
+                                reusingAssistantId = targetAssistantId,
+                            )
+                            AppLogger.info(TAG_STREAM, "retryLast runAgentLoop RETURN normal")
+                            botTurnSucceeded = outcome == AgentTurnOutcome.Completed &&
+                                drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy) == AgentTurnOutcome.Completed
+                            AppLogger.info(TAG_STREAM, "retryLast drainQueuedPrompts RETURN")
+                        }
                     } catch (e: CancellationException) {
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CANCELLED")
                         Log.d(TAG, "Agent loop cancelled")
@@ -6878,11 +7006,13 @@ class ChatViewModel(
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
+                        com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
                     }
                 } catch (e: CancellationException) {
                     AppLogger.info(TAG_STREAM, "retryLast streamJob CANCELLED waiting for slot")
                     Log.d(TAG, "Cancelled while waiting for concurrency slot")
+                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
                 }
                 // [T-android-stale-streamjob-clears-isstreaming] guard.
                 if (streamJob === coroutineContext[Job]) {
@@ -7316,7 +7446,15 @@ class ChatViewModel(
         fallbackProviders: List<FallbackCandidate> = emptyList(),
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
         reusingAssistantId: String? = null,
-    ) {
+    ): AgentTurnOutcome {
+        mergeExternalHistory()
+        // Refresh the cached identity before building the tool allow-list. This
+        // also covers a Bot Direct Chat where the user sends immediately after
+        // navigation, before the init coroutine has finished hydrating the VM.
+        chatRepository.getSession(activeSessionId)?.let { session ->
+            sessionBotId = session.botId
+            sessionSource = session.source
+        }
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
         pendingMediaCommitJob?.join()
 
@@ -7331,21 +7469,31 @@ class ChatViewModel(
             AppLogger.warning(TAG, "session overrides unavailable for $activeSessionId: ${error.message}")
         }.getOrDefault(SessionOverrides())
 
-        // Preserve the app's core runtime/tool/safety prompt and append the
-        // session-specific instruction as a clearly delimited final layer.
-        // Replacing the core prompt would make a custom persona accidentally
-        // remove tool/runtime instructions.
+        val botPrompt = runCatching {
+            val botId = chatRepository.getSession(activeSessionId)?.botId
+            botId?.let { botRepository?.getBot(it) }
+        }.onFailure { error ->
+            AppLogger.warning(TAG, "bot identity unavailable for $activeSessionId: ${error.message}")
+        }.getOrNull()?.let { bot ->
+            check(bot.enabled) { context.getString(R.string.bots_disabled_footer) }
+            com.openminis.app.agent.BotContextResolver.systemPrompt(bot)
+        }
+        val baseSystemPrompt = listOf(systemPrompt, botPrompt)
+            .filterNot { it.isNullOrBlank() }
+            .joinToString("\n\n")
+            .ifBlank { null }
+
         val effectiveSystemPrompt = sessionOverrides.systemPrompt?.let { sessionPrompt ->
             buildString {
-                if (!systemPrompt.isNullOrBlank()) {
-                    append(systemPrompt)
+                if (!baseSystemPrompt.isNullOrBlank()) {
+                    append(baseSystemPrompt)
                     append("\n\n")
                 }
                 append("<session-specific-instructions>\n")
                 append(sessionPrompt)
                 append("\n</session-specific-instructions>")
             }
-        } ?: systemPrompt
+        } ?: baseSystemPrompt
 
         // [T-android-mem-probe-trust] Send-path context shape. The existing
         // `messages-shape` probe only runs on session LOAD, so the 2026-08-15
@@ -7514,6 +7662,7 @@ class ChatViewModel(
         // which previously slapped a fake "200 turns hit" error on every
         // ordinary completion.
         var loopExitedNormally = false
+        var loopOutcome: AgentTurnOutcome = AgentTurnOutcome.Completed
         // [T-android-auto-compact-inloop] How many times the in-loop guard has
         // compacted during THIS runAgentLoop. Bounds compact-thrash: once the
         // cap is hit, a still-over-threshold history stops the turn rather than
@@ -7528,6 +7677,7 @@ class ChatViewModel(
         var didInjectEmptyToolReminder = false
         for (turn in 0 until MAX_AGENT_TURNS) {
             // Sanitize history before each API call (mirrors iOS pre-API validation)
+            mergeExternalHistory()
             sanitizeAgentHistory()
 
             // Context window management: offload large tool outputs in older
@@ -7631,6 +7781,7 @@ class ChatViewModel(
                     // on it. finalizeAtTurnLimit is skipped; the notice above is
                     // the user-visible explanation.
                     loopExitedNormally = true
+                    loopOutcome = AgentTurnOutcome.NeedsAttention("context_exhausted")
                     break
                 }
             }
@@ -8532,6 +8683,7 @@ class ChatViewModel(
                     // Deliberate stop, not the runaway ceiling — keep the
                     // post-loop tail from adding a fake turn-limit error.
                     loopExitedNormally = true
+                    loopOutcome = AgentTurnOutcome.Failed("stream_closed_without_finish_reason")
                     break
                 }
 
@@ -8592,6 +8744,10 @@ class ChatViewModel(
                             context.getString(R.string.error_empty_response_generic)
                     }
                     withContext(Dispatchers.Main) { setInlineError(hint) }
+                    loopOutcome = AgentTurnOutcome.Failed(hint)
+                }
+                if (!finishedCleanly) {
+                    loopOutcome = AgentTurnOutcome.NeedsAttention("model_finish_reason:$turnFinishReason")
                 }
                 // Auto-title after first exchange
                 if (turn == 0) generateSessionTitleIfNeeded()
@@ -9086,9 +9242,11 @@ class ChatViewModel(
             withContext(Dispatchers.Main) {
                 finalizeAtTurnLimit(assistantId, accumulatedText, allToolBlocks)
             }
+            loopOutcome = AgentTurnOutcome.NeedsAttention("agent_turn_limit_reached")
         } else {
             AppLogger.info(TAG_STREAM, "runAgentLoop EXIT (loop body ended naturally)")
         }
+        return loopOutcome
     }
 
     /**
@@ -9214,7 +9372,11 @@ class ChatViewModel(
                 sessionId = activeSessionId,
                 context = context,
                 caller = com.openminis.app.tools.runtime.ToolPermissionManager.CALLER_LOCAL,
-                toolId = toolId,
+                toolId = if (canonical == "delegate_bot") {
+                    "${activeBotRunId.orEmpty()}::$toolId"
+                } else {
+                    toolId
+                },
             )
         }
         return when (name) {
@@ -10994,6 +11156,21 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
     }
 
+    /** Wait for the actual stream coroutine to leave after cancellation. */
+    internal suspend fun awaitStreamExit(timeoutMs: Long): Boolean {
+        val job = streamJob ?: return true
+        if (job.isCompleted) return true
+        return kotlinx.coroutines.withTimeoutOrNull(timeoutMs.coerceAtLeast(0L)) {
+            job.join()
+            true
+        } ?: false
+    }
+
+    internal suspend fun awaitStreamExit(): Boolean {
+        streamJob?.join()
+        return true
+    }
+
     /**
      * T189: spawn a fresh agent loop to drain whatever the user queued during
      * the cancelled stream. 200ms delay matches iOS resumeQueueAfterCancel
@@ -11070,6 +11247,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             _isStreaming.value = true
             _canResume.value = false
             _error.value = null
+            val sourceRunId = beginBotSourceRun()
 
             streamJob = launch(Dispatchers.IO) {
                 AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob ENTER sid=$activeSessionId")
@@ -11084,16 +11262,20 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                             ?: com.openminis.app.data.model.FallbackStrategy.default
                     }
                     val fallbackProviders = buildFallbackProviders(provider)
+                    var botTurnSucceeded = false
 
                     try {
-                        AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drainQueuedPrompts CALL")
-                        drainQueuedPrompts(
-                            provider = provider,
-                            systemPrompt = systemPrompt,
-                            fallbackProviders = fallbackProviders,
-                            fallbackStrategy = activeFallbackStrategy,
-                        )
-                        AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drainQueuedPrompts RETURN")
+                        withBotTurnLock {
+                            AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drainQueuedPrompts CALL")
+                            val outcome = drainQueuedPrompts(
+                                provider = provider,
+                                systemPrompt = systemPrompt,
+                                fallbackProviders = fallbackProviders,
+                                fallbackStrategy = activeFallbackStrategy,
+                            )
+                            botTurnSucceeded = outcome == AgentTurnOutcome.Completed
+                            AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drainQueuedPrompts RETURN")
+                        }
                     } catch (e: CancellationException) {
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drain CANCELLED")
                     } catch (e: Exception) {
@@ -11112,10 +11294,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
+                        com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY exit")
                     }
                 } catch (e: CancellationException) {
                     AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob CANCELLED waiting for slot")
+                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
                 }
                 // [T-android-stale-streamjob-clears-isstreaming] guard.
                 if (streamJob === coroutineContext[Job]) {
@@ -11388,6 +11572,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                     if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
                     else "$prefix\n\n${baseSystemPrompt ?: ""}"
                 } else baseSystemPrompt
+            val sourceRunId = beginBotSourceRun()
 
             AppLogger.info(TAG_STREAM, "resume _isStreaming=true (sid=$activeSessionId)")
             _isStreaming.value = true
@@ -11404,17 +11589,21 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         } ?: com.openminis.app.data.model.FallbackStrategy.default
                     }
                     val fallbackProviders = buildFallbackProviders(provider)
+                    var botTurnSucceeded = false
                     try {
-                        AppLogger.info(TAG_STREAM, "resume runAgentLoop CALL")
-                        runAgentLoop(
-                            provider = provider,
-                            systemPrompt = systemPrompt,
-                            fallbackProviders = fallbackProviders,
-                            fallbackStrategy = activeFallbackStrategy,
-                        )
-                        AppLogger.info(TAG_STREAM, "resume runAgentLoop RETURN normal")
-                        drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy)
-                        AppLogger.info(TAG_STREAM, "resume drainQueuedPrompts RETURN")
+                        withBotTurnLock {
+                            AppLogger.info(TAG_STREAM, "resume runAgentLoop CALL")
+                            val outcome = runAgentLoop(
+                                provider = provider,
+                                systemPrompt = systemPrompt,
+                                fallbackProviders = fallbackProviders,
+                                fallbackStrategy = activeFallbackStrategy,
+                            )
+                            AppLogger.info(TAG_STREAM, "resume runAgentLoop RETURN normal")
+                            botTurnSucceeded = outcome == AgentTurnOutcome.Completed &&
+                                drainQueuedPrompts(provider, systemPrompt, fallbackProviders, activeFallbackStrategy) == AgentTurnOutcome.Completed
+                            AppLogger.info(TAG_STREAM, "resume drainQueuedPrompts RETURN")
+                        }
                     } catch (e: CancellationException) {
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop CANCELLED")
                         Log.d(TAG, "Agent loop cancelled (resume)")
@@ -11434,11 +11623,13 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
+                        com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")
                     }
                 } catch (e: CancellationException) {
                     AppLogger.info(TAG_STREAM, "resume streamJob CANCELLED waiting for slot")
                     Log.d(TAG, "Cancelled while waiting for concurrency slot (resume)")
+                    com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, false, sourceRunId)
                 }
                 // [T-android-stale-streamjob-clears-isstreaming] guard.
                 if (streamJob === coroutineContext[Job]) {
@@ -11492,6 +11683,12 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         if (_attachments.value.isNotEmpty()) return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                // Bot conversations and executions are explicitly created with
+                // durable identity/binding. Opening member details must not
+                // discard their session before the first message is sent.
+                val session = chatRepository.getSession(sid) ?: return@launch
+                if (session.botId != null || session.source == ChatSessionEntity.SOURCE_BOT_DELEGATION ||
+                    session.source == ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION) return@launch
                 val count = chatRepository.messageCount(sid)
                 if (count > 0) return@launch
                 AppLogger.info(

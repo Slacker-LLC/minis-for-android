@@ -130,6 +130,12 @@ object ToolPermissionManager {
         "agent.ralph" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "agent.ask" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "mcp.*" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        // Bot coordination stays inside the local Agent Runtime. It is
+        // deliberately invisible to remote MCP callers; the handler still
+        // performs the source-session and ownership checks.
+        "delegate_bot" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "list_bots" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "check_delegation" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         // skill.*
         "skill.*" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         // memory_* — not yet migrated to Registry; permission reserved for future migration.

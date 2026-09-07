@@ -437,6 +437,8 @@ fun ChatScreen(
     memoryRepository: MemoryRepository? = null,
     skillRepository: com.openminis.app.data.repository.SkillRepository? = null,
     mcpRepository: com.openminis.app.data.repository.MCPRepository? = null,
+    botRepository: com.openminis.app.data.repository.BotRepository? = null,
+    onBotDetails: (String) -> Unit = {},
     onBack: () -> Unit,
     isTwoPane: Boolean = false,
     onToggleSidebar: (() -> Unit)? = null,
@@ -482,6 +484,7 @@ fun ChatScreen(
             memoryRepository = memoryRepository,
             skillRepository = skillRepository,
             mcpRepository = mcpRepository,
+            botRepository = botRepository,
         ),
     )
     // [T-android-larky-longsession-followup] Consume the tail-windowed
@@ -494,6 +497,13 @@ fun ChatScreen(
     val messages by viewModel.uiMessages.collectAsState()
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val currentSession by remember(sessionId, chatRepository) {
+        chatRepository.observeSession(sessionId)
+    }.collectAsState(initial = null)
+    val team by remember(botRepository) {
+        botRepository?.observeBots() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
+    val currentBot = team.firstOrNull { it.id == currentSession?.botId }
     val generatingMessageId by viewModel.generatingMessageId.collectAsState()
     val replySpeechState by viewModel.replySpeechState.collectAsState()
     val canResume by viewModel.canResume.collectAsState()
@@ -2399,7 +2409,25 @@ fun ChatScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = {},
+                title = {
+                    currentBot?.let { bot ->
+                        Column(
+                            Modifier.clickable { onBotDetails(bot.id) }.padding(vertical = 6.dp),
+                        ) {
+                            Text(bot.name, style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                if (isStreaming) stringResource(R.string.bots_working)
+                                else if (!bot.enabled) stringResource(R.string.bots_disabled)
+                                else bot.systemPrompt?.lineSequence()?.firstOrNull { it.isNotBlank() }
+                                    ?: stringResource(R.string.bots_details),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ChatColors.secondaryText,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     if (!isTwoPane) {
                         if (onOpenDrawer != null) {
@@ -5253,7 +5281,7 @@ fun ChatScreen(
                                             label = "composerPlaceholder",
                                         ) { idx ->
                                             Text(
-                                                composerPlaceholderText(idx, soulName.name),
+                                                composerPlaceholderText(idx, currentBot?.name ?: soulName.name),
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                                                 fontSize = 16.5.sp * chatInputFontScale,
                                                 maxLines = 1,

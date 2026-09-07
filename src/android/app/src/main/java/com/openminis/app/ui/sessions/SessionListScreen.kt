@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
@@ -424,6 +425,7 @@ fun SessionListScreen(
     onRootfsClick: () -> Unit = {},
    // [T-android-scheduled-tasks-design] Entry to the scheduled-tasks list.
    onScheduledTasksClick: () -> Unit = {},
+    onBotsClick: () -> Unit = {},
     selectedSessionId: String? = null,
     draftPlaceholderId: String? = null,
 ) {
@@ -709,6 +711,9 @@ fun SessionListScreen(
                         // [T-android-scheduled-tasks-full] Badge shows the count of
                         // scheduled tasks so the user can see at a glance how many
                         // are configured without opening the list.
+                        IconButton(onClick = onBotsClick) {
+                            Icon(Icons.Outlined.Group, contentDescription = stringResource(R.string.bots_team))
+                        }
                         IconButton(onClick = onScheduledTasksClick) {
                             if (scheduledTaskCount > 0) {
                                 BadgedBox(badge = { Badge { Text("$scheduledTaskCount") } }) {

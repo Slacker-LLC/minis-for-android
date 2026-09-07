@@ -5,7 +5,7 @@ import android.util.Log
 import com.openminis.app.MinisApp
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.debug.HeadlessChatRunner
+import com.openminis.app.agent.AgentRunner
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -145,14 +145,14 @@ object RalphTool {
         handoff: String,
         title: String,
     ): RalphReport? {
-        val childId = HeadlessChatRunner.ensureSession(context)
+        val childId = AgentRunner.ensureSession(context)
         runCatching {
             app.chatRepository.updateSessionTitle(childId, "↳ Ralph $round: " + title.take(36))
             app.chatRepository.dao.updateSource(childId, "ralph")
         }
 
         val prompt = buildRoundPrompt(objective, round, maxRounds, handoff)
-        val result = HeadlessChatRunner.prompt(
+        val result = AgentRunner.prompt(
             context = context,
             sessionId = childId,
             text = prompt,

@@ -3,6 +3,7 @@ package com.openminis.app.debug
 import android.content.Context
 import androidx.core.content.FileProvider
 import com.openminis.app.MinisApp
+import com.openminis.app.agent.AgentRunner
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.remote.ChatTitleNormalizer
 import com.openminis.app.ui.chat.InputAttachment
@@ -13,7 +14,7 @@ import java.io.File
  * Mutation handlers for `chat.*` RPC methods — Phase 2.
  *
  * The `chat.prompt` / `chat.retry` paths drive the existing [ChatViewModel]
- * machinery via [HeadlessChatRunner]; `chat.session.cancel` calls
+ * machinery via [AgentRunner]; `chat.session.cancel` calls
  * [ChatViewModel.cancelStream] on the cached VM; `chat.session.delete` writes
  * directly to the repo (no VM needed). This keeps the agent-loop / streaming
  * code single-sourced — the RPC is purely a transport.
@@ -55,6 +56,7 @@ internal object ChatMutationMethods {
                     memoryRepository = app.memoryRepository,
                     skillRepository = app.skillRepository,
                     mcpRepository = app.mcpRepository,
+                    botRepository = app.botRepository,
                 ),
             )[com.openminis.app.ui.chat.ChatViewModel::class.java].also { it.sendMessage(text) }
         }
@@ -72,12 +74,12 @@ internal object ChatMutationMethods {
         val app = app(context)
         val existingId = params.optString("sessionId", "").ifEmpty { null }
         val isNew = existingId == null
-        val sessionId = existingId ?: HeadlessChatRunner.ensureSession(context)
+        val sessionId = existingId ?: AgentRunner.ensureSession(context)
 
         // Resolve model override (mutually exclusive with sessionId binding).
         val modelEntryId = if (params.has("modelEntryId") && !params.isNull("modelEntryId")) params.optString("modelEntryId").ifEmpty { null } else null
         val modelGroupId = if (params.has("modelGroupId") && !params.isNull("modelGroupId")) params.optString("modelGroupId").ifEmpty { null } else null
-        val overrideName = HeadlessChatRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
+        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
 
         // Decode attachments — RPC carries base64; we materialize them as
         // FileProvider-backed Uris so InputAttachment + the existing image
@@ -88,7 +90,7 @@ internal object ChatMutationMethods {
         val timeoutSec = params.optInt("waitTimeout", 600).coerceIn(1, 1800)
         val thinkingLevel = parseThinkingLevel(params)
         val chatOnly = params.optBoolean("chatOnly", false)
-        val result = HeadlessChatRunner.prompt(
+        val result = AgentRunner.prompt(
             context = context,
             sessionId = sessionId,
             text = text,
@@ -130,11 +132,11 @@ internal object ChatMutationMethods {
         // automation harnesses.)
         val modelEntryId = if (params.has("modelEntryId") && !params.isNull("modelEntryId")) params.optString("modelEntryId").ifEmpty { null } else null
         val modelGroupId = if (params.has("modelGroupId") && !params.isNull("modelGroupId")) params.optString("modelGroupId").ifEmpty { null } else null
-        val overrideName = HeadlessChatRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
+        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
 
         val wait = params.optBoolean("wait", false)
         val timeoutSec = params.optInt("waitTimeout", 600).coerceIn(1, 1800)
-        val result = HeadlessChatRunner.retry(
+        val result = AgentRunner.retry(
             context = context,
             sessionId = sessionId,
             messageId = messageId,
@@ -174,7 +176,7 @@ internal object ChatMutationMethods {
             ?: throw RPCException(-32602, "Session not found")
         val wait = params.optBoolean("wait", false)
         val timeoutSec = params.optInt("waitTimeout", 600).coerceIn(1, 1800)
-        val result = HeadlessChatRunner.rerunFromToolBlock(
+        val result = AgentRunner.rerunFromToolBlock(
             context = context,
             sessionId = sessionId,
             assistantMessageId = assistantMessageId,
@@ -216,7 +218,7 @@ internal object ChatMutationMethods {
         val sessionId = params.optString("sessionId", "").ifEmpty {
             throw RPCException(-32602, "Missing 'sessionId' param")
         }
-        val wasRunning = HeadlessChatRunner.cancel(context, sessionId)
+        val wasRunning = AgentRunner.cancel(context, sessionId)
         return JSONObject().apply {
             put("sessionId", sessionId)
             put("wasRunning", wasRunning)
@@ -239,7 +241,7 @@ internal object ChatMutationMethods {
         val entryId = params.optString("modelEntryId", "").ifEmpty {
             throw RPCException(-32602, "Missing 'modelEntryId' param")
         }
-        val (modelName, thinkingLevel) = HeadlessChatRunner.selectModel(context, sessionId, entryId)
+        val (modelName, thinkingLevel) = AgentRunner.selectModel(context, sessionId, entryId)
         return JSONObject().apply {
             put("sessionId", sessionId)
             put("modelEntryId", entryId)
@@ -259,7 +261,7 @@ internal object ChatMutationMethods {
         }
         val level = parseThinkingLevel(params)
             ?: throw RPCException(-32602, "Missing 'thinkingLevel' param")
-        val actual = HeadlessChatRunner.selectThinkingLevel(context, sessionId, level)
+        val actual = AgentRunner.selectThinkingLevel(context, sessionId, level)
         return JSONObject().apply {
             put("sessionId", sessionId)
             put("thinkingLevel", actual)
@@ -299,7 +301,7 @@ internal object ChatMutationMethods {
         }
         val waitTimeoutSec = params.optInt("waitTimeout", 120).coerceIn(1, 1800)
         val beforeMarkerCount = app.chatRepository.dao.listCompactMarkers(sessionId).size
-        val result = HeadlessChatRunner.compact(
+        val result = AgentRunner.compact(
             context = context,
             sessionId = sessionId,
             wait = true,
@@ -389,7 +391,7 @@ internal object ChatMutationMethods {
         // (no isReverting flag), so after kicking it off we poll the marker
         // list briefly until the count drops by one (or timeout).
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-            HeadlessChatRunner.revertCompact(context, sessionId)
+            AgentRunner.revertCompact(context, sessionId)
         }
         var afterMarkers = app.chatRepository.dao.listCompactMarkers(sessionId)
         val deadline = System.currentTimeMillis() + 5000L
@@ -420,9 +422,9 @@ internal object ChatMutationMethods {
             ?: throw RPCException(-32602, "Session not found")
         // Cancel any in-flight stream first so we don't leave a dangling job
         // writing into a deleted session row.
-        HeadlessChatRunner.cancel(context, sessionId)
+        AgentRunner.cancel(context, sessionId)
         app.chatRepository.deleteSession(sessionId)
-        HeadlessChatRunner.forget(sessionId)
+        AgentRunner.forget(sessionId)
         return JSONObject().apply {
             put("sessionId", sessionId)
             put("deleted", true)

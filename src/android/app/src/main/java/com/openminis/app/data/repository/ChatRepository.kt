@@ -18,6 +18,10 @@ class ChatRepository(
 
     fun observeSessions(): Flow<List<ChatSessionEntity>> = dao.observeSessions()
 
+    fun observeSession(id: String): Flow<ChatSessionEntity?> = dao.observeSession(id)
+
+    suspend fun latestBotConversation(botId: String): ChatSessionEntity? = dao.latestBotConversation(botId)
+
     suspend fun createSession(
         modelId: String,
         title: String? = null,
@@ -27,6 +31,9 @@ class ChatRepository(
         // here; existing call sites that omit it keep the prior
         // memoryEnabled=1 behavior (legacy default).
         memoryEnabled: Boolean = true,
+        botId: String? = null,
+        source: String? = null,
+        modelBinding: String? = null,
     ): ChatSessionEntity {
         val now = System.currentTimeMillis()
         val session = ChatSessionEntity(
@@ -36,6 +43,9 @@ class ChatRepository(
             createdAt = now,
             updatedAt = now,
             memoryEnabled = if (memoryEnabled) 1 else 0,
+            source = source,
+            botId = botId,
+            modelBinding = modelBinding,
         )
         dao.insertSession(session)
         return session
@@ -115,6 +125,10 @@ class ChatRepository(
 
     suspend fun updateSessionBinding(sessionId: String, binding: String, modelId: String) {
         dao.updateSessionBinding(sessionId, binding, modelId)
+    }
+
+    suspend fun updateSessionBot(sessionId: String, botId: String?) {
+        dao.updateSessionBot(sessionId, botId)
     }
 
     suspend fun deleteSession(id: String) {
@@ -359,6 +373,7 @@ class ChatRepository(
         tokenUsage: String? = null,
         reasoningContent: String? = null,
         modelSnapshot: ModelAttributionSnapshot? = null,
+        idempotencyKey: String? = null,
     ): MessageEntity {
         val now = System.currentTimeMillis()
         // Cap the body so a runaway tool_result (e.g. a 13 MB browser_use
@@ -373,7 +388,8 @@ class ChatRepository(
             partsJson
         }
         val message = MessageEntity(
-            id = UUID.randomUUID().toString(),
+            id = idempotencyKey?.let { UUID.nameUUIDFromBytes("$sessionId:$it".toByteArray(Charsets.UTF_8)).toString() }
+                ?: UUID.randomUUID().toString(),
             sessionId = sessionId,
             role = role,
             partsJson = capped,
@@ -386,7 +402,7 @@ class ChatRepository(
             providerType = modelSnapshot?.providerTypeRaw,
             providerInstanceId = modelSnapshot?.providerInstanceId,
         )
-        return dao.appendMessageWithPreview(message, extractTextPreview(capped))
+        return dao.appendMessageWithPreview(message, extractTextPreview(capped), ifAbsent = idempotencyKey != null)
     }
 
     /**

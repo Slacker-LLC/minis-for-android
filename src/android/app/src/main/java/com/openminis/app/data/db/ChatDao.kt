@@ -57,14 +57,20 @@ data class SessionTailRow(
 @Dao
 interface ChatDao {
     // Sessions
-    @Query("SELECT * FROM sessions ORDER BY updated_at DESC")
+    @Query("SELECT * FROM sessions WHERE source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation') ORDER BY updated_at DESC")
     fun observeSessions(): Flow<List<ChatSessionEntity>>
 
-    @Query("SELECT * FROM sessions ORDER BY updated_at DESC")
+    @Query("SELECT * FROM sessions WHERE source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation') ORDER BY updated_at DESC")
     suspend fun listSessions(): List<ChatSessionEntity>
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): ChatSessionEntity?
+
+    @Query("SELECT * FROM sessions WHERE id = :id")
+    fun observeSession(id: String): Flow<ChatSessionEntity?>
+
+    @Query("SELECT * FROM sessions WHERE bot_id = :botId AND (source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation')) ORDER BY updated_at DESC, created_at DESC LIMIT 1")
+    suspend fun latestBotConversation(botId: String): ChatSessionEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: ChatSessionEntity)
@@ -86,6 +92,9 @@ interface ChatDao {
 
     @Query("UPDATE sessions SET model_binding = :binding, model_id = :modelId, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionBinding(id: String, binding: String, modelId: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE sessions SET bot_id = :botId, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateSessionBot(id: String, botId: String?, updatedAt: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun deleteSession(id: String)
@@ -123,7 +132,8 @@ interface ChatDao {
     @Query("""
         SELECT DISTINCT s.* FROM sessions s
         LEFT JOIN messages m ON m.session_id = s.id
-        WHERE s.title LIKE :pattern OR m.parts_json LIKE :pattern
+        WHERE (s.source IS NULL OR s.source NOT IN ('subagent', 'bot_delegation', 'bot-delegation'))
+          AND (s.title LIKE :pattern OR m.parts_json LIKE :pattern)
         ORDER BY s.updated_at DESC
     """)
     suspend fun searchSessions(pattern: String): List<ChatSessionEntity>
@@ -205,6 +215,9 @@ interface ChatDao {
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     suspend fun loadMessages(sessionId: String): List<MessageEntity>
 
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun getMessageById(id: String): MessageEntity?
+
     @Query("SELECT * FROM messages WHERE session_id = :sessionId ORDER BY sort_order ASC")
     fun observeMessages(sessionId: String): Flow<List<MessageEntity>>
 
@@ -213,7 +226,11 @@ interface ChatDao {
 
     /** A failed preview update must not leave a row whose media caller rolls back. */
     @Transaction
-    suspend fun appendMessageWithPreview(message: MessageEntity, preview: String?): MessageEntity {
+    suspend fun appendMessageWithPreview(message: MessageEntity, preview: String?, ifAbsent: Boolean = false): MessageEntity {
+        if (ifAbsent) getMessageById(message.id)?.let { existing ->
+            require(existing.sessionId == message.sessionId && existing.role == message.role)
+            return existing
+        }
         val ordered = message.copy(sortOrder = nextSortOrder(message.sessionId))
         insertMessage(ordered)
         updateLastMessage(ordered.sessionId, preview, ordered.createdAt)
@@ -374,7 +391,7 @@ interface ChatDao {
     suspend fun updateLastAssistantError(sessionId: String, errorInfo: String?)
 
     // Pinned sessions first, then by updated_at
-    @Query("SELECT * FROM sessions ORDER BY CASE WHEN pinned_at IS NOT NULL THEN 0 ELSE 1 END, pinned_at DESC, updated_at DESC")
+    @Query("SELECT * FROM sessions WHERE source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation') ORDER BY CASE WHEN pinned_at IS NOT NULL THEN 0 ELSE 1 END, pinned_at DESC, updated_at DESC")
     fun observeSessionsSorted(): Flow<List<ChatSessionEntity>>
 
     // Compact markers — session-scoped archival summaries. "Append-only": rows
