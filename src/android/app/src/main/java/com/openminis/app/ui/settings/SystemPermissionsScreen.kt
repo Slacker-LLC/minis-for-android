@@ -17,11 +17,10 @@ import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryAlert
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,19 +41,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.R
-import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
-import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Surfaces OS-level permission states the user must grant through Android.
- * The structure follows upstream OpenMinis; the desktop-pet overlay grant is
- * the only fork-specific system permission kept here.
+ * Surfaces Android system permission states. App-owned Root mode selection is
+ * intentionally absent so the permission UI follows upstream behavior, while
+ * fork-specific system grants such as the desktop-pet overlay remain intact.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,12 +61,9 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     var a11yDegraded by remember { mutableStateOf(false) }
     var a11yRevoked by remember { mutableStateOf(false) }
     var shizukuReady by remember { mutableStateOf(false) }
+    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var repairing by remember { mutableStateOf(false) }
     var repairFailed by remember { mutableStateOf(false) }
-    var a11yRestricted by remember { mutableStateOf(false) }
-    var unrestricting by remember { mutableStateOf(false) }
-    var unrestrictFailed by remember { mutableStateOf(false) }
-    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -81,7 +75,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             a11yRevoked = !inSettings && !connected &&
                 AccessibilityRecoveryManager.hasEverBeenGranted(context)
             shizukuReady = ShizukuManager.isReady()
-            a11yRestricted = !a11yEnabled && RestrictedSettingsManager.isRestricted(context)
             overlayGranted = Settings.canDrawOverlays(context)
             delay(1000)
         }
@@ -126,52 +119,9 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 )
             }
 
-            if (a11yRestricted) {
-                SettingsSection(
-                    header = stringResource(R.string.system_permissions_a11y_restricted_header),
-                    footer = stringResource(R.string.system_permissions_a11y_restricted_footer),
-                ) {
-                    if (shizukuReady) {
-                        SettingsRow(
-                            icon = Icons.Outlined.LockOpen,
-                            iconColor = Color(0xFF34C759),
-                            title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
-                            subtitle = when {
-                                unrestricting ->
-                                    stringResource(R.string.system_permissions_a11y_restricted_working)
-                                unrestrictFailed ->
-                                    stringResource(R.string.system_permissions_a11y_restricted_failed)
-                                else ->
-                                    stringResource(R.string.system_permissions_a11y_restricted_shizuku_sub)
-                            },
-                            onClick = {
-                                if (unrestricting) return@SettingsRow
-                                unrestricting = true
-                                unrestrictFailed = false
-                                scope.launch {
-                                    val ok = RestrictedSettingsManager.clearWithShizuku(context)
-                                    unrestricting = false
-                                    unrestrictFailed = !ok
-                                }
-                            },
-                        )
-                    }
-                    SettingsRow(
-                        icon = Icons.Outlined.Info,
-                        iconColor = Color(0xFFFF9500),
-                        title = stringResource(R.string.system_permissions_a11y_restricted_manual),
-                        subtitle = stringResource(R.string.system_permissions_a11y_restricted_manual_sub),
-                        onClick = {
-                            (context as? Activity)?.let {
-                                PowerOptimizationManager.openAppDetailsSettings(it)
-                            }
-                        },
-                        showDivider = false,
-                    )
-                }
-            }
-
-            // Fork-specific system grant required by the floating desktop pet.
+            // OpenMinis Pet fork: system overlay permission remains because it
+            // is required for the floating desktop pet and is not an App-owned
+            // tool permission mode.
             SettingsSection(
                 header = "悬浮窗",
                 footer = "桌面宠物需要这个权限才能浮在其他应用上面。",
@@ -309,7 +259,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     onDismissRequest = { showClearCorrectionConfirm = false },
                     title = { Text(stringResource(R.string.voice_correction_clear_title)) },
                     confirmButton = {
-                        MinisTextButton(onClick = {
+                        TextButton(onClick = {
                             showClearCorrectionConfirm = false
                             com.openminis.app.speech.correction.VoiceCorrection.clearAllData(context)
                             Toast.makeText(
@@ -325,7 +275,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         }
                     },
                     dismissButton = {
-                        MinisTextButton(onClick = { showClearCorrectionConfirm = false }) {
+                        TextButton(onClick = { showClearCorrectionConfirm = false }) {
                             Text(stringResource(R.string.voice_correction_consent_not_now))
                         }
                     },
