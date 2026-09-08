@@ -195,6 +195,27 @@ class ProviderRepository(private val context: Context) {
     )
 
     /**
+     * Provider config persistence is serialized off the caller's dispatcher.
+     * Public mutators remain synchronous for API compatibility, but they only
+     * publish a memory snapshot and enqueue the DB + JSON write here.
+     */
+    private val persistenceScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+
+    private val persistenceQueue = ProviderConfigWriteQueue(
+        scope = persistenceScope,
+        persist = ::persistToDbAndMirror,
+        onFailure = { error ->
+            android.util.Log.e(
+                "ProviderRepo",
+                "[ProviderStore] async persistence failed; the next successful save will resync: ${error.message}",
+                error,
+            )
+        },
+    )
+
+    /**
      * Completes once the initial off-thread load has emitted (or determined
      * there's nothing persisted). Lets startup consumers that genuinely need
      * the config (e.g. the daily model refresh) wait instead of racing the
@@ -544,61 +565,86 @@ class ProviderRepository(private val context: Context) {
         if (!configLoadComplete.isCompleted) configLoadComplete.complete(Unit)
     }
 
+    /**
+     * Copy all mutable containers and mutable provider/group objects so a
+     * published StateFlow value can never be changed by the queued writer or
+     * by a later read-modify-write operation.
+     */
+    private fun copyConfig(config: ProviderConfig): ProviderConfig = config.copy(
+        instances = config.instances.map { it.copy() }.toMutableList(),
+        modelEntries = config.modelEntries.map { it.copy() }.toMutableList(),
+        modelGroups = config.modelGroups
+            .map { group -> group.copy(memberEntryIds = group.memberEntryIds.toMutableList()) }
+            .toMutableList(),
+        agentLoopModelEntryIds = config.agentLoopModelEntryIds.toMutableList(),
+        agentLoopGroupIds = config.agentLoopGroupIds.toMutableList(),
+    )
+
+    /**
+     * Keep the existing in-memory entry-id contract without doing JSON/Room
+     * work on the caller's thread. The full snapshot mapping still runs in the
+     * background writer; this small pure transformation only rewrites the
+     * legacy random UUID references to their durable composite form.
+     */
+    private fun canonicalizeConfig(config: ProviderConfig): ProviderConfig {
+        val canonical = copyConfig(config)
+        val idMap = canonical.modelEntries.associate { entry ->
+            entry.uuid to compositeEntryKey(entry.providerInstanceId, entry.baseModel.id)
+        }
+        for (index in canonical.modelEntries.indices) {
+            val entry = canonical.modelEntries[index]
+            canonical.modelEntries[index] = entry.copy(uuid = idMap[entry.uuid] ?: entry.uuid)
+        }
+        for (group in canonical.modelGroups) {
+            for (index in group.memberEntryIds.indices) {
+                val entryId = group.memberEntryIds[index]
+                group.memberEntryIds[index] = idMap[entryId] ?: entryId
+            }
+        }
+        for (index in canonical.agentLoopModelEntryIds.indices) {
+            val entryId = canonical.agentLoopModelEntryIds[index]
+            canonical.agentLoopModelEntryIds[index] = idMap[entryId] ?: entryId
+        }
+        return canonical
+    }
+
     private fun saveConfig(config: ProviderConfig) {
         // [T-android-provider-room-store] Double-write: DB + legacy JSON
-        // mirror, both produced inside the same configLock window. The
-        // mirror keeps older app builds able to read current config on
-        // downgrade; the DB is the new authoritative store on this build.
+        // mirror, now handled by the FIFO IO writer. The mirror keeps older
+        // app builds able to read current config on downgrade; the DB is the
+        // new authoritative store on this build.
         //
-        // Serialize + persist + emit under [configLock] so we never serialize
-        // a list that another writer is mutating. The fresh `.copy(…toMutableList())`
-        // wrapper alone is not enough: data-class structural equals walks the
-        // inner Lists and `prev` (already mutated in place by replaceEntries /
-        // addEntry / removeEntry) compares equal to `next` → MutableStateFlow
-        // suppresses the emission. T273 bumps `revision` so equals always
-        // returns false and 18+ collectAsState callers see the new value.
+        // Snapshot + emit under [configLock] so the writer never observes a
+        // list that another mutator is changing. The fresh deep copy also
+        // prevents the data-class structural equality trap where a published
+        // mutable list is changed in place before StateFlow can compare it.
+        // T273 bumps `revision` so every mutation is emitted.
         synchronized(configLock) {
             // [T-android-provider-empty-load-wipe] No "block empty saves" guard
-            // here on purpose: mutators pass the SAME object as _config.value
-            // and mutate it in place, so at this point an empty `config` and an
-            // empty `_config.value` are the same list — a legitimate
-            // "user deleted their last provider" is indistinguishable from a
-            // phantom-empty load. The wipe is prevented at the source instead
-            // (loadConfigSuspending refuses to return a blank config when the
-            // DB read failed rather than honestly reporting zero rows).
-            // persistToDbAndMirror returns the canonicalized config (entries'
-            // uuid in composite "{instanceId}/{modelId}" form). Emit that so
-            // subsequent in-memory reads — which compare entry.id by string
-            // equality (e.g. group.memberEntryIds.contains(it.id)) — use one
-            // consistent id shape rather than mixing legacy random uuids and
-            // composite keys.
-            //
-            // Catch persistence failures so callers stay fire-and-forget
-            // (matches the legacy `apply()` contract — pre-Room saveConfig
-            // never threw). DB write fails are rare in practice (disk full,
-            // SQLite corruption, transaction deadlock) but uncaught they'd
-            // crash whichever UI handler triggered the mutation. Still
-            // emit the in-memory state so the UI reflects the user's
-            // intent even when the disk write didn't land; the next
-            // successful save resyncs everything.
-            val canonical = try {
-                runBlocking { persistToDbAndMirror(config) }
-            } catch (e: Exception) {
+            // here on purpose: an empty config can be a legitimate "user
+            // deleted their last provider" mutation. The wipe is prevented at
+            // the source instead (loadConfigSuspending refuses to return a
+            // blank config when the DB read failed rather than honestly
+            // reporting zero rows).
+            // Keep the in-memory entry ids in the same canonical composite
+            // shape that persistToDbAndMirror writes. Persistence failures are
+            // handled by the worker so callers remain fire-and-forget (the
+            // legacy SharedPreferences `apply()` contract). The next
+            // successful save resynchronizes both stores.
+            val canonical = canonicalizeConfig(config)
+            canonical.revision = ProviderConfig.nextRevision()
+            _config.value = copyConfig(canonical)
+
+            // Queue a separate deep snapshot. The published value is now
+            // immediately available to Compose, while the worker performs
+            // JSON serialization, Room replaceAll, and SharedPreferences
+            // commit on Dispatchers.IO in FIFO order.
+            if (!persistenceQueue.enqueue(copyConfig(canonical))) {
                 android.util.Log.e(
                     "ProviderRepo",
-                    "[ProviderStore] saveConfig persistence failed; emitting in-memory only: ${e.message}",
-                    e,
+                    "[ProviderStore] async persistence queue is closed; in-memory config was updated only",
                 )
-                config
             }
-            _config.value = canonical.copy(
-                instances = canonical.instances.toMutableList(),
-                modelEntries = canonical.modelEntries.toMutableList(),
-                modelGroups = canonical.modelGroups.toMutableList(),
-                agentLoopModelEntryIds = canonical.agentLoopModelEntryIds.toMutableList(),
-                agentLoopGroupIds = canonical.agentLoopGroupIds.toMutableList(),
-                revision = ProviderConfig.nextRevision(),
-            )
         }
     }
 
