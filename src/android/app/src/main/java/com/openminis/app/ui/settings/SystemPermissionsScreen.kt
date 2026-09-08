@@ -17,11 +17,11 @@ import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryAlert
-import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.RestartAlt
-import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,7 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,47 +42,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
+import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
-import com.openminis.app.tools.android.PrivilegedAccessMode
-import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * T323: surfaces OS-level permission states (Accessibility service,
- * etc.) the user must grant via external Settings flows. Each row
- * reports current status and routes the user to the relevant system
- * settings page; we re-poll while the screen is visible so coming
- * back from system Settings refreshes the row automatically.
+ * Surfaces OS-level permission states the user must grant through Android.
+ * The structure follows upstream OpenMinis; the desktop-pet overlay grant is
+ * the only fork-specific system permission kept here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SystemPermissionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var a11yEnabled by remember { mutableStateOf(isAccessibilityEnabled(context)) }
-    // [T-android-a11y-miui-service-failure] "Service failed" degraded state:
-    // the OEM ROM (MIUI etc.) reports the service as enabled in Settings but
-    // has killed the process / revoked the binding, so getInstance() is null.
-    // On such a device the canonical remediation is autostart-whitelist +
-    // battery "no restrictions"; surface those (reusing PowerOptimizationManager)
-    // only when the service is degraded AND the vendor is known to enforce it.
     var a11yDegraded by remember { mutableStateOf(false) }
-    // [T-android-a11y-force-stop-recovery] Distinct from `a11yDegraded`: the
-    // grant itself is gone from Settings.Secure (force-stop stripped it), which
-    // is repairable by writing the setting back. `a11yDegraded` is the opposite
-    // case — grant present, process killed — where writing would be pointless.
     var a11yRevoked by remember { mutableStateOf(false) }
     var shizukuReady by remember { mutableStateOf(false) }
-    // OpenMinis Pet fork: polled with the other grants so returning from
-    // the system settings page refreshes the row without a manual back.
-    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var repairing by remember { mutableStateOf(false) }
     var repairFailed by remember { mutableStateOf(false) }
-    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
-    var showFullAccessConfirm by remember { mutableStateOf(false) }
+    var a11yRestricted by remember { mutableStateOf(false) }
+    var unrestricting by remember { mutableStateOf(false) }
+    var unrestrictFailed by remember { mutableStateOf(false) }
+    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -92,13 +78,10 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             val connected = MinisAccessibilityService.getInstance() != null
             a11yEnabled = inSettings || connected
             a11yDegraded = inSettings && !connected
-            // Only claim "revoked" once the user has actually granted it at
-            // least once — otherwise a first-run user who has never enabled the
-            // service would be shown a "repair" prompt for something that was
-            // never broken.
             a11yRevoked = !inSettings && !connected &&
                 AccessibilityRecoveryManager.hasEverBeenGranted(context)
             shizukuReady = ShizukuManager.isReady()
+            a11yRestricted = !a11yEnabled && RestrictedSettingsManager.isRestricted(context)
             overlayGranted = Settings.canDrawOverlays(context)
             delay(1000)
         }
@@ -110,7 +93,10 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.system_permissions_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
                     }
                 },
             )
@@ -123,49 +109,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState()),
         ) {
             SettingsSection(
-                header = "Root 权限模式",
-                footer = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                    "完全访问已开启：App 不再限制 Agent 的 Root 操作，也不会逐条弹窗，请仅在明确需要时使用。"
-                } else {
-                    "标准模式普通操作直接执行，只有最高风险的系统修改或 Root 初始化操作需要你的确认。"
-                },
-            ) {
-                SettingsRow(
-                    icon = Icons.Outlined.Security,
-                    iconColor = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) {
-                        Color(0xFF34C759)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    title = "标准模式",
-                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "普通操作直通，最高风险逐次确认",
-                    onClick = {
-                        PrivilegedAccessModeStore.setFromUserSettings(
-                            context,
-                            PrivilegedAccessMode.STANDARD,
-                        )
-                    },
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Security,
-                    iconColor = MaterialTheme.colorScheme.error,
-                    title = "完全访问",
-                    titleColor = MaterialTheme.colorScheme.error,
-                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                        "当前模式；App 层不限制 Agent Root 请求"
-                    } else {
-                        "高风险：开启前需要确认"
-                    },
-                    onClick = {
-                        if (privilegedAccessMode != PrivilegedAccessMode.FULL_ACCESS) {
-                            showFullAccessConfirm = true
-                        }
-                    },
-                    showDivider = false,
-                )
-            }
-
-            SettingsSection(
                 header = stringResource(R.string.system_permissions_section_a11y),
                 footer = stringResource(R.string.system_permissions_a11y_footer),
             ) {
@@ -173,18 +116,62 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     icon = Icons.Outlined.Accessibility,
                     iconColor = Color(0xFF34C759),
                     title = stringResource(R.string.system_permissions_a11y_row),
-                    subtitle = if (a11yEnabled)
+                    subtitle = if (a11yEnabled) {
                         stringResource(R.string.system_permissions_a11y_enabled)
-                    else
-                        stringResource(R.string.system_permissions_a11y_disabled),
+                    } else {
+                        stringResource(R.string.system_permissions_a11y_disabled)
+                    },
                     onClick = { openAccessibilitySettings(context) },
                     showDivider = false,
                 )
             }
 
-            // OpenMinis Pet fork: the floating pet needs "display over other
-            // apps". Managed here with the other system grants rather than on
-            // the pet screen, so the permission has exactly one owner.
+            if (a11yRestricted) {
+                SettingsSection(
+                    header = stringResource(R.string.system_permissions_a11y_restricted_header),
+                    footer = stringResource(R.string.system_permissions_a11y_restricted_footer),
+                ) {
+                    if (shizukuReady) {
+                        SettingsRow(
+                            icon = Icons.Outlined.LockOpen,
+                            iconColor = Color(0xFF34C759),
+                            title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
+                            subtitle = when {
+                                unrestricting ->
+                                    stringResource(R.string.system_permissions_a11y_restricted_working)
+                                unrestrictFailed ->
+                                    stringResource(R.string.system_permissions_a11y_restricted_failed)
+                                else ->
+                                    stringResource(R.string.system_permissions_a11y_restricted_shizuku_sub)
+                            },
+                            onClick = {
+                                if (unrestricting) return@SettingsRow
+                                unrestricting = true
+                                unrestrictFailed = false
+                                scope.launch {
+                                    val ok = RestrictedSettingsManager.clearWithShizuku(context)
+                                    unrestricting = false
+                                    unrestrictFailed = !ok
+                                }
+                            },
+                        )
+                    }
+                    SettingsRow(
+                        icon = Icons.Outlined.Info,
+                        iconColor = Color(0xFFFF9500),
+                        title = stringResource(R.string.system_permissions_a11y_restricted_manual),
+                        subtitle = stringResource(R.string.system_permissions_a11y_restricted_manual_sub),
+                        onClick = {
+                            (context as? Activity)?.let {
+                                PowerOptimizationManager.openAppDetailsSettings(it)
+                            }
+                        },
+                        showDivider = false,
+                    )
+                }
+            }
+
+            // Fork-specific system grant required by the floating desktop pet.
             SettingsSection(
                 header = "悬浮窗",
                 footer = "桌面宠物需要这个权限才能浮在其他应用上面。",
@@ -208,17 +195,12 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 )
             }
 
-            // [T-android-a11y-force-stop-recovery] Repair affordance, shown ONLY
-            // when the grant was previously held and is now missing from
-            // Settings.Secure — the force-stop signature. Hidden in the healthy
-            // case and on a fresh install (see hasEverBeenGranted) so the screen
-            // stays clean.
             if (a11yRevoked) {
                 SettingsSection(
                     header = stringResource(R.string.a11y_repair_section_header),
                     footer = stringResource(
                         if (shizukuReady) R.string.a11y_repair_footer_shizuku
-                        else R.string.a11y_repair_footer_manual
+                        else R.string.a11y_repair_footer_manual,
                     ),
                 ) {
                     SettingsRow(
@@ -226,7 +208,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         iconColor = Color(0xFFFF3B30),
                         title = stringResource(
                             if (shizukuReady) R.string.a11y_repair_row_shizuku
-                            else R.string.a11y_repair_row_manual
+                            else R.string.a11y_repair_row_manual,
                         ),
                         subtitle = when {
                             repairing -> stringResource(R.string.a11y_repair_in_progress)
@@ -242,13 +224,9 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                             repairing = true
                             repairFailed = false
                             scope.launch {
-                                val ok = AccessibilityRecoveryManager
-                                    .repairWithShizuku(context)
+                                val ok = AccessibilityRecoveryManager.repairWithShizuku(context)
                                 repairing = false
                                 repairFailed = !ok
-                                // On success the polling loop above clears
-                                // a11yRevoked within a second and this whole
-                                // section disappears on its own.
                             }
                         },
                         showDivider = false,
@@ -256,15 +234,12 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // [T-android-a11y-miui-service-failure] OEM keep-alive guidance. Only
-            // shown when the service is degraded ("此服务出现故障" — enabled in
-            // Settings but the process was killed by the ROM) AND the vendor is
-            // one known to enforce autostart on top of stock Android. Routes the
-            // two canonical remediations through the existing
-            // PowerOptimizationManager (which already catches a missing Activity
-            // and falls back). Stays hidden on Pixel / stock Android (Vendor.OTHER).
             val activity = context as? Activity
-            if (a11yDegraded && activity != null && PowerOptimizationManager.needsOemAutostartGuidance()) {
+            if (
+                a11yDegraded &&
+                activity != null &&
+                PowerOptimizationManager.needsOemAutostartGuidance()
+            ) {
                 val vendor = PowerOptimizationManager.Vendor.current().displayName
                 SettingsSection(
                     header = stringResource(R.string.system_permissions_a11y_oem_header),
@@ -296,9 +271,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // [T-android-voice-correction] Phase 4: opt-in consent for storing
-            // correction learning data, plus the wipe action. Placed here
-            // because it is a privacy control, matching iOS's Permissions page.
             var correctionEnabled by remember {
                 mutableStateOf(
                     com.openminis.app.speech.correction.VoiceCorrectionConsent.isEnabled(context),
@@ -318,8 +290,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         correctionEnabled = on
                         com.openminis.app.speech.correction.VoiceCorrectionConsent
                             .setEnabled(context, on)
-                        // Turning the toggle off counts as an answer, so the
-                        // one-time prompt must not reappear afterwards.
                         com.openminis.app.speech.correction.VoiceCorrectionConsent
                             .setPrompted(context, true)
                     },
@@ -339,10 +309,9 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     onDismissRequest = { showClearCorrectionConfirm = false },
                     title = { Text(stringResource(R.string.voice_correction_clear_title)) },
                     confirmButton = {
-                        TextButton(onClick = {
+                        MinisTextButton(onClick = {
                             showClearCorrectionConfirm = false
-                            com.openminis.app.speech.correction.VoiceCorrection
-                                .clearAllData(context)
+                            com.openminis.app.speech.correction.VoiceCorrection.clearAllData(context)
                             Toast.makeText(
                                 context,
                                 context.getString(R.string.voice_correction_cleared),
@@ -356,39 +325,8 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showClearCorrectionConfirm = false }) {
+                        MinisTextButton(onClick = { showClearCorrectionConfirm = false }) {
                             Text(stringResource(R.string.voice_correction_consent_not_now))
-                        }
-                    },
-                )
-            }
-
-            if (showFullAccessConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showFullAccessConfirm = false },
-                    title = { Text("开启 Root 完全访问？") },
-                    text = {
-                        Text(
-                            "开启后，Agent 发起的结构化 Root 命令将不再逐条询问。" +
-                                "这可能修改系统设置、应用与设备数据；Agent 本身不能切换此模式。",
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                PrivilegedAccessModeStore.setFromUserSettings(
-                                    context,
-                                    PrivilegedAccessMode.FULL_ACCESS,
-                                )
-                                showFullAccessConfirm = false
-                            },
-                        ) {
-                            Text("确认开启", color = MaterialTheme.colorScheme.error)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showFullAccessConfirm = false }) {
-                            Text("取消")
                         }
                     },
                 )
@@ -411,14 +349,14 @@ private fun openAccessibilitySettings(context: Context) {
         context.startActivity(
             Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            },
         )
     } catch (_: Throwable) {
         try {
             context.startActivity(
                 Intent(Settings.ACTION_SETTINGS).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                },
             )
         } catch (_: Throwable) {}
     }
