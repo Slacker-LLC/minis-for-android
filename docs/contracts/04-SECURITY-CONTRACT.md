@@ -8,15 +8,19 @@
 
 未知工具默认拒绝。仅本地的工具不得暴露给 MCP。
 
+## 权限交互
+
+- App 面向用户的工具权限管理跟随上游 OpenMinis；不要另加一套 Root“标准模式 / 完全访问”或其它全局权限模式。
+- Android 系统强制的运行时权限、无障碍、Restricted Settings、悬浮窗等仍由系统授权流程处理。
+- Fork 自有的 Root/minisd/Ubuntu 能力只作为执行后端存在，不改变上游权限页面与交互语义。
+
 ## Root
 
 - `minisd` 是目标上的唯一 Root 执行出口。
-- 标准模式按 App-owned 的结构化风险分类处理 Root 操作：普通操作直接执行，只有 `MUTATING` / `ROOT_SETUP` 最高风险操作进入用户请求；用户拒绝才返回拒绝。`root.exec` 是普通操作的快速路径，不能把它的 `POLICY_DENIED` 直接当成用户确认请求。
-- `root.fullExec` 与 `root.exec` 使用相同的结构化 `{tool,args,timeout_ms,execution_id}`；不得接收原始 `command`。工具只能从可信 Android 系统目录解析，minisd 策略固定为 `confirm`。
-- Confirm 必须保存并绑定**完整 method + params**，一次性，用后作废；参数不匹配、过期或重复使用均立即消耗确认票。
-- 标准模式的最高风险操作在用户请求获准后，以完全相同的结构化请求进入 `root.fullExec`；普通操作不因为快速路径缺少某个工具而触发用户请求。
-- 完全访问只能由用户在 App 设置里打开。开启后 App 层不再按风险拦截或询问，所有 Root 操作都可由 App 自动完成 `root.fullExec` 的内部确认重放；聊天页必须持续显示红色警告。
-- Agent 工具参数不得包含 `access_mode` 或其它模式切换入口；`root.shell` 保持 `LOCAL_ONLY`，Agent 不能自行切换模式。
+- App 不提供用户可切换的 Root 标准/完全访问模式。旧模式存储仅作兼容清理，不再形成产品权限状态。
+- `root.fullExec` 与 `root.exec` 使用结构化 `{tool,args,timeout_ms,execution_id}`；不得接收原始 `command`。工具只能从可信 Android 系统目录解析。
+- `root.fullExec` 的 confirm ticket 是 App 与 minisd 之间的内部一次性协议，不作为第二套用户权限管理 UI 暴露；ticket 必须绑定完整 method + params，一次性，用后作废，参数不匹配、过期或重复使用均拒绝。
+- Agent 工具参数不得包含 `access_mode` 或其它模式切换入口。
 - 为安装、启动、探测或修复 minisd/rootfs 而保留的受控 bootstrap/recovery `su -c` 只能执行静态 App-owned 命令；不得承载 Agent 提供的命令或 argv。剩余范围见 `06-CURRENT-GAPS.md`。
 
 ## minisd IPC
