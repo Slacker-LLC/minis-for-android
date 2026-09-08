@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">Toggle greyed out? (\"Restricted setting\")</string>
+    <string name="system_permissions_a11y_restricted_footer">Android blocks the accessibility toggle for apps installed from a downloaded APK file. This is an OS security policy, not a Minis bug — nothing is wrong with your install. Allowing restricted settings only re-enables the toggle; it grants nothing on its own, and you still choose whether to turn the service on.</string>
+    <string name="system_permissions_a11y_restricted_manual">Allow restricted settings</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">App info → ⋮ menu (top right) → Allow restricted settings</string>
+    <string name="system_permissions_a11y_restricted_shizuku">Allow restricted settings via Shizuku</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">One tap — clears the flag without leaving Minis</string>
+    <string name="system_permissions_a11y_restricted_working">Allowing…</string>
+    <string name="system_permissions_a11y_restricted_failed">Failed — use the manual steps below</string>
+</resources>
