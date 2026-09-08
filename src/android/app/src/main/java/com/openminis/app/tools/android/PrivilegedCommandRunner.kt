@@ -18,7 +18,93 @@ import java.util.concurrent.TimeUnit
 enum class PrivilegedBackend { ROOT, SHIZUKU, NONE }
 
 /** Risk of one privileged command, used to keep mutation approval explicit. */
-enum class CommandRisk { READ_ONLY, USER_VISIBLE, MUTATING, ROOT_SETUP }
+enum class CommandRisk(val severity: Int) {
+    READ_ONLY(0),
+    USER_VISIBLE(1),
+    MUTATING(2),
+    ROOT_SETUP(3),
+    ;
+
+    /** Standard Mode asks only for the highest-risk operations. */
+    fun requiresStandardApproval(): Boolean = this == MUTATING || this == ROOT_SETUP
+
+    companion object {
+        fun max(first: CommandRisk, second: CommandRisk): CommandRisk =
+            if (first.severity >= second.severity) first else second
+    }
+}
+
+/**
+ * Conservative classification for the generic local `root.shell` seam.
+ * Product-owned handlers still declare their known risk, while arbitrary
+ * tools/arguments must never be able to self-label as read-only.
+ */
+internal object PrivilegedCommandRisk {
+    private val packageMutations = setOf(
+        "install", "uninstall", "clear", "disable", "enable", "grant", "revoke",
+        "suspend", "unsuspend", "trim-caches", "move-package", "set-installer",
+        "install-create", "install-write", "install-commit", "install-abandon",
+        "create-user", "remove-user", "set-user-restriction", "set-home-activity",
+    )
+    private val packageReads = setOf(
+        "list", "path", "dump", "resolve-activity", "query-activities", "has-feature",
+    )
+    private val settingsMutations = setOf("put", "delete", "reset")
+    private val settingsReads = setOf("get", "list")
+    private val safeDumpsysTopics = setOf(
+        "activity", "cpuinfo", "display", "gfxinfo", "input_method", "meminfo",
+        "package", "procstats", "surfaceflinger", "window",
+    )
+
+    fun classify(tool: String, args: List<String>): CommandRisk {
+        return when (tool.substringAfterLast('/').lowercase()) {
+            "getprop", "pidof", "ps" -> CommandRisk.READ_ONLY
+            "logcat" -> if (args.any { it == "-c" || it == "--clear" }) {
+                CommandRisk.MUTATING
+            } else {
+                CommandRisk.READ_ONLY
+            }
+            "pm" -> classifyKnownReadOrMutation(args, packageReads, packageMutations)
+            "settings" -> classifyKnownReadOrMutation(args, settingsReads, settingsMutations)
+            "dumpsys" -> if (args.firstOrNull()?.lowercase()?.let { it in safeDumpsysTopics } == true) {
+                CommandRisk.READ_ONLY
+            } else {
+                CommandRisk.MUTATING
+            }
+            "am", "input", "monkey" -> CommandRisk.USER_VISIBLE
+            "mount", "umount" -> CommandRisk.ROOT_SETUP
+            "sh", "su", "toybox", "busybox" -> CommandRisk.ROOT_SETUP
+            "cmd" -> classifyCmd(args)
+            else -> CommandRisk.MUTATING
+        }
+    }
+
+    private fun classifyCmd(args: List<String>): CommandRisk {
+        if (args.firstOrNull()?.lowercase() == "package" &&
+            args.getOrNull(1)?.lowercase()?.let {
+                it in setOf(
+                    "dump", "path", "resolve-activity", "query-activities",
+                )
+            } == true
+        ) {
+            return CommandRisk.READ_ONLY
+        }
+        return CommandRisk.MUTATING
+    }
+
+    private fun classifyKnownReadOrMutation(
+        args: List<String>,
+        reads: Set<String>,
+        mutations: Set<String>,
+    ): CommandRisk {
+        if (args.any { it.lowercase() in mutations }) return CommandRisk.MUTATING
+        return if (args.any { it.lowercase() in reads }) {
+            CommandRisk.READ_ONLY
+        } else {
+            CommandRisk.MUTATING
+        }
+    }
+}
 
 /** Result of one argv-based Android command. */
 data class AndroidCommandResult(
@@ -192,49 +278,74 @@ object PrivilegedCommandRunner {
         val mode = PrivilegedAccessModeStore.get(context)
         val tool = argv.first()
         val commandArgs = argv.drop(1)
+        val effectiveRisk = CommandRisk.max(risk, PrivilegedCommandRisk.classify(tool, commandArgs))
         val executionId = MinisdClient.newExecutionId("root")
-        Log.i(TAG, "dispatch mode=${mode.wireValue} operation=$operation tool=$tool executionId=$executionId")
+        Log.i(
+            TAG,
+            "dispatch mode=${mode.wireValue} risk=${effectiveRisk.name.lowercase()} " +
+                "operation=$operation tool=$tool executionId=$executionId",
+        )
 
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         val broker = UbuntuRuntime.ensureBrokerReady()
         if (!broker.ok) return broker.toCommandResult(rootOnly)
 
         return try {
-            when (mode) {
-                PrivilegedAccessMode.STANDARD -> {
-                    val standard = UbuntuRuntime.client.rootExec(
-                        tool = tool,
-                        args = commandArgs,
-                        timeoutMs = timeoutMs,
-                        executionId = executionId,
+            if (mode == PrivilegedAccessMode.STANDARD && effectiveRisk.requiresStandardApproval()) {
+                val decision = ApprovalSeam.request(
+                    context,
+                    sessionId,
+                    "android_privileged",
+                    "$operation (${effectiveRisk.name.lowercase()})\n\ntool=$tool\nargs=${commandArgs.joinToString(prefix = "[", postfix = "]")}",
+                )
+                if (decision.decision != "allowed-once") {
+                    return AndroidCommandResult(
+                        backend = PrivilegedBackend.NONE,
+                        exitCode = 126,
+                        stdout = "",
+                        stderr = "",
+                        unavailableReason = "operation was not approved (${decision.decision})",
                     )
-                    if (standard.code != MinisdProtocol.ERROR_POLICY_DENIED) {
-                        standard.toCommandResult(rootOnly)
-                    } else {
-                        executeFull(
-                            context = context,
-                            sessionId = sessionId,
-                            tool = tool,
-                            args = commandArgs,
-                            operation = operation,
-                            risk = risk,
-                            timeoutMs = timeoutMs,
-                            executionId = executionId,
-                            requireUserApproval = true,
-                            rootOnly = rootOnly,
-                        )
-                    }
                 }
-                PrivilegedAccessMode.FULL_ACCESS -> executeFull(
-                    context = context,
-                    sessionId = sessionId,
+                // The user has already approved this exact App-owned operation.
+                // minisd still consumes its one-shot internal ticket below.
+                return executeFull(
                     tool = tool,
                     args = commandArgs,
-                    operation = operation,
-                    risk = risk,
                     timeoutMs = timeoutMs,
                     executionId = executionId,
-                    requireUserApproval = false,
+                    rootOnly = rootOnly,
+                )
+            }
+
+            if (mode == PrivilegedAccessMode.FULL_ACCESS) {
+                // Full Access removes App-level approval for every risk class.
+                return executeFull(
+                    tool = tool,
+                    args = commandArgs,
+                    timeoutMs = timeoutMs,
+                    executionId = executionId,
+                    rootOnly = rootOnly,
+                )
+            }
+
+            val standard = UbuntuRuntime.client.rootExec(
+                tool = tool,
+                args = commandArgs,
+                timeoutMs = timeoutMs,
+                executionId = executionId,
+            )
+            if (standard.code != MinisdProtocol.ERROR_POLICY_DENIED) {
+                standard.toCommandResult(rootOnly)
+            } else {
+                // Allow non-risk operations outside the fast-path allowlist to
+                // continue without turning a broker capability miss into a
+                // user approval request. Risk was classified before dispatch.
+                executeFull(
+                    tool = tool,
+                    args = commandArgs,
+                    timeoutMs = timeoutMs,
+                    executionId = executionId,
                     rootOnly = rootOnly,
                 )
             }
@@ -251,14 +362,16 @@ object PrivilegedCommandRunner {
         if (RootCommandRunner.passiveSuPath() == null) {
             return RootProbeResult(false, error = "su executable not found")
         }
-        val decision = ApprovalSeam.request(
-            context,
-            sessionId,
-            "android_capabilities",
-            "主动请求 Root 授权并读取 uid/gid/capabilities/SELinux 状态",
-        )
-        if (decision.decision != "allowed-once") {
-            return RootProbeResult(false, error = "root probe was not approved (${decision.decision})")
+        if (PrivilegedAccessModeStore.get(context) == PrivilegedAccessMode.STANDARD) {
+            val decision = ApprovalSeam.request(
+                context,
+                sessionId,
+                "android_capabilities",
+                "主动请求 Root 授权并读取 uid/gid/capabilities/SELinux 状态",
+            )
+            if (decision.decision != "allowed-once") {
+                return RootProbeResult(false, error = "root probe was not approved (${decision.decision})")
+            }
         }
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         val broker = UbuntuRuntime.ensureBrokerReady()
@@ -276,15 +389,10 @@ object PrivilegedCommandRunner {
     }
 
     private suspend fun executeFull(
-        context: Context,
-        sessionId: String,
         tool: String,
         args: List<String>,
-        operation: String,
-        risk: CommandRisk,
         timeoutMs: Long,
         executionId: String,
-        requireUserApproval: Boolean,
         rootOnly: Boolean,
     ): AndroidCommandResult {
         val challenged = UbuntuRuntime.client.rootFullExec(
@@ -304,23 +412,6 @@ object PrivilegedCommandRunner {
                 "",
                 unavailableReason = "CONFIRM_REQUIRED response omitted confirm_id",
             )
-        if (requireUserApproval) {
-            val decision = ApprovalSeam.request(
-                context,
-                sessionId,
-                "android_privileged",
-                "$operation (${risk.name.lowercase()})\n\ntool=$tool\nargs=${args.joinToString(prefix = "[", postfix = "]")}",
-            )
-            if (decision.decision != "allowed-once") {
-                return AndroidCommandResult(
-                    PrivilegedBackend.NONE,
-                    126,
-                    "",
-                    "",
-                    unavailableReason = "operation was not approved (${decision.decision})",
-                )
-            }
-        }
         return UbuntuRuntime.client.rootFullExec(
             tool = tool,
             args = args,

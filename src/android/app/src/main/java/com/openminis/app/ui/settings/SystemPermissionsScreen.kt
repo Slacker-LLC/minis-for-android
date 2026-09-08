@@ -125,9 +125,9 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             SettingsSection(
                 header = "Root 权限模式",
                 footer = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                    "完全访问已开启：Agent 的 Root 请求不再逐条弹窗，请仅在明确需要时使用。"
+                    "完全访问已开启：App 不再限制 Agent 的 Root 操作，也不会逐条弹窗，请仅在明确需要时使用。"
                 } else {
-                    "标准模式仅自动执行受控的只读命令；超出白名单或参数规则时，每次都需要你的确认。"
+                    "标准模式普通操作直接执行，只有最高风险的系统修改或 Root 初始化操作需要你的确认。"
                 },
             ) {
                 SettingsRow(
@@ -138,7 +138,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     title = "标准模式",
-                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "白名单直通，越权逐次确认",
+                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "普通操作直通，最高风险逐次确认",
                     onClick = {
                         PrivilegedAccessModeStore.setFromUserSettings(
                             context,
@@ -152,7 +152,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     title = "完全访问",
                     titleColor = MaterialTheme.colorScheme.error,
                     subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                        "当前模式；Agent Root 请求自动完成内部确认"
+                        "当前模式；App 层不限制 Agent Root 请求"
                     } else {
                         "高风险：开启前需要确认"
                     },

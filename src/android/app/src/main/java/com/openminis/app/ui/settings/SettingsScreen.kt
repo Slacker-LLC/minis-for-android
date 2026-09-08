@@ -389,7 +389,7 @@ fun SettingsScreen(
                     },
                     title = stringResource(R.string.settings_section_permissions),
                     subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                        "完全访问已开启 (高危) · 控制 Agent 权限"
+                        "完全访问已开启 (高危) · App 不限制 Agent Root 操作"
                     } else {
                         stringResource(R.string.settings_permissions_subtitle)
                     },

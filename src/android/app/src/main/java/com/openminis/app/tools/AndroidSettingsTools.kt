@@ -4,12 +4,11 @@ import android.content.Context
 import android.provider.Settings
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.ubuntu.UbuntuRuntime
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.openminis.app.tools.android.CommandRisk
+import com.openminis.app.tools.android.PrivilegedCommandRunner
 import org.json.JSONObject
 
-/** Structured settings access: Android API first, minisd root.exec fallback for writes. */
+/** Structured settings access: Android API first, privileged broker fallback for writes. */
 object AndroidSettingsOps {
     private val keyPattern = Regex("^[A-Za-z0-9_.-]{1,128}$")
 
@@ -31,7 +30,14 @@ object AndroidSettingsOps {
         }
     }
 
-    suspend fun set(context: Context, namespace: String, key: String, value: String?, delete: Boolean): ToolExecutionResult {
+    suspend fun set(
+        context: Context,
+        sessionId: String,
+        namespace: String,
+        key: String,
+        value: String?,
+        delete: Boolean,
+    ): ToolExecutionResult {
         validate(namespace, key)?.let { return it }
         if (!delete && value == null) return ToolExecutionResult("Error: value is required for set", false)
         if (value != null && value.length > 4_096) return ToolExecutionResult("Error: value exceeds 4096 characters", false)
@@ -50,23 +56,26 @@ object AndroidSettingsOps {
             return ToolExecutionResult(JSONObject().put("namespace", namespace).put("key", key).put("source", "android_api").put("updated", true).toString(), true)
         }
 
-        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         val args = if (delete) listOf("delete", namespace, key) else listOf("put", namespace, key, value!!)
-        val response = withContext(Dispatchers.IO) {
-            UbuntuRuntime.client.rootExec("settings", args, timeoutMs = 30_000)
-        }
-        if (!response.ok) {
+        val response = PrivilegedCommandRunner.run(
+            context = context,
+            sessionId = sessionId,
+            argv = listOf("settings") + args,
+            operation = "写入 Android setting $namespace/$key",
+            risk = CommandRisk.MUTATING,
+            timeoutMs = 30_000L,
+            rootOnly = true,
+        )
+        if (!response.success) {
             return ToolExecutionResult(
-                "Error: ${response.error?.code ?: "RUNTIME_UNAVAILABLE"}: ${response.error?.detail ?: "minisd settings failed"}",
+                "Error: ${response.unavailableReason ?: response.stderr.ifBlank { "minisd settings failed" }}",
                 false,
             )
         }
-        val exitCode = response.result?.optInt("exit_code", 1) ?: 1
-        val stderr = response.result?.optString("stderr").orEmpty()
         return ToolExecutionResult(
-            if (exitCode == 0) JSONObject().put("namespace", namespace).put("key", key).put("source", "minisd.root.exec").put("updated", true).toString()
-            else "Error: settings exit=$exitCode $stderr",
-            exitCode == 0,
+            if (response.exitCode == 0) JSONObject().put("namespace", namespace).put("key", key).put("source", "minisd.root").put("updated", true).toString()
+            else "Error: settings exit=${response.exitCode} ${response.stderr}",
+            response.exitCode == 0,
         )
     }
 
@@ -96,7 +105,7 @@ class AndroidSettingsGetHandler : AndroidSystemHandler() {
 class AndroidSettingsSetHandler : AndroidSystemHandler() {
     override val definition = AgentToolDefinition(
         name = "android.settings.set",
-        description = "Set or delete an Android setting. Uses minisd root.exec only if normal Android API write is unavailable.",
+        description = "Set or delete an Android setting. Uses the privileged broker only if normal Android API write is unavailable.",
         parameters = mapOf(
             "namespace" to AgentToolParam("string", "system/secure/global", listOf("system", "secure", "global")),
             "key" to AgentToolParam("string", "Settings key"),
@@ -109,6 +118,7 @@ class AndroidSettingsSetHandler : AndroidSystemHandler() {
         val a = args(argsJson)
         return AndroidSettingsOps.set(
             context,
+            sessionId,
             a.optString("namespace"),
             a.optString("key"),
             if (a.has("value")) a.optString("value") else null,

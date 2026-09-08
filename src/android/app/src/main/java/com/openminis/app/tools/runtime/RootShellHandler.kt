@@ -3,8 +3,8 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.tools.android.CommandRisk
 import com.openminis.app.tools.android.PrivilegedCommandRunner
+import com.openminis.app.tools.android.PrivilegedCommandRisk
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
@@ -16,8 +16,8 @@ class RootShellHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "root.shell",
         description = "Run one Android Root tool through minisd using structured tool and args. " +
-            "Standard mode auto-runs read-only allowlisted requests and asks the user once for other exact requests. " +
-            "Only the user can enable Full Access in App settings.",
+            "Standard mode runs normal operations directly and asks only for highest-risk operations. " +
+            "Full Access removes App-level approval. Only the user can enable Full Access in App settings.",
         parameters = mapOf(
             "tool" to AgentToolParam("string", "Executable name resolved only from trusted Android system directories"),
             "args" to AgentToolParam("array", "Arguments passed without shell parsing", items = AgentToolParam("string", "One argument")),
@@ -55,7 +55,7 @@ class RootShellHandler : ToolHandler {
             sessionId = sessionId,
             argv = listOf(tool) + argv,
             operation = "执行 Android Root 命令",
-            risk = CommandRisk.READ_ONLY,
+            risk = PrivilegedCommandRisk.classify(tool, argv),
             timeoutMs = timeout,
             rootOnly = true,
         )
