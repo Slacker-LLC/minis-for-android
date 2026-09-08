@@ -25,31 +25,37 @@ object PrivilegedAccessModeStore {
 
     private val current = MutableStateFlow(PrivilegedAccessMode.STANDARD)
 
+    @Volatile
+    private var legacyPreferenceCleared = false
+
     /** Runtime compatibility: no App-owned Root approval mode remains. */
     fun get(context: Context): PrivilegedAccessMode {
-        clearLegacyPreference(context)
+        clearLegacyPreferenceOnce(context)
         return PrivilegedAccessMode.FULL_ACCESS
     }
 
     /** UI compatibility: there is no selectable Full Access state anymore. */
     fun observe(context: Context): StateFlow<PrivilegedAccessMode> {
-        clearLegacyPreference(context)
+        clearLegacyPreferenceOnce(context)
         current.value = PrivilegedAccessMode.STANDARD
         return current.asStateFlow()
     }
 
     /** Kept for old call sites; mode changes are intentionally ignored. */
     fun setFromUserSettings(context: Context, mode: PrivilegedAccessMode) {
-        clearLegacyPreference(context)
+        clearLegacyPreferenceOnce(context)
         current.value = PrivilegedAccessMode.STANDARD
     }
 
-    private fun clearLegacyPreference(context: Context) {
+    @Synchronized
+    private fun clearLegacyPreferenceOnce(context: Context) {
+        if (legacyPreferenceCleared) return
         context.applicationContext
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .clear()
             .apply()
+        legacyPreferenceCleared = true
     }
 
     /** Legacy parser retained for source/test compatibility; no runtime path uses it. */
