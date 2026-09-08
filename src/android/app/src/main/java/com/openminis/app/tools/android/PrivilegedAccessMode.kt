@@ -5,7 +5,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** User-owned Root authority level. Agent tool arguments never select it. */
+/**
+ * Compatibility shim for the old Root Standard / Full Access UI.
+ *
+ * Upstream OpenMinis has no user-selectable Root permission mode. Keep the
+ * enum only so existing runtime call sites do not need to be rewritten, but
+ * do not expose or persist a mode choice. Runtime calls use the unrestricted
+ * structured minisd path so existing Root/Ubuntu capabilities keep working;
+ * UI observers always see the neutral STANDARD value and therefore never
+ * surface the removed Full Access state.
+ */
 enum class PrivilegedAccessMode(val wireValue: String) {
     STANDARD("standard"),
     FULL_ACCESS("full"),
@@ -13,44 +22,37 @@ enum class PrivilegedAccessMode(val wireValue: String) {
 
 object PrivilegedAccessModeStore {
     private const val PREFS = "privileged_access_mode"
-    private const val KEY_MODE = "mode"
 
     private val current = MutableStateFlow(PrivilegedAccessMode.STANDARD)
 
-    @Volatile
-    private var loaded = false
-
+    /** Runtime compatibility: no App-owned Root approval mode remains. */
     fun get(context: Context): PrivilegedAccessMode {
-        ensureLoaded(context)
-        return current.value
+        clearLegacyPreference(context)
+        return PrivilegedAccessMode.FULL_ACCESS
     }
 
+    /** UI compatibility: there is no selectable Full Access state anymore. */
     fun observe(context: Context): StateFlow<PrivilegedAccessMode> {
-        ensureLoaded(context)
+        clearLegacyPreference(context)
+        current.value = PrivilegedAccessMode.STANDARD
         return current.asStateFlow()
     }
 
-    /** UI-only mutation seam. This function is intentionally not exposed as an Agent tool. */
+    /** Kept for old call sites; mode changes are intentionally ignored. */
     fun setFromUserSettings(context: Context, mode: PrivilegedAccessMode) {
+        clearLegacyPreference(context)
+        current.value = PrivilegedAccessMode.STANDARD
+    }
+
+    private fun clearLegacyPreference(context: Context) {
         context.applicationContext
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_MODE, mode.wireValue)
+            .clear()
             .apply()
-        loaded = true
-        current.value = mode
     }
 
-    @Synchronized
-    private fun ensureLoaded(context: Context) {
-        if (loaded) return
-        val raw = context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_MODE, null)
-        current.value = parse(raw)
-        loaded = true
-    }
-
+    /** Legacy parser retained for source/test compatibility; no runtime path uses it. */
     internal fun parse(raw: String?): PrivilegedAccessMode = when (raw) {
         PrivilegedAccessMode.FULL_ACCESS.wireValue -> PrivilegedAccessMode.FULL_ACCESS
         else -> PrivilegedAccessMode.STANDARD
