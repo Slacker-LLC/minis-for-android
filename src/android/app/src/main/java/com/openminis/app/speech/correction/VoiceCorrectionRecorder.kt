@@ -91,11 +91,19 @@ class VoiceCorrectionRecorder(
             // was diffed within, so its length is the locality denominator;
             // fall back to the whole edited text when a sentence isn't known.
             val sentenceLength = contextSample?.length ?: maxOf(b.length, a.length)
+            // A standalone text-input replacement has no surrounding sentence
+            // context: the selected span may legitimately be the whole field
+            // (for example, correcting one short word). Keep the locality
+            // guard for transcript edits and for text edits embedded in a
+            // larger sentence; the other admission/rewrite checks still run.
+            val isStandaloneTextEdit =
+                source == VoiceCorrectionDb.SOURCE_TEXT && contextSample == b
             val verdict = CorrectionAdmission.judge(
                 from = fromText,
                 to = toText,
                 normalizer = normalizer,
                 sentenceLength = sentenceLength,
+                enforceLocality = !isStandaloneTextEdit,
             )
             if (!verdict.isAdmitted) {
                 droppedRewrite++

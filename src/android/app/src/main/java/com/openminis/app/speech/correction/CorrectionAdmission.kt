@@ -106,13 +106,16 @@ object CorrectionAdmission {
      * the before/after sentence lengths (the recorder has both).
      *
      * Signal order is load-bearing and mirrors iOS: locality → reorder →
-     * homophone → digitNorm → acronym.
+     * homophone → digitNorm → acronym. A caller may disable only the locality
+     * guard when it has an explicitly selected standalone text span and no
+     * surrounding sentence context; all other rejection signals still apply.
      */
     fun judge(
         from: String,
         to: String,
         normalizer: PhoneticNormalizer,
         sentenceLength: Int,
+        enforceLocality: Boolean = true,
     ): Verdict {
         val a = from.trim()
         val b = to.trim()
@@ -122,7 +125,7 @@ object CorrectionAdmission {
         // long deletion still counts as a big edit.
         val spanLen = maxOf(a.length, b.length)
         val locality = if (sentenceLength > 0) spanLen.toDouble() / sentenceLength.toDouble() else 1.0
-        if (locality > Config.MAX_EDIT_LOCALITY) {
+        if (enforceLocality && locality > Config.MAX_EDIT_LOCALITY) {
             return Verdict.RejectedTooGlobal(locality)
         }
 

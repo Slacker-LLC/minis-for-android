@@ -125,6 +125,18 @@ class CorrectionAdmissionTest {
         assertTrue("expected RejectedTooGlobal, got ${v.reason}", v is CorrectionAdmission.Verdict.RejectedTooGlobal)
     }
 
+    @Test
+    fun `standalone text input can use signals without sentence context`() {
+        val v = CorrectionAdmission.judge(
+            from = "审推",
+            to = "闪退",
+            normalizer = zh,
+            sentenceLength = 2,
+            enforceLocality = false,
+        )
+        assertTrue(v is CorrectionAdmission.Verdict.Homophone)
+    }
+
     // ── Signal unit checks ──
 
     @Test
