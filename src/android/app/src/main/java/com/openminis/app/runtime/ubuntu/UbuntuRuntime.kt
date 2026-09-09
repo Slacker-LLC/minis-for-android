@@ -4,9 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.runtime.ExecutionCoordinator
-import com.openminis.app.runtime.minisd.MinisdError
-import com.openminis.app.runtime.minisd.MinisdProtocol
-import com.openminis.app.runtime.minisd.MinisdResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,8 +19,6 @@ import org.json.JSONObject
  */
 object UbuntuRuntime {
     private const val TAG = "UbuntuRuntime"
-    private val WHITESPACE = Regex("\\s+")
-    private val SHA256_TOKEN = Regex("^[0-9a-fA-F]{64}$")
 
     data class Snapshot(
         val running: Boolean = false,
@@ -51,9 +46,6 @@ object UbuntuRuntime {
         val exitCode: Int,
         val durationMs: Long,
     )
-
-    class RuntimeInfrastructureException(val runtimeError: MinisdError) :
-        IllegalStateException("${runtimeError.code}: ${runtimeError.detail}")
 
     @Volatile
     var isInitialized: Boolean = false
@@ -162,104 +154,4 @@ object UbuntuRuntime {
         redirectPaths = false
         return next
     }
-
-    // ---------------------------------------------------------------------
-    // Transitional pure helpers retained only so the existing broker-era JVM
-    // regression suite keeps compiling while phase 2 deletes that dead code.
-    // None of these helpers are on the production execution path.
-    // ---------------------------------------------------------------------
-
-    internal fun shouldRetryAfterPreExecFailure(error: MinisdError?, attempt: Int): Boolean =
-        attempt == 0 && error?.code == MinisdProtocol.ERROR_KEEPER_NAMESPACE_LOST
-
-    internal fun shellStartMarker(seed: Long): String =
-        "__MINIS_EXEC_STARTED_${seed.toString(16)}__"
-
-    internal fun wrapShellCommand(command: String, marker: String): String {
-        require(marker.matches(Regex("^[A-Za-z0-9_]+$"))) { "invalid shell start marker" }
-        return "printf '%s\\n' '$marker' >&2\n$command"
-    }
-
-    internal fun didUserCommandStart(response: MinisdResponse, marker: String): Boolean {
-        val stderr = response.result?.optString("stderr").orEmpty()
-        return stderr.split('\n').any { it.trimEnd('\r') == marker }
-    }
-
-    internal fun stripShellStartMarker(stderr: String, marker: String): String =
-        stderr.split('\n')
-            .filterNot { it.trimEnd('\r') == marker }
-            .joinToString("\n")
-
-    internal fun brokerIdentityMatches(snapshot: Snapshot, expectedUid: Int): Boolean =
-        snapshot.guestUid == expectedUid
-
-    internal fun parseSha256sum(output: String): String? = output
-        .lineSequence()
-        .map { it.trim().split(WHITESPACE, limit = 2).firstOrNull().orEmpty() }
-        .firstOrNull { it.matches(SHA256_TOKEN) }
-        ?.lowercase()
-
-    internal fun brokerBinaryMatches(expectedSha256: String, sha256sumOutput: String): Boolean =
-        parseSha256sum(sha256sumOutput) == expectedSha256.lowercase()
-
-    internal fun runtimeLayoutMatches(
-        snapshot: Snapshot,
-        expectedWorkspace: String,
-        expectedMemory: String,
-        expectedSkills: String,
-        expectedShared: String,
-    ): Boolean = snapshot.layoutKnown &&
-        snapshot.hostWorkspace == expectedWorkspace &&
-        snapshot.hostMemory == expectedMemory &&
-        snapshot.hostSkills == expectedSkills &&
-        snapshot.hostShared == expectedShared
-
-    internal fun layoutMismatchDetail(
-        snapshot: Snapshot,
-        expectedWorkspace: String,
-        expectedMemory: String,
-        expectedSkills: String,
-        expectedShared: String,
-    ): String = "runtime layout mismatch: " +
-        "workspace=${snapshot.hostWorkspace ?: "unknown"} expected=$expectedWorkspace, " +
-        "memory=${snapshot.hostMemory ?: "unknown"} expected=$expectedMemory, " +
-        "skills=${snapshot.hostSkills ?: "unknown"} expected=$expectedSkills, " +
-        "shared=${snapshot.hostShared ?: "unknown"} expected=$expectedShared, " +
-        "layoutKnown=${snapshot.layoutKnown}"
-
-    internal fun mergeSnapshot(previous: Snapshot, resp: MinisdResponse): Snapshot {
-        val result = resp.result
-        return if (resp.ok && result != null) {
-            Snapshot(
-                running = result.optBoolean("running") ||
-                    result.optBoolean("provisioned") && previous.running,
-                available = result.optBoolean("available", result.optBoolean("running")),
-                pid = if (result.has("pid") && !result.isNull("pid")) result.optInt("pid") else previous.pid,
-                version = result.optString("version").ifEmpty { previous.version },
-                provisioned = result.optBoolean("provisioned") || previous.provisioned,
-                guestUid = if (result.has("uid") && !result.isNull("uid")) result.optInt("uid") else previous.guestUid,
-                guestGid = if (result.has("gid") && !result.isNull("gid")) result.optInt("gid") else previous.guestGid,
-                sessionsRoot = result.optString("sessions_root")
-                    .ifEmpty { previous.sessionsRoot.orEmpty() }.takeIf { it.isNotEmpty() },
-                layoutKnown = result.optBoolean("layout_known", false),
-                hostWorkspace = result.optNullableString("workspace"),
-                hostMemory = result.optNullableString("memory"),
-                hostSkills = result.optNullableString("skills"),
-                hostShared = result.optNullableString("shared"),
-                externalMountDigest = result.optNullableString("external_mount_digest"),
-                externalMountVerified = result.optBoolean("external_mount_verified", false),
-                lastError = result.optString("last_error").ifEmpty { null },
-                mock = result.optBoolean("mock"),
-                statusFresh = true,
-            )
-        } else {
-            previous.copy(
-                lastError = resp.error?.let { "${it.code}: ${it.detail}" } ?: "legacy runtime response failed",
-                statusFresh = false,
-            )
-        }
-    }
-
-    private fun JSONObject.optNullableString(key: String): String? =
-        if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotEmpty() } else null
 }

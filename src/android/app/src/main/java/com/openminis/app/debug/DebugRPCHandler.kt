@@ -14,7 +14,7 @@ import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.RuntimePathRegistry
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine

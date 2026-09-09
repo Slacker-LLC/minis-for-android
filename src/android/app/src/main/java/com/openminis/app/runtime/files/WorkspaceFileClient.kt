@@ -1,4 +1,4 @@
-package com.openminis.app.runtime.minisd
+package com.openminis.app.runtime.files
 
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.ubuntu.UbuntuPaths

@@ -1,6 +1,6 @@
 package com.openminis.app.tools
 
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import org.json.JSONArray
 import org.json.JSONObject
 

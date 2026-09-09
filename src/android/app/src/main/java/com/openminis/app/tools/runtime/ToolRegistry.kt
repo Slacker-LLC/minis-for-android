@@ -212,7 +212,7 @@ class LinuxPythonRunHandler : ToolHandler {
         } finally {
             cleanupFailure = when {
                 runCatching {
-                    com.openminis.app.runtime.minisd.WorkspaceFileClient.delete(sessionId, scriptPath)
+                    com.openminis.app.runtime.files.WorkspaceFileClient.delete(sessionId, scriptPath)
                 }.isSuccess -> null
                 else -> "CLEANUP_FAILURE: unable to delete temporary script $scriptPath"
             }

@@ -9,7 +9,7 @@ import coil.fetch.SourceResult
 import coil.key.Keyer
 import coil.request.Options
 import com.openminis.app.runtime.RuntimePathRegistry
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okio.buffer

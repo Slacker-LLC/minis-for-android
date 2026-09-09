@@ -3,7 +3,7 @@ package com.openminis.app.offload
 import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import java.io.File
 import java.security.MessageDigest
 

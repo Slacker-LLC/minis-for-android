@@ -16,7 +16,7 @@ import android.system.ErrnoException
 import android.system.OsConstants
 import android.util.Log
 import android.webkit.MimeTypeMap
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.File

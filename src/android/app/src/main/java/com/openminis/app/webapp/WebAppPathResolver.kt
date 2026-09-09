@@ -4,7 +4,7 @@ import android.content.Context
 import com.openminis.app.data.db.WebAppShortcutEntity
 import com.openminis.app.data.repository.WebAppShortcutRepository
 import com.openminis.app.runtime.RuntimePathRegistry
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import java.io.File
 
