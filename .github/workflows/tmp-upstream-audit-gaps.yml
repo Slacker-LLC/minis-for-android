@@ -55,6 +55,11 @@ jobs:
               main.write_text(s, encoding='utf-8')
           PY
           python .github/scripts/apply_upstream_audit_gaps.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/android/app/src/main/java/com/openminis/app/data/repository/ProviderRepository.kt')
+          p.write_text(p.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          PY
       - name: Validate diff
         run: |
           git diff --check
