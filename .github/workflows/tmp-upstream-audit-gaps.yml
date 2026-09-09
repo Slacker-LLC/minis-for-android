@@ -21,6 +21,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           script = Path('.github/scripts/apply_upstream_audit_gaps.py')
           text = script.read_text(encoding='utf-8')
@@ -31,25 +32,26 @@ jobs:
           main = Path('src/android/app/src/main/java/com/openminis/app/MainActivity.kt')
           s = main.read_text(encoding='utf-8')
           if 'showing newer-database guidance screen' not in s:
-              old = '''        val minisApp = application as? MinisApp
-          if (minisApp == null || !minisApp.subsystemsInitialized) {
-          '''
-              new = '''        val minisApp = application as? MinisApp
-
-          if (minisApp != null &&
-              minisApp.dbVersionDecision ==
-              com.openminis.app.data.db.DatabaseVersionGuard.Decision.SHOW_NEWER_DB_GUIDANCE
-          ) {
-              android.util.Log.w("MainActivity", "showing newer-database guidance screen")
-              setContent { NewerDatabaseGuidanceScreen(onExit = { finishAndRemoveTask() }) }
-              return
-          }
-
-          if (minisApp == null || !minisApp.subsystemsInitialized) {
-          '''
-              if old not in s:
+              pattern = re.compile(
+                  r'(?m)^(?P<i>\s*)val minisApp = application as\? MinisApp\n(?P=i)if \(minisApp == null \|\| !minisApp\.subsystemsInitialized\) \{'
+              )
+              m = pattern.search(s)
+              if not m:
                   raise SystemExit('Fork MainActivity anchor not found')
-              s = s.replace(old, new, 1)
+              i = m.group('i')
+              replacement = (
+                  f'{i}val minisApp = application as? MinisApp\n\n'
+                  f'{i}if (minisApp != null &&\n'
+                  f'{i}    minisApp.dbVersionDecision ==\n'
+                  f'{i}    com.openminis.app.data.db.DatabaseVersionGuard.Decision.SHOW_NEWER_DB_GUIDANCE\n'
+                  f'{i}) {{\n'
+                  f'{i}    android.util.Log.w("MainActivity", "showing newer-database guidance screen")\n'
+                  f'{i}    setContent {{ NewerDatabaseGuidanceScreen(onExit = {{ finishAndRemoveTask() }}) }}\n'
+                  f'{i}    return\n'
+                  f'{i}}}\n\n'
+                  f'{i}if (minisApp == null || !minisApp.subsystemsInitialized) {{'
+              )
+              s = pattern.sub(lambda _: replacement, s, count=1)
               main.write_text(s, encoding='utf-8')
           PY
           python .github/scripts/apply_upstream_audit_gaps.py
