@@ -10,14 +10,14 @@ import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
 import org.json.JSONObject
 
-/** Structured Android Root execution governed by the user-owned access mode. */
+/** Structured Android Root execution through the existing minisd broker. */
 class RootShellHandler : ToolHandler {
 
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "root.shell",
         description = "Run one Android Root tool through minisd using structured tool and args. " +
-            "Standard mode runs normal operations directly and asks only for highest-risk operations. " +
-            "Full Access removes App-level approval. Only the user can enable Full Access in App settings.",
+            "Root execution stays behind the broker's argv validation and internal one-shot confirm ticket; " +
+            "there is no separate App-owned Root permission mode.",
         parameters = mapOf(
             "tool" to AgentToolParam("string", "Executable name resolved only from trusted Android system directories"),
             "args" to AgentToolParam("array", "Arguments passed without shell parsing", items = AgentToolParam("string", "One argument")),
@@ -65,11 +65,11 @@ class RootShellHandler : ToolHandler {
             val kind = when {
                 response.timedOut -> ToolFailureKind.TOOL_TIMEOUT
                 else -> when (code) {
-                "TOOL_TIMEOUT", "TIMEOUT" -> ToolFailureKind.TOOL_TIMEOUT
-                "TRANSPORT_TIMEOUT" -> ToolFailureKind.TRANSPORT_TIMEOUT
-                "PROCESS_KILLED" -> ToolFailureKind.PROCESS_KILLED
-                "CLEANUP_FAILURE" -> ToolFailureKind.CLEANUP_FAILURE
-                else -> null
+                    "TOOL_TIMEOUT", "TIMEOUT" -> ToolFailureKind.TOOL_TIMEOUT
+                    "TRANSPORT_TIMEOUT" -> ToolFailureKind.TRANSPORT_TIMEOUT
+                    "PROCESS_KILLED" -> ToolFailureKind.PROCESS_KILLED
+                    "CLEANUP_FAILURE" -> ToolFailureKind.CLEANUP_FAILURE
+                    else -> null
                 }
             }
             return ToolExecutionResult(
