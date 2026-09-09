@@ -54,8 +54,6 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
-import com.openminis.app.tools.android.PrivilegedAccessMode
-import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,7 +65,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -151,7 +148,6 @@ fun SettingsScreen(
     var showSubagentLimits by remember { mutableStateOf(false) }
     var roleHeld by remember { mutableStateOf(false) }
     var roleAvailable by remember { mutableStateOf(false) }
-    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
 
     fun refreshAssistantRole() {
         val manager = roleManager
@@ -382,17 +378,9 @@ fun SettingsScreen(
             SettingsSection(title = stringResource(R.string.settings_section_permissions)) {
                 SettingsItem(
                     icon = Icons.Outlined.Shield,
-                    iconColor = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        Color(0xFF007AFF)
-                    },
+                    iconColor = Color(0xFF007AFF),
                     title = stringResource(R.string.settings_section_permissions),
-                    subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                        "完全访问已开启 (高危) · App 不限制 Agent Root 操作"
-                    } else {
-                        stringResource(R.string.settings_permissions_subtitle)
-                    },
+                    subtitle = stringResource(R.string.settings_permissions_subtitle),
                     onClick = onPermissionsClick,
                     showDivider = false,
                 )
