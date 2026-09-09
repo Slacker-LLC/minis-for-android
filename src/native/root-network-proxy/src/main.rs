@@ -154,6 +154,16 @@ fn handle_client(mut client: TcpStream) -> Result<(), String> {
 }
 
 fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
+    handle_inner_with_connector(client, |host, ip, port| {
+        TcpStream::connect(SocketAddr::from((ip, port)))
+            .map_err(|e| format!("{host}({ip}):{port}: {e}"))
+    })
+}
+
+fn handle_inner_with_connector<F>(client: &mut TcpStream, connector: F) -> Result<(), String>
+where
+    F: FnOnce(&str, Ipv4Addr, u16) -> Result<TcpStream, String>,
+{
     client.set_read_timeout(Some(Duration::from_secs(30))).ok();
     client
         .set_write_timeout(Some(Duration::from_secs(120)))
@@ -204,8 +214,7 @@ fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
     if is_forbidden_target(ip) {
         return Err(format!("blocked private/loopback target {host}({ip})"));
     }
-    let mut upstream = TcpStream::connect(SocketAddr::from((ip, port)))
-        .map_err(|e| format!("{host}({ip}):{port}: {e}"))?;
+    let mut upstream = connector(&host, ip, port)?;
     if is_connect {
         peer.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
             .map_err(|e| e.to_string())?;
@@ -395,6 +404,40 @@ fn copy(mut reader: TcpStream, mut writer: TcpStream) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::Shutdown;
+
+    fn proxy_pair() -> (TcpStream, TcpStream) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let client = TcpStream::connect(address).unwrap();
+        let (server, _) = listener.accept().unwrap();
+        (client, server)
+    }
+
+    fn local_origin(response: &'static [u8]) -> (SocketAddr, thread::JoinHandle<Vec<u8>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0u8; 1];
+            while request.windows(4).last() != Some(b"\r\n\r\n") {
+                if stream.read(&mut byte).unwrap_or(0) == 0 {
+                    break;
+                }
+                request.push(byte[0]);
+            }
+            stream.write_all(response).unwrap();
+            let _ = stream.shutdown(Shutdown::Write);
+            request
+        });
+        (address, handle)
+    }
+
+    fn test_connector(origin: SocketAddr) -> impl FnOnce(&str, Ipv4Addr, u16) -> Result<TcpStream, String> {
+        move |_host, _ip, _port| TcpStream::connect(origin).map_err(|error| error.to_string())
+    }
 
     #[test]
     fn connect_and_http_targets_parse() {
@@ -419,5 +462,70 @@ mod tests {
         assert!(is_forbidden_target(Ipv4Addr::new(192, 168, 1, 1)));
         assert!(!is_forbidden_target(Ipv4Addr::new(198, 18, 0, 1)));
         assert!(!is_forbidden_target(Ipv4Addr::new(8, 8, 8, 8)));
+    }
+
+    #[test]
+    fn apt_style_absolute_http_is_forwarded_end_to_end() {
+        let (origin, origin_thread) = local_origin(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 9\r\nConnection: close\r\n\r\nInRelease",
+        );
+        let (mut client, mut proxy_side) = proxy_pair();
+        let proxy_thread = thread::spawn(move || {
+            handle_inner_with_connector(&mut proxy_side, test_connector(origin))
+        });
+
+        client
+            .write_all(
+                b"GET http://8.8.8.8/ubuntu/dists/noble/InRelease HTTP/1.1\r\nHost: archive.ubuntu.com\r\nConnection: close\r\n\r\n",
+            )
+            .unwrap();
+        client.shutdown(Shutdown::Write).unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.ends_with("InRelease"));
+
+        let forwarded = String::from_utf8(origin_thread.join().unwrap()).unwrap();
+        assert!(forwarded.starts_with("GET /ubuntu/dists/noble/InRelease HTTP/1.1\r\n"));
+        assert!(forwarded.contains("Host: archive.ubuntu.com\r\n"));
+        proxy_thread.join().unwrap().unwrap();
+    }
+
+    #[test]
+    fn connect_tunnel_forwards_bidirectional_payload() {
+        let (origin, origin_thread) = local_origin(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\ntunnel",
+        );
+        let (mut client, mut proxy_side) = proxy_pair();
+        let proxy_thread = thread::spawn(move || {
+            handle_inner_with_connector(&mut proxy_side, test_connector(origin))
+        });
+
+        client
+            .write_all(b"CONNECT 8.8.8.8:443 HTTP/1.1\r\nHost: 8.8.8.8:443\r\n\r\n")
+            .unwrap();
+        let mut established = Vec::new();
+        let mut byte = [0u8; 1];
+        while established.windows(4).last() != Some(b"\r\n\r\n") {
+            client.read_exact(&mut byte).unwrap();
+            established.push(byte[0]);
+        }
+        assert_eq!(
+            String::from_utf8(established).unwrap(),
+            "HTTP/1.1 200 Connection Established\r\n\r\n"
+        );
+
+        client
+            .write_all(b"GET /through-tunnel HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        client.shutdown(Shutdown::Write).unwrap();
+        let mut tunneled = String::new();
+        client.read_to_string(&mut tunneled).unwrap();
+        assert!(tunneled.starts_with("HTTP/1.1 200 OK"));
+        assert!(tunneled.ends_with("tunnel"));
+
+        let forwarded = String::from_utf8(origin_thread.join().unwrap()).unwrap();
+        assert!(forwarded.starts_with("GET /through-tunnel HTTP/1.1\r\n"));
+        proxy_thread.join().unwrap().unwrap();
     }
 }
