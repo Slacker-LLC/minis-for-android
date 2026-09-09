@@ -84,6 +84,13 @@ class BuildCleanupGuardTests(unittest.TestCase):
         source.write_text("class MinisDocumentsProvider\n", encoding="utf-8")
         self.assertEqual([], GUARD.check_repository(root))
 
+    def test_plain_minisd_in_source_comment_does_not_count_as_runtime_dependency(self) -> None:
+        root = self.make_repo()
+        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("// Historical minisd broker note.\nval current = true\n", encoding="utf-8")
+        self.assertEqual([], GUARD.check_repository(root))
+
     def test_production_minisd_runtime_path_is_rejected_even_in_comment(self) -> None:
         root = self.make_repo()
         source = root / "src/android/app/src/main/java/example/Runtime.kt"
@@ -91,12 +98,14 @@ class BuildCleanupGuardTests(unittest.TestCase):
         source.write_text("// Historical runtime.minisd package.\n", encoding="utf-8")
         self.assertTrue(any("obsolete minisd build/runtime path" in error for error in GUARD.check_repository(root)))
 
-    def test_explicit_historical_negative_minisd_comment_is_allowed(self) -> None:
+    def test_xml_comment_is_ignored_but_resource_value_is_rejected(self) -> None:
         root = self.make_repo()
-        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source = root / "src/android/app/src/main/res/values/strings.xml"
         source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_text("// Historical note: no minisd broker remains.\n", encoding="utf-8")
+        source.write_text("<!-- historical minisd note --><resources><string name='x'>ok</string></resources>", encoding="utf-8")
         self.assertEqual([], GUARD.check_repository(root))
+        source.write_text("<resources><string name='x'>minisd</string></resources>", encoding="utf-8")
+        self.assertTrue(any("obsolete minisd identity" in error for error in GUARD.check_repository(root)))
 
     def test_migration_only_package_identity_is_allowed(self) -> None:
         root = self.make_repo()
