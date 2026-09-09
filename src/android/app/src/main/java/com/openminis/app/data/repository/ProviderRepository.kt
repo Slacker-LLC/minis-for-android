@@ -2954,7 +2954,8 @@ class ProviderRepository(private val context: Context) {
         }
 
         deb64(secret.manualOAuthToken)?.let { token ->
-            val manualManager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
+            val manualManager = oauthManagerFor(instance)
+                ?: com.openminis.app.auth.OAuthManager.forInstance(context, instance)
             if (manualManager != null && manualManager.loadManualBearerToken().isNullOrBlank()) {
                 manualManager.saveManualBearerToken(token)
                 wrote = true

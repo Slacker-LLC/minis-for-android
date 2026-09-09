@@ -11,7 +11,7 @@ import com.openminis.app.logging.AppLogger
  */
 object DatabaseVersionGuard {
     private const val TAG = "DbVersionGuard"
-    const val CODE_DB_VERSION = 20
+    const val CODE_DB_VERSION = APP_DATABASE_VERSION
     private const val DB_NAME = "minis.db"
 
     fun readOnDiskVersion(context: Context): Int? {

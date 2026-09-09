@@ -127,8 +127,8 @@ data class LLMModel(
         // Source of truth = XAIModelsAPI; this list is what surfaces in the
         // Add Provider → Models step before any models-cache call.
         //
-        // Catalog ordering = default-pick order. grok-4.3 stays the
-        // flagship on top. T-xai-models-refresh dropped grok-3-* slugs
+        // Catalog ordering = default-pick order. Keep the newest confirmed
+        // fallback model first. T-xai-models-refresh dropped grok-3-* slugs
         // (xAI server-side now redirects those to grok-4.3, so showing
         // them in the picker is just noise) and added the multi-agent
         // / build / fast / code-fast variants surfaced by xAI docs and
