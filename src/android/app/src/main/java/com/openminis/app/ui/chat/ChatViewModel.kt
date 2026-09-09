@@ -47,6 +47,7 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
+import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelAttributionSnapshot
 import com.openminis.app.data.model.SessionOverrides
@@ -1023,9 +1024,7 @@ class ChatViewModel(
             // threading the real flag lets a text-only model without a Vision
             // Group correctly LOSE the tool (iOS parity), while a configured
             // Vision Group keeps it.
-            supportsImageInput = currentModel?.let {
-                it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
-            } == true,
+            supportsImageInput = currentModel?.hasImageInput == true,
             visionGroupConfigured = com.openminis.app.tools.VisionGroupResolver.isConfigured(
                 providerRepository, context,
             ),
@@ -9467,9 +9466,7 @@ class ChatViewModel(
      * model to call read_image — closing the loop with executeReadImageTool.
      */
     private fun visionPlaceholderFor(path: String?): String? {
-        val nativeVision = currentModel?.let {
-            it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
-        } == true
+        val nativeVision = currentModel?.hasImageInput == true
         if (nativeVision) return null
         if (!com.openminis.app.tools.VisionGroupResolver.isConfigured(providerRepository, context)) return null
         return com.openminis.app.tools.VisionGroupResolver.noVisionImagePlaceholder(path)

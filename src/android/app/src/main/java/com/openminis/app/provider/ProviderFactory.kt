@@ -127,6 +127,13 @@ object ProviderFactory {
                     instance.credentialType == ProviderCredential.oauth) {
                     com.openminis.app.auth.OAuthManager.forInstance(context, instance)?.loadManualBearerToken()
                 } else null
+                // [T-android-xai-priority] Mark this provider as eligible for
+                // Priority Processing. This is a CAPABILITY flag only — whether
+                // the tier is actually requested is the user's global Fast Mode
+                // toggle (FastModePrefs), which the body builders read at
+                // request time. Set ONLY here, so the xAI-specific
+                // `service_tier` key can never leak into another vendor's body;
+                // a strict OpenAI-compatible relay 400s on unknown keys.
                 if (instance.credentialType == ProviderCredential.oauth && manualBearer.isNullOrEmpty()
                     && context != null) {
                     val oauthManager = com.openminis.app.auth.XAIOAuthManager(context, instance.id)
@@ -137,14 +144,14 @@ object ProviderFactory {
                         },
                         model = model,
                         basePath = base,
-                    )
+                    ).also { it.supportsPriorityProcessing = true }
                 } else {
                     val effectiveKey = if (!manualBearer.isNullOrEmpty()) manualBearer else apiKey
                     OpenAIProvider(
                         apiKey = effectiveKey,
                         model = model,
                         basePath = base,
-                    )
+                    ).also { it.supportsPriorityProcessing = true }
                 }
             }
             ProviderType.kimiCode -> {

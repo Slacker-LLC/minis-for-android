@@ -2177,7 +2177,7 @@ class ProviderRepository(private val context: Context) {
     suspend fun refreshModels(instance: ProviderInstance) {
         com.openminis.app.provider.ProviderTransportPolicy
             .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
-        var apiKey = loadApiKey(instance.id)
+        var apiKey = usableApiKey(instance)
 
         // For OAuth providers, try to refresh the token before using it (mirrors iOS validAccessToken)
         if (instance.credentialType == com.openminis.app.data.model.ProviderCredential.oauth && apiKey != null) {
@@ -2232,12 +2232,16 @@ class ProviderRepository(private val context: Context) {
                     ProviderType.openAI, ProviderType.openAIResponses ->
                         OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
                     ProviderType.openRouter -> OpenRouterModelsApi.fetchModels(apiKey)
-                    // xAI: the OAuth model list is fixed (no /v1/models gating
-                    // call needed — XAIModelsApi exposes the spec-mandated set).
-                    // For API-key users we still call the same static list; if
-                    // xAI later exposes a dynamic /v1/models endpoint this is
-                    // the place to swap in OpenAI-compatible fetch.
-                    ProviderType.xAI -> com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth()
+                    // xAI exposes the OpenAI-compatible /v1/models endpoint.
+                    // Keep the built-in catalog only as seed/fallback so models
+                    // released after this APK can appear on Refresh. OAuth xAI
+                    // instances may have no custom base, so default explicitly to
+                    // api.x.ai rather than letting the OpenAI helper pick OpenAI.
+                    ProviderType.xAI -> OpenAIModelsApi.fetchModels(
+                        apiKey,
+                        baseURL ?: "https://api.x.ai/v1",
+                        customUserAgent = instance.customUserAgent,
+                    ).ifEmpty { com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth() }
                     // [T-kimi-oauth] Kimi Code: unlike Codex OAuth, the Kimi
                     // OAuth token CAN call the models endpoint — real fetch
                     // from GET /coding/v1/models (OpenAI-compatible shape).

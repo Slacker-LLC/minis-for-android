@@ -48,4 +48,9 @@ object FastModePrefs {
         cachedEnabled = enabled
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun setCachedEnabledForTest(enabled: Boolean) {
+        cachedEnabled = enabled
+    }
 }

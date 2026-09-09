@@ -298,7 +298,7 @@ data class LLMModel(
      * when routed through the same model.
      */
     fun capabilityPromptFragment(): String? {
-        val inputs = inputModalities?.map { it.lowercase() } ?: emptyList()
+        val inputs = inputModalities.normalizeModalities() ?: emptyList()
         val hasImage = "image" in inputs
         val hasPdf = "pdf" in inputs
         val hasAudio = "audio" in inputs
@@ -359,7 +359,7 @@ data class LLMModel(
  * `"image" in modalities` checks, and capability fragments work uniformly.
  */
 fun String.normalizeModalityName(): String =
-    removeSuffix("_input").removeSuffix("_output").lowercase()
+    lowercase().removeSuffix("_input").removeSuffix("_output")
 
 fun List<String>?.normalizeModalities(): List<String>? =
     this?.map { it.normalizeModalityName() }?.distinct()?.takeIf { it.isNotEmpty() }
