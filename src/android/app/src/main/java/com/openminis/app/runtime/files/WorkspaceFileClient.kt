@@ -22,7 +22,7 @@ import java.util.UUID
  * Despite the historical package, this implementation contains no minisd/RPC
  * transport. Canonical user data lives in app-private storage and Android file
  * tools access it directly, matching upstream's storage model. The object will
- * move out of runtime.minisd once all callers are migrated.
+ * retain the guest-path API while using direct App-owned file I/O.
  */
 internal object WorkspaceFileClient {
     const val MAX_READ_CHUNK = 512 * 1024

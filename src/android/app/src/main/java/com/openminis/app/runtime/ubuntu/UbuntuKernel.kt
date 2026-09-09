@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.guest.GuestCommandBridge
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +99,10 @@ internal object UbuntuKernel {
             return@withLock Status(false, error = "failed to migrate legacy /data/adb/minis user data into app storage")
         }
 
+        if (!GuestCommandBridge.ensureGuestCliInstalled(ctx)) {
+            return@withLock Status(false, error = "failed to install direct guest command bridge")
+        }
+
         val version = health.metadata?.optString("version")?.takeIf { it.isNotBlank() }
         Status(true, appUid = ctx.applicationInfo.uid, version = version)
     }
@@ -172,6 +177,7 @@ internal object UbuntuKernel {
                 repaired.error ?: repaired.stderr.ifBlank { "rootfs repair exited ${repaired.exitCode}" },
             )
         }
+        GuestCommandBridge.invalidateGuestCli()
         return inspectRootfs()
     }
 
@@ -182,6 +188,7 @@ internal object UbuntuKernel {
             "rm -rf -- ${DirectRootRunner.shellQuote(rootfs)}",
             ROOTFS_TIMEOUT_MS,
         )
+        if (result.success) GuestCommandBridge.invalidateGuestCli()
         result.success
     }
 

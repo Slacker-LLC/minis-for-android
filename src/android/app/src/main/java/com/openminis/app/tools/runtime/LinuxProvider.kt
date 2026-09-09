@@ -8,7 +8,7 @@ import com.openminis.app.tools.ToolExecutionResult
  *
  * The Ubuntu runtime can die or be unavailable while the agent loop is
  * alive. This provider must therefore never hold a reference to any runtime
- * singleton (UbuntuRuntime / MinisdClient): availability is constructor-
+ * singleton (UbuntuRuntime / App-owned direct backend): availability is constructor-
  * injected ([available]), so the provider stays pure JVM-testable logic.
  *
  * Workspace file tools use App-owned host storage directly and remain usable
