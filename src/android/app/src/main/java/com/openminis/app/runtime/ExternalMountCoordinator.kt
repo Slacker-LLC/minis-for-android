@@ -3,9 +3,11 @@ package com.openminis.app.runtime
 import com.openminis.app.data.MountedFoldersStore
 
 /**
- * Maps user-selected SAF folders into the minisd-owned Ubuntu runtime
- * contract. The App sends URI-derived identities to `mount.reconcile`; it
- * never hands a resolved host path to the runtime or file tools.
+ * Enforces Android-side writability policy for user-selected SAF folders.
+ *
+ * The direct Ubuntu runtime resolves active SAF grants and creates the bind
+ * mounts when it prepares each session namespace. This coordinator exposes no
+ * Root, socket, RPC, or host-path handoff API.
  */
 object ExternalMountCoordinator {
 
@@ -50,10 +52,8 @@ object ExternalMountCoordinator {
 }
 
 /**
- * Thrown when a write tool is asked to modify a path inside a locked
- * external mount. The message is intentionally user-facing and matches
- * the wording surfaced in iOS so chat transcripts read the same way
- * across platforms.
+ * Thrown when a write tool is asked to modify a path inside a locked external
+ * mount. The message is intentionally user-facing and stable across callers.
  */
 class ReadOnlyMountException(val linuxPath: String) : Exception(
     "$linuxPath is inside a read-only mounted folder and cannot be modified. " +
