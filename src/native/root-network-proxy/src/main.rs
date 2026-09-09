@@ -10,7 +10,11 @@ const DEFAULT_LISTEN: &str = "127.0.0.1:18787";
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_CONCURRENT: usize = 64;
 const FALLBACK_DNS: &[&str] = &[
-    "223.5.5.5", "114.114.114.114", "119.29.29.29", "8.8.8.8", "1.1.1.1",
+    "223.5.5.5",
+    "114.114.114.114",
+    "119.29.29.29",
+    "8.8.8.8",
+    "1.1.1.1",
 ];
 
 #[cfg(target_os = "android")]
@@ -30,7 +34,11 @@ fn main() {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--listen" => listen = args.next().unwrap_or_else(|| usage("missing --listen value")),
+            "--listen" => {
+                listen = args
+                    .next()
+                    .unwrap_or_else(|| usage("missing --listen value"))
+            }
             "--help" | "-h" => usage(""),
             other => usage(&format!("unknown argument: {other}")),
         }
@@ -147,7 +155,9 @@ fn handle_client(mut client: TcpStream) -> Result<(), String> {
 
 fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
     client.set_read_timeout(Some(Duration::from_secs(30))).ok();
-    client.set_write_timeout(Some(Duration::from_secs(120))).ok();
+    client
+        .set_write_timeout(Some(Duration::from_secs(120)))
+        .ok();
     let mut reader = BufReader::new(client.try_clone().map_err(|e| e.to_string())?);
     let mut total = 0usize;
     let mut read_line_capped = |reader: &mut BufReader<TcpStream>| -> Result<String, String> {
@@ -227,8 +237,13 @@ fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
         }
     }
     let mut last = String::new();
-    for dns in discover_dns().into_iter().chain(FALLBACK_DNS.iter().map(|s| s.to_string())) {
-        let Ok(server) = dns.parse::<Ipv4Addr>() else { continue };
+    for dns in discover_dns()
+        .into_iter()
+        .chain(FALLBACK_DNS.iter().map(|s| s.to_string()))
+    {
+        let Ok(server) = dns.parse::<Ipv4Addr>() else {
+            continue;
+        };
         match dns_query_a(host, &format!("{server}:53")) {
             Ok(ip) => return Ok(ip),
             Err(error) => last = format!("{server}: {error}"),
@@ -240,7 +255,12 @@ fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
 fn discover_dns() -> Vec<String> {
     let mut found = Vec::new();
     for key in [
-        "net.dns1", "net.dns2", "net.dns3", "dhcp.wlan0.dns1", "dhcp.wlan0.dns2", "dhcp.eth0.dns1",
+        "net.dns1",
+        "net.dns2",
+        "net.dns3",
+        "dhcp.wlan0.dns1",
+        "dhcp.wlan0.dns2",
+        "dhcp.eth0.dns1",
     ] {
         if let Ok(output) = Command::new("/system/bin/getprop").arg(key).output() {
             let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -249,14 +269,23 @@ fn discover_dns() -> Vec<String> {
             }
         }
     }
-    if let Ok(output) = Command::new("/system/bin/dumpsys").arg("connectivity").output() {
+    if let Ok(output) = Command::new("/system/bin/dumpsys")
+        .arg("connectivity")
+        .output()
+    {
         let text = String::from_utf8_lossy(&output.stdout);
         for line in text.lines() {
             let lower = line.to_ascii_lowercase();
-            let Some(start) = lower.find("dnsaddresses") else { continue };
+            let Some(start) = lower.find("dnsaddresses") else {
+                continue;
+            };
             let rest = &line[start..];
-            let Some(open) = rest.find('[') else { continue };
-            let Some(close) = rest[open..].find(']') else { continue };
+            let Some(open) = rest.find('[') else {
+                continue;
+            };
+            let Some(close) = rest[open..].find(']') else {
+                continue;
+            };
             for token in rest[open + 1..open + close]
                 .split(|c: char| !c.is_ascii_hexdigit() && c != '.' && c != ':')
             {
@@ -289,7 +318,9 @@ fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
     query.push(0);
     query.extend_from_slice(&[0, 1, 0, 1]);
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
-    socket.set_read_timeout(Some(Duration::from_secs(3))).map_err(|e| e.to_string())?;
+    socket
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .map_err(|e| e.to_string())?;
     socket.send_to(&query, server).map_err(|e| e.to_string())?;
     let mut buf = [0u8; 512];
     let (size, _) = socket.recv_from(&mut buf).map_err(|e| e.to_string())?;
@@ -307,7 +338,9 @@ fn parse_dns_a(msg: &[u8]) -> Result<Ipv4Addr, String> {
     }
     index += 5;
     for _ in 0..answers {
-        if index + 12 > msg.len() { break; }
+        if index + 12 > msg.len() {
+            break;
+        }
         if msg[index] & 0xc0 == 0xc0 {
             index += 2;
         } else {
@@ -316,12 +349,19 @@ fn parse_dns_a(msg: &[u8]) -> Result<Ipv4Addr, String> {
             }
             index += 1;
         }
-        if index + 10 > msg.len() { break; }
+        if index + 10 > msg.len() {
+            break;
+        }
         let kind = u16::from_be_bytes([msg[index], msg[index + 1]]);
         let length = u16::from_be_bytes([msg[index + 8], msg[index + 9]]) as usize;
         index += 10;
         if kind == 1 && length == 4 && index + 4 <= msg.len() {
-            return Ok(Ipv4Addr::new(msg[index], msg[index + 1], msg[index + 2], msg[index + 3]));
+            return Ok(Ipv4Addr::new(
+                msg[index],
+                msg[index + 1],
+                msg[index + 2],
+                msg[index + 3],
+            ));
         }
         index += length;
     }
@@ -359,9 +399,16 @@ mod tests {
     #[test]
     fn connect_and_http_targets_parse() {
         let (host, port, connect, _) = parse_target("CONNECT example.com:443 HTTP/1.1").unwrap();
-        assert_eq!((host, port, connect), ("example.com".to_string(), 443, true));
-        let (host, port, connect, line) = parse_target("GET http://ports.ubuntu.com/ubuntu-ports/ HTTP/1.1").unwrap();
-        assert_eq!((host, port, connect), ("ports.ubuntu.com".to_string(), 80, false));
+        assert_eq!(
+            (host, port, connect),
+            ("example.com".to_string(), 443, true)
+        );
+        let (host, port, connect, line) =
+            parse_target("GET http://ports.ubuntu.com/ubuntu-ports/ HTTP/1.1").unwrap();
+        assert_eq!(
+            (host, port, connect),
+            ("ports.ubuntu.com".to_string(), 80, false)
+        );
         assert!(line.starts_with("GET /ubuntu-ports/ "));
     }
 
