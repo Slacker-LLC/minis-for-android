@@ -75,9 +75,9 @@ object FileWriteTool {
             }
 
             // Pi-style per-file mutation queue: concurrent writes/edits against
-            // the same guest target are serialized in request order. The actual
-            // file remains behind minisd because App cannot cross the SELinux
-            // boundary to /data/adb/minis directly.
+            // the same guest target are serialized in request order. Guest paths
+            // resolve through WorkspaceFileClient to App-owned storage or the
+            // explicitly configured external-mount bridge.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
                 val externalMountPath = ExternalMountAccess.isPath(path)
                 if (expectedSha256.isNotEmpty()) {
@@ -115,7 +115,7 @@ object FileWriteTool {
                 if (externalMountPath) {
                     com.openminis.app.logging.AppLogger.info(
                         "FileWrite",
-                        "mount write path=$path bytes=$bytes via=minisd-broker",
+                        "mount write path=$path bytes=$bytes via=external-mount",
                     )
                 }
                 ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)
