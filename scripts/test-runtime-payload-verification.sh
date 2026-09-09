@@ -40,7 +40,7 @@ PY
 mutate_tar() {
   local dir="$1" mode="$2"
   python3 - "$dir" "$mode" <<'PY'
-import io, json, pathlib, sys, tarfile
+import io, pathlib, sys, tarfile
 root = pathlib.Path(sys.argv[1]); mode = sys.argv[2]
 src = root / "ubuntu-arm64-rootfs.tar.gz"
 members = []
@@ -50,7 +50,9 @@ with tarfile.open(src, "r:gz") as tar:
         members.append((member, data))
 with tarfile.open(src, "w:gz") as tar:
     for member, data in members:
-        if mode == "malformed_metadata" and member.name == "etc/minis/rootfs.json": data = b"{}"
+        if mode == "malformed_metadata" and member.name == "etc/minis/rootfs.json":
+            data = b"{}"
+            member.size = len(data)
         if mode == "unsafe_symlink" and member.name == "workspace":
             member = tarfile.TarInfo("workspace"); member.type = tarfile.SYMTYPE; member.linkname = "../../data"
             data = None
