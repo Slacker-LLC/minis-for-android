@@ -134,6 +134,8 @@ data class LLMModel(
         // / build / fast / code-fast variants surfaced by xAI docs and
         // OpenClaw's catalog (port iOS db973552).
         // Official xAI catalog (docs.x.ai/docs/models) - synced from CLIProxyAPI models.json
+        // [T-provider-dynamic-catalog-reconcile] Seed/fallback for pre-network first paint.
+        val grok46 = LLMModel("grok-4.6", "Grok 4.6", "xAI", supportsReasoning = true)
         val grok45 = LLMModel("grok-4.5", "Grok 4.5", "xAI", supportsReasoning = true)
         val grok43 = LLMModel("grok-4.3", "Grok 4.3", "xAI", supportsReasoning = true)
         val grok420Reasoning = LLMModel("grok-4.20-0309-reasoning", "Grok 4.20 Reasoning", "xAI", supportsReasoning = true)
@@ -149,6 +151,7 @@ data class LLMModel(
         val grokCodeFast1 = LLMModel("grok-code-fast-1", "Grok Code Fast 1", "xAI", supportsReasoning = true)
 
         val allXAI = listOf(
+            grok46,
             grok45,
             grok43,
             grok420Reasoning,

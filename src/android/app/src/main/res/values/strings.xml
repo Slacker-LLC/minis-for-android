@@ -1755,4 +1755,9 @@
     <string name="chat_attachment_expand_preview" tools:ignore="MissingTranslation">Expand Preview</string>
     <string name="chat_attachment_collapse_preview" tools:ignore="MissingTranslation">Collapse Preview</string>
     <string name="chat_attachment_card_mode" tools:ignore="MissingTranslation">Collapse to Card</string>
+
+    <string name="newer_db_title">Your data is from a newer version</string>
+    <string name="newer_db_body">This copy of Minis is older than the one that created your data, so it cannot open it safely. Nothing has been deleted. Reinstall the newer version of Minis and your conversations will be available again.</string>
+    <string name="newer_db_versions">This version supports data format %1$d</string>
+    <string name="newer_db_exit">Close</string>
 </resources>

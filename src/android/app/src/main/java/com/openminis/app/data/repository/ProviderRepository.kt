@@ -2843,16 +2843,69 @@ class ProviderRepository(private val context: Context) {
         return if (sec.isEmpty) null else sec
     }
 
-    fun mergeBackupProviderConfig(config: com.openminis.app.data.model.ProviderConfig): Pair<Int, Int> {
+    /**
+     * Restore provider configuration without destroying local-only state.
+     * Package order wins for objects carried by the backup; existing local
+     * object contents win on id collision; local-only objects are appended.
+     */
+    fun mergeBackupProviderConfig(remote: com.openminis.app.data.model.ProviderConfig): Pair<Int, Int> {
         ensureConfigLoaded()
-        val before = _config.value.instances.size
-        val existingIds = _config.value.instances.map { it.id }.toSet()
-        val newInstances = config.instances.filter { it.id !in existingIds }
-        for (inst in newInstances) {
-            addInstance(inst)
+        return synchronized(configLock) {
+            val local = _config.value
+            val before = local.instances.size
+
+            val orderedInstances = mutableListOf<ProviderInstance>()
+            val placedInstances = mutableSetOf<String>()
+            for (ri in remote.instances) {
+                val existing = local.instances.firstOrNull { it.id == ri.id }
+                orderedInstances.add(existing ?: ri)
+                placedInstances.add(ri.id)
+            }
+            for (li in local.instances) {
+                if (li.id !in placedInstances) orderedInstances.add(li)
+            }
+
+            val mergedEntries = local.modelEntries.toMutableList()
+            val entryIds = mergedEntries.map { it.id }.toMutableSet()
+            for (entry in remote.modelEntries) {
+                if (entry.id !in entryIds) {
+                    mergedEntries.add(entry)
+                    entryIds.add(entry.id)
+                }
+            }
+
+            val orderedGroups = mutableListOf<ModelGroup>()
+            val placedGroups = mutableSetOf<String>()
+            for (rg in remote.modelGroups) {
+                val existing = local.modelGroups.firstOrNull { it.id == rg.id }
+                orderedGroups.add(existing ?: rg)
+                placedGroups.add(rg.id)
+            }
+            for (lg in local.modelGroups) {
+                if (lg.id !in placedGroups) orderedGroups.add(lg)
+            }
+
+            val mergedAgentEntries =
+                (local.agentLoopModelEntryIds + remote.agentLoopModelEntryIds).distinct()
+            val mergedAgentGroups =
+                (local.agentLoopGroupIds + remote.agentLoopGroupIds).distinct()
+
+            val merged = local.copy(
+                instances = orderedInstances,
+                modelEntries = mergedEntries,
+                modelGroups = orderedGroups,
+                agentLoopModelEntryIds = mergedAgentEntries.toMutableList(),
+                agentLoopGroupIds = mergedAgentGroups.toMutableList(),
+            )
+            saveConfig(merged)
+            val after = orderedInstances.size
+            android.util.Log.i(
+                "ProviderRepo",
+                "[Restore] provider merge: instances $before→$after " +
+                    "entries=${mergedEntries.size} groups=${orderedGroups.size}",
+            )
+            before to after
         }
-        val after = _config.value.instances.size
-        return Pair(before, after)
     }
 
     fun restoreBackupThinkingRules(rules: List<com.openminis.app.backup.BackupThinkingRuleRecord>): Pair<Int, Int> {
@@ -2881,35 +2934,56 @@ class ProviderRepository(private val context: Context) {
         return Pair(written, skipped)
     }
 
+    /**
+     * Restore missing credentials only. A backup must never roll a device's
+     * current API key / bearer / OAuth state back to an older secret.
+     */
     fun restoreBackupProviderSecret(secret: com.openminis.app.backup.BackupSecrets.ProviderSecret): Boolean {
-        val instance = _config.value.instances.firstOrNull { it.id == secret.instanceId } ?: return false
-        var changed = false
-        secret.apiKey?.let { b64 ->
-            val key = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
-            saveApiKey(instance.id, key)
-            changed = true
+        fun deb64(value: String?): String? = value?.let {
+            runCatching { String(Base64.decode(it, Base64.NO_WRAP), Charsets.UTF_8) }.getOrNull()
         }
-        val mgr = com.openminis.app.auth.OAuthManager.forInstance(context, instance) ?: oauthManagerFor(instance)
-        secret.manualOAuthToken?.let { b64 ->
-            val token = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
-            mgr?.saveManualBearerToken(token)
-            changed = true
+
+        val instance = instance(secret.instanceId) ?: return false
+        var wrote = false
+
+        deb64(secret.apiKey)?.let { key ->
+            if (loadApiKey(instance.id).isNullOrBlank()) {
+                saveApiKey(instance.id, key)
+                wrote = true
+            }
         }
-        secret.oauthToken?.let { b64 ->
-            val tokenJson = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
-            mgr?.importStoredTokensJson(tokenJson)
-            changed = true
+
+        deb64(secret.manualOAuthToken)?.let { token ->
+            val manualManager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
+            if (manualManager != null && manualManager.loadManualBearerToken().isNullOrBlank()) {
+                manualManager.saveManualBearerToken(token)
+                wrote = true
+            }
         }
-        secret.oauthEmail?.let { b64 ->
-            val email = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
-            mgr?.importOAuthString("email", email)
-            changed = true
+
+        val oauthManager = oauthManagerFor(instance)
+        if (oauthManager != null) {
+            deb64(secret.oauthToken)?.let { tokenJson ->
+                if (oauthManager.exportStoredTokensJson().isNullOrBlank()) {
+                    oauthManager.importStoredTokensJson(tokenJson)
+                    wrote = true
+                }
+            }
+            if (instance.providerType == ProviderType.gemini) {
+                deb64(secret.oauthEmail)?.let { email ->
+                    if (oauthManager.exportOAuthString("email").isNullOrBlank()) {
+                        oauthManager.importOAuthString("email", email)
+                        wrote = true
+                    }
+                }
+                deb64(secret.oauthGcpProject)?.let { project ->
+                    if (oauthManager.exportOAuthString("gcp_project").isNullOrBlank()) {
+                        oauthManager.importOAuthString("gcp_project", project)
+                        wrote = true
+                    }
+                }
+            }
         }
-        secret.oauthGcpProject?.let { b64 ->
-            val proj = try { String(Base64.decode(b64, Base64.NO_WRAP), Charsets.UTF_8) } catch (_: Exception) { b64 }
-            mgr?.importOAuthString("gcp_project", proj)
-            changed = true
-        }
-        return changed
+        return wrote
     }
 }

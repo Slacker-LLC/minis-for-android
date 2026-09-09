@@ -902,4 +902,9 @@
     <string name="chat_attachment_expand_preview">展開預覽</string>
     <string name="chat_attachment_collapse_preview">收起預覽</string>
     <string name="chat_attachment_card_mode">收起為卡片</string>
+
+    <string name="newer_db_title">資料來自較新的版本</string>
+    <string name="newer_db_body">目前安裝的 Minis 比建立這些資料的版本更舊，因此無法安全開啟資料庫。資料沒有被刪除。重新安裝較新的 Minis 版本後，原有對話會恢復。</string>
+    <string name="newer_db_versions">目前版本支援的資料格式：%1$d</string>
+    <string name="newer_db_exit">關閉</string>
 </resources>
