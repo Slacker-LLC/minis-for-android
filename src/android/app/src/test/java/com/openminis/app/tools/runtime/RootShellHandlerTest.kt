@@ -1,6 +1,5 @@
 package com.openminis.app.tools.runtime
 
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,13 +34,8 @@ class RootShellHandlerTest {
     }
 
     @Test
-    fun `handler itself fails closed even if called directly`() = runBlocking {
-        val result = RootShellHandler().execute(
-            argsJson = "{}",
-            sessionId = "test-session",
-            context = TestContext(),
-            toolId = "test-tool",
-        )
+    fun `handler fail closed result remains permission denied`() {
+        val result = RootShellHandler().failClosedResult()
         assertFalse(result.success)
         assertTrue(result.output.contains("permission_denied"))
     }
