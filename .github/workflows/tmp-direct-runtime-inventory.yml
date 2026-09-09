@@ -1,0 +1,28 @@
+name: tmp-direct-runtime-inventory
+
+on:
+  push:
+    branches:
+      - refactor/direct-ubuntu-runtime
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Runtime dependency inventory
+        run: |
+          echo '=== minisd package refs ==='
+          rg -n --glob '!src/android/app/src/main/java/com/openminis/app/runtime/minisd/**' --glob '!src/minisd/**' --glob '!target/**' 'runtime\.minisd|Minisd[A-Za-z]+|minisd' src/android || true
+          echo '=== UbuntuRuntime.client refs ==='
+          rg -n 'UbuntuRuntime\.client|\.client\.(ubuntu|root|runtime|workspace|mount|cancel)' src/android/app/src/main/java || true
+          echo '=== workspace file client refs ==='
+          rg -n 'WorkspaceFileClient' src/android/app/src/main/java || true
+          echo '=== runtime/native payload refs ==='
+          rg -n 'libminisd|minisd\.so|src/minisd|runtime payload|runtime_payload|RUNTIME_PAYLOAD' src/android .github || true
+          echo '=== su/process helpers ==='
+          rg -n 'ProcessBuilder\(|/system/bin/su|resolveSu\(|su -c|chroot|unshare|mount --bind' src/android/app/src/main/java src/android/app/src/main/assets || true
