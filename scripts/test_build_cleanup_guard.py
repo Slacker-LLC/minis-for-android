@@ -63,17 +63,26 @@ class BuildCleanupGuardTests(unittest.TestCase):
         (root / "scripts/tool.sh").write_text("bash scripts/build-minisd-android.sh\n", encoding="utf-8")
         self.assertTrue(any("obsolete minisd build/runtime path" in error for error in GUARD.check_repository(root)))
 
-    def test_minisd_paths_are_rejected(self) -> None:
+    def test_production_minisd_identity_is_rejected(self) -> None:
         root = self.make_repo()
-        obsolete = root / "src/native/minisd"
-        obsolete.mkdir(parents=True, exist_ok=True)
-        (obsolete / "Cargo.toml").write_text("[package]\nname='minisd'\n", encoding="utf-8")
-        self.assertTrue(any("obsolete build path exists" in error for error in GUARD.check_repository(root)))
+        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text('val runtime = "minisd"\n', encoding="utf-8")
+        self.assertTrue(any("obsolete minisd identity" in error for error in GUARD.check_repository(root)))
 
-    def test_minisd_tooling_reference_is_rejected(self) -> None:
+    def test_production_minisd_runtime_path_is_rejected_even_in_comment(self) -> None:
         root = self.make_repo()
-        (root / "scripts/tool.sh").write_text("bash scripts/build-minisd-android.sh\n", encoding="utf-8")
+        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("// Historical runtime.minisd package.\n", encoding="utf-8")
         self.assertTrue(any("obsolete minisd build/runtime path" in error for error in GUARD.check_repository(root)))
+
+    def test_explicit_historical_negative_minisd_comment_is_allowed(self) -> None:
+        root = self.make_repo()
+        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("// Historical note: no minisd broker remains.\n", encoding="utf-8")
+        self.assertEqual([], GUARD.check_repository(root))
 
     def test_migration_only_package_identity_is_allowed(self) -> None:
         root = self.make_repo()
