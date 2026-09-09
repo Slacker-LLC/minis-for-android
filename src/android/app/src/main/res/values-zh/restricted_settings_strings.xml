@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">开关是灰的？（「受限设置」）</string>
+    <string name="system_permissions_a11y_restricted_footer">对于通过下载的 APK 文件安装的应用，Android 会锁定无障碍开关。这是系统的安全策略，不是 Minis 的问题，你的安装包没有损坏。「允许受限设置」只是把开关解锁，本身不授予任何权限，是否开启该服务仍由你决定。</string>
+    <string name="system_permissions_a11y_restricted_manual">允许受限设置</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">应用详情 → 右上角 ⋮ 菜单 → 允许受限设置</string>
+    <string name="system_permissions_a11y_restricted_shizuku">通过 Shizuku 允许受限设置</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">一键解除，无需离开 Minis</string>
+    <string name="system_permissions_a11y_restricted_working">正在解除…</string>
+    <string name="system_permissions_a11y_restricted_failed">解除失败 — 请按下方步骤手动操作</string>
+</resources>

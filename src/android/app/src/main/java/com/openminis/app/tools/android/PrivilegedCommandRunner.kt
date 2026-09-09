@@ -6,7 +6,6 @@ import com.openminis.app.runtime.minisd.MinisdClient
 import com.openminis.app.runtime.minisd.MinisdProtocol
 import com.openminis.app.runtime.minisd.MinisdResponse
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
-import com.openminis.app.tools.ApprovalSeam
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -17,16 +16,13 @@ import java.util.concurrent.TimeUnit
 /** Backend selected for one privileged Android command. */
 enum class PrivilegedBackend { ROOT, SHIZUKU, NONE }
 
-/** Risk of one privileged command, used to keep mutation approval explicit. */
+/** Risk classification retained for audit logging and conservative command analysis. */
 enum class CommandRisk(val severity: Int) {
     READ_ONLY(0),
     USER_VISIBLE(1),
     MUTATING(2),
     ROOT_SETUP(3),
     ;
-
-    /** Standard Mode asks only for the highest-risk operations. */
-    fun requiresStandardApproval(): Boolean = this == MUTATING || this == ROOT_SETUP
 
     companion object {
         fun max(first: CommandRisk, second: CommandRisk): CommandRisk =
@@ -261,7 +257,7 @@ internal object AppCommandRunner {
     }
 }
 
-/** Unified seam only for operations that genuinely need shell privilege. */
+/** Unified seam for operations that genuinely need shell privilege. */
 object PrivilegedCommandRunner {
     private const val TAG = "PrivilegedCommand"
 
@@ -275,15 +271,14 @@ object PrivilegedCommandRunner {
         rootOnly: Boolean = false,
     ): AndroidCommandResult {
         require(argv.isNotEmpty()) { "privileged command argv must not be empty" }
-        val mode = PrivilegedAccessModeStore.get(context)
         val tool = argv.first()
         val commandArgs = argv.drop(1)
         val effectiveRisk = CommandRisk.max(risk, PrivilegedCommandRisk.classify(tool, commandArgs))
         val executionId = MinisdClient.newExecutionId("root")
         Log.i(
             TAG,
-            "dispatch mode=${mode.wireValue} risk=${effectiveRisk.name.lowercase()} " +
-                "operation=$operation tool=$tool executionId=$executionId",
+            "dispatch risk=${effectiveRisk.name.lowercase()} operation=$operation " +
+                "tool=$tool session=$sessionId executionId=$executionId",
         )
 
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
@@ -291,64 +286,13 @@ object PrivilegedCommandRunner {
         if (!broker.ok) return broker.toCommandResult(rootOnly)
 
         return try {
-            if (mode == PrivilegedAccessMode.STANDARD && effectiveRisk.requiresStandardApproval()) {
-                val decision = ApprovalSeam.request(
-                    context,
-                    sessionId,
-                    "android_privileged",
-                    "$operation (${effectiveRisk.name.lowercase()})\n\ntool=$tool\nargs=${commandArgs.joinToString(prefix = "[", postfix = "]")}",
-                )
-                if (decision.decision != "allowed-once") {
-                    return AndroidCommandResult(
-                        backend = PrivilegedBackend.NONE,
-                        exitCode = 126,
-                        stdout = "",
-                        stderr = "",
-                        unavailableReason = "operation was not approved (${decision.decision})",
-                    )
-                }
-                // The user has already approved this exact App-owned operation.
-                // minisd still consumes its one-shot internal ticket below.
-                return executeFull(
-                    tool = tool,
-                    args = commandArgs,
-                    timeoutMs = timeoutMs,
-                    executionId = executionId,
-                    rootOnly = rootOnly,
-                )
-            }
-
-            if (mode == PrivilegedAccessMode.FULL_ACCESS) {
-                // Full Access removes App-level approval for every risk class.
-                return executeFull(
-                    tool = tool,
-                    args = commandArgs,
-                    timeoutMs = timeoutMs,
-                    executionId = executionId,
-                    rootOnly = rootOnly,
-                )
-            }
-
-            val standard = UbuntuRuntime.client.rootExec(
+            executeFull(
                 tool = tool,
                 args = commandArgs,
                 timeoutMs = timeoutMs,
                 executionId = executionId,
+                rootOnly = rootOnly,
             )
-            if (standard.code != MinisdProtocol.ERROR_POLICY_DENIED) {
-                standard.toCommandResult(rootOnly)
-            } else {
-                // Allow non-risk operations outside the fast-path allowlist to
-                // continue without turning a broker capability miss into a
-                // user approval request. Risk was classified before dispatch.
-                executeFull(
-                    tool = tool,
-                    args = commandArgs,
-                    timeoutMs = timeoutMs,
-                    executionId = executionId,
-                    rootOnly = rootOnly,
-                )
-            }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
                 runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
@@ -362,17 +306,7 @@ object PrivilegedCommandRunner {
         if (RootCommandRunner.passiveSuPath() == null) {
             return RootProbeResult(false, error = "su executable not found")
         }
-        if (PrivilegedAccessModeStore.get(context) == PrivilegedAccessMode.STANDARD) {
-            val decision = ApprovalSeam.request(
-                context,
-                sessionId,
-                "android_capabilities",
-                "主动请求 Root 授权并读取 uid/gid/capabilities/SELinux 状态",
-            )
-            if (decision.decision != "allowed-once") {
-                return RootProbeResult(false, error = "root probe was not approved (${decision.decision})")
-            }
-        }
+        Log.i(TAG, "active root probe requested session=$sessionId")
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         val broker = UbuntuRuntime.ensureBrokerReady()
         val probe = if (broker.ok) {
@@ -388,6 +322,11 @@ object PrivilegedCommandRunner {
         return probe
     }
 
+    /**
+     * Root execution remains governed by minisd's structured argv validation
+     * and its one-shot internal confirm ticket. There is no additional
+     * App-owned Root permission mode above this boundary.
+     */
     private suspend fun executeFull(
         tool: String,
         args: List<String>,

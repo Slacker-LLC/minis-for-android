@@ -1,19 +1,9 @@
 package com.openminis.app.tools.android
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PrivilegedCommandRiskTest {
-
-    @Test
-    fun `standard mode asks only for highest-risk classes`() {
-        assertFalse(CommandRisk.READ_ONLY.requiresStandardApproval())
-        assertFalse(CommandRisk.USER_VISIBLE.requiresStandardApproval())
-        assertTrue(CommandRisk.MUTATING.requiresStandardApproval())
-        assertTrue(CommandRisk.ROOT_SETUP.requiresStandardApproval())
-    }
 
     @Test
     fun `generic root commands are classified from tool and args`() {

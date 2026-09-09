@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">Переключатель неактивен? («Ограниченная настройка»)</string>
+    <string name="system_permissions_a11y_restricted_footer">Android блокирует переключатель специальных возможностей для приложений, установленных из загруженного APK-файла. Это политика безопасности системы, а не ошибка Minis — с вашей установкой всё в порядке. Разрешение ограниченных настроек лишь возвращает переключатель в рабочее состояние; само по себе оно ничего не предоставляет, и вы по-прежнему решаете, включать службу или нет.</string>
+    <string name="system_permissions_a11y_restricted_manual">Разрешить ограниченные настройки</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">О приложении → меню ⋮ (вверху справа) → Разрешить ограниченные настройки</string>
+    <string name="system_permissions_a11y_restricted_shizuku">Разрешить ограниченные настройки через Shizuku</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">Одно нажатие — снимает флаг, не выходя из Minis</string>
+    <string name="system_permissions_a11y_restricted_working">Разрешение…</string>
+    <string name="system_permissions_a11y_restricted_failed">Не удалось — выполните шаги вручную ниже</string>
+</resources>

@@ -2,6 +2,7 @@ package com.openminis.app.ui.settings
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -9,10 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Shield
-import com.openminis.app.tools.android.PrivilegedAccessMode
-import com.openminis.app.tools.android.PrivilegedAccessModeStore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,44 +31,40 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
+import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisTextButton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun OffloadPermissionScreen(
     onBack: () -> Unit,
-    // [T-android-privileged-backend] Navigate to the multi-backend
-    // (Shizuku + AXManager) screen from the privileged-backend integration row.
     onOpenPrivilegedBackend: () -> Unit = {},
     onOpenSystemPermissions: () -> Unit = {},
 ) {
     val grouped = OffloadPermissionManager.toolRegistry
         .filter { it.showInSettings }
         .groupBy { it.category }
-    // T336: Integrations category gets dedicated handcrafted SectionCards
-    // (one per CLI) with system-layer state + action rows. Skip it from
-    // the auto-rendered loop below.
     val autoCategories = grouped.entries
         .filter { it.key != OffloadPermissionManager.PermissionCategory.INTEGRATIONS }
 
     var showResetConfirm by remember { mutableStateOf(false) }
-    var showFullAccessConfirm by remember { mutableStateOf(false) }
-
     val configEnabled by com.openminis.app.config.MinisConfigPermissionStore.enabled.collectAsState()
-
     val context = LocalContext.current
-    val privilegedAccessMode by PrivilegedAccessModeStore.observe(context).collectAsState()
 
     var a11yEnabled by remember { mutableStateOf(isA11yServiceEnabled(context)) }
+    var a11yRestricted by remember { mutableStateOf(false) }
+    var unrestricting by remember { mutableStateOf(false) }
+    var unrestrictFailed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
-        // Re-poll once a second so coming back from system Accessibility
-        // settings flips the row without a manual refresh.
         while (true) {
             a11yEnabled = isA11yServiceEnabled(context) || MinisAccessibilityService.getInstance() != null
+            a11yRestricted = !a11yEnabled && RestrictedSettingsManager.isRestricted(context)
             delay(1000)
         }
     }
@@ -84,52 +79,6 @@ fun OffloadPermissionScreen(
             }
         },
     ) {
-        // Root 权限模式 (标准模式 / 完全访问)
-        SettingsSection(
-            header = "Root 权限模式",
-            footer = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                "完全访问已开启：App 不再限制 Agent 的 Root 操作，也不会逐条弹窗，请仅在明确需要时使用。"
-            } else {
-                "标准模式普通操作直接执行，只有最高风险的系统修改或 Root 初始化操作需要你的确认。"
-            },
-        ) {
-            SettingsRow(
-                icon = Icons.Outlined.Security,
-                iconColor = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) {
-                    Color(0xFF34C759)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                title = "标准模式",
-                subtitle = if (privilegedAccessMode == PrivilegedAccessMode.STANDARD) "当前模式" else "普通操作直通，最高风险逐次确认",
-                onClick = {
-                    PrivilegedAccessModeStore.setFromUserSettings(
-                        context,
-                        PrivilegedAccessMode.STANDARD,
-                    )
-                },
-                showDivider = true,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Security,
-                iconColor = MaterialTheme.colorScheme.error,
-                title = "完全访问",
-                titleColor = MaterialTheme.colorScheme.error,
-                subtitle = if (privilegedAccessMode == PrivilegedAccessMode.FULL_ACCESS) {
-                    "当前模式；App 层不限制 Agent Root 请求"
-                } else {
-                    "高风险：开启前需要确认"
-                },
-                onClick = {
-                    if (privilegedAccessMode != PrivilegedAccessMode.FULL_ACCESS) {
-                        showFullAccessConfirm = true
-                    }
-                },
-                showDivider = false,
-            )
-        }
-
-        // T-config: master switch for the minis-config CLI surface.
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
             footer = stringResource(R.string.perm_minis_config_desc),
@@ -155,12 +104,6 @@ fun OffloadPermissionScreen(
             }
         }
 
-        // T336 / T345-2: dedicated SectionCard per integration CLI, rendered
-        // after the Privacy/Media/System auto-categories so the information
-        // hierarchy reads: configuration → privacy → system integrations.
-        // Each card shows the CLI description, the tri-state agent gate, the
-        // system-layer status, and (when system-layer is not satisfied) a
-        // deeplink back to the OS settings page that fixes it.
         IntegrationSection(
             iconVector = Icons.Outlined.Accessibility,
             iconTint = Color(0xFF34C759),
@@ -176,12 +119,46 @@ fun OffloadPermissionScreen(
             onSystemAction = { openAccessibilitySettings(context) },
         )
 
+        if (a11yRestricted) {
+            SettingsSection(
+                header = stringResource(R.string.system_permissions_a11y_restricted_header),
+                footer = stringResource(R.string.system_permissions_a11y_restricted_footer),
+            ) {
+                if (shizukuSnap.state == ShizukuManager.State.READY) {
+                    SettingsRow(
+                        title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
+                        subtitle = when {
+                            unrestricting ->
+                                stringResource(R.string.system_permissions_a11y_restricted_working)
+                            unrestrictFailed ->
+                                stringResource(R.string.system_permissions_a11y_restricted_failed)
+                            else ->
+                                stringResource(R.string.system_permissions_a11y_restricted_shizuku_sub)
+                        },
+                        onClick = {
+                            if (unrestricting) return@SettingsRow
+                            unrestricting = true
+                            unrestrictFailed = false
+                            scope.launch {
+                                val ok = RestrictedSettingsManager.clearWithShizuku(context)
+                                unrestricting = false
+                                unrestrictFailed = !ok
+                            }
+                        },
+                    )
+                }
+                SettingsRow(
+                    title = stringResource(R.string.system_permissions_a11y_restricted_manual),
+                    subtitle = stringResource(R.string.system_permissions_a11y_restricted_manual_sub),
+                    onClick = { openAppDetailsSettings(context) },
+                    showDivider = false,
+                )
+            }
+        }
+
         IntegrationSection(
             iconVector = Icons.Outlined.Shield,
             iconTint = Color(0xFFAF52DE),
-            // [T-android-privileged-backend] One section covers both Shizuku
-            // and AXManager (they share the same binder slot + protocol);
-            // toolName stays "shizuku_cli" so user authz is preserved.
             sectionHeaderRes = R.string.perm_section_privileged_backend,
             sectionFooterRes = R.string.perm_shizuku_section_footer,
             toolName = "shizuku_cli",
@@ -189,14 +166,12 @@ fun OffloadPermissionScreen(
             systemReady = ShizukuManager.isReady(),
             systemStatusTitleRes = shizukuSubtitleRes(shizukuSnap.state),
             systemActionTitleRes = shizukuActionTitleRes(shizukuSnap.state),
-            // Open the unified Shizuku-protocol screen for setup actions.
             onSystemAction = onOpenPrivilegedBackend,
-            // The status row itself opens the same page so users can revisit
-            // the setup walkthrough even after the manager is already ready.
             onStatusRowClick = onOpenPrivilegedBackend,
         )
 
-        // Additional System Permissions (Overlay, Voice Correction)
+        // Fork-only system grants remain reachable without creating a second
+        // Agent permission model. Root authority is intentionally absent here.
         SettingsSection(
             header = "更多系统特权",
             footer = "查看桌面宠物悬浮窗权限、系统无障碍守护与语音学习设置。",
@@ -212,37 +187,6 @@ fun OffloadPermissionScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-    }
-
-    if (showFullAccessConfirm) {
-        AlertDialog(
-            onDismissRequest = { showFullAccessConfirm = false },
-            title = { Text("开启 Root 完全访问？") },
-            text = {
-                Text(
-                    "开启后，Agent 发起的结构化 Root 命令将不再逐条询问。" +
-                        "这可能修改系统设置、应用与设备数据；Agent 本身不能切换此模式。",
-                )
-            },
-            confirmButton = {
-                MinisTextButton(
-                    onClick = {
-                        PrivilegedAccessModeStore.setFromUserSettings(
-                            context,
-                            PrivilegedAccessMode.FULL_ACCESS,
-                        )
-                        showFullAccessConfirm = false
-                    },
-                ) {
-                    Text("确认开启", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                MinisTextButton(onClick = { showFullAccessConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
     }
 
     if (showResetConfirm) {
@@ -269,22 +213,6 @@ fun OffloadPermissionScreen(
     }
 }
 
-/**
- * T336: composite SectionCard for a single integration CLI. Layout:
- *
- *   [icon]  CLI title
- *           CLI description (one-liner)
- *   ─────────
- *   Agent permission        [tri-state ▾]
- *   ─────────
- *   System authorization   [status text in color]
- *   ─────────
- *   (only when systemReady=false): [Open system settings →]
- *
- * The system-status row is read-only — the user goes to the OS settings
- * page to flip it. systemReady drives both the status row's color/icon
- * and the visibility of the action row below.
- */
 @Composable
 private fun IntegrationSection(
     iconVector: ImageVector,
@@ -297,18 +225,12 @@ private fun IntegrationSection(
     systemStatusTitleRes: Int,
     systemActionTitleRes: Int,
     onSystemAction: () -> Unit,
-    // [T-android-privileged-backend] When set, the system-status row becomes a
-    // chevron-clickable entry to a dedicated detail screen (the multi-backend
-    // Shizuku/AXManager page) — shown REGARDLESS of systemReady, so the user can
-    // open it even when the backend is already authorized. Null keeps the
-    // original read-only status row + conditional action behavior (a11y row).
     onStatusRowClick: (() -> Unit)? = null,
 ) {
     SettingsSection(
         header = stringResource(sectionHeaderRes),
         footer = stringResource(sectionFooterRes),
     ) {
-        // Header row: CLI title + description, with a colored leading icon.
         SettingsRow(
             icon = iconVector,
             iconColor = iconTint,
@@ -317,11 +239,8 @@ private fun IntegrationSection(
             showChevron = false,
         )
 
-        // Agent tri-state policy.
         AgentPolicyRow(toolName = toolName, showDivider = true)
 
-        // System-layer status. When [onStatusRowClick] is provided the row is a
-        // navigation entry (chevron, always shown); otherwise it's read-only.
         SettingsRow(
             title = stringResource(R.string.perm_system_authorization),
             onClick = onStatusRowClick,
@@ -332,14 +251,11 @@ private fun IntegrationSection(
                     text = stringResource(systemStatusTitleRes),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (systemReady) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error,
+                    else MaterialTheme.colorScheme.error,
                 )
             },
         )
 
-        // Conditional action row: only for the read-only (a11y) variant, and
-        // only when the system layer needs attention. The privileged-backend
-        // variant routes everything through [onStatusRowClick] above instead.
         if (onStatusRowClick == null && !systemReady) {
             SettingsRow(
                 title = stringResource(systemActionTitleRes),
@@ -350,11 +266,6 @@ private fun IntegrationSection(
     }
 }
 
-/**
- * Shared tri-state row. Reused by the dedicated IntegrationSection cards
- * AND by the auto-rendered category loop below — same dropdown menu,
- * same chip in trailing.
- */
 @Composable
 private fun AgentPolicyRow(
     toolName: String,
@@ -367,13 +278,6 @@ private fun AgentPolicyRow(
         SettingsRow(
             title = stringResource(R.string.perm_agent_policy),
             onClick = { expanded = true },
-            // [T-android-perm-row-affordance] This row OPENS A DROPDOWN, but with
-            // showChevron=false it looked like a read-only status line — nothing
-            // hinted it was tappable. It also broke alignment with the sibling
-            // "system authorization" row: a chevron costs 4dp spacer + 20dp icon,
-            // so that row's value text sits 24dp further left and the two values
-            // visibly failed to line up inside the same card.
-            // Showing the chevron fixes both at once.
             showChevron = true,
             showDivider = showDivider,
             trailing = {
@@ -384,10 +288,6 @@ private fun AgentPolicyRow(
                 )
             },
         )
-        // T336-followup: anchor the menu's right edge to the row's right
-        // edge so it grows down-and-left from the trailing chip instead
-        // of Material3's default down-and-right (which on a narrow phone
-        // pushed the menu off the screen edge).
         MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }, alignEnd = true) {
             for (level in OffloadPermissionManager.PermissionLevel.entries) {
                 DropdownMenuItem(
@@ -421,10 +321,6 @@ private fun PermissionRow(
             title = toolTitle(tool),
             subtitle = tool.toolName,
             onClick = { expanded = true },
-            // [T-android-perm-row-affordance] Same dropdown affordance as
-            // AgentPolicyRow — this row opens the same tri-state menu, so it gets
-            // the same chevron. Keeping the two in sync also keeps every value in
-            // the Privacy list on one right edge.
             showChevron = true,
             showDivider = showDivider,
             trailing = {
@@ -435,10 +331,6 @@ private fun PermissionRow(
                 )
             },
         )
-        // T336-followup: anchor the menu's right edge to the row's right
-        // edge so it grows down-and-left from the trailing chip instead
-        // of Material3's default down-and-right (which on a narrow phone
-        // pushed the menu off the screen edge).
         MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }, alignEnd = true) {
             for (level in OffloadPermissionManager.PermissionLevel.entries) {
                 DropdownMenuItem(
@@ -463,9 +355,6 @@ private fun categoryHeaderRes(category: OffloadPermissionManager.PermissionCateg
     OffloadPermissionManager.PermissionCategory.PRIVACY -> R.string.perm_section_privacy
     OffloadPermissionManager.PermissionCategory.MEDIA -> R.string.perm_section_media
     OffloadPermissionManager.PermissionCategory.SYSTEM -> R.string.perm_section_system
-    // INTEGRATIONS is rendered by IntegrationSection above; this branch is
-    // unreachable through the auto-loop but kept exhaustive for `when`
-    // exhaustiveness. Reuse the a11y header as a harmless fallback.
     OffloadPermissionManager.PermissionCategory.INTEGRATIONS -> R.string.perm_section_a11y
 }
 
@@ -517,14 +406,33 @@ private fun openAccessibilitySettings(context: Context) {
         context.startActivity(
             Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            },
         )
     } catch (_: Throwable) {
         try {
             context.startActivity(
                 Intent(Settings.ACTION_SETTINGS).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+                },
+            )
+        } catch (_: Throwable) {}
+    }
+}
+
+private fun openAppDetailsSettings(context: Context) {
+    try {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    } catch (_: Throwable) {
+        try {
+            context.startActivity(
+                Intent(Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
             )
         } catch (_: Throwable) {}
     }
@@ -537,13 +445,11 @@ private fun shizukuSubtitleRes(state: ShizukuManager.State): Int = when (state) 
     ShizukuManager.State.READY -> R.string.shizuku_state_ready
 }
 
-// T336: state-dependent action row title — different verbs per phase of
-// the Shizuku setup funnel.
 private fun shizukuActionTitleRes(state: ShizukuManager.State): Int = when (state) {
     ShizukuManager.State.NOT_INSTALLED -> R.string.shizuku_install_btn
     ShizukuManager.State.NOT_RUNNING -> R.string.shizuku_open_btn
     ShizukuManager.State.NEED_PERMISSION -> R.string.shizuku_grant_btn
-    ShizukuManager.State.READY -> 0  // never displayed (systemReady=true)
+    ShizukuManager.State.READY -> 0
 }
 
 private fun performShizukuAction(context: Context, state: ShizukuManager.State) {
@@ -551,6 +457,6 @@ private fun performShizukuAction(context: Context, state: ShizukuManager.State) 
         ShizukuManager.State.NOT_INSTALLED -> ShizukuManager.openInstallPage(context)
         ShizukuManager.State.NOT_RUNNING -> ShizukuManager.openShizukuApp(context)
         ShizukuManager.State.NEED_PERMISSION -> ShizukuManager.requestPermission()
-        ShizukuManager.State.READY -> {} // no-op; row never rendered
+        ShizukuManager.State.READY -> {}
     }
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">스위치가 회색으로 비활성화되어 있나요?(「제한된 설정」)</string>
+    <string name="system_permissions_a11y_restricted_footer">Android는 내려받은 APK 파일로 설치한 앱에 대해 접근성 스위치를 잠급니다. 이는 OS의 보안 정책이며 Minis의 문제가 아닙니다. 설치 자체에는 아무 이상이 없습니다. 제한된 설정을 허용하면 스위치를 조작할 수 있게 될 뿐이며, 그 자체로 어떤 권한이 부여되지는 않고 서비스를 켤지 여부는 여전히 직접 선택합니다.</string>
+    <string name="system_permissions_a11y_restricted_manual">제한된 설정 허용</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">앱 정보 → ⋮ 메뉴(오른쪽 위) → 제한된 설정 허용</string>
+    <string name="system_permissions_a11y_restricted_shizuku">Shizuku로 제한된 설정 허용</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">한 번만 탭하면 Minis를 벗어나지 않고 해제됩니다</string>
+    <string name="system_permissions_a11y_restricted_working">허용하는 중…</string>
+    <string name="system_permissions_a11y_restricted_failed">실패했습니다 — 아래의 수동 절차를 따르세요</string>
+</resources>
