@@ -33,7 +33,7 @@
 
 ## 硬规则
 
-1. 现役 guest 用户数据由 App 私有目录持有；`/data/adb/minis/rootfs` 是 Root-owned、可替换运行时。旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 只作为迁移源，不得重新成为现役真源。
+1. 现役 guest 用户数据由 App 私有目录持有，host backing 从 Android `Context.filesDir` 派生；`/data/adb/minis/rootfs` 是 Root-owned、可替换运行时。旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 只作为迁移源，不得重新成为现役真源。
 2. Guest 进程使用设备实际 App UID/GID，并通过 `setpriv` 清空 groups/capabilities；禁止写死 `10000`。
 3. Root 只负责 rootfs、namespace、bind、chroot、受控迁移和固定 loopback 网络代理等 App-owned 基础设施。禁止新增模型/工具可控的任意 Root shell、Root RPC 或通用 broker。
 4. 产品运行时不引入 PRoot/Alpine 兼容路径；不要为了兼容关闭 SELinux。
