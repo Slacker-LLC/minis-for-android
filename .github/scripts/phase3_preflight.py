@@ -4,6 +4,15 @@ from pathlib import Path
 worker = Path(__file__).with_name("phase3_direct_runtime_cleanup.py")
 text = worker.read_text(encoding="utf-8")
 
+# The worker embeds the generated check_build_cleanup.py in a raw triple-single
+# quoted literal. Keep the regex itself double-quoted so it cannot terminate
+# that outer literal before the worker is parsed.
+old = "LEGACY_IOS_RE = re.compile(r'''(?i)(?:^|[\\\\/\\s'\"`])src[\\\\/]ios(?:[\\\\/\\s'\"`]|$)''')"
+new = 'LEGACY_IOS_RE = re.compile(r"(?i)(?:^|[\\\\/\\s\\\'\\\"`])src[\\\\/]ios(?:[\\\\/\\s\\\'\\\"`]|$)")'
+if old not in text:
+    raise SystemExit("cannot patch nested LEGACY_IOS_RE literal")
+text = text.replace(old, new, 1)
+
 old = 'SELF_EXCLUDED_SCRIPTS = {"scripts/check_build_cleanup.py", "scripts/test_build_cleanup_guard.py"}'
 new = '''SELF_EXCLUDED_SCRIPTS = {
             "scripts/check_build_cleanup.py",
