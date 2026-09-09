@@ -51,6 +51,18 @@ class BuildCleanupGuardTests(unittest.TestCase):
         )
         self.assertTrue(any("upstream clone pipeline" in error for error in GUARD.check_repository(root)))
 
+    def test_minisd_paths_are_rejected(self) -> None:
+        root = self.make_repo()
+        obsolete = root / "src/native/minisd"
+        obsolete.mkdir(parents=True, exist_ok=True)
+        (obsolete / "Cargo.toml").write_text("[package]\nname='minisd'\n", encoding="utf-8")
+        self.assertTrue(any("obsolete build path exists" in error for error in GUARD.check_repository(root)))
+
+    def test_minisd_tooling_reference_is_rejected(self) -> None:
+        root = self.make_repo()
+        (root / "scripts/tool.sh").write_text("bash scripts/build-minisd-android.sh\n", encoding="utf-8")
+        self.assertTrue(any("obsolete minisd build/runtime path" in error for error in GUARD.check_repository(root)))
+
     def test_migration_only_package_identity_is_allowed(self) -> None:
         root = self.make_repo()
         (root / "src/android/app/build.gradle.kts").write_text(

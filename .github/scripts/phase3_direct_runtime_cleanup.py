@@ -1663,7 +1663,6 @@ def acceptance_and_cleanup() -> None:
     # Remove all one-off refactor scaffolding in the working tree before testing,
     # so the tested tree is exactly the tree committed by the final cleanup commit.
     for path in [
-        ".github/workflows/tmp-direct-runtime-inventory.yml",
         ".github/scripts/phase1_direct_runtime_patch.py",
         ".github/scripts/phase2a_direct_runtime_cleanup.py",
         ".github/scripts/phase2b_direct_guest_bridge.py",
@@ -1749,9 +1748,6 @@ def main() -> None:
     branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()
     if branch != BRANCH:
         raise SystemExit(f"refusing to run on {branch!r}; expected {BRANCH}")
-    phase_payload_and_network_proxy()
-    phase_remove_minisd()
-    phase_ci()
     phase_guards()
     phase_docs()
     acceptance_and_cleanup()
