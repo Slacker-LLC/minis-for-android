@@ -2,7 +2,6 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
 
 /**
@@ -64,7 +63,7 @@ internal object UbuntuProvisioner {
             )
         }
 
-        val proxy = RuntimePathRegistry.systemProxyEnv(context)["http_proxy"].orEmpty()
+        val proxy = RootNetworkProxy.PROXY_URI
         val provision = DirectRootRunner.runScript(
             buildProvisionCommand(rootfs, proxy),
             PROVISION_TIMEOUT_MS,

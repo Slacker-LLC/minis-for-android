@@ -1510,8 +1510,14 @@ def phase_guards() -> None:
         )
         ROOT_ACTIVE_DOCS = ("README.md", "README.zh-CN.md", "BUILDING.md", "BUILDING.zh-CN.md", "CONTRIBUTING.md")
         SCRIPT_SUFFIXES = {".sh", ".ps1", ".py"}
-        SELF_EXCLUDED_SCRIPTS = {"scripts/check_build_cleanup.py", "scripts/test_build_cleanup_guard.py"}
-        LEGACY_IOS_RE = re.compile(r'''(?i)(?:^|[\\/\s'"`])src[\\/]ios(?:[\\/\s'"`]|$)''')
+        SELF_EXCLUDED_SCRIPTS = {
+            "scripts/check_build_cleanup.py",
+            "scripts/test_build_cleanup_guard.py",
+            "scripts/check-runtime-package-boundary.sh",
+            "scripts/verify-runtime-payload.sh",
+            "scripts/verify-root-network-proxy.sh",
+        }
+        LEGACY_IOS_RE = re.compile(r"(?i)(?:^|[\\/\s\'\"`])src[\\/]ios(?:[\\/\s\'\"`]|$)")
         LEGACY_WRAPPER_RE = re.compile(r"(?i)build-pet-apk\.ps1")
         ACTIVE_MINISD_RE = re.compile(r"(?i)(?:src/native/minisd|build-minisd-android|libminisd\.so|minisd-arm64-v8a|runtime\.minisd|minisd\.sock)")
         UPSTREAM_CLONE_RE = re.compile(r"(?is)\bgit\s+clone\b[^\n]*(?:github\.com[/:]OpenMinis/OpenMinis(?:\.git)?|\bOpenMinisPet\b)")
@@ -1663,11 +1669,13 @@ def acceptance_and_cleanup() -> None:
         ".github/scripts/phase2b_direct_guest_bridge.py",
         ".github/scripts/phase2c_wire_provisioner.py",
         ".github/scripts/phase3_direct_runtime_cleanup.py",
+        ".github/scripts/phase3_preflight.py",
     ]:
         target = ROOT / path
         if target.is_file(): target.unlink()
 
     run("git", "diff", "--check")
+    run("bash", "-n", "scripts/build-ubuntu-rootfs.sh", "scripts/build-root-network-proxy-android.sh", "scripts/build-runtime-payload.sh", "scripts/test-build-ubuntu-rootfs-verification.sh", "scripts/test-runtime-payload-verification.sh", "scripts/verify-runtime-payload.sh", "scripts/verify-root-network-proxy.sh", "scripts/verify-android-release.sh", "scripts/check-runtime-package-boundary.sh")
     run("python3", "scripts/test_build_cleanup_guard.py")
     run("python3", "scripts/check_build_cleanup.py")
     run("bash", "scripts/test-build-ubuntu-rootfs-verification.sh")
@@ -1714,9 +1722,18 @@ def acceptance_and_cleanup() -> None:
     print("=== final minisd grep ===")
     print(grep.stdout)
     forbidden = []
+    negative_guard_paths = {
+        "scripts/check_build_cleanup.py",
+        "scripts/test_build_cleanup_guard.py",
+        "scripts/check-runtime-package-boundary.sh",
+        "scripts/verify-runtime-payload.sh",
+        "scripts/verify-root-network-proxy.sh",
+    }
     for line in grep.stdout.splitlines():
         path = line.split(":", 1)[0]
-        if path.startswith(("src/android/", "scripts/", ".github/workflows/")):
+        if path.startswith("src/android/") or path.startswith(".github/workflows/"):
+            forbidden.append(line)
+        elif path.startswith("scripts/") and path not in negative_guard_paths:
             forbidden.append(line)
     if forbidden:
         print("Forbidden active minisd references remain:", *forbidden, sep="\n", file=sys.stderr)

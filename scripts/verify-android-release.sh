@@ -44,5 +44,6 @@ while IFS= read -r dex; do
 done < <(unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex$')
 
 "$(cd "$(dirname "$0")" && pwd)/verify-runtime-payload.sh" "$APK"
+"$(cd "$(dirname "$0")" && pwd)/verify-root-network-proxy.sh" "$APK"
 
 echo "release APK verification passed"

@@ -165,9 +165,10 @@ fun buildConfigString(value: String): String =
 val runtimeDistDir = rootProject.file("../../dist")
 val packagedRootfs = runtimeDistDir.resolve("ubuntu-arm64-rootfs.tar.gz")
 val packagedRuntimeManifest = runtimeDistDir.resolve("runtime-manifest.json")
-val packagedMinisdAndroid = runtimeDistDir.resolve("minisd-arm64-v8a")
+val packagedRootNetworkProxy = runtimeDistDir.resolve("minis-root-network-proxy-arm64-v8a")
+val packagedRootNetworkProxySha = runtimeDistDir.resolve("minis-root-network-proxy-arm64-v8a.sha256")
 val generatedRuntimeAssets = layout.buildDirectory.dir("generated/runtimePayload/assets")
-val generatedRuntimeJniLibs = layout.buildDirectory.dir("generated/runtimePayload/jniLibs")
+val generatedRootNetworkProxyJniLibs = layout.buildDirectory.dir("generated/rootNetworkProxy/jniLibs")
 val runtimeRootfsAsset = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
 val protectedRuntimeRootfsAsset = "$runtimeRootfsAsset.aapt-preserve"
 
@@ -272,15 +273,14 @@ android {
 
     sourceSets.getByName("main") {
         assets.srcDir(generatedRuntimeAssets)
-        jniLibs.srcDir(generatedRuntimeJniLibs)
+        jniLibs.srcDir(generatedRootNetworkProxyJniLibs)
     }
 
     packaging {
         jniLibs {
-            // minisd is executed from ApplicationInfo.nativeLibraryDir. Force
-            // Package Manager to materialize the APK-owned ELF on disk.
+            // The single-purpose Root network proxy executes directly from
+            // ApplicationInfo.nativeLibraryDir, so the ELF must be materialized.
             useLegacyPackaging = true
-            keepDebugSymbols += "**/libminisd.so"
         }
     }
 
@@ -318,40 +318,34 @@ val copyBashismRules by tasks.registering(Copy::class) {
 }
 val stageRuntimePayload by tasks.registering {
     group = "build"
-    description = "Stages an optional verified runtime payload from dist into generated Android sources."
-    inputs.files(packagedRootfs, packagedRuntimeManifest, packagedMinisdAndroid)
-    outputs.dirs(generatedRuntimeAssets, generatedRuntimeJniLibs)
+    description = "Stages an optional verified rootfs-only runtime payload from dist into Android assets."
+    inputs.files(packagedRootfs, packagedRuntimeManifest)
+    outputs.dir(generatedRuntimeAssets)
     outputs.upToDateWhen { false }
     doLast {
-        val inputs = listOf(packagedRootfs, packagedRuntimeManifest, packagedMinisdAndroid)
+        val inputs = listOf(packagedRootfs, packagedRuntimeManifest)
         val missing = inputs.filterNot { it.isFile }
         val required = System.getenv("MINIS_REQUIRE_RUNTIME_PAYLOAD") == "1"
-        if ((missing.isNotEmpty() && missing.size != inputs.size) || required) {
-            if (missing.isNotEmpty()) {
-                throw GradleException(
-                    "Runtime payload is incomplete; missing: ${missing.joinToString { it.path }}",
-                )
-            }
+        if ((missing.isNotEmpty() && missing.size != inputs.size) || (required && missing.isNotEmpty())) {
+            throw GradleException("Rootfs runtime payload is incomplete; missing: ${missing.joinToString { it.path }}")
         }
 
-        delete(generatedRuntimeAssets, generatedRuntimeJniLibs)
+        delete(generatedRuntimeAssets)
         if (missing.isNotEmpty()) return@doLast
 
         val manifest = JsonSlurper().parse(packagedRuntimeManifest) as? Map<*, *>
             ?: throw GradleException("Runtime manifest is not a JSON object")
         val expected = mapOf(
-            "schemaVersion" to 2,
-            "protocolVersion" to 1,
-            "layoutVersion" to 2,
-            "abi" to "arm64-v8a",
+            "schemaVersion" to 3,
+            "distro" to "ubuntu",
+            "arch" to "arm64",
+            "profile" to "base",
         )
         expected.forEach { (key, value) ->
-            if (manifest[key] != value) {
-                throw GradleException("Runtime manifest $key must be $value")
-            }
+            if (manifest[key] != value) throw GradleException("Runtime manifest $key must be $value")
         }
-        if (manifest["minisdSha256"] != sha256(packagedMinisdAndroid)) {
-            throw GradleException("Runtime manifest minisd SHA-256 mismatch")
+        if (manifest.keys.any { it in setOf("minisdVersion", "minisdSha256", "protocolVersion") }) {
+            throw GradleException("Runtime manifest contains obsolete broker fields")
         }
         if (manifest["rootfsSha256"] != sha256(packagedRootfs)) {
             throw GradleException("Runtime manifest rootfs SHA-256 mismatch")
@@ -361,16 +355,38 @@ val stageRuntimePayload by tasks.registering {
         }
 
         copy {
-            from(packagedRootfs) {
-                rename { "ubuntu-arm64-rootfs.tar.gz.aapt-preserve" }
-            }
+            from(packagedRootfs) { rename { "ubuntu-arm64-rootfs.tar.gz.aapt-preserve" } }
             from(packagedRuntimeManifest)
             into(generatedRuntimeAssets.get().dir("minis-runtime"))
         }
+    }
+}
+
+val stageRootNetworkProxy by tasks.registering {
+    group = "build"
+    description = "Stages the single-purpose Root outbound proxy separately from the rootfs payload."
+    inputs.files(packagedRootNetworkProxy, packagedRootNetworkProxySha)
+    outputs.dir(generatedRootNetworkProxyJniLibs)
+    outputs.upToDateWhen { false }
+    doLast {
+        val inputs = listOf(packagedRootNetworkProxy, packagedRootNetworkProxySha)
+        val missing = inputs.filterNot { it.isFile }
+        val required = System.getenv("MINIS_REQUIRE_RUNTIME_PAYLOAD") == "1"
+        val runtimePresent = packagedRootfs.isFile || packagedRuntimeManifest.isFile
+        if ((missing.isNotEmpty() && missing.size != inputs.size) || ((required || runtimePresent) && missing.isNotEmpty())) {
+            throw GradleException("Root network proxy payload is incomplete; missing: ${missing.joinToString { it.path }}")
+        }
+
+        delete(generatedRootNetworkProxyJniLibs)
+        if (missing.isNotEmpty()) return@doLast
+        val expected = packagedRootNetworkProxySha.readText().trim().split(Regex("\\s+"), limit = 2).firstOrNull().orEmpty().lowercase()
+        if (!expected.matches(Regex("[0-9a-f]{64}")) || expected != sha256(packagedRootNetworkProxy)) {
+            throw GradleException("Root network proxy SHA-256 mismatch")
+        }
         copy {
-            from(packagedMinisdAndroid)
-            into(generatedRuntimeJniLibs.get().dir("arm64-v8a"))
-            rename { "libminisd.so" }
+            from(packagedRootNetworkProxy)
+            into(generatedRootNetworkProxyJniLibs.get().dir("arm64-v8a"))
+            rename { "libminisnetproxy.so" }
         }
     }
 }
@@ -401,10 +417,11 @@ tasks.matching { it.name == "mergeDebugAssets" || it.name == "mergeReleaseAssets
         }
     }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
-    .configureEach { dependsOn(stageRuntimePayload) }
+    .configureEach { dependsOn(stageRootNetworkProxy) }
 tasks.named("preBuild") {
     dependsOn(copyBashismRules)
     dependsOn(stageRuntimePayload)
+    dependsOn(stageRootNetworkProxy)
     dependsOn(verifyRcloneAar16k)
 }
 

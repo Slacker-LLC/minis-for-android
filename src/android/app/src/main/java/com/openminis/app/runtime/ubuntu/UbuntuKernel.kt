@@ -94,6 +94,11 @@ internal object UbuntuKernel {
             )
         }
 
+        val network = RootNetworkProxy.ensureReady(ctx)
+        if (!network.ready) {
+            return@withLock Status(false, error = network.detail ?: "Root outbound network proxy unavailable")
+        }
+
         val provisioned = UbuntuProvisioner.ensureProvisioned(ctx)
         if (!provisioned.ready) {
             return@withLock Status(
@@ -309,7 +314,7 @@ internal object UbuntuKernel {
             "PYTHONDONTWRITEBYTECODE" to "1",
             "GOMAXPROCS" to "2",
         )
-        env.putAll(RuntimePathRegistry.systemProxyEnv(ctx))
+        env.putAll(RootNetworkProxy.proxyEnv())
         val envArgs = env.entries.joinToString(" ") {
             DirectRootRunner.shellQuote("${it.key}=${it.value}")
         }
