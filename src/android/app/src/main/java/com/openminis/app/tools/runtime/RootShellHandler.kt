@@ -20,13 +20,15 @@ class RootShellHandler : ToolHandler {
         timeoutMs = 1_000L,
     )
 
+    internal fun failClosedResult(): ToolExecutionResult = ToolExecutionResult(
+        output = "Error: permission_denied: root.shell is retired; use a fixed-purpose Android tool",
+        success = false,
+    )
+
     override suspend fun execute(
         argsJson: String,
         sessionId: String,
         context: Context,
         toolId: String,
-    ): ToolExecutionResult = ToolExecutionResult(
-        output = "Error: permission_denied: root.shell is retired; use a fixed-purpose Android tool",
-        success = false,
-    )
+    ): ToolExecutionResult = failClosedResult()
 }
