@@ -419,7 +419,9 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let handle = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
             let mut request = Vec::new();
             let mut byte = [0u8; 1];
             while request.windows(4).last() != Some(b"\r\n\r\n") {
@@ -435,7 +437,9 @@ mod tests {
         (address, handle)
     }
 
-    fn test_connector(origin: SocketAddr) -> impl FnOnce(&str, Ipv4Addr, u16) -> Result<TcpStream, String> {
+    fn test_connector(
+        origin: SocketAddr,
+    ) -> impl FnOnce(&str, Ipv4Addr, u16) -> Result<TcpStream, String> {
         move |_host, _ip, _port| TcpStream::connect(origin).map_err(|error| error.to_string())
     }
 
@@ -516,7 +520,9 @@ mod tests {
         );
 
         client
-            .write_all(b"GET /through-tunnel HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n")
+            .write_all(
+                b"GET /through-tunnel HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n",
+            )
             .unwrap();
         client.shutdown(Shutdown::Write).unwrap();
         let mut tunneled = String::new();
