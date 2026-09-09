@@ -56,9 +56,6 @@ ACTIVE_MINISD_RE = re.compile(
 # Match the retired daemon identity without confusing normal Minis-prefixed
 # names such as MinisDocumentsProvider or MinisDebug* with `minisd`.
 PRODUCTION_MINISD_RE = re.compile(r"(?:\bminisd\b|\bMinisd[A-Za-z0-9_]*\b|\bMINISD\b)")
-NEGATIVE_HISTORY_RE = re.compile(
-    r"(?i)\b(?:historical|history|legacy|former|obsolete|removed|retired|without|no|not)\b"
-)
 UPSTREAM_CLONE_RE = re.compile(
     r"(?is)\bgit\s+clone\b[^\n]*(?:github\.com[/:]OpenMinis/OpenMinis(?:\.git)?|\bOpenMinisPet\b)"
 )
@@ -111,23 +108,27 @@ def _read_text(path: Path, relative: str, errors: list[str], kind: str) -> str |
         return None
 
 
+def _strip_source_comments(text: str) -> str:
+    """Remove source comments while preserving strings/identifiers for residue checks."""
+    text = re.sub(r"(?s)<!--.*?-->", "", text)
+    text = re.sub(r"(?s)/\*.*?\*/", "", text)
+    text = re.sub(r"(?m)//[^\n]*$", "", text)
+    return text
+
+
 def _check_production_minisd(relative: str, text: str, errors: list[str]) -> None:
+    # Concrete obsolete paths/artifacts are never valid in production source,
+    # even in comments: they are common copy/paste vectors for regressions.
     if ACTIVE_MINISD_RE.search(text):
         errors.append(f"obsolete minisd build/runtime path referenced by production source: {relative}")
         return
 
-    lines = text.splitlines()
-    for index, line in enumerate(lines):
-        if not PRODUCTION_MINISD_RE.search(line):
-            continue
-        start = max(0, index - 1)
-        end = min(len(lines), index + 2)
-        context = " ".join(lines[start:end])
-        if NEGATIVE_HISTORY_RE.search(context):
-            continue
-        errors.append(
-            f"obsolete minisd identity referenced by production source: {relative}:{index + 1}"
-        )
+    # Plain historical prose may remain in comments, but executable source,
+    # string literals, resource values and identifiers must not carry the old
+    # daemon identity.
+    code = _strip_source_comments(text)
+    if PRODUCTION_MINISD_RE.search(code):
+        errors.append(f"obsolete minisd identity referenced by production source: {relative}")
 
 
 def check_repository(root: Path) -> list[str]:
