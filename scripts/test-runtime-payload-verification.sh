@@ -60,6 +60,27 @@ with tarfile.open(src, "w:gz") as tar:
 PY
 }
 
+mutate_manifest() {
+  local mode="$1" dir="$2"
+  python3 - "$dir/runtime-manifest.json" "$mode" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+mode = sys.argv[2]
+data = json.loads(path.read_text(encoding="utf-8"))
+if mode == "wrong_upstream_sha":
+    data["upstreamSha256"] = "0" * 64
+elif mode == "wrong_arch":
+    data["arch"] = "x86_64"
+elif mode == "invalid_revision":
+    data["revision"] = 0
+elif mode == "obsolete_broker_field":
+    data["minisdSha256"] = "0" * 64
+else:
+    raise SystemExit(f"unknown manifest mutation: {mode}")
+path.write_text(json.dumps(data), encoding="utf-8")
+PY
+}
+
 expect_failure() {
   local name="$1"; shift
   local dir="$TMP/$name"
@@ -75,10 +96,10 @@ make_fixture "$TMP/valid"
 "$VERIFY" "$TMP/valid"
 expect_failure tampered_rootfs sh -c 'printf tampered >> "$1/ubuntu-arm64-rootfs.tar.gz"' _
 expect_failure missing_rootfs sh -c 'rm "$1/ubuntu-arm64-rootfs.tar.gz"' _
-expect_failure wrong_upstream_sha sh -c 'python3 - "$1/runtime-manifest.json" <<"PY"\nimport json, pathlib, sys\np=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["upstreamSha256"]="0"*64; p.write_text(json.dumps(d))\nPY' _
-expect_failure wrong_arch sh -c 'python3 - "$1/runtime-manifest.json" <<"PY"\nimport json, pathlib, sys\np=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["arch"]="x86_64"; p.write_text(json.dumps(d))\nPY' _
-expect_failure invalid_revision sh -c 'python3 - "$1/runtime-manifest.json" <<"PY"\nimport json, pathlib, sys\np=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["revision"]=0; p.write_text(json.dumps(d))\nPY' _
-expect_failure obsolete_broker_field sh -c 'python3 - "$1/runtime-manifest.json" <<"PY"\nimport json, pathlib, sys\np=pathlib.Path(sys.argv[1]); d=json.loads(p.read_text()); d["minisdSha256"]="0"*64; p.write_text(json.dumps(d))\nPY' _
+expect_failure wrong_upstream_sha mutate_manifest wrong_upstream_sha
+expect_failure wrong_arch mutate_manifest wrong_arch
+expect_failure invalid_revision mutate_manifest invalid_revision
+expect_failure obsolete_broker_field mutate_manifest obsolete_broker_field
 
 # Tar structural failures use direct fixture mutations.
 for mode in unsafe_symlink duplicate_entry malformed_metadata; do
