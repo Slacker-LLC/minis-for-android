@@ -49,7 +49,6 @@ new_test.parent.mkdir(parents=True, exist_ok=True)
 new_test.write_text(r'''package com.openminis.app.runtime.guest
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -121,5 +120,25 @@ class GuestCommandBridgeTest {
     }
 }
 ''', encoding="utf-8")
+
+# These comments were the last Java/Kotlin mentions of the removed API/package.
+for path, old, new in [
+    (
+        MAIN / "com/openminis/app/tools/runtime/ToolProvider.kt",
+        "(UbuntuRuntime / MinisdClient)",
+        "(UbuntuRuntime / App-owned direct backend)",
+    ),
+    (
+        MAIN / "com/openminis/app/tools/runtime/LinuxProvider.kt",
+        "singleton (UbuntuRuntime / MinisdClient)",
+        "singleton (UbuntuRuntime / App-owned direct backend)",
+    ),
+    (
+        MAIN / "com/openminis/app/runtime/files/WorkspaceFileClient.kt",
+        "move out of runtime.minisd once all callers are migrated.",
+        "retain the guest-path API while using direct App-owned file I/O.",
+    ),
+]:
+    replace_required(path, old, new)
 
 print("phase2b direct guest bridge cleanup applied")
