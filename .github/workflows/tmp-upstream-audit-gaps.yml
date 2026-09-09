@@ -17,57 +17,67 @@ jobs:
         with:
           ref: fix/upstream-audit-gaps-20260909
           fetch-depth: 0
-      - name: Apply audited fixes
+      - name: Refine audited fixes
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
-          script = Path('.github/scripts/apply_upstream_audit_gaps.py')
-          text = script.read_text(encoding='utf-8')
-          text = text.replace('"🇨🇳"', '"\\\\uD83C\\\\uDDE8\\\\uD83C\\\\uDDF3"')
-          text = text.replace('"🇹🇼"', '"\\\\uD83C\\\\uDDF9\\\\uD83C\\\\uDDFC"')
-          script.write_text(text, encoding='utf-8')
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              s = p.read_text(encoding='utf-8')
+              if old not in s:
+                  raise SystemExit(f'missing anchor: {label}')
+              if s.count(old) != 1:
+                  raise SystemExit(f'non-unique anchor: {label} ({s.count(old)})')
+              p.write_text(s.replace(old, new, 1), encoding='utf-8')
 
-          main = Path('src/android/app/src/main/java/com/openminis/app/MainActivity.kt')
-          s = main.read_text(encoding='utf-8')
-          if 'showing newer-database guidance screen' not in s:
-              pattern = re.compile(
-                  r'(?m)^(?P<i>\s*)val minisApp = application as\? MinisApp\n(?P=i)if \(minisApp == null \|\| !minisApp\.subsystemsInitialized\) \{'
-              )
-              m = pattern.search(s)
-              if not m:
-                  raise SystemExit('Fork MainActivity anchor not found')
-              i = m.group('i')
-              replacement = (
-                  f'{i}val minisApp = application as? MinisApp\n\n'
-                  f'{i}if (minisApp != null &&\n'
-                  f'{i}    minisApp.dbVersionDecision ==\n'
-                  f'{i}    com.openminis.app.data.db.DatabaseVersionGuard.Decision.SHOW_NEWER_DB_GUIDANCE\n'
-                  f'{i}) {{\n'
-                  f'{i}    android.util.Log.w("MainActivity", "showing newer-database guidance screen")\n'
-                  f'{i}    setContent {{ NewerDatabaseGuidanceScreen(onExit = {{ finishAndRemoveTask() }}) }}\n'
-                  f'{i}    return\n'
-                  f'{i}}}\n\n'
-                  f'{i}if (minisApp == null || !minisApp.subsystemsInitialized) {{'
-              )
-              s = pattern.sub(lambda _: replacement, s, count=1)
-              main.write_text(s, encoding='utf-8')
-          PY
-          python .github/scripts/apply_upstream_audit_gaps.py
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('src/android/app/src/main/java/com/openminis/app/data/repository/ProviderRepository.kt')
-          p.write_text(p.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          replace_once(
+              'src/android/app/src/main/java/com/openminis/app/data/repository/ProviderRepository.kt',
+              '            val manualManager = com.openminis.app.auth.OAuthManager.forInstance(context, instance)\n',
+              '            val manualManager = oauthManagerFor(instance)\n                ?: com.openminis.app.auth.OAuthManager.forInstance(context, instance)\n',
+              'manual bearer manager fallback',
+          )
+
+          app_db = Path('src/android/app/src/main/java/com/openminis/app/data/db/AppDatabase.kt')
+          s = app_db.read_text(encoding='utf-8')
+          if 'const val APP_DATABASE_VERSION = 20' not in s:
+              anchor = 'import androidx.sqlite.db.SupportSQLiteDatabase\n\n'
+              if anchor not in s:
+                  raise SystemExit('missing AppDatabase import anchor')
+              s = s.replace(anchor, anchor + 'const val APP_DATABASE_VERSION = 20\n\n', 1)
+          if '    version = 20,\n' in s:
+              s = s.replace('    version = 20,\n', '    version = APP_DATABASE_VERSION,\n', 1)
+          if '    version = APP_DATABASE_VERSION,\n' not in s:
+              raise SystemExit('AppDatabase annotation not bound to shared version constant')
+          app_db.write_text(s, encoding='utf-8')
+
+          replace_once(
+              'src/android/app/src/main/java/com/openminis/app/data/db/DatabaseVersionGuard.kt',
+              '    const val CODE_DB_VERSION = 20\n',
+              '    const val CODE_DB_VERSION = APP_DATABASE_VERSION\n',
+              'shared database version constant',
+          )
+
+          model = Path('src/android/app/src/main/java/com/openminis/app/data/model/LLMModel.kt')
+          s = model.read_text(encoding='utf-8')
+          s = s.replace(
+              '        // Catalog ordering = default-pick order. grok-4.3 stays the\n        // flagship on top.',
+              '        // Catalog ordering = default-pick order. Keep the newest confirmed\n        // fallback model first.',
+              1,
+          )
+          model.write_text(s, encoding='utf-8')
           PY
       - name: Validate diff
         run: |
           git diff --check
-          git diff --exit-code -- . ':!.github/scripts/apply_upstream_audit_gaps.py' ':!.github/workflows/tmp-upstream-audit-gaps.yml' >/dev/null && exit 1 || true
-      - name: Commit fixes
+          grep -q 'const val APP_DATABASE_VERSION = 20' src/android/app/src/main/java/com/openminis/app/data/db/AppDatabase.kt
+          grep -q 'version = APP_DATABASE_VERSION' src/android/app/src/main/java/com/openminis/app/data/db/AppDatabase.kt
+          grep -q 'CODE_DB_VERSION = APP_DATABASE_VERSION' src/android/app/src/main/java/com/openminis/app/data/db/DatabaseVersionGuard.kt
+          grep -q 'val manualManager = oauthManagerFor(instance)' src/android/app/src/main/java/com/openminis/app/data/repository/ProviderRepository.kt
+      - name: Commit refinement
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/android/app
-          git commit -m "fix(android): apply remaining upstream audit gaps"
+          git commit -m "fix(android): harden audit gap integration"
           git push origin HEAD:fix/upstream-audit-gaps-20260909
