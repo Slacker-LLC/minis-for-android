@@ -1,0 +1,35 @@
+name: tmp-remaining-audit-sync
+
+on:
+  push:
+    branches:
+      - fix/upstream-audit-gaps-20260909
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/upstream-audit-gaps-20260909
+          fetch-depth: 0
+      - name: Fetch locked upstream baseline
+        run: git fetch --no-tags --depth=1 https://github.com/OpenMinis/OpenMinis.git 4ef29002e88db1e20e462ec2ff46916e8a7dcb45
+      - name: Apply remaining audited sync
+        run: python3 .github/scripts/apply_remaining_audit_sync.py
+      - name: Validate patch
+        run: |
+          git diff --check
+          git status --short
+          test -n "$(git diff --name-only -- src/android/app)"
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android/app
+          git commit -m "fix(android): finish audited upstream behavior sync"
+          git push origin HEAD:fix/upstream-audit-gaps-20260909
