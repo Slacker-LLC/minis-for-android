@@ -53,6 +53,32 @@ object ExecutionCoordinator {
         appContext = context.applicationContext
     }
 
+    /**
+     * Verify the direct Ubuntu runtime before a caller performs guest-command
+     * side effects such as creating a temporary script in canonical storage.
+     * Returns null when ready, otherwise the same structured failure used by
+     * [execute].
+     */
+    suspend fun ensureRuntimeReady(): CommandResult? = ensureRuntimeReady(System.currentTimeMillis())
+
+    private suspend fun ensureRuntimeReady(startTime: Long): CommandResult? {
+        if (!::appContext.isInitialized) {
+            return failure(
+                "execution coordinator is not initialized",
+                startTime,
+                "RUNTIME_UNAVAILABLE",
+            )
+        }
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(appContext)
+        val ready = UbuntuRuntime.ensureReady()
+        if (ready.running) return null
+        return failure(
+            "ubuntu unavailable: ${ready.lastError ?: "not ready"}",
+            startTime,
+            "RUNTIME_UNAVAILABLE",
+        )
+    }
+
     suspend fun execute(
         sessionId: String,
         command: String,
@@ -65,15 +91,7 @@ object ExecutionCoordinator {
         }
         return mutex.withLock {
             val startTime = System.currentTimeMillis()
-            if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(appContext)
-            val ready = UbuntuRuntime.ensureReady()
-            if (!ready.running) {
-                return@withLock failure(
-                    "ubuntu unavailable: ${ready.lastError ?: "not ready"}",
-                    startTime,
-                    "RUNTIME_UNAVAILABLE",
-                )
-            }
+            ensureRuntimeReady(startTime)?.let { return@withLock it }
 
             val danger = DangerousCommandPolicy.dangerousReason(command)
             if (danger != null) {
