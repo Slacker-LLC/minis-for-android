@@ -4,6 +4,33 @@ from pathlib import Path
 worker = Path(__file__).with_name("phase3_direct_runtime_cleanup.py")
 text = worker.read_text(encoding="utf-8")
 
+# The first successful worker pass already pushed the rootfs/network payload
+# migration and physical minisd deletion. CI was then written through the
+# GitHub connector because GITHUB_TOKEN cannot push workflow-file changes.
+# Resume only from guards/docs/acceptance to keep the phased work idempotent.
+old = '''    phase_payload_and_network_proxy()
+    phase_remove_minisd()
+    phase_ci()
+    phase_guards()
+    phase_docs()
+    acceptance_and_cleanup()
+'''
+new = '''    phase_guards()
+    phase_docs()
+    acceptance_and_cleanup()
+'''
+if old not in text:
+    raise SystemExit("cannot patch phase3 resume point")
+text = text.replace(old, new, 1)
+
+# The Actions token also cannot delete workflow files in the final cleanup
+# commit. Leave the temporary workflow for the connector to delete after the
+# tested code/docs cleanup commit has landed.
+workflow_cleanup = '        ".github/workflows/tmp-direct-runtime-inventory.yml",\n'
+if workflow_cleanup not in text:
+    raise SystemExit("cannot defer temporary workflow deletion")
+text = text.replace(workflow_cleanup, "", 1)
+
 # The worker embeds the generated check_build_cleanup.py in a raw triple-single
 # quoted literal. Keep the regex itself double-quoted so it cannot terminate
 # that outer literal before the worker is parsed.
@@ -71,4 +98,4 @@ if old not in text:
 text = text.replace(old, new, 1)
 
 worker.write_text(text, encoding="utf-8", newline="\n")
-print("phase3 worker acceptance hardened")
+print("phase3 worker resumed after CI handoff")
