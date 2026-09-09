@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">Interrupteur grisé ? (« Réglage restreint »)</string>
+    <string name="system_permissions_a11y_restricted_footer">Android bloque l\'interrupteur d\'accessibilité pour les applis installées depuis un fichier APK téléchargé. C\'est une politique de sécurité du système, pas un bug de Minis — votre installation n\'a rien d\'anormal. Autoriser les réglages restreints ne fait que réactiver l\'interrupteur ; cela n\'accorde rien en soi, et vous décidez toujours d\'activer ou non le service.</string>
+    <string name="system_permissions_a11y_restricted_manual">Autoriser les réglages restreints</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">Infos sur l\'appli → menu ⋮ (en haut à droite) → Autoriser les réglages restreints</string>
+    <string name="system_permissions_a11y_restricted_shizuku">Autoriser les réglages restreints via Shizuku</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">Un seul appui — lève l\'indicateur sans quitter Minis</string>
+    <string name="system_permissions_a11y_restricted_working">Autorisation en cours…</string>
+    <string name="system_permissions_a11y_restricted_failed">Échec — suivez les étapes manuelles ci-dessous</string>
+</resources>
