@@ -1,4 +1,4 @@
-name: tmp-direct-runtime-phase1
+name: tmp-direct-runtime-phase2a
 
 on:
   push:
@@ -6,16 +6,33 @@ on:
       - refactor/direct-ubuntu-runtime
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  compile:
+  cleanup-and-test:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           ref: refactor/direct-ubuntu-runtime
+          fetch-depth: 0
+      - name: Apply phase 2a cleanup
+        run: python3 .github/scripts/phase2a_direct_runtime_cleanup.py
+      - name: Validate diff
+        run: |
+          git diff --check
+          if grep -RInE 'runtime\.minisd\.(MinisdClient|MinisdProtocol|MinisdBootstrap|ExecutionCancellationRegistry)' src/android/app/src/main/java src/android/app/src/test/java; then
+            echo 'stale broker API reference remains' >&2
+            exit 1
+          fi
+      - name: Commit phase 2a
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor(runtime): remove dead minisd client layers"
+          git push origin HEAD:refactor/direct-ubuntu-runtime
       - uses: actions/setup-go@v5
         with:
           go-version-file: deps/rclone-mobile/go.mod
@@ -39,10 +56,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v5.0.2
-      - name: Compile Android Kotlin
+      - name: Compile and run JVM tests
         env:
           MINIS_REQUIRE_RUNTIME_PAYLOAD: '0'
         working-directory: src/android
         run: |
           chmod +x gradlew
-          ./gradlew :app:compileDebugKotlin --max-workers=4 --stacktrace
+          ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --max-workers=4 --stacktrace
