@@ -4,7 +4,7 @@ from pathlib import Path
 worker = Path(__file__).with_name("phase3_direct_runtime_cleanup.py")
 text = worker.read_text(encoding="utf-8")
 
-# Production migration, guards, and top-level docs are already committed.
+# Production migration, guards, and active docs/contracts are already committed.
 # The one-off worker must now do exactly one thing: run the full acceptance
 # suite against the final tree with the phase scripts removed in its worktree.
 full = '''    phase_payload_and_network_proxy()
@@ -33,12 +33,13 @@ workflow_line = '        ".github/workflows/tmp-direct-runtime-inventory.yml",\n
 if workflow_line in text:
     text = text.replace(workflow_line, "", 1)
 
-# GitHub's contents API does not preserve the executable bit for gradlew.
-# Acceptance runs the wrapper directly, so restore the checkout-local mode
-# without committing any production-tree permission change.
-gradlew = Path("gradlew")
-if gradlew.is_file():
-    gradlew.chmod(gradlew.stat().st_mode | 0o111)
+# Contents-API edits can leave the Android wrapper without an executable bit in
+# the branch tree. Acceptance invokes it directly from src/android, so restore
+# only the checkout-local mode; the helper itself is deleted after acceptance.
+gradlew = Path("src/android/gradlew")
+if not gradlew.is_file():
+    raise SystemExit("Android gradlew is missing")
+gradlew.chmod(gradlew.stat().st_mode | 0o111)
 
 worker.write_text(text, encoding="utf-8", newline="\n")
 print("phase3 worker ready for acceptance only")
