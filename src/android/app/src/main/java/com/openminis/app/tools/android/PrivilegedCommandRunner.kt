@@ -2,13 +2,9 @@ package com.openminis.app.tools.android
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.runtime.minisd.MinisdClient
-import com.openminis.app.runtime.minisd.MinisdProtocol
-import com.openminis.app.runtime.minisd.MinisdResponse
-import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.ubuntu.DirectRootRunner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -274,149 +270,49 @@ object PrivilegedCommandRunner {
         val tool = argv.first()
         val commandArgs = argv.drop(1)
         val effectiveRisk = CommandRisk.max(risk, PrivilegedCommandRisk.classify(tool, commandArgs))
-        val executionId = MinisdClient.newExecutionId("root")
         Log.i(
             TAG,
-            "dispatch risk=${effectiveRisk.name.lowercase()} operation=$operation " +
-                "tool=$tool session=$sessionId executionId=$executionId",
+            "direct-root risk=${effectiveRisk.name.lowercase()} operation=$operation " +
+                "tool=$tool session=$sessionId",
         )
-
-        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
-        val broker = UbuntuRuntime.ensureBrokerReady()
-        if (!broker.ok) return broker.toCommandResult(rootOnly)
-
-        return try {
-            executeFull(
-                tool = tool,
-                args = commandArgs,
-                timeoutMs = timeoutMs,
-                executionId = executionId,
-                rootOnly = rootOnly,
-            )
+        val result = try {
+            DirectRootRunner.runArgv(argv, timeoutMs)
         } catch (cancelled: CancellationException) {
-            withContext(NonCancellable) {
-                runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
-            }
             throw cancelled
         }
+        return AndroidCommandResult(
+            backend = if (result.error == null) PrivilegedBackend.ROOT else PrivilegedBackend.NONE,
+            exitCode = result.exitCode,
+            stdout = result.stdout,
+            stderr = result.stderr,
+            timedOut = result.timedOut,
+            unavailableReason = result.error?.let {
+                if (rootOnly) "required Root capability is unavailable: $it" else it
+            },
+        )
     }
 
-    /** Explicit root authorization probe. Never called by passive capability reads. */
+    /** Explicit Root authorization probe; passive capability reads never invoke su. */
     suspend fun requestActiveRootProbe(context: Context, sessionId: String): RootProbeResult {
         if (RootCommandRunner.passiveSuPath() == null) {
             return RootProbeResult(false, error = "su executable not found")
         }
         Log.i(TAG, "active root probe requested session=$sessionId")
-        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
-        val broker = UbuntuRuntime.ensureBrokerReady()
-        val probe = if (broker.ok) {
-            UbuntuRuntime.client.rootProbe().toRootProbe()
+        val script = """
+            id
+            cat /proc/self/status 2>/dev/null || true
+            echo __CONTEXT__
+            id -Z 2>/dev/null || echo unknown
+            echo __MODE__
+            getenforce 2>/dev/null || echo unknown
+        """.trimIndent()
+        val result = DirectRootRunner.runScript(script, 15_000L)
+        val probe = if (result.error != null || result.timedOut) {
+            RootProbeResult(false, error = result.error ?: "Root probe timed out")
         } else {
-            RootProbeResult(
-                authorized = false,
-                error = "${broker.error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: " +
-                    (broker.error?.detail ?: "minisd broker unavailable"),
-            )
+            RootProbeParser.parse(result.stdout, result.exitCode, result.stderr)
         }
         RootCommandRunner.updateProbe(probe)
         return probe
-    }
-
-    /**
-     * Root execution remains governed by minisd's structured argv validation
-     * and its one-shot internal confirm ticket. There is no additional
-     * App-owned Root permission mode above this boundary.
-     */
-    private suspend fun executeFull(
-        tool: String,
-        args: List<String>,
-        timeoutMs: Long,
-        executionId: String,
-        rootOnly: Boolean,
-    ): AndroidCommandResult {
-        val challenged = UbuntuRuntime.client.rootFullExec(
-            tool = tool,
-            args = args,
-            timeoutMs = timeoutMs,
-            executionId = executionId,
-        )
-        if (challenged.code != MinisdProtocol.ERROR_CONFIRM_REQUIRED) {
-            return challenged.toCommandResult(rootOnly)
-        }
-        val confirmId = challenged.error?.confirmId
-            ?: return AndroidCommandResult(
-                PrivilegedBackend.NONE,
-                126,
-                "",
-                "",
-                unavailableReason = "CONFIRM_REQUIRED response omitted confirm_id",
-            )
-        return UbuntuRuntime.client.rootFullExec(
-            tool = tool,
-            args = args,
-            timeoutMs = timeoutMs,
-            confirmId = confirmId,
-            executionId = executionId,
-        ).toCommandResult(rootOnly)
-    }
-
-    private fun MinisdResponse.toCommandResult(rootOnly: Boolean): AndroidCommandResult {
-        if (!ok) {
-            val code = error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE
-            return AndroidCommandResult(
-                backend = PrivilegedBackend.NONE,
-                exitCode = 126,
-                stdout = "",
-                stderr = "",
-                timedOut = code == "TOOL_TIMEOUT" || code == "TIMEOUT",
-                unavailableReason = "$code: ${error?.detail ?: if (rootOnly) "required Root capability is unavailable" else "Root execution failed"}",
-            )
-        }
-        val payload = result
-            ?: return AndroidCommandResult(
-                PrivilegedBackend.NONE,
-                126,
-                "",
-                "",
-                unavailableReason = "malformed minisd Root response",
-            )
-        return AndroidCommandResult(
-            backend = PrivilegedBackend.ROOT,
-            exitCode = payload.optInt("exit_code", 1),
-            stdout = payload.optString("stdout"),
-            stderr = payload.optString("stderr"),
-        )
-    }
-
-    private fun MinisdResponse.toRootProbe(): RootProbeResult {
-        if (!ok) {
-            return RootProbeResult(
-                authorized = false,
-                error = "${error?.code ?: MinisdProtocol.ERROR_RUNTIME_UNAVAILABLE}: ${error?.detail ?: "Root probe failed"}",
-            )
-        }
-        val payload = result ?: return RootProbeResult(false, error = "malformed minisd root.probe response")
-        val groupsJson = payload.optJSONArray("groups")
-        val groups = buildList {
-            if (groupsJson != null) {
-                for (index in 0 until groupsJson.length()) add(groupsJson.optInt(index).toString())
-            }
-        }
-        val uid = payload.optInt("uid", -1).takeIf { it >= 0 }
-        val selinuxEnforcing = if (payload.has("enforcing") && !payload.isNull("enforcing")) {
-            payload.optBoolean("enforcing")
-        } else {
-            null
-        }
-        return RootProbeResult(
-            authorized = uid == 0,
-            effectiveUid = uid,
-            effectiveGid = payload.optInt("gid", -1).takeIf { it >= 0 },
-            groups = groups,
-            effectiveCapabilitiesHex = payload.optString("capEff").ifBlank { null },
-            selinuxContext = payload.optString("selinux").ifBlank { null },
-            selinuxMode = selinuxEnforcing?.let { if (it) "Enforcing" else "Permissive" },
-            error = if (uid == 0) null else "minisd broker is not running as uid 0",
-        )
     }
 }

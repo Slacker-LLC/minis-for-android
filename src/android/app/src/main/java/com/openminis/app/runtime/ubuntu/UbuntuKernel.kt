@@ -325,7 +325,7 @@ internal object UbuntuKernel {
             UbuntuPaths.LEGACY_MEMORY to UbuntuPaths.hostMemory,
             UbuntuPaths.LEGACY_SKILLS to UbuntuPaths.hostSkills,
             UbuntuPaths.LEGACY_SHARED to UbuntuPaths.hostShared,
-            "$${UbuntuPaths.HOST_MINIS}/mcp-servers" to UbuntuPaths.hostMcpServers,
+            "${UbuntuPaths.HOST_MINIS}/mcp-servers" to UbuntuPaths.hostMcpServers,
             UbuntuPaths.LEGACY_HOME to UbuntuPaths.hostHome,
             UbuntuPaths.LEGACY_SESSIONS to UbuntuPaths.hostSessions,
         )

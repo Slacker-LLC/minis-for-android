@@ -5,6 +5,7 @@ import android.util.Log
 import com.openminis.app.runtime.minisd.WorkspaceFileClient
 import com.openminis.app.runtime.terminal.PtyBackend
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
+import com.openminis.app.runtime.ubuntu.UbuntuKernel
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -64,10 +65,23 @@ class TerminalSession internal constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.IO),
         { sessionId ->
             if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context.applicationContext)
-            prepareLaunch(sessionId, context.applicationInfo.uid,
-                { UbuntuRuntime.ensureReady() },
-                { WorkspaceFileClient.info(it, "/workspace"); Unit },
-                { UbuntuRuntime.findSu() })
+            val ready = UbuntuRuntime.ensureReady()
+            check(ready.statusFresh && ready.running && ready.lastError == null) {
+                ready.lastError ?: "Ubuntu runtime is not ready"
+            }
+            WorkspaceFileClient.info(sessionId, "/workspace")
+            val direct = UbuntuKernel.prepareLaunch(sessionId, interactive = true)
+            Launch(
+                cmd = direct.argv.first(),
+                argv = direct.argv.toTypedArray(),
+                env = arrayOf(
+                    "TERM=xterm-256color",
+                    "LANG=C.UTF-8",
+                    "LC_ALL=C.UTF-8",
+                    "HOME=/home/minis",
+                    "MINIS_CHAT_SESSION_ID=${sessionId.orEmpty()}",
+                ),
+            )
         },
         NativePtyBackend,
     )

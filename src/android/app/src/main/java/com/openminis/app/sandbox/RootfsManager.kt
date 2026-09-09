@@ -2,7 +2,9 @@ package com.openminis.app.sandbox
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.runtime.minisd.MinisdProtocol
+import com.openminis.app.runtime.ExecutionCoordinator
+import com.openminis.app.runtime.ubuntu.UbuntuKernel
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.runtime.ubuntu.RootfsHealth
 import com.openminis.app.runtime.ubuntu.RootfsHealthCode
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
@@ -32,7 +34,7 @@ sealed class RootfsInstallState {
  */
 class RootfsManager private constructor(private val context: Context) {
 
-    val rootfsDir: File = File(MinisdProtocol.DEFAULT_ROOTFS)
+    val rootfsDir: File = File(UbuntuPaths.HOST_ROOTFS)
 
     val isInstalled: Boolean
         get() = _installState.value is RootfsInstallState.Installed
@@ -41,15 +43,14 @@ class RootfsManager private constructor(private val context: Context) {
     val installState: StateFlow<RootfsInstallState> = _installState.asStateFlow()
 
     suspend fun checkHealth(): RootfsHealth = withContext(Dispatchers.IO) {
-        if (!com.openminis.app.runtime.ubuntu.UbuntuRuntime.isInitialized) {
-            com.openminis.app.runtime.ubuntu.UbuntuRuntime.init(context)
-        }
-        com.openminis.app.runtime.ubuntu.UbuntuRuntime.inspectRootfs()
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        UbuntuKernel.inspectRootfs()
     }
 
     suspend fun installIfNeeded() = withContext(Dispatchers.IO) {
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
         _installState.value = RootfsInstallState.Preparing
-        val before = checkHealth()
+        val before = UbuntuKernel.inspectRootfs()
         if (before.healthy) {
             _installState.value = RootfsInstallState.Installed
             return@withContext
@@ -58,40 +59,25 @@ class RootfsManager private constructor(private val context: Context) {
             _installState.value = RootfsInstallState.Failed(before.detail)
             return@withContext
         }
-
         _installState.value = RootfsInstallState.Extracting(0f)
-        // RuntimeDistributionManager owns staging, validation, switching, and
-        // rollback. RootfsManager must not recreate those privileged actions.
-        val started = UbuntuRuntime.start()
-        if (!started.statusFresh || !started.running) {
-            _installState.value = RootfsInstallState.Failed(
-                started.lastError ?: "rootfs deployment did not start Ubuntu",
-            )
-            return@withContext
-        }
-
-        _installState.value = RootfsInstallState.Finalizing
-        val after = checkHealth()
-        if (after.healthy) {
-            _installState.value = RootfsInstallState.Installed
+        val after = UbuntuKernel.ensureRootfs()
+        _installState.value = if (after.healthy) {
+            RootfsInstallState.Installed
         } else {
-            _installState.value = RootfsInstallState.Failed(
-                "rootfs recovery completed but validation failed: ${after.detail}",
-            )
+            RootfsInstallState.Failed(after.detail)
         }
     }
 
     suspend fun installProotIfNeeded() = withContext(Dispatchers.IO) { Unit }
 
     suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
-        if (keepUserData) Log.i(TAG, "reset: persistent user data is external to rootfs and will be preserved")
-        if (!UbuntuRuntime.isInitialized) {
-            UbuntuRuntime.init(context)
-        }
-        val result = UbuntuRuntime.resetRootfs()
-        if (result.outcome != com.openminis.app.runtime.distribution.RuntimeDistributionManager.DeploymentOutcome.RESET) {
-            _installState.value = RootfsInstallState.Failed(result.detail)
-            throw IllegalStateException(result.detail)
+        if (keepUserData) Log.i(TAG, "reset: app-owned persistent user data will be preserved")
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        ExecutionCoordinator.stopCurrentCommand()
+        if (!UbuntuKernel.resetRootfs()) {
+            val detail = "failed to reset Ubuntu rootfs"
+            _installState.value = RootfsInstallState.Failed(detail)
+            throw IllegalStateException(detail)
         }
         _installState.value = RootfsInstallState.Idle
         null
@@ -132,11 +118,8 @@ class RootfsManager private constructor(private val context: Context) {
                     Log.d(TAG, "direct write to resolv.conf: ${t.message}")
                 }
             }
-            if (UbuntuRuntime.isInitialized) {
-                UbuntuRuntime.refreshDns(nameservers)
-            } else {
-                true
-            }
+            if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+            UbuntuKernel.refreshDns(nameservers)
         }
     }
 
