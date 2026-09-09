@@ -22,7 +22,30 @@ jobs:
           git remote add upstream https://github.com/OpenMinis/OpenMinis.git || true
           git fetch --depth=1 upstream main
       - name: Apply scoped parity fixes
-        run: python3 .github/scripts/apply_upstream_113_followup.py
+        run: |
+          # The Fork has one raw native-vision expression plus one local-variable
+          # form; let the guarded patch handle the first, then normalize the second.
+          sed -i 's/if s.count(raw_vision) != 2:/if s.count(raw_vision) != 1:/' .github/scripts/apply_upstream_113_followup.py
+          sed -i 's/expected 2, found/expected 1, found/' .github/scripts/apply_upstream_113_followup.py
+          python3 .github/scripts/apply_upstream_113_followup.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/android/app/src/main/java/com/openminis/app/ui/chat/ChatViewModel.kt')
+          s = p.read_text(encoding='utf-8')
+          old = '''        val nativeVision = currentModel?.let {
+              it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
+          } == true
+'''
+          if old not in s:
+              old = '''        val nativeVision = currentModel?.let {
+            it.inputModalities?.map { m -> m.lowercase() }?.contains("image") == true
+        } == true
+'''
+          if s.count(old) != 1:
+              raise SystemExit(f'visionPlaceholder nativeVision anchor count={s.count(old)}')
+          s = s.replace(old, '        val nativeVision = currentModel?.hasImageInput == true\n', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Validate patch
         run: |
           git diff --check
