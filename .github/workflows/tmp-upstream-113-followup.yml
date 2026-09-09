@@ -1,0 +1,39 @@
+name: tmp-upstream-113-followup
+
+on:
+  push:
+    branches:
+      - fix/upstream-1.13-parity-followup
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/upstream-1.13-parity-followup
+          fetch-depth: 0
+      - name: Fetch upstream source
+        run: |
+          git remote add upstream https://github.com/OpenMinis/OpenMinis.git || true
+          git fetch --depth=1 upstream main
+      - name: Apply scoped parity fixes
+        run: python3 .github/scripts/apply_upstream_113_followup.py
+      - name: Validate patch
+        run: |
+          git diff --check
+          git diff --exit-code -- src/android/app >/dev/null && {
+            echo "patch produced no Android changes" >&2
+            exit 1
+          } || true
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android/app
+          git commit -m "fix(android): sync upstream provider and vision parity"
+          git push origin HEAD:fix/upstream-1.13-parity-followup
