@@ -25,6 +25,10 @@ jobs:
           s = p.read_text(encoding='utf-8')
           s = s.replace('"🇨🇳"', '"\\\\uD83C\\\\uDDE8\\\\uD83C\\\\uDDF3"')
           s = s.replace('"🇹🇼"', '"\\\\uD83C\\\\uDDF9\\\\uD83C\\\\uDDFC"')
+          s = s.replace(
+              "        val minisApp = application as? MinisApp\\n\\n        if (minisApp == null || !minisApp.subsystemsInitialized) {\\n",
+              "        val minisApp = application as? MinisApp\\n        if (minisApp == null || !minisApp.subsystemsInitialized) {\\n",
+          )
           p.write_text(s, encoding='utf-8')
           PY
           python .github/scripts/apply_upstream_audit_gaps.py
