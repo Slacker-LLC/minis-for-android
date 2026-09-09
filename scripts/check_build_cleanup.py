@@ -53,7 +53,9 @@ LEGACY_WRAPPER_RE = re.compile(r"(?i)build-pet-apk\.ps1")
 ACTIVE_MINISD_RE = re.compile(
     r"(?i)(?:src/native/minisd|build-minisd-android|libminisd\.so|minisd-arm64-v8a|runtime\.minisd|minisd\.sock)"
 )
-PRODUCTION_MINISD_RE = re.compile(r"(?i)minisd")
+# Match the retired daemon identity without confusing normal Minis-prefixed
+# names such as MinisDocumentsProvider or MinisDebug* with `minisd`.
+PRODUCTION_MINISD_RE = re.compile(r"(?:\bminisd\b|\bMinisd[A-Za-z0-9_]*\b|\bMINISD\b)")
 NEGATIVE_HISTORY_RE = re.compile(
     r"(?i)\b(?:historical|history|legacy|former|obsolete|removed|retired|without|no|not)\b"
 )
