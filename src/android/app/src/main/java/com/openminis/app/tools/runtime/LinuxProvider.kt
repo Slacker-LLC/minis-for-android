@@ -15,14 +15,14 @@ import com.openminis.app.tools.ToolExecutionResult
  * even before Ubuntu starts. Runtime-backed tools get one on-demand recovery
  * attempt through [revive]. If that recovery still fails, execution is handed
  * to the downstream handler so it can surface the concrete bootstrap error
- * (missing minisd, missing rootfs, auth mismatch, keeper failure, and so on)
+ * (missing rootfs, Root access failure, mount/provisioning failure, and so on)
  * instead of replacing it with a generic availability error. A provider that
  * has no recovery hook retains the fixed `ubuntu_runtime_unavailable` fallback.
  */
 class LinuxProvider(
     private val available: () -> Boolean,
     /** Optional on-demand recovery: called once when [available] is false
-     *  (e.g. UbuntuRuntime.ensureReady — cheap when minisd is already up). */
+     *  (e.g. UbuntuRuntime.ensureReady — cheap when direct Ubuntu is already ready). */
     private val revive: (suspend () -> Boolean)? = null,
 ) : ToolProvider {
 
