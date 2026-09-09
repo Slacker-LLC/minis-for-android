@@ -61,7 +61,8 @@ class LlmCorrectionStrategy(
 
         val instance = repository.instance(entry.providerInstanceId)
             ?: throw CorrectionError.NoModelAvailable
-        val apiKey = repository.loadApiKey(instance.id) ?: throw CorrectionError.NoModelAvailable
+        // Keyless compatible endpoints are valid, matching the normal chat path.
+        val apiKey = repository.usableApiKey(instance) ?: throw CorrectionError.NoModelAvailable
         val provider = ProviderFactory.create(instance, apiKey, entry.model, this.context)
 
         // [T-android-voice-correction-diag] Name the resolved model BEFORE the
@@ -111,7 +112,7 @@ class LlmCorrectionStrategy(
         repository.resolveTitleSubEntry()?.let { return it to "sub" }
         val primaryGroupId = repository.defaultPrimaryGroupId
         val group = primaryGroupId?.let { repository.group(it) }
-        val entry = group?.let { repository.firstEnabledMemberEntry(it) }
+        val entry = group?.let { repository.availableMemberEntries(it).firstOrNull() }
         if (entry != null) return entry to "primary"
         Log.e(TAG, "no correction model available (neither sub nor primary group resolves)")
         return null

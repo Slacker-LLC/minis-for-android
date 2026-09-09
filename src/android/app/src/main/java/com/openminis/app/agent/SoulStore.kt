@@ -460,7 +460,7 @@ object SystemPromptBuilder {
         // the model never says "I can't change my personality".
         val soulEditHint =
             "---\n" +
-            "SOUL.md fields (name / style / lang / body) can be edited two ways:\n" +
+            "SOUL.md fields (name / icon / style / lang / body) can be edited two ways:\n" +
             "1. Tool: call `minis-config` to propose changes (user must approve).\n" +
             "2. UI: ask the user to go to Settings → Soul to edit directly.\n" +
             "Pick whichever the user finds easier in context. Do not say you cannot change your personality."

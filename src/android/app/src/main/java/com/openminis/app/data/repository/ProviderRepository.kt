@@ -1050,6 +1050,33 @@ class ProviderRepository(private val context: Context) {
         enabledMemberEntries(group).firstOrNull()
 
     /**
+     * [T-android-group-resolve-skip-uncredentialed] Whether [instance] has ANY
+     * usable credential — API key, an intentionally keyless compatible endpoint,
+     * a manual bearer, or a stored OAuth token.
+     */
+    fun hasAnyCredential(instance: ProviderInstance): Boolean {
+        if (usableApiKey(instance) != null) return true
+        return com.openminis.app.auth.OAuthManager.hasStoredCredential(context, instance.id)
+    }
+
+    /**
+     * Members of [group] that are usable now. Filtering happens before routing,
+     * preserves declaration order, and skips hidden/disabled/uncredentialed rows.
+     */
+    fun availableMemberEntries(group: ModelGroup): List<ModelEntry> {
+        val config = _config.value
+        return group.memberEntryIds.mapNotNull { entryId ->
+            val entry = config.modelEntries.find { it.id == entryId } ?: return@mapNotNull null
+            if (entry.isHidden) return@mapNotNull null
+            val instance = config.instances.find { it.id == entry.providerInstanceId }
+                ?: return@mapNotNull null
+            if (!instance.isEnabled) return@mapNotNull null
+            if (!hasAnyCredential(instance)) return@mapNotNull null
+            entry
+        }
+    }
+
+    /**
      * [T-android-regenerate-title-submodel] The dedicated title-generation
      * sub-model entry: the first enabled member of the configured
      * `defaultSubGroupId` group. Returns null when no sub-group is configured or
@@ -1061,7 +1088,7 @@ class ProviderRepository(private val context: Context) {
     fun resolveTitleSubEntry(): ModelEntry? {
         val subGroupId = defaultSubGroupId ?: return null
         val group = group(subGroupId) ?: return null
-        return firstEnabledMemberEntry(group)
+        return availableMemberEntries(group).firstOrNull()
     }
 
     /**

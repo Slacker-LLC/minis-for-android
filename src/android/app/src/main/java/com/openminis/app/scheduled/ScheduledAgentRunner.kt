@@ -200,7 +200,8 @@ object ScheduledAgentRunner {
                             ?.let { eid -> app.providerRepository.config.value.modelEntries.firstOrNull { it.id == eid }?.model?.id }
                             ?: groupIdForSeed
                                 ?.let { gid -> app.providerRepository.group(gid) }
-                                ?.let { g -> app.providerRepository.enabledMemberEntries(g).firstOrNull()?.model?.id }
+                                // Credential-aware: unattended runs skip members that cannot authenticate.
+                                ?.let { g -> app.providerRepository.availableMemberEntries(g).firstOrNull()?.model?.id }
                     }
                     ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
                     ?: run {
