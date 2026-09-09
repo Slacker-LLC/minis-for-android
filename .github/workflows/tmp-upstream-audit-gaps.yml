@@ -18,7 +18,16 @@ jobs:
           ref: fix/upstream-audit-gaps-20260909
           fetch-depth: 0
       - name: Apply audited fixes
-        run: python .github/scripts/apply_upstream_audit_gaps.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/apply_upstream_audit_gaps.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('"🇨🇳"', '"\\\\uD83C\\\\uDDE8\\\\uD83C\\\\uDDF3"')
+          s = s.replace('"🇹🇼"', '"\\\\uD83C\\\\uDDF9\\\\uD83C\\\\uDDFC"')
+          p.write_text(s, encoding='utf-8')
+          PY
+          python .github/scripts/apply_upstream_audit_gaps.py
       - name: Validate diff
         run: |
           git diff --check
