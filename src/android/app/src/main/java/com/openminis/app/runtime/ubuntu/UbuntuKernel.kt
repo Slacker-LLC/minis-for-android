@@ -94,6 +94,14 @@ internal object UbuntuKernel {
             )
         }
 
+        val provisioned = UbuntuProvisioner.ensureProvisioned(ctx)
+        if (!provisioned.ready) {
+            return@withLock Status(
+                false,
+                error = provisioned.detail ?: "Ubuntu package provisioning failed",
+            )
+        }
+
         val migrated = migrateRootOwnedUserDataLocked(ctx)
         if (!migrated) {
             return@withLock Status(false, error = "failed to migrate legacy /data/adb/minis user data into app storage")
