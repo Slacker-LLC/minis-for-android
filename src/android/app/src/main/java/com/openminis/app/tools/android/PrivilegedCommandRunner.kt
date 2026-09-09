@@ -324,8 +324,8 @@ object PrivilegedCommandRunner {
 
     /**
      * Root execution remains governed by minisd's structured argv validation
-     * and its one-shot internal confirm ticket. There is no App-owned
-     * STANDARD/FULL_ACCESS permission mode above this boundary.
+     * and its one-shot internal confirm ticket. There is no additional
+     * App-owned Root permission mode above this boundary.
      */
     private suspend fun executeFull(
         tool: String,
