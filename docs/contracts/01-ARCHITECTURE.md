@@ -1,6 +1,6 @@
 # 01 — 运行时架构合同
 
-本文定义当前产品应保持的 Root/minisd/Ubuntu 执行边界。最终 `master` 源码与测试用于判断实现现状；已确认偏差写入 `06-CURRENT-GAPS.md`。
+本文定义当前产品应保持的 Direct Root / Ubuntu 执行边界。最终目标分支源码与测试用于判断实现现状；已确认偏差写入 `06-CURRENT-GAPS.md`。
 
 ## 总图
 
@@ -12,66 +12,72 @@ Android 原生 App
 ├─ Android 原生工具
 ├─ MCP Client + 本地 MCP Server
 ├─ Voice / Assistant / Overlay
-└─ Unix socket RPC
+└─ ExecutionCoordinator / App-owned persistent shell
    ↓
-minisd（Root Broker，可信计算基）
+UbuntuKernel / DirectRootRunner
    ↓
-独立 mount namespace + 显式 bind mount + chroot
+su → setsid → unshare -m
+   ↓ 显式 bind mount
+chroot /data/adb/minis/rootfs
    ↓
-Ubuntu 24.04 userspace（与 Android 共用内核，不是虚拟机）
+setpriv(App UID/GID, clear groups, drop all capabilities)
+   ↓
+Ubuntu 24.04 bash / userspace
 ```
 
-产品运行时是 Root-only。PRoot、Alpine 或其它 userspace 模拟执行后端不属于当前架构，也不是兼容性要求。
+产品运行时是 Root-only。PRoot、Alpine、旧 broker 或其它 userspace 模拟/双栈后端不属于当前架构。
 
 ## Android App
 
-App 是应用数据库、Provider/Model、工具注册与权限、用户审批、session 选择、运行时编排和恢复策略的权威。
+App 是应用数据库、Provider/Model、工具注册与权限、用户审批、session 选择、运行时编排、shell 生命周期和恢复策略的权威。不要为 MCP、Terminal、Voice 或其它入口再造第二套 Agent、数据库、权限或 session 真源。
 
-不要为 MCP、Terminal、Voice 或其它入口再造第二套 Agent、数据库、权限或 session 真源。
+## Root 边界
 
-## minisd
+Root 只用于 App 自有基础设施：
 
-`minisd` 是唯一特权 Linux 边界。它负责：
+- 探测 Root 与 direct chroot 前置条件；
+- 校验、安装、修复 `/data/adb/minis/rootfs`；
+- 为每个 shell 建立独立 mount namespace 和显式 bind mounts；
+- 进入 chroot 后用 `setpriv` 降到真实 App UID/GID并清空 capabilities；
+- 执行一次性 legacy 数据迁移；
+- 启动固定 loopback 的 Root 网络代理。
 
-- 私有、结构化、有界的 Root RPC；
-- `/data/adb/minis` 布局与实际 App UID/GID；
-- keeper、mount namespace、显式 bind mount、chroot；
-- session 路径的包含与隔离；
-- rootfs 启动、健康、恢复所需的特权操作。
-
-运行时策略只能收紧编译期能力天花板，不能扩大。Agent 命令不得因为进入 guest 就保留无限制 root 身份。
+`DirectRootRunner` 是内部 launcher，不是 Agent 工具，也不是通用 Root RPC。Agent、MCP、Provider、模型输出不得直接成为 Root 脚本或 `su -c` 参数。
 
 ## Ubuntu guest
 
 Ubuntu 24.04 userspace运行在 Android 内核上。chroot 不是 VM，也不是强隔离容器。
 
-对模型和普通工具公开 guest 路径：`/workspace`、`/memory`、`/skills`、`/shared`、`/home/minis`。Host `/data/adb/minis/...` 是 runtime/storage 实现细节，不应成为模型提示词里的默认路径。
+对模型和普通工具公开 guest 路径：`/workspace`、`/memory`、`/skills`、`/shared`、`/home/minis` 和 `/var/minis/...`。这些 guest 路径由 direct runtime 绑定到 App-owned backing；Host 绝对路径不是模型提示词里的默认接口。
 
 ## Session
 
-当调用链带有效 `session_id` 时，workspace 与相关附件/浏览器/offload 数据必须来自该 session backing。Terminal、shell、文件链接、附件与 Agent 执行应对同一 session 得到一致视图。
+当调用链带有效 `session_id` 时，workspace、attachments、offloads、browser 必须来自该 session backing。Terminal、shell、文件链接、附件与 Agent 执行应对同一 session 得到一致视图。
 
-不得用固定 UID/GID 或全局 `/workspace` 旁路 session 语义。当前 Terminal 偏差见 #186 / `06-CURRENT-GAPS.md`。
+不得用固定 UID/GID或全局 `/workspace` 旁路 session 语义。
 
 ## 启动顺序
 
-1. 校验固定持久化参数；
-2. 必要时退休陈旧 keeper；
-3. 创建/校正 `/data/adb/minis` 布局、owner、mode；
-4. 校验路径包含、符号链接与 backing，拒绝无效/tmpfs 用户数据源；
-5. 校验或恢复 rootfs；
-6. 启动 keeper，建立 namespace/bind/chroot；
-7. guest/runtime 探针通过后才报告 READY。
-
-`minisd` 必须能在 rootfs 损坏时独立启动，以便恢复 rootfs。
+1. 初始化 App-owned 路径与 session/global backing；
+2. 验证 Root 授权；
+3. 校验或修复 rootfs；
+4. 验证 `unshare` / `mount` / `chroot` / `setsid` / guest `setpriv`；
+5. 确保固定 Root 网络代理可用；
+6. 完成 Ubuntu provision；
+7. 如需要，迁移旧 Root-owned 用户数据到 App 私有目录；
+8. 安装/刷新 guest command bridge；
+9. 建立 per-shell namespace/binds/chroot，并在 guest 内降权后启动 bash；
+10. 只有全部前置条件通过才报告 READY。
 
 ## 网络
 
-Guest 使用 Android 网络栈。当前有效网络发生变化时，包括 VPN 开启/切换/关闭，guest resolver 应跟随实际 system/VPN DNS 刷新。公共 DNS fallback 属于策略层，不能代替正确继承当前网络 DNS。当前缺口见 #190。
+Guest 的 HTTP/HTTPS 出站通过 `127.0.0.1:18787` 的独立 `minis-root-network-proxy`。该 helper 以 Root 身份负责向外建立连接，用于绕过部分 Android/VPN/BPF 场景对非 Root guest UID 的出站限制；它只提供 HTTP absolute-form 和 CONNECT 转发，不提供命令、文件或通用 RPC。
+
+代理监听地址固定为 loopback，拒绝普通 private/loopback 目标；`198.18.0.0/15` Fake-IP 范围保留用于 VPN/TUN 兼容。DNS 优先读取 Android 当前网络信息并有受控 fallback。真实 VPN/DNS 行为仍需设备验收。
 
 ## 非目标
 
-- 不恢复 PRoot/Alpine 双运行时；
+- 不恢复旧 broker 或 PRoot/Alpine 双运行时；
 - 不把 guest 宣传成 VM/强沙箱；
 - 不把 Root、无障碍、Shizuku、普通 Android API 合并成一条权限阶梯；
 - 不通过伪装 FGS 类型维持无限后台寿命；

@@ -1,95 +1,99 @@
 # Execution Environment
 
-This document describes the current rooted-device execution contract for Minis for Android. Current implementation deviations are listed explicitly instead of being hidden behind the target architecture.
+This document describes the current rooted-device execution contract for Minis for Android.
 
 ## Overview
 
 ```text
-Android kernel
-  ↓
 Android app
-  ↓ Unix socket RPC
-minisd (root broker)
   ↓
-private mount namespace
+ExecutionCoordinator / App-owned persistent shell
+  ↓
+UbuntuKernel / DirectRootRunner
+  ↓
+su → setsid → unshare -m
   ↓ explicit bind mounts
-chroot
+chroot /data/adb/minis/rootfs
+  ↓
+setpriv(real App UID/GID, clear groups, drop capabilities)
   ↓
 Ubuntu 24.04 userspace
 ```
 
-The Ubuntu environment reuses the Android kernel. It is not a VM and is not a complete container security boundary. The active product runtime is Root-only; PRoot/Alpine compatibility is not part of this execution model.
+The Ubuntu environment reuses the Android kernel. It is not a VM or a complete container security boundary. The active product runtime is Root-only; PRoot/Alpine and the former root broker are not active backends.
 
 ## Roles
 
 ### Android app
 
-The app owns application/database state, provider/model state, tool registration and permissions, user approvals, execution checkpoints, session selection, and runtime readiness/recovery orchestration.
+The app owns application/database state, provider/model state, tool registration and permissions, user approvals, execution checkpoints, session selection, path resolution, shell lifecycle, and runtime readiness/recovery orchestration.
 
-### `minisd`
+### Root infrastructure
 
-`minisd` is the privileged root broker and part of the trusted computing base. It owns the bounded privileged RPC surface, prepares the canonical host-side persistent layout, establishes the private namespace/binds/chroot, and launches guest execution under the dynamically resolved App guest UID/GID.
+Root is used narrowly to validate/repair the rootfs, establish each shell's private mount namespace, apply explicit bind mounts, enter the chroot, perform the one-time legacy data migration, and start the fixed loopback network proxy.
 
-A fixed UID/GID such as `10000:10000` is not a valid runtime contract.
+`DirectRootRunner` is internal infrastructure. It is not an Agent/MCP command surface and must not accept model-controlled commands.
 
 ### Ubuntu guest
 
-The guest is Ubuntu 24.04 userspace entered through the chroot prepared by `minisd`. Public tool contracts use guest paths such as `/workspace`, `/memory`, `/skills`, `/shared`, and `/home/minis` rather than host paths.
+Guest commands run under the real Android App UID/GID after `setpriv` clears supplementary groups and Linux capabilities. A fixed identity such as `10000:10000` is not a valid runtime contract.
 
-## Canonical host layout
+Public tool contracts use guest paths such as `/workspace`, `/memory`, `/skills`, `/shared`, `/home/minis`, and `/var/minis/...` rather than host paths.
 
-Root: `/data/adb/minis`.
+## Host storage
 
-| Host path | Purpose / guest mapping |
+Root-owned runtime state:
+
+| Host path | Purpose |
 |---|---|
 | `/data/adb/minis/rootfs` | replaceable Ubuntu rootfs |
-| `/data/adb/minis/workspace` | global `/workspace` backing where a non-session flow explicitly uses it |
-| `/data/adb/minis/sessions` | per-session backing |
-| `/data/adb/minis/memory` | `/memory` |
-| `/data/adb/minis/skills` | `/skills` |
-| `/data/adb/minis/shared` | `/shared` |
-| `/data/adb/minis/home` | `/home/minis` |
-| `/data/adb/minis/run` | broker/runtime state |
-| `/data/adb/minis/log` | broker/runtime logs |
 
-Persistent user-data directories use the real App guest UID/GID and mode `0700`. Rootfs/run/log use their runtime-specific root ownership/modes.
+Active guest user data is App-owned and derived from `Context.filesDir`:
 
-Persistent sources must be canonical, contained, non-symlink escape paths and not tmpfs-backed. Alternate persistence backing must fail closed.
+| Backing | Guest role |
+|---|---|
+| `minis/workspace` | global `/workspace` when explicitly non-session |
+| `minis-sessions/<session_id>/...` | per-session workspace/attachments/offloads/browser |
+| `minis-global/memory` | `/memory` |
+| `minis-global/skills` | `/skills` |
+| `minis-global/shared` | `/shared` |
+| `minis-global/mcp-servers` | `/var/minis/mcp-servers` |
+| `minis/home` | `/home/minis` |
+
+Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` paths are migration sources only. After `.root-data-migrated-v1` is written they are not active bind sources.
 
 ## Session execution
 
-With a valid `session_id`, execution must use the session backing below `/data/adb/minis/sessions/<session_id>/`. Session data such as `workspace`, `attachments`, `offloads`, and `browser` stays under the same containment and ownership checks.
+With a valid `session_id`, execution must use the corresponding App-owned session backing. The same session view must be shared by terminal, Agent shell, attachments, links, offloads, browser data, and file access.
 
-A terminal or helper path must not silently fall back to fixed `10000:10000` plus global `/workspace` when the selected chat/runtime session is session-scoped.
+Each shell gets its own mount namespace. Namespace mounts disappear with that shell/process tree.
 
 ## Startup order
 
-1. validate the fixed persistent parameters;
-2. retire stale keeper state when required;
-3. create/repair `/data/adb/minis` ownership and modes using the actual App identity;
-4. validate containment/backing and reject invalid persistent sources;
-5. validate or recover the Ubuntu rootfs;
-6. start the keeper and establish namespace/binds/chroot;
-7. expose READY only after the runtime readiness checks succeed.
+1. initialize App-owned paths;
+2. verify Root authorization;
+3. inspect/repair the Ubuntu rootfs;
+4. verify `unshare`, `mount`, `chroot`, `setsid`, and guest `setpriv`;
+5. ensure the Root network proxy is ready;
+6. provision the Ubuntu userspace;
+7. migrate legacy Root-owned user data if the marker is absent;
+8. install/refresh the guest command bridge;
+9. create per-shell namespace/binds/chroot;
+10. drop to App UID/GID and start bash.
 
-The broker must remain independently startable when the rootfs needs repair.
-
-## Rootfs lifecycle
-
-The Ubuntu rootfs is runtime state, not user data. Runtime upgrade/recovery may replace `/data/adb/minis/rootfs`, but it must not replace `workspace`, `sessions`, `memory`, `skills`, `shared`, or `home`.
+Readiness is fail-closed: a missing required stage must not silently fall back to another backend.
 
 ## Network and DNS
 
-The guest uses Android's network stack. DNS must follow the currently effective Android network, including VPN-provided resolvers, and must refresh when the active network/VPN changes. Public DNS fallback is a separate policy decision and must not substitute for correctly inheriting the active VPN/system resolver.
+Guest HTTP/HTTPS uses `http://127.0.0.1:18787`, served by the standalone Root helper `minis-root-network-proxy`. The helper exists because some Android/VPN/BPF configurations can block outbound connections made by the non-root guest UID while Root egress remains usable.
 
-## Current implementation deviations
+The proxy is deliberately narrow: fixed loopback listener, HTTP absolute-form/CONNECT only, bounded headers/concurrency, ordinary private/loopback target rejection, and no command/file/RPC surface. The `198.18.0.0/15` Fake-IP range is explicitly allowed for VPN/TUN compatibility.
 
-At the 2026-09-04 audit baseline (`master` `6f10d1b3f413d37aca5c21465e8e71ef3eb12120`):
+DNS is derived from Android network information with controlled fallbacks. CI proves parser/policy/build behavior; real VPN switching and OEM networking still require device verification.
 
-- #186: the terminal PTY path does not yet fully follow the dynamic guest identity/session workspace contract.
-- #190: VPN-enabled devices can leave the Ubuntu guest without a usable current DNS resolver.
+## Rootfs lifecycle
 
-These are implementation gaps, not alternate supported architectures.
+The Ubuntu rootfs is runtime state, not user data. Runtime upgrade/recovery may replace `/data/adb/minis/rootfs`, but it must not replace App-owned workspace, sessions, memory, skills, shared data, MCP data, or home.
 
 ## SELinux and capability model
 
