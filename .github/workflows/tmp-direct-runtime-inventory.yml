@@ -18,13 +18,13 @@ jobs:
         run: |
           echo '=== minisd package refs ==='
           grep -RInE --exclude-dir=.git --exclude-dir=build --exclude-dir=minisd 'runtime\.minisd|Minisd[A-Za-z]+|minisd' src/android/app/src/main src/android/app/src/test src/android/app/build.gradle.kts src/android/build.gradle.kts 2>/dev/null || true
+          echo '=== cleanup type callers ==='
+          grep -RInE --exclude='RuntimeDistributionManager.kt' --exclude='RuntimeDistributionManifest.kt' --exclude='RuntimePayloadVerifier.kt' --exclude='RuntimeDiagnostics.kt' --exclude='RuntimeProvision.kt' --exclude='MinisdConfigBridgeServer.kt' 'RuntimeDistributionManager|RuntimeDistributionManifest|RuntimePayloadVerifier|RuntimeDiagnosticsMapper|BrokerDiagnostic|KeeperDiagnostic|RuntimeProvision|MinisdConfigBridgeServer' src/android/app/src/main/java src/android/app/src/test/java 2>/dev/null || true
           echo '=== UbuntuRuntime API refs ==='
           grep -RInE --exclude='UbuntuRuntime.kt' 'UbuntuRuntime\.[A-Za-z_]+' src/android/app/src/main/java src/android/app/src/test/java 2>/dev/null || true
-          echo '=== UbuntuRuntime.client refs ==='
-          grep -RInE 'UbuntuRuntime\.client|\.client\.(ubuntu|root|runtime|workspace|mount|cancel)' src/android/app/src/main/java 2>/dev/null || true
           echo '=== WorkspaceFileClient refs ==='
-          grep -RIn 'WorkspaceFileClient' src/android/app/src/main/java 2>/dev/null || true
-          echo '=== runtime/native payload refs ==='
-          grep -RInE --exclude-dir=.git 'libminisd|minisd\.so|src/minisd|runtime payload|runtime_payload|RUNTIME_PAYLOAD' src/android .github 2>/dev/null || true
-          echo '=== su/process/chroot helpers ==='
-          grep -RInE 'ProcessBuilder\(|/system/bin/su|resolveSu\(|su -c|chroot|unshare|mount --bind' src/android/app/src/main/java src/android/app/src/main/assets 2>/dev/null || true
+          grep -RIn 'WorkspaceFileClient' src/android/app/src/main/java src/android/app/src/test/java 2>/dev/null || true
+          echo '=== guest bridge / minis-config refs ==='
+          grep -RInE --exclude-dir=.git 'minis-config|mini[s-]model-use|NativeOffloadServer|ConfigOffloadHandler' src/android/app/src/main/java src/android/app/src/main/assets scripts src/native 2>/dev/null || true
+          echo '=== runtime payload/build refs ==='
+          grep -RInE --exclude-dir=.git 'libminisd|minisd-arm64|minisdSha|minisdVersion|build-minisd|src/native/minisd|runtime-manifest|MINIS_REQUIRE_RUNTIME_PAYLOAD' src/android scripts .github README.md docs 2>/dev/null || true
