@@ -70,6 +70,20 @@ class BuildCleanupGuardTests(unittest.TestCase):
         source.write_text('val runtime = "minisd"\n', encoding="utf-8")
         self.assertTrue(any("obsolete minisd identity" in error for error in GUARD.check_repository(root)))
 
+    def test_production_minisd_class_identity_is_rejected(self) -> None:
+        root = self.make_repo()
+        source = root / "src/android/app/src/main/java/example/Runtime.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("class MinisdClient\n", encoding="utf-8")
+        self.assertTrue(any("obsolete minisd identity" in error for error in GUARD.check_repository(root)))
+
+    def test_normal_minis_d_prefixed_name_is_not_a_daemon_match(self) -> None:
+        root = self.make_repo()
+        source = root / "src/android/app/src/main/java/example/Documents.kt"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("class MinisDocumentsProvider\n", encoding="utf-8")
+        self.assertEqual([], GUARD.check_repository(root))
+
     def test_production_minisd_runtime_path_is_rejected_even_in_comment(self) -> None:
         root = self.make_repo()
         source = root / "src/android/app/src/main/java/example/Runtime.kt"
