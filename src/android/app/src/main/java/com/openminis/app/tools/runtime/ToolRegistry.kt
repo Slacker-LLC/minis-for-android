@@ -180,6 +180,18 @@ class LinuxPythonRunHandler : ToolHandler {
         if (code.isBlank()) return ToolExecutionResult("Error: 'code' is required", false)
         val requestedMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else null
         val timeoutMs = ToolTimeoutPolicy.resolve("linux.python.run", callerOverrideMs = requestedMs).timeoutMs ?: 300_000L
+        val readinessFailure = com.openminis.app.runtime.ExecutionCoordinator.ensureRuntimeReady()
+        if (readinessFailure != null) {
+            val failureKind = readinessFailure.failureKind.toToolFailureKind()
+            return ToolExecutionResult(
+                output = readinessFailure.output,
+                success = false,
+                toolTitle = args.optString("tool_title", "linux.python.run"),
+                timedOut = failureKind == ToolFailureKind.TOOL_TIMEOUT,
+                failureKind = failureKind,
+            )
+        }
+
         val scriptPath = "/workspace/python_run_${System.currentTimeMillis()}_${toolId.ifBlank { "tool" }}.py"
         var primary: ToolExecutionResult? = null
         var cancelled: CancellationException? = null
