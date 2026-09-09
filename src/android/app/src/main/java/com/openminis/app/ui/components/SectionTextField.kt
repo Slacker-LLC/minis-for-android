@@ -25,6 +25,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
 /**
  * Text input for use inside a [SectionCard]. Wraps a BasicTextField in
@@ -70,6 +71,7 @@ fun SectionTextField(
      * look the settings screens have.
      */
     containerColor: Color? = null,
+    contentHorizontalPadding: Dp = 0.dp,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val colors = OutlinedTextFieldDefaults.colors(
@@ -84,7 +86,7 @@ fun SectionTextField(
     // Horizontal = 0 so glyphs align with sibling section content (parent
     // already adds the 16dp horizontal inset). See T352.
     val contentPadding = PaddingValues(
-        horizontal = 0.dp,
+        horizontal = contentHorizontalPadding,
         vertical = SectionDesign.RowVerticalPadding,
     )
     val mergedTextStyle = LocalTextStyle.current.merge(textStyle)

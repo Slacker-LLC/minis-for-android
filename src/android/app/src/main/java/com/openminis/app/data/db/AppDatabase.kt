@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+const val APP_DATABASE_VERSION = 20
+
 @Database(
     entities = [
         ChatSessionEntity::class,
@@ -20,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BotTaskEntity::class,
         BotInboxEventEntity::class,
     ],
-    version = 20,
+    version = APP_DATABASE_VERSION,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

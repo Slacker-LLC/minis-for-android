@@ -40,6 +40,7 @@ import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.ui.navigation.AppNavigation
 import com.openminis.app.ui.navigation.Routes
 import com.openminis.app.ui.navigation.safeNavigate
+import com.openminis.app.ui.NewerDatabaseGuidanceScreen
 import com.openminis.app.ui.settings.KEY_FONT_APP_BASE
 import com.openminis.app.ui.settings.KEY_KEEP_SCREEN_AWAKE
 import com.openminis.app.ui.settings.KEY_LANGUAGE
@@ -242,6 +243,16 @@ class MainActivity : ComponentActivity() {
         // assigned, so it stays false for exactly as long as composing is
         // genuinely unsafe.
         val minisApp = application as? MinisApp
+
+        if (minisApp != null &&
+            minisApp.dbVersionDecision ==
+            com.openminis.app.data.db.DatabaseVersionGuard.Decision.SHOW_NEWER_DB_GUIDANCE
+        ) {
+            android.util.Log.w("MainActivity", "showing newer-database guidance screen")
+            setContent { NewerDatabaseGuidanceScreen(onExit = { finishAndRemoveTask() }) }
+            return
+        }
+
         if (minisApp == null || !minisApp.subsystemsInitialized) {
             android.util.Log.w(
                 "MainActivity",

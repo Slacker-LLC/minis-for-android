@@ -1356,4 +1356,10 @@
     <string name="chat_attachment_expand_preview">Vorschau erweitern</string>
     <string name="chat_attachment_collapse_preview">Vorschau einklappen</string>
     <string name="chat_attachment_card_mode">Als Karte einklappen</string>
+    <string name="compact_progress">Wird verdichtet… %1$d s vergangen</string>
+    <string name="compact_progress_split">Wird verdichtet… %1$d s · Zusammenfassung in Segmenten (%2$d/%3$d)</string>
+    <string name="newer_db_title">Ihre Daten stammen aus einer neueren Version</string>
+    <string name="newer_db_body">Diese Kopie von Minis ist älter als die Version, die Ihre Daten erstellt hat, und kann sie daher nicht sicher öffnen.\n\nEs wurde nichts gelöscht — Ihre Unterhaltungen sind auf diesem Gerät unversehrt. Installieren Sie die neuere Version von Minis erneut, dann ist alles wieder da.</string>
+    <string name="newer_db_versions">Diese Version unterstützt Datenformat %1$d</string>
+    <string name="newer_db_exit">Schließen</string>
 </resources>

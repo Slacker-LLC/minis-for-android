@@ -1246,4 +1246,10 @@
     <string name="chat_attachment_expand_preview">Agrandir l\'aperçu</string>
     <string name="chat_attachment_collapse_preview">Réduire l\'aperçu</string>
     <string name="chat_attachment_card_mode">Réduire en carte</string>
+    <string name="compact_progress">Compactage… %1$d s écoulées</string>
+    <string name="compact_progress_split">Compactage… %1$d s · résumé par segments (%2$d/%3$d)</string>
+    <string name="newer_db_title">Vos données proviennent d\'une version plus récente</string>
+    <string name="newer_db_body">Cette copie de Minis est plus ancienne que celle qui a créé vos données, elle ne peut donc pas les ouvrir sans risque.\n\nRien n\'a été supprimé — vos conversations sont intactes sur cet appareil. Réinstallez la version plus récente de Minis et tout sera de nouveau là.</string>
+    <string name="newer_db_versions">Cette version prend en charge le format de données %1$d</string>
+    <string name="newer_db_exit">Fermer</string>
 </resources>

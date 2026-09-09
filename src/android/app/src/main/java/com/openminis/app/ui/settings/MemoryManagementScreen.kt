@@ -50,6 +50,7 @@ import com.openminis.app.ui.components.DialogTextField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.width
 
 /**
  * Settings-level memory file management.
@@ -190,26 +191,37 @@ private fun MemoryFileRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // [T-android-memory-row-date-wrap] Let the name/size group
+                // flex and truncate; the fixed date remains one line.
                 Row(
+                    modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
                         file.name,
                         style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     if (file.fileSize.isNotBlank()) {
                         Text(
                             file.fileSize,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     file.modifiedDate,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
             if (file.preview.isNotBlank()) {

@@ -1609,4 +1609,11 @@
     <string name="chat_attachment_expand_preview">展开预览</string>
     <string name="chat_attachment_collapse_preview">收起预览</string>
     <string name="chat_attachment_card_mode">收起为卡片</string>
+
+    <string name="newer_db_title">数据来自更新的版本</string>
+    <string name="newer_db_body">当前安装的 Minis 比创建这些数据的版本更旧，因此无法安全打开数据库。数据没有被删除。重新安装较新的 Minis 版本后，会恢复原有会话。</string>
+    <string name="newer_db_versions">当前版本支持的数据格式：%1$d</string>
+    <string name="newer_db_exit">关闭</string>
+    <string name="compact_progress">正在压缩… 已进行 %1$d 秒</string>
+    <string name="compact_progress_split">正在压缩… %1$d 秒 · 分段摘要中（%2$d/%3$d）</string>
 </resources>

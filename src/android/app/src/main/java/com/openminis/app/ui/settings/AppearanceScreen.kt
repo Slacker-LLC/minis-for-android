@@ -116,7 +116,7 @@ const val KEY_AUTO_GROUPING = "autoGroupingEnabled"  // Boolean, default true
 const val KEY_FONT_CHAT_INPUT = "font_chat_input"  // Int scale level -2..3
 const val KEY_FONT_MESSAGE = "font_message"        // Int scale level -2..3
 const val KEY_FONT_APP_BASE = "font_app_base"      // Int scale level -2..3
-const val KEY_LANGUAGE = "app_language"             // "" = system, "en", "zh", "ja", "ko", "fr", "de", "ru"
+const val KEY_LANGUAGE = "app_language"             // "" = system, "en", "zh", "zh-Hant", "ja", "ko", "fr", "de", "ru"
 
 /** True when Enter (without Shift) should send the message. iOS calls this
  *  `returnKeyBehavior == 1`. Default 0 = Enter inserts a newline (matches
@@ -154,6 +154,7 @@ private val languageOptions = listOf(
     LanguageOption("", "\uD83C\uDF10", ""),
     LanguageOption("en", "\uD83C\uDDFA\uD83C\uDDF8", "English"),
     LanguageOption("zh", "\uD83C\uDDE8\uD83C\uDDF3", "简体中文"),
+    LanguageOption("zh-Hant", "\uD83C\uDDF9\uD83C\uDDFC", "繁體中文"),
     LanguageOption("ja", "\uD83C\uDDEF\uD83C\uDDF5", "日本語"),
     LanguageOption("ko", "\uD83C\uDDF0\uD83C\uDDF7", "한국어"),
     LanguageOption("fr", "\uD83C\uDDEB\uD83C\uDDF7", "Français"),

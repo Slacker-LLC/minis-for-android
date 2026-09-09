@@ -99,6 +99,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.openminis.app.i18n.uppercaseForDisplay
 
 /**
  * Inline state for the three update actions on [SkillDetailScreen]
@@ -965,7 +966,7 @@ private fun DetailSection(
     ) {
         if (header != null) {
             Text(
-                text = header.uppercase(),
+                text = header.uppercaseForDisplay(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,

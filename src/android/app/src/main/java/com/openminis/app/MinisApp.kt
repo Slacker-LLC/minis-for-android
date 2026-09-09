@@ -16,6 +16,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.data.db.AppDatabase
+import com.openminis.app.data.db.DatabaseVersionGuard
 import com.openminis.app.data.repository.BackgroundSettingsRepository
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.BotRepository
@@ -78,6 +79,10 @@ class MinisApp : Application(), ImageLoaderFactory {
      */
     @Volatile
     var subsystemsInitialized: Boolean = false
+        private set
+
+    @Volatile
+    var dbVersionDecision: DatabaseVersionGuard.Decision = DatabaseVersionGuard.Decision.PROCEED
         private set
 
     /**
@@ -393,7 +398,15 @@ class MinisApp : Application(), ImageLoaderFactory {
         // show the crash-share dialog. The app still cannot do real work this
         // launch, but it FAILS VISIBLY AND RECOVERABLY instead of dying on the
         // first Compose frame forever.
+        dbVersionDecision = DatabaseVersionGuard.evaluate(this)
+
         try {
+        if (dbVersionDecision == DatabaseVersionGuard.Decision.SHOW_NEWER_DB_GUIDANCE) {
+            error(
+                "on-disk chat schema is newer than this build " +
+                    "(code=${DatabaseVersionGuard.CODE_DB_VERSION}); refusing to open it; database left untouched"
+            )
+        }
         // Repositories that read canonical guest files must have a configured
         // broker client before their constructors run.
         UbuntuRuntime.init(this)
