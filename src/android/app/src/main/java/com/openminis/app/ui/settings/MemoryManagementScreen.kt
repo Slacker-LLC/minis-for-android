@@ -50,6 +50,7 @@ import com.openminis.app.ui.components.DialogTextField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.width
 
 /**
  * Settings-level memory file management.

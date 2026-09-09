@@ -33,6 +33,8 @@ import com.openminis.app.ui.theme.ChatColors
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableStateOf
 
 // [T-android-split-chat] Self-contained "thinking / streaming" dot indicators
 // extracted verbatim from ChatScreen.kt. `internal` so the chat package can

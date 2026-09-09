@@ -1606,4 +1606,8 @@
     <string name="chat_attachment_card_mode">Свернуть в карточку</string>
     <string name="compact_progress">Сжатие… прошло %1$d с</string>
     <string name="compact_progress_split">Сжатие… %1$d с · сводка по частям (%2$d/%3$d)</string>
+    <string name="newer_db_title">Ваши данные созданы более новой версией</string>
+    <string name="newer_db_body">Эта копия Minis старше той, что создала ваши данные, поэтому не может безопасно их открыть.\n\nНичего не удалено — ваши переписки на устройстве целы. Переустановите более новую версию Minis, и всё вернётся на место.</string>
+    <string name="newer_db_versions">Эта версия поддерживает формат данных %1$d</string>
+    <string name="newer_db_exit">Закрыть</string>
 </resources>

@@ -1364,4 +1364,8 @@
     <string name="chat_attachment_card_mode">カードに折りたたむ</string>
     <string name="compact_progress">圧縮中… %1$d 秒経過</string>
     <string name="compact_progress_split">圧縮中… %1$d 秒 · 分割して要約中（%2$d/%3$d）</string>
+    <string name="newer_db_title">データが新しいバージョンで作成されています</string>
+    <string name="newer_db_body">この Minis は、データを作成したバージョンより古いため、安全に開くことができません。\n\n何も削除されていません。会話はこの端末に無事残っています。新しいバージョンの Minis を再インストールすれば、すべて元どおりになります。</string>
+    <string name="newer_db_versions">このバージョンが対応するデータ形式：%1$d</string>
+    <string name="newer_db_exit">閉じる</string>
 </resources>

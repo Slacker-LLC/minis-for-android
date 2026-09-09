@@ -1356,4 +1356,8 @@
     <string name="chat_attachment_card_mode">카드로 접기</string>
     <string name="compact_progress">압축 중… %1$d초 경과</string>
     <string name="compact_progress_split">압축 중… %1$d초 · 분할 요약 중(%2$d/%3$d)</string>
+    <string name="newer_db_title">데이터가 더 새로운 버전에서 만들어졌습니다</string>
+    <string name="newer_db_body">이 Minis는 데이터를 만든 버전보다 오래되어 안전하게 열 수 없습니다.\n\n삭제된 것은 없습니다. 대화는 이 기기에 그대로 남아 있습니다. 더 새로운 버전의 Minis를 다시 설치하면 모두 그대로 나타납니다.</string>
+    <string name="newer_db_versions">이 버전이 지원하는 데이터 형식: %1$d</string>
+    <string name="newer_db_exit">닫기</string>
 </resources>
