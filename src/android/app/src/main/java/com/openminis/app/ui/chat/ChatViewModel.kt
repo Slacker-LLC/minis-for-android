@@ -4665,7 +4665,7 @@ class ChatViewModel(
         // this entry inside the group last time"). Honor it only if the
         // entry is still enabled; otherwise fall back to the first enabled
         // member so the session can still proceed on a now-degraded group.
-        val enabledMembers = providerRepository.enabledMemberEntries(group)
+        val enabledMembers = providerRepository.availableMemberEntries(group)
         if (enabledMembers.isEmpty()) return false
         val targetEntry = if (preferredEntryId != null) {
             enabledMembers.firstOrNull { it.id == preferredEntryId } ?: enabledMembers.first()

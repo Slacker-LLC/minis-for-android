@@ -663,13 +663,16 @@ class BrowserTabPool(private val context: Context) {
             ?: return BrowserActionResult.error("Failed to acquire browser tab")
         return try {
             val result = tab.manager.execute(input)
+            val withDialogs = tab.manager.drainInterceptedDialogReport()
+                ?.let { result.copy(text = it + result.text) }
+                ?: result
             // [T-android-browser-result-tab-id] Stamp the VERIFIED tab id — the
             // id of the tab we actually acquired and dispatched on, NOT the
             // global selectedTabId, which the fan-out branch in acquireTab
             // overwrites mid-flight when it spawns a fresh tab for a concurrent
             // navigate. Without this the agent had to guess tab_id for its
             // follow-up reads/scrolls and routinely picked the wrong tab.
-            stampTabId(result.copy(pageURL = tab.manager.currentURL.value), tab.id)
+            stampTabId(withDialogs.copy(pageURL = tab.manager.currentURL.value), tab.id)
         } finally {
             tab.lastActivityDate = Date()
             if (implicitTab) {

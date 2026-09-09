@@ -118,6 +118,9 @@ class BrowserUseManager(
     private val _currentURL = MutableStateFlow("")
     val currentURL: StateFlow<String> = _currentURL.asStateFlow()
 
+    /** JS dialogs answered by the headless agent WebView, reported on the next tool result. */
+    private val dialogQueue = InterceptedDialogQueue()
+
     private val _pageTitle = MutableStateFlow("")
     val pageTitle: StateFlow<String> = _pageTitle.asStateFlow()
 
@@ -344,7 +347,12 @@ class BrowserUseManager(
                 // of the WebView so they reach the matching app instead of
                 // surfacing as ERR_UNKNOWN_URL_SCHEME.
                 return com.openminis.app.ui.browser.BrowserExternalSchemeHandler
-                    .handle(view.context, request.url)
+                    .handle(
+                        view.context,
+                        request.url,
+                        com.openminis.app.ui.browser.BrowserExternalSchemeHandler
+                            .Origin.AGENT_BACKGROUND,
+                    )
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
@@ -511,8 +519,61 @@ class BrowserUseManager(
             override fun onCloseWindow(window: WebView) {
                 onCloseWindow?.invoke()
             }
+
+            override fun onJsAlert(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: android.webkit.JsResult?,
+            ): Boolean {
+                recordInterceptedDialog("alert", message.orEmpty(), null, "(dismissed)")
+                result?.confirm()
+                return true
+            }
+
+            override fun onJsConfirm(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                result: android.webkit.JsResult?,
+            ): Boolean {
+                recordInterceptedDialog("confirm", message.orEmpty(), null, "false")
+                result?.cancel()
+                return true
+            }
+
+            override fun onJsPrompt(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                defaultValue: String?,
+                result: android.webkit.JsPromptResult?,
+            ): Boolean {
+                recordInterceptedDialog("prompt", message.orEmpty(), defaultValue, "null")
+                result?.cancel()
+                return true
+            }
         }
     }
+
+    private fun recordInterceptedDialog(
+        kind: String,
+        message: String,
+        defaultText: String?,
+        defaultResponse: String,
+    ) {
+        val url = _currentURL.value
+        dialogQueue.record(
+            kind = kind,
+            message = message,
+            defaultText = defaultText,
+            pageURL = url.ifEmpty { null },
+            defaultResponse = defaultResponse,
+        )
+        Log.i(TAG, "[JSDialog] intercepted $kind on $url — answered $defaultResponse")
+    }
+
+    fun drainInterceptedDialogReport(): String? = dialogQueue.drainReport()
 
     // -- Execute Action --
 

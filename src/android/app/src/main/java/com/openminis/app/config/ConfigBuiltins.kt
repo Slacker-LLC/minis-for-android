@@ -309,16 +309,17 @@ internal object ConfigBuiltins {
     // -- Chat / input --
 
     private fun registerChat(r: ConfigRegistry, context: Context) {
-        // Default app prefs — Android persists most chat preferences in
-        // the default SharedPreferences for the package.
-        val prefs = context.getSharedPreferences("minis_settings", Context.MODE_PRIVATE)
+        val appearancePrefs = context.getSharedPreferences(
+            com.openminis.app.ui.settings.PREF_APPEARANCE,
+            Context.MODE_PRIVATE,
+        )
         r.register(
             PrefsIntCodedEnumField(
                 path = "chat.returnKey",
                 displayName = "Return key behavior",
                 description = "What the on-screen Return key does in the chat box.",
-                prefs = prefs,
-                key = "return_key_behavior",
+                prefs = appearancePrefs,
+                key = com.openminis.app.ui.settings.KEY_RETURN_KEY_BEHAVIOR,
                 cases = listOf("newline", "send"),
                 defaultIndex = 0,
             )
@@ -328,8 +329,8 @@ internal object ConfigBuiltins {
                 path = "chat.keepScreenAwake",
                 displayName = "Keep screen awake during tasks",
                 description = "Prevents auto-lock while the agent is busy.",
-                prefs = prefs,
-                key = "keep_screen_awake_during_tasks",
+                prefs = appearancePrefs,
+                key = com.openminis.app.ui.settings.KEY_KEEP_SCREEN_AWAKE,
                 defaultValue = false,
             )
         )
@@ -344,10 +345,6 @@ internal object ConfigBuiltins {
         // (Compose recomposes immediately, no manual cache invalidation
         // needed on Android — there is no analogue to iOS
         // FontSettings.messageBaseScale .Published cache).
-        val appearancePrefs = context.getSharedPreferences(
-            com.openminis.app.ui.settings.PREF_APPEARANCE,
-            Context.MODE_PRIVATE,
-        )
         r.register(
             PrefsBoolField(
                 path = "chat.toolPreview",
@@ -849,15 +846,67 @@ internal object ConfigBuiltins {
     // -- Soul (SOUL.md personality) --
     //
     // [T-soul-md-minisconfig] Exposes the editable subset of SOUL.md
-    // (name / style / lang / body) as `soul.*` config paths. The on-disk
-    // YAML emoji field is intentionally NOT registered — matches the
-    // iOS rollback where ✨ is locked as the identity icon.
+    // (name / icon / style / lang / body) as `soul.*` config paths. The legacy
+    // YAML emoji field remains unregistered; `icon` is the current identity surface.
     //
     // Writes go through the standard PendingConfigChange / user-confirm
     // gate (registered with [ConfigRisk.SENSITIVE]); only the *approved*
     // writer touches disk. Each writer reads the current SOUL.md so
     // unrelated fields (incl. the on-disk `emoji` value that survives
     // for round-trip) are preserved when one field changes.
+
+    private fun resolveSoulIconImage(raw: String): String {
+        val icon = com.openminis.app.agent.SoulIcon
+        val bytes: ByteArray = when (val src = icon.classifySource(raw)) {
+            is com.openminis.app.agent.SoulIcon.Source.Unsupported ->
+                throw ConfigError.InvalidValue(src.reason)
+            is com.openminis.app.agent.SoulIcon.Source.Bytes -> src.data
+            is com.openminis.app.agent.SoulIcon.Source.LinuxPath -> {
+                val root = icon.ALLOWED_LINUX_ROOTS.firstOrNull {
+                    src.path == it || src.path.startsWith("$it/")
+                } ?: throw ConfigError.InvalidValue(
+                    "path must be inside one of ${icon.ALLOWED_LINUX_ROOTS.joinToString(", ")}",
+                )
+                val normalized = runCatching {
+                    java.nio.file.Paths.get(src.path).normalize().toString()
+                }.getOrElse {
+                    throw ConfigError.InvalidValue("invalid path: ${src.path}")
+                }
+                if (normalized != src.path) {
+                    throw ConfigError.InvalidValue("path must not contain traversal segments")
+                }
+                val sessionScoped = root == "/var/minis/attachments" ||
+                    root == "/var/minis/workspace" || root == "/var/minis/offloads"
+                val sid = if (sessionScoped) {
+                    ChatViewModelStore.activeSessionId
+                        ?: throw ConfigError.InvalidValue(
+                            "no active session — open a chat first, or pass the image inline as a data URI",
+                        )
+                } else ""
+                runCatching {
+                    com.openminis.app.runtime.minisd.WorkspaceFileClient
+                        .readAllBlocking(sid, src.path)
+                }.getOrElse {
+                    throw ConfigError.InvalidValue("could not read ${src.path}: ${it.message}")
+                }
+            }
+        }
+
+        val bitmap = runCatching {
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }.getOrNull() ?: throw ConfigError.InvalidValue(
+            "that data isn't a decodable image (png / jpeg / webp / gif are supported; svg is not)",
+        )
+        return when (val result = icon.encode(bitmap)) {
+            is com.openminis.app.agent.SoulIcon.EncodeResult.Success -> result.dataUri
+            is com.openminis.app.agent.SoulIcon.EncodeResult.Failure -> when (result.reason) {
+                com.openminis.app.agent.SoulIcon.Rejection.TOO_LARGE ->
+                    throw ConfigError.InvalidValue("that image is too large to store inline")
+                com.openminis.app.agent.SoulIcon.Rejection.UNREADABLE ->
+                    throw ConfigError.InvalidValue("that image could not be processed")
+            }
+        }
+    }
 
     private fun registerSoul(r: ConfigRegistry, context: Context) {
         // Length cap is language-aware now (Chinese ≤ 800 chars OR
@@ -900,6 +949,34 @@ internal object ConfigBuiltins {
                     }
                     val cur = loadCurrent()
                     saveCurrent(cur.copy(metadata = cur.metadata.copy(name = name)))
+                },
+            )
+        )
+
+        r.register(
+            ClosureField(
+                path = "soul.icon",
+                displayName = "Soul icon",
+                description = "Identity icon/avatar. Accepts one emoji, base64/data URI image, minis:// resource, or a path under /var/minis/{attachments,workspace,offloads,shared,memory,skills}. Images are normalized and stored inline; remote URLs are not supported.",
+                valueSchema = ConfigSchema.Str(),
+                risk = ConfigRisk.SENSITIVE,
+                revertable = false,
+                reader = {
+                    val raw = loadCurrent().metadata.icon
+                    ConfigValue.Str(if (com.openminis.app.agent.SoulIcon.isDataUri(raw)) "<image>" else raw)
+                },
+                writer = { v ->
+                    val raw = (v as? ConfigValue.Str)?.value
+                        ?: throw ConfigError.TypeMismatch("string")
+                    val trimmed = raw.trim()
+                    val cur = loadCurrent()
+                    val next = when {
+                        trimmed.isEmpty() -> ""
+                        com.openminis.app.agent.SoulIcon.graphemeClusters(trimmed).size == 1 &&
+                            com.openminis.app.agent.SoulIcon.isEmojiGlyph(trimmed) -> trimmed
+                        else -> resolveSoulIconImage(trimmed)
+                    }
+                    saveCurrent(cur.copy(metadata = cur.metadata.copy(icon = next)))
                 },
             )
         )
