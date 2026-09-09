@@ -6,10 +6,10 @@
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-**Minis for Android** is an independent AI agent runtime for rooted Android devices: a native Android app, a Rust root broker (`minisd`), and Ubuntu 24.04 userspace sharing the Android kernel. It is not a VM.
+**Minis for Android** is an independent AI agent runtime for rooted Android devices: a native Android app and Ubuntu 24.04 userspace sharing the Android kernel. It is not a VM. The App owns runtime/session lifecycle; Root is bounded to mount/chroot maintenance plus a loopback-only outbound network proxy.
 
 ```text
-Android app → Unix socket RPC → minisd → mount namespace + bind mounts + chroot → Ubuntu 24.04
+Android app → ExecutionCoordinator → RootPersistentShell → UbuntuKernel → su → unshare -m → bind mounts → chroot → setpriv(App UID) → bash
 ```
 
 The production runtime is Root-only. PRoot and other userspace-emulation backends are not part of the active runtime contract.
@@ -25,7 +25,7 @@ The namespace is intentionally allowed to differ from the installed application 
 
 Current main branch status:
 
-- Sandbox DNS refresh flow implemented through `ubuntu.refreshDns` RPC and runtime DNS discovery.
+- Direct Ubuntu DNS refresh and App-owned rootfs provisioning are implemented without a runtime RPC daemon.
 - Tool routing improved with normalized tool names and alias resolution.
 - Runtime permission handling updated for config paths and guest home directories.
 - Message deletion and pasted text handling updated to preserve database/UI consistency.

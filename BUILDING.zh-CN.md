@@ -14,7 +14,7 @@
 - CMake 3.22.1；
 - Rust stable + `aarch64-linux-android`。
 
-Gradle、minisd 与 rclone 默认使用 NDK `28.2.13676358`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
+Gradle、Root 网络代理与 rclone 默认使用 NDK `28.2.13676358`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
 
 ## 1. 克隆
 
@@ -39,7 +39,7 @@ cp src/android/app/provider-customization.properties.example \
 
 不要提交真实 API Key、OAuth token、Provider 私有标识、签名密钥或其他凭据。
 
-## 3. 构建 `minisd`
+## 3. 构建 Root 网络代理
 
 打包前还需构建并导入 rclone（包含 arm64-v8a 与 x86_64）：
 
@@ -49,14 +49,11 @@ mkdir -p src/android/app/libs
 cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
 ```
 
-修改 Go 依赖、NDK 或 rclone 构建参数后，需要重新生成 AAR。不要复用旧工作树的 AAR。
-APK 构建完成后运行 `bash scripts/verify-android-16k.sh <apk>`；该检查同时验证 ZIP、ELF 对齐和必需 JNI 库的 ABI 覆盖。
-AAB 使用 `BUNDLETOOL_JAR=<bundletool-all.jar> bash scripts/verify-android-bundle.sh <aab>`，检查由 bundletool 实际生成的 APK。
-x86_64 用于模拟器开发；minisd 与 Ubuntu 运行时仍仅支持 arm64，JNI 库齐全不代表 x86_64 支持完整 Root 运行时。
+Root 网络代理只负责 `127.0.0.1:18787` 的 HTTP/CONNECT 出站转发，不提供 RPC 或任意 Root 命令接口：
 
 ```bash
 rustup target add aarch64-linux-android
-bash scripts/build-minisd-android.sh
+bash scripts/build-root-network-proxy-android.sh
 ```
 
 ## 4. 构建 Ubuntu rootfs
@@ -73,7 +70,7 @@ bash scripts/build-minisd-android.sh
 bash scripts/build-runtime-payload.sh
 ```
 
-脚本输出 `dist/minisd-arm64-v8a`、`dist/ubuntu-arm64-rootfs.tar.gz` 和 `dist/runtime-manifest.json`。Gradle 只允许三项一起打包，拒绝部分载荷。纯源码本地构建可以全部省略并在设备上 fail-closed；CI 组装的每个 APK 则强制包含并验证完整载荷。
+该脚本只输出 rootfs payload：`dist/ubuntu-arm64-rootfs.tar.gz` 和 `dist/runtime-manifest.json`。Root 网络代理由 `build-root-network-proxy-android.sh` 独立构建和校验，Gradle 以 `libminisnetproxy.so` 单独打包；CI 组装 APK 时两者都必须存在。
 
 ## 5. 构建 Debug APK
 
@@ -108,12 +105,12 @@ cd src/android
 ./gradlew :app:assembleDebugAndroidTest --no-daemon
 ```
 
-Rust：
+Root 网络代理 Rust：
 
 ```bash
-cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
-cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
-cargo test --locked --manifest-path src/native/minisd/Cargo.toml
+cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
+cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
 ```
 
 Rootfs 校验：
@@ -153,27 +150,16 @@ cd src/android
 ## 当前 Linux 执行路径
 
 ```text
-Android kernel
+Android App
   ↓
-minisd Root Broker
+ExecutionCoordinator → RootPersistentShell → UbuntuKernel
   ↓
-mount namespace + bind mount + chroot
+su → unshare -m → bind mount → chroot
   ↓
-Ubuntu 24.04 userspace
+setpriv(App UID, capabilities=none) → Ubuntu 24.04 bash
 ```
 
-guest 复用 Android 内核，并以 App guest UID 运行。`minisd` 会在 keeper 启动前准备固定的 host 持久化数据源：
-
-```text
-/data/adb/minis/workspace
-/data/adb/minis/sessions
-/data/adb/minis/memory
-/data/adb/minis/skills
-/data/adb/minis/shared
-/data/adb/minis/home
-```
-
-这些路径是固定运行时输入。启动时会拒绝其他持久化路径，并拒绝位于 tmpfs 上的持久化数据源。
+App 直接持有会话 shell。Root 仅用于 mount/chroot/rootfs 维护和 loopback-only 出站代理；普通 guest 命令不会以 UID 0 执行。旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 数据只做一次迁移，rootfs reset 不得删除用户数据。
 
 更多内容：
 
