@@ -5,7 +5,7 @@ import android.util.Log
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.ProviderRepository
-import com.openminis.app.runtime.minisd.MinisdConfigBridgeServer
+import com.openminis.app.runtime.guest.GuestCommandBridge
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -41,9 +41,6 @@ class ConfigRegistry private constructor() {
      */
     fun resolveField(path: String): ConfigField? {
         fields[path]?.let { return it }
-        // Collection child lookup: split into [base, id, leaf]. The leaf
-        // may itself contain dots (e.g. `models.<uuid>.modality.video`),
-        // so cap maxSplits at 2.
         val segments = path.split('.', limit = 3)
         if (segments.size != 3) return null
         val coll = collections[segments[0]] ?: return null
@@ -52,14 +49,12 @@ class ConfigRegistry private constructor() {
 
     fun collection(basePath: String): ConfigCollection? = collections[basePath]
 
-    /** All registered top-level field paths (excluding hidden), sorted. */
     fun allVisibleFieldPaths(): List<String> =
         fields.values
             .filter { it.access != ConfigAccess.HIDDEN }
             .map { it.path }
             .sorted()
 
-    /** Topic names = unique first segments of every visible path / collection base. Sorted. */
     fun topics(): List<String> {
         val set = LinkedHashSet<String>()
         for (f in fields.values) {
@@ -71,14 +66,6 @@ class ConfigRegistry private constructor() {
         return set.sorted()
     }
 
-    /**
-     * All visible fields whose path equals `<topic>` (the bare topic
-     * name — e.g. an aggregate `providers` summary) or starts with
-     * `<topic>.`. When [topic] matches a registered collection, a
-     * representative child's fields (using the first child id) are
-     * also included so `topic-help <collection>` surfaces the per-
-     * child schema instead of an empty list. Mirrors iOS.
-     */
     fun fields(topic: String): List<ConfigField> {
         val out = ArrayList<ConfigField>()
         for (f in fields.values) {
@@ -99,13 +86,6 @@ class ConfigRegistry private constructor() {
         return out.sortedBy { it.path }
     }
 
-    /**
-     * Topic-help is part of the public Agent contract. Keep that contract
-     * aligned with current runtime behavior even while legacy field metadata
-     * is retained internally for source compatibility with upstream-derived
-     * code. SOUL body length is deliberately unrestricted; transport request
-     * ceilings are separate safety limits and are not personality limits.
-     */
     private fun agentVisibleField(field: ConfigField): ConfigField =
         if (field.path == "soul.body") {
             object : ConfigField by field {
@@ -122,10 +102,6 @@ class ConfigRegistry private constructor() {
     companion object {
         private const val TAG = "ConfigRegistry"
 
-        /**
-         * Process-wide singleton. The first caller to invoke [init] wins;
-         * subsequent calls are no-ops so idempotent registration is safe.
-         */
         @Volatile private var INSTANCE: ConfigRegistry? = null
 
         fun get(): ConfigRegistry =
@@ -146,11 +122,10 @@ class ConfigRegistry private constructor() {
                         r, context, providerRepository, envVarRepository, chatRepository,
                     )
                 }
-                // Publish the registry before opening the minisd bridge. A bridge
-                // request can therefore never observe a half-initialized registry.
+                // Publish first so a guest request can never observe a partial registry.
                 INSTANCE = r
-                runCatching { MinisdConfigBridgeServer.start(context.applicationContext) }
-                    .onFailure { Log.w(TAG, "minisd config bridge start failed: ${it.message}") }
+                runCatching { GuestCommandBridge.start(context.applicationContext) }
+                    .onFailure { Log.w(TAG, "direct guest command bridge start failed: ${it.message}") }
                 return r
             }
         }
