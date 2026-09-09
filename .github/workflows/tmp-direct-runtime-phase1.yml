@@ -1,0 +1,40 @@
+name: tmp-direct-runtime-phase1
+
+on:
+  push:
+    branches:
+      - refactor/direct-ubuntu-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  phase1:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refactor/direct-ubuntu-runtime
+          fetch-depth: 0
+      - name: Apply phase 1 direct runtime patch
+        run: python3 .github/scripts/phase1_direct_runtime_patch.py
+      - name: Validate diff
+        run: git diff --check
+      - name: Commit phase 1
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/android/app/src/main/java
+          git commit -m "refactor(runtime): bypass minisd for active Ubuntu path"
+          git push origin HEAD:refactor/direct-ubuntu-runtime
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+      - name: Compile Android Kotlin
+        working-directory: src/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileDebugKotlin --stacktrace
