@@ -33,5 +33,12 @@ workflow_line = '        ".github/workflows/tmp-direct-runtime-inventory.yml",\n
 if workflow_line in text:
     text = text.replace(workflow_line, "", 1)
 
+# GitHub's contents API does not preserve the executable bit for gradlew.
+# Acceptance runs the wrapper directly, so restore the checkout-local mode
+# without committing any production-tree permission change.
+gradlew = Path("gradlew")
+if gradlew.is_file():
+    gradlew.chmod(gradlew.stat().st_mode | 0o111)
+
 worker.write_text(text, encoding="utf-8", newline="\n")
 print("phase3 worker ready for acceptance only")
