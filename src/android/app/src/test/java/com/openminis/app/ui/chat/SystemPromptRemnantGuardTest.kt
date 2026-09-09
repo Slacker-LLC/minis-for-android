@@ -58,7 +58,8 @@ class SystemPromptRemnantGuardTest {
         val deployTool = defs.first { it.name == com.openminis.app.tools.android.AndroidAgentTools.DEPLOY }
         assertTrue("Deploy tool must reference Ubuntu 24.04", deployTool.description.contains("Ubuntu 24.04"))
         val capTool = defs.first { it.name == com.openminis.app.tools.android.AndroidAgentTools.CAPABILITIES }
-        assertTrue("Capabilities tool must reference minisd", capTool.description.contains("minisd"))
+        assertTrue("Capabilities tool must reference Direct Ubuntu", capTool.description.contains("Direct Ubuntu"))
+        assertFalse("Capabilities tool must not reference obsolete minisd", capTool.description.contains("minisd", ignoreCase = true))
     }
 
     @Test
