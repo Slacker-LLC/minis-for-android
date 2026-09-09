@@ -58,6 +58,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.power.PowerOptimizationManager
+import com.openminis.app.i18n.uppercaseForDisplay
 
 /**
  * T50 settings screen — surfaces the two pieces of background-keep-alive
@@ -282,7 +283,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
 @Composable
 private fun BgSectionTitle(text: String) {
     Text(
-        text = text.uppercase(),
+        text = text.uppercaseForDisplay(),
         fontSize = 12.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 6.dp),

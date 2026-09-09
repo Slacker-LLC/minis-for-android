@@ -507,6 +507,7 @@ fun ChatScreen(
     val generatingMessageId by viewModel.generatingMessageId.collectAsState()
     val replySpeechState by viewModel.replySpeechState.collectAsState()
     val canResume by viewModel.canResume.collectAsState()
+    val compactProgress by viewModel.compactProgress.collectAsState()
     val error by viewModel.error.collectAsState()
     val modelName by viewModel.modelName.collectAsState()
    val sessionTitle by viewModel.sessionTitle.collectAsState()
@@ -3266,6 +3267,14 @@ fun ChatScreen(
                         .lastOrNull { it.role == "assistant" }
                         ?.error
                         ?.isNotBlank() == true
+                    compactProgress?.let { progress ->
+                        item(key = "__compact_progress__", contentType = "compact_progress") {
+                            CompactProgressIndicator(
+                                progress = progress,
+                                onCancel = { viewModel.cancelCompact() },
+                            )
+                        }
+                    }
                     if (canResume && !isStreaming && error == null && !lastAssistantHasError) {
                         item(key = "__resume_banner__", contentType = "resume_banner") {
                             ResumeBanner(onResume = {

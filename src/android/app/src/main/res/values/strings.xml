@@ -1760,4 +1760,6 @@
     <string name="newer_db_body">This copy of Minis is older than the one that created your data, so it cannot open it safely. Nothing has been deleted. Reinstall the newer version of Minis and your conversations will be available again.</string>
     <string name="newer_db_versions">This version supports data format %1$d</string>
     <string name="newer_db_exit">Close</string>
+    <string name="compact_progress">Compacting… %1$d s elapsed</string>
+    <string name="compact_progress_split">Compacting… %1$d s · summarizing in segments (%2$d/%3$d)</string>
 </resources>

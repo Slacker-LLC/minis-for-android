@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.ui.theme.ChatColors
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 // [T-android-split-chat] Self-contained "thinking / streaming" dot indicators
 // extracted verbatim from ChatScreen.kt. `internal` so the chat package can
@@ -129,3 +132,54 @@ internal fun TypingIndicator() {
         }
     }
 }
+
+@Composable
+internal fun CompactProgressIndicator(
+    progress: ChatViewModel.CompactProgress,
+    onCancel: () -> Unit,
+) {
+    // Re-reads the clock every second; the changing value is what makes the
+    // row demonstrably alive.
+    var elapsedSec by remember(progress.startedAtMs) { mutableStateOf(0) }
+    LaunchedEffect(progress.startedAtMs) {
+        while (true) {
+            elapsedSec = ((System.currentTimeMillis() - progress.startedAtMs) / 1000L).toInt()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (progress.depth > 0) {
+                // Only surfaced once a split actually happened — saying
+                // "segment 1" on the common single-call path would imply a
+                // complexity that isn't there.
+                stringResource(
+                    R.string.compact_progress_split,
+                    elapsedSec,
+                    progress.callsIssued,
+                    progress.callBudget,
+                )
+            } else {
+                stringResource(R.string.compact_progress, elapsedSec)
+            },
+            fontSize = 14.sp,
+            color = ChatColors.tertiaryText,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.cancel),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clickable(onClick = onCancel)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+// ─── Typing Indicator (three dots pulsing) ────────────────────────────────────

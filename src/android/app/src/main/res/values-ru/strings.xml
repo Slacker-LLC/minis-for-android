@@ -1604,4 +1604,6 @@
     <string name="chat_attachment_expand_preview">Развернуть предпросмотр</string>
     <string name="chat_attachment_collapse_preview">Свернуть предпросмотр</string>
     <string name="chat_attachment_card_mode">Свернуть в карточку</string>
+    <string name="compact_progress">Сжатие… прошло %1$d с</string>
+    <string name="compact_progress_split">Сжатие… %1$d с · сводка по частям (%2$d/%3$d)</string>
 </resources>

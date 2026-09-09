@@ -48,6 +48,9 @@ import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.model.normalizeModalities
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 
 /**
  * [T-android-provider-voice] First-class modality scoping for the shared
@@ -106,6 +109,7 @@ enum class PickerModalityFilter {
  * the surrounding chrome (Scaffold + TopAppBar + confirm button) and
  * retains access to the LazyListState for reorder / scroll-to.
  */
+@OptIn(ExperimentalLayoutApi::class)
 fun LazyListScope.modelEntryPickerItems(
     instances: List<ProviderInstance>,
     availableEntries: List<ModelEntry>,
@@ -335,28 +339,20 @@ fun LazyListScope.modelEntryPickerItems(
                                     entry.model.displayName,
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                // [T-android-modality-chip] Whole chips wrap to the
+                                // next line; a plain Row squeezes long labels into
+                                // character-by-character vertical columns.
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    itemVerticalAlignment = Alignment.CenterVertically,
+                                ) {
                                     Text(
                                         entry.model.id,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                     )
-                                    // [T-android-provider-voice] Modality chips
-                                    // (iOS entryRow modalityBadges: img / audio /
-                                    // video / pdf and the -out variants).
                                     modalityBadges(entry.model).forEach { badge ->
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            badge,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                                                    RoundedCornerShape(3.dp),
-                                                )
-                                                .padding(horizontal = 4.dp, vertical = 1.dp),
-                                        )
+                                        ModalityBadge(badge)
                                     }
                                 }
                             }

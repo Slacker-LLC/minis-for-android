@@ -141,6 +141,7 @@ fun GroupPickerSheet(
                 placeholder = stringResource(R.string.group_new_name_hint),
                 modifier = Modifier.padding(horizontal = 20.dp),
                 containerColor = SectionDesign.screenBackgroundColor(),
+                contentHorizontalPadding = 16.dp,
             )
             Spacer(Modifier.height(8.dp))
             SectionTextField(
@@ -151,6 +152,7 @@ fun GroupPickerSheet(
                 placeholder = stringResource(R.string.group_desc_hint),
                 modifier = Modifier.padding(horizontal = 20.dp),
                 containerColor = SectionDesign.screenBackgroundColor(),
+                contentHorizontalPadding = 16.dp,
             )
 
             if (duplicate != null) {

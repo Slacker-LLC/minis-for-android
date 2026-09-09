@@ -1354,4 +1354,6 @@
     <string name="chat_attachment_expand_preview">미리보기 펼치기</string>
     <string name="chat_attachment_collapse_preview">미리보기 접기</string>
     <string name="chat_attachment_card_mode">카드로 접기</string>
+    <string name="compact_progress">압축 중… %1$d초 경과</string>
+    <string name="compact_progress_split">압축 중… %1$d초 · 분할 요약 중(%2$d/%3$d)</string>
 </resources>

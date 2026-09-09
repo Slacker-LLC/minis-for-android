@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -52,6 +51,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import kotlinx.coroutines.delay
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * Fullscreen variant of the in-chat HTML preview. Hosts the same
@@ -75,7 +75,7 @@ fun WebPreviewFullscreenScreen(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val darkTheme = isSystemInDarkTheme()
+    val darkTheme = ChatColors.isDark
 
     LaunchedEffect(holder) {
         holder.startIfNeeded()
@@ -99,8 +99,6 @@ fun WebPreviewFullscreenScreen(
             onDispose { }
         } else {
             val controller = WindowInsetsControllerCompat(window, view)
-            val previousLightStatus = controller.isAppearanceLightStatusBars
-            val previousLightNav = controller.isAppearanceLightNavigationBars
             controller.isAppearanceLightStatusBars = false
             controller.isAppearanceLightNavigationBars = false
             controller.systemBarsBehavior =
@@ -108,8 +106,8 @@ fun WebPreviewFullscreenScreen(
             controller.hide(WindowInsetsCompat.Type.systemBars())
             onDispose {
                 controller.show(WindowInsetsCompat.Type.systemBars())
-                controller.isAppearanceLightStatusBars = previousLightStatus
-                controller.isAppearanceLightNavigationBars = previousLightNav
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }

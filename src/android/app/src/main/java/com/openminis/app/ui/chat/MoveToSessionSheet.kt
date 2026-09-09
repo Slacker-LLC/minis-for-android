@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import androidx.compose.material.icons.outlined.Add
 
 /**
  * Bottom sheet listing all chat sessions except the current one. Tapping
@@ -108,6 +109,10 @@ fun MoveToSessionSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            // [T-android-moveto-new-chat] A fresh draft is a first-class target.
+            NewChatRow(
+                onClick = { onSelect("__new__${java.util.UUID.randomUUID()}") },
+            )
             if (sessions.isEmpty()) {
                 Text(
                     stringResource(R.string.move_to_sheet_empty),
@@ -136,6 +141,46 @@ fun MoveToSessionSheet(
             }
         }
     }
+}
+
+/** [T-android-moveto-new-chat] Fresh-draft destination above existing sessions. */
+@Composable
+private fun NewChatRow(onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(color = MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(color = accent.copy(alpha = 0.18f), shape = CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Text(
+            text = stringResource(R.string.new_chat),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
 }
 
 /**

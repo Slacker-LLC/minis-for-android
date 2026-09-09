@@ -94,6 +94,7 @@ import com.openminis.app.pet.PetControlActivity
 import com.openminis.app.ui.components.openExternalUrl
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.openminis.app.i18n.uppercaseForDisplay
 
 /** RoleManager was added in Android 10; older devices use voice-input Settings. */
 @Suppress("NewApi")
@@ -664,7 +665,7 @@ private fun SettingsSection(
     ) {
         // Section header
         Text(
-            text = title.uppercase(),
+            text = title.uppercaseForDisplay(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,

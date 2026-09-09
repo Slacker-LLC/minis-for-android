@@ -25,6 +25,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.lang.ref.WeakReference
 import kotlin.coroutines.resume
+import android.content.ClipData
+import android.content.ClipboardManager
 
 /**
  * JSON-RPC 2.0 method dispatcher for the debug server.
@@ -89,6 +91,7 @@ class DebugRPCHandler(private val context: Context) {
             "debug.tap" -> handleTap(params)
             "debug.scroll" -> handleScroll(params)
             "debug.inputText" -> handleInputText(params)
+            "debug.setClipboard" -> handleSetClipboard(params)
             "debug.llmRequests" -> handleLLMRequests(params)
             "debug.llmRequests.clear" -> { LLMRequestLog.clear(); JSONObject().put("cleared", true) }
             "debug.agentTrace" -> handleAgentTrace(params)
@@ -988,6 +991,37 @@ class DebugRPCHandler(private val context: Context) {
     }
 
     // ── LLM Request Tracking ──────────────────────────────────────────────
+
+    private suspend fun handleSetClipboard(params: JSONObject): JSONObject {
+        val text = params.optString("text")
+        if (text.isEmpty()) throw RPCException(-32602, "Invalid params: 'text' is required")
+        val label = params.optString("label", "minis-debug")
+
+        // ClipboardManager.setPrimaryClip must run on a Looper thread, and the
+        // write is only honoured while this app holds focus.
+        withContext(Dispatchers.Main) {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText(label, text))
+        }
+
+        // Read it straight back: a silent no-op here (focus lost, OEM policy)
+        // would otherwise show up much later as a paste that pasted nothing.
+        val readBack = withContext(Dispatchers.Main) {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+            cm.primaryClip?.getItemAt(0)?.text?.length ?: -1
+        }
+
+        return JSONObject().apply {
+            put("ok", readBack == text.length)
+            put("length", text.length)
+            put("clipboardLength", readBack)
+        }
+    }
+
+    // ── LLM Request Tracking ──────────────────────────────────────────────
+
 
     private fun handleLLMRequests(params: JSONObject): JSONObject {
         val last = if (params.has("last") && !params.isNull("last")) params.optInt("last", -1).takeIf { it > 0 } else null

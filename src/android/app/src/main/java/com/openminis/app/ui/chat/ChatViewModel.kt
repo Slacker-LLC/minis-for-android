@@ -914,6 +914,17 @@ class ChatViewModel(
     val compactSummary: StateFlow<String?> = _compactSummary.asStateFlow()
 
     /** True when a compact-summary LLM call is in flight (UI disables further sends). */
+    data class CompactProgress(
+        val startedAtMs: Long,
+        val depth: Int = 0,
+        val callsIssued: Int = 0,
+        val callBudget: Int = MAX_COMPACT_LLM_CALLS,
+        val timeoutSeconds: Int = 0,
+    )
+
+    private val _compactProgress = MutableStateFlow<CompactProgress?>(null)
+    val compactProgress: StateFlow<CompactProgress?> = _compactProgress.asStateFlow()
+
     private val _isCompacting = MutableStateFlow(false)
     val isCompacting: StateFlow<Boolean> = _isCompacting.asStateFlow()
 
@@ -923,6 +934,17 @@ class ChatViewModel(
      * when coroutines resume on different IO threads.
      */
     private val compactCallsIssued = AtomicInteger(0)
+
+    /** Job for the active manual/context compaction run. */
+    private var compactJob: Job? = null
+
+    /** Cancel an in-flight compaction. No-op when nothing is running. */
+    fun cancelCompact() {
+        val job = compactJob ?: return
+        if (!job.isActive) return
+        AppLogger.info(TAG, "[Compact] cancelled by user")
+        job.cancel(CancellationException("compact cancelled by user"))
+    }
 
     private class CompactCallBudgetExceeded : IllegalStateException(
         "Compaction call budget exhausted",
@@ -2056,10 +2078,16 @@ class ChatViewModel(
         markStarted()
         _isCompacting.value = true
         compactCallsIssued.set(0)
-        val compactTimeoutMs = compactTimeoutMsFor(
-            buildConversationTextForSummary(toCompact).length,
+        val transcriptChars = buildConversationTextForSummary(toCompact).length
+        val compactTimeoutMs = compactTimeoutMsFor(transcriptChars)
+        _compactProgress.value = CompactProgress(
+            startedAtMs = System.currentTimeMillis(),
+            depth = 0,
+            callsIssued = 0,
+            callBudget = MAX_COMPACT_LLM_CALLS,
+            timeoutSeconds = (compactTimeoutMs / 1000L).toInt(),
         )
-        viewModelScope.launch(Dispatchers.IO) {
+        compactJob = viewModelScope.launch(Dispatchers.IO) {
             // [T-android-compact-queued-drain] Only a SUCCESSFUL compact kicks
             // the queued-prompt drain below; failure/cancel/empty-summary paths
             // keep today's behavior (queued bubbles stay pending + cancellable).
@@ -2251,6 +2279,7 @@ class ChatViewModel(
                 _error.value = e.message ?: "Provider configuration rejected"
             } finally {
                 _isCompacting.value = false
+                _compactProgress.value = null
                 // [T-android-auto-compact-inloop] Signal the awaiting in-loop
                 // caller. In `finally` so a thrown/cancelled compaction can
                 // never strand the agent loop waiting on a callback.
@@ -3157,6 +3186,10 @@ class ChatViewModel(
         if (callNumber > MAX_COMPACT_LLM_CALLS) {
             throw CompactCallBudgetExceeded()
         }
+        _compactProgress.value = _compactProgress.value?.copy(
+            depth = depth,
+            callsIssued = callNumber,
+        )
         AppLogger.info(
             TAG,
             "[Compact] summary call $callNumber/$MAX_COMPACT_LLM_CALLS (messages=${messages.size}, depth=$depth)",

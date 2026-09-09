@@ -79,6 +79,7 @@ import com.openminis.app.ui.components.DialogTextField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.i18n.uppercaseForDisplay
 
 /**
  * Settings → Mount External Folders. Mirrors iOS MountedFoldersSettingsView.
@@ -505,7 +506,7 @@ private fun ListHeader(count: Int, atCapacity: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(R.string.mount_folders_title).uppercase(),
+            text = stringResource(R.string.mount_folders_title).uppercaseForDisplay(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
