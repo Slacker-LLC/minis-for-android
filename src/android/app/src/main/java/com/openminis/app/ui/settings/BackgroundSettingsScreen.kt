@@ -174,7 +174,9 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                 icon = Icons.Outlined.Layers,
                 iconColor = Color(0xFF5856D6),
                 title = stringResource(R.string.settings_bg_overlay),
-                checked = backgroundOverlayEnabled && canDrawOverlays,
+                // The switch represents the persisted USER INTENT. Permission is a
+                // separate capability gate, surfaced by the footer and enforced by the service.
+                checked = backgroundOverlayEnabled,
                 onCheckedChange = { wanted ->
                     if (wanted && !canDrawOverlays) {
                         try {
