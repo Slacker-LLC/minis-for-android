@@ -41,12 +41,6 @@ object UbuntuRuntime {
         val statusFresh: Boolean = false,
     )
 
-    data class ShellResult(
-        val output: String,
-        val exitCode: Int,
-        val durationMs: Long,
-    )
-
     @Volatile
     var isInitialized: Boolean = false
         private set
