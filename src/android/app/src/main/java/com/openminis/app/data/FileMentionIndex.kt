@@ -2,6 +2,7 @@ package com.openminis.app.data
 
 import android.content.Context
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -192,8 +193,13 @@ class FileMentionIndex(
     ): List<Entry> {
         val out = mutableListOf<Entry>()
         for ((guestRoot, scope) in layers) {
-            val info = runCatching { WorkspaceFileClient.info(sessionId, guestRoot) }
-                .getOrNull()
+            val info = try {
+                WorkspaceFileClient.info(sessionId, guestRoot)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
             if (info?.optString("type") != "dir") continue
             val linuxRoot = linuxRootFor(scope)
             // Always include the root itself so `@workspace` / `@shared` can be referenced.
@@ -240,14 +246,18 @@ class FileMentionIndex(
             if (node.depth > maxDepth) continue
             var offset = 0
             while (out.size < budget) {
-                val listing = runCatching {
+                val listing = try {
                     WorkspaceFileClient.list(
                         sessionId,
                         node.guestPath,
                         500,
                         offset,
                     )
-                }.getOrNull() ?: break
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                } ?: break
                 val entries = listing.optJSONArray("entries") ?: break
                 for (index in 0 until entries.length()) {
                     if (out.size >= budget) break
