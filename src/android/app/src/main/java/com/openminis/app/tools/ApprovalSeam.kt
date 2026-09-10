@@ -59,7 +59,8 @@ object ApprovalSeam {
     /**
      * Request a one-time approval for a dangerous operation. Returns
      * allowed-once when answered positively, otherwise rejected / cancelled
-     * (timeout) / unavailable (no responder in time). Never throws.
+     * (timeout) / unavailable (no responder in time). Never throws except for
+     * structured coroutine cancellation from the caller.
      */
     suspend fun request(
         context: Context,
@@ -79,12 +80,15 @@ object ApprovalSeam {
         )
         pending[req.id] = req
         Log.i(TAG, "approval/asked id=${req.id.take(8)} tool=$toolName session=$sessionId summary=${summary.take(120)}")
-        val allowed = withTimeoutOrNull(ANSWER_TIMEOUT_MS) { req.deferred.await() }
-        pending.remove(req.id)
-        return when {
-            allowed == true -> ApprovalDecision("allowed-once", "user")
-            allowed == false -> ApprovalDecision("rejected", "user")
-            else -> ApprovalDecision("cancelled", null)
+        return try {
+            val allowed = withTimeoutOrNull(ANSWER_TIMEOUT_MS) { req.deferred.await() }
+            when {
+                allowed == true -> ApprovalDecision("allowed-once", "user")
+                allowed == false -> ApprovalDecision("rejected", "user")
+                else -> ApprovalDecision("cancelled", null)
+            }
+        } finally {
+            pending.remove(req.id)
         }
     }
 
