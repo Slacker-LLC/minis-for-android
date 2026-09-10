@@ -208,7 +208,7 @@ internal object UbuntuKernel {
     suspend fun refreshDns(nameservers: List<String>): Boolean {
         val safe = nameservers.filter { it.matches(Regex("^[0-9A-Fa-f:.]{2,64}$")) }.distinct()
         if (safe.isEmpty()) return false
-        val lines = safe.joinToString("\\n") { "nameserver $it" } + "\\n"
+        val lines = safe.joinToString("\n") { "nameserver $it" } + "\n"
         val target = UbuntuPaths.HOST_ROOTFS + "/etc/resolv.conf"
         val script = "printf %s ${DirectRootRunner.shellQuote(lines)} > ${DirectRootRunner.shellQuote(target)} && chmod 644 ${DirectRootRunner.shellQuote(target)}"
         return DirectRootRunner.runScript(script, ROOT_TIMEOUT_MS).success
@@ -278,9 +278,17 @@ internal object UbuntuKernel {
         if (store != null) {
             for (entry in store.entries.value) {
                 if (!entry.isActive) continue
-                val host = store.resolvePosixPath(Uri.parse(entry.treeUri), ctx)
+                val treeUri = Uri.parse(entry.treeUri)
+                val host = store.resolvePosixPath(treeUri, ctx)
                     ?: error("active external mount ${entry.name} is not accessible")
-                binds += Bind(host, "/var/minis/mounts/${entry.name}", !entry.effectiveWritable)
+                val hasPersistedWrite = ctx.contentResolver.persistedUriPermissions.any {
+                    it.uri == treeUri && it.isWritePermission
+                }
+                binds += Bind(
+                    host,
+                    "/var/minis/mounts/${entry.name}",
+                    readOnly = !entry.effectiveWritable || !hasPersistedWrite,
+                )
             }
         }
 
