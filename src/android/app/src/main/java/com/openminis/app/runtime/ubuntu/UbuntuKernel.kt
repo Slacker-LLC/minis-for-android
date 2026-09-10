@@ -218,7 +218,7 @@ internal object UbuntuKernel {
     suspend fun reconcileExternalMounts(entries: List<MountedFoldersStore.Entry>? = null): Boolean {
         val store = RuntimePathRegistry.mountedFoldersStore ?: return true
         return runCatching {
-            store.buildMountSnapshot(entries ?: store.entries.value)
+            store.validateMountEntries(entries ?: store.entries.value)
             ExecutionCoordinator.stopCurrentCommand()
             true
         }.getOrElse {
