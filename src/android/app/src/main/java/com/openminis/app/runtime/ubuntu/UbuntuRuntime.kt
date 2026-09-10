@@ -109,6 +109,7 @@ object UbuntuRuntime {
 
     suspend fun stop(): Snapshot {
         ExecutionCoordinator.stopCurrentCommand()
+        RootNetworkProxy.stop()
         val next = _snapshot.value.copy(running = false, available = false, statusFresh = true)
         _snapshot.value = next
         redirectPaths = false

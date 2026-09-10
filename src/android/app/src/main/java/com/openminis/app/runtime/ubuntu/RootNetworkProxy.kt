@@ -29,10 +29,19 @@ internal object RootNetworkProxy {
     private var process: Process? = null
 
     suspend fun ensureReady(context: Context): Status = lock.withLock {
-        if (listenerReady()) return@withLock Status(true)
-        process?.let { stale ->
-            runCatching { stale.destroyForcibly() }
+        process?.let { child ->
+            if (child.isAlive && listenerReady()) {
+                return@withLock Status(true)
+            }
+            runCatching { child.destroyForcibly() }
             process = null
+        }
+
+        // A loopback listener without our live Process handle is not evidence
+        // that the trusted Root proxy is running. Treat an occupied port as a
+        // conflict instead of silently trusting another local process.
+        if (listenerReady()) {
+            return@withLock Status(false, "$PROXY_LISTEN is already occupied by an unmanaged listener")
         }
 
         val su = DirectRootRunner.findSu()
@@ -73,6 +82,24 @@ internal object RootNetworkProxy {
         runCatching { child.destroyForcibly() }
         process = null
         Status(false, "Root network proxy did not bind $PROXY_LISTEN")
+    }
+
+    suspend fun stop() = lock.withLock {
+        val child = process
+        process = null
+        if (child != null) {
+            runCatching { child.destroy() }
+            repeat(20) {
+                if (!child.isAlive && !listenerReady()) return@withLock
+                delay(25)
+            }
+            runCatching { child.destroyForcibly() }
+        }
+        repeat(40) {
+            if (!listenerReady()) return@withLock
+            delay(25)
+        }
+        Log.w(TAG, "Root network proxy listener is still bound after stop: $PROXY_LISTEN")
     }
 
     fun proxyEnv(): Map<String, String> = linkedMapOf(
