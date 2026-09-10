@@ -70,6 +70,9 @@ object UbuntuRuntime {
             return fail(error)
         }
         val status = UbuntuKernel.ensureReady()
+        if (!status.ready) {
+            RootNetworkProxy.stop()
+        }
         val uid = status.appUid ?: appContext?.applicationInfo?.uid
         val next = if (status.ready && uid != null) {
             Snapshot(

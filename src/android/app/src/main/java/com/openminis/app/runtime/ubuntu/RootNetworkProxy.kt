@@ -85,16 +85,14 @@ internal object RootNetworkProxy {
     }
 
     suspend fun stop() = lock.withLock {
-        val child = process
+        val child = process ?: return@withLock
         process = null
-        if (child != null) {
-            runCatching { child.destroy() }
-            repeat(20) {
-                if (!child.isAlive && !listenerReady()) return@withLock
-                delay(25)
-            }
-            runCatching { child.destroyForcibly() }
+        runCatching { child.destroy() }
+        repeat(20) {
+            if (!child.isAlive && !listenerReady()) return@withLock
+            delay(25)
         }
+        runCatching { child.destroyForcibly() }
         repeat(40) {
             if (!listenerReady()) return@withLock
             delay(25)
