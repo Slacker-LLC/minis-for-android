@@ -73,7 +73,7 @@ fn read_auth_token() -> Result<String, String> {
     std::io::stdin()
         .read_line(&mut token)
         .map_err(|error| format!("cannot read proxy auth token: {error}"))?;
-    let token = token.trim_end_matches(|c| c == '\r' || c == '\n');
+    let token = token.trim_end_matches(['\r', '\n']);
     if token.len() != 64
         || !token
             .bytes()
@@ -86,7 +86,7 @@ fn read_auth_token() -> Result<String, String> {
 
 fn base64_encode(input: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut output = String::with_capacity(((input.len() + 2) / 3) * 4);
+    let mut output = String::with_capacity(input.len().div_ceil(3) * 4);
     let mut index = 0usize;
     while index < input.len() {
         let a = input[index] as u32;
