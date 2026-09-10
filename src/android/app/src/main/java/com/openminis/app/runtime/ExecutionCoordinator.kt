@@ -33,9 +33,7 @@ object ExecutionCoordinator {
         val output: String,
         val exitCode: Int,
         val durationMs: Long,
-        val fullOutput: String? = null,
         val failureKind: FailureKind? = null,
-        val errorCode: String? = null,
     )
 
     private lateinit var appContext: Context
@@ -60,11 +58,7 @@ object ExecutionCoordinator {
 
     private suspend fun ensureRuntimeReady(startTime: Long): CommandResult? {
         if (!::appContext.isInitialized) {
-            return failure(
-                "execution coordinator is not initialized",
-                startTime,
-                "RUNTIME_UNAVAILABLE",
-            )
+            return failure("execution coordinator is not initialized", startTime)
         }
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(appContext)
         val ready = UbuntuRuntime.ensureReady()
@@ -72,7 +66,6 @@ object ExecutionCoordinator {
         return failure(
             "ubuntu unavailable: ${ready.lastError ?: "not ready"}",
             startTime,
-            "RUNTIME_UNAVAILABLE",
         )
     }
 
@@ -93,7 +86,7 @@ object ExecutionCoordinator {
             val danger = DangerousCommandPolicy.dangerousReason(command)
             if (danger != null) {
                 Log.w(TAG, "[$sessionId] blocked dangerous command: $danger")
-                return@withLock failure("blocked: $danger", startTime, "POLICY_DENIED")
+                return@withLock failure("blocked: $danger", startTime)
             }
 
             try {
@@ -117,9 +110,7 @@ object ExecutionCoordinator {
                     output = output,
                     exitCode = ran.exitCode,
                     durationMs = System.currentTimeMillis() - startTime,
-                    fullOutput = sanitized,
                     failureKind = if (ran.exitCode == 124) FailureKind.TOOL_TIMEOUT else null,
-                    errorCode = if (ran.exitCode == 124) "TOOL_TIMEOUT" else null,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -129,7 +120,6 @@ object ExecutionCoordinator {
                 failure(
                     error.message ?: error::class.java.simpleName,
                     startTime,
-                    "RUNTIME_FAILURE",
                 )
             }
         }
@@ -147,20 +137,13 @@ object ExecutionCoordinator {
         }
     }
 
-    private fun failure(message: String, startTime: Long, code: String): CommandResult {
-        val kind = when (code) {
-            "TOOL_TIMEOUT", "TIMEOUT" -> FailureKind.TOOL_TIMEOUT
-            else -> FailureKind.RUNTIME_FAILURE
-        }
-        val exitCode = if (kind == FailureKind.TOOL_TIMEOUT) 124 else 1
+    private fun failure(message: String, startTime: Long): CommandResult {
         val sanitized = TerminalSanitizer.sanitize(message)
         return CommandResult(
             output = sanitized,
-            exitCode = exitCode,
+            exitCode = 1,
             durationMs = System.currentTimeMillis() - startTime,
-            fullOutput = sanitized,
-            failureKind = kind,
-            errorCode = code,
+            failureKind = FailureKind.RUNTIME_FAILURE,
         )
     }
 
