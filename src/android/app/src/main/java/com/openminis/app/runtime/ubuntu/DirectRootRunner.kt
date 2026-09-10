@@ -57,7 +57,7 @@ internal object DirectRootRunner {
                 ?: return@withContext Result(126, "", "", error = "su executable not found")
             val process = try {
                 ProcessBuilder(su, "-c", script).redirectErrorStream(false).start()
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 return@withContext Result(
                     exitCode = 126,
                     stdout = "",
@@ -114,7 +114,7 @@ internal object DirectRootRunner {
             } catch (cancelled: CancellationException) {
                 process.destroyForcibly()
                 throw cancelled
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 process.destroyForcibly()
                 Result(
                     exitCode = 126,
