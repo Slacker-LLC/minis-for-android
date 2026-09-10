@@ -4,7 +4,7 @@ import com.openminis.app.runtime.files.WorkspaceFileClient
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Broker-only access to the minisd-owned external mount namespace. */
+/** Compatibility helpers for linux.file.* operations on Direct SAF mounts. */
 internal object ExternalMountAccess {
     private const val PREFIX = "/var/minis/mounts/"
 
@@ -69,25 +69,31 @@ internal object ExternalMountAccess {
         val boundedMax = maxEntries.coerceAtLeast(1)
         while (queue.isNotEmpty() && result.size < boundedMax) {
             val directory = queue.removeFirst()
-            val listing = list(directory, 500, 0)
-            val entries = listing.optJSONArray("entries") ?: JSONArray()
-            for (index in 0 until entries.length()) {
-                if (result.size >= boundedMax) break
-                val item = entries.optJSONObject(index) ?: continue
-                val name = item.optString("name")
-                if (name.isEmpty() || name == "." || name == ".." ||
-                    name.contains('/') || name.contains('\\') || name.contains('\u0000')
-                ) continue
-                val path = "$directory/$name"
-                val type = item.optString("type", "other")
-                result += Entry(
-                    path = path,
-                    name = name,
-                    type = type,
-                    size = item.optLong("size", 0L),
-                    modified = item.optLong("modified", 0L),
-                )
-                if (recursive && type == "dir") queue.addLast(path)
+            var offset = 0
+            while (result.size < boundedMax) {
+                val listing = list(directory, 500, offset)
+                val entries = listing.optJSONArray("entries") ?: JSONArray()
+                for (index in 0 until entries.length()) {
+                    if (result.size >= boundedMax) break
+                    val item = entries.optJSONObject(index) ?: continue
+                    val name = item.optString("name")
+                    if (name.isEmpty() || name == "." || name == ".." ||
+                        name.contains('/') || name.contains('\\') || name.contains('\u0000')
+                    ) continue
+                    val path = "$directory/$name"
+                    val type = item.optString("type", "other")
+                    result += Entry(
+                        path = path,
+                        name = name,
+                        type = type,
+                        size = item.optLong("size", 0L),
+                        modified = item.optLong("modified", 0L),
+                    )
+                    if (recursive && type == "dir") queue.addLast(path)
+                }
+                val next = listing.optLong("next_offset", -1L)
+                if (next < 0L || entries.length() == 0 || next > Int.MAX_VALUE) break
+                offset = next.toInt()
             }
             if (!recursive) break
         }
