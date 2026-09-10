@@ -8,6 +8,7 @@ import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.guest.GuestCommandBridge
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -217,12 +218,14 @@ internal object UbuntuKernel {
     /** Validate a candidate SAF snapshot and recycle live shells so next spawn uses it. */
     suspend fun reconcileExternalMounts(entries: List<MountedFoldersStore.Entry>? = null): Boolean {
         val store = RuntimePathRegistry.mountedFoldersStore ?: return true
-        return runCatching {
+        return try {
             store.validateMountEntries(entries ?: store.entries.value)
             ExecutionCoordinator.stopCurrentCommand()
             true
-        }.getOrElse {
-            Log.w(TAG, "external mount validation failed: ${it.message}")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.w(TAG, "external mount validation failed: ${error.message}")
             false
         }
     }
