@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
-import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -22,24 +22,9 @@ object ReadImageTool {
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "prompt"),
-        timeoutMs = 60_000L,
     )
 
-    /**
-     * T178: when the caller knows the owning session, prefer
-     * [RuntimePathRegistry.resolveSessionHostPath] so per-session subdirs
-     * (`/var/minis/{attachments,workspace,offloads,browser}/...`) resolve
-     * directly against this session's host dir instead of consulting the
-     * global, last-writer-wins `bindMounts` map. Without this, an agent
-     * loop in session A that calls `read_image` after session B booted
-     * its PRoot reads from session B's host dir — confirmed leak per
-     * docs/parity/cross-session-isolation-audit.md.
-     *
-     * The legacy single-arg overload is preserved for callers that don't
-     * know the session id (and falls back to the global map). Mirror iOS
-     * `ReadImageTool` which carries `sessionId` through its tool-call
-     * pipeline.
-     */
+    /** Upstream read-image behavior with only the PRoot path resolver replaced. */
     suspend fun execute(argsJson: String, sessionId: String? = null, context: Context? = null): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
@@ -54,71 +39,45 @@ object ReadImageTool {
                 "/var/minis/" + java.net.URLDecoder.decode(rawPath.removePrefix("minis://"), "UTF-8")
             } else rawPath
 
-            val fileBytes = if (path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")) {
-                ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
-            } else {
-                val sid = sessionId?.takeIf { it.isNotBlank() }
-                    ?: return ToolExecutionResult("Error: a chat session is required for image access", false, toolTitle = toolTitle)
-                WorkspaceFileClient.readAll(sid, path)
+            if (context != null) UbuntuPaths.initialize(context)
+            val file = UbuntuPaths.resolveForFileAccess(sessionId, path)
+                ?: return ToolExecutionResult("Error: Cannot resolve path: $path", false, toolTitle = toolTitle)
+
+            if (!file.exists()) {
+                return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             }
 
-            // Read dimensions without decoding pixels first, so an oversized
-            // image cannot blow up the heap before we get a chance to subsample.
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.size, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-                return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
-            }
-
-            // Subsample so the decoded bitmap's longest edge is at most 4000 px;
-            // the exact 2000 px scale below is then cheap and memory-safe.
-            val decodeMaxEdge = 4000
-            var inSampleSize = 1
-            while (bounds.outWidth / inSampleSize > decodeMaxEdge ||
-                bounds.outHeight / inSampleSize > decodeMaxEdge
-            ) {
-                inSampleSize *= 2
-            }
-            val decodeOpts = BitmapFactory.Options()
-            decodeOpts.inSampleSize = inSampleSize
-            val original = BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.size, decodeOpts)
+            val original = BitmapFactory.decodeFile(file.absolutePath)
                 ?: return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
+            val originalWidth = original.width
+            val originalHeight = original.height
 
             val maxEdge = 2000
-            var scaled: Bitmap? = null
-            try {
-                val s = if (original.width > maxEdge || original.height > maxEdge) {
-                    val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
-                    val w = (original.width * scale).toInt()
-                    val h = (original.height * scale).toInt()
-                    Bitmap.createScaledBitmap(original, w, h, true)
-                } else {
-                    original
-                }
-                scaled = s
-
-                val out = ByteArrayOutputStream()
-                s.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                val imageBytes = out.toByteArray()
-
-                val metadata = "[$path | ${original.width}x${original.height} | ${fileBytes.size} bytes]"
-                ToolExecutionResult(
-                    output = metadata,
-                    success = true,
-                    imageData = imageBytes,
-                    imageMimeType = "image/jpeg",
-                    toolTitle = toolTitle,
-                    // The source lives behind minisd's SELinux boundary, so the
-                    // inline bytes are the only App-side preview representation.
-                    imageFilePath = null,
-                )
-            } finally {
-                // Always release the full-size bitmap, even when the 2000 px
-                // scale (or JPEG compress) throws.
-                val s = scaled
-                if (s != null && s !== original) s.recycle()
-                original.recycle()
+            val scaled = if (original.width > maxEdge || original.height > maxEdge) {
+                val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
+                val w = (original.width * scale).toInt()
+                val h = (original.height * scale).toInt()
+                Bitmap.createScaledBitmap(original, w, h, true)
+            } else {
+                original
             }
+
+            val out = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            val imageBytes = out.toByteArray()
+
+            if (scaled !== original) scaled.recycle()
+            original.recycle()
+
+            val metadata = "[$path | ${originalWidth}x${originalHeight} | ${file.length()} bytes]"
+            ToolExecutionResult(
+                output = metadata,
+                success = true,
+                imageData = imageBytes,
+                imageMimeType = "image/jpeg",
+                toolTitle = toolTitle,
+                imageFilePath = file.absolutePath,
+            )
         } catch (e: Exception) {
             ToolExecutionResult("Error reading image: ${e.message}", false)
         }
