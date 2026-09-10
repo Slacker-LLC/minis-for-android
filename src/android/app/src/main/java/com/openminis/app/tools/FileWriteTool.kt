@@ -24,7 +24,6 @@ object FileWriteTool {
         ),
         required = listOf("tool_title", "path", "content"),
         propertyOrdering = listOf("tool_title", "path", "content", "append", "create_dirs"),
-        timeoutMs = 30_000L,
     )
 
     suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
@@ -33,8 +32,8 @@ object FileWriteTool {
             val path = args.optString("path", "")
             val content = args.optString("content", "")
             val append = args.optBoolean("append", false)
-            // Transport-only optimistic-concurrency guard used by Web Remote.
-            // It is intentionally not advertised in the LLM tool schema.
+            // Transport-only optimistic-concurrency guard used by Remote/file
+            // editor callers. It intentionally stays out of the LLM schema.
             val expectedSha256 = args.optString("expected_sha256", "").trim().lowercase()
             val toolTitle = args.optString("tool_title", NAME)
 
@@ -42,8 +41,9 @@ object FileWriteTool {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
-            // Per-session permission preset (DSH /permission) gate. read-only
-            // and workspace-write presets must really refuse out-of-bounds writes.
+            // Per-session permission preset (DSH /permission) gate. This is a
+            // product security boundary and must stay independent of the Linux
+            // backend implementation.
             if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
                 return ToolExecutionResult(
                     "Error: session permission preset `workspace-write` only allows writing under " +
@@ -54,11 +54,6 @@ object FileWriteTool {
                 )
             }
 
-            // T219: read-only mount guard. Reject before opening so we don't
-            // half-create files inside a Locked external mount and surface a
-            // friendly hint pointing the user at Settings. Mirrors iOS
-            // ExternalMountCoordinator.isLinuxPathUnderReadOnlyMount used by
-            // AIChatViewModel.fileWrite (AIChatViewModel.swift:8333-8341).
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
@@ -67,28 +62,26 @@ object FileWriteTool {
                 )
             }
 
-            // Validate UTF-8
             val contentBytes = try {
                 content.toByteArray(Charsets.UTF_8)
             } catch (_: Exception) {
                 return ToolExecutionResult("Error: Content is not valid UTF-8", false, toolTitle = toolTitle)
             }
 
-            // Pi-style per-file mutation queue: concurrent writes/edits against
-            // the same guest target are serialized in request order. Guest paths
-            // resolve through WorkspaceFileClient to App-owned storage or the
-            // explicitly configured external-mount bridge.
+            // Same-target mutations must see a serialized file state. This is
+            // independent of whether the storage backend is Ubuntu workspace or
+            // an explicitly exposed external mount.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
                 val externalMountPath = ExternalMountAccess.isPath(path)
+
+                // Check the revision while holding the same per-file mutation
+                // lock as the following write, so check+write is atomic with
+                // respect to file_write/file_edit calls in this process.
                 if (expectedSha256.isNotEmpty()) {
                     val current = try {
-                        if (externalMountPath) {
-                            ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
-                        } else {
-                            WorkspaceFileClient.readAll(sessionId, path)
-                        }
+                        WorkspaceFileClient.readAll(sessionId, path)
                     } catch (error: WorkspaceFileClient.Failure) {
-                        if (error.code == "RUNTIME_UNAVAILABLE") {
+                        if (error.code == "RUNTIME_UNAVAILABLE" || error.code == "NOT_FOUND") {
                             return@withKey ToolExecutionResult(
                                 "Error: File changed since it was opened (it no longer exists): $path",
                                 false, toolTitle = toolTitle,
@@ -104,9 +97,7 @@ object FileWriteTool {
                     }
                 }
 
-                val bytes = if (externalMountPath) {
-                    ExternalMountAccess.write(path, contentBytes, append)
-                } else if (append) {
+                val bytes = if (append) {
                     WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
                 } else {
                     WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)

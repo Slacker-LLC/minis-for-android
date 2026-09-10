@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -16,6 +17,8 @@ import java.util.concurrent.TimeUnit
  */
 internal object DirectRootRunner {
     private const val MAX_CAPTURE_CHARS = 1_048_576
+    private const val RUNNER_STATE_DIR = "/data/adb/minis/runtime"
+    private const val CLEANUP_TIMEOUT_MS = 900L
 
     data class Result(
         val exitCode: Int,
@@ -55,9 +58,12 @@ internal object DirectRootRunner {
         withContext(Dispatchers.IO) {
             val su = findSu()
                 ?: return@withContext Result(126, "", "", error = "su executable not found")
+            val runId = UUID.randomUUID().toString().replace("-", "")
+            val pidFile = "$RUNNER_STATE_DIR/runner-$runId.pid"
+            val wrappedScript = buildProcessGroupCommand(script, pidFile)
             val process = try {
-                ProcessBuilder(su, "-c", script).redirectErrorStream(false).start()
-            } catch (error: Throwable) {
+                ProcessBuilder(su, "-c", wrappedScript).redirectErrorStream(false).start()
+            } catch (error: Exception) {
                 return@withContext Result(
                     exitCode = 126,
                     stdout = "",
@@ -92,7 +98,7 @@ internal object DirectRootRunner {
                     finished = process.waitFor(100, TimeUnit.MILLISECONDS)
                 }
                 if (!finished) {
-                    process.destroyForcibly()
+                    terminateProcessGroup(su, pidFile, process)
                     process.waitFor(1_000, TimeUnit.MILLISECONDS)
                     outThread.join(1_000)
                     errThread.join(1_000)
@@ -112,10 +118,10 @@ internal object DirectRootRunner {
                     stderr = stderr.value(),
                 )
             } catch (cancelled: CancellationException) {
-                process.destroyForcibly()
+                terminateProcessGroup(su, pidFile, process)
                 throw cancelled
-            } catch (error: Throwable) {
-                process.destroyForcibly()
+            } catch (error: Exception) {
+                terminateProcessGroup(su, pidFile, process)
                 Result(
                     exitCode = 126,
                     stdout = stdout.value(),
@@ -123,9 +129,51 @@ internal object DirectRootRunner {
                     error = error.message ?: error::class.java.simpleName,
                 )
             } finally {
-                process.destroy()
+                runCatching { process.destroy() }
             }
         }
+
+    internal fun buildProcessGroupCommand(script: String, pidFile: String): String {
+        val grouped = buildString {
+            append("umask 077; ")
+            append("mkdir -p ${shellQuote(RUNNER_STATE_DIR)} || exit 126; ")
+            append("echo \$\$ > ${shellQuote(pidFile)} || exit 126; ")
+            append("/system/bin/sh -c ${shellQuote(script)}; ")
+            append("__minis_status=\$?; ")
+            append("rm -f -- ${shellQuote(pidFile)}; ")
+            append("exit \$__minis_status")
+        }
+        return "if command -v setsid >/dev/null 2>&1; then " +
+            "exec setsid /system/bin/sh -c ${shellQuote(grouped)}; " +
+            "else echo 'setsid is required for isolated Root maintenance' >&2; exit 125; fi"
+    }
+
+    internal fun buildProcessGroupCleanupCommand(pidFile: String): String =
+        "PID=\$(cat ${shellQuote(pidFile)} 2>/dev/null || true); " +
+            "case \"\$PID\" in ''|*[!0-9]*) ;; *) " +
+            "if [ \"\$PID\" -gt 1 ]; then " +
+            "kill -TERM -\$PID 2>/dev/null || kill -TERM \$PID 2>/dev/null || true; " +
+            "sleep 0.05; " +
+            "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; " +
+            "fi ;; esac; rm -f -- ${shellQuote(pidFile)}"
+
+    private fun terminateProcessGroup(su: String, pidFile: String, process: Process) {
+        try {
+            val killer = ProcessBuilder(
+                su,
+                "-c",
+                buildProcessGroupCleanupCommand(pidFile),
+            ).redirectErrorStream(true).start()
+            if (!killer.waitFor(CLEANUP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                killer.destroyForcibly()
+            } else {
+                killer.destroy()
+            }
+        } catch (_: Exception) {
+            // Fall through to killing the directly owned launcher process.
+        }
+        runCatching { process.destroyForcibly() }
+    }
 
     fun shellQuote(value: String): String =
         "'" + value.replace("'", "'\"'\"'") + "'"

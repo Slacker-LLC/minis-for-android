@@ -7,6 +7,8 @@ import com.openminis.app.runtime.ExecutionCoordinator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
@@ -41,12 +43,6 @@ object UbuntuRuntime {
         val statusFresh: Boolean = false,
     )
 
-    data class ShellResult(
-        val output: String,
-        val exitCode: Int,
-        val durationMs: Long,
-    )
-
     @Volatile
     var isInitialized: Boolean = false
         private set
@@ -58,6 +54,7 @@ object UbuntuRuntime {
     @Volatile
     private var appContext: Context? = null
 
+    private val lifecycleLock = Mutex()
     private val _snapshot = MutableStateFlow(Snapshot())
     val snapshot: StateFlow<Snapshot> = _snapshot.asStateFlow()
 
@@ -70,14 +67,15 @@ object UbuntuRuntime {
         Log.i(TAG, "initialized direct Ubuntu backend uid=${ctx.applicationInfo.uid}")
     }
 
-    internal fun contextOrNull(): Context? = appContext
-
-    suspend fun ensureReady(): Snapshot {
+    suspend fun ensureReady(): Snapshot = lifecycleLock.withLock {
         if (!isInitialized) {
             val error = "UbuntuRuntime.init(context) has not been called"
-            return fail(error)
+            return@withLock fail(error)
         }
         val status = UbuntuKernel.ensureReady()
+        if (!status.ready) {
+            RootNetworkProxy.stop()
+        }
         val uid = status.appUid ?: appContext?.applicationInfo?.uid
         val next = if (status.ready && uid != null) {
             Snapshot(
@@ -108,19 +106,20 @@ object UbuntuRuntime {
         }
         _snapshot.value = next
         redirectPaths = next.running
-        return next
+        next
     }
 
     suspend fun refresh(): Snapshot = ensureReady()
 
     suspend fun start(): Snapshot = ensureReady()
 
-    suspend fun stop(): Snapshot {
+    suspend fun stop(): Snapshot = lifecycleLock.withLock {
         ExecutionCoordinator.stopCurrentCommand()
+        RootNetworkProxy.stop()
         val next = _snapshot.value.copy(running = false, available = false, statusFresh = true)
         _snapshot.value = next
         redirectPaths = false
-        return next
+        next
     }
 
     suspend fun inspectRootfs(): RootfsHealth = UbuntuKernel.inspectRootfs()
@@ -131,7 +130,7 @@ object UbuntuRuntime {
     }
 
     suspend fun reconcileExternalMounts(entries: List<MountedFoldersStore.Entry>? = null): Boolean =
-        UbuntuKernel.reconcileExternalMounts(entries)
+        lifecycleLock.withLock { UbuntuKernel.reconcileExternalMounts(entries) }
 
     fun findSu(): String? = UbuntuKernel.findSu()
 

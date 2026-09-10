@@ -1,56 +1,49 @@
 # Android `minis://` URL Scheme
 
-**Status:** Current Android implementation
+**Status:** current Android implementation on `refactor/direct-ubuntu-runtime`.
 
-This document describes the `minis://` behavior implemented by Minis for Android. The source of truth is the Android routing and path-resolution code, primarily `ChatLinkResolver`, `DeepLinkHandler`, and `UbuntuPaths`.
+Source of truth: `ChatLinkResolver`, `DeepLinkHandler`, `RuntimePathRegistry`, `runtime.ubuntu.UbuntuPaths`, and `runtime.files.WorkspaceFileClient`.
 
-The Android scheme has two roles:
+The scheme has two roles:
 
-1. app-navigation deep links recognized by `DeepLinkHandler`;
-2. sandbox/resource links resolved by `ChatLinkResolver` when the URL is not a recognized navigation target.
-
-It is **not** the old iOS/iSH session-scoped resource protocol. In particular, the current Android path resolver does not provide per-chat file isolation for these URLs.
+1. application navigation deep links recognized by `DeepLinkHandler`;
+2. guest/resource links resolved by `ChatLinkResolver` when the URL is not a recognized navigation target.
 
 ## Routing order
 
-When a chat Markdown link is tapped, `ChatLinkResolver.resolve(...)` applies this order:
+`ChatLinkResolver.resolveAsync(...)` performs link resolution on `Dispatchers.IO` and applies this order:
 
-1. If the scheme is `minis`, parse it with `DeepLinkHandler`.
-   - A recognized action becomes an app `DeepLink`.
-   - An unrecognized action falls through to sandbox-file resolution.
-2. Resolve supported sandbox/file paths.
-   - An existing non-directory file becomes `SandboxFile`.
-3. Send supported non-HTTP external schemes such as `intent:`, `mailto:`, `tel:`, `geo:`, and `market:` to Android as `ExternalApp` links.
-4. Everything else becomes a normal `Web` link.
+1. recognized `minis://` navigation action → `DeepLink`;
+2. canonical guest/resource path → stage/read through the runtime file layer and return `SandboxFile`;
+3. supported Android external scheme (`intent:`, `mailto:`, `tel:`, `geo:`, `market:` etc.) → `ExternalApp`;
+4. remaining URL → `Web`.
 
-Navigation therefore has priority over resource lookup. A URL that `DeepLinkHandler` recognizes is never reinterpreted as a sandbox file.
+A recognized navigation URI is never reinterpreted as a guest file.
 
 ## Navigation URLs
 
-The following `minis://` routes are currently recognized by `DeepLinkHandler`.
+Current recognized routes include:
 
 | URL | Android action |
 | --- | --- |
 | `minis://share` | Open share flow |
 | `minis://views/alarm` | Open alarm list |
-| `minis://open_terminal?init_command=...` | Open terminal; optional initial command |
-| `minis://action/new_chat` | Start a new chat |
-| `minis://action/voice_chat` | Start a new chat and trigger voice input |
-| `minis://action/camera_chat` | Start a new chat and trigger camera attachment |
-| `minis://session/<sessionId>` | Open a chat session |
-| `minis://session/<sessionId>/<resource-path>?title=...` | Open that session's HTML preview |
+| `minis://open_terminal?init_command=...` | Open terminal with optional initial command |
+| `minis://action/new_chat` | New chat |
+| `minis://action/voice_chat` | New chat + voice input |
+| `minis://action/camera_chat` | New chat + camera attachment |
+| `minis://session/<sessionId>` | Open session |
+| `minis://session/<sessionId>/<resource-path>?title=...` | Open session HTML preview |
 | `minis://settings` | Settings home |
-| `minis://settings/providers` | Provider list |
-| `minis://settings/providers/<instanceId>` | Provider detail |
-| `minis://settings/model-groups` | Model Groups |
-| `minis://settings/model-groups/<groupId>` | Model Group detail |
+| `minis://settings/providers[/<instanceId>]` | Provider list/detail |
+| `minis://settings/model-groups[/<groupId>]` | Model groups/detail |
 | `minis://settings/usage` | Usage statistics |
 | `minis://settings/skills` | Skills |
 | `minis://settings/memory` | Memory |
 | `minis://settings/storage` | Storage |
 | `minis://settings/mount-external` | External mounted folders |
 | `minis://settings/shared-folders` | Shared folders |
-| `minis://settings/logs` | Logs; optional `?tab=...` is forwarded |
+| `minis://settings/logs?tab=...` | Logs |
 | `minis://settings/appearance` | Appearance |
 | `minis://settings/background` | Background |
 | `minis://settings/about` | About |
@@ -58,29 +51,11 @@ The following `minis://` routes are currently recognized by `DeepLinkHandler`.
 | `minis://settings/rootfs` | Rootfs management |
 | `minis://settings/environments` | Environment variables |
 
-Accepted aliases in the current parser include:
+Aliases accepted by the parser include `model_groups`, `usage-stats`, `usage_stats`, `mount_external`, `mounts`, `mounted-folders`, `mounted_folders`, `shared_folders`, `mirrors`, `rootfs-management`, and `rootfs_management`.
 
-- `model_groups` for `model-groups`;
-- `usage-stats` and `usage_stats` for `usage`;
-- `mount_external`, `mounts`, `mounted-folders`, and `mounted_folders` for `mount-external`;
-- `shared_folders` for `shared-folders`;
-- `mirrors`, `rootfs-management`, and `rootfs_management` for `rootfs`.
-
-`minis://settings/environments` also accepts `create_key`, `create_value`, and `create_note` query parameters. A non-empty `create_key` opens the prefilled create flow; missing value/note parameters become empty strings.
-
-An important parser rule is that an unknown path below `minis://settings/...` falls back to Settings home. It does **not** become a resource URL.
+`minis://settings/environments` accepts `create_key`, `create_value`, and `create_note`; non-empty `create_key` opens the prefilled creation flow. Unknown paths below `minis://settings/...` fall back to Settings home.
 
 ## Resource URLs
-
-A `minis://` URL that is not consumed as navigation is eligible for sandbox-file resolution.
-
-For a normal relative resource URL:
-
-```text
-minis://<name>/<path>
-        ↓
-/var/minis/<name>/<path>
-```
 
 Examples:
 
@@ -92,67 +67,81 @@ minis://browser/page.html
 minis://memory/GLOBAL.md
 minis://skills/example/SKILL.md
 minis://shared/data.json
-```
-
-An absolute form is also accepted:
-
-```text
 minis:///var/minis/workspace/report.csv
 ```
 
-For resource resolution, `ChatLinkResolver`:
+Relative `minis://<name>/<path>` resources map to the guest namespace under `/var/minis/<name>/<path>` unless the decoded path is already absolute.
 
-- removes the `minis://` prefix;
-- removes the query component beginning at `?`;
-- URL-decodes the remaining path as UTF-8;
-- preserves `#` as a literal filename character;
-- prepends `/var/minis/` unless the decoded path is already absolute.
+Canonical guest roots recognized by the resolver include:
 
-The result becomes a `SandboxFile` only when the resolved host path exists and is not a directory.
+```text
+/var/minis
+/workspace
+/memory
+/skills
+/shared
+/home/minis
+```
 
-## Android host-path mapping
+`/var/minis/mounts/...` is intentionally excluded from the canonical staged-resource shortcut because SAF-backed external mounts are a distinct trust/path domain.
 
-After app initialization, `UbuntuPaths` maps the stable guest paths to app-private storage:
+## Percent decoding
 
-| Guest/Linux path | Android host path |
+The current resolver does not use ordinary form-decoding semantics blindly:
+
+- `+` is protected so a literal plus in a filename is not converted to a space;
+- the first percent-decoded candidate is attempted first;
+- a second percent decode is attempted only if the first candidate cannot be resolved;
+- malformed decoding falls back safely rather than crashing.
+
+This preserves literal-percent filenames while supporting double-encoded links.
+
+## Session semantics and staging
+
+Session-aware file resolution is now real, not a global alias masquerading as session isolation.
+
+For canonical guest paths, `ChatLinkResolver` stages the file through `WorkspaceFileClient.readToFile(sessionId, guestPath, cacheFile)` into an App cache file before preview/open. Session-scoped guest paths are not staged without a `sessionId`.
+
+Session-scoped aliases include `/workspace`, `/var/minis/workspace`, `/var/minis/attachments`, `/var/minis/offloads`, `/var/minis/browser`, and their child paths. `UbuntuPaths.resolveSessionHostPath(...)` resolves these into the selected `<filesDir>/minis-sessions/<session_id>/...` backing.
+
+Global aliases such as memory, skills, shared, MCP-server data, and home continue to use global App-owned backing.
+
+## Current host backing
+
+| Guest/Linux path | App-owned backing |
 | --- | --- |
-| `/workspace` | `<filesDir>/minis/workspace` |
-| `/var/minis/workspace` | `<filesDir>/minis/workspace` |
-| `/var/minis/attachments` | `<filesDir>/minis/workspace/attachments` |
-| `/var/minis/offloads` | `<filesDir>/minis/workspace/offloads` |
-| `/var/minis/browser` | `<filesDir>/minis/workspace/browser` |
-| `/memory`, `/var/minis/memory` | `<filesDir>/minis/memory` |
-| `/skills`, `/var/minis/skills` | `<filesDir>/minis/skills` |
-| `/shared`, `/var/minis/shared` | `<filesDir>/minis/shared` |
+| global `/workspace` / `/var/minis/workspace` | `<filesDir>/minis/workspace` |
+| session `/workspace` | `<filesDir>/minis-sessions/<session_id>/workspace` |
+| session attachments | `<filesDir>/minis-sessions/<session_id>/attachments` |
+| session offloads | `<filesDir>/minis-sessions/<session_id>/offloads` |
+| session browser | `<filesDir>/minis-sessions/<session_id>/browser` |
+| `/memory`, `/var/minis/memory` | `<filesDir>/minis-global/memory` |
+| `/skills`, `/var/minis/skills` | `<filesDir>/minis-global/skills` |
+| `/shared`, `/var/minis/shared` | `<filesDir>/minis-global/shared` |
+| `/var/minis/mcp-servers` | `<filesDir>/minis-global/mcp-servers` |
+| `/home/minis` | `<filesDir>/minis/home` |
 
-`/data/adb/minis` is reserved for root-owned Ubuntu runtime state such as the rootfs and `minisd`; it is not the app workspace.
+`/data/adb/minis/rootfs` is Root-owned replaceable Ubuntu runtime state and is not a chat/resource backing. Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` locations are migration sources only.
 
-Additional paths can be supplied by the runtime bind-mount registry, including user-authorized external folders.
+## SAF external mounts
 
-`UbuntuPaths` rejects empty paths, NUL-containing paths, and any path containing a `..` segment. Resolved children are canonicalized and must remain inside the selected host mount.
+Paths under `/var/minis/mounts/<name>` are resolved from persisted SAF grants by the Direct Ubuntu/runtime path layer. They are not inserted into ordinary App-owned aliases, and effective read-only/writable state must follow the grant.
 
-## Session semantics
+## Other link forms
 
-`ChatLinkResolver` accepts an optional `sessionId` and prefers `MinisKernel.resolveSessionHostPath(...)` when a session and `Context` are available. However, the current Android implementation of `UbuntuPaths.resolveSessionHostPath(...)` ignores the `sessionId` and delegates directly to the global `resolveHostPath(...)` mapping.
-
-Therefore the current resource aliases above are app-scoped path mappings, not per-chat isolated stores. Do not document `minis://workspace/...` or `minis://attachments/...` as resolving to independent files for each chat unless the Android implementation changes.
-
-The `minis://session/<sessionId>/...` navigation form is different: its session id selects the chat/preview destination. It does not change the resource resolver into a per-session filesystem.
-
-## Other chat-link forms
-
-`ChatLinkResolver` also understands these non-`minis://` forms:
-
-- `file:///...` — decoded to a host `File` and opened as a sandbox file when it exists and is not a directory;
-- absolute scheme-less Linux paths such as `/var/minis/workspace/file.txt` — resolved through the current Ubuntu path/mount registry;
-- supported Android external schemes — dispatched to the appropriate app;
-- HTTP(S) and other remaining URLs — handled as web links.
+- `file:///...` can open an existing host file when allowed by the existing path/preview flow;
+- absolute guest paths can be resolved through the runtime path registry;
+- supported non-HTTP Android schemes are dispatched externally;
+- HTTP(S) and remaining URLs become web links.
 
 ## Implementation references
 
-- `src/android/app/src/main/java/com/openminis/app/ui/chat/ChatLinkResolver.kt`
-- `src/android/app/src/main/java/com/openminis/app/deeplink/DeepLinkHandler.kt`
-- `src/android/app/src/main/java/com/openminis/app/sandbox/MinisKernel.kt`
-- `src/android/app/src/main/java/com/openminis/app/sandbox/ubuntu/UbuntuPaths.kt`
+```text
+src/android/app/src/main/java/com/openminis/app/ui/chat/ChatLinkResolver.kt
+src/android/app/src/main/java/com/openminis/app/deeplink/DeepLinkHandler.kt
+src/android/app/src/main/java/com/openminis/app/runtime/RuntimePathRegistry.kt
+src/android/app/src/main/java/com/openminis/app/runtime/ubuntu/UbuntuPaths.kt
+src/android/app/src/main/java/com/openminis/app/runtime/files/WorkspaceFileClient.kt
+```
 
-When behavior and this document differ, update this document from the Android implementation rather than copying the former iOS/iSH specification.
+Do not restore references to the removed `MinisKernel`/old sandbox Ubuntu path model or the former privileged broker as the resource-resolution authority.

@@ -38,7 +38,6 @@ object FileEditTool {
             ),
             required = listOf("tool_title", "path", "edits"),
             propertyOrdering = listOf("tool_title", "path", "edits", "old_string", "new_string", "replace_all"),
-            timeoutMs = 60_000L,
         )
     }
 
@@ -51,7 +50,8 @@ object FileEditTool {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
-            // Per-session permission preset (DSH /permission) gate, mirroring FileWriteTool.
+            // Per-session permission preset is a product security boundary and
+            // stays independent of the Linux backend implementation.
             if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
                 return ToolExecutionResult(
                     "Error: session permission preset `workspace-write` only allows writing under " +
@@ -60,6 +60,8 @@ object FileEditTool {
                 )
             }
 
+            // Keep upstream read-only-mount semantics while routing the check
+            // through the Direct Ubuntu/Root path registry.
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
@@ -68,26 +70,19 @@ object FileEditTool {
                 )
             }
 
-            val externalMountPath = ExternalMountAccess.isPath(path)
-            if (externalMountPath) {
-                val metadata = ExternalMountAccess.info(path)
-                if (metadata.optString("type") != "file") {
-                    return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
-                }
-            } else {
-                val metadata = WorkspaceFileClient.info(sessionId, path)
-                if (metadata.optString("type") != "file") {
-                    return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
-                }
-            }
-
+            // Read, match and write under one per-target transaction so another
+            // file_write/file_edit cannot invalidate the snapshot in between.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
-                val content = if (externalMountPath) {
-                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
-                        .toString(Charsets.UTF_8)
-                } else {
-                    WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
+                val metadata = WorkspaceFileClient.info(sessionId, path)
+                if (!metadata.optBoolean("exists", false)) {
+                    return@withKey ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
                 }
+                val type = metadata.optString("type", "")
+                if (type.isNotBlank() && type != "file") {
+                    return@withKey ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
+                }
+
+                val content = WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
                 val edits = parseEdits(args)
                 if (edits.isEmpty()) {
                     return@withKey ToolExecutionResult(
@@ -96,35 +91,29 @@ object FileEditTool {
                     )
                 }
 
-                // Preserve legacy replace_all semantics separately: Pi-style multi-edit
-                // requires unique matches, while old traces may intentionally replace all.
+                // Preserve legacy replace_all semantics separately: Pi-style
+                // multi-edit requires unique matches, while old traces may
+                // intentionally replace every exact occurrence.
                 if (!args.has("edits") && args.optBoolean("replace_all", false)) {
                     val old = args.optString("old_string", "")
                     val new = args.optString("new_string", "")
-                    if (old.isEmpty()) return@withKey ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
-                    // CRLF files: match on the LF-normalized text so old_string
-                    // written with \n still finds lines in a \r\n file, then
-                    // restore the original line-ending style afterwards.
+                    if (old.isEmpty()) {
+                        return@withKey ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
+                    }
                     val normalized = FileEditEngine.normalizeLf(content)
                     val normalizedOld = FileEditEngine.normalizeLf(old)
                     val count = Regex.escape(normalizedOld).toRegex().findAll(normalized).count()
-                    if (count == 0) return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
+                    if (count == 0) {
+                        return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
+                    }
                     val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
                     val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
-                    val bytes = if (externalMountPath) {
-                        ExternalMountAccess.write(path, restored.toByteArray(Charsets.UTF_8), append = false)
-                    } else {
-                        WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
-                    }
+                    val bytes = WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
                     return@withKey ToolExecutionResult("Edited $path ($count replacements, $bytes bytes)", true, toolTitle = toolTitle)
                 }
 
                 val result = FileEditEngine.apply(content, edits, path)
-                val bytes = if (externalMountPath) {
-                    ExternalMountAccess.write(path, result.newContent.toByteArray(Charsets.UTF_8), append = false)
-                } else {
-                    WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
-                }
+                val bytes = WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
                 val fuzzyNote = if (result.fuzzyMatchCount > 0) ", ${result.fuzzyMatchCount} fuzzy match(es)" else ""
                 val lineNote = result.firstChangedLine?.let { ", first changed line $it" }.orEmpty()
                 val diff = takeCodePoints(result.diff, MAX_DIFF_CHARS)
@@ -141,11 +130,7 @@ object FileEditTool {
         }
     }
 
-    /**
-     * Take at most [max] UTF-16 code units of [text] without splitting a
-     * surrogate pair (a raw take() can leave a dangling high surrogate, which
-     * then decodes to U+FFFD in the tool result).
-     */
+    /** Take at most [max] UTF-16 code units without splitting a surrogate pair. */
     private fun takeCodePoints(text: String, max: Int): String {
         if (text.length <= max) return text
         var end = max
@@ -168,13 +153,15 @@ object FileEditTool {
         if (array != null) {
             for (i in 0 until array.length()) {
                 val item = array.optJSONObject(i) ?: continue
-                val oldText = when {
-                    item.has("old_text") -> item.optString("old_text", "")
-                    else -> item.optString("oldText", "")
+                val oldText = if (item.has("old_text")) {
+                    item.optString("old_text", "")
+                } else {
+                    item.optString("oldText", "")
                 }
-                val newText = when {
-                    item.has("new_text") -> item.optString("new_text", "")
-                    else -> item.optString("newText", "")
+                val newText = if (item.has("new_text")) {
+                    item.optString("new_text", "")
+                } else {
+                    item.optString("newText", "")
                 }
                 out += FileEditEngine.Edit(oldText, newText)
             }

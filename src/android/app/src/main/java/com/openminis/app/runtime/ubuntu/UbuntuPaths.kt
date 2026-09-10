@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.net.Uri
 import com.openminis.app.runtime.RuntimePathRegistry
+import kotlinx.coroutines.CancellationException
 import java.io.File
 
 /**
@@ -172,11 +173,16 @@ object UbuntuPaths {
 
     fun isExternalMountWritable(path: String): Boolean {
         if (!path.startsWith("/var/minis/mounts/")) return false
+        val ctx = appContext ?: return false
         val name = path.removePrefix("/var/minis/mounts/").substringBefore('/')
         val entry = RuntimePathRegistry.mountedFoldersStore?.entries?.value
             ?.firstOrNull { it.name == name && it.isActive }
             ?: return false
-        return entry.effectiveWritable
+        val uri = Uri.parse(entry.treeUri)
+        val permission = ctx.contentResolver.persistedUriPermissions
+            .firstOrNull { it.uri == uri }
+            ?: return false
+        return entry.effectiveWritable && permission.isReadPermission && permission.isWritePermission
     }
 
     private suspend fun resolveExternalMount(linuxPath: String): File? {
@@ -189,7 +195,15 @@ object UbuntuPaths {
             ?.firstOrNull { it.name == name && it.isActive }
             ?: return null
         val store = RuntimePathRegistry.mountedFoldersStore ?: return null
-        val rootPath = store.resolvePosixPath(Uri.parse(entry.treeUri), ctx) ?: return null
+        val uri = Uri.parse(entry.treeUri)
+        try {
+            store.validateMountEntries(listOf(entry))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return null
+        }
+        val rootPath = store.resolvePosixPath(uri, ctx) ?: return null
         return childOf(rootPath, rest.substringAfter('/', ""))
     }
 

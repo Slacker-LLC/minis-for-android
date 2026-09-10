@@ -1,6 +1,6 @@
 # Minis for Android 构建说明
 
-> 产品行为以 [AGENTS.md](AGENTS.md) 与 [docs/contracts/](docs/contracts/00-IDENTITY.md) 为准。构建命令与工具链以本文件、[BUILDING.md](BUILDING.md) 和实际脚本为准；三者冲突时以脚本为准。
+产品行为以 [AGENTS.md](AGENTS.md) 与 [docs/contracts/](docs/contracts/00-IDENTITY.md) 为准；精确工具链以实际 Gradle、脚本和本文件为准。
 
 ## 当前工具链
 
@@ -10,17 +10,18 @@
 - Android Gradle Plugin 8.10.1；
 - Kotlin 2.1.0；
 - compileSdk 36 / targetSdk 35 / minSdk 26；
-- Android NDK 28.2.13676358 或更高版本；
+- Android NDK 28.2.13676358 或更高；
 - CMake 3.22.1；
 - Rust stable + `aarch64-linux-android`。
 
-Gradle、Root 网络代理与 rclone 默认使用 NDK `28.2.13676358`。验证其它已安装版本时统一设置 `MINIS_NDK_VERSION`；若另外指定 `ANDROID_NDK_HOME`，必须指向同一版本。
+Gradle、Android 网络兼容代理与 rclone 默认使用 NDK `28.2.13676358`。验证其它版本时统一设置 `MINIS_NDK_VERSION`，`ANDROID_NDK_HOME` 也必须指向对应版本。
 
-## 1. 克隆
+## 1. 克隆与切换分支
 
 ```bash
 git clone https://github.com/Slacker-LLC/minis-for-android.git
 cd minis-for-android
+git switch refactor/direct-ubuntu-runtime
 ```
 
 当前运行时不需要初始化 Git submodule。
@@ -37,11 +38,11 @@ cp src/android/app/provider-customization.properties.example \
    src/android/app/provider-customization.properties
 ```
 
-不要提交真实 API Key、OAuth token、Provider 私有标识、签名密钥或其他凭据。
+不要提交 API Key、OAuth token、Provider 私有标识、签名密钥或其它凭据。
 
-## 3. 构建 Root 网络代理
+## 3. 构建 native 依赖
 
-打包前还需构建并导入 rclone（包含 arm64-v8a 与 x86_64）：
+rclone：
 
 ```bash
 bash deps/build_rclone_android.sh
@@ -49,28 +50,30 @@ mkdir -p src/android/app/libs
 cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
 ```
 
-Root 网络代理只负责 `127.0.0.1:18787` 的 HTTP/CONNECT 出站转发，不提供 RPC 或任意 Root 命令接口：
+网络兼容 helper：
 
 ```bash
 rustup target add aarch64-linux-android
 bash scripts/build-root-network-proxy-android.sh
 ```
 
-## 4. 构建 Ubuntu rootfs
+当前二进制/Android 启动类沿用 `root-network-proxy` 命名，是因为现阶段部署可用特权身份建立出站 socket，以兼容部分 Android/VPN/BPF 对 App-UID guest 的限制。**代理协议本身并不依赖 Root，也不是 chroot 的必要组成部分。** 它只提供 `127.0.0.1:18787` HTTP/CONNECT 转发，不提供 shell、文件或通用 Root RPC。
+
+## 4. 构建 Ubuntu rootfs/runtime payload
 
 ```bash
 ./scripts/build-ubuntu-rootfs.sh
-```
-
-脚本会下载并校验固定 SHA-256 的 Ubuntu 24.04 arm64 base rootfs，并生成可复现的 rootfs 归档。
-
-一次生成完整且经过验证的 APK 运行时载荷：
-
-```bash
 bash scripts/build-runtime-payload.sh
 ```
 
-该脚本只输出 rootfs payload：`dist/ubuntu-arm64-rootfs.tar.gz` 和 `dist/runtime-manifest.json`。Root 网络代理由 `build-root-network-proxy-android.sh` 独立构建和校验，Gradle 以 `libminisnetproxy.so` 单独打包；CI 组装 APK 时两者都必须存在。
+runtime payload 只包含：
+
+```text
+dist/ubuntu-arm64-rootfs.tar.gz
+dist/runtime-manifest.json
+```
+
+网络 helper 单独构建/校验，Gradle 以 `libminisnetproxy.so` 独立打包。
 
 ## 5. 构建 Debug APK
 
@@ -85,17 +88,17 @@ cd src/android
 src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Debug APK 使用本机持久化的固定调试签名，不会把签名材料提交到仓库。首次构建时会自动生成一次：Windows 与 WSL 共用 `C:\Users\<用户名>\.minis\debug.keystore`；其他 Linux 环境使用 `~/.minis/debug.keystore`。也可以通过 `MINIS_DEBUG_KEYSTORE` 指定路径。该签名只用于 Debug，Release 仍必须使用显式的正式签名配置。
-
-安装：
+安装到明确授权设备：
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-APK/AAB 只作为本地或 CI 构建产物，不应提交到 Git。
+Debug 使用本机持久调试签名：Windows/WSL 默认 `C:\Users\<用户名>\.minis\debug.keystore`，Linux 默认 `~/.minis/debug.keystore`，可用 `MINIS_DEBUG_KEYSTORE` 覆盖。Release 不得回退使用 Debug key。
 
-## 6. 测试
+## 6. 测试与校验
+
+Android：
 
 ```bash
 cd src/android
@@ -105,7 +108,17 @@ cd src/android
 ./gradlew :app:assembleDebugAndroidTest --no-daemon
 ```
 
-Root 网络代理 Rust：
+Runtime/build guard：
+
+```bash
+python3 scripts/test_build_cleanup_guard.py
+python3 scripts/check_build_cleanup.py
+bash scripts/test-build-ubuntu-rootfs-verification.sh
+bash scripts/test-runtime-payload-verification.sh
+bash scripts/check-runtime-package-boundary.sh
+```
+
+网络 helper：
 
 ```bash
 cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
@@ -113,58 +126,48 @@ cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml -
 cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
 ```
 
-Rootfs 校验：
-
-```bash
-bash scripts/test-build-ubuntu-rootfs-verification.sh
-bash scripts/test-runtime-payload-verification.sh
-```
-
-文档来源隔离检查：
+文档：
 
 ```bash
 python3 scripts/test_docs_provenance.py
 python3 scripts/check_docs_provenance.py
 ```
 
-## 7. Release 签名
+16 KiB：
 
-Release 构建必须显式提供正式签名配置：
+```bash
+bash scripts/verify-android-16k.sh <apk>
+BUNDLETOOL_JAR=/path/to/bundletool.jar bash scripts/verify-android-bundle.sh <aab>
+```
+
+## 7. Release
+
+Release 签名必须显式提供：
 
 ```bash
 export RELEASE_KEYSTORE=/absolute/path/to/release.jks
 export RELEASE_STORE_PASSWORD='...'
 export RELEASE_KEY_ALIAS='...'
 export RELEASE_KEY_PASSWORD='...'
-```
 
-然后：
-
-```bash
 cd src/android
 ./gradlew :app:assembleRelease --no-daemon
 ```
 
-缺少签名配置时 Release gate 必须失败，不能回退使用 Android debug key。
+缺少正式签名时必须失败关闭。
 
 ## 当前 Linux 执行路径
 
 ```text
 Android App
-  ↓
-ExecutionCoordinator → RootPersistentShell → UbuntuKernel
-  ↓
-su → unshare -m → bind mount → chroot
-  ↓
-setpriv(App UID, capabilities=none) → Ubuntu 24.04 bash
+  → ExecutionCoordinator → RootPersistentShell → UbuntuKernel
+  → su → setsid → unshare -m → bind mount → chroot
+  → setpriv(真实 App UID/GID, clear groups/caps)
+  → Ubuntu 24.04 bash
 ```
 
-App 直接持有会话 shell。Root 仅用于 mount/chroot/rootfs 维护和 loopback-only 出站代理；普通 guest 命令不会以 UID 0 执行。旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` 数据只做一次迁移，rootfs reset 不得删除用户数据。
+Root 只负责建立 Direct Ubuntu 环境所需的最小基础设施；普通 guest 命令不是 Root 命令。网络代理是独立兼容组件，不应再和 Root/chroot 本身写成同一概念。
 
-更多内容：
+KernelSU/Magisk/APatch、SELinux、mount namespace、VPN/DNS/BPF/Fake-IP 与 OEM 生命周期仍需真机验收。
 
-- [README.md](README.md)
-- [README.zh-CN.md](README.zh-CN.md)
-- [PROVENANCE.md](PROVENANCE.md)
-- [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)
-- [docs/SECURITY.md](docs/SECURITY.md)
+更多内容：[README.zh-CN.md](README.zh-CN.md)、[docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)、[docs/SECURITY.md](docs/SECURITY.md)。

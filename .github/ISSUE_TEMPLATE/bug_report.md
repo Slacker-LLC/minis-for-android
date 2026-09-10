@@ -16,9 +16,10 @@ labels: ["bug", "triage"]
 | Android version | |
 | Minis `versionName` / `versionCode` | |
 | Device / ROM | |
-| Root status | None / Magisk / KernelSU / APatch / other |
+| Root solution/status | None / Magisk / KernelSU / APatch / other |
 | SELinux mode (if relevant) | |
 | Provider / model (if relevant) | |
+| VPN/TUN/Fake-IP (if network-related) | |
 
 ## Steps to reproduce
 
@@ -28,15 +29,11 @@ labels: ["bug", "triage"]
 
 ## Expected behavior
 
-<!-- What should have happened? -->
-
 ## Actual behavior
-
-<!-- What happened instead? -->
 
 ## Logs / diagnostics
 
-<!-- Paste only sanitized logs. Remove API keys, OAuth/MCP tokens, signing material, private file contents, phone numbers, contacts, and unrelated device data. -->
+<!-- Sanitize logs. Remove API keys, OAuth/MCP tokens, signing material, private file contents, phone numbers, contacts, and unrelated device data. -->
 
 ```text
 
@@ -48,11 +45,12 @@ labels: ["bug", "triage"]
 - [ ] Provider / model
 - [ ] Android-native tool
 - [ ] MCP
-- [ ] Direct Ubuntu / Root infrastructure / network proxy
+- [ ] Direct Ubuntu / rootfs / mount / privilege drop
+- [ ] Network compatibility proxy / DNS / VPN / BPF
 - [ ] Voice / assistant / overlay
 - [ ] Build / CI / release
 - [ ] Other
 
 ## Additional context
 
-<!-- For Root/runtime issues, include the capability/SELinux result rather than assuming that a Root-provider name alone proves the capability. For VPN/DNS issues, include whether the fixed loopback guest proxy was reachable. -->
+<!-- Root and networking are separate. For Root/runtime issues include the actual capability/SELinux/mount result. For network issues say whether guest direct networking fails, whether 127.0.0.1:18787 is reachable, and whether the failure is DNS, route, VPN/TUN/Fake-IP, or proxy-specific. Do not assume a proxy problem merely because the device is rooted. -->

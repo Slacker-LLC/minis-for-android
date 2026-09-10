@@ -23,6 +23,9 @@ target_link_libraries(pty_bridge ${log-lib})
 target_link_libraries(minis_crash_handler ${log-lib})
 target_link_libraries(jieba_jni ${log-lib})
 
+# AGP 8.10 defaults to NDK r27, which does not emit 16 KB-aligned shared
+# libraries by default. Keep every app-owned JNI library compatible with
+# Android devices that use 16 KB pages.
 target_link_options(pty_bridge PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 target_link_options(minis_crash_handler PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 target_link_options(jieba_jni PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")

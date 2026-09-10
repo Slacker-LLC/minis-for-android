@@ -11,9 +11,10 @@ import android.content.Context
  * (see [FileWriteTool]/[FileEditTool]).
  *
  * Presets (DSH enum the bundled web client can express):
- *  - `workspace-write`: file writes allowed only under `/var/minis/workspace`
- *    (and the per-session virtual `/var/minis/` dirs that map into app storage);
- *    everything else is refused with an explicit hint.
+ *  - `workspace-write`: file writes allowed only under `/workspace`,
+ *    `/var/minis/workspace`, and the per-session virtual attachments/offloads/
+ *    browser directories; global memory/skills/shared and external mounts are
+ *    refused.
  *  - `danger-full-access`: no extra restriction from this store; existing T219
  *    read-only mount guards and the OS sandbox still apply.
  *
@@ -58,21 +59,28 @@ object SessionPermissionStore {
     fun allowsFileWrite(context: Context, sessionId: String, linuxPath: String): Boolean {
         val preset = preset(context, sessionId) ?: return true
         if (preset == DANGER_FULL_ACCESS) return true
-        if (linuxPath.contains('\u0000') || linuxPath.split('/').any { it == ".." }) return false
-        // workspace-write: only the per-session virtual /var/minis tree.
+        return isWorkspaceWritePath(linuxPath)
+    }
+
+    /** Pure path gate used by `workspace-write`; kept testable without Android state. */
+    internal fun isWorkspaceWritePath(linuxPath: String): Boolean {
+        if (linuxPath.isBlank() || linuxPath.contains('\u0000') || linuxPath.split('/').any { it == ".." }) {
+            return false
+        }
         val normalized = if (linuxPath.startsWith('/')) {
             linuxPath
         } else {
             "/var/minis/workspace/${linuxPath.trimStart('/')}"
         }
-        return normalized.startsWith("/var/minis/workspace/") ||
+        return normalized == "/workspace" ||
+            normalized.startsWith("/workspace/") ||
             normalized == "/var/minis/workspace" ||
+            normalized.startsWith("/var/minis/workspace/") ||
+            normalized == "/var/minis/attachments" ||
             normalized.startsWith("/var/minis/attachments/") ||
+            normalized == "/var/minis/offloads" ||
             normalized.startsWith("/var/minis/offloads/") ||
-            normalized.startsWith("/var/minis/browser/") ||
-            normalized.startsWith("/var/minis/shared/") ||
-            normalized.startsWith("/var/minis/skills/") ||
-            normalized.startsWith("/var/minis/memory/") ||
-            normalized.startsWith("/var/minis/mounts/")
+            normalized == "/var/minis/browser" ||
+            normalized.startsWith("/var/minis/browser/")
     }
 }

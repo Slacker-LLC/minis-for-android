@@ -12,7 +12,6 @@ import com.openminis.app.data.model.AgentToolParam
 object AgentTools {
     private val BOT_COORDINATION_TOOL_NAMES = setOf("delegate_bot", "list_bots", "check_delegation")
 
-
     fun makeAgentTools(
         supportsImageInput: Boolean = true,
         // [T-android-vision-group / GH#182] When the main model can't natively
@@ -32,8 +31,7 @@ object AgentTools {
         /**
          * Agent preset's real tool configuration: `CORE` (minimal mode)
          * exposes only the persistent shell + file triad; `FULL` keeps the
-         * whole capability set. This is the one knob that makes a preset a
-         * real runtime behavior difference, not a UI label.
+         * whole capability set.
          */
         presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
             com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
@@ -43,10 +41,10 @@ object AgentTools {
         add(FileReadTool.definition())
         add(FileWriteTool.definition())
         add(FileEditTool.definition())
+
         if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) {
             // Bot coordination is part of the Bot identity contract, so a
-            // minimal Agent preset must not silently remove list/delegate/check
-            // from a Bot session. Keep every other full-runtime tool hidden.
+            // minimal Bot session must still be able to list/delegate/check.
             if (botEnabled) {
                 addAll(
                     com.openminis.app.tools.runtime.ToolRegistry.definitions()
@@ -55,10 +53,10 @@ object AgentTools {
             }
             return@buildList
         }
-        // Android development/debug loop. These high-cohesion tools reuse the
-        // existing AccessibilityService, Shizuku, Ubuntu runtime, approval,
-        // checkpoint, JobRegistry, and output-spill seams rather than creating
-        // parallel runtimes.
+
+        // These are intentional fork product capabilities. They reuse the
+        // existing runtime/permission/checkpoint seams rather than creating a
+        // parallel Ubuntu execution path.
         addAll(com.openminis.app.tools.android.AndroidAgentTools.definitions())
         if (supportsImageInput || visionGroupConfigured) {
             add(ReadImageTool.definition())
@@ -71,7 +69,6 @@ object AgentTools {
         add(createGoalDefinition())
         add(updateGoalDefinition())
         add(todoWriteDefinition())
-        // Job system (DeepSeek Harness dsh-tool-jobs, minimal port).
         add(JobTools.jobOutputDefinition())
         add(JobTools.jobListDefinition())
         add(JobTools.jobKillDefinition())
@@ -79,10 +76,10 @@ object AgentTools {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
         }
-        // ToolRegistry owns runtime schemas. Legacy tools above already expose
-        // aliases such as shell_execute/file_read/android_logs; add only the
-        // remaining canonical handlers so new capabilities are visible to the
-        // local agent without maintaining a second definition registry.
+
+        // ToolRegistry owns canonical fork runtime schemas. Legacy definitions
+        // above retain their model-facing names; add only canonical handlers
+        // not already represented, while respecting the Bot identity gate.
         val legacyCanonicals = mapNotNull {
             com.openminis.app.tools.runtime.ToolRegistry.canonicalName(it.name)
         }.toSet()
@@ -93,13 +90,16 @@ object AgentTools {
         )
     }
 
-    // Aligned with iOS AIChatViewModel.swift:4982-4993
+    // Upstream shell contract adapted to the direct Ubuntu backend. Root only
+    // launches the mount namespace/chroot; guest commands are privilege-dropped
+    // to the Android app UID with Linux capabilities cleared. ToolRegistry
+    // reuses the same schema under its canonical linux.shell name.
     fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
         name = name,
-        description = "Execute a command in the on-device Ubuntu 24.04 environment (uid 10000). " +
-            "The command runs via /bin/bash -lc with stdout and stderr merged. " +
-            "Workspace is /workspace, backed by /data/adb/minis/workspace. " +
-            "Default timeout is 15 minutes.",
+        description = "Execute a command in the on-device Ubuntu 24.04 environment. " +
+            "Root launches the chroot, but commands run privilege-dropped as the Android app UID with Linux capabilities cleared. " +
+            "Workspace is the session-scoped /workspace backed by app-private storage. " +
+            "Commands run in a persistent Bash shell with stdout and stderr merged. Default timeout is 15 minutes.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
             "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
@@ -115,7 +115,7 @@ object AgentTools {
         name = "browser_use",
         description = "Control a web browser with up to 3 tabs. " +
             "Do NOT use this tool for minis:// action URLs (open_terminal, views, settings) — those are app deep links, use Markdown links in chat instead. " +
-            "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview app sandbox files (e.g. navigate to minis://workspace/index.html). " +
+            "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview session files (e.g. navigate to minis://workspace/index.html). " +
             "Sub-resources (JS, CSS, images, fonts) referenced via minis:// absolute paths or relative paths within HTML pages resolve correctly. " +
             "Use navigate to open URLs, screenshot to see the page (returns an image), " +
             "click/type to interact with elements, get_text/get_readable to extract content, " +
@@ -131,8 +131,7 @@ object AgentTools {
             "Use tab_id to target a specific tab (defaults to the most recently used tab).",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Open Wikipedia homepage', 'Take screenshot of current page'). Use the same language as the user."),
-            "action" to AgentToolParam("string", "The browser action to perform",
-                enumValues = BrowserAction.allValues),
+            "action" to AgentToolParam("string", "The browser action to perform", enumValues = BrowserAction.allValues),
             "url" to AgentToolParam("string", "URL to navigate to (for navigate action) or resource to download (for fetch action)"),
             "selector" to AgentToolParam("string", "CSS selector for targeting elements (click, type, get_text, scroll, hover, find_elements). For scroll: specify a scrollable container to scroll (e.g. 'div.timeline'); if omitted, auto-detects the best scrollable element."),
             "text" to AgentToolParam("string", "Text to type (for type action)"),
@@ -156,10 +155,8 @@ object AgentTools {
         ),
         required = listOf("tool_title", "action"),
         propertyOrdering = listOf("tool_title", "action", "tab_id", "url", "selector", "text", "coordinate_x", "coordinate_y", "direction", "amount", "scroll_count", "item_selector", "script", "user_agent", "max_depth", "keywords", "fuzzy", "cookies", "timeout", "viewport_width", "viewport_height", "reset"),
-        timeoutMs = 120_000L,
     )
 
-    // Aligned with iOS AIChatViewModel.swift:5059-5067
     private fun memoryWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_write",
         description = "Write a memory entry to today's daily log (YYYY-MM-DD.md). Memories persist across all sessions. " +
@@ -173,10 +170,8 @@ object AgentTools {
         ),
         required = listOf("tool_title", "content"),
         propertyOrdering = listOf("tool_title", "content"),
-        timeoutMs = 30_000L,
     )
 
-    // Aligned with iOS AIChatViewModel.swift:5069-5078
     private fun memoryGetDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_get",
         description = "Retrieve memories from persistent storage. Supports keyword-based fuzzy search across memory files. " +
@@ -188,20 +183,13 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
-        timeoutMs = 30_000L,
     )
 
-    /**
-     * Delegation. Kept deliberately narrow: one self-contained task in, one
-     * answer out. The child starts with a blank context, so the description
-     * hammers on writing a standalone prompt — the single most common way
-     * delegation goes wrong is assuming the child can see this conversation.
-     */
     private fun subagentDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "subagent",
         description = "Delegate a self-contained sub-task to a child agent that runs in its own session with its own context, " +
             "then return only its final answer. Use this for work that would otherwise flood your own context with " +
-            "intermediate output \u2014 searching across many files, reading long logs, exploring an unfamiliar codebase, " +
+            "intermediate output — searching across many files, reading long logs, exploring an unfamiliar codebase, " +
             "or any independent investigation whose details you do not need to keep. " +
             "The child CANNOT see this conversation: write `prompt` as a complete, standalone task including all needed " +
             "paths, names and constraints, and state exactly what it should report back. " +

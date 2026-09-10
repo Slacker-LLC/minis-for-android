@@ -22,7 +22,6 @@ object FileReadTool {
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "offset", "lines", "direction", "max_length"),
-        timeoutMs = 60_000L,
     )
 
     suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
@@ -43,23 +42,29 @@ object FileReadTool {
             // full file size so it can paginate with offset/lines if needed.
             // iOS mirrors this cap in AIChatViewModel.executeFileRead.
             val MAX_LENGTH_HARD_CAP = 80_000
-            val maxLength = args.optInt("max_length", 15000).coerceAtLeast(0).coerceAtMost(MAX_LENGTH_HARD_CAP)
+            val maxLength = args.optInt("max_length", 15000)
+                .coerceAtLeast(0)
+                .coerceAtMost(MAX_LENGTH_HARD_CAP)
             val direction = args.optString("direction", "head")
 
             if (path.isBlank()) {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
-            val fileBytes = if (ExternalMountAccess.isPath(path)) {
-                ExternalMountAccess.read(path, 50L * 1024 * 1024)
-            } else {
-                WorkspaceFileClient.readAll(
-                    sessionId = sessionId,
-                    path = path,
-                    maxBytes = 50L * 1024 * 1024,
-                )
+            val info = WorkspaceFileClient.info(sessionId, path)
+            if (!info.optBoolean("exists", false)) {
+                return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             }
-            val size = fileBytes.size.toLong()
+            if (info.optString("type") == "dir") {
+                return ToolExecutionResult("Error: Path is a directory: $path", false, toolTitle = toolTitle)
+            }
+            val size = info.optLong("size", 0L)
+
+            val fileBytes = WorkspaceFileClient.readAll(
+                sessionId = sessionId,
+                path = path,
+                maxBytes = 50L * 1024 * 1024,
+            )
 
             // Binary detection: check first 8192 bytes for null bytes.
             val isBinary = fileBytes.take(8192).any { it == 0.toByte() }
@@ -95,7 +100,6 @@ object FileReadTool {
             } else {
                 offset
             }
-            val showEnd = showStart + selectedLines.size - 1
 
             val output = FileReadOutputFormatter.format(
                 path = path,

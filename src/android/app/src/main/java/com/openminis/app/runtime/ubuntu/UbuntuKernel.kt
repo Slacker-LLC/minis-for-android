@@ -8,6 +8,7 @@ import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.guest.GuestCommandBridge
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -208,7 +209,7 @@ internal object UbuntuKernel {
     suspend fun refreshDns(nameservers: List<String>): Boolean {
         val safe = nameservers.filter { it.matches(Regex("^[0-9A-Fa-f:.]{2,64}$")) }.distinct()
         if (safe.isEmpty()) return false
-        val lines = safe.joinToString("\\n") { "nameserver $it" } + "\\n"
+        val lines = safe.joinToString("\n") { "nameserver $it" } + "\n"
         val target = UbuntuPaths.HOST_ROOTFS + "/etc/resolv.conf"
         val script = "printf %s ${DirectRootRunner.shellQuote(lines)} > ${DirectRootRunner.shellQuote(target)} && chmod 644 ${DirectRootRunner.shellQuote(target)}"
         return DirectRootRunner.runScript(script, ROOT_TIMEOUT_MS).success
@@ -217,12 +218,14 @@ internal object UbuntuKernel {
     /** Validate a candidate SAF snapshot and recycle live shells so next spawn uses it. */
     suspend fun reconcileExternalMounts(entries: List<MountedFoldersStore.Entry>? = null): Boolean {
         val store = RuntimePathRegistry.mountedFoldersStore ?: return true
-        return runCatching {
-            store.buildMountSnapshot(entries ?: store.entries.value)
+        return try {
+            store.validateMountEntries(entries ?: store.entries.value)
             ExecutionCoordinator.stopCurrentCommand()
             true
-        }.getOrElse {
-            Log.w(TAG, "external mount validation failed: ${it.message}")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.w(TAG, "external mount validation failed: ${error.message}")
             false
         }
     }
@@ -278,9 +281,21 @@ internal object UbuntuKernel {
         if (store != null) {
             for (entry in store.entries.value) {
                 if (!entry.isActive) continue
-                val host = store.resolvePosixPath(Uri.parse(entry.treeUri), ctx)
+                val treeUri = Uri.parse(entry.treeUri)
+                val hasPersistedRead = ctx.contentResolver.persistedUriPermissions.any {
+                    it.uri == treeUri && it.isReadPermission
+                }
+                check(hasPersistedRead) { "active external mount ${entry.name} has no persisted read grant" }
+                val host = store.resolvePosixPath(treeUri, ctx)
                     ?: error("active external mount ${entry.name} is not accessible")
-                binds += Bind(host, "/var/minis/mounts/${entry.name}", !entry.effectiveWritable)
+                val hasPersistedWrite = ctx.contentResolver.persistedUriPermissions.any {
+                    it.uri == treeUri && it.isWritePermission
+                }
+                binds += Bind(
+                    host,
+                    "/var/minis/mounts/${entry.name}",
+                    readOnly = !entry.effectiveWritable || !hasPersistedWrite,
+                )
             }
         }
 

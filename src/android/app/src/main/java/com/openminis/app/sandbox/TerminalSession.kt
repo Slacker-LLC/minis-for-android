@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.lang.ref.WeakReference
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** JNI entry points implemented by pty_bridge.c. */
 internal object PtyBridge {
@@ -93,10 +95,34 @@ class TerminalSession internal constructor(
         const val DEFAULT_ROWS = 24
         private const val RETRY_IO = -11 // EAGAIN on Android/Linux.
 
-        /** Retained receiver hooks; shell environment is captured at launch. */
-        fun broadcastTimezone(tz: String) = Unit
-        fun broadcastProxy(env: Map<String, String>) = Unit
+        /** Mirrors upstream: weak registry lets system env changes reach live terminals. */
+        private val liveSessions = CopyOnWriteArrayList<WeakReference<TerminalSession>>()
 
+        fun broadcastTimezone(tz: String) {
+            val dead = mutableListOf<WeakReference<TerminalSession>>()
+            for (ref in liveSessions) {
+                val session = ref.get()
+                if (session == null) {
+                    dead += ref
+                    continue
+                }
+                if (session.isRunning) session.applyTimezone(tz)
+            }
+            liveSessions.removeAll(dead.toSet())
+        }
+
+        fun broadcastProxy(env: Map<String, String>) {
+            val dead = mutableListOf<WeakReference<TerminalSession>>()
+            for (ref in liveSessions) {
+                val session = ref.get()
+                if (session == null) {
+                    dead += ref
+                    continue
+                }
+                if (session.isRunning) session.applyEnvMap(env)
+            }
+            liveSessions.removeAll(dead.toSet())
+        }
     }
 
     enum class State { IDLE, BOOTING, RUNNING, STOPPED }
@@ -141,7 +167,12 @@ class TerminalSession internal constructor(
             fd = backend.open(launch, cols, rows, pid)
             check(fd >= 0 && pid[0] > 0) { "Failed to spawn PTY: $fd" }
             currentCoroutineContext().ensureActive()
-            synchronized(lock) { if (activeRun === run) _state.value = State.RUNNING }
+            synchronized(lock) {
+                if (activeRun === run) {
+                    _state.value = State.RUNNING
+                    liveSessions.add(WeakReference(this))
+                }
+            }
             val buffer = ByteArray(4096)
             var pending: ByteArray? = null
             var offset = 0
@@ -182,6 +213,7 @@ class TerminalSession internal constructor(
                     if (pid[0] > 0) backend.terminateAndWait(pid[0])
                 }
             } finally {
+                liveSessions.removeAll { it.get() === this || it.get() == null }
                 synchronized(lock) {
                     if (activeRun === run) { activeRun = null; _state.value = State.STOPPED }
                 }
@@ -193,14 +225,42 @@ class TerminalSession internal constructor(
         if (bytes.isEmpty()) return
         synchronized(lock) { activeRun?.input?.trySend(Input.Bytes(bytes.copyOf())) }
     }
-    fun sendText(text: String) = sendRawBytes(text.toByteArray(Charsets.UTF_8))
+
+    fun sendText(text: String) {
+        if (text.isEmpty()) return
+        sendRawBytes(normalizeLineEndings(text).toByteArray(Charsets.UTF_8))
+    }
+
+    private fun normalizeLineEndings(text: String): String {
+        if ('\n' !in text && '\r' !in text) return text
+        val sb = StringBuilder(text.length)
+        var index = 0
+        while (index < text.length) {
+            when (val char = text[index]) {
+                '\r' -> {
+                    sb.append('\r')
+                    if (index + 1 < text.length && text[index + 1] == '\n') index++
+                }
+                '\n' -> sb.append('\r')
+                else -> sb.append(char)
+            }
+            index++
+        }
+        return sb.toString()
+    }
+
     @Deprecated("Use sendText / sendRawBytes instead — real TTY doesn't line-buffer.")
-    fun sendInput(text: String) = sendText(text)
+    fun sendInput(text: String) {
+        sendRawBytes((normalizeLineEndings(text) + "\r").toByteArray(Charsets.UTF_8))
+    }
+
     fun sendInterrupt() = sendRawBytes(byteArrayOf(0x03)) // The TTY signals the foreground process group.
+
     fun setWindowSize(newCols: Int, newRows: Int) {
         if (newCols <= 0 || newRows <= 0) return
         synchronized(lock) { activeRun?.input?.trySend(Input.Resize(newCols, newRows)) }
     }
+
     fun stop() {
         synchronized(lock) {
             val run = activeRun
@@ -209,6 +269,25 @@ class TerminalSession internal constructor(
             run?.input?.cancel()
             run?.job?.cancel()
         }
+        liveSessions.removeAll { it.get() === this || it.get() == null }
     }
+
+    private fun applyTimezone(tz: String) {
+        if (!isRunning) return
+        val escaped = tz.replace("'", "'\\''")
+        sendRawBytes("export TZ='$escaped'\r".toByteArray(Charsets.UTF_8))
+    }
+
+    private fun applyEnvMap(env: Map<String, String>) {
+        if (!isRunning || env.isEmpty()) return
+        val commands = buildString {
+            for ((key, value) in env) {
+                val escaped = value.replace("'", "'\\''")
+                append("export ").append(key).append("='").append(escaped).append("'\r")
+            }
+        }
+        sendRawBytes(commands.toByteArray(Charsets.UTF_8))
+    }
+
     fun clearOutput() { _clearVersion.value += 1 }
 }

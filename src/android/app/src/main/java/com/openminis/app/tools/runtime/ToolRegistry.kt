@@ -11,6 +11,7 @@ import org.json.JSONObject
 object ToolRegistry {
     private val handlers = linkedMapOf<String, ToolHandler>()
     private val aliases = linkedMapOf<String, String>()
+    private val hiddenFromDiscovery = setOf("root.shell")
 
     internal fun normalize(name: String): String =
         name.lowercase().filter { it.isLetterOrDigit() }
@@ -67,14 +68,16 @@ object ToolRegistry {
     }
 
     fun definition(name: String): AgentToolDefinition? = canonicalName(name)?.let { handlers[it]?.definition }
-    fun definitions(): List<AgentToolDefinition> = handlers.values.map { it.definition }
+    fun definitions(): List<AgentToolDefinition> = handlers.values
+        .map { it.definition }
+        .filterNot { it.name in hiddenFromDiscovery }
     fun handler(name: String): ToolHandler? = canonicalName(name)?.let { handlers[it] }
     fun contains(name: String): Boolean = canonicalName(name) != null
 
     fun definitionsForCaller(caller: String): List<AgentToolDefinition> {
         if (caller == ToolPermissionManager.CALLER_LOCAL) return definitions()
         val mcpVisible = ToolPermissionManager.mcpVisibleTools()
-        return handlers.values.map { it.definition }.filter { it.name in mcpVisible }
+        return definitions().filter { it.name in mcpVisible }
     }
 }
 
@@ -147,7 +150,7 @@ class LinuxShellHandler : ToolHandler {
             command = command,
             timeout = timeoutMs,
         )
-        val failureKind = result.failureKind.toToolFailureKind()
+        val failureKind = result.toToolFailureKind()
         return ToolExecutionResult(
             output = result.output,
             success = result.exitCode == 0 && failureKind == null,
@@ -161,9 +164,9 @@ class LinuxShellHandler : ToolHandler {
 class LinuxPythonRunHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "linux.python.run",
-        description = "Run Python 3 code in the on-device Ubuntu 24.04 environment (uid 10000). " +
-            "Pass code as a string; it is written to /workspace and executed with python3. " +
-            "Workspace is /workspace; use linux.file.write for files first if the script is long.",
+        description = "Run Python 3 code in the on-device Ubuntu 24.04 environment as the Android app UID (not Root). " +
+            "Pass code as a string; it is written to the session-scoped /workspace and executed with python3. " +
+            "Linux capabilities are cleared; use linux.file.write for files first if the script is long.",
         parameters = mapOf(
             "tool_title" to com.openminis.app.data.model.AgentToolParam("string", "A concise 5-10 word summary shown to the user."),
             "code" to com.openminis.app.data.model.AgentToolParam("string", "Python 3 code to execute."),
@@ -182,7 +185,7 @@ class LinuxPythonRunHandler : ToolHandler {
         val timeoutMs = ToolTimeoutPolicy.resolve("linux.python.run", callerOverrideMs = requestedMs).timeoutMs ?: 300_000L
         val readinessFailure = com.openminis.app.runtime.ExecutionCoordinator.ensureRuntimeReady()
         if (readinessFailure != null) {
-            val failureKind = readinessFailure.failureKind.toToolFailureKind()
+            val failureKind = readinessFailure.toToolFailureKind()
             return ToolExecutionResult(
                 output = readinessFailure.output,
                 success = false,
@@ -210,7 +213,7 @@ class LinuxPythonRunHandler : ToolHandler {
                     command = "python3 ${shellQuote(scriptPath)}",
                     timeout = timeoutMs,
                 )
-                val failureKind = result.failureKind.toToolFailureKind()
+                val failureKind = result.toToolFailureKind()
                 primary = ToolExecutionResult(
                     output = result.output,
                     success = result.exitCode == 0 && failureKind == null,
@@ -248,13 +251,8 @@ class LinuxPythonRunHandler : ToolHandler {
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 }
 
-private fun com.openminis.app.runtime.ExecutionCoordinator.FailureKind?.toToolFailureKind(): ToolFailureKind? = when (this) {
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.TOOL_TIMEOUT -> ToolFailureKind.TOOL_TIMEOUT
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.TRANSPORT_TIMEOUT -> ToolFailureKind.TRANSPORT_TIMEOUT
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.PROCESS_KILLED -> ToolFailureKind.PROCESS_KILLED
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.CLEANUP_FAILURE -> ToolFailureKind.CLEANUP_FAILURE
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.RUNTIME_FAILURE, null -> null
-}
+private fun com.openminis.app.runtime.ExecutionCoordinator.CommandResult.toToolFailureKind(): ToolFailureKind? =
+    if (exitCode == 124) ToolFailureKind.TOOL_TIMEOUT else null
 
 class AndroidToolHandler(
     private val legacyName: String,

@@ -1,71 +1,92 @@
 # 06 — 当前已确认缺口
 
-> **Direct-runtime 迁移说明（2026-09-10）**：本文件下方的 `main`/SHA 条目保留 2026-09-06 审计快照，用于追溯当时已经确认的问题；其中出现的旧 Root broker 与 `/data/adb/minis/{workspace,...}` 用户数据布局属于该历史基线，**不是** `refactor/direct-ubuntu-runtime` 的当前架构。当前 runtime/storage 合同以 `01-ARCHITECTURE.md`、`03-STORAGE-CONTRACT.md`、`04-SECURITY-CONTRACT.md` 及最终目标分支源码/测试为准。完成本次迁移后，应以最终 SHA 重新建立新的 gap 基线，而不是把下方旧架构描述继续当“当前事实”。
+> 基线更新：2026-09-10，`refactor/direct-ubuntu-runtime`（PR #235 已合并到 `main`）。本文件只维护重新核验后的当前状态。更早的 broker/PRoot/旧 storage 审计结论保留在 Git 历史、`docs/issue-*.md` 与 `docs/archive/`，不再混入当前缺口正文。
 
-本文记录已核验源码与合同之间的差异，不用历史 Issue 的标题代替当前调用链证据。
+## 已完成的 Direct Ubuntu 迁移边界
 
-核验基线：`main` `5e6ea531197f7c230d145b35d3d2f16c5df03188`，2026-09-06。下列合并状态仅对应此 SHA；后续合并须重新核对最终源码和检查结果。
+以下不再属于“待实现”项：
 
-## 已在基线中核验的实现
+- 生产 Linux runtime 已切到 Android App-owned Direct Ubuntu 24.04 chroot；
+- 旧特权 broker 的 Android/native/build/socket/package 路径已退出生产树；
+- runtime payload 为 rootfs-only；
+- active guest 用户数据改为从 `Context.filesDir` 派生的 App-owned backing；
+- `/data/adb/minis/rootfs` 保持 Root-owned、可替换 runtime state；
+- legacy Root-owned 用户数据只作为一次性迁移源；
+- guest 使用真实 App UID/GID，并通过 `setpriv` 清空 supplementary groups/capabilities；
+- `DirectRootRunner` 只作为内部基础设施；`root.shell` 对 local Agent 与 MCP 都拒绝；
+- build/package/runtime regression guards 已覆盖旧 broker 身份回归；
+- loopback HTTP/CONNECT helper 已与 rootfs payload 分离构建和验证。
 
-- `applicationId = llc.slacker.minis`，namespace 为 `com.openminis.app`。
-- Root + `minisd` + Ubuntu 24.04 chroot；canonical 数据根仍为 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`，rootfs 是可替换运行时。
-- `proguard-rules.pro` 已保留 RealTimeCutVAD JNI 类。Release 构建验证与真实语音检测是两层证据。
-- `deleteFromMessage` 已采用数据库删除成功后提交 UI/历史/记忆的顺序；单条删除也已在 #203 复用此顺序。
+## 网络架构说明
 
-| 已合并 PR | 最终代码行为 | 已有验证及边界 |
-|---|---|---|
-| [#194](https://github.com/Slacker-LLC/minis-for-android/pull/194) | `SessionHistoryLoader` 经 Repository 分页恢复完整历史，去除最近 100 条截断 | 405 条历史、跨页工具配对及取消测试；没有宣称实现数据库懒加载 |
-| [#195](https://github.com/Slacker-LLC/minis-for-android/pull/195) | home 初始化保留既有文件权限，bootstrap 不再递归改权 | Rust 权限回归和 Kotlin 测试；不会自动恢复旧版本已丢失的执行位 |
-| [#196](https://github.com/Slacker-LLC/minis-for-android/pull/196)、[#200](https://github.com/Slacker-LLC/minis-for-android/pull/200) | 图片持久化、重载、展示；正常/中断提交去重，重试清理，OpenAI 后续请求回传图片 | 文件与请求 fixture 测试；真实账号生图未验收 |
-| [#197](https://github.com/Slacker-LLC/minis-for-android/pull/197) | `minis-model-use run` 保留有界 stdin，原 guest 文件输入路径继续复用 | Bash→native→测试 Android endpoint 往返、分发拒绝用例、Rust 测试 |
-| [#198](https://github.com/Slacker-LLC/minis-for-android/pull/198) | `gpt-6-astra` 目录与发现、OAuth/API Responses 路由、推理档位和请求参数约束 | OAuth fixture 和 API MockWebServer；未证明具体账号权限或真实服务调用成功 |
-| [#199](https://github.com/Slacker-LLC/minis-for-android/pull/199) | Terminal 复用 runtime/session 准备和真实 UID/GID，拒绝宿主回退；PTY 单协程管理读写关闭及 reap | Kotlin 生命周期、生产 C 的 Linux JVM/子进程检查、Debug/Release CI；Android root/终端交互未验收 |
-| [#201](https://github.com/Slacker-LLC/minis-for-android/pull/201) | DNS 刷新锁在读取当前 resolver 之前取得，避免旧刷新最终覆盖新配置 | 并发顺序、失败、取消测试；VPN 切换的设备行为未验收 |
-| [#202](https://github.com/Slacker-LLC/minis-for-android/pull/202) | 粘贴文件准备持有清理责任，提交后不删附件；消息序号、内容与摘要使用 Room 事务 | 61 项局部测试；Room 回滚/并发仪器测试已编译，设备执行待验收 |
-| [#203](https://github.com/Slacker-LLC/minis-for-android/pull/203) | 单条助手消息删除复用数据库提交后更新 UI、历史、记忆和朗读 | 3 项提交顺序/失败/取消测试 |
-| [#204](https://github.com/Slacker-LLC/minis-for-android/pull/204) | ChatScreen 点击实际接入 resolveAsync，staging 移除 runBlocking 并传播取消 | 原有 4 项路径测试和 Android CI；设备交互延迟未测 |
+网络代理与 Root/chroot 不是同一层。
 
-以上 PR 的对应提交 CI 已通过。合并、构建和单测不替代设备验收。
+`minis-root-network-proxy` 是当前实现名称；HTTP/CONNECT 代理协议本身不依赖 Root。当前 Android 部署可让 helper 以特权身份建立出站 socket，仅用于兼容某些 VPN/BPF/UID 策略下 App-UID guest 无法直接联网的情况。
 
-## 基线中仍存在的确认缺口
+因此当前缺口不是“Root 必须有代理”，而是：**真实设备上何时需要该兼容路径、VPN/DNS/BPF/Fake-IP 切换是否可靠，仍需要设备证据。**
 
-以下两个修复 PR 的对应提交 CI 均已通过，基线尚未包含它们。
+## 当前明确待设备验收
 
-### SOUL 异步启动仍把读取故障当成缺失
+CI/宿主测试不能替代以下证据：
 
-`initializeAsync` 调用的 `ensureExistsSuspending` 对 `info` 失败使用 `getOrNull`，随后写默认内容。同步入口的 ENOENT 判断没有覆盖实际异步启动，且过宽的错误文本匹配会混淆目标文件缺失和 daemon/backing 不可用。
+1. KernelSU/Magisk/APatch 等目标 Root 方案的真实授权与生命周期；
+2. SELinux 下 `su → unshare → mount/bind → chroot → setpriv` 的完整执行；
+3. 非固定 App UID/GID 下的 owner、读写与 session workspace 一致性；
+4. 无 VPN → VPN、VPN A → VPN B、VPN → 无 VPN 的 DNS/路由刷新；
+5. `198.18.0.0/15` Fake-IP/TUN、Android BPF/UID policy 下 guest `curl` / `apt`；
+6. 终端反复打开/关闭、App 进程死亡与 OEM 后台策略下的实际行为。
 
-修复：[#205](https://github.com/Slacker-LLC/minis-for-android/pull/205)。两个入口共用明确缺失判断，已有条目不写、读取故障/取消传播；10 项 SOUL 测试通过。现有 RPC 没有原子 create-if-absent，本修复不保证检查与写入之间的跨进程并发编辑安全。
+没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
-### 文件链接无条件二次解码可选错文件
+## 当前开放 Issue
 
-`decodePath` 无条件二次解码 `my%2520file.txt`，即使目标 `my%20file.txt` 存在也会选成 `my file.txt`。
+GitHub Issue 是独立工作队列，不等于每条描述都仍与当前 Direct Ubuntu 源码一致。2026-09-10 仍 open 的主要项包括：
 
-修复：[#206](https://github.com/Slacker-LLC/minis-for-android/pull/206)，复用已合并的 #204，目标分支为 main。一次解码后的文件优先，找不到才尝试第二次；8 项测试覆盖真实文件优先级、回退、加号、畸形 percent 和编码问号。
+### 安全 / 数据完整性
 
-### Bot 团队 UI 尚未进入远端主线
+- #230 OAuth 回调与 token 响应日志泄露风险；
+- #231 备份恢复读取端缺少资源上限；
+- #232 加密备份允许未认证的额外 payload；
+- #233 旧闹钟迁移 idempotency 问题。
 
-2026-09-07 补充核验远端 `main` `e602efe53689ec90f0bafcac4cd0d95d1b47fe80`：源码树与仓库代码搜索均未发现 `BotsScreen`、`BotRepository`、`BotTask`、`BotDelegation` 或 `BotTeamExperiencePreview`。因此当前远端基线不存在可按 Android/Material 规范审计和修复的真实 Bot 团队页面，也没有可从主线移除的体验预览入口。
+### Android / Chat / 文件 / 终端
 
-历史 PR #208、#219 均将 Bot orchestration/UI/domain 描述为开发机上的未提交 WIP；远端 `feat/bot-orchestration` 仅包含 2026-06 的 MiniApp/Harmony demo 提交，不能作为该真实 Bot 实现来源。在真实 WIP 恢复为可追溯提交前，不应在 `main` 中重建 Bot UI、伪造 Repository/Room 数据或另建导航。恢复后再沿 `BotsScreen -> BotRepository/Room -> SessionDrawer/ChatScreen` 及 `BotTask`、`BotDelegation`、`Session` 的真实链路做 Android/Material 合规修复。
+- #229 进程恢复时文件浏览/预览 Holder 丢失；
+- #184 消息删除 DB-first 一致性；
+- #185 SOUL.md 默认写入与读取失败区分；
+- #186 PTY UID/GID 与 session workspace；
+- #187 文件链接 staging 主线程 I/O；
+- #188 粘贴内容提交前消费；
+- #189 PTY child reap/zombie；
+- #190 VPN 下 Ubuntu DNS/网络切换；
+- #183 `minis://` 双编码与 `+` 解码；
+- #182 Release VAD JNI/R8 兼容。
 
-## 本轮集成检查
+### UI / 维护性
 
-在从 `be357f3b` 集成 #202～#206 得到的本地提交 `f7ea80989ff7dfa474bfd880f80a65fd8d6ba8b9` 上，所有修复无冲突合并；完整 Android 单元测试统计 1,640 项，其中 1,638 项通过、2 项跳过，0 失败、0 错误。Room 仪器测试编译、runtime 包边界 guard、生产 PTY C 的 Linux JVM/子进程测试均通过。该提交仅用于本地集成核验，没有将其推送或合并到 `main`。
+- #192 Root 权限模式页面导航入口；
+- #216 ProviderRepository 同步 `runBlocking` 持久化；
+- #217 ChatViewModel 职责拆分；
+- #218 ChatScreen / StreamingMarkdownText 拆分；
+- #223 rclone AAR 构建前 16 KiB/ABI 校验建议。
 
-## 待设备验收
+其中部分 Issue 的正文仍引用旧 runtime/broker 术语，或描述的是早于 PR #235 的代码。处理前必须先对最终当前源码重新审计；如果问题已被后续提交解决，应关闭/更新 Issue，而不是照旧正文重复实现。
 
-- ChatGPT OAuth 与 API key 的真实 GPT-6 请求，以及真实生图后的停止、重试、重启恢复和后续图片问答。
-- Android 终端首次启动、root 授权、session workspace 一致性和反复关闭后的进程回收。
-- 无 VPN→VPN、VPN A→VPN B、VPN→无 VPN 时 guest 域名解析。
-- Room 回滚仪器测试、真实文件链接 staging、删除失败和 SOUL 读取故障注入。
+## 文档已知非缺口
 
-没有上述设备证据时，交付必须写明未验证。构建产物、fixture、CI 或宿主 Linux 测试都不能替代。
+以下内容故意允许保留旧术语：
+
+- `docs/archive/**`；
+- `docs/issue-*.md` 中明确标记的历史实现记录；
+- regression guard / negative test 中用于阻止旧实现回归的字符串；
+- Git 历史与历史 patch snapshots。
+
+这些不是生产依赖。
 
 ## 维护规则
 
-1. 新条目必须有当前代码或可复现行为支持；检查实际入口，不能只确认 helper 存在。
-2. 修复合并后核对最终目标分支的代码和测试，再更新基线、移出确认缺口。
-3. 不把 namespace 统一、另一套运行时、未证实的理论 hardening 自动升级为修复任务。
-4. CI 按改动范围复用现有任务，保留 Release/JNI 检查和设备验证边界。
+1. 新 gap 必须有当前代码、最新测试或可复现设备行为支持；
+2. Issue 标题/旧 PR 不能代替当前调用链证据；
+3. 修复后重新核对最终目标分支，再从本文件移除；
+4. 网络问题必须区分 guest direct networking、兼容 proxy、DNS、VPN/TUN、BPF/UID policy，不得全部归因于 Root；
+5. 构建/fixture/CI 证据与物理设备证据分开记录。

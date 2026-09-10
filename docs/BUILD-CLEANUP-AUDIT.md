@@ -1,35 +1,53 @@
-# Issue #53 Build Cleanup Audit
+# Build Cleanup Audit
 
-This audit records the build-path decisions for Issue #53. It is intentionally narrower than runtime cleanup, package-identity migration, and source-provenance history.
+This document began as the Issue #53 build-path audit and now records the post-Direct-Ubuntu cleanup boundary. Historical decisions are retained only where useful; current build truth comes from the final branch source, scripts, and CI.
 
-## Classification
-
-### Removed dead build/tooling paths
-
-- `scripts/verify_models_dev_resolution.py`: legacy verifier with no current Android/Rust build role.
-- The removed copy/output branch in `scripts/update_models_dev.sh`: the active Android catalog output remains `src/android/app/src/main/assets/models-dev-api.json`.
-
-### Migrated active legacy entry point
-
-- The old pet-named PowerShell APK wrapper was still functionally valid because it directly built the checked-in Android Gradle project. Its behavior was retained under `scripts/build-android-debug.ps1`; the legacy filename was removed.
-
-### Canonical build contract
-
-`BUILDING.md` is the single canonical build/release guide. Current build entry points operate directly on this repository:
+## Current canonical build entry points
 
 - Android: `src/android/gradlew`
-- Rust: `src/native/minisd/Cargo.toml`
-- rootfs: `scripts/build-ubuntu-rootfs.sh`
-- Windows convenience wrapper: `scripts/build-android-debug.ps1`
+- Direct Ubuntu rootfs: `scripts/build-ubuntu-rootfs.sh`
+- Rootfs-only runtime payload: `scripts/build-runtime-payload.sh`
+- Network compatibility helper: `scripts/build-root-network-proxy-android.sh`
+- rclone Android binding: `deps/build_rclone_android.sh`
+- Windows debug convenience wrapper: `scripts/build-android-debug.ps1`
 - CI: `.github/workflows/ci.yml`
 
-## Regression guard
+There is no active privileged-broker build stage, Android client package, socket protocol, broker native source tree, or broker binary packaged into the APK.
 
-`scripts/check_build_cleanup.py` scans active root build docs, scripts, and GitHub workflows. It rejects:
+## Runtime package split
 
-- the removed legacy PowerShell build wrapper;
-- references from active tooling to removed external source trees;
-- active tooling that clones a historical upstream repository as a build stage;
-- active tooling that applies a historical upstream patch pipeline.
+The runtime payload contains only the verified Ubuntu rootfs archive and manifest. The loopback network helper is an independent native artifact and is verified separately.
 
-`scripts/test_build_cleanup_guard.py` covers positive and negative fixtures.
+The network helper's current privileged deployment identity is not a reason to treat it as part of Root/chroot packaging. HTTP/CONNECT proxying is a separate network-compatibility function.
+
+## Removed/dead paths
+
+The cleanup history includes removal of:
+
+- obsolete developer-only model verifier paths with no current Android/Rust build role;
+- the legacy pet-named PowerShell APK wrapper while retaining its useful behavior under `scripts/build-android-debug.ps1`;
+- the old privileged-broker native source/build/package path;
+- one-off Phase 1/2/3 migration scripts and temporary CI workflow used only during the Direct Ubuntu refactor.
+
+Historical patch snapshots under `docs/archive/snapshots/` are not executable build inputs.
+
+## Regression guards
+
+`scripts/check_build_cleanup.py` and `scripts/test_build_cleanup_guard.py` enforce the active build cleanup boundary. They reject obsolete runtime identities in production source/build/package paths while allowing clearly historical/negative guard text where required to prevent regression.
+
+`scripts/check-runtime-package-boundary.sh` separately enforces Android runtime package ownership and the narrow legacy-package allowlist.
+
+Runtime payload/network/APK verification is additionally covered by:
+
+```text
+scripts/test-build-ubuntu-rootfs-verification.sh
+scripts/test-runtime-payload-verification.sh
+scripts/verify-runtime-payload.sh
+scripts/verify-root-network-proxy.sh
+scripts/verify-android-16k.sh
+scripts/verify-android-bundle.sh
+```
+
+## Historical note
+
+Older revisions of this audit named the former privileged broker as the Rust build entry point. That statement is obsolete after the Direct Ubuntu refactor and must not be used as a current build instruction.

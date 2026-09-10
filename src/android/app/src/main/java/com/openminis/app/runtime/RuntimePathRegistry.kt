@@ -2,9 +2,11 @@ package com.openminis.app.runtime
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.util.Log
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.MountedFoldersStore
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.TimeZone
 import kotlin.math.abs
@@ -101,8 +103,8 @@ object RuntimePathRegistry {
     }
 
     /**
-     * True when [linuxPath] resolves under a `/var/minis/mounts/<name>`
-     * mount whose effective writability is false.
+     * True when [linuxPath] resolves under a known `/var/minis/mounts/<name>`
+     * mount that is not currently authorized for writes.
      */
     fun isLinuxPathUnderReadOnlyMount(linuxPath: String): Boolean {
         if (!linuxPath.startsWith(MOUNTS_LINUX_PREFIX)) return false
@@ -110,13 +112,34 @@ object RuntimePathRegistry {
         val rest = linuxPath.removePrefix(MOUNTS_LINUX_PREFIX)
         val name = rest.substringBefore('/')
         if (name.isEmpty()) return false
-        val entry = store.entries.value.firstOrNull { it.name == name } ?: return false
-        return !entry.isActive || !entry.effectiveWritable
+        store.entries.value.firstOrNull { it.name == name } ?: return false
+        return !com.openminis.app.runtime.ubuntu.UbuntuPaths.isExternalMountWritable(linuxPath)
     }
 
-    /** External roots are indexed through direct runtime listings, never host Files. */
-    @Suppress("UNUSED_PARAMETER")
-    fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> = emptyList()
+    /**
+     * Build the transient host roots used only by the background @-mention
+     * index. Host paths are re-derived from the current SAF grant on every
+     * scan; they are never persisted or inserted into [bindMounts].
+     */
+    suspend fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> {
+        val store = mountedFoldersStore ?: return emptyList()
+        val out = ArrayList<FileMentionIndex.MountEntry>()
+        for (entry in store.entries.value) {
+            if (!entry.isActive) continue
+            val uri = runCatching { Uri.parse(entry.treeUri) }.getOrNull() ?: continue
+            val rootPath = try {
+                store.validateMountEntries(listOf(entry))
+                store.resolvePosixPath(uri, context)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "Skipping unavailable @-mention mount ${entry.name}: ${error.message}")
+                null
+            } ?: continue
+            out += FileMentionIndex.MountEntry(entry.name, File(rootPath))
+        }
+        return out
+    }
 
     /**
      * Build a POSIX TZ string from the current system timezone.
