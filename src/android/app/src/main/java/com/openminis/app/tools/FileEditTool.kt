@@ -73,12 +73,7 @@ object FileEditTool {
             // Read, match and write under one per-target transaction so another
             // file_write/file_edit cannot invalidate the snapshot in between.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
-                val externalMountPath = ExternalMountAccess.isPath(path)
-                val metadata = if (externalMountPath) {
-                    ExternalMountAccess.info(path)
-                } else {
-                    WorkspaceFileClient.info(sessionId, path)
-                }
+                val metadata = WorkspaceFileClient.info(sessionId, path)
                 if (!metadata.optBoolean("exists", false)) {
                     return@withKey ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
                 }
@@ -87,12 +82,7 @@ object FileEditTool {
                     return@withKey ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
                 }
 
-                val content = if (externalMountPath) {
-                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
-                        .toString(Charsets.UTF_8)
-                } else {
-                    WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
-                }
+                val content = WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
                 val edits = parseEdits(args)
                 if (edits.isEmpty()) {
                     return@withKey ToolExecutionResult(
@@ -118,20 +108,12 @@ object FileEditTool {
                     }
                     val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
                     val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
-                    val bytes = if (externalMountPath) {
-                        ExternalMountAccess.write(path, restored.toByteArray(Charsets.UTF_8), append = false)
-                    } else {
-                        WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
-                    }
+                    val bytes = WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
                     return@withKey ToolExecutionResult("Edited $path ($count replacements, $bytes bytes)", true, toolTitle = toolTitle)
                 }
 
                 val result = FileEditEngine.apply(content, edits, path)
-                val bytes = if (externalMountPath) {
-                    ExternalMountAccess.write(path, result.newContent.toByteArray(Charsets.UTF_8), append = false)
-                } else {
-                    WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
-                }
+                val bytes = WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
                 val fuzzyNote = if (result.fuzzyMatchCount > 0) ", ${result.fuzzyMatchCount} fuzzy match(es)" else ""
                 val lineNote = result.firstChangedLine?.let { ", first changed line $it" }.orEmpty()
                 val diff = takeCodePoints(result.diff, MAX_DIFF_CHARS)
