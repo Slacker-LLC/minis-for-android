@@ -2,6 +2,7 @@ package com.openminis.app.runtime
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.util.Log
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.MountedFoldersStore
@@ -114,9 +115,28 @@ object RuntimePathRegistry {
         return !entry.isActive || !entry.effectiveWritable
     }
 
-    /** External roots are indexed through direct runtime listings, never host Files. */
-    @Suppress("UNUSED_PARAMETER")
-    fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> = emptyList()
+    /**
+     * Build the transient host roots used only by the background @-mention
+     * index. Host paths are re-derived from the current SAF grant on every
+     * scan; they are never persisted or inserted into [bindMounts].
+     */
+    suspend fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> {
+        val store = mountedFoldersStore ?: return emptyList()
+        val out = ArrayList<FileMentionIndex.MountEntry>()
+        for (entry in store.entries.value) {
+            if (!entry.isActive) continue
+            val uri = runCatching { Uri.parse(entry.treeUri) }.getOrNull() ?: continue
+            val rootPath = try {
+                store.validateMountEntries(listOf(entry))
+                store.resolvePosixPath(uri, context)
+            } catch (error: Throwable) {
+                Log.w(TAG, "Skipping unavailable @-mention mount ${entry.name}: ${error.message}")
+                null
+            } ?: continue
+            out += FileMentionIndex.MountEntry(entry.name, File(rootPath))
+        }
+        return out
+    }
 
     /**
      * Build a POSIX TZ string from the current system timezone.
