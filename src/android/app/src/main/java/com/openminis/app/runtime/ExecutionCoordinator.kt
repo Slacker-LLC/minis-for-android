@@ -8,6 +8,7 @@ import com.openminis.app.runtime.ubuntu.RootNetworkProxy
 import com.openminis.app.runtime.ubuntu.RootPersistentShell
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.sandbox.TerminalSession
+import com.openminis.app.tools.ApprovalSeam
 import com.openminis.app.tools.DangerousCommandPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -86,8 +87,27 @@ object ExecutionCoordinator {
 
             val danger = DangerousCommandPolicy.dangerousReason(command)
             if (danger != null) {
-                Log.w(TAG, "[$sessionId] blocked dangerous command: $danger")
-                return@withLock failure("blocked: $danger", startTime)
+                val decision = ApprovalSeam.request(
+                    context = appContext,
+                    sessionId = sessionId,
+                    toolName = "linux.shell",
+                    summary = "执行危险命令：$danger\n\n$command",
+                )
+                when (decision.decision) {
+                    "allowed-once" -> Log.i(TAG, "[$sessionId] dangerous command approved once: $danger")
+                    "rejected" -> return@withLock policyFailure(
+                        "Error: command rejected by the user (approval denied): $command",
+                        startTime,
+                    )
+                    "cancelled" -> return@withLock policyFailure(
+                        "Error: approval request timed out with no answer; the destructive command was NOT run: $command",
+                        startTime,
+                    )
+                    else -> return@withLock policyFailure(
+                        "Error: approval unavailable; the destructive command was NOT run: $command",
+                        startTime,
+                    )
+                }
             }
 
             try {
@@ -156,6 +176,15 @@ object ExecutionCoordinator {
             exitCode = 1,
             durationMs = System.currentTimeMillis() - startTime,
             failureKind = FailureKind.RUNTIME_FAILURE,
+        )
+    }
+
+    private fun policyFailure(message: String, startTime: Long): CommandResult {
+        val sanitized = TerminalSanitizer.sanitize(message)
+        return CommandResult(
+            output = sanitized,
+            exitCode = 1,
+            durationMs = System.currentTimeMillis() - startTime,
         )
     }
 
