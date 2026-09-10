@@ -9,6 +9,8 @@ use std::time::Duration;
 const DEFAULT_LISTEN: &str = "127.0.0.1:18787";
 const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_CONCURRENT: usize = 64;
+const AUTH_REQUIRED: &str = "proxy authentication required";
+const PROXY_USER: &str = "minis";
 const FALLBACK_DNS: &[&str] = &[
     "223.5.5.5",
     "114.114.114.114",
@@ -31,6 +33,7 @@ fn main() {
     }
 
     let mut listen = DEFAULT_LISTEN.to_string();
+    let mut auth_stdin = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -39,6 +42,7 @@ fn main() {
                     .next()
                     .unwrap_or_else(|| usage("missing --listen value"))
             }
+            "--auth-stdin" => auth_stdin = true,
             "--help" | "-h" => usage(""),
             other => usage(&format!("unknown argument: {other}")),
         }
@@ -46,7 +50,11 @@ fn main() {
     if listen != DEFAULT_LISTEN {
         usage("listen address is fixed to loopback 127.0.0.1:18787");
     }
-    if let Err(error) = run_forever(&listen) {
+    if !auth_stdin {
+        usage("--auth-stdin is required");
+    }
+    let auth_token = read_auth_token().unwrap_or_else(|error| usage(&error));
+    if let Err(error) = run_forever(&listen, &auth_token) {
         eprintln!("root-network-proxy: {error}");
         std::process::exit(1);
     }
@@ -56,8 +64,77 @@ fn usage(error: &str) -> ! {
     if !error.is_empty() {
         eprintln!("root-network-proxy: {error}");
     }
-    eprintln!("usage: minis-root-network-proxy [--listen 127.0.0.1:18787]");
+    eprintln!(
+        "usage: minis-root-network-proxy [--listen 127.0.0.1:18787] --auth-stdin"
+    );
     std::process::exit(if error.is_empty() { 0 } else { 2 });
+}
+
+fn read_auth_token() -> Result<String, String> {
+    let mut token = String::new();
+    std::io::stdin()
+        .read_line(&mut token)
+        .map_err(|error| format!("cannot read proxy auth token: {error}"))?;
+    let token = token.trim_end_matches(|c| c == '\r' || c == '\n');
+    if token.len() != 64
+        || !token
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err("proxy auth token must be 256-bit lowercase hex".into());
+    }
+    Ok(token.to_string())
+}
+
+fn base64_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut output = String::with_capacity(((input.len() + 2) / 3) * 4);
+    let mut index = 0usize;
+    while index < input.len() {
+        let a = input[index] as u32;
+        let b = if index + 1 < input.len() {
+            input[index + 1] as u32
+        } else {
+            0
+        };
+        let c = if index + 2 < input.len() {
+            input[index + 2] as u32
+        } else {
+            0
+        };
+        let bits = (a << 16) | (b << 8) | c;
+        output.push(TABLE[((bits >> 18) & 0x3f) as usize] as char);
+        output.push(TABLE[((bits >> 12) & 0x3f) as usize] as char);
+        if index + 1 < input.len() {
+            output.push(TABLE[((bits >> 6) & 0x3f) as usize] as char);
+        } else {
+            output.push('=');
+        }
+        if index + 2 < input.len() {
+            output.push(TABLE[(bits & 0x3f) as usize] as char);
+        } else {
+            output.push('=');
+        }
+        index += 3;
+    }
+    output
+}
+
+fn expected_proxy_auth(token: &str) -> String {
+    let user_info = format!("{PROXY_USER}:{token}");
+    format!("Basic {}", base64_encode(user_info.as_bytes()))
+}
+
+fn constant_time_eq(left: &str, right: &str) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.as_bytes()
+        .iter()
+        .zip(right.as_bytes())
+        .fold(0u8, |diff, (a, b)| diff | (a ^ b))
+        == 0
 }
 
 fn is_fake_ip(ip: Ipv4Addr) -> bool {
@@ -113,9 +190,10 @@ fn split_host_port(spec: &str, default_port: u16) -> Result<(String, u16), Strin
     Ok((spec.to_string(), default_port))
 }
 
-fn run_forever(listen: &str) -> Result<(), String> {
+fn run_forever(listen: &str, auth_token: &str) -> Result<(), String> {
     let server = TcpListener::bind(listen).map_err(|e| format!("bind {listen}: {e}"))?;
     let active = Arc::new(AtomicUsize::new(0));
+    let expected_auth = Arc::new(expected_proxy_auth(auth_token));
     println!("READY {listen}");
     let _ = std::io::stdout().flush();
     for incoming in server.incoming() {
@@ -129,38 +207,51 @@ fn run_forever(listen: &str) -> Result<(), String> {
         }
         active.fetch_add(1, Ordering::SeqCst);
         let active = Arc::clone(&active);
+        let expected_auth = Arc::clone(&expected_auth);
         thread::spawn(move || {
-            let _ = handle_client(stream);
+            let _ = handle_client(stream, expected_auth.as_str());
             active.fetch_sub(1, Ordering::SeqCst);
         });
     }
     Ok(())
 }
 
-fn handle_client(mut client: TcpStream) -> Result<(), String> {
-    match handle_inner(&mut client) {
+fn handle_client(mut client: TcpStream, expected_auth: &str) -> Result<(), String> {
+    match handle_inner(&mut client, expected_auth) {
         Ok(()) => Ok(()),
         Err(error) => {
             let body = error.as_bytes();
-            let _ = write!(
-                client,
-                "HTTP/1.1 502 Bad Gateway\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            );
+            if error == AUTH_REQUIRED {
+                let _ = write!(
+                    client,
+                    "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"minis\"\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+            } else {
+                let _ = write!(
+                    client,
+                    "HTTP/1.1 502 Bad Gateway\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+            }
             let _ = client.write_all(body);
             Err(error)
         }
     }
 }
 
-fn handle_inner(client: &mut TcpStream) -> Result<(), String> {
-    handle_inner_with_connector(client, |host, ip, port| {
+fn handle_inner(client: &mut TcpStream, expected_auth: &str) -> Result<(), String> {
+    handle_inner_with_connector(client, expected_auth, |host, ip, port| {
         TcpStream::connect(SocketAddr::from((ip, port)))
             .map_err(|e| format!("{host}({ip}):{port}: {e}"))
     })
 }
 
-fn handle_inner_with_connector<F>(client: &mut TcpStream, connector: F) -> Result<(), String>
+fn handle_inner_with_connector<F>(
+    client: &mut TcpStream,
+    expected_auth: &str,
+    connector: F,
+) -> Result<(), String>
 where
     F: FnOnce(&str, Ipv4Addr, u16) -> Result<TcpStream, String>,
 {
@@ -195,19 +286,41 @@ where
     let first = read_line_capped(&mut reader)?;
     let (host, port, is_connect, forward_line) = parse_target(first.trim_end())?;
     let mut head = Vec::new();
+    let mut authenticated = false;
+    let mut auth_header_seen = false;
     if !is_connect {
         head.extend_from_slice(forward_line.as_bytes());
         head.extend_from_slice(b"\r\n");
     }
     loop {
         let line = read_line_capped(&mut reader)?;
+        if line == "\r\n" || line == "\n" || line.is_empty() {
+            if !is_connect {
+                head.extend_from_slice(line.as_bytes());
+            }
+            break;
+        }
+        if let Some((name, value)) = line.split_once(':') {
+            if name.eq_ignore_ascii_case("Proxy-Authorization") {
+                if auth_header_seen {
+                    return Err(AUTH_REQUIRED.into());
+                }
+                auth_header_seen = true;
+                if !constant_time_eq(value.trim(), expected_auth) {
+                    return Err(AUTH_REQUIRED.into());
+                }
+                authenticated = true;
+                continue;
+            }
+        }
         if !is_connect {
             head.extend_from_slice(line.as_bytes());
         }
-        if line == "\r\n" || line == "\n" || line.is_empty() {
-            break;
-        }
     }
+    if !authenticated {
+        return Err(AUTH_REQUIRED.into());
+    }
+
     let buffered = reader.buffer().to_vec();
     let mut peer = reader.into_inner();
     let ip = resolve_ipv4(&host)?;
@@ -406,6 +519,13 @@ mod tests {
     use super::*;
     use std::net::Shutdown;
 
+    const TEST_TOKEN: &str =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    fn test_auth() -> String {
+        expected_proxy_auth(TEST_TOKEN)
+    }
+
     fn proxy_pair() -> (TcpStream, TcpStream) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
@@ -460,6 +580,12 @@ mod tests {
     }
 
     #[test]
+    fn proxy_auth_encoding_is_stable() {
+        assert_eq!(base64_encode(b"minis:abc"), "bWluaXM6YWJj");
+        assert!(test_auth().starts_with("Basic bWluaXM6"));
+    }
+
+    #[test]
     fn lan_targets_are_blocked_but_fake_ip_is_allowed() {
         assert!(is_forbidden_target(Ipv4Addr::new(127, 0, 0, 1)));
         assert!(is_forbidden_target(Ipv4Addr::new(10, 0, 0, 1)));
@@ -469,20 +595,58 @@ mod tests {
     }
 
     #[test]
+    fn proxy_auth_is_required() {
+        for auth_line in [None, Some("Proxy-Authorization: Basic wrong\r\n")] {
+            let (mut client, proxy_side) = proxy_pair();
+            let expected = test_auth();
+            let proxy_thread = thread::spawn(move || handle_client(proxy_side, &expected));
+            let request = format!(
+                "GET http://8.8.8.8/ HTTP/1.1\r\nHost: 8.8.8.8\r\n{}Connection: close\r\n\r\n",
+                auth_line.unwrap_or("")
+            );
+            client.write_all(request.as_bytes()).unwrap();
+            client.shutdown(Shutdown::Write).unwrap();
+            let mut response = String::new();
+            client.read_to_string(&mut response).unwrap();
+            assert!(response.starts_with("HTTP/1.1 407 Proxy Authentication Required"));
+            assert!(response.contains("Proxy-Authenticate: Basic realm=\"minis\""));
+            assert_eq!(proxy_thread.join().unwrap().unwrap_err(), AUTH_REQUIRED);
+        }
+    }
+
+    #[test]
+    fn duplicate_proxy_auth_is_rejected() {
+        let (mut client, proxy_side) = proxy_pair();
+        let expected = test_auth();
+        let proxy_thread = thread::spawn(move || handle_client(proxy_side, &expected));
+        let auth = test_auth();
+        let request = format!(
+            "GET http://8.8.8.8/ HTTP/1.1\r\nHost: 8.8.8.8\r\nProxy-Authorization: {auth}\r\nProxy-Authorization: {auth}\r\nConnection: close\r\n\r\n"
+        );
+        client.write_all(request.as_bytes()).unwrap();
+        client.shutdown(Shutdown::Write).unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 407 Proxy Authentication Required"));
+        assert_eq!(proxy_thread.join().unwrap().unwrap_err(), AUTH_REQUIRED);
+    }
+
+    #[test]
     fn apt_style_absolute_http_is_forwarded_end_to_end() {
         let (origin, origin_thread) = local_origin(
             b"HTTP/1.1 200 OK\r\nContent-Length: 9\r\nConnection: close\r\n\r\nInRelease",
         );
         let (mut client, mut proxy_side) = proxy_pair();
+        let expected = test_auth();
         let proxy_thread = thread::spawn(move || {
-            handle_inner_with_connector(&mut proxy_side, test_connector(origin))
+            handle_inner_with_connector(&mut proxy_side, &expected, test_connector(origin))
         });
 
-        client
-            .write_all(
-                b"GET http://8.8.8.8/ubuntu/dists/noble/InRelease HTTP/1.1\r\nHost: archive.ubuntu.com\r\nConnection: close\r\n\r\n",
-            )
-            .unwrap();
+        let request = format!(
+            "GET http://8.8.8.8/ubuntu/dists/noble/InRelease HTTP/1.1\r\nHost: archive.ubuntu.com\r\nProxy-Authorization: {}\r\nConnection: close\r\n\r\n",
+            test_auth()
+        );
+        client.write_all(request.as_bytes()).unwrap();
         client.shutdown(Shutdown::Write).unwrap();
         let mut response = String::new();
         client.read_to_string(&mut response).unwrap();
@@ -492,6 +656,7 @@ mod tests {
         let forwarded = String::from_utf8(origin_thread.join().unwrap()).unwrap();
         assert!(forwarded.starts_with("GET /ubuntu/dists/noble/InRelease HTTP/1.1\r\n"));
         assert!(forwarded.contains("Host: archive.ubuntu.com\r\n"));
+        assert!(!forwarded.to_ascii_lowercase().contains("proxy-authorization:"));
         proxy_thread.join().unwrap().unwrap();
     }
 
@@ -501,13 +666,16 @@ mod tests {
             b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\ntunnel",
         );
         let (mut client, mut proxy_side) = proxy_pair();
+        let expected = test_auth();
         let proxy_thread = thread::spawn(move || {
-            handle_inner_with_connector(&mut proxy_side, test_connector(origin))
+            handle_inner_with_connector(&mut proxy_side, &expected, test_connector(origin))
         });
 
-        client
-            .write_all(b"CONNECT 8.8.8.8:443 HTTP/1.1\r\nHost: 8.8.8.8:443\r\n\r\n")
-            .unwrap();
+        let request = format!(
+            "CONNECT 8.8.8.8:443 HTTP/1.1\r\nHost: 8.8.8.8:443\r\nProxy-Authorization: {}\r\n\r\n",
+            test_auth()
+        );
+        client.write_all(request.as_bytes()).unwrap();
         let mut established = Vec::new();
         let mut byte = [0u8; 1];
         while established.windows(4).last() != Some(b"\r\n\r\n") {
