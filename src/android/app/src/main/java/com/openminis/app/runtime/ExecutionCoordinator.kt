@@ -24,15 +24,10 @@ import java.util.concurrent.ConcurrentHashMap
 object ExecutionCoordinator {
     private const val TAG = "ExecutionCoordinator"
 
-    enum class FailureKind {
-        TOOL_TIMEOUT,
-    }
-
     data class CommandResult(
         val output: String,
         val exitCode: Int,
         val durationMs: Long,
-        val failureKind: FailureKind? = null,
     )
 
     private lateinit var appContext: Context
@@ -117,7 +112,6 @@ object ExecutionCoordinator {
                     output = output,
                     exitCode = ran.exitCode,
                     durationMs = System.currentTimeMillis() - startTime,
-                    failureKind = if (ran.exitCode == 124) FailureKind.TOOL_TIMEOUT else null,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled

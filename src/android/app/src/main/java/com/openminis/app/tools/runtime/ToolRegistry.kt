@@ -150,7 +150,7 @@ class LinuxShellHandler : ToolHandler {
             command = command,
             timeout = timeoutMs,
         )
-        val failureKind = result.failureKind.toToolFailureKind()
+        val failureKind = result.toToolFailureKind()
         return ToolExecutionResult(
             output = result.output,
             success = result.exitCode == 0 && failureKind == null,
@@ -185,7 +185,7 @@ class LinuxPythonRunHandler : ToolHandler {
         val timeoutMs = ToolTimeoutPolicy.resolve("linux.python.run", callerOverrideMs = requestedMs).timeoutMs ?: 300_000L
         val readinessFailure = com.openminis.app.runtime.ExecutionCoordinator.ensureRuntimeReady()
         if (readinessFailure != null) {
-            val failureKind = readinessFailure.failureKind.toToolFailureKind()
+            val failureKind = readinessFailure.toToolFailureKind()
             return ToolExecutionResult(
                 output = readinessFailure.output,
                 success = false,
@@ -213,7 +213,7 @@ class LinuxPythonRunHandler : ToolHandler {
                     command = "python3 ${shellQuote(scriptPath)}",
                     timeout = timeoutMs,
                 )
-                val failureKind = result.failureKind.toToolFailureKind()
+                val failureKind = result.toToolFailureKind()
                 primary = ToolExecutionResult(
                     output = result.output,
                     success = result.exitCode == 0 && failureKind == null,
@@ -251,10 +251,8 @@ class LinuxPythonRunHandler : ToolHandler {
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 }
 
-private fun com.openminis.app.runtime.ExecutionCoordinator.FailureKind?.toToolFailureKind(): ToolFailureKind? = when (this) {
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.TOOL_TIMEOUT -> ToolFailureKind.TOOL_TIMEOUT
-    null -> null
-}
+private fun com.openminis.app.runtime.ExecutionCoordinator.CommandResult.toToolFailureKind(): ToolFailureKind? =
+    if (exitCode == 124) ToolFailureKind.TOOL_TIMEOUT else null
 
 class AndroidToolHandler(
     private val legacyName: String,
