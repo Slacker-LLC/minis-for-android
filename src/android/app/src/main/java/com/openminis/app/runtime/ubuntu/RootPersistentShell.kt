@@ -11,6 +11,7 @@ import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * One persistent, privilege-dropped Ubuntu shell for one chat session.
@@ -38,29 +39,57 @@ internal class RootPersistentShell(private val sessionId: String) {
     @Volatile
     private var launch: UbuntuKernel.Launch? = null
 
+    /** Explicit Stop permanently closes this shell instance. */
+    private val closed = AtomicBoolean(false)
+
     val isAlive: Boolean get() = process?.isAlive == true
 
     suspend fun ensureStarted() {
         if (isAlive) return
-        withContext(Dispatchers.IO) {
-            if (isAlive) return@withContext
-            stopInternal()
-            val prepared = UbuntuKernel.prepareLaunch(sessionId, interactive = false)
-            val spawned = ProcessBuilder(prepared.argv)
-                .redirectErrorStream(true)
-                .start()
-            process = spawned
-            launch = prepared
-            writer = BufferedWriter(OutputStreamWriter(spawned.outputStream, StandardCharsets.UTF_8))
-            startReader(spawned)
-            // Give su/unshare/chroot a short window to fail synchronously. A
-            // healthy persistent shell stays alive indefinitely.
-            Thread.sleep(180)
-            if (!spawned.isAlive) {
-                val exit = runCatching { spawned.exitValue() }.getOrNull()
+        check(!closed.get()) { "direct Ubuntu shell is stopped" }
+        try {
+            withContext(Dispatchers.IO) {
+                if (isAlive) return@withContext
+                check(!closed.get()) { "direct Ubuntu shell is stopped" }
                 stopInternal()
-                error("direct Ubuntu shell exited during startup${exit?.let { " (exit=$it)" }.orEmpty()}")
+                check(!closed.get()) { "direct Ubuntu shell is stopped" }
+
+                val prepared = UbuntuKernel.prepareLaunch(sessionId, interactive = false)
+                check(!closed.get()) { "direct Ubuntu shell was stopped during startup" }
+                val spawned = ProcessBuilder(prepared.argv)
+                    .redirectErrorStream(true)
+                    .start()
+                // Publish the owned process before checking [closed]. If Stop
+                // raced between the pre-spawn check and ProcessBuilder.start(),
+                // it may have seen no process; this post-spawn check then owns
+                // cleanup of the newly created Root process tree.
+                process = spawned
+                launch = prepared
+                if (closed.get()) {
+                    stopInternal()
+                    error("direct Ubuntu shell was stopped during startup")
+                }
+                writer = BufferedWriter(OutputStreamWriter(spawned.outputStream, StandardCharsets.UTF_8))
+                startReader(spawned)
+                // Give su/unshare/chroot a short window to fail synchronously. A
+                // healthy persistent shell stays alive indefinitely.
+                Thread.sleep(180)
+                if (closed.get()) {
+                    stopInternal()
+                    error("direct Ubuntu shell was stopped during startup")
+                }
+                if (!spawned.isAlive) {
+                    val exit = runCatching { spawned.exitValue() }.getOrNull()
+                    stopInternal()
+                    error("direct Ubuntu shell exited during startup${exit?.let { " (exit=$it)" }.orEmpty()}")
+                }
             }
+        } catch (failure: Throwable) {
+            // Cancellation can be delivered when withContext returns even after
+            // ProcessBuilder.start() succeeded. Always clean the Root process
+            // tree before propagating the original failure/cancellation.
+            stopInternal()
+            throw failure
         }
     }
 
@@ -117,7 +146,10 @@ internal class RootPersistentShell(private val sessionId: String) {
         }
     }
 
-    fun stop() = stopInternal()
+    fun stop() {
+        closed.set(true)
+        stopInternal()
+    }
 
     private fun startReader(spawned: Process) {
         Thread({

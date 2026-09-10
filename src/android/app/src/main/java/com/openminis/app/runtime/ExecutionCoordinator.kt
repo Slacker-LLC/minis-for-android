@@ -132,9 +132,20 @@ object ExecutionCoordinator {
         return globalLock.withLock {
             shells[sessionId]?.takeIf { it.isAlive }?.let { return@withLock it }
             shells.remove(sessionId)?.stop()
-            RootPersistentShell(sessionId).also { shell ->
+
+            // Match upstream's visibility rule: publish the shell before its
+            // potentially slow startup so Stop/runtime shutdown can reach it.
+            // Root startup has more failure points than PRoot, so remove and
+            // close the instance on every failed/cancelled startup.
+            val shell = RootPersistentShell(sessionId)
+            shells[sessionId] = shell
+            try {
                 shell.ensureStarted()
-                shells[sessionId] = shell
+                shell
+            } catch (failure: Throwable) {
+                shells.remove(sessionId, shell)
+                shell.stop()
+                throw failure
             }
         }
     }
