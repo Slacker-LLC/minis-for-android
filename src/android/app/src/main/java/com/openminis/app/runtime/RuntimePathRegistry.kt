@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import com.openminis.app.data.FileMentionIndex
 import com.openminis.app.data.MountedFoldersStore
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.TimeZone
 import kotlin.math.abs
@@ -129,7 +130,9 @@ object RuntimePathRegistry {
             val rootPath = try {
                 store.validateMountEntries(listOf(entry))
                 store.resolvePosixPath(uri, context)
-            } catch (error: Throwable) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 Log.w(TAG, "Skipping unavailable @-mention mount ${entry.name}: ${error.message}")
                 null
             } ?: continue
