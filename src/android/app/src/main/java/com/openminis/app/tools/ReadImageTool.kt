@@ -24,7 +24,6 @@ object ReadImageTool {
         propertyOrdering = listOf("tool_title", "path", "prompt"),
     )
 
-    /** Upstream read-image behavior with only the PRoot path resolver replaced. */
     suspend fun execute(argsJson: String, sessionId: String? = null, context: Context? = null): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
@@ -46,38 +45,66 @@ object ReadImageTool {
             if (!file.exists()) {
                 return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             }
-
-            val original = BitmapFactory.decodeFile(file.absolutePath)
-                ?: return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
-            val originalWidth = original.width
-            val originalHeight = original.height
-
-            val maxEdge = 2000
-            val scaled = if (original.width > maxEdge || original.height > maxEdge) {
-                val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
-                val w = (original.width * scale).toInt()
-                val h = (original.height * scale).toInt()
-                Bitmap.createScaledBitmap(original, w, h, true)
-            } else {
-                original
+            if (!file.isFile) {
+                return ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
             }
 
-            val out = ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            val imageBytes = out.toByteArray()
+            // Read dimensions without allocating the full pixel buffer. Large
+            // screenshots/camera images can otherwise exhaust the Android heap
+            // before the final 2000 px scale has a chance to run.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
+            }
+            val originalWidth = bounds.outWidth
+            val originalHeight = bounds.outHeight
 
-            if (scaled !== original) scaled.recycle()
-            original.recycle()
+            val decodeMaxEdge = 4000
+            var inSampleSize = 1
+            while (originalWidth / inSampleSize > decodeMaxEdge ||
+                originalHeight / inSampleSize > decodeMaxEdge
+            ) {
+                inSampleSize *= 2
+            }
 
-            val metadata = "[$path | ${originalWidth}x${originalHeight} | ${file.length()} bytes]"
-            ToolExecutionResult(
-                output = metadata,
-                success = true,
-                imageData = imageBytes,
-                imageMimeType = "image/jpeg",
-                toolTitle = toolTitle,
-                imageFilePath = file.absolutePath,
-            )
+            val decodeOptions = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+            }
+            val original = BitmapFactory.decodeFile(file.absolutePath, decodeOptions)
+                ?: return ToolExecutionResult("Error: Cannot decode image: $path", false, toolTitle = toolTitle)
+
+            var scaled: Bitmap? = null
+            try {
+                val maxEdge = 2000
+                val image = if (original.width > maxEdge || original.height > maxEdge) {
+                    val scale = maxEdge.toFloat() / maxOf(original.width, original.height)
+                    val width = (original.width * scale).toInt().coerceAtLeast(1)
+                    val height = (original.height * scale).toInt().coerceAtLeast(1)
+                    Bitmap.createScaledBitmap(original, width, height, true)
+                } else {
+                    original
+                }
+                scaled = image
+
+                val out = ByteArrayOutputStream()
+                image.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                val imageBytes = out.toByteArray()
+
+                val metadata = "[$path | ${originalWidth}x${originalHeight} | ${file.length()} bytes]"
+                ToolExecutionResult(
+                    output = metadata,
+                    success = true,
+                    imageData = imageBytes,
+                    imageMimeType = "image/jpeg",
+                    toolTitle = toolTitle,
+                    imageFilePath = file.absolutePath,
+                )
+            } finally {
+                val image = scaled
+                if (image != null && image !== original) image.recycle()
+                original.recycle()
+            }
         } catch (e: Exception) {
             ToolExecutionResult("Error reading image: ${e.message}", false)
         }
