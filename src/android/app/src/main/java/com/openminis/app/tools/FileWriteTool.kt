@@ -6,6 +6,7 @@ import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.internal.FileMutationQueue
+import com.openminis.app.tools.internal.FileRevision
 import org.json.JSONObject
 
 object FileWriteTool {
@@ -31,6 +32,9 @@ object FileWriteTool {
             val path = args.optString("path", "")
             val content = args.optString("content", "")
             val append = args.optBoolean("append", false)
+            // Transport-only optimistic-concurrency guard used by Remote/file
+            // editor callers. It intentionally stays out of the LLM schema.
+            val expectedSha256 = args.optString("expected_sha256", "").trim().lowercase()
             val toolTitle = args.optString("tool_title", NAME)
 
             if (path.isBlank()) {
@@ -71,6 +75,34 @@ object FileWriteTool {
             // an explicitly exposed external mount.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
                 val externalMountPath = ExternalMountAccess.isPath(path)
+
+                // Check the revision while holding the same per-file mutation
+                // lock as the following write, so check+write is atomic with
+                // respect to file_write/file_edit calls in this process.
+                if (expectedSha256.isNotEmpty()) {
+                    val current = try {
+                        if (externalMountPath) {
+                            ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
+                        } else {
+                            WorkspaceFileClient.readAll(sessionId, path)
+                        }
+                    } catch (error: WorkspaceFileClient.Failure) {
+                        if (error.code == "RUNTIME_UNAVAILABLE") {
+                            return@withKey ToolExecutionResult(
+                                "Error: File changed since it was opened (it no longer exists): $path",
+                                false, toolTitle = toolTitle,
+                            )
+                        }
+                        throw error
+                    }
+                    if (!FileRevision.sha256(current).equals(expectedSha256, ignoreCase = true)) {
+                        return@withKey ToolExecutionResult(
+                            "Error: File changed since it was opened; reload before saving: $path",
+                            false, toolTitle = toolTitle,
+                        )
+                    }
+                }
+
                 val bytes = if (externalMountPath) {
                     ExternalMountAccess.write(path, contentBytes, append)
                 } else if (append) {
