@@ -153,17 +153,9 @@ object ExecutionCoordinator {
     private fun failure(message: String, startTime: Long, code: String): CommandResult {
         val kind = when (code) {
             "TOOL_TIMEOUT", "TIMEOUT" -> FailureKind.TOOL_TIMEOUT
-            "TRANSPORT_TIMEOUT" -> FailureKind.TRANSPORT_TIMEOUT
-            "PROCESS_KILLED" -> FailureKind.PROCESS_KILLED
-            "CLEANUP_FAILURE" -> FailureKind.CLEANUP_FAILURE
             else -> FailureKind.RUNTIME_FAILURE
         }
-        val exitCode = when (kind) {
-            FailureKind.TOOL_TIMEOUT -> 124
-            FailureKind.TRANSPORT_TIMEOUT -> 125
-            FailureKind.PROCESS_KILLED -> 137
-            else -> 1
-        }
+        val exitCode = if (kind == FailureKind.TOOL_TIMEOUT) 124 else 1
         val sanitized = TerminalSanitizer.sanitize(message)
         return CommandResult(
             output = sanitized,
