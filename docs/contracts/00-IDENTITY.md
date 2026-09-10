@@ -22,7 +22,7 @@ Android 安装身份与源码 namespace 可以不同；当前没有全库迁移 
 
 ## 当前运行时身份
 
-产品 Linux runtime 是 **Direct Ubuntu 24.04 chroot**。Android App 自己持有 session/shell 生命周期；需要特权的 rootfs、mount namespace、bind mount、chroot、受控迁移等基础设施由内部 Root 路径完成。Guest shell 最终降到设备实际 App UID/GID，并清空 supplementary groups 与 Linux capabilities。
+合同中的 **direct Ubuntu** 指当前生产 Linux runtime：Direct Ubuntu 24.04 chroot。Android App 自己持有 session/shell 生命周期；需要特权的 rootfs、mount namespace、bind mount、chroot、受控迁移等基础设施由内部 Root 路径完成。Guest shell 最终降到设备实际 App UID/GID，并清空 supplementary groups 与 Linux capabilities。
 
 旧特权 broker、PRoot 和 Alpine 不属于当前生产架构；历史文档可以保留这些名称用于解释迁移背景，但现役实现/构建/合同不得把它们当 active component。
 

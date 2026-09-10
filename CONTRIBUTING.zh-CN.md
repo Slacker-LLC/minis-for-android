@@ -19,7 +19,7 @@
 3. `applicationId = llc.slacker.minis`，namespace = `com.openminis.app`；不要把全库 namespace 重命名混入无关 PR。
 4. Guest UID/GID 使用当前安装实际 App identity；进入 chroot 后清空 supplementary groups/capabilities，禁止写死 `10000`。
 5. 新工具走现有 Tool Registry 与权限/结果模型。
-6. Root 只用于 App-owned Direct Ubuntu 基础设施；禁止把模型、Agent、MCP 或 Provider 输出直接送入 `DirectRootRunner` / `su -c`。
+6. Root 只用于 App-owned **direct Ubuntu 24.04 chroot** 基础设施；禁止把模型、Agent、MCP 或 Provider 输出直接送入 `DirectRootRunner` / `su -c`。
 7. 不恢复旧 broker、PRoot/Alpine 或双栈 runtime。
 8. Session 执行保持对应 session workspace 语义，不能用全局 workspace 绕过隔离。
 9. 网络代理和 Root/chroot 分开设计。代理协议本身不需要 Root；当前 helper 仅可为 Android 出站 UID/VPN/BPF 兼容以特权身份启动，并且只能是 loopback HTTP/CONNECT 单用途服务。

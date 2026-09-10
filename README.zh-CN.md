@@ -2,7 +2,7 @@
 
 面向 **已 Root Android 设备** 的 AI Agent Runtime。原生 Android App + Ubuntu 24.04 userspace，共用 Android 内核，不是虚拟机。
 
-**中文合同定义长期行为边界；最终目标分支源码与测试定义当前实现事实。** Agent 先读 [`AGENTS.md`](AGENTS.md) 与 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)。
+**中文合同定义应保持的行为边界；最终目标分支源码与测试定义当前实现事实。** Agent 先读 [`AGENTS.md`](AGENTS.md) 与 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)。
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](BUILDING.md)
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
