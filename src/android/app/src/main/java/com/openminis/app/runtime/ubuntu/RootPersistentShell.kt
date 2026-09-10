@@ -136,11 +136,15 @@ internal class RootPersistentShell(private val sessionId: String) {
                             if (pending === state) pending = null
                         } else {
                             state.output.append(line).append('\n')
-                            runCatching { state.lineCallback?.invoke(line) }
+                            try {
+                                state.lineCallback?.invoke(line)
+                            } catch (_: Exception) {
+                                // Tool-output observers must not terminate the shell reader.
+                            }
                         }
                     }
                 }
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 Log.d(TAG, "[$sessionId] reader ended: ${error.message}")
             } finally {
                 val state = pending
@@ -172,7 +176,9 @@ internal class RootPersistentShell(private val sessionId: String) {
 
         val prepared = launch
         launch = null
-        val pid = prepared?.pidFile?.takeIf { it.isFile }?.readText()?.trim()?.toIntOrNull()
+        val pid = runCatching {
+            prepared?.pidFile?.takeIf { it.isFile }?.readText()?.trim()?.toIntOrNull()
+        }.getOrNull()
         if (pid != null && pid > 1) {
             val su = DirectRootRunner.findSu()
             if (su != null) {
