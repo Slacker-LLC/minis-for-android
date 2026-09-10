@@ -161,9 +161,9 @@ class LinuxShellHandler : ToolHandler {
 class LinuxPythonRunHandler : ToolHandler {
     override val definition: AgentToolDefinition = AgentToolDefinition(
         name = "linux.python.run",
-        description = "Run Python 3 code in the on-device Ubuntu 24.04 environment (uid 10000). " +
-            "Pass code as a string; it is written to /workspace and executed with python3. " +
-            "Workspace is /workspace; use linux.file.write for files first if the script is long.",
+        description = "Run Python 3 code in the on-device Ubuntu 24.04 environment as the Android app UID (not Root). " +
+            "Pass code as a string; it is written to the session-scoped /workspace and executed with python3. " +
+            "Linux capabilities are cleared; use linux.file.write for files first if the script is long.",
         parameters = mapOf(
             "tool_title" to com.openminis.app.data.model.AgentToolParam("string", "A concise 5-10 word summary shown to the user."),
             "code" to com.openminis.app.data.model.AgentToolParam("string", "Python 3 code to execute."),
