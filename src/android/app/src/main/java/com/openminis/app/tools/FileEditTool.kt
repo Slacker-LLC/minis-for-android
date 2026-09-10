@@ -5,6 +5,7 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONObject
 
 object FileEditTool {
@@ -61,63 +62,66 @@ object FileEditTool {
                 )
             }
 
-            val externalMountPath = ExternalMountAccess.isPath(path)
-            val metadata = if (externalMountPath) {
-                ExternalMountAccess.info(path)
-            } else {
-                WorkspaceFileClient.info(sessionId, path)
-            }
-            if (!metadata.optBoolean("exists", false)) {
-                return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
-            }
+            // Read-match-write is one mutation transaction. Without this queue,
+            // concurrent file_write/file_edit calls can overwrite a state that
+            // changed after this edit was matched.
+            FileMutationQueue.withKey("$sessionId\u0000$path") {
+                val externalMountPath = ExternalMountAccess.isPath(path)
+                val metadata = if (externalMountPath) {
+                    ExternalMountAccess.info(path)
+                } else {
+                    WorkspaceFileClient.info(sessionId, path)
+                }
+                if (!metadata.optBoolean("exists", false)) {
+                    return@withKey ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
+                }
 
-            // PRootKernel.resolveSessionHostPath is replaced only at this I/O
-            // boundary; edit matching and replacement semantics remain upstream.
-            val content = if (externalMountPath) {
-                ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES).toString(Charsets.UTF_8)
-            } else {
-                WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
-            }
+                val content = if (externalMountPath) {
+                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES).toString(Charsets.UTF_8)
+                } else {
+                    WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
+                }
 
-            var count = 0
-            var searchFrom = 0
-            while (true) {
-                val idx = content.indexOf(oldString, searchFrom)
-                if (idx < 0) break
-                count++
-                searchFrom = idx + oldString.length
-            }
+                var count = 0
+                var searchFrom = 0
+                while (true) {
+                    val idx = content.indexOf(oldString, searchFrom)
+                    if (idx < 0) break
+                    count++
+                    searchFrom = idx + oldString.length
+                }
 
-            if (count == 0) {
-                return ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
-            }
+                if (count == 0) {
+                    return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
+                }
 
-            if (count > 1 && !replaceAll) {
-                return ToolExecutionResult(
-                    "Error: old_string found $count times in $path. Use replace_all=true to replace all occurrences, " +
-                        "or provide a more specific old_string that matches exactly once.",
-                    false, toolTitle = toolTitle,
+                if (count > 1 && !replaceAll) {
+                    return@withKey ToolExecutionResult(
+                        "Error: old_string found $count times in $path. Use replace_all=true to replace all occurrences, " +
+                            "or provide a more specific old_string that matches exactly once.",
+                        false, toolTitle = toolTitle,
+                    )
+                }
+
+                val newContent = if (replaceAll) {
+                    content.replace(oldString, newString)
+                } else {
+                    content.replaceFirst(oldString, newString)
+                }
+                val bytes = newContent.toByteArray(Charsets.UTF_8)
+                if (externalMountPath) {
+                    ExternalMountAccess.write(path, bytes, append = false)
+                } else {
+                    WorkspaceFileClient.writeBytes(sessionId, path, bytes)
+                }
+
+                val replacements = if (replaceAll) count else 1
+                ToolExecutionResult(
+                    "Edited $path ($replacements replacement(s), ${newContent.length} bytes)",
+                    true,
+                    toolTitle = toolTitle,
                 )
             }
-
-            val newContent = if (replaceAll) {
-                content.replace(oldString, newString)
-            } else {
-                content.replaceFirst(oldString, newString)
-            }
-            val bytes = newContent.toByteArray(Charsets.UTF_8)
-            if (externalMountPath) {
-                ExternalMountAccess.write(path, bytes, append = false)
-            } else {
-                WorkspaceFileClient.writeBytes(sessionId, path, bytes)
-            }
-
-            val replacements = if (replaceAll) count else 1
-            ToolExecutionResult(
-                "Edited $path ($replacements replacement(s), ${newContent.length} bytes)",
-                true,
-                toolTitle = toolTitle,
-            )
         } catch (e: Exception) {
             ToolExecutionResult("Error editing file: ${e.message}", false)
         }
