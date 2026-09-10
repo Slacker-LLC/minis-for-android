@@ -36,6 +36,19 @@ object FileWriteTool {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
+            // Per-session permission preset (DSH /permission) gate. This is a
+            // product security boundary and must stay independent of the Linux
+            // backend implementation.
+            if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
+                return ToolExecutionResult(
+                    "Error: session permission preset `workspace-write` only allows writing under " +
+                        "/var/minis/workspace (and per-session /var/minis/* dirs). This path is not" +
+                        " allowed. Switch the session to `danger-full-access` on the device if this" +
+                        " write must proceed.",
+                    false, toolTitle = toolTitle,
+                )
+            }
+
             // Upstream read-only mount behavior, routed through the Ubuntu/Root
             // runtime path registry instead of PRootKernel.
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
