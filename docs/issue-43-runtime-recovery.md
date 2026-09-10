@@ -1,35 +1,40 @@
-# Issue #43 runtime recovery contract
+# Issue #43 runtime recovery contract — historical implementation record
 
-Issue #43 is split across three independently owned changes so concurrent runtime work does not overwrite another branch.
+> **Status (2026-09-10): historical.** This document describes the former privileged-broker runtime stage. It is retained for recovery-semantics history only. The active production runtime is Direct Ubuntu 24.04; current behavior is defined by `docs/EXECUTION-ENVIRONMENT.md` and `docs/contracts/01-ARCHITECTURE.md`.
 
-## This branch: pre-exec failure semantics
+## Historical scope
 
-`ubuntu.exec` and `ubuntu.adminExec` must distinguish a helper failure that occurs before guest `execve(2)` from a real guest process that exits with the same numeric status.
+Issue #43 split recovery work across several concurrent changes. At that time, the execution path used a privileged broker/helper and needed to distinguish a helper failure that occurred before guest `execve(2)` from a real guest process that exited with the same numeric status.
 
-The broker generates a fresh 128-bit token for each helper execution and exposes it only in the helper process environment. The helper emits an internal marker containing that token only when it returns before guest `execve`. Guest execution uses an explicit replacement environment, so the internal token is not inherited by the guest process.
+The historical broker generated a fresh per-execution token and exposed it only to the helper environment. The helper emitted an internal marker containing that token only when it returned before guest `execve`. Guest execution used an explicit replacement environment so the token was not inherited by the guest process.
 
-The broker promotes an authenticated marker to a structured RPC error:
+Historical structured mappings included:
 
-- helper code 4 + failed keeper `setns` -> `KEEPER_NAMESPACE_LOST`
-- helper code 4 + per-session namespace/mount setup -> `RUNTIME_LAYOUT_MISMATCH`
-- helper code 5 -> `CHROOT_UNAVAILABLE`
-- helper code 6 -> `PRIVILEGE_SETUP_FAILED`
-- helper code 7 -> `EXEC_UNAVAILABLE`
+- helper code 4 + failed keeper `setns` → `KEEPER_NAMESPACE_LOST`;
+- helper code 4 + per-session namespace/mount setup → `RUNTIME_LAYOUT_MISMATCH`;
+- helper code 5 → `CHROOT_UNAVAILABLE`;
+- helper code 6 → `PRIVILEGE_SETUP_FAILED`;
+- helper code 7 → `EXEC_UNAVAILABLE`.
 
-A numeric guest exit 4/5/6/7 without the authenticated marker remains an ordinary `exit_code`. This is required to avoid retrying a command that already reached guest `execve` and may have produced side effects.
+A numeric guest exit 4/5/6/7 without the authenticated marker remained an ordinary guest `exit_code`, avoiding unsafe replay after a command had already reached `execve`.
 
-The Android recovery state machine already retries `KEEPER_NAMESPACE_LOST` at most once by stopping/rebuilding the keeper and replaying only that proven pre-exec attempt. Other structured failures are surfaced without automatic replay.
+## What remains relevant today
 
-## Concurrent branch boundaries
+The old broker/keeper protocol is gone, but the safety principle remains current:
 
-PR #63 owns Issue #50 Android persistent-path migration and the canonical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` contract. This branch does not change those Android path files.
+- distinguish proven pre-execution failure from a command that may already have produced side effects;
+- fail closed when Direct Ubuntu readiness cannot be established;
+- do not blindly replay operations with unknown outcome;
+- report Root/rootfs/mount/chroot/privilege-drop failures distinctly enough for diagnosis.
 
-PR #66 owns Issue #51 runtime distribution, versioned/atomic rootfs installation and rollback. It also changes `src/native/minisd/src/main.rs` and `src/native/minisd/src/ubuntu.rs`; this branch touches only the helper pre-exec marker/error-classification hunks in those files and intentionally does not implement or replace #66 rootfs selection/distribution logic.
+Current Direct Ubuntu code must implement those principles through its own readiness/execution state rather than reintroducing the old marker/socket/broker protocol.
 
-When #66 is merged, retain both behaviors: its active-rootfs selection plus this branch's authenticated pre-exec marker and structured error promotion.
+## Historical concurrent boundaries
 
-## Verification
+Older references to PR #63/#66/#75, Root-owned canonical user data, keeper namespaces, or native broker source files describe the repository state at that time. They are not current implementation instructions.
 
-Host CI must run the Rust test suite. The regression tests cover marker authentication, exact error-code mapping, distinction between keeper namespace loss and session-layout failure, and generation of a non-static 128-bit token.
+Current storage is App-owned except for replaceable Root-owned rootfs state; see `docs/contracts/03-STORAGE-CONTRACT.md` and `docs/contracts/07-OWNERSHIP-MIGRATION.md`.
 
-Device-only scenarios from Issue #43 (killed keeper, corrupted/missing rootfs, stale UID/install state) remain device acceptance work; this branch does not run `adb` and does not claim device evidence.
+## Verification boundary
+
+Repository CI can cover failure classification, retry policy, unit behavior, payload boundaries, and Direct Ubuntu build contracts. Killed Root processes, corrupted/missing rootfs on a device, SELinux behavior, mount failures, stale UID/install state, VPN/BPF behavior, and OEM lifecycle still require device acceptance tests.

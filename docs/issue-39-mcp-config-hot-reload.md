@@ -1,64 +1,31 @@
-# MCP configuration hot-reload contract (Issue #39)
+# MCP configuration hot-reload contract (Issue #39) — implementation record
 
-## Scope
+> **Status (2026-09-10): historical implementation record.** Current `MCPRepository`, `MCPProvider`, Tool Registry and tests are authoritative. References in old PR discussions to concurrent runtime/package migrations are no longer current planning constraints.
 
-This change resolves the concrete runtime correctness problem in Issue #39: changing the global MCP server configuration must update the active MCP client connections and ToolRegistry without requiring an app restart.
+## Purpose
 
-It does **not** turn `McpRpcMethods` into a newly promised long-term public API. That interface-policy question remains separate from the hot-reload correctness contract.
+The behavior introduced for Issue #39 was intended to keep persisted global MCP server configuration, active MCP client sessions, and registered remote tools synchronized without requiring an app restart.
 
-## Source of truth and runtime consumer
+## Source of truth
 
-`MCPRepository` owns the Android view of `servers.json` and the `servers` StateFlow. `MCPProvider` consumes that state to create MCP client sessions and register remote tools as `mcp.<server>.<tool>`.
+`MCPRepository` owns the Android view of MCP server configuration and publishes state. `MCPProvider` consumes that state to create client sessions and register remote tools under the existing Tool Registry/runtime permission model.
 
-Before this change, these operations updated Repository state/disk but left MCPProvider untouched:
+Effective global configuration mutations should notify/reload the provider; no-op writes should not reconnect healthy sessions unnecessarily. A supported disk refresh that observes a real configuration change should republish state and reload the provider.
 
-- add;
-- update;
-- delete;
-- global enable/disable/toggle;
-- JSON import;
-- re-reading a file modified by another supported writer.
-
-That allowed the persisted config and ToolRegistry/session set to disagree until some unrelated caller explicitly invoked `MCPProvider.reload()`.
-
-## Contract after this change
-
-`MCPProvider.init(repository, context)` binds one module-internal Repository change callback to `MCPProvider.reload()`.
-
-The Repository emits the callback after an effective global server-config mutation. Identical/no-op writes do not reconnect healthy sessions.
-
-`reloadFromDisk()` compares the newly parsed file with the published state and reloads only when the effective config changed. This is the bridge for external writers such as the in-guest `minis-mcp-cli`: writing the file alone cannot synchronously invoke Android code, but the next supported disk refresh both republishes the config and reconnects the provider.
-
-Session-only MCP enable/disable overrides do not reconnect global transports because they are per-session selection state, not server connection configuration.
+Per-session MCP selection/enablement is not the same thing as global transport configuration and should not create an unnecessary global reconnect.
 
 ## Failure semantics
 
-The configuration write happens before the reload callback. A callback exception is logged but does not report the already-persisted configuration as rolled back. `MCPProvider.reload()` itself is asynchronous and already uses generation cancellation, bounded connection concurrency, per-server load timeout, and registry teardown/re-registration.
+Persisting configuration and reloading runtime connections are distinct stages. A reload failure after a successful persistent write must not be falsely reported as if the storage write rolled back. Re-initialization must detach stale callbacks/consumers so old repository instances cannot mutate the current provider lifecycle.
 
-When MCPProvider is re-initialized with another Repository, the old Repository callback is detached first so stale objects cannot trigger reloads against the new source.
+## Current runtime/security relationship
 
-## Interface boundary
+MCP configuration hot reload does not own the Direct Ubuntu runtime, Root infrastructure, network compatibility proxy, Android storage contract, or Root authorization policy.
 
-Current `McpRpcMethods` remains a debug/remote configuration surface in the repository. This change deliberately fixes behavior below that surface at `MCPRepository`, so UI, debug RPC and import paths cannot diverge in hot-reload semantics.
+External MCP tools must still pass through the canonical Tool Registry/permission boundary. A configuration reload cannot make centrally denied capabilities available. Generic Root execution remains denied; MCP output must never become input to `DirectRootRunner` or arbitrary `su -c`.
 
-No statement here guarantees `McpRpcMethods` as a permanent external integration API. A future supported configuration interface should reuse the Repository contract rather than adding another MCP configuration source of truth.
-
-Issue #40's `LOCAL_ONLY`, LAN HTTP/TLS and timeout questions are not changed here.
-
-## Concurrent work
-
-PR #66 and PR #69 currently carry broad runtime-distribution/application-identity changes and may move the same Kotlin classes to the new package identity. This PR is based on current `master` and owns only the MCP config-change/hot-reload behavior. When those migrations integrate, the callback semantics and tests must be preserved through any package move.
-
-PR #75 and Issue #45 do not own this MCP client configuration path.
+The guest loopback HTTP/CONNECT network helper is unrelated to MCP server/client hot reload and must not become an MCP transport tunnel or command channel.
 
 ## Verification
 
-`MCPRepositoryHotReloadTest` uses an isolated temporary `servers.json` and verifies:
-
-- add/update/enable/import trigger exactly one callback for an effective change;
-- identical writes and unchanged disk refreshes do not reconnect;
-- an externally rewritten `servers.json` triggers a callback on `reloadFromDisk()`;
-- preview parsing is read-only;
-- a reload callback failure does not make a persisted mutation appear rolled back.
-
-CI remains the authority for Android compilation and JVM test execution. No adb or device operation is required or claimed by this change.
+Current repository tests should cover effective-change reloads, no-op writes, external supported refresh, callback failure semantics, stale repository detachment, and Tool Registry/session consistency. Canonical Android CI remains authoritative for compile/unit/lint/package results. Live third-party MCP interoperability requires explicit integration/device evidence when claimed.
