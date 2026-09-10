@@ -102,8 +102,8 @@ object RuntimePathRegistry {
     }
 
     /**
-     * True when [linuxPath] resolves under a `/var/minis/mounts/<name>`
-     * mount whose effective writability is false.
+     * True when [linuxPath] resolves under a known `/var/minis/mounts/<name>`
+     * mount that is not currently authorized for writes.
      */
     fun isLinuxPathUnderReadOnlyMount(linuxPath: String): Boolean {
         if (!linuxPath.startsWith(MOUNTS_LINUX_PREFIX)) return false
@@ -111,8 +111,8 @@ object RuntimePathRegistry {
         val rest = linuxPath.removePrefix(MOUNTS_LINUX_PREFIX)
         val name = rest.substringBefore('/')
         if (name.isEmpty()) return false
-        val entry = store.entries.value.firstOrNull { it.name == name } ?: return false
-        return !entry.isActive || !entry.effectiveWritable
+        store.entries.value.firstOrNull { it.name == name } ?: return false
+        return !com.openminis.app.runtime.ubuntu.UbuntuPaths.isExternalMountWritable(linuxPath)
     }
 
     /**
