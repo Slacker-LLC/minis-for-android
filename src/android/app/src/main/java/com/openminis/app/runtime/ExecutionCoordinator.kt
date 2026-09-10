@@ -7,6 +7,7 @@ import com.openminis.app.runtime.terminal.TerminalSanitizer
 import com.openminis.app.runtime.ubuntu.RootNetworkProxy
 import com.openminis.app.runtime.ubuntu.RootPersistentShell
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.sandbox.TerminalSession
 import com.openminis.app.tools.DangerousCommandPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -178,11 +179,13 @@ object ExecutionCoordinator {
     }
 
     suspend fun broadcastTimezoneChange() {
-        val env = mapOf("TZ" to RuntimePathRegistry.posixTz())
+        val tz = RuntimePathRegistry.posixTz()
+        val env = mapOf("TZ" to tz)
         shells.forEach { (sessionId, shell) ->
             if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
                 .onFailure { Log.d(TAG, "[$sessionId] timezone update failed: ${it.message}") }
         }
+        TerminalSession.broadcastTimezone(tz)
     }
 
     suspend fun broadcastProxyChange() {
@@ -194,5 +197,6 @@ object ExecutionCoordinator {
             if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
                 .onFailure { Log.d(TAG, "[$sessionId] proxy update failed: ${it.message}") }
         }
+        TerminalSession.broadcastProxy(env)
     }
 }
