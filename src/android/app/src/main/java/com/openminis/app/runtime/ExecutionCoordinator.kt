@@ -26,9 +26,6 @@ object ExecutionCoordinator {
 
     enum class FailureKind {
         TOOL_TIMEOUT,
-        TRANSPORT_TIMEOUT,
-        PROCESS_KILLED,
-        CLEANUP_FAILURE,
         RUNTIME_FAILURE,
     }
 
