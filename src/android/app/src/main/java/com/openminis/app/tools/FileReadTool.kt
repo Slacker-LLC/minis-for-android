@@ -22,7 +22,6 @@ object FileReadTool {
         ),
         required = listOf("tool_title", "path"),
         propertyOrdering = listOf("tool_title", "path", "offset", "lines", "direction", "max_length"),
-        timeoutMs = 60_000L,
     )
 
     suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
@@ -43,12 +42,25 @@ object FileReadTool {
             // full file size so it can paginate with offset/lines if needed.
             // iOS mirrors this cap in AIChatViewModel.executeFileRead.
             val MAX_LENGTH_HARD_CAP = 80_000
-            val maxLength = args.optInt("max_length", 15000).coerceAtLeast(0).coerceAtMost(MAX_LENGTH_HARD_CAP)
+            val maxLength = args.optInt("max_length", 15000).coerceAtMost(MAX_LENGTH_HARD_CAP)
             val direction = args.optString("direction", "head")
 
             if (path.isBlank()) {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
+
+            val info = if (ExternalMountAccess.isPath(path)) {
+                ExternalMountAccess.info(path)
+            } else {
+                WorkspaceFileClient.info(sessionId, path)
+            }
+            if (!info.optBoolean("exists", false)) {
+                return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
+            }
+            if (info.optString("type") == "dir") {
+                return ToolExecutionResult("Error: Path is a directory: $path", false, toolTitle = toolTitle)
+            }
+            val size = info.optLong("size", 0L)
 
             val fileBytes = if (ExternalMountAccess.isPath(path)) {
                 ExternalMountAccess.read(path, 50L * 1024 * 1024)
@@ -59,7 +71,6 @@ object FileReadTool {
                     maxBytes = 50L * 1024 * 1024,
                 )
             }
-            val size = fileBytes.size.toLong()
 
             // Binary detection: check first 8192 bytes for null bytes.
             val isBinary = fileBytes.take(8192).any { it == 0.toByte() }
@@ -74,7 +85,7 @@ object FileReadTool {
             val allLines = fileBytes.toString(Charsets.UTF_8).lines()
             val totalLines = allLines.size
 
-            val requestedLines = if (args.has("lines")) args.optInt("lines").coerceAtLeast(0) else null
+            val requestedLines = if (args.has("lines")) args.optInt("lines") else null
 
             val selectedLines = if (direction == "tail") {
                 val count = requestedLines ?: totalLines
@@ -97,16 +108,58 @@ object FileReadTool {
             }
             val showEnd = showStart + selectedLines.size - 1
 
-            val output = FileReadOutputFormatter.format(
-                path = path,
-                size = size,
-                totalLines = totalLines,
-                selectedLines = selectedLines,
-                showStart = showStart,
-                direction = direction,
-                maxLength = maxLength,
-            )
-            ToolExecutionResult(output, true, toolTitle = toolTitle)
+            var content = selectedLines.joinToString("\n")
+
+            // [T-fileread-truncation-header] The header used to report the line
+            // range chosen BEFORE truncation, and said nothing about having
+            // truncated at all — only the body gained a trailing
+            // "... (truncated)". So a cut-off read still announced
+            // "showing 1-1324 of 1324", which the agent took as the whole file
+            // and never paged on.
+            //
+            // Recompute the range that actually survived and hand back the
+            // offset to resume from. Confined to the truncating branch; a read
+            // that fits is byte-identical to before.
+            var effectiveStart = showStart
+            var effectiveEnd = showEnd
+            var nextOffset: Int? = null
+            var wasTruncated = false
+            if (content.length > maxLength) {
+                wasTruncated = true
+                if (direction == "tail") {
+                    // tail asks for the END of the file; take() returned the
+                    // start of the tail window instead — the opposite.
+                    content = content.takeLast(maxLength)
+                    // Drop a leading partial line so the first line is whole.
+                    val firstNewline = content.indexOf('\n')
+                    if (firstNewline in 0 until content.length - 1) {
+                        content = content.substring(firstNewline + 1)
+                    }
+                    effectiveStart = effectiveEnd - content.count { it == '\n' }
+                    // No next_offset for tail: paging forward from the end of
+                    // the file is meaningless.
+                } else {
+                    content = content.take(maxLength)
+                    // Back off to the last complete line, so the next page does
+                    // not re-read or split a line.
+                    val lastNewline = content.lastIndexOf('\n')
+                    if (lastNewline > 0) content = content.substring(0, lastNewline)
+                    effectiveEnd = showStart + content.count { it == '\n' }
+                    if (effectiveEnd < totalLines) nextOffset = effectiveEnd + 1
+                }
+            }
+
+            var header = "[$path | $size bytes | $totalLines lines | " +
+                "showing $effectiveStart-$effectiveEnd of $totalLines"
+            if (wasTruncated) {
+                header += " | truncated at $maxLength chars"
+                // Named to match the tool's own `offset` parameter so the model
+                // can copy it straight into the next call.
+                header += if (nextOffset != null) ", next_offset=$nextOffset"
+                          else ", retry with a smaller lines value"
+            }
+            header += "]"
+            ToolExecutionResult("$header\n$content", true, toolTitle = toolTitle)
         } catch (e: Exception) {
             ToolExecutionResult("Error reading file: ${e.message}", false)
         }
