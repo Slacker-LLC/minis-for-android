@@ -64,9 +64,7 @@ fn usage(error: &str) -> ! {
     if !error.is_empty() {
         eprintln!("root-network-proxy: {error}");
     }
-    eprintln!(
-        "usage: minis-root-network-proxy [--listen 127.0.0.1:18787] --auth-stdin"
-    );
+    eprintln!("usage: minis-root-network-proxy [--listen 127.0.0.1:18787] --auth-stdin");
     std::process::exit(if error.is_empty() { 0 } else { 2 });
 }
 
@@ -87,8 +85,7 @@ fn read_auth_token() -> Result<String, String> {
 }
 
 fn base64_encode(input: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut output = String::with_capacity(((input.len() + 2) / 3) * 4);
     let mut index = 0usize;
     while index < input.len() {
@@ -519,8 +516,7 @@ mod tests {
     use super::*;
     use std::net::Shutdown;
 
-    const TEST_TOKEN: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     fn test_auth() -> String {
         expected_proxy_auth(TEST_TOKEN)
@@ -656,7 +652,9 @@ mod tests {
         let forwarded = String::from_utf8(origin_thread.join().unwrap()).unwrap();
         assert!(forwarded.starts_with("GET /ubuntu/dists/noble/InRelease HTTP/1.1\r\n"));
         assert!(forwarded.contains("Host: archive.ubuntu.com\r\n"));
-        assert!(!forwarded.to_ascii_lowercase().contains("proxy-authorization:"));
+        assert!(!forwarded
+            .to_ascii_lowercase()
+            .contains("proxy-authorization:"));
         proxy_thread.join().unwrap().unwrap();
     }
 
