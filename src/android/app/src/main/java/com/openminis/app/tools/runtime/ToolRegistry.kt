@@ -253,7 +253,7 @@ class LinuxPythonRunHandler : ToolHandler {
 
 private fun com.openminis.app.runtime.ExecutionCoordinator.FailureKind?.toToolFailureKind(): ToolFailureKind? = when (this) {
     com.openminis.app.runtime.ExecutionCoordinator.FailureKind.TOOL_TIMEOUT -> ToolFailureKind.TOOL_TIMEOUT
-    com.openminis.app.runtime.ExecutionCoordinator.FailureKind.RUNTIME_FAILURE, null -> null
+    null -> null
 }
 
 class AndroidToolHandler(

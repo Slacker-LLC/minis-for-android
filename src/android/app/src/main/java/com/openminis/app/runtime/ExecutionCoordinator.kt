@@ -26,7 +26,6 @@ object ExecutionCoordinator {
 
     enum class FailureKind {
         TOOL_TIMEOUT,
-        RUNTIME_FAILURE,
     }
 
     data class CommandResult(
@@ -148,7 +147,6 @@ object ExecutionCoordinator {
             output = sanitized,
             exitCode = 1,
             durationMs = System.currentTimeMillis() - startTime,
-            failureKind = FailureKind.RUNTIME_FAILURE,
         )
     }
 
