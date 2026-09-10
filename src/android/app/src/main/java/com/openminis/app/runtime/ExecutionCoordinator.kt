@@ -115,7 +115,7 @@ object ExecutionCoordinator {
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 shells.remove(sessionId)?.stop()
                 lastInjectedKeys.remove(sessionId)
                 failure(
