@@ -42,7 +42,9 @@ object FileReadTool {
             // full file size so it can paginate with offset/lines if needed.
             // iOS mirrors this cap in AIChatViewModel.executeFileRead.
             val MAX_LENGTH_HARD_CAP = 80_000
-            val maxLength = args.optInt("max_length", 15000).coerceAtMost(MAX_LENGTH_HARD_CAP)
+            val maxLength = args.optInt("max_length", 15000)
+                .coerceAtLeast(0)
+                .coerceAtMost(MAX_LENGTH_HARD_CAP)
             val direction = args.optString("direction", "head")
 
             if (path.isBlank()) {
@@ -85,7 +87,7 @@ object FileReadTool {
             val allLines = fileBytes.toString(Charsets.UTF_8).lines()
             val totalLines = allLines.size
 
-            val requestedLines = if (args.has("lines")) args.optInt("lines") else null
+            val requestedLines = if (args.has("lines")) args.optInt("lines").coerceAtLeast(0) else null
 
             val selectedLines = if (direction == "tail") {
                 val count = requestedLines ?: totalLines
