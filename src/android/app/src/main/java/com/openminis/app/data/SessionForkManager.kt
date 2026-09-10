@@ -7,7 +7,7 @@ import com.openminis.app.data.db.AppDatabase
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.io.File

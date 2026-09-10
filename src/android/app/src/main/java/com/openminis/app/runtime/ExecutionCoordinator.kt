@@ -4,25 +4,23 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.runtime.terminal.TerminalSanitizer
+import com.openminis.app.runtime.ubuntu.RootPersistentShell
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.DangerousCommandPolicy
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Android orchestration boundary for guest command execution. It serializes
- * commands per chat session and delegates runtime readiness plus execution to
- * [UbuntuRuntime]; minisd owns privileged broker, mount namespace and chroot
- * infrastructure.
+ * Per-session guest execution coordinator.
+ *
+ * This intentionally follows upstream Android's ExecutionCoordinator shape:
+ * one persistent shell per session, one mutex per session, and direct process
+ * ownership in the App. The only backend difference is that our shell enters a
+ * Root-created Ubuntu chroot instead of a PRoot Alpine userspace.
  */
 object ExecutionCoordinator {
-
     private const val TAG = "ExecutionCoordinator"
     private const val SESSION_MUTEX_LIMIT = 256
 
@@ -46,11 +44,39 @@ object ExecutionCoordinator {
     private lateinit var appContext: Context
     var envVarRepository: EnvVarRepository? = null
 
+    private val shells = ConcurrentHashMap<String, RootPersistentShell>()
     private val mutexes = ConcurrentHashMap<String, Mutex>()
-    private val cancellationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lastInjectedKeys = ConcurrentHashMap<String, Set<String>>()
+    private val globalLock = Mutex()
 
     fun init(context: Context) {
         appContext = context.applicationContext
+    }
+
+    /**
+     * Verify the direct Ubuntu runtime before a caller performs guest-command
+     * side effects such as creating a temporary script in canonical storage.
+     * Returns null when ready, otherwise the same structured failure used by
+     * [execute].
+     */
+    suspend fun ensureRuntimeReady(): CommandResult? = ensureRuntimeReady(System.currentTimeMillis())
+
+    private suspend fun ensureRuntimeReady(startTime: Long): CommandResult? {
+        if (!::appContext.isInitialized) {
+            return failure(
+                "execution coordinator is not initialized",
+                startTime,
+                "RUNTIME_UNAVAILABLE",
+            )
+        }
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(appContext)
+        val ready = UbuntuRuntime.ensureReady()
+        if (ready.running) return null
+        return failure(
+            "ubuntu unavailable: ${ready.lastError ?: "not ready"}",
+            startTime,
+            "RUNTIME_UNAVAILABLE",
+        )
     }
 
     suspend fun execute(
@@ -60,57 +86,67 @@ object ExecutionCoordinator {
         lineCallback: ((String) -> Unit)? = null,
     ): CommandResult {
         val mutex = mutexes.getOrPut(sessionId) { Mutex() }
-        if (mutexes.size > SESSION_MUTEX_LIMIT) mutexes.clear()
+        if (mutexes.size > SESSION_MUTEX_LIMIT) {
+            mutexes.keys.filter { it !in shells.keys }.take(mutexes.size - SESSION_MUTEX_LIMIT).forEach(mutexes::remove)
+        }
         return mutex.withLock {
             val startTime = System.currentTimeMillis()
-            if (!UbuntuRuntime.isInitialized) {
-                return@withLock failure("Ubuntu runtime is not initialized", startTime, "RUNTIME_UNAVAILABLE")
-            }
-            val ready = UbuntuRuntime.ensureReady()
-            if (!ready.running) {
-                return@withLock failure(
-                    "ubuntu unavailable: ${ready.lastError ?: "not running"}",
-                    startTime,
-                    "RUNTIME_UNAVAILABLE",
-                )
-            }
-            Log.i(TAG, "[$sessionId] ubuntu.exec ${command.take(80)}")
+            ensureRuntimeReady(startTime)?.let { return@withLock it }
+
             val danger = DangerousCommandPolicy.dangerousReason(command)
             if (danger != null) {
                 Log.w(TAG, "[$sessionId] blocked dangerous command: $danger")
                 return@withLock failure("blocked: $danger", startTime, "POLICY_DENIED")
             }
-            val envVars = envVarRepository?.allAsDict() ?: emptyMap()
-            val ran = try {
-                UbuntuRuntime.shell(
-                    command = command,
-                    sessionId = sessionId,
-                    timeoutMs = timeout,
-                    env = envVars,
-                    lineCallback = lineCallback,
+
+            try {
+                val shell = getOrCreateShell(sessionId)
+                val env = envVarRepository?.allAsDict().orEmpty()
+                val previous = lastInjectedKeys[sessionId].orEmpty()
+                if (env.isNotEmpty() || previous.isNotEmpty()) {
+                    shell.applyEnvironment(env, previous)
+                    lastInjectedKeys[sessionId] = env.keys.toSet()
+                }
+                Log.i(TAG, "[$sessionId] direct ubuntu shell ${command.take(80)}")
+                val ran = shell.executeCommand(command, timeout, lineCallback)
+                val sanitized = TerminalSanitizer.sanitize(ran.output)
+                val truncated = TerminalSanitizer.truncateIfNeeded(sanitized)
+                val output = if (ran.exitCode != 0 && ran.exitCode != 124 && ran.exitCode != 130) {
+                    "$truncated\n(exit code: ${ran.exitCode})"
+                } else {
+                    truncated
+                }
+                CommandResult(
+                    output = output,
+                    exitCode = ran.exitCode,
+                    durationMs = System.currentTimeMillis() - startTime,
+                    fullOutput = sanitized,
+                    failureKind = if (ran.exitCode == 124) FailureKind.TOOL_TIMEOUT else null,
+                    errorCode = if (ran.exitCode == 124) "TOOL_TIMEOUT" else null,
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (infra: UbuntuRuntime.RuntimeInfrastructureException) {
-                val error = infra.runtimeError
-                if (error.code == "USER_CANCELLATION") {
-                    throw CancellationException(error.detail.ifBlank { "shell execution cancelled by user" })
-                }
-                return@withLock failure(error.detail, startTime, error.code)
+            } catch (error: Throwable) {
+                shells.remove(sessionId)?.stop()
+                lastInjectedKeys.remove(sessionId)
+                failure(
+                    error.message ?: error::class.java.simpleName,
+                    startTime,
+                    "RUNTIME_FAILURE",
+                )
             }
-            val sanitized = TerminalSanitizer.sanitize(ran.output)
-            val truncated = TerminalSanitizer.truncateIfNeeded(sanitized)
-            val output = if (ran.exitCode != 0 && ran.exitCode != 124) {
-                "$truncated\n(exit code: ${ran.exitCode})"
-            } else {
-                truncated
+        }
+    }
+
+    private suspend fun getOrCreateShell(sessionId: String): RootPersistentShell {
+        shells[sessionId]?.takeIf { it.isAlive }?.let { return it }
+        return globalLock.withLock {
+            shells[sessionId]?.takeIf { it.isAlive }?.let { return@withLock it }
+            shells.remove(sessionId)?.stop()
+            RootPersistentShell(sessionId).also { shell ->
+                shell.ensureStarted()
+                shells[sessionId] = shell
             }
-            CommandResult(
-                output = output,
-                exitCode = ran.exitCode,
-                durationMs = System.currentTimeMillis() - startTime,
-                fullOutput = sanitized,
-            )
         }
     }
 
@@ -140,41 +176,37 @@ object ExecutionCoordinator {
     }
 
     fun sessionDidTerminate(sessionId: String) {
+        shells.remove(sessionId)?.stop()
         mutexes.remove(sessionId)
+        lastInjectedKeys.remove(sessionId)
     }
 
-    /**
-     * User-facing Stop path. Transport close is synchronous so a blocked socket
-     * unblocks immediately; the idempotent broker kill runs on a separate scope
-     * and targets only the captured execution id.
-     */
+    /** User-facing Stop. Kill the session shell; next command recreates it. */
     fun stopCurrentCommand(sessionId: String) {
-        val executionId = UbuntuRuntime.client.cancelSessionTransport(sessionId)
-        if (executionId != null) {
-            cancellationScope.launch {
-                runCatching { UbuntuRuntime.client.cancelExecution(executionId) }
-                    .onFailure { Log.w(TAG, "[$sessionId] exec.cancel failed: ${it.message}") }
-            }
-        }
+        shells.remove(sessionId)?.stop()
+        lastInjectedKeys.remove(sessionId)
     }
 
-    /** Stops every currently tracked session, for runtime-wide mount/config changes. */
+    /** Stop every live session before mount-layout or rootfs changes. */
     fun stopCurrentCommand() {
-        UbuntuRuntime.client.cancelAllSessionTransports().forEach { target ->
-            cancellationScope.launch {
-                runCatching { UbuntuRuntime.client.cancelExecution(target.executionId) }
-                    .onFailure {
-                        Log.w(TAG, "[${target.sessionId}] global exec.cancel failed: ${it.message}")
-                    }
-            }
-        }
+        shells.values.forEach { it.stop() }
+        shells.clear()
+        lastInjectedKeys.clear()
     }
 
     suspend fun broadcastTimezoneChange() {
-        Log.d(TAG, "broadcastTimezoneChange: no-op (minisd resolves TZ per exec)")
+        val env = mapOf("TZ" to RuntimePathRegistry.posixTz())
+        shells.forEach { (sessionId, shell) ->
+            if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
+                .onFailure { Log.d(TAG, "[$sessionId] timezone update failed: ${it.message}") }
+        }
     }
 
     suspend fun broadcastProxyChange() {
-        Log.d(TAG, "broadcastProxyChange: no-op (minisd resolves proxy per exec)")
+        val env = RuntimePathRegistry.systemProxyEnv(appContext)
+        shells.forEach { (sessionId, shell) ->
+            if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
+                .onFailure { Log.d(TAG, "[$sessionId] proxy update failed: ${it.message}") }
+        }
     }
 }

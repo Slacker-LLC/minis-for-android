@@ -24,12 +24,12 @@ The build files are authoritative. At the time of writing the repository uses:
 | CMake | 3.22.1 |
 | Rust | stable + `aarch64-linux-android` target |
 
-Gradle, minisd and rclone default to NDK `28.2.13676358`. Set
+Gradle, the Root network proxy and rclone default to NDK `28.2.13676358`. Set
 `MINIS_NDK_VERSION` consistently when validating another installed version;
 explicit `ANDROID_NDK_HOME` overrides for shell builds must point to that version.
 Rebuild `deps/build/rclone/rclone.aar` and copy it to `src/android/app/libs/`
 after changing Go dependencies or native build flags. The binding includes both
-arm64-v8a and x86_64; the minisd/Ubuntu runtime remains arm64-only.
+arm64-v8a and x86_64; the Root network proxy/Ubuntu runtime remains arm64-only.
 
 After packaging, run `bash scripts/verify-android-16k.sh <apk>` to check ZIP/ELF
 alignment and required JNI ABI coverage. For an AAB, set `BUNDLETOOL_JAR` and run
@@ -62,14 +62,14 @@ Do not commit real provider identifiers, OAuth material, API keys, signing keys,
 
 Some integrations require build-time provider customization that is intentionally absent from the public repository. Public builds must treat unavailable integrations explicitly rather than relying on hidden/private values.
 
-## 3. Build `minisd`
+## 3. Build the Root network proxy
 
 ```bash
 rustup target add aarch64-linux-android
-bash scripts/build-minisd-android.sh
+bash scripts/build-root-network-proxy-android.sh
 ```
 
-`minisd` is the Rust root broker used by the rooted-device execution path.
+This binary has one responsibility: expose `127.0.0.1:18787` so App-UID Ubuntu guests can use Root egress on Android/VPN configurations that restrict non-Root outbound sockets. It has no RPC or command-execution API.
 
 ## 4. Build the Ubuntu rootfs
 
@@ -85,7 +85,7 @@ To produce the complete verified APK payload in one command, run:
 bash scripts/build-runtime-payload.sh
 ```
 
-This writes `dist/minisd-arm64-v8a`, `dist/ubuntu-arm64-rootfs.tar.gz`, and `dist/runtime-manifest.json`. Gradle packages the three files together; partial payloads are rejected. Source-only local builds may omit all three and fail closed on the device, while CI requires and verifies the complete payload in every assembled APK.
+This writes the rootfs-only payload: `dist/ubuntu-arm64-rootfs.tar.gz` and `dist/runtime-manifest.json`. Build `scripts/build-root-network-proxy-android.sh` separately; Gradle stages its verified ELF independently as `libminisnetproxy.so`. CI requires both the rootfs payload and proxy for assembled APKs.
 
 ## 5. Build a debug APK
 
@@ -140,12 +140,12 @@ Instrumentation package:
 
 Connected tests should only run on an explicitly authorized emulator or device.
 
-Rust quality checks:
+Root network proxy Rust quality checks:
 
 ```bash
-cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
-cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
-cargo test --locked --manifest-path src/native/minisd/Cargo.toml
+cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
+cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
 ```
 
 Rootfs verification:
@@ -199,27 +199,16 @@ The repository CI validates:
 The rooted-device Linux path is:
 
 ```text
-Android kernel
+Android App
   ↓
-minisd
+ExecutionCoordinator → RootPersistentShell → UbuntuKernel
   ↓
-mount namespace + bind mounts + chroot
+su → unshare -m → bind mounts → chroot
   ↓
-Ubuntu 24.04 userspace
+setpriv(App UID, no capabilities) → Ubuntu 24.04 bash
 ```
 
-The guest reuses the Android kernel and runs with the app guest UID. `minisd` prepares the canonical persistent host sources under `/data/adb/minis/` before keeper startup:
-
-```text
-/data/adb/minis/workspace
-/data/adb/minis/sessions
-/data/adb/minis/memory
-/data/adb/minis/skills
-/data/adb/minis/shared
-/data/adb/minis/home
-```
-
-These sources are fixed runtime inputs. Startup rejects alternate persistent paths, and persistent backing must not be tmpfs.
+The App owns persistent user data and per-session shells. Root is used only for mount/chroot/rootfs maintenance and the loopback-only outbound network proxy. Existing data under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}` is migrated into App-owned storage; resetting the rootfs must not delete user data.
 
 ## Troubleshooting
 
@@ -235,7 +224,7 @@ Set `ANDROID_NDK_HOME` to NDK `28.2.13676358` or newer, with the directory conta
 
 ### Ubuntu runtime is unavailable on device
 
-Verify root access and the installed runtime paths under `/data/adb/minis/`, then inspect `minisd` status and application logs. Do not disable SELinux globally as a troubleshooting step.
+Verify root access and the installed runtime paths under `/data/adb/minis/`, then inspect direct Ubuntu/runtime and Root network proxy application logs. Do not disable SELinux globally as a troubleshooting step.
 
 ### Provider flow is unavailable
 

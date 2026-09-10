@@ -20,7 +20,7 @@ jobs:
     outputs:
       android: ${{ steps.filter.outputs.android }}
       docs: ${{ steps.filter.outputs.docs }}
-      minisd: ${{ steps.filter.outputs.minisd }}
+      network_proxy: ${{ steps.filter.outputs.network_proxy }}
       rootfs: ${{ steps.filter.outputs.rootfs }}
     steps:
       - uses: actions/checkout@v5
@@ -42,7 +42,7 @@ jobs:
 
           android=false
           docs=false
-          minisd=false
+          network_proxy=false
           rootfs=false
 
           mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
@@ -61,25 +61,25 @@ jobs:
                 ;;
             esac
             case "$path" in
-              src/native/minisd/*)
-                minisd=true
+              src/native/root-network-proxy/*|scripts/build-root-network-proxy-android.sh|scripts/verify-root-network-proxy.sh)
+                network_proxy=true
                 android=true
                 ;;
             esac
             case "$path" in
-              scripts/build-ubuntu-rootfs.sh|scripts/build-minisd-android.sh|scripts/build-runtime-payload.sh|scripts/test-build-ubuntu-rootfs-verification.sh|scripts/test-runtime-payload-verification.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh|scripts/check-runtime-package-boundary.sh|src/android/*)
+              scripts/build-ubuntu-rootfs.sh|scripts/build-runtime-payload.sh|scripts/test-build-ubuntu-rootfs-verification.sh|scripts/test-runtime-payload-verification.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh|scripts/check-runtime-package-boundary.sh|src/android/*)
                 rootfs=true
                 ;;
             esac
             case "$path" in
-              src/android/*|src/shared/bashism/*|scripts/build-ubuntu-rootfs.sh|scripts/build-minisd-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh)
+              src/android/*|src/shared/bashism/*|scripts/build-ubuntu-rootfs.sh|scripts/build-root-network-proxy-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-root-network-proxy.sh|scripts/verify-android-release.sh)
                 android=true
                 ;;
             esac
             if [[ "$path" == ".github/workflows/ci.yml" ]]; then
               android=true
               docs=true
-              minisd=true
+              network_proxy=true
               rootfs=true
             fi
           done
@@ -87,7 +87,7 @@ jobs:
           {
             echo "android=$android"
             echo "docs=$docs"
-            echo "minisd=$minisd"
+            echo "network_proxy=$network_proxy"
             echo "rootfs=$rootfs"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -113,23 +113,23 @@ jobs:
       - name: Check current docs and provenance allowlist
         run: python3 scripts/check_docs_provenance.py
 
-  minisd:
-    name: minisd quality
+  root-network-proxy-quality:
+    name: Root network proxy quality
     needs: changes
-    if: needs.changes.outputs.minisd == 'true'
+    if: needs.changes.outputs.network_proxy == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust quality components
         run: rustup component add rustfmt clippy
       - name: Format
-        run: cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
+        run: cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
       - name: Clippy
-        run: cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml --all-targets -- -D warnings
       - name: Test
-        run: cargo test --locked --manifest-path src/native/minisd/Cargo.toml
+        run: cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
       - name: Release build
-        run: cargo build --locked --release --manifest-path src/native/minisd/Cargo.toml
+        run: cargo build --locked --release --manifest-path src/native/root-network-proxy/Cargo.toml
 
   rootfs-verification:
     name: Rootfs verification tests
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Shell syntax
-        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/build-minisd-android.sh scripts/build-runtime-payload.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/test-runtime-payload-verification.sh scripts/verify-runtime-payload.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/build-root-network-proxy-android.sh scripts/build-runtime-payload.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/test-runtime-payload-verification.sh scripts/verify-runtime-payload.sh scripts/verify-root-network-proxy.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
       - name: Fail-closed checksum tests
         run: bash scripts/test-build-ubuntu-rootfs-verification.sh
       - name: Runtime payload verification tests
@@ -148,7 +148,28 @@ jobs:
         run: bash scripts/check-runtime-package-boundary.sh
 
   runtime-payload:
-    name: Build verified Android runtime payload
+    name: Build verified Ubuntu rootfs payload
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and verify rootfs-only runtime payload
+        run: bash scripts/build-runtime-payload.sh
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-runtime-payload
+          path: |
+            dist/ubuntu-arm64-rootfs.tar.gz
+            dist/ubuntu-arm64-rootfs.tar.gz.sha256
+            dist/ubuntu-arm64-rootfs.manifest.json
+            dist/runtime-manifest.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  root-network-proxy-android:
+    name: Build Android Root network proxy
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
@@ -160,18 +181,16 @@ jobs:
           test -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
           rustup target add aarch64-linux-android
-      - name: Build and verify runtime payload
-        run: bash scripts/build-runtime-payload.sh
+      - name: Build and verify Root network proxy
+        run: |
+          bash scripts/build-root-network-proxy-android.sh
+          bash scripts/verify-root-network-proxy.sh dist
       - uses: actions/upload-artifact@v7.0.1
         with:
-          name: android-runtime-payload
+          name: android-root-network-proxy
           path: |
-            dist/minisd-arm64-v8a
-            dist/minisd-arm64-v8a.sha256
-            dist/ubuntu-arm64-rootfs.tar.gz
-            dist/ubuntu-arm64-rootfs.tar.gz.sha256
-            dist/ubuntu-arm64-rootfs.manifest.json
-            dist/runtime-manifest.json
+            dist/minis-root-network-proxy-arm64-v8a
+            dist/minis-root-network-proxy-arm64-v8a.sha256
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
@@ -248,7 +267,7 @@ jobs:
 
   android-debug-build:
     name: Android debug build
-    needs: [changes, runtime-payload, rclone-android]
+    needs: [changes, runtime-payload, root-network-proxy-android, rclone-android]
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     steps:
@@ -266,6 +285,10 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v8.0.1
         with:
+          name: android-root-network-proxy
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
           name: rclone-android-aar
           path: src/android/app/libs
       - name: Prepare Gradle wrapper
@@ -276,7 +299,9 @@ jobs:
         working-directory: src/android
         run: ./gradlew :app:assembleDebug --max-workers=4 --stacktrace
       - name: Verify debug APK runtime payload
-        run: bash scripts/verify-runtime-payload.sh src/android/app/build/outputs/apk/debug/app-debug.apk
+        run: |
+          bash scripts/verify-runtime-payload.sh src/android/app/build/outputs/apk/debug/app-debug.apk
+          bash scripts/verify-root-network-proxy.sh src/android/app/build/outputs/apk/debug/app-debug.apk
       - name: Verify debug APK 16 KB native alignment
         run: |
           python3 scripts/test-android-16k.py
@@ -284,7 +309,7 @@ jobs:
 
   android-release:
     name: Android release build and verification
-    needs: [changes, runtime-payload, rclone-android]
+    needs: [changes, runtime-payload, root-network-proxy-android, rclone-android]
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-24.04
     env:
@@ -304,6 +329,10 @@ jobs:
       - uses: actions/download-artifact@v8.0.1
         with:
           name: android-runtime-payload
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-root-network-proxy
           path: dist
       - uses: actions/download-artifact@v8.0.1
         with:
@@ -354,7 +383,7 @@ jobs:
   android:
     name: Android build, test and release checks
     if: always()
-    needs: [changes, runtime-payload, android-checks, android-debug-build, android-release]
+    needs: [changes, runtime-payload, root-network-proxy-android, android-checks, android-debug-build, android-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Verify Android check results
@@ -362,6 +391,7 @@ jobs:
           ANDROID_CHANGED: ${{ needs.changes.outputs.android }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           PAYLOAD_RESULT: ${{ needs.runtime-payload.result }}
+          PROXY_RESULT: ${{ needs.root-network-proxy-android.result }}
           CHECKS_RESULT: ${{ needs.android-checks.result }}
           BUILD_RESULT: ${{ needs.android-debug-build.result }}
           RELEASE_RESULT: ${{ needs.android-release.result }}
@@ -374,8 +404,8 @@ jobs:
             echo "No Android-related files changed; Android checks were skipped."
             exit 0
           fi
-          if [[ "$PAYLOAD_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$BUILD_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
-            echo "Android checks failed: payload=$PAYLOAD_RESULT checks=$CHECKS_RESULT build=$BUILD_RESULT release=$RELEASE_RESULT" >&2
+          if [[ "$PAYLOAD_RESULT" != "success" || "$PROXY_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$BUILD_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
+            echo "Android checks failed: payload=$PAYLOAD_RESULT proxy=$PROXY_RESULT checks=$CHECKS_RESULT build=$BUILD_RESULT release=$RELEASE_RESULT" >&2
             exit 1
           fi
           echo "All Android checks passed."

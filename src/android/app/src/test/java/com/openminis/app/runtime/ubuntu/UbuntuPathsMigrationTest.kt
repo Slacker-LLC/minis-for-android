@@ -15,32 +15,45 @@ class UbuntuPathsMigrationTest {
     }
 
     @Test
-    fun defaultHostPathsAreCanonical() {
-        assertEquals("/data/adb/minis/workspace", UbuntuPaths.hostWorkspace.replace('\\', '/'))
-        assertEquals("/data/adb/minis/sessions", UbuntuPaths.hostSessions.replace('\\', '/'))
-        assertEquals("/data/adb/minis/memory", UbuntuPaths.hostMemory.replace('\\', '/'))
-        assertEquals("/data/adb/minis/home", UbuntuPaths.hostHome.replace('\\', '/'))
+    fun defaultHostPathsExposeLegacyMigrationSourcesBeforeInitialization() {
+        assertEquals(UbuntuPaths.LEGACY_WORKSPACE, UbuntuPaths.hostWorkspace.replace('\\', '/'))
+        assertEquals(UbuntuPaths.LEGACY_SESSIONS, UbuntuPaths.hostSessions.replace('\\', '/'))
+        assertEquals(UbuntuPaths.LEGACY_MEMORY, UbuntuPaths.hostMemory.replace('\\', '/'))
+        assertEquals(UbuntuPaths.LEGACY_HOME, UbuntuPaths.hostHome.replace('\\', '/'))
     }
 
     @Test
-    fun legacySourcesMapToBrokerTargetsWithoutCanonicalDestinationFiles() {
-        val filesDir = Files.createTempDirectory("minis-legacy-src").toFile()
+    fun activeLayoutMovesUserDataAwayFromLegacyRootOwnedPaths() {
+        val filesDir = Files.createTempDirectory("minis-app-owned-layout").toFile()
         try {
-            val roots = UbuntuPaths.legacyMigrationRoots(filesDir)
+            UbuntuPaths.useLayoutForTest(filesDir)
+
+            val activeRoots = listOf(
+                UbuntuPaths.hostWorkspace,
+                UbuntuPaths.hostMemory,
+                UbuntuPaths.hostSkills,
+                UbuntuPaths.hostShared,
+                UbuntuPaths.hostHome,
+                UbuntuPaths.hostSessions,
+            ).map { File(it).canonicalFile }
+
             assertEquals(
-                listOf("workspace", "memory", "skills", "shared", "home"),
-                roots.map { it.target },
+                listOf("workspace", "memory", "skills", "shared", "home", "sessions"),
+                activeRoots.map { it.relativeTo(filesDir.canonicalFile).path.replace('\\', '/') },
             )
-            assertEquals(
-                listOf(
-                    "minis/workspace",
-                    "minis-global/memory",
-                    "minis-global/skills",
-                    "minis-global/shared",
-                    "minis/home",
-                ),
-                roots.map { it.source.relativeTo(filesDir).path.replace('\\', '/') },
+            assertTrue(activeRoots.all { it.path.startsWith(filesDir.canonicalPath + File.separator) })
+            assertTrue(activeRoots.none { it.path.startsWith(UbuntuPaths.HOST_MINIS + "/") })
+
+            val legacySources = listOf(
+                UbuntuPaths.LEGACY_WORKSPACE,
+                UbuntuPaths.LEGACY_MEMORY,
+                UbuntuPaths.LEGACY_SKILLS,
+                UbuntuPaths.LEGACY_SHARED,
+                UbuntuPaths.LEGACY_HOME,
+                UbuntuPaths.LEGACY_SESSIONS,
             )
+            assertTrue(legacySources.all { it.startsWith(UbuntuPaths.HOST_MINIS + "/") })
+            assertFalse(legacySources.contains(UbuntuPaths.HOST_ROOTFS))
         } finally {
             filesDir.deleteRecursively()
         }

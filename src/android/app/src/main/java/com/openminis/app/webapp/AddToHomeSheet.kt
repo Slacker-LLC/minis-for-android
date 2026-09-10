@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.data.repository.WebAppShortcutRepository
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

@@ -11,9 +11,9 @@ import kotlin.math.abs
 
 /**
  * Android-side registry for host/guest path resolution and bind-mount inputs.
- * Ubuntu process and mount-namespace lifecycle is owned by minisd; this object
- * only maintains the app-visible path registry, SAF mount snapshots, and host
- * environment helpers consumed while constructing runtime requests.
+ * Ubuntu process and mount-namespace lifecycle is App-owned by the direct runtime;
+ * this object maintains the app-visible path registry, SAF mount snapshots, and
+ * host environment helpers consumed while constructing direct launches.
  */
 object RuntimePathRegistry {
 
@@ -91,13 +91,13 @@ object RuntimePathRegistry {
     @Volatile
     var mountedFoldersStore: MountedFoldersStore? = null
 
-    /** External mounts are broker-owned; this only clears the obsolete App bind map. */
+    /** External mounts are direct-runtime-owned; this only clears the obsolete App bind map. */
     @Suppress("UNUSED_PARAMETER")
     fun applyMountedFoldersSnapshot(context: Context) {
         val stale = bindMounts.keys
             .filter { it.startsWith(MOUNTS_LINUX_PREFIX) }
         for (key in stale) bindMounts.remove(key)
-        Log.i(TAG, "applyMountedFoldersSnapshot: broker-owned mounts; removedLegacy=${stale.size}")
+        Log.i(TAG, "applyMountedFoldersSnapshot: direct-runtime-owned mounts; removedLegacy=${stale.size}")
     }
 
     /**
@@ -114,7 +114,7 @@ object RuntimePathRegistry {
         return !entry.isActive || !entry.effectiveWritable
     }
 
-    /** External roots are indexed through broker listings, never host Files. */
+    /** External roots are indexed through direct runtime listings, never host Files. */
     @Suppress("UNUSED_PARAMETER")
     fun mountEntriesForIndex(context: Context): List<FileMentionIndex.MountEntry> = emptyList()
 

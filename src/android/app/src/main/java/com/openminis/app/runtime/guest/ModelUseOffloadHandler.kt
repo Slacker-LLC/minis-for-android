@@ -12,7 +12,7 @@ import com.openminis.app.provider.safeOptString
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -20,7 +20,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * `minis-model-use` — list, search, and invoke LLM models from Alpine shell.
+ * `minis-model-use` — list, search, and invoke LLM models from the Ubuntu shell.
  * Mirrors iOS ModelUseOffload.m + ModelUseOffloadBridge.swift.
  *
  * Subcommands:
@@ -1239,8 +1239,8 @@ class ModelUseOffloadHandler(
 
     /**
      * [T-android-model-use-session-scoped-write] Resolve a `/var/minis/<sub>/...`
-     * Linux path to the caller session's OWN broker namespace, bypassing the
-     * global (last-writer-wins) RuntimePathRegistry.bindMounts map. That global map is
+     * Linux path against the caller session's App-owned storage mapping rather
+     * than the global last-writer-wins bind-mount map. That global map is
      * overwritten by ExecutionCoordinator.buildSessionBindMounts on every shell
      * build, so RuntimePathRegistry.resolveHostPath("/var/minis/attachments") returns
      * whichever session built a shell most recently — a model-use call from
@@ -1250,10 +1250,9 @@ class ModelUseOffloadHandler(
      * the write to minisAttachmentsPersistentDir(for: callerSid).
      *
      * Session-scoped subdirs are attachments/offloads/workspace/browser (see
-     * buildSessionBindMounts). For those, host dir = filesDir/minis-sessions/
-     * <sid>/<sub>/<rest>. Returns null when [sessionId] is null (caller then
-     * falls back to the broker and logs the degrade) or the path
-     * isn't a session-scoped `/var/minis/<sub>` path.
+     * buildSessionBindMounts). WorkspaceFileClient resolves these directly to
+     * filesDir/minis-sessions/<sid>/<sub>/<rest> and keeps session identity
+     * explicit for every read/write.
      */
     private fun safeGuestName(name: String): String =
         name.substringAfterLast('/').substringAfterLast('\\')
@@ -1274,7 +1273,7 @@ class ModelUseOffloadHandler(
     private fun logModelUseWrite(responsePath: String, bytes: Int, sessionId: String?) {
         Log.i(
             "ModelUseImage",
-            "[ModelUseWrite] path=$responsePath bytes=$bytes sessionId=$sessionId via=minisd",
+            "[ModelUseWrite] path=$responsePath bytes=$bytes sessionId=$sessionId via=app-storage",
         )
     }
 
@@ -1566,10 +1565,8 @@ class ModelUseOffloadHandler(
      * Android offload path actually needs):
      *
      *  - `data:<mime>;base64,<...>` → inline base64
-     *  - `file:///<host-path>` → direct host read
-     *  - `/var/minis/<scope>/<path>` or `/<abs/linux/path>` → via
-     *    [RuntimePathRegistry.resolveHostPath] (which already handles
-     *    `/var/minis/` bind mounts longest-prefix)
+     *  - `file:///<guest-path>` → guest-storage read
+     *  - `/var/minis/<scope>/<path>` or `/<abs/linux/path>` → guest-storage read
      *  - `http(s)://` → throw with a hint to download via shell_execute
      *    first (matches iOS — avoids egressing user content)
      *  - anything else (relative paths, unknown schemes) → throw
@@ -1606,13 +1603,13 @@ class ModelUseOffloadHandler(
             )
         }
 
-        // file:///guest/path → strip prefix and read through minisd. External
-        // SAF mounts retain their independent Android-side mapping.
+        // file:///guest/path → strip prefix and read through App-owned guest
+        // storage. External SAF mounts retain their independent Android mapping.
         val linuxPath = when {
             url.startsWith("file://") -> url.removePrefix("file://")
             url.startsWith("/") -> url
             else -> throw ImageInputError(
-                "Unsupported image_url '$url'. Use a data: URL, file:///host/path, " +
+                "Unsupported image_url '$url'. Use a data: URL, file:///guest/path, " +
                     "/var/minis/<scope>/<path>, or an absolute Linux path."
             )
         }

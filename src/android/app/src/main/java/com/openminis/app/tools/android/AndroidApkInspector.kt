@@ -5,7 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.openminis.app.BuildConfig
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

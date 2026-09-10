@@ -1,21 +1,12 @@
-# 07 — 属主校正与身份恢复合同
+# 07 — 旧 Root-owned 数据迁移合同
 
 > 关联：`00-IDENTITY.md`、`03-STORAGE-CONTRACT.md`
 
-本文件保留原文件名以避免旧链接失效，但当前合同不再要求“六阶段事务级属主迁移”。`applicationId = llc.slacker.minis` 已经是当前事实；这里解决的是 `/data/adb/minis` 用户数据 owner 与当前 App identity 不一致时，如何安全恢复。
+本文件保留原文件名以避免旧链接失效。当前职责不是“属主校正当前 canonical 数据”，而是把旧版本位于 `/data/adb/minis` 的 Root-owned 用户数据一次性迁入 App 私有存储。
 
-## 目标
+## 迁移源
 
-需要满足四件事：
-
-1. 只修改 Minis canonical 用户数据；
-2. 使用当前设备真实 App UID/GID；
-3. 不跟随符号链接、不逃出允许根；
-4. 中断后可以重新运行并继续收敛，不要求逆向回滚已经成功的 `chown`。
-
-## 允许处理的用户数据根
-
-只允许：
+只允许以下固定历史路径作为 source：
 
 ```text
 /data/adb/minis/workspace
@@ -24,73 +15,55 @@
 /data/adb/minis/skills
 /data/adb/minis/shared
 /data/adb/minis/home
+/data/adb/minis/mcp-servers
 ```
 
-`rootfs`、`run`、`log` 使用各自 runtime 权限，不得因为用户数据 owner reconcile 被整体递归改成 App UID/GID。
+`/data/adb/minis/rootfs` 不是用户数据迁移源，不能被复制到 App 私有目录或递归改成 App owner。
 
-## 当前 App UID/GID
+## 迁移目标
 
-必须从当前安装/runtime 的真实身份取得 UID/GID，并验证结果有效。任何文档示例数字都不是合同值；禁止写死 `10000`、旧安装 UID 或假定 UID/GID 恒定。
+目标由 `UbuntuPaths.initialize(context)` 从当前 `Context.filesDir` 派生：workspace、sessions、global memory/skills/shared/mcp-servers、home。目标 owner 使用当前安装的真实 App UID/GID，禁止固定 `10000`。
 
-具体获取方式应优先复用现有 minisd/Android runtime 已经验证的 identity 来源，而不是再建立一套独立包名→UID 推断逻辑。
+## 当前实现顺序
 
-## 幂等前向校正
-
-推荐流程：
+迁移发生在 `UbuntuKernel.ensureReady()` 的串行化启动路径中，并早于 guest shell 启动：
 
 ```text
-resolve current App UID/GID
-  ↓
-validate canonical allowed roots
-  ↓
-walk without following symlinks
-  ↓
-for each allowed entry:
-  owner already correct → skip
-  owner mismatch        → fchown/chown through safe existing primitive
-  invalid/symlink/escape/error → fail closed
-  ↓
-optional completion/version marker
+marker 已存在
+  → 跳过 legacy copy
+
+marker 不存在
+  → 对每个固定 source：source 不存在则跳过
+  → mkdir -p destination
+  → cp -a source/. destination/
+  → chown -R 当前 App UID:GID destination
+  → 所有 source 成功后写 <filesDir>/minis/.root-data-migrated-v1
 ```
 
-只修改 owner 不匹配项。已经正确的条目不需要重复写。
+任一 Root copy/chown 失败时 runtime readiness 失败，完成标记不得写入。只有全部复制成功后才写 marker。
 
-中途崩溃、断电或进程死亡后，下次启动从允许根重新扫描即可：之前已修好的条目会被跳过，未修好的继续处理。算法通过“重复执行得到同一最终状态”实现恢复。
+## 语义边界
 
-## 路径安全
+- 这是一次性前向迁移，不是长期双向同步。
+- marker 写入后，旧 `/data/adb/minis/*` 用户目录不再参与运行时 path resolution 或 bind source 选择。
+- 旧 source 默认保留，用于避免迁移本身执行破坏性删除；后续清理必须是独立、明确授权的任务。
+- 当前实现使用固定 source 常量和 `cp -a`，没有逐文件 WAL、逆向 rollback 或 fd-relative 事务遍历；文档不得宣称这些尚未实现的保证。
+- 因此迁移期间不应并发启动 guest 或允许同一目标被其它写入者修改。当前 `UbuntuKernel` readiness mutex 和迁移发生在 shell 启动前是必要前提。
 
-- 不跟随 symlink；
-- 不接受 `..`、NUL 或 canonical escape；
-- 递归遍历必须始终锚定在允许根；
-- 如现有 native 层已有 fd-relative/openat 类安全遍历能力，应复用；
-- 任一无法证明安全包含的条目必须失败关闭，而不是跳出 root 后继续 `chown`。
+## 不允许
 
-## 并发
-
-属主校正期间不得让 guest 同时依赖一半旧 owner、一半新 owner 的不确定状态。可以复用现有 runtime startup/recovery 串行化或最窄排他锁，目标只是避免并发访问，不要求建立新的跨文件事务引擎。
-
-## 可选完成标记
-
-如果启动成本需要优化，可以保存一个简单的 layout/ownership version 或 completion marker。标记只能作为“已完成该版本检查”的优化，不能代替真实路径/owner 校验，也不能让错误 owner 永久跳过修复。
-
-## 明确不要求
-
-当前没有证据支持默认引入以下复杂机制：
-
-- 六阶段 PREPARE/FREEZE/FD-MIGRATION/FSYNC/COMMIT/CLEANUP 状态机；
-- 每个文件记录 old/new UID/GID 的 WAL；
-- 逐项逆向 owner rollback；
-- 为 owner 迁移预留 20% 数据量磁盘空间；
-- 为一次 ownership reconcile 建立跨 Room/filesystem 事务框架。
-
-如果未来出现明确需求，例如必须在两个 Android 应用身份之间**可逆**迁移同一份数据，再单独设计迁移协议并给出真实恢复测试；不要提前把该复杂度放进日常 runtime。
+- 把任意用户输入路径加入 source/destination；
+- 将 legacy source 重新定义为现役真源；
+- marker 未成功写入时假装迁移完成；
+- 迁移失败后静默继续启动 Ubuntu；
+- 为了“更保险”递归修改整个 `/data/adb/minis` owner；
+- 在本任务中自动删除旧 source。
 
 ## 验收
 
-- owner 已正确：重复执行不改变数据；
-- 部分 owner 错误：只修不匹配项；
-- 中途被终止：再次执行能收敛到正确 owner；
-- symlink/escape：拒绝且不修改允许根外文件；
-- session 深层目录：保持在 sessions root 内并完成校正；
-- rootfs/run/log：不被用户数据 reconcile 错误递归 chown；
-- 最终 UID/GID 来自当前实际 App identity，而不是固定数字。
+- source 全不存在：迁移成功并可写完成 marker；
+- 部分 source 存在：只复制固定存在项；
+- copy/chown 失败：runtime fail-closed，marker 不写；
+- marker 已存在：不得再次从 legacy source 覆盖 App-owned 数据；
+- 最终目标 owner 来自当前实际 App UID/GID；
+- rootfs 不参与用户数据迁移。

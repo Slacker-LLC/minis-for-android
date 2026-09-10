@@ -2,7 +2,7 @@ package com.openminis.app.agent
 
 import android.content.Context
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

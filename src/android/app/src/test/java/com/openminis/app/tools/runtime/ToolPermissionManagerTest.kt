@@ -24,11 +24,12 @@ class ToolPermissionManagerTest {
     }
 
     @Test
-    fun `local only root shell invisible to mcp`() {
-        assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor("root.shell", "local_agent"))
-        assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor("root.shell", "mcp:tok1"))
+    fun `root shell is denied for every external caller`() {
+        assertEquals(ToolPermissionManager.Level.MCP_DENIED, ToolPermissionManager.levelFor("root.shell", "local_agent"))
+        assertEquals(ToolPermissionManager.Level.MCP_DENIED, ToolPermissionManager.levelFor("root.shell", "mcp:tok1"))
+        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
         assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "mcp:tok1"))
-        assertTrue(ToolPermissionManager.localOnlyTools.contains("root.shell"))
+        assertFalse(ToolPermissionManager.localOnlyTools.contains("root.shell"))
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("root.shell"))
     }
 
@@ -51,7 +52,6 @@ class ToolPermissionManagerTest {
 
     @Test
     fun `token scope subset and ceiling`() {
-        // subset limits
         assertTrue(
             ToolPermissionManager.tokenCanCall(
                 "linux.file.read", "mcp:tok1",
@@ -66,7 +66,6 @@ class ToolPermissionManagerTest {
                 maxLevel = ToolPermissionManager.Level.MCP_ALLOWED,
             ),
         )
-        // ceiling: CONFIRM tool needs CONFIRM ceiling, not ALLOWED
         assertFalse(
             ToolPermissionManager.tokenCanCall(
                 "linux.shell", "mcp:tok1",
@@ -81,7 +80,6 @@ class ToolPermissionManagerTest {
                 maxLevel = ToolPermissionManager.Level.MCP_CONFIRM,
             ),
         )
-        // LOCAL_ONLY never passes
         assertFalse(
             ToolPermissionManager.tokenCanCall(
                 "root.shell", "mcp:tok1",
@@ -93,13 +91,11 @@ class ToolPermissionManagerTest {
 
     @Test
     fun `wildcard group matches child tools`() {
-        // android.diagnose.* group → CONFIRM for MCP
         assertEquals(
             ToolPermissionManager.Level.MCP_CONFIRM,
             ToolPermissionManager.levelFor("android.diagnose.process", "mcp:tok1"),
         )
         assertTrue(ToolPermissionManager.isRegistered("android.diagnose.process"))
-        // explicit key beats wildcard: clear is DENIED while read is CONFIRM
         assertEquals(
             ToolPermissionManager.Level.MCP_DENIED,
             ToolPermissionManager.levelFor("android.logs.clear", "mcp:tok1"),
@@ -108,7 +104,6 @@ class ToolPermissionManagerTest {
             ToolPermissionManager.Level.MCP_CONFIRM,
             ToolPermissionManager.levelFor("android.logs.read", "mcp:tok1"),
         )
-        // mcp.* group → LOCAL_ONLY
         assertEquals(
             ToolPermissionManager.Level.LOCAL_ONLY,
             ToolPermissionManager.levelFor("mcp.github", "mcp:tok1"),
@@ -117,7 +112,6 @@ class ToolPermissionManagerTest {
 
     @Test
     fun `whole-tool entries are not dead for local agent`() {
-        // 三号评审发现：整名注册的工具若权限表只有通配键，本地会被拒死。
         for (tool in listOf("android.diagnose", "android.deploy", "system.jobs", "android.logs")) {
             assertTrue("$tool should be allowed locally", ToolPermissionManager.isAllowedFor(tool, "local_agent"))
         }
@@ -126,9 +120,9 @@ class ToolPermissionManagerTest {
     }
 
     @Test
-    fun `local caller can use local only tools while mcp cannot`() {
+    fun `local caller can use intended local only tools while root shell stays denied`() {
         assertTrue(ToolPermissionManager.isAllowedFor("android.logs.clear", "local_agent"))
-        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
+        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
         assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "mcp:tok1"))
     }
 

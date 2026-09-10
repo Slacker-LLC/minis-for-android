@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail if current project documentation regresses into historical or stale runtime framing."""
+"""Fail if current project documentation regresses into historical runtime framing."""
 from __future__ import annotations
 
 import re
@@ -22,9 +22,10 @@ ALLOWLIST_FILES = {
     "THIRD_PARTY_LICENSES.md",
     "CHANGELOG.md",
     "LICENSE",
+    "docs/BUILD-CLEANUP-AUDIT.md",
     "docs/contracts/06-CURRENT-GAPS.md",
 }
-ALLOWLIST_PREFIXES = ("docs/archive/",)
+ALLOWLIST_PREFIXES = ("docs/archive/", "docs/issue-")
 CONTRACT_FILES = (
     "docs/contracts/00-IDENTITY.md",
     "docs/contracts/01-ARCHITECTURE.md",
@@ -33,58 +34,77 @@ CONTRACT_FILES = (
     "docs/contracts/04-SECURITY-CONTRACT.md",
     "docs/contracts/05-ENGINEERING.md",
     "docs/contracts/06-CURRENT-GAPS.md",
+    "docs/contracts/07-OWNERSHIP-MIGRATION.md",
+    "docs/contracts/08-BOT-COORDINATION.md",
 )
 BANNED_PATTERNS = {
     "OpenMinis product framing": re.compile(r"\bOpenMinis(?:Pet)?\b"),
     "PRoot runtime framing": re.compile(r"\bPRoot\b"),
     "Alpine runtime framing": re.compile(r"\bAlpine\b"),
+    "obsolete minisd runtime framing": re.compile(r"\bminisd\b", re.IGNORECASE),
+    "obsolete Root-owned user-data framing": re.compile(
+        r"(?:persistent|canonical|active|真源|持久化|现役)[^\n]{0,160}"
+        r"/data/adb/minis/(?:workspace|sessions|memory|skills|shared|home|mcp-servers)",
+        re.IGNORECASE,
+    ),
     "removed upstream policy document": re.compile(r"UPSTREAM\.md"),
     "removed Web Remote framing": re.compile(r"\bWeb Remote\b"),
     "removed Cloudflare Tunnel framing": re.compile(r"\bCloudflare Tunnel\b"),
-    "obsolete App-filesDir persistent backing": re.compile(
-        r"Context\.filesDir|app(?:'s)? private files directory|App 私有 files 目录",
-        re.IGNORECASE,
-    ),
-    "stale app-private workspace framing": re.compile(r"app-private workspace", re.IGNORECASE),
-    "stale single-authority persistence framing": re.compile(
-        r"single source of truth[^\n]{0,180}persistence",
-        re.IGNORECASE,
-    ),
     "English-primary documentation policy": re.compile(
         r"English is the primary (?:documentation )?language",
         re.IGNORECASE,
     ),
 }
+NEGATABLE_LABELS = {
+    "PRoot runtime framing",
+    "Alpine runtime framing",
+    "obsolete minisd runtime framing",
+    "obsolete Root-owned user-data framing",
+}
 REQUIRED_EXECUTION_TERMS = (
     "Ubuntu 24.04",
-    "minisd",
     "mount namespace",
     "chroot",
-    "/data/adb/minis/workspace",
-    "/data/adb/minis/sessions",
-    "/data/adb/minis/memory",
-    "/data/adb/minis/skills",
-    "/data/adb/minis/shared",
-    "/data/adb/minis/home",
+    "setpriv",
+    "Context.filesDir",
+    "/data/adb/minis/rootfs",
+    "127.0.0.1:18787",
 )
-REQUIRED_README_TERMS = ("Ubuntu 24.04", "minisd", "/data/adb/minis")
-REQUIRED_CONTRIBUTING_TERMS = ("minisd", "/data/adb/minis", "mount namespace")
-REQUIRED_SECURITY_TERMS = ("minisd", "/data/adb/minis", "tmpfs")
+REQUIRED_README_TERMS = (
+    "Ubuntu 24.04",
+    "Context.filesDir",
+    "/data/adb/minis/rootfs",
+)
+REQUIRED_CONTRIBUTING_TERMS = (
+    "direct Ubuntu",
+    "App-owned",
+    "Root",
+)
+REQUIRED_SECURITY_TERMS = (
+    "DirectRootRunner",
+    "App-owned",
+    "/data/adb/minis/rootfs",
+    "127.0.0.1:18787",
+)
 REQUIRED_PROVENANCE_TERMS = (
     "OpenMinis/OpenMinis",
     "GPL-3.0",
     "https://github.com/OpenMinis/OpenMinis",
 )
-REQUIRED_IDENTITY_TERMS = ("llc.slacker.minis", "slacker.llc")
+REQUIRED_IDENTITY_TERMS = ("llc.slacker.minis", "slacker.llc", "direct Ubuntu")
 REQUIRED_STORAGE_CONTRACT_TERMS = (
-    "/data/adb/minis/workspace",
-    "/data/adb/minis/sessions",
-    "/data/adb/minis/memory",
-    "/data/adb/minis/skills",
-    "/data/adb/minis/shared",
-    "/data/adb/minis/home",
+    "Context.filesDir",
+    "/data/adb/minis/rootfs",
+    "minis-sessions",
+    "minis-global",
+    ".root-data-migrated-v1",
 )
-REQUIRED_AGENTS_TERMS = ("llc.slacker.minis", "docs/contracts/")
+REQUIRED_AGENTS_TERMS = (
+    "llc.slacker.minis",
+    "docs/contracts/",
+    "Context.filesDir",
+    "DirectRootRunner",
+)
 REQUIRED_ZH_README_AUTHORITY = ("中文合同定义应保持的行为边界",)
 
 
@@ -139,9 +159,9 @@ NEGATIVE_CONTEXT_KEYWORDS = (
     "不保留",
     "不采用",
     "非目标",
-    "别",
-    "免",
-    "无需",
+    "旧",
+    "历史",
+    "迁移源",
     "not ",
     "no ",
     "without ",
@@ -155,6 +175,11 @@ NEGATIVE_CONTEXT_KEYWORDS = (
     "replaced",
     "neither",
     "banned",
+    "legacy",
+    "historical",
+    "former",
+    "obsolete",
+    "migration source",
 )
 
 
@@ -174,12 +199,13 @@ def check_tree(root: Path) -> list[str]:
         found_labels = set()
         for line in text.splitlines():
             for label, pattern in BANNED_PATTERNS.items():
-                if pattern.search(line):
-                    if label in ("PRoot runtime framing", "Alpine runtime framing") and is_negative_mention(line):
-                        continue
-                    if label not in found_labels:
-                        found_labels.add(label)
-                        errors.append(f"{rel}: contains {label}")
+                if not pattern.search(line):
+                    continue
+                if label in NEGATABLE_LABELS and is_negative_mention(line):
+                    continue
+                if label not in found_labels:
+                    found_labels.add(label)
+                    errors.append(f"{rel}: contains {label}")
 
     for rel in CONTRACT_FILES:
         if not (root / rel).is_file():

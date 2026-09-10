@@ -48,11 +48,11 @@ labels: ["bug", "triage"]
 - [ ] Provider / model
 - [ ] Android-native tool
 - [ ] MCP
-- [ ] Ubuntu / `minisd`
+- [ ] Direct Ubuntu / Root infrastructure / network proxy
 - [ ] Voice / assistant / overlay
 - [ ] Build / CI / release
 - [ ] Other
 
 ## Additional context
 
-<!-- For root/runtime issues, include the capability/SELinux result rather than assuming that root-provider name alone proves the capability. -->
+<!-- For Root/runtime issues, include the capability/SELinux result rather than assuming that a Root-provider name alone proves the capability. For VPN/DNS issues, include whether the fixed loopback guest proxy was reachable. -->

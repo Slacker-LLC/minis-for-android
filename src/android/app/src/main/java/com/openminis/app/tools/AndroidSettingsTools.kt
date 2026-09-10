@@ -8,7 +8,7 @@ import com.openminis.app.tools.android.CommandRisk
 import com.openminis.app.tools.android.PrivilegedCommandRunner
 import org.json.JSONObject
 
-/** Structured settings access: Android API first, privileged broker fallback for writes. */
+/** Structured settings access: Android API first, privileged Root fallback for writes. */
 object AndroidSettingsOps {
     private val keyPattern = Regex("^[A-Za-z0-9_.-]{1,128}$")
 
@@ -43,7 +43,7 @@ object AndroidSettingsOps {
         if (value != null && value.length > 4_096) return ToolExecutionResult("Error: value exceeds 4096 characters", false)
 
         // System settings can be granted to an ordinary app. Try that narrow
-        // path first; secure/global writes fall through to the root broker.
+        // path first; secure/global writes fall through to the privileged Root runner.
         val wrote = runCatching {
             when (namespace) {
                 "system" -> Settings.System.putString(context.contentResolver, key, if (delete) null else value)
@@ -68,19 +68,19 @@ object AndroidSettingsOps {
         )
         if (!response.success) {
             return ToolExecutionResult(
-                "Error: ${response.unavailableReason ?: response.stderr.ifBlank { "minisd settings failed" }}",
+                "Error: ${response.unavailableReason ?: response.stderr.ifBlank { "privileged settings command failed" }}",
                 false,
             )
         }
         return ToolExecutionResult(
-            if (response.exitCode == 0) JSONObject().put("namespace", namespace).put("key", key).put("source", "minisd.root").put("updated", true).toString()
+            if (response.exitCode == 0) JSONObject().put("namespace", namespace).put("key", key).put("source", "root_direct").put("updated", true).toString()
             else "Error: settings exit=${response.exitCode} ${response.stderr}",
             response.exitCode == 0,
         )
     }
 
     private fun validate(namespace: String, key: String): ToolExecutionResult? = when {
-        namespace !in setOf("system", "secure", "global") -> ToolExecutionResult("Error: namespace must be system, secure, or global", false)
+        namespace !in setOf("system", "secure", "global") -> ToolExecutionResult("Error: namespace must be system, secure, global", false)
         !keyPattern.matches(key) -> ToolExecutionResult("Error: invalid settings key", false)
         else -> null
     }
@@ -105,7 +105,7 @@ class AndroidSettingsGetHandler : AndroidSystemHandler() {
 class AndroidSettingsSetHandler : AndroidSystemHandler() {
     override val definition = AgentToolDefinition(
         name = "android.settings.set",
-        description = "Set or delete an Android setting. Uses the privileged broker only if normal Android API write is unavailable.",
+        description = "Set or delete an Android setting. Uses the privileged Root runner only if normal Android API write is unavailable.",
         parameters = mapOf(
             "namespace" to AgentToolParam("string", "system/secure/global", listOf("system", "secure", "global")),
             "key" to AgentToolParam("string", "Settings key"),

@@ -3,39 +3,37 @@
 ## 怎么判断“当前事实”
 
 ```text
-最终 main 源码与测试 → 当前实现事实
+最终目标分支源码与测试 → 当前实现事实
 AGENTS.md + docs/contracts/* → 应保持的长期行为边界
-06-CURRENT-GAPS.md → 当前实现与合同的已确认差异
+06-CURRENT-GAPS.md → 已确认差异/带日期的历史审计基线
 README / 专题 docs → 面向读者的说明
 历史 Issue/PR/计划/archive → 历史证据，不是当前事实
 ```
 
-已经合并过的 PR 不能证明某个修复今天仍存在；集成、stacked PR 或后续 merge 可能让代码回归。审查和修复都必须读取最终目标分支实际代码。
-
-合同也不能因为陈旧就凌驾于当前事实：发现合同与代码冲突时，先确认当前实现与维护者意图。若代码是缺陷，修代码并更新 gap；若合同已过时，更新合同，不要把正确代码改回旧阶段。
+合同与代码冲突时先核对实现与维护者意图：代码是缺陷就修代码并记录 gap；合同过时就更新合同，不要把正确代码改回旧阶段。
 
 ## 分支与 PR
 
 - 默认基于最新 `main`；stacked PR 按明确 base/head 工作。
 - 一次 PR 只解决一个问题或一条可独立验收边界。
-- 不把 namespace 重命名、runtime、存储、MCP、网络等无关变化混在一个修复中。
 - 不 force-push、不重写历史，除非维护者对该具体操作明确授权。
-- 合并前核对最终 diff；合并后需要验证最终 `main` 的关键行为，而不是只看 PR 页面曾显示通过。
+- 合并前核对最终 diff；合并后需要验证最终目标分支关键行为，而不是只看 PR 页面曾显示通过。
 
 ## 当前 Android 身份
 
-- `applicationId = llc.slacker.minis` 已经是当前实现。
-- `namespace = com.openminis.app` 仍是当前实现。
-- 两者不同不是 bug；全库 Kotlin/Java package 重命名必须作为明确独立任务，不得在日常修复中顺手进行。
+- `applicationId = llc.slacker.minis`。
+- `namespace = com.openminis.app`。
+- 两者不同不是 bug；全库 Kotlin/Java package 重命名必须作为明确独立任务。
 
 ## Runtime 边界
 
-- 产品 runtime：Root + `minisd` + Ubuntu 24.04 chroot。
-- 不恢复 PRoot/Alpine 兼容层，除非产品范围被明确重新定义。
-- 持久化真源：`/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`。
-- UID/GID 动态取得，禁止固定 `10000`。
-- Session 相关入口必须保持 session workspace/namespace 语义。
-- 新 Root 执行只走结构化 `minisd` 边界；bootstrap/recovery 中的受控静态特权动作不得变成模型可控 shell。
+- 产品 runtime：Root + App-owned direct Ubuntu 24.04 chroot。
+- 不恢复旧 broker、PRoot/Alpine 兼容层或双运行时。
+- 用户数据：App-owned backing；Root-owned 持久 runtime 仅保留 `/data/adb/minis/rootfs` 等明确基础设施。
+- UID/GID 动态取得，guest 通过 `setpriv` 降权并清空 capabilities；禁止固定 `10000`。
+- Session 相关入口必须保持 session workspace 语义。
+- Root launcher 只执行 App 构造的基础设施脚本，禁止模型可控 root shell/RPC。
+- Root 网络兼容由单用途 loopback proxy 提供，不能扩展成通用服务面。
 
 ## 外部实现参考
 
@@ -44,9 +42,9 @@ README / 专题 docs → 面向读者的说明
 ## 文档
 
 - 行为或长期边界改变时，同步更新对应中文合同。
-- 当前已确认缺陷进入 `06-CURRENT-GAPS.md`；修复合并并在最终 main 验证后再删除。
+- `06-CURRENT-GAPS.md` 中带 SHA/日期的条目只能证明对应历史基线；新架构迁移后必须重新核对再称“当前”。
 - 历史 Issue/PR 实施文档保留历史语境，不承担动态状态列表职责。
-- `DEVELOPMENT-STATUS.md` 若带 SHA，只代表该 SHA 的快照；main 前进后要重新核对。
+- `DEVELOPMENT-STATUS.md` 若带 SHA，只代表该 SHA 的快照。
 - 法律来源只在 `PROVENANCE.md` 维护。
 
 ## 验证（按改动范围取最小充分集）
@@ -58,29 +56,40 @@ python3 scripts/test_docs_provenance.py
 python3 scripts/check_docs_provenance.py
 ```
 
+Runtime boundary / payload：
+
+```bash
+python3 scripts/test_build_cleanup_guard.py
+python3 scripts/check_build_cleanup.py
+bash scripts/test-build-ubuntu-rootfs-verification.sh
+bash scripts/test-runtime-payload-verification.sh
+bash scripts/check-runtime-package-boundary.sh
+```
+
+Root network proxy：
+
+```bash
+cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
+cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
+bash scripts/build-root-network-proxy-android.sh
+bash scripts/verify-root-network-proxy.sh dist
+```
+
 Android：
 
 ```bash
 cd src/android
+./gradlew :app:compileDebugKotlin --no-daemon
 ./gradlew :app:testDebugUnitTest --no-daemon
 ./gradlew :app:lintDebug --no-daemon
 ```
 
-Release/R8/JNI 敏感改动还必须跑对应 Release 构建/检查；Debug 通过不能替代 Release 证据。
-
-`minisd`：
-
-```bash
-cargo fmt --manifest-path src/native/minisd/Cargo.toml --all -- --check
-cargo clippy --locked --manifest-path src/native/minisd/Cargo.toml --all-targets -- -D warnings
-cargo test --locked --manifest-path src/native/minisd/Cargo.toml
-```
-
-Root、mount、SELinux、VPN/DNS、OEM 生命周期等设备行为，只有在明确设备上实际验证后才能声称通过。
+Release/R8/JNI 敏感改动必须跑对应 Release 构建/检查；Debug 不能替代。Root、mount、SELinux、VPN/DNS、OEM 生命周期等设备行为，只有明确设备实测后才能声称通过。
 
 ## Agent 工作方式
 
 - 先读当前目标分支代码、测试和相关合同，再决定方案。
 - 优先最小修复；不要为理论风险自动建立大型基础设施。
-- 复现与真实用户影响优先于架构洁癖。
-- 已修问题如果在最终 main 回归，按当前代码重新修复并补能防止再次回归的最窄测试。
+- 替换旧实现后删除死路径，不保留无需求的兼容 shim。
+- 已修问题如果回归，按当前代码重新修复并补最窄回归测试。

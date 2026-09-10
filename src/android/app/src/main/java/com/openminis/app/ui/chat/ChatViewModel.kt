@@ -63,7 +63,7 @@ import com.openminis.app.provider.catalogMaxThinkingLevel
 import com.openminis.app.provider.effectiveMaxThinkingLevel
 import com.openminis.app.provider.selectableThinkingLevels
 import com.openminis.app.runtime.ExecutionCoordinator
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.AgentTools
 import com.openminis.app.tools.AskUserQuestionTool
 import com.openminis.app.tools.ContextPressure

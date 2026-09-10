@@ -8,7 +8,7 @@ import com.openminis.app.browser.BrowserActionResult
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
 import com.openminis.app.runtime.guest.NativeOffloadResult
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.ExternalMountAccess
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
@@ -22,7 +22,7 @@ import java.util.TimeZone
 
 /**
  * minis-browser-use — expose the agent's browser_use tool as a CLI inside the
- * PRoot sandbox.
+ * Ubuntu chroot.
  *
  * Output contract mirrors iOS `BrowserUseOffload.m` / `NativeOffloadUtils.m`:
  * every invocation emits a JSON envelope
@@ -257,7 +257,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
                     out.put("image_path", linuxPath)
                     out.put("minis_url", "minis://browser/${linuxPath.substringAfterLast('/')}")
                 } else {
-                    Log.w(TAG, "Failed to persist screenshot through minisd")
+                    Log.w(TAG, "Failed to persist screenshot through guest storage")
                 }
             }
         }

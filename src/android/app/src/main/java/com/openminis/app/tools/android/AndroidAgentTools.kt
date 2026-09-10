@@ -23,7 +23,7 @@ object AndroidAgentTools {
             name = CAPABILITIES,
             description = "Read the actual Android capability matrix without silently triggering Root authorization. " +
                 "Use action=get first. action=active_root_probe is the only path that may ask the user for su authorization. " +
-                "action=probe_native_chroot runs isolated chroot/mount/namespace probes after Root is authorized; guest runtime runs in a managed chroot under minisd.",
+                "action=probe_native_chroot runs isolated chroot/mount/namespace probes after Root is authorized; guest runtime uses the managed Direct Ubuntu chroot.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam("string", "get (passive), active_root_probe, or probe_native_chroot", listOf("get", "active_root_probe", "probe_native_chroot")),
             ),
@@ -339,8 +339,8 @@ object AndroidAgentTools {
             .put("mountNamespace", probeOperation(values["namespace"]))
             .put("bindMount", probeOperation(values["bindMount"]))
             .put("selinuxMode", root.selinuxMode ?: "unknown")
-            .put("nativeChrootExperimental", true)
-            .put("nativeChrootDefault", false)
+            .put("nativeChrootExperimental", false)
+            .put("nativeChrootDefault", true)
             .put("security", "chroot is not a container or sandbox; project builds must drop privileges")
             .put("stderr", result.stderr.take(2_000))
     }

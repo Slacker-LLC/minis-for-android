@@ -2,7 +2,7 @@ package com.openminis.app.data
 
 import android.content.Context
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.internal.TextRetainer
 import java.io.File
 import java.util.UUID

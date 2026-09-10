@@ -1,160 +1,82 @@
 # Security Model
 
-Minis for Android is a high-privilege Android agent project. Root access, MCP, Accessibility, provider credentials, package management, and device-control tools are treated as security boundaries rather than convenience features.
-
-The public repository is source-first. A locally built APK should not be assumed production-ready merely because it compiles.
+Minis for Android is a high-privilege Android agent project. Root access, MCP, Accessibility, provider credentials, package management, and device-control tools are security boundaries rather than convenience features.
 
 ## Security principles
 
-1. Fail closed when identity, policy, path containment, signing, checksum, or credential requirements are not satisfied.
-2. Keep privileged operations structured and narrow.
+1. Fail closed when identity, policy, path containment, signing, checksum, credential, rootfs, or direct-runtime prerequisites are not satisfied.
+2. Keep privileged operations App-owned, narrow, and separate from Agent/model command input.
 3. Reuse one canonical tool permission/runtime layer.
-4. Treat local agent, MCP callers, Android services, and root broker clients as distinct callers.
+4. Treat local Agent, MCP callers, Android services, and internal Root infrastructure as distinct callers.
 5. Require negative tests for security-sensitive behavior.
 6. Do not trade away SELinux or platform security globally to make a feature work.
 
-## Credentials
+## Credentials and local services
 
-Provider API keys, OAuth tokens, MCP tokens, DebugServer tokens, signing material, and other secrets must not be committed to the repository or returned through diagnostic APIs.
+Provider API keys, OAuth tokens, MCP tokens, DebugServer tokens, signing material, and other secrets must not be committed to the repository or returned through diagnostic APIs. Secure storage failures must not downgrade secrets to plaintext.
 
-Encrypted storage must fail closed if secure initialization is unavailable. Do not silently downgrade secrets to plaintext storage.
+DebugServer remains loopback-bound and debug-only. The local MCP server binds loopback by default, requires bearer authentication, filters tools by caller policy, and must not expose arbitrary Root shell or unrestricted host filesystem access.
 
-Build-time provider customization is separate from runtime secrets. If a required private integration value is absent, the build/runtime should expose an explicit unavailable state instead of failing only after the user enters the flow.
+## Direct Root boundary
 
-## Local services
+There is no production root broker or generic Root RPC in the current architecture.
 
-### DebugServer
+`DirectRootRunner` is an internal launcher used by trusted Android runtime code for fixed or programmatically constructed infrastructure operations: Root probing, rootfs repair, mount namespace/bind/chroot setup, one-time legacy migration, and tightly scoped runtime maintenance. Agent, MCP, Provider, and model output must not flow directly into its script input.
 
-DebugServer is a development surface. It must remain loopback-bound and debug-only; production artifacts must not accidentally expose debug RPC behavior.
-
-### MCP server
-
-The local MCP server:
-
-- binds to loopback by default;
-- requires bearer authentication;
-- filters tool visibility and execution by caller/token policy;
-- can require user confirmation for sensitive calls;
-- must not expose arbitrary root shell or unrestricted host filesystem access to remote callers.
-
-MCP is an integration surface into the existing Android runtime, not a second authority for sessions, tools, or data.
-
-## `minisd` root broker
-
-`minisd` is part of the trusted computing base.
-
-Security model:
-
-```text
-client
-  ↓ peer identity / framed RPC
-minisd
-  ↓ compile-time capability ceiling
-runtime policy (restrict only)
-  ↓ structured privileged operation
-Android / namespace / mount / chroot
-```
-
-Required properties include:
-
-- private Unix socket;
-- peer identity checks;
-- explicit request/response framing and size limits;
-- concurrent client handling without one slow client blocking the accept loop;
-- no runtime policy mechanism capable of expanding the compile-time command/method ceiling;
-- bounded stdout/stderr collection while continuously draining child pipes;
-- process-tree termination on timeout;
-- structured method allowlists rather than arbitrary remote command execution.
+Guest execution is not Root execution. After Root establishes the namespace and chroot, `setpriv` switches to the real App UID/GID, clears supplementary groups, and drops inheritable/ambient/bounding capabilities before bash is started.
 
 Root-provider identity is diagnostic only. `uid=0` does not prove that SELinux, mount, or Linux capabilities permit a requested operation.
 
+## Root network proxy
+
+The standalone `minis-root-network-proxy` is part of the trusted runtime infrastructure but is intentionally single-purpose:
+
+- listener fixed to `127.0.0.1:18787`;
+- HTTP absolute-form and CONNECT only;
+- no shell, filesystem, plugin, configuration, or generic RPC API;
+- bounded request header and concurrent connection counts;
+- ordinary loopback/private/link-local/broadcast destinations rejected;
+- `198.18.0.0/15` retained only for explicit VPN Fake-IP compatibility;
+- Android DNS discovery and controlled fallback resolution.
+
+This helper preserves guest network compatibility without recreating a privileged broker.
+
 ## Ubuntu chroot boundary
 
-The Ubuntu guest is not a VM or a complete container security boundary. It shares the Android kernel.
+The Ubuntu guest is not a VM or complete container security boundary. It shares the Android kernel.
 
-Security rules:
+Active user data is App-owned; `/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Per-session data must bind only from its corresponding App-owned session backing. SAF external locations remain a separate grant-based trust domain and are bound read-only when the effective grant is read-only.
 
-- root establishes the namespace/chroot, but arbitrary agent code runs with the app guest UID;
-- persistent guest-data sources are fixed under `/data/adb/minis/{workspace,sessions,memory,skills,shared,home}`;
-- `minisd` prepares and validates persistent bind sources before keeper mount-namespace creation;
-- persistent data directories use the guest UID/GID with mode `0700`;
-- non-canonical or tmpfs-backed persistent sources fail closed;
-- host/guest mounts are explicit;
-- guest paths are canonically contained;
-- unnecessary host paths are not made writable;
-- mount/chroot operations do not disable global SELinux;
-- rootfs input is pinned and SHA-256 verified before use.
+Host/guest mounts are explicit, guest paths are contained, global SELinux is not disabled, and rootfs input is pinned/checksum/manifest verified before use.
 
 ## File and path boundaries
 
-File and mount paths must reject traversal, NUL input, canonical escape, and symlink escape where relevant.
+File and mount paths must reject traversal, NUL input, canonical escape, and relevant symlink escape. App-owned data, App cache/staging, SAF locations, and Root-owned rootfs are distinct storage domains and must not be silently substituted for one another.
 
-SAF-granted external locations and the root-managed `/data/adb/minis` Agent-data sources are separate trust domains. Access across those domains must use the intended Android/root-broker boundary rather than assuming direct path equivalence.
-
-Large tool output should be bounded or spilled to controlled storage instead of being allowed to exhaust memory or IPC buffers.
+Large tool output should be bounded or spilled to controlled storage instead of exhausting memory.
 
 ## Tool authorization
 
-All agent/MCP tools must enter the canonical tool registry and runtime permission layer.
+All Agent/MCP tools enter the canonical tool registry and runtime permission layer. Unknown tools default deny; local-only tools are not exposed to MCP; UI checks are not execution authorization; side-effecting tools retain checkpoint/approval/recovery semantics.
 
-Rules:
-
-- unknown tools default to deny;
-- local-only tools are not exposed to MCP callers;
-- sensitive remote tools use confirmation or explicit denial as appropriate;
-- UI checks are not security boundaries; execution entry points re-check authorization;
-- side-effecting tools use checkpoints/approval/recovery semantics where needed.
-
-## Android privilege model
-
-Ordinary Android APIs, Accessibility, Shizuku-compatible bridges, and root are separate capabilities.
-
-Prefer ordinary Android APIs when they can perform the operation. Probe privileged backends only when needed, and return structured unavailable/partial states when a capability is missing.
-
-System-granted roles and permissions such as Accessibility, overlay, microphone, SAF, assistant role, and battery exemptions remain explicit user/system decisions.
+No tool is allowed to turn direct-runtime Root infrastructure into a model-controlled shell.
 
 ## Network transport
 
-Cloud providers, OAuth, update metadata, and credential-bearing requests should use HTTPS.
+Cloud providers, OAuth, update metadata, and credential-bearing requests should use HTTPS. Local/private HTTP provider endpoints require explicit application policy; broad public cleartext must not become an implicit fallback. Credential-bearing flows must not follow HTTPS-to-HTTP downgrade redirects.
 
-Local/private HTTP provider endpoints may be supported only through explicit application policy; broad public cleartext endpoints must not become an implicit fallback.
-
-Credential-bearing flows must not follow HTTPS-to-HTTP downgrade redirects.
-
-Network-policy changes require tests for allowed local endpoints, rejected public cleartext endpoints, and downgrade redirects.
+The local Root network proxy is an internal guest egress path, not permission to expose a remote proxy service.
 
 ## Release security
 
-Release signing is fail-closed. Debug signing must never be accepted as a production release fallback.
-
-Repository CI checks release-signing failure paths, Debug/Release lint, Debug/Release packaging, and the final release APK.
+Release signing is fail-closed. Debug signing must never be accepted as a production release fallback. Runtime packaging verifies the rootfs-only manifest and standalone Root network proxy independently; obsolete broker binaries/socket contracts are rejected by regression guards.
 
 APKs/AABs are build artifacts and are not committed to Git.
 
 ## Process death and uncertain outcomes
 
-Android may terminate the process or foreground service while work is in progress.
+Recovery must distinguish operation never started, clean failure, completed, and outcome unknown. Unknown side effects must not be blindly retried.
 
-Recovery must distinguish:
+## Device-verification boundary
 
-- operation never started;
-- operation failed cleanly;
-- operation completed;
-- operation outcome is unknown.
-
-An unknown side-effecting outcome must not be retried blindly.
-
-## Security test expectations
-
-Security-sensitive changes should include cases equivalent to:
-
-```text
-allowed request        -> succeeds
-unauthorized request   -> denied
-invalid input          -> denied
-boundary-sized input   -> bounded
-IPC/process failure    -> fail closed
-restart/recovery       -> no duplicate side effect
-```
-
-Use the live GitHub Issues list for open hardening work instead of embedding volatile issue status in this document.
+CI and host tests can prove payload integrity, Rust policy, build compatibility, package contents, and Android compile/unit behavior. They cannot prove Root authorization, SELinux behavior, real mount semantics, VPN switching, or OEM process lifecycle on a physical device. Those claims require explicit device tests.

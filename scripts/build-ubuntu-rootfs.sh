@@ -116,7 +116,7 @@ ln -sfn /skills "$STAGE/var/minis/skills"
 ln -sfn /shared "$STAGE/var/minis/shared"
 
 rm -f "$STAGE/etc/resolv.conf"
-printf '# generated placeholder; minisd overwrites on ubuntu.start\nnameserver 8.8.8.8\nnameserver 8.8.4.4\n' \
+printf '# generated placeholder; direct Ubuntu runtime refreshes this before use\nnameserver 8.8.8.8\nnameserver 8.8.4.4\n' \
   > "$STAGE/etc/resolv.conf"
 
 if [[ ! -s "$STAGE/etc/hosts" ]]; then
@@ -155,7 +155,7 @@ cat > "$STAGE/etc/minis/rootfs.json" <<EOF
   "preinstalled": "base-only",
   "source_url": "${BASE_URL}",
   "upstream_sha256": "${EXPECTED_BASE_SHA256}",
-  "note": "python3/git/curl installed on device via ubuntu.provision"
+  "note": "python3/git/curl installed on device by the App-owned UbuntuProvisioner"
 }
 EOF
 

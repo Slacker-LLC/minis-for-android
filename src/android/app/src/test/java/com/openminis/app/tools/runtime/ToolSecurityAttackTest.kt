@@ -46,10 +46,14 @@ class ToolSecurityAttackTest {
         )) {
             assertNotAllowed(tool)
         }
-        // the one registered root.* entry is LOCAL_ONLY, invisible to MCP
+        // The retired root.shell compatibility name is denied to both local Agents and MCP.
         assertEquals(
-            ToolPermissionManager.Level.LOCAL_ONLY,
+            ToolPermissionManager.Level.MCP_DENIED,
             ToolPermissionManager.levelFor("root.shell", attacker),
+        )
+        assertEquals(
+            ToolPermissionManager.Level.MCP_DENIED,
+            ToolPermissionManager.levelFor("root.shell", ToolPermissionManager.CALLER_LOCAL),
         )
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("root.shell"))
     }

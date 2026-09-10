@@ -64,7 +64,7 @@ object AndroidCapabilityResolver {
                 root?.selinuxContext?.let { put("selinuxContext", it) }
                 root?.selinuxMode?.let { put("selinuxMode", it) }
                 root?.error?.let { put("lastProbeError", it) }
-                put("provider", JSONObject.NULL) // provider names never decide capability.
+                put("provider", JSONObject.NULL)
             })
             put("privilegedShell", JSONObject().apply {
                 put("root", CapabilityFact(rootStatus, when (rootStatus) {
@@ -152,22 +152,22 @@ object AndroidCapabilityResolver {
         }
         val ubuntuDetail = when {
             runtime.running && runtime.provisioned ->
-                "Ubuntu 24.04 is running through minisd; per-session workspace is prepared on first exec"
-            runtime.running -> "Ubuntu runtime is running but provisioning is not confirmed"
+                "Ubuntu 24.04 direct chroot runtime is running; per-session workspace is prepared on first exec"
+            runtime.running -> "Ubuntu direct chroot runtime is running but provisioning is not confirmed"
             runtime.lastError != null -> "Ubuntu runtime unavailable: ${runtime.lastError}"
-            else -> "Ubuntu runtime is not started; capability probes require minisd"
+            else -> "Ubuntu direct chroot runtime is not started; Root authorization and rootfs readiness are required"
         }
         return JSONObject().apply {
             put("defaultEnvironment", "ubuntu")
-            put("ubuntu", CapabilityFact(ubuntuStatus, ubuntuDetail, "minisd").toJson())
+            put("ubuntu", CapabilityFact(ubuntuStatus, ubuntuDetail, "direct_root").toJson())
             put("sessionWorkspace", CapabilityFact(
                 if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
                 if (runtime.running) {
-                    "Created and bound by minisd for each session; App does not access /data/adb/minis directly"
+                    "App-owned session workspace is bind-mounted into the direct Ubuntu chroot for each session"
                 } else {
-                    "Requires a running Ubuntu/minisd runtime"
+                    "Requires a running direct Ubuntu chroot runtime"
                 },
-                "minisd",
+                "direct_root",
             ).toJson())
             put("java", CapabilityFact(
                 if (runtime.running) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE,
@@ -203,7 +203,7 @@ object AndroidCapabilityResolver {
                     chrootBit -> CapabilityStatus.PARTIAL
                     else -> CapabilityStatus.UNAVAILABLE
                 },
-                if (chrootBit) "CAP_SYS_CHROOT bit is present; native chroot remains experimental and operation probes are still required" else "CAP_SYS_CHROOT not confirmed",
+                if (chrootBit) "CAP_SYS_CHROOT bit is present; direct chroot still requires active operation and SELinux probes" else "CAP_SYS_CHROOT not confirmed",
                 "root",
             ).toJson())
             put("mount", CapabilityFact(
@@ -213,8 +213,8 @@ object AndroidCapabilityResolver {
             ).toJson())
             put("bindMount", CapabilityFact(if (adminBit) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE, "requires mount permission, namespace behavior, and SELinux acceptance", "root").toJson())
             put("mountNamespace", CapabilityFact(if (adminBit) CapabilityStatus.PARTIAL else CapabilityStatus.UNAVAILABLE, "requires an active unshare/nsenter probe", "root").toJson())
-            put("nativeChrootExperimental", true)
-            put("nativeChrootDefault", false)
+            put("nativeChrootExperimental", false)
+            put("nativeChrootDefault", true)
             put("selfUpdateContinuousExecution", "UNSUPPORTED")
         }
     }

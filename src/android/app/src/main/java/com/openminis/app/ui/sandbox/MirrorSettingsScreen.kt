@@ -422,7 +422,7 @@ object MirrorSpeedTestViewModel {
         useCustomMirror[category] == true && selectedMirrorId[category] != null
 
     private fun rootfsDataDir(context: Context): File =
-        File(com.openminis.app.runtime.minisd.MinisdProtocol.DEFAULT_ROOTFS).takeIf { it.exists() && it.isDirectory }
+        File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_ROOTFS).takeIf { it.exists() && it.isDirectory }
             ?: File(context.applicationContext.filesDir, "rootfs")
 
     private fun applyMirror(context: Context, category: MirrorCategory) {

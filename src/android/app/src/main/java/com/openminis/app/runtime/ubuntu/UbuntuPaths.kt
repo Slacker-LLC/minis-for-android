@@ -1,35 +1,48 @@
 package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
-import android.util.Base64
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import android.net.Uri
+import com.openminis.app.runtime.RuntimePathRegistry
 import java.io.File
-import java.io.FileInputStream
-import java.nio.file.Files
-import java.nio.file.LinkOption
 
 /**
- * Persistent Linux guest data is contracted at `/data/adb/minis`.
- * App file tools and minisd bind mounts must use these host paths.
+ * Host/guest path contract for the direct Ubuntu backend.
+ *
+ * The Ubuntu rootfs remains Root-owned at /data/adb/minis/rootfs. User data is
+ * deliberately App-owned again, matching upstream Android's storage model:
+ * Android file tools operate directly on filesDir and the Root backend only
+ * bind-mounts those directories into the chroot.
  */
 object UbuntuPaths {
+    /** Legacy/root runtime root. Only rootfs and migration source remain here. */
     const val HOST_MINIS = "/data/adb/minis"
     const val HOST_ROOTFS = "$HOST_MINIS/rootfs"
-    const val MIGRATION_MARKER = "$HOST_MINIS/run/legacy-filesdir-migrated"
+    const val LEGACY_WORKSPACE = "$HOST_MINIS/workspace"
+    const val LEGACY_MEMORY = "$HOST_MINIS/memory"
+    const val LEGACY_SKILLS = "$HOST_MINIS/skills"
+    const val LEGACY_SHARED = "$HOST_MINIS/shared"
+    const val LEGACY_SESSIONS = "$HOST_MINIS/sessions"
+    const val LEGACY_HOME = "$HOST_MINIS/home"
 
-    var hostWorkspace: String = "$HOST_MINIS/workspace"
+    @Volatile
+    private var appContext: Context? = null
+
+    var hostWorkspace: String = LEGACY_WORKSPACE
         private set
-    var hostMemory: String = "$HOST_MINIS/memory"
+    var hostMemory: String = LEGACY_MEMORY
         private set
-    var hostSkills: String = "$HOST_MINIS/skills"
+    var hostSkills: String = LEGACY_SKILLS
         private set
-    var hostShared: String = "$HOST_MINIS/shared"
+    var hostShared: String = LEGACY_SHARED
         private set
-    var hostSessions: String = "$HOST_MINIS/sessions"
+    var hostSessions: String = LEGACY_SESSIONS
         private set
-    var hostHome: String = "$HOST_MINIS/home"
+    var hostHome: String = LEGACY_HOME
+        private set
+    var hostMcpServers: String = "$HOST_MINIS/mcp-servers"
         private set
 
+    /** Additional Android-visible binds registered by RuntimePathRegistry. */
     val bindMounts: MutableMap<String, String> = linkedMapOf()
 
     private val aliases = listOf(
@@ -44,6 +57,7 @@ object UbuntuPaths {
         "/var/minis/skills" to { hostSkills },
         "/shared" to { hostShared },
         "/var/minis/shared" to { hostShared },
+        "/var/minis/mcp-servers" to { hostMcpServers },
         "/home/minis" to { hostHome },
     )
 
@@ -61,28 +75,49 @@ object UbuntuPaths {
         "/var/minis/browser" to "browser",
     )
 
-    data class LegacyMigrationResult(
-        val skipped: Boolean,
-        val copied: Boolean,
-        val error: String? = null,
-    )
+    fun initialize(context: Context) {
+        val ctx = context.applicationContext
+        appContext = ctx
+        val files = ctx.filesDir
+        hostWorkspace = File(files, "minis/workspace").absolutePath
+        hostMemory = File(files, "minis-global/memory").absolutePath
+        hostSkills = File(files, "minis-global/skills").absolutePath
+        hostShared = File(files, "minis-global/shared").absolutePath
+        hostMcpServers = File(files, "minis-global/mcp-servers").absolutePath
+        hostSessions = File(files, "minis-sessions").absolutePath
+        hostHome = File(files, "minis/home").absolutePath
+        ensureBaseDirs()
+    }
+
+    fun ensureBaseDirs(): Boolean = listOf(
+        hostWorkspace,
+        hostMemory,
+        hostSkills,
+        hostShared,
+        hostMcpServers,
+        hostSessions,
+        hostHome,
+    ).all { path -> File(path).isDirectory || File(path).mkdirs() }
 
     internal fun useLayoutForTest(root: File) {
         hostWorkspace = File(root, "workspace").absolutePath
         hostMemory = File(root, "memory").absolutePath
         hostSkills = File(root, "skills").absolutePath
         hostShared = File(root, "shared").absolutePath
+        hostMcpServers = File(root, "mcp-servers").absolutePath
         hostSessions = File(root, "sessions").absolutePath
         hostHome = File(root, "home").absolutePath
     }
 
     internal fun resetLayoutForTest() {
-        hostWorkspace = "$HOST_MINIS/workspace"
-        hostMemory = "$HOST_MINIS/memory"
-        hostSkills = "$HOST_MINIS/skills"
-        hostShared = "$HOST_MINIS/shared"
-        hostSessions = "$HOST_MINIS/sessions"
-        hostHome = "$HOST_MINIS/home"
+        appContext = null
+        hostWorkspace = LEGACY_WORKSPACE
+        hostMemory = LEGACY_MEMORY
+        hostSkills = LEGACY_SKILLS
+        hostShared = LEGACY_SHARED
+        hostMcpServers = "$HOST_MINIS/mcp-servers"
+        hostSessions = LEGACY_SESSIONS
+        hostHome = LEGACY_HOME
     }
 
     fun sessionDir(sessionId: String): File? = ensureSessionDirsAt(File(hostSessions), sessionId)
@@ -98,14 +133,10 @@ object UbuntuPaths {
         return childOf(match.second(), linuxPath.removePrefix(match.first).removePrefix("/"))
     }
 
+    /** Resolve only App-owned/global paths synchronously. */
     fun resolveHostPath(linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
-        // External SAF mounts are owned by minisd. Returning a host File here
-        // would bypass the persisted-grant re-attestation and kernel mount
-        // policy, so callers must use the broker-backed file client instead.
-        if (linuxPath == "/var/minis/mounts" || linuxPath.startsWith("/var/minis/mounts/")) {
-            return null
-        }
+        if (isExternalMountPath(linuxPath)) return null
         resolveGuest(linuxPath)?.let { return it }
         val sorted = bindMounts.keys.sortedByDescending { it.length }
         for (mount in sorted) {
@@ -116,6 +147,50 @@ object UbuntuPaths {
         }
         if (!linuxPath.startsWith("/")) return resolveGuest("/workspace/$linuxPath")
         return null
+    }
+
+    /**
+     * Resolve a path for Android-side file I/O. External mounts are re-derived
+     * from the persisted SAF grant on each access; no Root broker is involved.
+     */
+    suspend fun resolveForFileAccess(sessionId: String?, linuxPath: String): File? {
+        if (unsafePath(linuxPath)) return null
+        if (isExternalMountPath(linuxPath)) return resolveExternalMount(linuxPath)
+        if (!sessionId.isNullOrBlank() && isSessionScopedPath(linuxPath)) {
+            return resolveSessionPath(File(hostSessions), sessionId, linuxPath)
+        }
+        return resolveHostPath(linuxPath)
+    }
+
+    suspend fun externalMountRoot(name: String): File? {
+        if (name.isBlank() || name == "." || name == ".." || name.contains('/')) return null
+        return resolveExternalMount("/var/minis/mounts/$name")
+    }
+
+    fun isExternalMountPath(path: String): Boolean =
+        path == "/var/minis/mounts" || path.startsWith("/var/minis/mounts/")
+
+    fun isExternalMountWritable(path: String): Boolean {
+        if (!path.startsWith("/var/minis/mounts/")) return false
+        val name = path.removePrefix("/var/minis/mounts/").substringBefore('/')
+        val entry = RuntimePathRegistry.mountedFoldersStore?.entries?.value
+            ?.firstOrNull { it.name == name && it.isActive }
+            ?: return false
+        return entry.effectiveWritable
+    }
+
+    private suspend fun resolveExternalMount(linuxPath: String): File? {
+        if (!linuxPath.startsWith("/var/minis/mounts/")) return null
+        val ctx = appContext ?: return null
+        val rest = linuxPath.removePrefix("/var/minis/mounts/")
+        val name = rest.substringBefore('/')
+        if (name.isEmpty()) return null
+        val entry = RuntimePathRegistry.mountedFoldersStore?.entries?.value
+            ?.firstOrNull { it.name == name && it.isActive }
+            ?: return null
+        val store = RuntimePathRegistry.mountedFoldersStore ?: return null
+        val rootPath = store.resolvePosixPath(Uri.parse(entry.treeUri), ctx) ?: return null
+        return childOf(rootPath, rest.substringAfter('/', ""))
     }
 
     internal fun isSafeSessionId(sessionId: String): Boolean =
@@ -135,6 +210,12 @@ object UbuntuPaths {
             val dir = File(session, subdir)
             if (!dir.isDirectory && !dir.mkdirs()) return null
         }
+        // Bind targets under /workspace must exist after the workspace bind is
+        // installed, so create harmless placeholders in the host workspace.
+        val workspace = File(session, "workspace")
+        listOf("attachments", "offloads", "browser").forEach { subdir ->
+            File(workspace, subdir).mkdirs()
+        }
         return session
     }
 
@@ -151,8 +232,10 @@ object UbuntuPaths {
         return childOf(base.absolutePath, rest)
     }
 
-    fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? =
-        resolveSessionHostPath(sessionId, linuxPath)
+    fun resolveSessionHostPath(sessionId: String, linuxPath: String, context: Context): File? {
+        if (appContext == null) initialize(context)
+        return resolveSessionHostPath(sessionId, linuxPath)
+    }
 
     fun resolveSessionHostPath(sessionId: String, linuxPath: String): File? =
         if (isSessionScopedPath(linuxPath)) {
@@ -162,170 +245,12 @@ object UbuntuPaths {
         }
 
     @Suppress("UNUSED_PARAMETER")
-    fun deleteSession(context: Context, sessionId: String): Boolean =
-        runCatching {
-            WorkspaceFileClient.deleteSessionBlocking(sessionId)
-            true
-        }.getOrDefault(false)
-
-    internal data class MigrationRoot(
-        val source: File,
-        val target: String,
-        val sessionId: String? = null,
-    )
-
-    internal fun legacyMigrationRoots(filesDir: File): List<MigrationRoot> = listOf(
-        MigrationRoot(File(filesDir, "minis/workspace"), "workspace"),
-        MigrationRoot(File(filesDir, "minis-global/memory"), "memory"),
-        MigrationRoot(File(filesDir, "minis-global/skills"), "skills"),
-        MigrationRoot(File(filesDir, "minis-global/shared"), "shared"),
-        MigrationRoot(File(filesDir, "minis/home"), "home"),
-    )
-
-    suspend fun migrateLegacyFilesDir(filesDir: File): LegacyMigrationResult =
-        migrateLegacyFilesDir(filesDir, brokerReady = false)
-
-    internal suspend fun migrateLegacyFilesDirAfterBrokerReady(filesDir: File): LegacyMigrationResult =
-        migrateLegacyFilesDir(filesDir, brokerReady = true)
-
-    private suspend fun migrateLegacyFilesDir(filesDir: File, brokerReady: Boolean): LegacyMigrationResult {
-        val ensureBroker = !brokerReady
-        return try {
-            if (WorkspaceFileClient.migrationStatus(ensureBroker = ensureBroker).optBoolean("complete")) {
-                return LegacyMigrationResult(skipped = true, copied = false)
-            }
-            var present = false
-            for (root in legacyMigrationRoots(filesDir)) {
-                if (!Files.exists(root.source.toPath(), LinkOption.NOFOLLOW_LINKS)) continue
-                if (!root.source.isDirectory || Files.isSymbolicLink(root.source.toPath())) {
-                    return LegacyMigrationResult(
-                        skipped = false,
-                        copied = false,
-                        error = "legacy migration source is not a real directory: ${root.source}",
-                    )
-                }
-                present = true
-                migrateDirectory(root.source, root.target, ensureBroker = ensureBroker)
-            }
-            val sessions = File(filesDir, "minis-sessions")
-            if (Files.exists(sessions.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                if (!sessions.isDirectory || Files.isSymbolicLink(sessions.toPath())) {
-                    return LegacyMigrationResult(
-                        skipped = false,
-                        copied = false,
-                        error = "legacy session source is not a real directory: $sessions",
-                    )
-                }
-                for (session in sessions.listFiles()?.sortedBy { it.name }
-                    ?: throw IllegalStateException("cannot list legacy session source: $sessions")) {
-                    if (!isSafeSessionId(session.name)) {
-                        return LegacyMigrationResult(
-                            skipped = false,
-                            copied = false,
-                            error = "invalid legacy session id: ${session.name}",
-                        )
-                    }
-                    if (!session.isDirectory || Files.isSymbolicLink(session.toPath())) {
-                        return LegacyMigrationResult(
-                            skipped = false,
-                            copied = false,
-                            error = "legacy session is not a real directory: $session",
-                        )
-                    }
-                    present = true
-                    migrateDirectory(session, "session", session.name, ensureBroker = ensureBroker)
-                }
-            }
-            WorkspaceFileClient.migrationComplete(ensureBroker = ensureBroker)
-            LegacyMigrationResult(skipped = !present, copied = present)
-        } catch (t: Throwable) {
-            LegacyMigrationResult(
-                skipped = false,
-                copied = false,
-                error = t.message ?: t::class.java.simpleName,
-            )
-        }
-    }
-
-    private suspend fun migrateDirectory(
-        source: File,
-        target: String,
-        sessionId: String? = null,
-        prefix: String = "",
-        ensureBroker: Boolean,
-    ) {
-        for (entry in source.listFiles()?.sortedBy { it.name }
-            ?: throw IllegalStateException("cannot list legacy migration directory: $source")) {
-            if (entry.name.isEmpty() || entry.name == "." || entry.name == ".." ||
-                entry.name.contains('/') || entry.name.contains('\\') ||
-                entry.name.contains('\u0000') || Files.isSymbolicLink(entry.toPath())
-            ) {
-                throw IllegalStateException("unsafe legacy migration entry: ${entry.name}")
-            }
-            val path = if (prefix.isEmpty()) entry.name else "$prefix/${entry.name}"
-            when {
-                entry.isDirectory -> {
-                    WorkspaceFileClient.migrationMkdir(
-                        target,
-                        path,
-                        sessionId,
-                        ensureBroker = ensureBroker,
-                    )
-                    migrateDirectory(entry, target, sessionId, path, ensureBroker)
-                }
-                entry.isFile -> migrateFile(entry, target, path, sessionId, ensureBroker)
-                else -> throw IllegalStateException("unsupported legacy migration entry: $entry")
-            }
-        }
-    }
-
-    private suspend fun migrateFile(
-        source: File,
-        target: String,
-        path: String,
-        sessionId: String?,
-        ensureBroker: Boolean,
-    ) {
-        val existing = WorkspaceFileClient.migrationInfo(
-            target,
-            path,
-            sessionId,
-            ensureBroker = ensureBroker,
-        )
-        if (existing.optBoolean("exists", true)) {
-            if (existing.optString("type") != "file") {
-                throw IllegalStateException("legacy migration target is not a file: $target/$path")
-            }
-            if (existing.optLong("size", -1L) == source.length()) return
-        }
-        FileInputStream(source).use { input ->
-            val buffer = ByteArray(WorkspaceFileClient.MAX_WRITE_CHUNK)
-            var append = false
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (count == 0) continue
-                WorkspaceFileClient.migrationWrite(
-                    target = target,
-                    path = path,
-                    dataBase64 = Base64.encodeToString(buffer, 0, count, Base64.NO_WRAP),
-                    append = append,
-                    sessionId = sessionId,
-                    ensureBroker = ensureBroker,
-                )
-                append = true
-            }
-            if (!append) {
-                WorkspaceFileClient.migrationWrite(
-                    target = target,
-                    path = path,
-                    dataBase64 = "",
-                    append = false,
-                    sessionId = sessionId,
-                    ensureBroker = ensureBroker,
-                )
-            }
-        }
+    fun deleteSession(context: Context, sessionId: String): Boolean {
+        if (appContext == null) initialize(context)
+        if (!isSafeSessionId(sessionId)) return false
+        val root = File(hostSessions).canonicalFile
+        val target = childOf(root.absolutePath, sessionId) ?: return false
+        return !target.exists() || target.deleteRecursively()
     }
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {
@@ -333,7 +258,7 @@ object UbuntuPaths {
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
     }
 
-    private fun childOf(base: String, rest: String): File? = runCatching {
+    internal fun childOf(base: String, rest: String): File? = runCatching {
         val root = File(base).canonicalFile
         val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
         if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null

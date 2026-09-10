@@ -4,7 +4,7 @@ import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.internal.FileEditEngine
 import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONArray

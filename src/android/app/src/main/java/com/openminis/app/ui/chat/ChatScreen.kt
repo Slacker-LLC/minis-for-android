@@ -7,7 +7,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import java.io.File
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asAndroidBitmap

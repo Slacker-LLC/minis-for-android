@@ -884,7 +884,7 @@ internal object ConfigBuiltins {
                         )
                 } else ""
                 runCatching {
-                    com.openminis.app.runtime.minisd.WorkspaceFileClient
+                    com.openminis.app.runtime.files.WorkspaceFileClient
                         .readAllBlocking(sid, src.path)
                 }.getOrElse {
                     throw ConfigError.InvalidValue("could not read ${src.path}: ${it.message}")

@@ -4,28 +4,28 @@
 
 ## 调用方隔离
 
-本地 Agent、MCP 调用方、Android 服务、minisd 客户端是不同调用方。UI 勾选不是安全边界；执行入口必须再检查授权。
+本地 Agent、MCP 调用方、Android 服务和 direct runtime 内部 Root 基础设施是不同调用方。UI 勾选不是安全边界；执行入口必须再检查授权。
 
 未知工具默认拒绝。仅本地的工具不得暴露给 MCP。
 
 ## Root
 
-- `minisd` 是目标上的唯一 Root 执行出口。
-- 标准模式按 App-owned 的结构化风险分类处理 Root 操作：普通操作直接执行，只有 `MUTATING` / `ROOT_SETUP` 最高风险操作进入用户请求；用户拒绝才返回拒绝。`root.exec` 是普通操作的快速路径，不能把它的 `POLICY_DENIED` 直接当成用户确认请求。
-- `root.fullExec` 与 `root.exec` 使用相同的结构化 `{tool,args,timeout_ms,execution_id}`；不得接收原始 `command`。工具只能从可信 Android 系统目录解析，minisd 策略固定为 `confirm`。
-- Confirm 必须保存并绑定**完整 method + params**，一次性，用后作废；参数不匹配、过期或重复使用均立即消耗确认票。
-- 标准模式的最高风险操作在用户请求获准后，以完全相同的结构化请求进入 `root.fullExec`；普通操作不因为快速路径缺少某个工具而触发用户请求。
-- 完全访问只能由用户在 App 设置里打开。开启后 App 层不再按风险拦截或询问，所有 Root 操作都可由 App 自动完成 `root.fullExec` 的内部确认重放；聊天页必须持续显示红色警告。
-- Agent 工具参数不得包含 `access_mode` 或其它模式切换入口；`root.shell` 保持 `LOCAL_ONLY`，Agent 不能自行切换模式。
-- 为安装、启动、探测或修复 minisd/rootfs 而保留的受控 bootstrap/recovery `su -c` 只能执行静态 App-owned 命令；不得承载 Agent 提供的命令或 argv。剩余范围见 `06-CURRENT-GAPS.md`。
+- 当前不存在生产 Root broker / Root RPC。Root 只用于 App 自有 direct Ubuntu 基础设施。
+- `DirectRootRunner` 是 internal launcher，只能执行 App 构造的受控脚本；禁止 Agent、MCP、Provider 或模型输出直接进入它的 Root 命令参数。
+- Root 动作应限制在 rootfs 探测/修复、namespace/bind/chroot、受控 legacy 数据迁移、固定网络代理启动及同类明确基础设施需求。
+- Guest shell 进入 chroot 后必须通过 `setpriv --reuid=<appUid> --regid=<appUid> --clear-groups`，并清空 inheritable、ambient、bounding capabilities。
+- 不允许为了“兼容旧接口”增加任意 root shell、通用 argv/command RPC 或旧 broker shim。
+- Root-provider identity 只是可用性信号；uid=0 不代表 SELinux、mount 或 Linux capability 一定允许操作。
 
-## minisd IPC
+## Root 网络代理
 
-- 私有 Unix socket；生产路径不要用 world-writable 模式。
-- Peer 身份校验；`--once` / skip-peer 不得进入生产启动路径。
-- 有界帧、有界输出、超时杀进程树。
-- `root.exec` 与 `root.fullExec` 的 socket 请求都必须在阻塞 worker 中执行，避免长命令阻塞 broker 接收循环。
-- `uid=0` 的 peer 仍须受方法白名单约束。
+`minis-root-network-proxy` 是单用途 Root helper，不是 daemon command surface。
+
+- 监听固定为 `127.0.0.1:18787`；非该地址启动必须拒绝。
+- 仅接受 HTTP absolute-form 和 CONNECT 出站转发。
+- 不提供 shell、文件系统、配置 RPC、动态插件或命令执行接口。
+- 普通 loopback/private/link-local/broadcast 目标必须拒绝；`198.18.0.0/15` 仅作为明确 VPN Fake-IP 兼容例外。
+- 请求头和并发必须有界；网络错误不得扩大为 Root 命令能力。
 
 ## MCP
 
@@ -40,7 +40,17 @@
 - 密钥不得进仓库、不得经诊断 API 返回。
 - 明文 HTTP 仅允许经应用层显式策略的本地/可信源；NSC 全开不等于策略全开。
 - DebugServer 仅 loopback 且仅 debug 构建。
+- Guest 通过固定 loopback Root proxy 出站不等于允许远程访问该 proxy。
 
 ## Ubuntu 边界
 
-chroot 不是 VM。guest 逃出即宿主机。不要在文档或 UI 里把它宣传成强沙箱。
+chroot 不是 VM。guest 与 Android 共享内核；不要在文档或 UI 里把它宣传成强沙箱。
+
+- Root 建立 namespace/binds/chroot；任意 Agent/guest 代码以 App UID/GID 且无 Linux capabilities 运行。
+- host/guest mounts 必须显式构造；session 数据只能绑定对应 session backing。
+- SAF external mounts 必须按 grant 权限决定 read-only/writable。
+- rootfs 输入必须经过 pin/checksum/manifest 校验；rootfs repair 不得覆盖 App-owned 用户数据。
+
+## 构建边界
+
+runtime payload 是 rootfs-only；Root 网络代理单独构建和验证。构建与发布不得重新引入旧 broker 二进制、socket、manifest 字段或 Android client/protocol 类型。负向 guard 中允许保留这些字符串，用来阻止回归。

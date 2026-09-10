@@ -2,9 +2,10 @@ package com.openminis.app.sandbox
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.runtime.minisd.WorkspaceFileClient
+import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.runtime.terminal.PtyBackend
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
+import com.openminis.app.runtime.ubuntu.UbuntuKernel
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -64,10 +65,23 @@ class TerminalSession internal constructor(
         CoroutineScope(SupervisorJob() + Dispatchers.IO),
         { sessionId ->
             if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context.applicationContext)
-            prepareLaunch(sessionId, context.applicationInfo.uid,
-                { UbuntuRuntime.ensureReady() },
-                { WorkspaceFileClient.info(it, "/workspace"); Unit },
-                { UbuntuRuntime.findSu() })
+            val ready = UbuntuRuntime.ensureReady()
+            check(ready.statusFresh && ready.running && ready.lastError == null) {
+                ready.lastError ?: "Ubuntu runtime is not ready"
+            }
+            WorkspaceFileClient.info(sessionId, "/workspace")
+            val direct = UbuntuKernel.prepareLaunch(sessionId, interactive = true)
+            Launch(
+                cmd = direct.argv.first(),
+                argv = direct.argv.toTypedArray(),
+                env = arrayOf(
+                    "TERM=xterm-256color",
+                    "LANG=C.UTF-8",
+                    "LC_ALL=C.UTF-8",
+                    "HOME=/home/minis",
+                    "MINIS_CHAT_SESSION_ID=${sessionId.orEmpty()}",
+                ),
+            )
         },
         NativePtyBackend,
     )
@@ -83,39 +97,6 @@ class TerminalSession internal constructor(
         fun broadcastTimezone(tz: String) = Unit
         fun broadcastProxy(env: Map<String, String>) = Unit
 
-        internal suspend fun prepareLaunch(
-            sessionId: String?,
-            appUid: Int,
-            ensureReady: suspend () -> UbuntuRuntime.Snapshot,
-            prepareWorkspace: suspend (String?) -> Unit,
-            findSu: () -> String?,
-        ): Launch {
-            require(sessionId == null || UbuntuPaths.isSafeSessionId(sessionId)) { "Invalid terminal session id" }
-            val ready = ensureReady()
-            check(ready.statusFresh && ready.running && !ready.mock && ready.lastError == null) {
-                ready.lastError ?: "Ubuntu runtime is not ready"
-            }
-            check(appUid > 0 && ready.guestUid == appUid && ready.guestGid == appUid) {
-                "Ubuntu runtime identity does not match the app"
-            }
-            val pid = checkNotNull(ready.pid?.takeIf { it > 0 }) { "Ubuntu keeper pid is missing" }
-            // The broker creates and validates all canonical session directories.
-            prepareWorkspace(sessionId)
-            val su = checkNotNull(findSu()) { "Root launcher is unavailable" }
-            val script = buildLaunchScript(appUid, appUid, pid, sessionId)
-            return Launch(su, arrayOf(su, "-c", script), arrayOf(
-                "TERM=xterm-256color", "LANG=C.UTF-8", "LC_ALL=C.UTF-8", "HOME=/home/minis",
-                "PATH=/system/bin:/system/xbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                "MINIS_CHAT_SESSION_ID=${sessionId.orEmpty()}",
-            ))
-        }
-
-        internal fun buildLaunchScript(guestUid: Int, guestGid: Int, keeperPid: Int, sessionId: String?): String {
-            require(guestUid > 0 && guestGid > 0 && keeperPid > 0)
-            require(sessionId == null || UbuntuPaths.isSafeSessionId(sessionId))
-            val sessionArg = sessionId?.let { " --session-root '${UbuntuPaths.HOST_MINIS}/sessions/$it'" }.orEmpty()
-            return "exec /data/adb/minis/bin/minisd --helper exec --pid $keeperPid --rootfs /data/adb/minis/rootfs$sessionArg --uid $guestUid --gid $guestGid --cwd /workspace -- /bin/bash -l"
-        }
     }
 
     enum class State { IDLE, BOOTING, RUNNING, STOPPED }

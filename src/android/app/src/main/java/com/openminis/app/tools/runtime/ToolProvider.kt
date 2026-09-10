@@ -10,7 +10,7 @@ import com.openminis.app.tools.ToolExecutionResult
  * pass-through.
  *
  * Providers must stay pure logic: no imports of runtime singletons
- * (UbuntuRuntime / MinisdClient). Availability checks are constructor-injected
+ * (UbuntuRuntime / App-owned direct backend). Availability checks are constructor-injected
  * so JVM unit tests stay green.
  */
 interface ToolProvider {
