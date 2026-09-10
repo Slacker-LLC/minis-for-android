@@ -11,8 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
  * One-time tool approval seam (DeepSeek Harness dsh-user-approval contract,
  * Android port).
  *
- * Dangerous operations (destructive shell commands, etc.) declare themselves
- * through [request]; the seam asks the user (phone UI / Web Remote), returns
+ * Operations that require one-time consent declare themselves through
+ * [request]; the seam asks the user (phone UI / Web Remote), returns
  * allowed-once | rejected | cancelled | unavailable, and records an audit
  * pair (asked/decided) in the log. Policy is ask | never; "never" rejects
  * without asking. Missing responders close as cancelled/unavailable.
@@ -57,10 +57,10 @@ object ApprovalSeam {
     }
 
     /**
-     * Request a one-time approval for a dangerous operation. Returns
-     * allowed-once when answered positively, otherwise rejected / cancelled
-     * (timeout) / unavailable (no responder in time). Never throws except for
-     * structured coroutine cancellation from the caller.
+     * Request a one-time approval for an operation. Returns allowed-once when
+     * answered positively, otherwise rejected / cancelled (timeout) /
+     * unavailable (no responder in time). Never throws except for structured
+     * coroutine cancellation from the caller.
      */
     suspend fun request(
         context: Context,
@@ -113,36 +113,5 @@ object ApprovalSeam {
             req.deferred.complete(false)
             pending.remove(req.id)
         }
-    }
-}
-
-/**
- * Detects destructive shell commands that should go through the approval
- * seam. Conservative regex list: only clearly destructive patterns, to avoid
- * false positives on legitimate work (e.g. `rm file.txt` is fine,
- * `rm -rf /` is not).
- */
-object DangerousCommandPolicy {
-    private val DANGEROUS_PATTERNS = listOf(
-        Regex("""\brm\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\s+(/|/\*|~)""", RegexOption.IGNORE_CASE),
-        Regex("""\bmkfs\b""", RegexOption.IGNORE_CASE),
-        Regex("""\bdd\s+.*of=/dev/""", RegexOption.IGNORE_CASE),
-        Regex("""\b:\(\)\s*\{\s*:\|:&\s*\}\s*;\s*:"""),
-        Regex("""\b>\s*/dev/sd"""),
-        Regex("""\bshutdown\b|\breboot\b|\bpoweroff\b""", RegexOption.IGNORE_CASE),
-        Regex("""\bchmod\s+[-+]?[0-7]{3,4}\s+/""", RegexOption.IGNORE_CASE),
-        Regex("""\bcurl\s+.*\|\s*(sudo\s+)?(sh|bash)\s*$""", RegexOption.IGNORE_CASE),
-    )
-
-    /** Returns a human-readable reason when [command] is dangerous, else null. */
-    fun dangerousReason(command: String): String? {
-        val c = command.trim()
-        if (c.isEmpty()) return null
-        for (pattern in DANGEROUS_PATTERNS) {
-            if (pattern.containsMatchIn(c)) {
-                return "matches dangerous pattern: " + pattern.pattern.take(60)
-            }
-        }
-        return null
     }
 }
