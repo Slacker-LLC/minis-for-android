@@ -45,10 +45,6 @@ object ExternalMountCoordinator {
         val entry = store.entries.value.firstOrNull { it.name == name } ?: return false
         return !entry.isActive || !entry.effectiveWritable
     }
-
-    /** Compatibility seam for callers that still ask for legacy bind specs. */
-    @Suppress("UNUSED_PARAMETER")
-    fun bindMountSpecs(store: MountedFoldersStore): List<Pair<String, String>> = emptyList()
 }
 
 /**
