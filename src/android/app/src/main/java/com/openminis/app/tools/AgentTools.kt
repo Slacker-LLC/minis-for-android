@@ -47,9 +47,10 @@ object AgentTools {
     }
 
     // Upstream tool contract with only the Linux backend description adapted
-    // from Alpine/PRoot to the fork's Ubuntu/Root runtime.
-    private fun shellExecuteDefinition(): AgentToolDefinition = AgentToolDefinition(
-        name = "shell_execute",
+    // from Alpine/PRoot to the fork's Ubuntu/Root runtime. The optional name is
+    // retained only for the fork's compatibility registry while it is removed.
+    fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
+        name = name,
         description = "Execute a command in the on-device Ubuntu Linux environment (Root chroot). " +
             "The command runs via /bin/bash -lc with stdout and stderr merged. " +
             "Default timeout is 15 minutes.",
