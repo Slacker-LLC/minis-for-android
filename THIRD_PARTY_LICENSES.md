@@ -2,27 +2,30 @@
 
 Minis for Android contains code derived from [OpenMinis/OpenMinis](https://github.com/OpenMinis/OpenMinis) and uses additional third-party open-source components.
 
-This file is a project-level inventory, not a substitute for the license files shipped by each dependency. Exact dependency versions remain authoritative in Gradle, Cargo, vendored source, and lock files.
+This file is a project-level inventory, not a substitute for license files shipped by each dependency. Exact dependency versions remain authoritative in Gradle, Cargo, vendored source, Go modules, generated rootfs package metadata, and lock/sum files.
 
-## Project and upstream license
+## Project and source-lineage license
 
-OpenMinis is distributed under GPL-3.0. Minis for Android is a derivative work and continues to be distributed under **GPL-3.0**. Removing upstream iOS code or replacing the upstream Android PRoot runtime does not remove the GPL obligations that apply to the derived application code.
+OpenMinis is distributed under GPL-3.0. Minis for Android is a derivative work and continues to be distributed under **GPL-3.0**. Replacing earlier Android runtime implementations does not remove GPL obligations that apply to derived application code.
 
-When distributing a modified APK, provide the corresponding source and preserve applicable copyright/license notices.
+When distributing a modified APK, provide corresponding source and preserve applicable copyright/license notices.
 
-See also [PROVENANCE.md](PROVENANCE.md) and [LICENSE](LICENSE).
+See [PROVENANCE.md](PROVENANCE.md) and [LICENSE](LICENSE).
 
 ## Active native/runtime components
 
-| Component | Source | License | Use |
+| Component | Source | License | Current use |
 |---|---|---|---|
-| `minisd` | this repository, `src/native/minisd/` | GPL-3.0 with project | Root broker / chroot setup |
-| serde / serde_json | Cargo.lock | MIT OR Apache-2.0 | JSON protocol |
-| libc (Rust crate) | Cargo.lock | MIT OR Apache-2.0 | low-level Linux/Unix calls |
-| Ubuntu 24.04 Base | Ubuntu project | aggregate package licenses | generated rootfs userspace |
+| `minis-root-network-proxy` | this repository, `src/native/root-network-proxy/` | GPL-3.0-only | fixed loopback HTTP/CONNECT network compatibility helper |
+| rclone v1.75.0 mobile binding | `deps/rclone-mobile/`, upstream `rclone/rclone` | MIT for rclone core; transitive modules retain their own licenses | Android remote-transfer binding |
+| Ubuntu 24.04 Base | Ubuntu project | aggregate package licenses | generated Direct Ubuntu rootfs userspace |
 | cppjieba | vendored Android native source | MIT | word segmentation |
 
-The Ubuntu rootfs is a generated build artifact. Its packages retain their own licenses and notices.
+The current `minis-root-network-proxy` Cargo manifest has no third-party crate dependencies; it uses the Rust standard library. The helper may be launched with privileged identity on Android for UID/VPN/BPF egress compatibility, but HTTP/CONNECT proxying itself is not inherently a Root requirement.
+
+The rclone mobile module currently pins `github.com/rclone/rclone v1.75.0`; `deps/rclone-mobile/go.mod` and `go.sum` are authoritative for its transitive module graph. Those transitive dependencies keep their own licenses and notices.
+
+The Ubuntu rootfs is a generated build artifact. Packages inside it retain their individual licenses and notices.
 
 ## Android dependencies
 
@@ -49,18 +52,19 @@ Use `src/android/app/build.gradle.kts` and Gradle dependency reports for the cur
 | KaTeX | Android app assets | MIT |
 | cppjieba dictionaries | Android app assets | MIT / upstream distribution terms |
 
-## Removed or historical components
+## Removed or historical runtime components
 
-The current Android execution architecture does not build or ship the historical Alpine + PRoot runtime. Older Git history and archived documents may still mention:
+The current Android execution architecture does **not** build or ship the former privileged `minisd` broker or the earlier Alpine/PRoot runtime. Older Git history, archived documents, Issue implementation records, and regression tests may still mention:
 
+- `minisd` and its former Rust dependencies/protocol path;
 - OpenMinis/Termux PRoot and ELF loaders (GPL-2.0);
 - talloc (LGPL-3.0-or-later);
 - Alpine Linux minirootfs;
 - iSH and iOS-only dependencies removed from this Android-focused tree;
 - historical Web Remote assets and associated web tooling.
 
-Those historical references must not be read as a statement that the components are part of the current Android artifact.
+These historical references do not mean those components are part of the current APK/runtime payload.
 
 ## Verification
 
-Before publishing binaries, verify the final dependency graph and bundled assets against this inventory. If a dependency is added, removed, or relicensed, update this file in the same change.
+Before publishing binaries, verify the final Gradle/Cargo/Go dependency graphs, generated Ubuntu rootfs package notices, and bundled assets against this inventory. If a dependency is added, removed, upgraded, or relicensed, update this file in the same change.
