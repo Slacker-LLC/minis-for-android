@@ -51,11 +51,7 @@ object FileReadTool {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
 
-            val info = if (ExternalMountAccess.isPath(path)) {
-                ExternalMountAccess.info(path)
-            } else {
-                WorkspaceFileClient.info(sessionId, path)
-            }
+            val info = WorkspaceFileClient.info(sessionId, path)
             if (!info.optBoolean("exists", false)) {
                 return ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
             }
@@ -64,15 +60,11 @@ object FileReadTool {
             }
             val size = info.optLong("size", 0L)
 
-            val fileBytes = if (ExternalMountAccess.isPath(path)) {
-                ExternalMountAccess.read(path, 50L * 1024 * 1024)
-            } else {
-                WorkspaceFileClient.readAll(
-                    sessionId = sessionId,
-                    path = path,
-                    maxBytes = 50L * 1024 * 1024,
-                )
-            }
+            val fileBytes = WorkspaceFileClient.readAll(
+                sessionId = sessionId,
+                path = path,
+                maxBytes = 50L * 1024 * 1024,
+            )
 
             // Binary detection: check first 8192 bytes for null bytes.
             val isBinary = fileBytes.take(8192).any { it == 0.toByte() }
