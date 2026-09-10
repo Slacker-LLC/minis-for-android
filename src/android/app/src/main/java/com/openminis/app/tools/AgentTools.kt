@@ -10,6 +10,7 @@ import com.openminis.app.data.model.AgentToolParam
  * Tool definitions aligned with iOS AIChatViewModel.makeAgentTools().
  */
 object AgentTools {
+    private val BOT_COORDINATION_TOOL_NAMES = setOf("delegate_bot", "list_bots", "check_delegation")
 
     fun makeAgentTools(
         supportsImageInput: Boolean = true,
@@ -27,28 +28,71 @@ object AgentTools {
         // attempt those calls. Mirrors the iOS gate at
         // AIChatViewModel.makeAgentTools(memoryEnabled:).
         memoryEnabled: Boolean = true,
-        // Temporary source-compatibility parameters while fork-only preset/Bot
-        // call sites are removed. They intentionally do not alter tool exposure.
-        presetToolset: Any? = null,
+        /**
+         * Agent preset's real tool configuration: `CORE` (minimal mode)
+         * exposes only the persistent shell + file triad; `FULL` keeps the
+         * whole capability set.
+         */
+        presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
+            com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
         botEnabled: Boolean = false,
     ): List<AgentToolDefinition> = buildList {
         add(shellExecuteDefinition())
         add(FileReadTool.definition())
         add(FileWriteTool.definition())
         add(FileEditTool.definition())
+
+        if (presetToolset == com.openminis.app.remote.AgentPresetRegistry.Toolset.CORE) {
+            // Bot coordination is part of the Bot identity contract, so a
+            // minimal Bot session must still be able to list/delegate/check.
+            if (botEnabled) {
+                addAll(
+                    com.openminis.app.tools.runtime.ToolRegistry.definitions()
+                        .filter { it.name in BOT_COORDINATION_TOOL_NAMES },
+                )
+            }
+            return@buildList
+        }
+
+        // These are intentional fork product capabilities. They reuse the
+        // existing runtime/permission/checkpoint seams rather than creating a
+        // parallel Ubuntu execution path.
+        addAll(com.openminis.app.tools.android.AndroidAgentTools.definitions())
         if (supportsImageInput || visionGroupConfigured) {
             add(ReadImageTool.definition())
         }
         add(browserUseDefinition())
+        add(subagentDefinition())
+        add(RalphTool.definition())
+        add(askUserQuestionDefinition())
+        add(getGoalDefinition())
+        add(createGoalDefinition())
+        add(updateGoalDefinition())
+        add(todoWriteDefinition())
+        add(JobTools.jobOutputDefinition())
+        add(JobTools.jobListDefinition())
+        add(JobTools.jobKillDefinition())
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
         }
+
+        // ToolRegistry owns canonical fork runtime schemas. Legacy definitions
+        // above retain their model-facing names; add only canonical handlers
+        // not already represented, while respecting the Bot identity gate.
+        val legacyCanonicals = mapNotNull {
+            com.openminis.app.tools.runtime.ToolRegistry.canonicalName(it.name)
+        }.toSet()
+        addAll(
+            com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
+                it.name !in legacyCanonicals && (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES)
+            },
+        )
     }
 
-    // Upstream tool contract with only the Linux backend description adapted
-    // from Alpine/PRoot to the fork's Ubuntu/Root runtime. The optional name is
-    // retained only for the fork's compatibility registry while it is removed.
+    // Upstream shell contract with only the Linux backend description adapted
+    // from Alpine/PRoot to the fork's Ubuntu/Root runtime. ToolRegistry reuses
+    // the same schema under its canonical linux.shell name.
     fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
         name = name,
         description = "Execute a command in the on-device Ubuntu Linux environment (Root chroot). " +
@@ -85,8 +129,7 @@ object AgentTools {
             "Use tab_id to target a specific tab (defaults to the most recently used tab).",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Open Wikipedia homepage', 'Take screenshot of current page'). Use the same language as the user."),
-            "action" to AgentToolParam("string", "The browser action to perform",
-                enumValues = BrowserAction.allValues),
+            "action" to AgentToolParam("string", "The browser action to perform", enumValues = BrowserAction.allValues),
             "url" to AgentToolParam("string", "URL to navigate to (for navigate action) or resource to download (for fetch action)"),
             "selector" to AgentToolParam("string", "CSS selector for targeting elements (click, type, get_text, scroll, hover, find_elements). For scroll: specify a scrollable container to scroll (e.g. 'div.timeline'); if omitted, auto-detects the best scrollable element."),
             "text" to AgentToolParam("string", "Text to type (for type action)"),
@@ -112,7 +155,6 @@ object AgentTools {
         propertyOrdering = listOf("tool_title", "action", "tab_id", "url", "selector", "text", "coordinate_x", "coordinate_y", "direction", "amount", "scroll_count", "item_selector", "script", "user_agent", "max_depth", "keywords", "fuzzy", "cookies", "timeout", "viewport_width", "viewport_height", "reset"),
     )
 
-    // Aligned with iOS AIChatViewModel.swift:5059-5067
     private fun memoryWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_write",
         description = "Write a memory entry to today's daily log (YYYY-MM-DD.md). Memories persist across all sessions. " +
@@ -128,7 +170,6 @@ object AgentTools {
         propertyOrdering = listOf("tool_title", "content"),
     )
 
-    // Aligned with iOS AIChatViewModel.swift:5069-5078
     private fun memoryGetDefinition(): AgentToolDefinition = AgentToolDefinition(
         name = "memory_get",
         description = "Retrieve memories from persistent storage. Supports keyword-based fuzzy search across memory files. " +
@@ -140,5 +181,117 @@ object AgentTools {
         ),
         required = listOf("tool_title"),
         propertyOrdering = listOf("tool_title", "scope", "keywords"),
+    )
+
+    private fun subagentDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "subagent",
+        description = "Delegate a self-contained sub-task to a child agent that runs in its own session with its own context, " +
+            "then return only its final answer. Use this for work that would otherwise flood your own context with " +
+            "intermediate output — searching across many files, reading long logs, exploring an unfamiliar codebase, " +
+            "or any independent investigation whose details you do not need to keep. " +
+            "The child CANNOT see this conversation: write `prompt` as a complete, standalone task including all needed " +
+            "paths, names and constraints, and state exactly what it should report back. " +
+            "The child has the same tools you do (shell, file read/write/edit, browser). " +
+            "Do NOT delegate trivial work you can finish in one step, and do not delegate something that needs your " +
+            "in-flight context. Delegation is capped at 3 levels deep.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the delegated task, shown to the user (e.g. 'Search codebase for auth logic'). Use the same language as the user."),
+            "prompt" to AgentToolParam("string", "The complete, self-contained task for the child agent, including every path/name/constraint it needs and exactly what to report back. It has no access to the current conversation."),
+        ),
+        required = listOf("tool_title", "prompt"),
+        propertyOrdering = listOf("tool_title", "prompt"),
+    )
+
+    private fun askUserQuestionDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = AskUserQuestionTool.NAME,
+        description = "Pause and ask the user a concise question when you need confirmation, a choice, or missing " +
+            "information to continue. The user answers through the web UI and the answer comes back as a structured " +
+            "tool result. Use sparingly: one question at a time, only when you truly cannot proceed with a " +
+            "reasonable assumption. Never use it for rhetorical questions or things you can decide yourself.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of the question, shown to the user."),
+            "question" to AgentToolParam("string", "The question to ask the user, in the user's language."),
+            "options" to AgentToolParam(
+                type = "array",
+                description = "Optional answer choices. Each item: {label, value, recommended?}. Omit for free-form questions.",
+                items = AgentToolParam(
+                    type = "object",
+                    description = "One answer choice.",
+                    properties = mapOf(
+                        "label" to AgentToolParam("string", "Human-readable label shown to the user."),
+                        "value" to AgentToolParam("string", "Stable machine-readable value returned to you."),
+                        "recommended" to AgentToolParam("boolean", "Optional hint shown to the user."),
+                    ),
+                    requiredProperties = listOf("label", "value"),
+                ),
+            ),
+            "multiple" to AgentToolParam("boolean", "Allow multiple selections (default false)."),
+            "allowCustom" to AgentToolParam("boolean", "Allow a free-form custom answer (default true)."),
+            "timeoutMinutes" to AgentToolParam("integer", "How long to wait for the user (1-30, default 10)."),
+        ),
+        required = listOf("tool_title", "question"),
+        propertyOrdering = listOf("tool_title", "question", "options", "multiple", "allowCustom", "timeoutMinutes"),
+    )
+
+    private fun getGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "get_goal",
+        description = "Return the current session goal (text and active/paused state), or state that none is set.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of this call, shown to the user."),
+        ),
+        required = listOf("tool_title"),
+        propertyOrdering = listOf("tool_title"),
+        timeoutMs = 10_000L,
+    )
+
+    private fun createGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "create_goal",
+        description = "Set a new goal for this session. Use when the user states a clear target to work toward; " +
+            "the goal stays visible in the web UI until changed or cleared.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the goal, shown to the user."),
+            "goal" to AgentToolParam("string", "The goal text, in the user's language."),
+        ),
+        required = listOf("tool_title", "goal"),
+        propertyOrdering = listOf("tool_title", "goal"),
+        timeoutMs = 10_000L,
+    )
+
+    private fun updateGoalDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "update_goal",
+        description = "Replace the current session goal with new text. Use when the user refines the target.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the change, shown to the user."),
+            "goal" to AgentToolParam("string", "The new goal text, in the user's language."),
+        ),
+        required = listOf("tool_title", "goal"),
+        propertyOrdering = listOf("tool_title", "goal"),
+    )
+
+    private fun todoWriteDefinition(): AgentToolDefinition = AgentToolDefinition(
+        name = "todo_write",
+        description = "Replace the session's todo list in one atomic call. Send the COMPLETE list every time — " +
+            "there are no partial updates. Use for multi-step work so the user can track progress in the web UI. " +
+            "Status values: pending / in_progress / completed / skipped.",
+        parameters = mapOf(
+            "tool_title" to AgentToolParam("string", "Short summary of the list change, shown to the user."),
+            "todos" to AgentToolParam(
+                type = "array",
+                description = "Full todo list. Each item: {title, status?, id?}.",
+                items = AgentToolParam(
+                    type = "object",
+                    description = "One todo item.",
+                    properties = mapOf(
+                        "title" to AgentToolParam("string", "Task description."),
+                        "status" to AgentToolParam("string", "pending / in_progress / completed / skipped."),
+                        "id" to AgentToolParam("string", "Stable item id (keep existing ids when updating)."),
+                    ),
+                    requiredProperties = listOf("title"),
+                ),
+            ),
+        ),
+        required = listOf("tool_title", "todos"),
+        propertyOrdering = listOf("tool_title", "todos"),
+        timeoutMs = 10_000L,
     )
 }
