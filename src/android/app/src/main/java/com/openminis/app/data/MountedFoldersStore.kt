@@ -336,16 +336,12 @@ class MountedFoldersStore(private val context: Context) {
         val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return null
         val parts = docId.split(':', limit = 2)
         val volume = parts.firstOrNull().orEmpty()
-        if (volume != "primary" && !isStorageUuid(volume)) return null
+        if (volume != "primary" && !isSafeStorageVolumeId(volume)) return null
         val relative = parts.getOrNull(1).orEmpty()
         val segments = if (relative.isEmpty()) emptyList() else relative.split('/')
         if (segments.any { !isSafeSegment(it) }) return null
-        return MountIdentity(volume = volume.lowercase(), pathSegments = segments)
+        return MountIdentity(volume = volume, pathSegments = segments)
     }
-
-    private fun isStorageUuid(value: String): Boolean =
-        Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-            .matches(value)
 
     private fun isSafeSegment(value: String): Boolean =
         value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
@@ -446,6 +442,11 @@ class MountedFoldersStore(private val context: Context) {
         private val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }
+
+/** Accept an opaque StorageVolume UUID string while keeping the /storage fallback path safe. */
+internal fun isSafeStorageVolumeId(value: String): Boolean =
+    value.isNotEmpty() && value.length <= 128 && value != "." && value != ".." &&
+        !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
 
 /**
  * SAF helper — call [buildPickerIntent] from an `ActivityResultContract`,
