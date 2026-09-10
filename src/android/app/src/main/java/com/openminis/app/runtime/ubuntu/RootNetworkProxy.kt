@@ -56,7 +56,7 @@ internal object RootNetworkProxy {
             ProcessBuilder(su, "-c", command)
                 .redirectErrorStream(true)
                 .start()
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             return@withLock Status(false, "cannot start Root network proxy: ${error.message}")
         }
         process = child
@@ -116,7 +116,7 @@ internal object RootNetworkProxy {
             socket.connect(InetSocketAddress("127.0.0.1", 18787), 150)
         }
         true
-    } catch (_: Throwable) {
+    } catch (_: Exception) {
         false
     }
 }
