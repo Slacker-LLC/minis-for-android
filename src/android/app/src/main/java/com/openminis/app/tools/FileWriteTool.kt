@@ -5,6 +5,7 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.tools.internal.FileMutationQueue
 import org.json.JSONObject
 
 object FileWriteTool {
@@ -65,24 +66,27 @@ object FileWriteTool {
                 return ToolExecutionResult("Error: Content is not valid UTF-8", false, toolTitle = toolTitle)
             }
 
-            // PRootKernel.resolveSessionHostPath is replaced only at this I/O
-            // boundary. WorkspaceFileClient keeps the upstream per-session file
-            // model while resolving paths against the Ubuntu chroot workspace.
-            val bytes = if (ExternalMountAccess.isPath(path)) {
-                ExternalMountAccess.write(path, contentBytes, append)
-            } else if (append) {
-                WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
-            } else {
-                WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)
-            }
+            // Same-target mutations must see a serialized file state. This is
+            // independent of whether the storage backend is Ubuntu workspace or
+            // an explicitly exposed external mount.
+            FileMutationQueue.withKey("$sessionId\u0000$path") {
+                val externalMountPath = ExternalMountAccess.isPath(path)
+                val bytes = if (externalMountPath) {
+                    ExternalMountAccess.write(path, contentBytes, append)
+                } else if (append) {
+                    WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
+                } else {
+                    WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)
+                }
 
-            if (ExternalMountAccess.isPath(path)) {
-                com.openminis.app.logging.AppLogger.info(
-                    "FileWrite",
-                    "mount write path=$path bytes=$bytes via=external-mount",
-                )
+                if (externalMountPath) {
+                    com.openminis.app.logging.AppLogger.info(
+                        "FileWrite",
+                        "mount write path=$path bytes=$bytes via=external-mount",
+                    )
+                }
+                ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)
             }
-            ToolExecutionResult("Wrote to $path ($bytes bytes)", true, toolTitle = toolTitle)
         } catch (e: Exception) {
             ToolExecutionResult("Error writing file: ${e.message}", false)
         }
