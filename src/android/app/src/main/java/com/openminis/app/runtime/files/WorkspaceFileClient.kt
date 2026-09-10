@@ -245,12 +245,14 @@ internal object WorkspaceFileClient {
         if (!sourceFile.exists()) throw Failure("NOT_FOUND", "source does not exist: $source")
         val destinationFile = resolveRequired(destinationSessionId ?: sessionId, destination)
         destinationFile.parentFile?.mkdirs()
-        if (destinationFile.exists() && !destinationFile.deleteRecursively()) {
+        if (SafeFileTree.existsNoFollow(destinationFile) && !SafeFileTree.deleteRecursively(destinationFile)) {
             throw Failure("IO_ERROR", "cannot replace destination: $destination")
         }
         if (!sourceFile.renameTo(destinationFile)) {
             copyEntry(sourceFile, destinationFile)
-            if (!sourceFile.deleteRecursively()) throw Failure("IO_ERROR", "cannot remove source after copy: $source")
+            if (!SafeFileTree.deleteRecursively(sourceFile)) {
+                throw Failure("IO_ERROR", "cannot remove source after copy: $source")
+            }
         }
         JSONObject().put("moved", true).put("type", fileType(destinationFile))
     }
@@ -266,7 +268,7 @@ internal object WorkspaceFileClient {
     suspend fun deleteSession(sessionId: String): JSONObject = withContext(Dispatchers.IO) {
         if (!UbuntuPaths.isSafeSessionId(sessionId)) throw Failure("BAD_PARAMS", "invalid session id")
         val target = UbuntuPaths.sessionDir(sessionId) ?: throw Failure("BAD_PARAMS", "invalid session path")
-        val deleted = !target.exists() || target.deleteRecursively()
+        val deleted = SafeFileTree.deleteRecursively(target)
         if (!deleted) throw Failure("IO_ERROR", "cannot delete session $sessionId")
         JSONObject().put("deleted", true)
     }
@@ -276,8 +278,8 @@ internal object WorkspaceFileClient {
     suspend fun delete(sessionId: String?, path: String): JSONObject = withContext(Dispatchers.IO) {
         requireWritablePath(path)
         val target = resolveRequired(sessionId, path)
-        if (!target.exists()) return@withContext JSONObject().put("deleted", false)
-        if (!target.deleteRecursively()) throw Failure("IO_ERROR", "cannot delete: $path")
+        if (!SafeFileTree.existsNoFollow(target)) return@withContext JSONObject().put("deleted", false)
+        if (!SafeFileTree.deleteRecursively(target)) throw Failure("IO_ERROR", "cannot delete: $path")
         JSONObject().put("deleted", true)
     }
 
@@ -411,16 +413,28 @@ internal object WorkspaceFileClient {
 
     private fun copyEntry(source: File, destination: File) {
         if (source.canonicalPath == destination.canonicalPath) return
+        if (SafeFileTree.isSymbolicLink(source)) {
+            throw Failure("BAD_PARAMS", "refusing to recursively copy symbolic link: $source")
+        }
+        if (SafeFileTree.isSymbolicLink(destination)) {
+            if (!SafeFileTree.deleteRecursively(destination)) {
+                throw Failure("IO_ERROR", "cannot replace symbolic-link destination: $destination")
+            }
+        }
         destination.parentFile?.mkdirs()
         if (source.isDirectory) {
-            if (destination.exists() && !destination.isDirectory) {
-                if (!destination.delete()) throw Failure("IO_ERROR", "cannot replace $destination")
+            if (SafeFileTree.existsNoFollow(destination) && !destination.isDirectory) {
+                if (!SafeFileTree.deleteRecursively(destination)) {
+                    throw Failure("IO_ERROR", "cannot replace $destination")
+                }
             }
             if (!destination.isDirectory && !destination.mkdirs()) throw Failure("IO_ERROR", "cannot create $destination")
             source.listFiles()?.forEach { child -> copyEntry(child, File(destination, child.name)) }
                 ?: throw Failure("IO_ERROR", "cannot list $source")
         } else if (source.isFile) {
-            val temp = File(destination.parentFile, ".${destination.name}.minis-tmp-${UUID.randomUUID()}")
+            val parent = destination.parentFile
+                ?: throw Failure("BAD_PARAMS", "destination has no parent: $destination")
+            val temp = File(parent, ".${destination.name}.minis-tmp-${UUID.randomUUID()}")
             FileInputStream(source).use { input ->
                 FileOutputStream(temp).use { output ->
                     input.copyTo(output, MAX_WRITE_CHUNK)
@@ -434,7 +448,7 @@ internal object WorkspaceFileClient {
     }
 
     private fun replaceFile(temporary: File, destination: File) {
-        if (destination.exists() && !destination.deleteRecursively()) {
+        if (SafeFileTree.existsNoFollow(destination) && !SafeFileTree.deleteRecursively(destination)) {
             temporary.delete()
             throw Failure("IO_ERROR", "cannot replace destination: $destination")
         }
@@ -446,7 +460,7 @@ internal object WorkspaceFileClient {
                         output.fd.sync()
                     }
                 }
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 destination.delete()
                 throw Failure("IO_ERROR", "cannot commit file: ${error.message}")
             } finally {
