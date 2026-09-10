@@ -40,6 +40,17 @@ object FileEditTool {
                 return ToolExecutionResult("Error: 'old_string' is required and cannot be empty", false, toolTitle = toolTitle)
             }
 
+            // Per-session permission preset (DSH /permission) gate. This is a
+            // product security boundary and must stay independent of the Linux
+            // backend implementation.
+            if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
+                return ToolExecutionResult(
+                    "Error: session permission preset `workspace-write` only allows writing under " +
+                        "/var/minis/workspace (and per-session /var/minis/* dirs); refusing to edit $path.",
+                    false, toolTitle = toolTitle,
+                )
+            }
+
             // Upstream read-only mount behavior, routed through the Ubuntu/Root
             // runtime path registry instead of PRootKernel.
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
