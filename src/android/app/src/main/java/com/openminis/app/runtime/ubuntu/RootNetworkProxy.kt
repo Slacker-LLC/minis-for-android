@@ -35,18 +35,23 @@ internal object RootNetworkProxy {
     @Volatile
     private var process: Process? = null
 
+    /** True only after the currently owned child itself announced a successful bind. */
+    @Volatile
+    private var processReady: Boolean = false
+
     suspend fun ensureReady(context: Context): Status = lock.withLock {
         process?.let { child ->
-            if (child.isAlive && listenerReady()) {
+            if (processReady && child.isAlive && listenerReady()) {
                 return@withLock Status(true)
             }
             runCatching { child.destroyForcibly() }
             process = null
+            processReady = false
         }
 
-        // A loopback listener without our live Process handle is not evidence
-        // that the trusted Root proxy is running. Treat an occupied port as a
-        // conflict instead of silently trusting another local process.
+        // A loopback listener without our live, READY-confirmed Process handle
+        // is not evidence that the trusted Root proxy is running. Treat an
+        // occupied port as a conflict instead of trusting another local process.
         if (listenerReady()) {
             return@withLock Status(false, "$PROXY_LISTEN is already occupied by an unmanaged listener")
         }
@@ -68,6 +73,7 @@ internal object RootNetworkProxy {
             return@withLock Status(false, "cannot start Root network proxy: ${error.message}")
         }
         process = child
+        processReady = false
         try {
             child.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
                 writer.write(authToken)
@@ -77,13 +83,21 @@ internal object RootNetworkProxy {
         } catch (error: Exception) {
             runCatching { child.destroyForcibly() }
             process = null
+            processReady = false
             return@withLock Status(false, "cannot authenticate Root network proxy startup: ${error.message}")
         }
         Thread({
-            runCatching {
+            try {
                 child.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { Log.d(TAG, it) }
+                    lines.forEach { line ->
+                        if (isReadyAnnouncement(line) && process === child) {
+                            processReady = true
+                        }
+                        Log.d(TAG, line)
+                    }
                 }
+            } catch (_: Exception) {
+                // Child exit or pipe teardown is observed by the lifecycle poll/next readiness check.
             }
         }, "minis-root-network-proxy-log").apply {
             isDaemon = true
@@ -92,20 +106,30 @@ internal object RootNetworkProxy {
 
         repeat(80) {
             if (!child.isAlive) {
-                process = null
+                if (process === child) {
+                    process = null
+                    processReady = false
+                }
                 return@withLock Status(false, "Root network proxy exited before becoming ready")
             }
-            if (listenerReady()) return@withLock Status(true)
+            // The TCP probe alone is insufficient: another local process could
+            // win the bind race after our preflight check. Trust the listener
+            // only after this exact child emitted READY after its successful bind.
+            if (processReady && listenerReady() && child.isAlive) return@withLock Status(true)
             delay(25)
         }
         runCatching { child.destroyForcibly() }
-        process = null
+        if (process === child) {
+            process = null
+            processReady = false
+        }
         Status(false, "Root network proxy did not bind $PROXY_LISTEN")
     }
 
     suspend fun stop() = lock.withLock {
         val child = process ?: return@withLock
         process = null
+        processReady = false
         runCatching { child.destroy() }
         repeat(20) {
             if (!child.isAlive && !listenerReady()) return@withLock
@@ -136,6 +160,8 @@ internal object RootNetworkProxy {
         }
         return "http://$PROXY_USER:$token@$PROXY_LISTEN"
     }
+
+    internal fun isReadyAnnouncement(line: String): Boolean = line == "READY $PROXY_LISTEN"
 
     private fun randomToken(): String {
         val bytes = ByteArray(32)
