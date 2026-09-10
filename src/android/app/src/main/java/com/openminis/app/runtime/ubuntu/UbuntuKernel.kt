@@ -279,6 +279,10 @@ internal object UbuntuKernel {
             for (entry in store.entries.value) {
                 if (!entry.isActive) continue
                 val treeUri = Uri.parse(entry.treeUri)
+                val hasPersistedRead = ctx.contentResolver.persistedUriPermissions.any {
+                    it.uri == treeUri && it.isReadPermission
+                }
+                check(hasPersistedRead) { "active external mount ${entry.name} has no persisted read grant" }
                 val host = store.resolvePosixPath(treeUri, ctx)
                     ?: error("active external mount ${entry.name} is not accessible")
                 val hasPersistedWrite = ctx.contentResolver.persistedUriPermissions.any {
