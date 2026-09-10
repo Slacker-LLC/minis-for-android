@@ -64,8 +64,6 @@ object UbuntuRuntime {
         Log.i(TAG, "initialized direct Ubuntu backend uid=${ctx.applicationInfo.uid}")
     }
 
-    internal fun contextOrNull(): Context? = appContext
-
     suspend fun ensureReady(): Snapshot {
         if (!isInitialized) {
             val error = "UbuntuRuntime.init(context) has not been called"
