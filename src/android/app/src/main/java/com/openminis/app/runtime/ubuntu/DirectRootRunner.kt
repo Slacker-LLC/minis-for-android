@@ -145,7 +145,7 @@ internal object DirectRootRunner {
         }
         return "if command -v setsid >/dev/null 2>&1; then " +
             "exec setsid /system/bin/sh -c ${shellQuote(grouped)}; " +
-            "else exec /system/bin/sh -c ${shellQuote(script)}; fi"
+            "else echo 'setsid is required for isolated Root maintenance' >&2; exit 125; fi"
     }
 
     internal fun buildProcessGroupCleanupCommand(pidFile: String): String =

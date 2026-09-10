@@ -16,7 +16,18 @@ class DirectRootRunnerTest {
         assertTrue(command.contains("echo \$\$ >"))
         assertTrue(command.contains("__minis_status=\$?"))
         assertTrue(command.contains("rm -f --"))
-        assertTrue(command.contains("else exec /system/bin/sh -c"))
+    }
+
+    @Test
+    fun `root maintenance fails closed when setsid is unavailable`() {
+        val command = DirectRootRunner.buildProcessGroupCommand(
+            "touch /should-not-run",
+            "/data/adb/minis/runtime/runner-test.pid",
+        )
+        val fallback = command.substringAfter("else ")
+        assertTrue(fallback.contains("setsid is required"))
+        assertTrue(fallback.contains("exit 125"))
+        assertFalse(fallback.contains("touch /should-not-run"))
     }
 
     @Test
