@@ -41,7 +41,6 @@ object ExecutionCoordinator {
     private val shells = ConcurrentHashMap<String, RootPersistentShell>()
     private val mutexes = ConcurrentHashMap<String, Mutex>()
     private val lastInjectedKeys = ConcurrentHashMap<String, Set<String>>()
-    private val globalLock = Mutex()
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -125,15 +124,13 @@ object ExecutionCoordinator {
         }
     }
 
+    /** Called only while [execute] holds this session's mutex. */
     private suspend fun getOrCreateShell(sessionId: String): RootPersistentShell {
         shells[sessionId]?.takeIf { it.isAlive }?.let { return it }
-        return globalLock.withLock {
-            shells[sessionId]?.takeIf { it.isAlive }?.let { return@withLock it }
-            shells.remove(sessionId)?.stop()
-            RootPersistentShell(sessionId).also { shell ->
-                shell.ensureStarted()
-                shells[sessionId] = shell
-            }
+        shells.remove(sessionId)?.stop()
+        return RootPersistentShell(sessionId).also { shell ->
+            shell.ensureStarted()
+            shells[sessionId] = shell
         }
     }
 
