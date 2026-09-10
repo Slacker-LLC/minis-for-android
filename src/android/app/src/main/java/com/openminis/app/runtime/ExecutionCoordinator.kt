@@ -172,7 +172,10 @@ object ExecutionCoordinator {
     }
 
     suspend fun broadcastProxyChange() {
-        val env = RuntimePathRegistry.systemProxyEnv(appContext)
+        // Direct Ubuntu always exits through the Root loopback proxy. Android's
+        // system HTTP proxy must not replace these variables in an already-live
+        // shell or its networking diverges from newly launched sessions.
+        val env = com.openminis.app.runtime.ubuntu.RootNetworkProxy.proxyEnv()
         shells.forEach { (sessionId, shell) ->
             if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
                 .onFailure { Log.d(TAG, "[$sessionId] proxy update failed: ${it.message}") }
