@@ -54,8 +54,6 @@ object FileWriteTool {
                 )
             }
 
-            // Upstream read-only mount behavior, routed through the Ubuntu/Root
-            // runtime path registry instead of PRootKernel.
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
@@ -81,13 +79,9 @@ object FileWriteTool {
                 // respect to file_write/file_edit calls in this process.
                 if (expectedSha256.isNotEmpty()) {
                     val current = try {
-                        if (externalMountPath) {
-                            ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
-                        } else {
-                            WorkspaceFileClient.readAll(sessionId, path)
-                        }
+                        WorkspaceFileClient.readAll(sessionId, path)
                     } catch (error: WorkspaceFileClient.Failure) {
-                        if (error.code == "RUNTIME_UNAVAILABLE") {
+                        if (error.code == "RUNTIME_UNAVAILABLE" || error.code == "NOT_FOUND") {
                             return@withKey ToolExecutionResult(
                                 "Error: File changed since it was opened (it no longer exists): $path",
                                 false, toolTitle = toolTitle,
@@ -103,9 +97,7 @@ object FileWriteTool {
                     }
                 }
 
-                val bytes = if (externalMountPath) {
-                    ExternalMountAccess.write(path, contentBytes, append)
-                } else if (append) {
+                val bytes = if (append) {
                     WorkspaceFileClient.appendBytes(sessionId, path, contentBytes)
                 } else {
                     WorkspaceFileClient.writeBytes(sessionId, path, contentBytes)
