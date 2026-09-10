@@ -5,45 +5,53 @@ import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.tools.internal.FileEditEngine
 import com.openminis.app.tools.internal.FileMutationQueue
+import org.json.JSONArray
 import org.json.JSONObject
 
 object FileEditTool {
     const val NAME = "file_edit"
+    private const val MAX_DIFF_CHARS = 12_000
 
-    fun definition(): AgentToolDefinition = AgentToolDefinition(
-        name = NAME,
-        description = "Make targeted edits to an existing file using exact string replacement. ALWAYS use file_read first to see the current file contents before editing. Prefer file_edit over file_write when modifying existing files — only the changed part needs to be specified. The old_string must match exactly one location in the file (including whitespace/indentation), unless replace_all is true.",
-        parameters = mapOf(
-            "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Fix typo in Python script', 'Update config value'). Use the same language as the user."),
-            "path" to AgentToolParam("string", "Absolute Linux path to the file to edit (e.g. /root/script.py)"),
-            "old_string" to AgentToolParam("string", "The exact text to find in the file. Must match precisely including whitespace and indentation. Must be unique in the file unless replace_all is true."),
-            "new_string" to AgentToolParam("string", "The replacement text. Use empty string to delete old_string."),
-            "replace_all" to AgentToolParam("boolean", "If true, replace ALL occurrences of old_string (default: false)"),
-        ),
-        required = listOf("tool_title", "path", "old_string", "new_string"),
-        propertyOrdering = listOf("tool_title", "path", "old_string", "new_string", "replace_all"),
-    )
+    fun definition(): AgentToolDefinition {
+        val editItem = AgentToolParam(
+            type = "object",
+            description = "One targeted replacement. Every old_text is matched against the original file, not incrementally.",
+            properties = mapOf(
+                "old_text" to AgentToolParam("string", "Exact text to replace. It must identify one unique, non-overlapping region of the original file."),
+                "new_text" to AgentToolParam("string", "Replacement text. Use an empty string to delete the matched block."),
+            ),
+            requiredProperties = listOf("old_text", "new_text"),
+        )
+        return AgentToolDefinition(
+            name = NAME,
+            description = "Edit one existing text file with one or more atomic targeted replacements. ALWAYS file_read the relevant region first. All edits are matched against the same original snapshot; overlapping edits are rejected. Matching is exact first, then a conservative fuzzy fallback for Unicode punctuation/special spaces/trailing whitespace. Original BOM and CRLF/LF style are preserved. Prefer this over file_write for modifying existing files.",
+            parameters = mapOf(
+                "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
+                "path" to AgentToolParam("string", "Absolute Linux path to the file to edit (e.g. /var/minis/workspace/app/src/Main.kt)"),
+                "edits" to AgentToolParam("array", "One or more non-overlapping targeted replacements. If nearby changes touch the same logical block, merge them into one edit.", items = editItem),
+                // Legacy fields remain accepted at runtime so old tool traces / clients do not break.
+                "old_string" to AgentToolParam("string", "Legacy single-edit field. Prefer edits[].old_text."),
+                "new_string" to AgentToolParam("string", "Legacy single-edit field. Prefer edits[].new_text."),
+                "replace_all" to AgentToolParam("boolean", "Legacy compatibility only. When true with old_string/new_string, replaces all exact occurrences."),
+            ),
+            required = listOf("tool_title", "path", "edits"),
+            propertyOrdering = listOf("tool_title", "path", "edits", "old_string", "new_string", "replace_all"),
+        )
+    }
 
     suspend fun execute(argsJson: String, sessionId: String, context: Context): ToolExecutionResult {
         return try {
             val args = JSONObject(argsJson)
             val path = args.optString("path", "")
-            val oldString = args.optString("old_string", "")
-            val newString = args.optString("new_string", "")
-            val replaceAll = args.optBoolean("replace_all", false)
             val toolTitle = args.optString("tool_title", NAME)
-
             if (path.isBlank()) {
                 return ToolExecutionResult("Error: 'path' is required", false, toolTitle = toolTitle)
             }
-            if (oldString.isEmpty()) {
-                return ToolExecutionResult("Error: 'old_string' is required and cannot be empty", false, toolTitle = toolTitle)
-            }
 
-            // Per-session permission preset (DSH /permission) gate. This is a
-            // product security boundary and must stay independent of the Linux
-            // backend implementation.
+            // Per-session permission preset is a product security boundary and
+            // stays independent of the Linux backend implementation.
             if (!SessionPermissionStore.allowsFileWrite(context, sessionId, path)) {
                 return ToolExecutionResult(
                     "Error: session permission preset `workspace-write` only allows writing under " +
@@ -52,8 +60,8 @@ object FileEditTool {
                 )
             }
 
-            // Upstream read-only mount behavior, routed through the Ubuntu/Root
-            // runtime path registry instead of PRootKernel.
+            // Keep upstream read-only-mount semantics while routing the check
+            // through the Direct Ubuntu/Root path registry.
             if (RuntimePathRegistry.isLinuxPathUnderReadOnlyMount(path)) {
                 return ToolExecutionResult(
                     "Error: $path is inside a read-only mounted folder and cannot be modified. " +
@@ -62,9 +70,8 @@ object FileEditTool {
                 )
             }
 
-            // Read-match-write is one mutation transaction. Without this queue,
-            // concurrent file_write/file_edit calls can overwrite a state that
-            // changed after this edit was matched.
+            // Read, match and write under one per-target transaction so another
+            // file_write/file_edit cannot invalidate the snapshot in between.
             FileMutationQueue.withKey("$sessionId\u0000$path") {
                 val externalMountPath = ExternalMountAccess.isPath(path)
                 val metadata = if (externalMountPath) {
@@ -75,49 +82,63 @@ object FileEditTool {
                 if (!metadata.optBoolean("exists", false)) {
                     return@withKey ToolExecutionResult("Error: File not found: $path", false, toolTitle = toolTitle)
                 }
+                val type = metadata.optString("type", "")
+                if (type.isNotBlank() && type != "file") {
+                    return@withKey ToolExecutionResult("Error: Path is not a regular file: $path", false, toolTitle = toolTitle)
+                }
 
                 val content = if (externalMountPath) {
-                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES).toString(Charsets.UTF_8)
+                    ExternalMountAccess.read(path, WorkspaceFileClient.MAX_FILE_BYTES)
+                        .toString(Charsets.UTF_8)
                 } else {
                     WorkspaceFileClient.readAll(sessionId, path).toString(Charsets.UTF_8)
                 }
-
-                var count = 0
-                var searchFrom = 0
-                while (true) {
-                    val idx = content.indexOf(oldString, searchFrom)
-                    if (idx < 0) break
-                    count++
-                    searchFrom = idx + oldString.length
-                }
-
-                if (count == 0) {
-                    return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
-                }
-
-                if (count > 1 && !replaceAll) {
+                val edits = parseEdits(args)
+                if (edits.isEmpty()) {
                     return@withKey ToolExecutionResult(
-                        "Error: old_string found $count times in $path. Use replace_all=true to replace all occurrences, " +
-                            "or provide a more specific old_string that matches exactly once.",
+                        "Error: provide a non-empty 'edits' array (or legacy old_string/new_string)",
                         false, toolTitle = toolTitle,
                     )
                 }
 
-                val newContent = if (replaceAll) {
-                    content.replace(oldString, newString)
-                } else {
-                    content.replaceFirst(oldString, newString)
-                }
-                val bytes = newContent.toByteArray(Charsets.UTF_8)
-                if (externalMountPath) {
-                    ExternalMountAccess.write(path, bytes, append = false)
-                } else {
-                    WorkspaceFileClient.writeBytes(sessionId, path, bytes)
+                // Preserve legacy replace_all semantics separately: Pi-style
+                // multi-edit requires unique matches, while old traces may
+                // intentionally replace every exact occurrence.
+                if (!args.has("edits") && args.optBoolean("replace_all", false)) {
+                    val old = args.optString("old_string", "")
+                    val new = args.optString("new_string", "")
+                    if (old.isEmpty()) {
+                        return@withKey ToolExecutionResult("Error: old_string cannot be empty", false, toolTitle = toolTitle)
+                    }
+                    val normalized = FileEditEngine.normalizeLf(content)
+                    val normalizedOld = FileEditEngine.normalizeLf(old)
+                    val count = Regex.escape(normalizedOld).toRegex().findAll(normalized).count()
+                    if (count == 0) {
+                        return@withKey ToolExecutionResult("Error: old_string not found in $path", false, toolTitle = toolTitle)
+                    }
+                    val updated = normalized.replace(normalizedOld, FileEditEngine.normalizeLf(new))
+                    val restored = FileEditEngine.restoreLineEnding(updated, FileEditEngine.detectLineEnding(content))
+                    val bytes = if (externalMountPath) {
+                        ExternalMountAccess.write(path, restored.toByteArray(Charsets.UTF_8), append = false)
+                    } else {
+                        WorkspaceFileClient.writeBytes(sessionId, path, restored.toByteArray(Charsets.UTF_8))
+                    }
+                    return@withKey ToolExecutionResult("Edited $path ($count replacements, $bytes bytes)", true, toolTitle = toolTitle)
                 }
 
-                val replacements = if (replaceAll) count else 1
+                val result = FileEditEngine.apply(content, edits, path)
+                val bytes = if (externalMountPath) {
+                    ExternalMountAccess.write(path, result.newContent.toByteArray(Charsets.UTF_8), append = false)
+                } else {
+                    WorkspaceFileClient.writeBytes(sessionId, path, result.newContent.toByteArray(Charsets.UTF_8))
+                }
+                val fuzzyNote = if (result.fuzzyMatchCount > 0) ", ${result.fuzzyMatchCount} fuzzy match(es)" else ""
+                val lineNote = result.firstChangedLine?.let { ", first changed line $it" }.orEmpty()
+                val diff = takeCodePoints(result.diff, MAX_DIFF_CHARS)
+                val diffNote = if (result.diff.length > MAX_DIFF_CHARS) "\n[diff truncated to $MAX_DIFF_CHARS chars]" else ""
                 ToolExecutionResult(
-                    "Edited $path ($replacements replacement(s), ${newContent.length} bytes)",
+                    "Edited $path (${result.replacementCount} block(s)$fuzzyNote$lineNote, $bytes bytes)" +
+                        if (diff.isNotBlank()) "\n\n$diff$diffNote" else "",
                     true,
                     toolTitle = toolTitle,
                 )
@@ -125,5 +146,47 @@ object FileEditTool {
         } catch (e: Exception) {
             ToolExecutionResult("Error editing file: ${e.message}", false)
         }
+    }
+
+    /** Take at most [max] UTF-16 code units without splitting a surrogate pair. */
+    private fun takeCodePoints(text: String, max: Int): String {
+        if (text.length <= max) return text
+        var end = max
+        if (Character.isHighSurrogate(text[end - 1]) && end < text.length &&
+            Character.isLowSurrogate(text[end])
+        ) {
+            end -= 1
+        }
+        return text.substring(0, end)
+    }
+
+    private fun parseEdits(args: JSONObject): List<FileEditEngine.Edit> {
+        val out = mutableListOf<FileEditEngine.Edit>()
+        val array: JSONArray? = when (val raw = args.opt("edits")) {
+            is JSONArray -> raw
+            is String -> runCatching { JSONArray(raw) }.getOrNull()
+            is JSONObject -> JSONArray().put(raw)
+            else -> null
+        }
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                val oldText = if (item.has("old_text")) {
+                    item.optString("old_text", "")
+                } else {
+                    item.optString("oldText", "")
+                }
+                val newText = if (item.has("new_text")) {
+                    item.optString("new_text", "")
+                } else {
+                    item.optString("newText", "")
+                }
+                out += FileEditEngine.Edit(oldText, newText)
+            }
+        }
+        if (out.isEmpty() && args.has("old_string") && args.has("new_string")) {
+            out += FileEditEngine.Edit(args.optString("old_string", ""), args.optString("new_string", ""))
+        }
+        return out
     }
 }
