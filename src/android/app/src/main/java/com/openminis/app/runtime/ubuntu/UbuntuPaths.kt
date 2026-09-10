@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.net.Uri
 import com.openminis.app.runtime.RuntimePathRegistry
+import kotlinx.coroutines.CancellationException
 import java.io.File
 
 /**
@@ -197,7 +198,9 @@ object UbuntuPaths {
         val uri = Uri.parse(entry.treeUri)
         try {
             store.validateMountEntries(listOf(entry))
-        } catch (_: Throwable) {
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
             return null
         }
         val rootPath = store.resolvePosixPath(uri, ctx) ?: return null
