@@ -40,7 +40,7 @@ import java.util.UUID
  * at [DEFAULT_MATCH_LIMIT].
  */
 class FileMentionIndex(
-    private val mountsProvider: () -> List<MountEntry> = { emptyList() },
+    private val mountsProvider: suspend () -> List<MountEntry> = { emptyList() },
     private val cacheTtlMs: Long = DEFAULT_CACHE_TTL_MS,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
