@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.runtime.terminal.TerminalSanitizer
+import com.openminis.app.runtime.ubuntu.RootNetworkProxy
 import com.openminis.app.runtime.ubuntu.RootPersistentShell
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
 import com.openminis.app.tools.DangerousCommandPolicy
@@ -90,11 +91,24 @@ object ExecutionCoordinator {
 
             try {
                 val shell = getOrCreateShell(sessionId)
-                val env = envVarRepository?.allAsDict().orEmpty()
+                val userEnv = envVarRepository?.allAsDict().orEmpty()
+                val runtimeProxy = RootNetworkProxy.proxyEnv()
+                val runtimeProxyKeys = runtimeProxy.keys
+                val env = if (userEnv.keys.any { it in runtimeProxyKeys }) {
+                    userEnv.toMutableMap().apply { putAll(runtimeProxy) }
+                } else {
+                    userEnv
+                }
+                // Runtime-owned proxy variables must never be unset by the
+                // user-env delta path. They are established by prepareLaunch
+                // and, when a user key conflicts, overwritten above with the
+                // required Root loopback proxy value.
                 val previous = lastInjectedKeys[sessionId].orEmpty()
+                    .filterNot { it in runtimeProxyKeys }
+                    .toSet()
                 if (env.isNotEmpty() || previous.isNotEmpty()) {
                     shell.applyEnvironment(env, previous)
-                    lastInjectedKeys[sessionId] = env.keys.toSet()
+                    lastInjectedKeys[sessionId] = userEnv.keys.toSet()
                 }
                 Log.i(TAG, "[$sessionId] direct ubuntu shell ${command.take(80)}")
                 val ran = shell.executeCommand(command, timeout, lineCallback)
@@ -175,7 +189,7 @@ object ExecutionCoordinator {
         // Direct Ubuntu always exits through the Root loopback proxy. Android's
         // system HTTP proxy must not replace these variables in an already-live
         // shell or its networking diverges from newly launched sessions.
-        val env = com.openminis.app.runtime.ubuntu.RootNetworkProxy.proxyEnv()
+        val env = RootNetworkProxy.proxyEnv()
         shells.forEach { (sessionId, shell) ->
             if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
                 .onFailure { Log.d(TAG, "[$sessionId] proxy update failed: ${it.message}") }
