@@ -90,14 +90,16 @@ object AgentTools {
         )
     }
 
-    // Upstream shell contract with only the Linux backend description adapted
-    // from Alpine/PRoot to the fork's Ubuntu/Root runtime. ToolRegistry reuses
-    // the same schema under its canonical linux.shell name.
+    // Upstream shell contract adapted to the direct Ubuntu backend. Root only
+    // launches the mount namespace/chroot; guest commands are privilege-dropped
+    // to the Android app UID with Linux capabilities cleared. ToolRegistry
+    // reuses the same schema under its canonical linux.shell name.
     fun shellExecuteDefinition(name: String = "shell_execute"): AgentToolDefinition = AgentToolDefinition(
         name = name,
-        description = "Execute a command in the on-device Ubuntu Linux environment (Root chroot). " +
-            "The command runs via /bin/bash -lc with stdout and stderr merged. " +
-            "Default timeout is 15 minutes.",
+        description = "Execute a command in the on-device Ubuntu 24.04 environment. " +
+            "Root launches the chroot, but commands run privilege-dropped as the Android app UID with Linux capabilities cleared. " +
+            "Workspace is the session-scoped /workspace backed by app-private storage. " +
+            "Commands run in a persistent Bash shell with stdout and stderr merged. Default timeout is 15 minutes.",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Install Python data analysis packages', 'List files in home directory'). Use the same language as the user."),
             "command" to AgentToolParam("string", "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
