@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object ExecutionCoordinator {
     private const val TAG = "ExecutionCoordinator"
-    private const val SESSION_MUTEX_LIMIT = 256
 
     enum class FailureKind {
         TOOL_TIMEOUT,
@@ -75,10 +74,11 @@ object ExecutionCoordinator {
         timeout: Long = 600_000L,
         lineCallback: ((String) -> Unit)? = null,
     ): CommandResult {
+        // The mutex stays registered for the session lifetime. Opportunistically
+        // evicting an unlocked-looking entry here is unsafe: another coroutine
+        // may already hold a reference but not yet have entered withLock, which
+        // would let a replacement mutex admit a second concurrent command.
         val mutex = mutexes.getOrPut(sessionId) { Mutex() }
-        if (mutexes.size > SESSION_MUTEX_LIMIT) {
-            mutexes.keys.filter { it !in shells.keys }.take(mutexes.size - SESSION_MUTEX_LIMIT).forEach(mutexes::remove)
-        }
         return mutex.withLock {
             val startTime = System.currentTimeMillis()
             ensureRuntimeReady(startTime)?.let { return@withLock it }
