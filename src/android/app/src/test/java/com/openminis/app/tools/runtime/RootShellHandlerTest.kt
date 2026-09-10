@@ -34,6 +34,27 @@ class RootShellHandlerTest {
     }
 
     @Test
+    fun `retired root shell remains resolvable but hidden from discovery`() {
+        ToolRegistry.register(RootShellHandler(), aliasNames = listOf("shell_root"))
+        try {
+            assertTrue(ToolRegistry.contains("root.shell"))
+            assertEquals("root.shell", ToolRegistry.canonicalName("shell_root"))
+            assertTrue(ToolRegistry.definition("root.shell") != null)
+            assertFalse(ToolRegistry.definitions().any { it.name == "root.shell" })
+            assertFalse(
+                ToolRegistry.definitionsForCaller(ToolPermissionManager.CALLER_LOCAL)
+                    .any { it.name == "root.shell" },
+            )
+            assertFalse(
+                ToolRegistry.definitionsForCaller("mcp:attacker")
+                    .any { it.name == "root.shell" },
+            )
+        } finally {
+            ToolRegistry.unregister("root.shell")
+        }
+    }
+
+    @Test
     fun `handler fail closed result remains permission denied`() {
         val result = RootShellHandler().failClosedResult()
         assertFalse(result.success)
