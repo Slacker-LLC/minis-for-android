@@ -36,6 +36,7 @@ object UbuntuRuntime {
         val hostSkills: String? = null,
         val hostShared: String? = null,
         val lastError: String? = null,
+        val statusFresh: Boolean = false,
     )
 
     @Volatile
@@ -82,12 +83,14 @@ object UbuntuRuntime {
                 hostSkills = UbuntuPaths.hostSkills,
                 hostShared = UbuntuPaths.hostShared,
                 lastError = null,
+                statusFresh = true,
             )
         } else {
             _snapshot.value.copy(
                 running = false,
                 available = false,
                 lastError = status.error ?: "direct Ubuntu backend unavailable",
+                statusFresh = true,
             )
         }
         _snapshot.value = next
@@ -101,7 +104,7 @@ object UbuntuRuntime {
     suspend fun stop(): Snapshot = lifecycleLock.withLock {
         ExecutionCoordinator.stopCurrentCommand()
         RootNetworkProxy.stop()
-        val next = _snapshot.value.copy(running = false, available = false)
+        val next = _snapshot.value.copy(running = false, available = false, statusFresh = true)
         _snapshot.value = next
         next
     }
@@ -131,6 +134,7 @@ object UbuntuRuntime {
             running = false,
             available = false,
             lastError = detail,
+            statusFresh = false,
         )
         _snapshot.value = next
         return next
