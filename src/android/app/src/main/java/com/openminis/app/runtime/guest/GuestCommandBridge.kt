@@ -152,12 +152,16 @@ internal object GuestCommandBridge {
         while (!server.isClosed) {
             val socket = try {
                 server.accept()
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 if (!server.isClosed) Log.w(TAG, "accept failed: ${error.message}")
                 return
             }
             if (!requestLimiter.tryAcquire()) {
-                runCatching { socket.close() }
+                try {
+                    socket.close()
+                } catch (_: Exception) {
+                    // Best effort while rejecting excess work.
+                }
                 Log.w(TAG, "rejecting bridge connection: too many concurrent requests")
                 continue
             }
@@ -165,16 +169,23 @@ internal object GuestCommandBridge {
                 thread(name = "guest-command-bridge-request", isDaemon = true) {
                     try {
                         socket.use { client ->
-                            runCatching { handleClient(client, expectedToken) }
-                                .onFailure { Log.w(TAG, "request failed: ${it.message}") }
+                            try {
+                                handleClient(client, expectedToken)
+                            } catch (error: Exception) {
+                                Log.w(TAG, "request failed: ${error.message}")
+                            }
                         }
                     } finally {
                         requestLimiter.release()
                     }
                 }
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 requestLimiter.release()
-                runCatching { socket.close() }
+                try {
+                    socket.close()
+                } catch (_: Exception) {
+                    // Best effort after worker creation failed.
+                }
                 Log.w(TAG, "cannot start bridge request worker: ${error.message}")
             }
         }
@@ -232,12 +243,12 @@ internal object GuestCommandBridge {
                 dispatch(cmd, rewritten, session, cwd, stdin)
             } catch (error: IllegalArgumentException) {
                 NativeOffloadResult(1, "minis-bridge: ${error.message}\n")
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 Log.w(TAG, "handler failed for $cmd: ${error.message}", error)
                 NativeOffloadResult(1, "minis-bridge: handler failed\n")
             }
             writeResponse(output, result.exitCode.coerceIn(0, 255), result.output)
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             writeResponse(output, 1, "minis-bridge: ${error.message ?: "invalid request"}\n")
         }
     }
