@@ -1,7 +1,9 @@
 package com.openminis.app.runtime.guest
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GuestCommandBridgeTest {
@@ -69,5 +71,23 @@ class GuestCommandBridgeTest {
         ) { null }
         assertEquals(127, result.exitCode)
         assertEquals("minis-model-use handler not registered\n", result.output)
+    }
+
+    @Test
+    fun `connection limiter rejects excess workers and recovers after release`() {
+        val limiter = GuestBridgeConnectionLimiter(2)
+        assertTrue(limiter.tryAcquire())
+        assertTrue(limiter.tryAcquire())
+        assertEquals(2, limiter.activeCount())
+        assertFalse(limiter.tryAcquire())
+
+        limiter.release()
+        assertEquals(1, limiter.activeCount())
+        assertTrue(limiter.tryAcquire())
+        assertEquals(2, limiter.activeCount())
+
+        limiter.release()
+        limiter.release()
+        assertEquals(0, limiter.activeCount())
     }
 }

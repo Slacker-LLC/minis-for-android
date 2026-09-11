@@ -14,6 +14,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /**
@@ -31,6 +32,7 @@ internal object GuestCommandBridge {
     private const val MAX_ARGC = 128
     private const val MAX_ARG_BYTES = 64 * 1024
     private const val MAX_FILE_BYTES = 2 * 1024 * 1024
+    private const val MAX_CONCURRENT_REQUESTS = 16
     private const val READ_TIMEOUT_MS = 15_000
     private const val INSTALL_TIMEOUT_MS = 15_000L
 
@@ -46,6 +48,7 @@ internal object GuestCommandBridge {
     private var cliInstalled: Boolean = false
 
     private val configHandler by lazy { ConfigOffloadHandler() }
+    private val requestLimiter = GuestBridgeConnectionLimiter(MAX_CONCURRENT_REQUESTS)
 
     @Synchronized
     fun start(context: Context): Endpoint {
@@ -153,11 +156,26 @@ internal object GuestCommandBridge {
                 if (!server.isClosed) Log.w(TAG, "accept failed: ${error.message}")
                 return
             }
-            thread(name = "guest-command-bridge-request", isDaemon = true) {
-                socket.use { client ->
-                    runCatching { handleClient(client, expectedToken) }
-                        .onFailure { Log.w(TAG, "request failed: ${it.message}") }
+            if (!requestLimiter.tryAcquire()) {
+                runCatching { socket.close() }
+                Log.w(TAG, "rejecting bridge connection: too many concurrent requests")
+                continue
+            }
+            try {
+                thread(name = "guest-command-bridge-request", isDaemon = true) {
+                    try {
+                        socket.use { client ->
+                            runCatching { handleClient(client, expectedToken) }
+                                .onFailure { Log.w(TAG, "request failed: ${it.message}") }
+                        }
+                    } finally {
+                        requestLimiter.release()
+                    }
                 }
+            } catch (error: Throwable) {
+                requestLimiter.release()
+                runCatching { socket.close() }
+                Log.w(TAG, "cannot start bridge request worker: ${error.message}")
             }
         }
     }
@@ -348,4 +366,28 @@ case "${'$'}exit_code" in
   *) exit "${'$'}exit_code" ;;
 esac
 """
+}
+
+/** Fixed-capacity gate applied before a bridge worker thread is created. */
+internal class GuestBridgeConnectionLimiter(private val maxConcurrent: Int) {
+    init {
+        require(maxConcurrent > 0) { "maxConcurrent must be positive" }
+    }
+
+    private val active = AtomicInteger(0)
+
+    fun tryAcquire(): Boolean {
+        while (true) {
+            val current = active.get()
+            if (current >= maxConcurrent) return false
+            if (active.compareAndSet(current, current + 1)) return true
+        }
+    }
+
+    fun release() {
+        val remaining = active.decrementAndGet()
+        check(remaining >= 0) { "bridge connection limiter released without acquisition" }
+    }
+
+    internal fun activeCount(): Int = active.get()
 }
