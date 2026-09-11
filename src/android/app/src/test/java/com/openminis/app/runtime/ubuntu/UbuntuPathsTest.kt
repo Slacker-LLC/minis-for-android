@@ -2,12 +2,14 @@ package com.openminis.app.runtime.ubuntu
 
 import org.junit.Assume.assumeNoException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 
 class UbuntuPathsTest {
     @Test
@@ -166,6 +168,53 @@ class UbuntuPathsTest {
         } finally {
             sessionsRoot.toFile().deleteRecursively()
             outside.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session cleanup deletes symlink entry without following target`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-delete-link")
+        val outside = Files.createTempDirectory("minis-session-delete-outside")
+        val marker = outside.resolve("keep.txt")
+        Files.writeString(marker, "keep")
+        val link = sessionsRoot.resolve("session-a")
+        try {
+            try {
+                Files.createSymbolicLink(link, outside)
+            } catch (error: Exception) {
+                if (!symlinksUnavailable(error)) throw error
+                assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            assertTrue(UbuntuPaths.deleteSessionAt(sessionsRoot.toFile(), "session-a"))
+            assertFalse(Files.exists(link, LinkOption.NOFOLLOW_LINKS))
+            assertTrue(Files.exists(marker))
+        } finally {
+            Files.deleteIfExists(link)
+            outside.toFile().deleteRecursively()
+            sessionsRoot.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session cleanup does not follow nested symlinks`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-delete-nested")
+        val outside = Files.createTempDirectory("minis-session-delete-nested-outside")
+        val marker = outside.resolve("keep.txt")
+        Files.writeString(marker, "keep")
+        try {
+            val session = UbuntuPaths.ensureSessionDirsAt(sessionsRoot.toFile(), "session-a")!!
+            val link = File(session, "workspace/escape").toPath()
+            try {
+                Files.createSymbolicLink(link, outside)
+            } catch (error: Exception) {
+                if (!symlinksUnavailable(error)) throw error
+                assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            assertTrue(UbuntuPaths.deleteSessionAt(sessionsRoot.toFile(), "session-a"))
+            assertTrue(Files.exists(marker))
+        } finally {
+            outside.toFile().deleteRecursively()
+            sessionsRoot.toFile().deleteRecursively()
         }
     }
 
