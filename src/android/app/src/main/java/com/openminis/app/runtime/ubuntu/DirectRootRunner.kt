@@ -75,17 +75,21 @@ internal object DirectRootRunner {
             val stdout = BoundedText(MAX_CAPTURE_CHARS)
             val stderr = BoundedText(MAX_CAPTURE_CHARS)
             val outThread = Thread({
-                runCatching {
+                try {
                     process.inputStream.bufferedReader().useLines { lines ->
                         lines.forEach(stdout::appendLine)
                     }
+                } catch (_: Exception) {
+                    // Stream closure during process teardown is expected.
                 }
             }, "direct-root-stdout").apply { isDaemon = true; start() }
             val errThread = Thread({
-                runCatching {
+                try {
                     process.errorStream.bufferedReader().useLines { lines ->
                         lines.forEach(stderr::appendLine)
                     }
+                } catch (_: Exception) {
+                    // Stream closure during process teardown is expected.
                 }
             }, "direct-root-stderr").apply { isDaemon = true; start() }
 
@@ -129,7 +133,11 @@ internal object DirectRootRunner {
                     error = error.message ?: error::class.java.simpleName,
                 )
             } finally {
-                runCatching { process.destroy() }
+                try {
+                    process.destroy()
+                } catch (_: Exception) {
+                    // Best effort after group cleanup / normal process exit.
+                }
             }
         }
 
@@ -172,7 +180,11 @@ internal object DirectRootRunner {
         } catch (_: Exception) {
             // Fall through to killing the directly owned launcher process.
         }
-        runCatching { process.destroyForcibly() }
+        try {
+            process.destroyForcibly()
+        } catch (_: Exception) {
+            // Best-effort fallback when Root group cleanup could not complete.
+        }
     }
 
     fun shellQuote(value: String): String =
