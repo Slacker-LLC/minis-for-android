@@ -126,7 +126,11 @@ object RuntimePathRegistry {
         val out = ArrayList<FileMentionIndex.MountEntry>()
         for (entry in store.entries.value) {
             if (!entry.isActive) continue
-            val uri = runCatching { Uri.parse(entry.treeUri) }.getOrNull() ?: continue
+            val uri = try {
+                Uri.parse(entry.treeUri)
+            } catch (_: Exception) {
+                continue
+            }
             val rootPath = try {
                 store.validateMountEntries(listOf(entry))
                 store.resolvePosixPath(uri, context)
@@ -173,8 +177,8 @@ object RuntimePathRegistry {
             } else {
                 ""
             }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to read system proxy: ${t.message}")
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to read system proxy: ${error.message}")
             ""
         }
         val out = linkedMapOf<String, String>()
