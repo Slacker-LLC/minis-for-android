@@ -106,7 +106,7 @@ class UbuntuPathsTest {
             assertTrue(!attachment.path.contains("workspace${java.io.File.separator}attachments"))
             assertEquals(
                 attachment.canonicalFile,
-                    UbuntuPaths.resolveSessionPath(
+                UbuntuPaths.resolveSessionPath(
                     sessionsRoot,
                     "session-a",
                     "/workspace/attachments/photo.png",
@@ -114,7 +114,7 @@ class UbuntuPathsTest {
             )
             assertEquals(
                 attachment.canonicalFile,
-                    UbuntuPaths.resolveSessionPath(
+                UbuntuPaths.resolveSessionPath(
                     sessionsRoot,
                     "session-a",
                     "/var/minis/workspace/attachments/photo.png",
@@ -125,6 +125,47 @@ class UbuntuPathsTest {
             assertTrue(second.exists())
         } finally {
             filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session directory setup rejects symlinked bind source`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-symlink-source")
+        val outside = Files.createTempDirectory("minis-session-symlink-outside")
+        try {
+            val session = sessionsRoot.resolve("session-a")
+            Files.createDirectories(session)
+            try {
+                Files.createSymbolicLink(session.resolve("workspace"), outside)
+            } catch (error: Exception) {
+                if (!symlinksUnavailable(error)) throw error
+                assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            assertNull(UbuntuPaths.ensureSessionDirsAt(sessionsRoot.toFile(), "session-a"))
+        } finally {
+            sessionsRoot.toFile().deleteRecursively()
+            outside.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session directory setup rejects symlinked nested bind target`() {
+        val sessionsRoot = Files.createTempDirectory("minis-session-symlink-target")
+        val outside = Files.createTempDirectory("minis-session-target-outside")
+        try {
+            val session = UbuntuPaths.ensureSessionDirsAt(sessionsRoot.toFile(), "session-a")!!
+            val nested = File(File(session, "workspace"), "attachments")
+            assertTrue(nested.delete())
+            try {
+                Files.createSymbolicLink(nested.toPath(), outside)
+            } catch (error: Exception) {
+                if (!symlinksUnavailable(error)) throw error
+                assumeNoException("Symbolic links are unavailable on this test host", error)
+            }
+            assertNull(UbuntuPaths.ensureSessionDirsAt(sessionsRoot.toFile(), "session-a"))
+        } finally {
+            sessionsRoot.toFile().deleteRecursively()
+            outside.toFile().deleteRecursively()
         }
     }
 
