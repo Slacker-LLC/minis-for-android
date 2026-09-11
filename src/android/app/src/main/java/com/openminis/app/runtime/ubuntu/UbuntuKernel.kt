@@ -57,6 +57,14 @@ internal object UbuntuKernel {
 
     fun findSu(): String? = DirectRootRunner.findSu()
 
+    internal fun buildGuestSetprivExec(uid: Int, envArgs: String, shellArgs: String): String {
+        require(uid > 0) { "invalid app uid" }
+        return "exec chroot \"\$ROOTFS\" /usr/bin/setpriv " +
+            "--reuid=$uid --regid=$uid --clear-groups " +
+            "--inh-caps=-all --ambient-caps=-all --bounding-set=-all --no-new-privs " +
+            "/usr/bin/env -i $envArgs $shellArgs"
+    }
+
     suspend fun ensureReady(): Status = lock.withLock {
         val ctx = appContext ?: return@withLock Status(false, error = "UbuntuKernel.init(context) has not been called")
         UbuntuPaths.initialize(ctx)
@@ -79,19 +87,23 @@ internal object UbuntuKernel {
             return@withLock Status(false, error = health.detail)
         }
 
+        val rootfs = UbuntuPaths.HOST_ROOTFS
         val backendProbe = DirectRootRunner.runScript(
             "command -v unshare >/dev/null 2>&1 && " +
                 "command -v mount >/dev/null 2>&1 && " +
                 "command -v chroot >/dev/null 2>&1 && " +
                 "command -v setsid >/dev/null 2>&1 && " +
-                "test -x ${DirectRootRunner.shellQuote(UbuntuPaths.HOST_ROOTFS + "/usr/bin/setpriv")}",
+                "test -x ${DirectRootRunner.shellQuote(rootfs + "/usr/bin/setpriv")} && " +
+                "chroot ${DirectRootRunner.shellQuote(rootfs)} /usr/bin/setpriv --no-new-privs /usr/bin/true",
             ROOT_TIMEOUT_MS,
         )
         if (!backendProbe.success) {
             return@withLock Status(
                 false,
                 error = "direct chroot backend prerequisites are unavailable: " +
-                    backendProbe.stderr.ifBlank { backendProbe.error ?: "unshare/mount/chroot/setsid/setpriv probe failed" },
+                    backendProbe.stderr.ifBlank {
+                        backendProbe.error ?: "unshare/mount/chroot/setsid/setpriv --no-new-privs probe failed"
+                    },
             )
         }
 
@@ -334,10 +346,7 @@ internal object UbuntuKernel {
             DirectRootRunner.shellQuote("${it.key}=${it.value}")
         }
         val shellArgs = if (interactive) "/bin/bash -l" else "/bin/bash --noprofile --norc"
-        commands += "exec chroot \"\$ROOTFS\" /usr/bin/setpriv " +
-            "--reuid=$uid --regid=$uid --clear-groups " +
-            "--inh-caps=-all --ambient-caps=-all --bounding-set=-all " +
-            "/usr/bin/env -i $envArgs $shellArgs"
+        commands += buildGuestSetprivExec(uid, envArgs, shellArgs)
         val inner = commands.joinToString("\n")
 
         val pidDir = File(ctx.cacheDir, "minis-shells").apply { mkdirs() }
