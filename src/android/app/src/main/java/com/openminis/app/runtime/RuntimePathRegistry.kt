@@ -14,8 +14,8 @@ import kotlin.math.abs
 /**
  * Android-side registry for host/guest path resolution and bind-mount inputs.
  * Ubuntu process and mount-namespace lifecycle is App-owned by the direct runtime;
- * this object maintains the app-visible path registry, SAF mount snapshots, and
- * host environment helpers consumed while constructing direct launches.
+ * this object maintains the app-visible path registry, SAF mount state, and host
+ * environment helpers consumed while constructing direct launches.
  */
 object RuntimePathRegistry {
 
@@ -34,14 +34,13 @@ object RuntimePathRegistry {
         get() = com.openminis.app.runtime.ubuntu.UbuntuPaths.bindMounts
 
     /**
-     * Seed mount registry + SAF snapshot. Idempotent; called from
-     * MinisApp.onCreate. Ubuntu runtime start is handled by
-     * [com.openminis.app.runtime.ubuntu.UbuntuRuntime.ensureReady].
+     * Seed the app-owned/global mount registry. Idempotent; called from
+     * MinisApp.onCreate. External SAF mounts are direct-runtime-owned and are
+     * validated from [mountedFoldersStore] when a session namespace is built.
      */
     fun initialize(context: Context) {
         if (isInitialized) return
         registerGlobalBindMounts(context)
-        applyMountedFoldersSnapshot(context)
         markInitialized()
         Log.i(TAG, "runtime path registry seeded bindMounts=${bindMounts.size}")
     }
@@ -92,15 +91,6 @@ object RuntimePathRegistry {
 
     @Volatile
     var mountedFoldersStore: MountedFoldersStore? = null
-
-    /** External mounts are direct-runtime-owned; this only clears the obsolete App bind map. */
-    @Suppress("UNUSED_PARAMETER")
-    fun applyMountedFoldersSnapshot(context: Context) {
-        val stale = bindMounts.keys
-            .filter { it.startsWith(MOUNTS_LINUX_PREFIX) }
-        for (key in stale) bindMounts.remove(key)
-        Log.i(TAG, "applyMountedFoldersSnapshot: direct-runtime-owned mounts; removedLegacy=${stale.size}")
-    }
 
     /**
      * True when [linuxPath] resolves under a known `/var/minis/mounts/<name>`
