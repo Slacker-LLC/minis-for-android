@@ -266,14 +266,17 @@ object UbuntuPaths {
             resolveHostPath(linuxPath)
         }
 
-    @Suppress("UNUSED_PARAMETER")
     fun deleteSession(context: Context, sessionId: String): Boolean {
         if (appContext == null) initialize(context)
+        return deleteSessionAt(File(hostSessions), sessionId)
+    }
+
+    internal fun deleteSessionAt(sessionsRoot: File, sessionId: String): Boolean {
         if (!isSafeSessionId(sessionId)) return false
-        val root = File(hostSessions).canonicalFile
-        val rawTarget = File(root, sessionId)
-        if (SafeFileTree.isSymbolicLink(rawTarget)) return false
-        val target = childOf(root.absolutePath, sessionId) ?: return false
+        if (SafeFileTree.isSymbolicLink(sessionsRoot)) return false
+        if (!SafeFileTree.existsNoFollow(sessionsRoot)) return true
+        if (!sessionsRoot.isDirectory) return false
+        val target = File(sessionsRoot, sessionId)
         return !SafeFileTree.existsNoFollow(target) || SafeFileTree.deleteRecursively(target)
     }
 
