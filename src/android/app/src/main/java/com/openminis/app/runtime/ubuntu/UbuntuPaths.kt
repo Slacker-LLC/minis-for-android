@@ -3,6 +3,7 @@ package com.openminis.app.runtime.ubuntu
 import android.content.Context
 import android.net.Uri
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.files.SafeFileTree
 import kotlinx.coroutines.CancellationException
 import java.io.File
 
@@ -218,17 +219,24 @@ object UbuntuPaths {
 
     internal fun ensureSessionDirsAt(sessionsRoot: File, sessionId: String): File? {
         if (!isSafeSessionId(sessionId)) return null
-        if (!sessionsRoot.isDirectory && !sessionsRoot.mkdirs()) return null
+        if (!ensureRealDirectory(sessionsRoot)) return null
+
+        val rawSession = File(sessionsRoot, sessionId)
+        if (!ensureRealDirectory(rawSession)) return null
         val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return null
-        listOf("workspace", "attachments", "offloads", "browser").forEach { subdir ->
-            val dir = File(session, subdir)
-            if (!dir.isDirectory && !dir.mkdirs()) return null
+        if (session.canonicalFile != rawSession.canonicalFile) return null
+
+        val namedDirs = listOf("workspace", "attachments", "offloads", "browser")
+        for (subdir in namedDirs) {
+            if (!ensureRealDirectory(File(session, subdir))) return null
         }
-        // Bind targets under /workspace must exist after the workspace bind is
-        // installed, so create harmless placeholders in the host workspace.
+
+        // Bind targets under /workspace must be real directories. A guest-created
+        // symlink here would otherwise be followed by Root mount --bind before
+        // privilege drop on the next shell launch.
         val workspace = File(session, "workspace")
-        listOf("attachments", "offloads", "browser").forEach { subdir ->
-            File(workspace, subdir).mkdirs()
+        for (subdir in listOf("attachments", "offloads", "browser")) {
+            if (!ensureRealDirectory(File(workspace, subdir))) return null
         }
         return session
     }
@@ -263,8 +271,17 @@ object UbuntuPaths {
         if (appContext == null) initialize(context)
         if (!isSafeSessionId(sessionId)) return false
         val root = File(hostSessions).canonicalFile
+        val rawTarget = File(root, sessionId)
+        if (SafeFileTree.isSymbolicLink(rawTarget)) return false
         val target = childOf(root.absolutePath, sessionId) ?: return false
-        return !target.exists() || target.deleteRecursively()
+        return !SafeFileTree.existsNoFollow(target) || SafeFileTree.deleteRecursively(target)
+    }
+
+    private fun ensureRealDirectory(directory: File): Boolean {
+        if (SafeFileTree.isSymbolicLink(directory)) return false
+        if (directory.isDirectory) return true
+        if (SafeFileTree.existsNoFollow(directory)) return false
+        return directory.mkdirs() && directory.isDirectory && !SafeFileTree.isSymbolicLink(directory)
     }
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {
@@ -272,11 +289,13 @@ object UbuntuPaths {
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
     }
 
-    internal fun childOf(base: String, rest: String): File? = runCatching {
+    internal fun childOf(base: String, rest: String): File? = try {
         val root = File(base).canonicalFile
         val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
         if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null
-    }.getOrNull()
+    } catch (_: Exception) {
+        null
+    }
 
     private fun unsafePath(path: String): Boolean =
         path.isEmpty() || path.contains('\u0000') || path.split('/').any { it == ".." }
