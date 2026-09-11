@@ -182,8 +182,14 @@ object ExecutionCoordinator {
         val tz = RuntimePathRegistry.posixTz()
         val env = mapOf("TZ" to tz)
         shells.forEach { (sessionId, shell) ->
-            if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
-                .onFailure { Log.d(TAG, "[$sessionId] timezone update failed: ${it.message}") }
+            if (!shell.isAlive) return@forEach
+            try {
+                shell.applyEnvironment(env)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.d(TAG, "[$sessionId] timezone update failed: ${error.message}")
+            }
         }
         TerminalSession.broadcastTimezone(tz)
     }
@@ -194,8 +200,14 @@ object ExecutionCoordinator {
         // shell or its networking diverges from newly launched sessions.
         val env = RootNetworkProxy.proxyEnv()
         shells.forEach { (sessionId, shell) ->
-            if (shell.isAlive) runCatching { shell.applyEnvironment(env) }
-                .onFailure { Log.d(TAG, "[$sessionId] proxy update failed: ${it.message}") }
+            if (!shell.isAlive) return@forEach
+            try {
+                shell.applyEnvironment(env)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.d(TAG, "[$sessionId] proxy update failed: ${error.message}")
+            }
         }
         TerminalSession.broadcastProxy(env)
     }
