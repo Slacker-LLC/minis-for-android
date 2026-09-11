@@ -9,6 +9,8 @@ import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.SecureRandom
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * Single-purpose Root outbound proxy for direct Ubuntu guests.
@@ -24,6 +26,7 @@ internal object RootNetworkProxy {
     private const val PROXY_USER = "minis"
     private const val TAG = "RootNetworkProxy"
     private const val BINARY = "libminisnetproxy.so"
+    private const val CLEANUP_TIMEOUT_MS = 900L
     private val lock = Mutex()
     private val authToken = randomToken()
 
@@ -35,6 +38,9 @@ internal object RootNetworkProxy {
     @Volatile
     private var process: Process? = null
 
+    @Volatile
+    private var processPidFile: File? = null
+
     /** True only after the currently owned child itself announced a successful bind. */
     @Volatile
     private var processReady: Boolean = false
@@ -44,9 +50,15 @@ internal object RootNetworkProxy {
             if (processReady && child.isAlive && listenerReady()) {
                 return@withLock Status(true)
             }
-            runCatching { child.destroyForcibly() }
+            val stalePidFile = processPidFile
             process = null
+            processPidFile = null
             processReady = false
+            terminateManagedProxy(child, stalePidFile)
+            repeat(20) {
+                if (!listenerReady()) return@repeat
+                delay(25)
+            }
         }
 
         // A loopback listener without our live, READY-confirmed Process handle
@@ -62,9 +74,13 @@ internal object RootNetworkProxy {
         if (!binary.isFile) {
             return@withLock Status(false, "packaged Root network proxy is missing: ${binary.absolutePath}")
         }
-
-        val command = "exec ${DirectRootRunner.shellQuote(binary.absolutePath)} " +
-            "--listen ${DirectRootRunner.shellQuote(PROXY_LISTEN)} --auth-stdin"
+        val uid = context.applicationInfo.uid
+        if (uid <= 0) {
+            return@withLock Status(false, "invalid Android app uid for outbound network proxy")
+        }
+        val pidDir = File(context.cacheDir, "minis-root-proxy").apply { mkdirs() }
+        val pidFile = File(pidDir, "proxy-${UUID.randomUUID()}.pid")
+        val command = buildLaunchCommand(binary.absolutePath, pidFile.absolutePath, uid)
         val child = try {
             ProcessBuilder(su, "-c", command)
                 .redirectErrorStream(true)
@@ -73,6 +89,7 @@ internal object RootNetworkProxy {
             return@withLock Status(false, "cannot start Root network proxy: ${error.message}")
         }
         process = child
+        processPidFile = pidFile
         processReady = false
         try {
             child.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -81,9 +98,10 @@ internal object RootNetworkProxy {
                 writer.flush()
             }
         } catch (error: Exception) {
-            runCatching { child.destroyForcibly() }
             process = null
+            processPidFile = null
             processReady = false
+            terminateManagedProxy(child, pidFile)
             return@withLock Status(false, "cannot authenticate Root network proxy startup: ${error.message}")
         }
         Thread({
@@ -108,8 +126,10 @@ internal object RootNetworkProxy {
             if (!child.isAlive) {
                 if (process === child) {
                     process = null
+                    processPidFile = null
                     processReady = false
                 }
+                terminateManagedProxy(child, pidFile)
                 return@withLock Status(false, "Root network proxy exited before becoming ready")
             }
             // The TCP probe alone is insufficient: another local process could
@@ -118,24 +138,22 @@ internal object RootNetworkProxy {
             if (processReady && listenerReady() && child.isAlive) return@withLock Status(true)
             delay(25)
         }
-        runCatching { child.destroyForcibly() }
         if (process === child) {
             process = null
+            processPidFile = null
             processReady = false
         }
+        terminateManagedProxy(child, pidFile)
         Status(false, "Root network proxy did not bind $PROXY_LISTEN")
     }
 
     suspend fun stop() = lock.withLock {
-        val child = process ?: return@withLock
+        val child = process
+        val pidFile = processPidFile
         process = null
+        processPidFile = null
         processReady = false
-        runCatching { child.destroy() }
-        repeat(20) {
-            if (!child.isAlive && !listenerReady()) return@withLock
-            delay(25)
-        }
-        runCatching { child.destroyForcibly() }
+        terminateManagedProxy(child, pidFile)
         repeat(40) {
             if (!listenerReady()) return@withLock
             delay(25)
@@ -162,6 +180,66 @@ internal object RootNetworkProxy {
     }
 
     internal fun isReadyAnnouncement(line: String): Boolean = line == "READY $PROXY_LISTEN"
+
+    internal fun buildLaunchCommand(binaryPath: String, pidFilePath: String, uid: Int): String {
+        require(uid > 0) { "invalid app uid" }
+        val child = "umask 077; " +
+            "echo \$\$ > ${DirectRootRunner.shellQuote(pidFilePath)} || exit 126; " +
+            "chown $uid:$uid ${DirectRootRunner.shellQuote(pidFilePath)} || exit 126; " +
+            "exec ${DirectRootRunner.shellQuote(binaryPath)} " +
+            "--listen ${DirectRootRunner.shellQuote(PROXY_LISTEN)} --auth-stdin"
+        return "if command -v setsid >/dev/null 2>&1; then " +
+            "exec setsid /system/bin/sh -c ${DirectRootRunner.shellQuote(child)}; " +
+            "else echo 'setsid is required for isolated Root proxy' >&2; exit 125; fi"
+    }
+
+    internal fun buildCleanupCommand(pidFilePath: String): String =
+        "PID=\$(cat ${DirectRootRunner.shellQuote(pidFilePath)} 2>/dev/null || true); " +
+            "case \"\$PID\" in ''|*[!0-9]*) ;; *) " +
+            "if [ \"\$PID\" -gt 1 ]; then " +
+            "kill -TERM -\$PID 2>/dev/null || kill -TERM \$PID 2>/dev/null || true; " +
+            "sleep 0.05; " +
+            "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; " +
+            "fi ;; esac; rm -f -- ${DirectRootRunner.shellQuote(pidFilePath)}"
+
+    private fun terminateManagedProxy(child: Process?, pidFile: File?) {
+        val su = DirectRootRunner.findSu()
+        if (su != null && pidFile != null) {
+            try {
+                val killer = ProcessBuilder(
+                    su,
+                    "-c",
+                    buildCleanupCommand(pidFile.absolutePath),
+                ).redirectErrorStream(true).start()
+                if (!killer.waitFor(CLEANUP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    killer.destroyForcibly()
+                } else {
+                    killer.destroy()
+                }
+            } catch (_: Exception) {
+                // Fall through to the directly owned launcher Process.
+            }
+        }
+        if (child != null) {
+            try {
+                child.destroy()
+            } catch (_: Exception) {
+                // Continue with the forcible fallback below.
+            }
+            if (child.isAlive) {
+                try {
+                    child.destroyForcibly()
+                } catch (_: Exception) {
+                    // Listener verification in stop/ensureReady catches leftovers.
+                }
+            }
+        }
+        try {
+            pidFile?.delete()
+        } catch (_: Exception) {
+            // Best-effort cleanup of the App-owned lifecycle marker.
+        }
+    }
 
     private fun randomToken(): String {
         val bytes = ByteArray(32)
