@@ -25,7 +25,6 @@ object UbuntuRuntime {
     data class Snapshot(
         val running: Boolean = false,
         val available: Boolean = false,
-        val pid: Int? = null,
         val version: String? = null,
         val provisioned: Boolean = false,
         val guestUid: Int? = null,
@@ -36,10 +35,8 @@ object UbuntuRuntime {
         val hostMemory: String? = null,
         val hostSkills: String? = null,
         val hostShared: String? = null,
-        val externalMountDigest: String? = null,
         val externalMountVerified: Boolean = false,
         val lastError: String? = null,
-        val mock: Boolean = false,
         val statusFresh: Boolean = false,
     )
 
@@ -76,7 +73,6 @@ object UbuntuRuntime {
             Snapshot(
                 running = true,
                 available = true,
-                pid = null,
                 version = status.version,
                 provisioned = true,
                 guestUid = uid,
