@@ -2,6 +2,7 @@ package com.openminis.app.runtime.files
 
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -199,12 +200,16 @@ internal object WorkspaceFileClient {
         require(filename.isNotEmpty() && !filename.contains('/') && !filename.contains('\\')) {
             "filename must be a single path component"
         }
-        val used = runCatching {
+        val used = try {
             val array = list(sessionId, directory, 500, 0).optJSONArray("entries") ?: JSONArray()
             buildSet {
                 for (i in 0 until array.length()) array.optJSONObject(i)?.optString("name")?.let(::add)
             }
-        }.getOrDefault(emptySet())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            emptySet()
+        }
         if (filename !in used) return childPath(directory, filename)
         val dot = filename.lastIndexOf('.')
         val base = if (dot > 0) filename.substring(0, dot) else filename
