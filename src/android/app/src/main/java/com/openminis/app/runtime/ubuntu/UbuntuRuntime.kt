@@ -48,10 +48,6 @@ object UbuntuRuntime {
         private set
 
     @Volatile
-    var redirectPaths: Boolean = false
-        private set
-
-    @Volatile
     private var appContext: Context? = null
 
     private val lifecycleLock = Mutex()
@@ -63,7 +59,6 @@ object UbuntuRuntime {
         appContext = ctx
         UbuntuKernel.init(ctx)
         isInitialized = true
-        redirectPaths = true
         Log.i(TAG, "initialized direct Ubuntu backend uid=${ctx.applicationInfo.uid}")
     }
 
@@ -105,7 +100,6 @@ object UbuntuRuntime {
             )
         }
         _snapshot.value = next
-        redirectPaths = next.running
         next
     }
 
@@ -118,7 +112,6 @@ object UbuntuRuntime {
         RootNetworkProxy.stop()
         val next = _snapshot.value.copy(running = false, available = false, statusFresh = true)
         _snapshot.value = next
-        redirectPaths = false
         next
     }
 
@@ -150,7 +143,6 @@ object UbuntuRuntime {
             statusFresh = false,
         )
         _snapshot.value = next
-        redirectPaths = false
         return next
     }
 }
