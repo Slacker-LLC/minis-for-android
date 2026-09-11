@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
 use std::process::Command;
@@ -18,6 +19,7 @@ const FALLBACK_DNS: &[&str] = &[
     "8.8.8.8",
     "1.1.1.1",
 ];
+static DNS_QUERY_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[cfg(target_os = "android")]
 unsafe extern "C" {
@@ -139,11 +141,25 @@ fn is_fake_ip(ip: Ipv4Addr) -> bool {
     octets[0] == 198 && (octets[1] == 18 || octets[1] == 19)
 }
 
+fn is_shared_address(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    octets[0] == 100 && (64..=127).contains(&octets[1])
+}
+
 fn is_forbidden_target(ip: Ipv4Addr) -> bool {
     if is_fake_ip(ip) {
         return false;
     }
-    ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_broadcast()
+    let octets = ip.octets();
+    octets[0] == 0
+        || ip.is_unspecified()
+        || ip.is_loopback()
+        || ip.is_private()
+        || ip.is_link_local()
+        || is_shared_address(ip)
+        || ip.is_multicast()
+        || octets[0] >= 240
+        || ip.is_broadcast()
 }
 
 fn parse_target(first_line: &str) -> Result<(String, u16, bool, String), String> {
@@ -322,7 +338,7 @@ where
     let mut peer = reader.into_inner();
     let ip = resolve_ipv4(&host)?;
     if is_forbidden_target(ip) {
-        return Err(format!("blocked private/loopback target {host}({ip})"));
+        return Err(format!("blocked non-public target {host}({ip})"));
     }
     let mut upstream = connector(&host, ip, port)?;
     if is_connect {
@@ -424,9 +440,23 @@ fn usable_dns(value: &str) -> bool {
     false
 }
 
+fn next_dns_query_id() -> u16 {
+    let mut bytes = [0u8; 2];
+    if File::open("/dev/urandom")
+        .and_then(|mut file| file.read_exact(&mut bytes))
+        .is_ok()
+    {
+        return u16::from_be_bytes(bytes);
+    }
+    let counter = DNS_QUERY_COUNTER.fetch_add(1, Ordering::Relaxed) as u16;
+    counter.wrapping_add(std::process::id() as u16)
+}
+
 fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
+    let transaction_id = next_dns_query_id();
     let mut query = Vec::new();
-    query.extend_from_slice(&[0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
+    query.extend_from_slice(&transaction_id.to_be_bytes());
+    query.extend_from_slice(&[0x01, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
     for label in host.split('.') {
         if label.is_empty() || label.len() > 63 {
             return Err("bad name".into());
@@ -440,41 +470,98 @@ fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
     socket
         .set_read_timeout(Some(Duration::from_secs(3)))
         .map_err(|e| e.to_string())?;
-    socket.send_to(&query, server).map_err(|e| e.to_string())?;
+    socket.connect(server).map_err(|e| e.to_string())?;
+    socket.send(&query).map_err(|e| e.to_string())?;
     let mut buf = [0u8; 512];
-    let (size, _) = socket.recv_from(&mut buf).map_err(|e| e.to_string())?;
-    parse_dns_a(&buf[..size])
+    let size = socket.recv(&mut buf).map_err(|e| e.to_string())?;
+    parse_dns_a(&buf[..size], transaction_id)
 }
 
-fn parse_dns_a(msg: &[u8]) -> Result<Ipv4Addr, String> {
+fn skip_dns_name(msg: &[u8], index: &mut usize) -> Result<(), String> {
+    let mut labels = 0usize;
+    loop {
+        if *index >= msg.len() {
+            return Err("truncated dns name".into());
+        }
+        let length = msg[*index];
+        if length & 0xc0 == 0xc0 {
+            if *index + 1 >= msg.len() {
+                return Err("truncated dns pointer".into());
+            }
+            *index += 2;
+            return Ok(());
+        }
+        if length & 0xc0 != 0 {
+            return Err("invalid dns label".into());
+        }
+        *index += 1;
+        if length == 0 {
+            return Ok(());
+        }
+        let length = length as usize;
+        if length > 63 || *index + length > msg.len() {
+            return Err("truncated dns label".into());
+        }
+        *index += length;
+        labels += 1;
+        if labels > 127 {
+            return Err("dns name too deep".into());
+        }
+    }
+}
+
+fn parse_dns_a(msg: &[u8], expected_transaction_id: u16) -> Result<Ipv4Addr, String> {
     if msg.len() < 12 {
         return Err("short dns".into());
     }
+    let transaction_id = u16::from_be_bytes([msg[0], msg[1]]);
+    if transaction_id != expected_transaction_id {
+        return Err("dns transaction id mismatch".into());
+    }
+    let flags = u16::from_be_bytes([msg[2], msg[3]]);
+    if flags & 0x8000 == 0 {
+        return Err("dns packet is not a response".into());
+    }
+    if flags & 0x7800 != 0 {
+        return Err("unsupported dns opcode".into());
+    }
+    if flags & 0x0200 != 0 {
+        return Err("truncated dns response".into());
+    }
+    let rcode = flags & 0x000f;
+    if rcode != 0 {
+        return Err(format!("dns rcode {rcode}"));
+    }
+    let questions = u16::from_be_bytes([msg[4], msg[5]]) as usize;
+    if questions != 1 {
+        return Err("unexpected dns question count".into());
+    }
     let answers = u16::from_be_bytes([msg[6], msg[7]]) as usize;
     let mut index = 12usize;
-    while index < msg.len() && msg[index] != 0 {
-        index += 1 + msg[index] as usize;
+    skip_dns_name(msg, &mut index)?;
+    if index + 4 > msg.len() {
+        return Err("truncated dns question".into());
     }
-    index += 5;
+    let question_type = u16::from_be_bytes([msg[index], msg[index + 1]]);
+    let question_class = u16::from_be_bytes([msg[index + 2], msg[index + 3]]);
+    if question_type != 1 || question_class != 1 {
+        return Err("unexpected dns question".into());
+    }
+    index += 4;
+
     for _ in 0..answers {
-        if index + 12 > msg.len() {
-            break;
-        }
-        if msg[index] & 0xc0 == 0xc0 {
-            index += 2;
-        } else {
-            while index < msg.len() && msg[index] != 0 {
-                index += 1 + msg[index] as usize;
-            }
-            index += 1;
-        }
+        skip_dns_name(msg, &mut index)?;
         if index + 10 > msg.len() {
-            break;
+            return Err("truncated dns answer".into());
         }
         let kind = u16::from_be_bytes([msg[index], msg[index + 1]]);
+        let class = u16::from_be_bytes([msg[index + 2], msg[index + 3]]);
         let length = u16::from_be_bytes([msg[index + 8], msg[index + 9]]) as usize;
         index += 10;
-        if kind == 1 && length == 4 && index + 4 <= msg.len() {
+        if index + length > msg.len() {
+            return Err("truncated dns rdata".into());
+        }
+        if kind == 1 && class == 1 && length == 4 {
             return Ok(Ipv4Addr::new(
                 msg[index],
                 msg[index + 1],
@@ -559,6 +646,28 @@ mod tests {
         move |_host, _ip, _port| TcpStream::connect(origin).map_err(|error| error.to_string())
     }
 
+    fn dns_response(transaction_id: u16, flags: u16, answer_class: u16) -> Vec<u8> {
+        let mut msg = Vec::new();
+        msg.extend_from_slice(&transaction_id.to_be_bytes());
+        msg.extend_from_slice(&flags.to_be_bytes());
+        msg.extend_from_slice(&1u16.to_be_bytes());
+        msg.extend_from_slice(&1u16.to_be_bytes());
+        msg.extend_from_slice(&0u16.to_be_bytes());
+        msg.extend_from_slice(&0u16.to_be_bytes());
+        for label in ["example", "com"] {
+            msg.push(label.len() as u8);
+            msg.extend_from_slice(label.as_bytes());
+        }
+        msg.push(0);
+        msg.extend_from_slice(&[0, 1, 0, 1]);
+        msg.extend_from_slice(&[0xc0, 0x0c]);
+        msg.extend_from_slice(&[0, 1]);
+        msg.extend_from_slice(&answer_class.to_be_bytes());
+        msg.extend_from_slice(&[0, 0, 0, 60]);
+        msg.extend_from_slice(&[0, 4, 8, 8, 8, 8]);
+        msg
+    }
+
     #[test]
     fn connect_and_http_targets_parse() {
         let (host, port, connect, _) = parse_target("CONNECT example.com:443 HTTP/1.1").unwrap();
@@ -582,12 +691,39 @@ mod tests {
     }
 
     #[test]
-    fn lan_targets_are_blocked_but_fake_ip_is_allowed() {
+    fn non_public_targets_are_blocked_but_fake_ip_is_allowed() {
+        assert!(is_forbidden_target(Ipv4Addr::new(0, 0, 0, 0)));
+        assert!(is_forbidden_target(Ipv4Addr::new(0, 1, 2, 3)));
         assert!(is_forbidden_target(Ipv4Addr::new(127, 0, 0, 1)));
         assert!(is_forbidden_target(Ipv4Addr::new(10, 0, 0, 1)));
+        assert!(is_forbidden_target(Ipv4Addr::new(100, 64, 0, 1)));
+        assert!(is_forbidden_target(Ipv4Addr::new(100, 127, 255, 254)));
+        assert!(is_forbidden_target(Ipv4Addr::new(169, 254, 1, 1)));
         assert!(is_forbidden_target(Ipv4Addr::new(192, 168, 1, 1)));
+        assert!(is_forbidden_target(Ipv4Addr::new(224, 0, 0, 1)));
+        assert!(is_forbidden_target(Ipv4Addr::new(240, 0, 0, 1)));
+        assert!(!is_forbidden_target(Ipv4Addr::new(100, 128, 0, 1)));
         assert!(!is_forbidden_target(Ipv4Addr::new(198, 18, 0, 1)));
         assert!(!is_forbidden_target(Ipv4Addr::new(8, 8, 8, 8)));
+    }
+
+    #[test]
+    fn dns_parser_requires_matching_successful_in_a_response() {
+        let response = dns_response(0x1234, 0x8180, 1);
+        assert_eq!(
+            parse_dns_a(&response, 0x1234).unwrap(),
+            Ipv4Addr::new(8, 8, 8, 8)
+        );
+        assert!(parse_dns_a(&response, 0x5678).is_err());
+
+        let not_response = dns_response(0x1234, 0x0100, 1);
+        assert!(parse_dns_a(&not_response, 0x1234).is_err());
+
+        let nxdomain = dns_response(0x1234, 0x8183, 1);
+        assert!(parse_dns_a(&nxdomain, 0x1234).is_err());
+
+        let wrong_class = dns_response(0x1234, 0x8180, 3);
+        assert!(parse_dns_a(&wrong_class, 0x1234).is_err());
     }
 
     #[test]
