@@ -4,9 +4,8 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.io.Reader
@@ -139,12 +138,10 @@ internal class RootPersistentShell(private val sessionId: String) {
                 currentWriter.newLine()
                 currentWriter.flush()
             }
-            return try {
-                withTimeout(timeoutMs.coerceAtLeast(1L)) { completion.await() }
-            } catch (_: TimeoutCancellationException) {
-                stop()
-                CommandResult("command timed out after ${timeoutMs}ms", 124)
-            }
+            val result = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { completion.await() }
+            if (result != null) return result
+            stop()
+            return CommandResult("command timed out after ${timeoutMs}ms", 124)
         } catch (cancelled: CancellationException) {
             stop()
             throw cancelled
