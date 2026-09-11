@@ -272,8 +272,7 @@ internal object WorkspaceFileClient {
 
     suspend fun deleteSession(sessionId: String): JSONObject = withContext(Dispatchers.IO) {
         if (!UbuntuPaths.isSafeSessionId(sessionId)) throw Failure("BAD_PARAMS", "invalid session id")
-        val target = UbuntuPaths.sessionDir(sessionId) ?: throw Failure("BAD_PARAMS", "invalid session path")
-        val deleted = SafeFileTree.deleteRecursively(target)
+        val deleted = UbuntuPaths.deleteSessionAt(File(UbuntuPaths.hostSessions), sessionId)
         if (!deleted) throw Failure("IO_ERROR", "cannot delete session $sessionId")
         JSONObject().put("deleted", true)
     }
