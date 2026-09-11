@@ -9,7 +9,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
+import java.io.Reader
 import java.nio.charset.StandardCharsets
+import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,7 +27,7 @@ internal class RootPersistentShell(private val sessionId: String) {
 
     private data class Pending(
         val marker: String,
-        val output: StringBuilder,
+        val output: BoundedCommandOutput,
         val lineCallback: ((String) -> Unit)?,
         val completion: CompletableDeferred<CommandResult>,
     )
@@ -122,7 +124,12 @@ internal class RootPersistentShell(private val sessionId: String) {
         check(pending == null) { "only one command may run in a persistent shell" }
         val marker = UUID.randomUUID().toString().replace("-", "")
         val completion = CompletableDeferred<CommandResult>()
-        val state = Pending(marker, StringBuilder(), lineCallback, completion)
+        val state = Pending(
+            marker = marker,
+            output = BoundedCommandOutput(MAX_CAPTURE_CHARS),
+            lineCallback = lineCallback,
+            completion = completion,
+        )
         pending = state
         try {
             withContext(Dispatchers.IO) {
@@ -155,23 +162,34 @@ internal class RootPersistentShell(private val sessionId: String) {
         Thread({
             try {
                 spawned.inputStream.bufferedReader(StandardCharsets.UTF_8).use { reader ->
+                    val lines = BoundedLineReader(reader, MAX_LINE_CHARS)
                     while (true) {
-                        val line = reader.readLine() ?: break
+                        val read = lines.readLine() ?: break
                         val state = pending
                         if (state == null) continue
+                        val line = read.text
                         val prefix = "__MINIS_DONE_${state.marker}_EXIT_"
-                        if (line.startsWith(prefix) && line.endsWith("__")) {
+                        if (!read.truncated && line.startsWith(prefix) && line.endsWith("__")) {
                             val code = line.removePrefix(prefix).removeSuffix("__").toIntOrNull() ?: 1
                             state.completion.complete(
-                                CommandResult(state.output.toString().trimEnd('\n'), code),
+                                CommandResult(state.output.value().trimEnd('\n'), code),
                             )
                             if (pending === state) pending = null
                         } else {
-                            state.output.append(line).append('\n')
+                            state.output.appendLine(line)
                             try {
                                 state.lineCallback?.invoke(line)
                             } catch (_: Exception) {
                                 // Tool-output observers must not terminate the shell reader.
+                            }
+                            if (read.truncated) {
+                                val notice = "[... ${read.omittedChars} characters omitted from overlong line ...]"
+                                state.output.appendLine(notice)
+                                try {
+                                    state.lineCallback?.invoke(notice)
+                                } catch (_: Exception) {
+                                    // Tool-output observers must not terminate the shell reader.
+                                }
                             }
                         }
                     }
@@ -182,10 +200,10 @@ internal class RootPersistentShell(private val sessionId: String) {
                 val state = pending
                 if (state != null && !state.completion.isCompleted) {
                     val exit = runCatching { spawned.exitValue() }.getOrNull() ?: 1
+                    val captured = state.output.value().trimEnd('\n')
                     state.completion.complete(
                         CommandResult(
-                            state.output.toString().trimEnd('\n') +
-                                if (state.output.isNotEmpty()) "\n[shell exited]" else "[shell exited]",
+                            captured + if (captured.isNotEmpty()) "\n[shell exited]" else "[shell exited]",
                             exit,
                         ),
                     )
@@ -237,5 +255,138 @@ internal class RootPersistentShell(private val sessionId: String) {
 
     companion object {
         private const val TAG = "RootPersistentShell"
+        internal const val MAX_CAPTURE_CHARS = 100_000
+        internal const val MAX_LINE_CHARS = 100_000
+    }
+}
+
+/**
+ * Retains a bounded head and tail while the reader continues draining stdout.
+ * This prevents a high-volume guest command from growing the Android heap until
+ * its timeout, while preserving the most useful beginning and ending output.
+ */
+internal class BoundedCommandOutput(private val maxChars: Int) {
+    init {
+        require(maxChars >= 2) { "maxChars must be at least 2" }
+    }
+
+    private val headLimit = maxChars / 2
+    private val tailLimit = maxChars - headLimit
+    private val head = StringBuilder(headLimit)
+    private val tail = ArrayDeque<String>()
+    private var tailChars = 0
+    private var totalChars = 0L
+
+    fun appendLine(line: String) {
+        append(line)
+        append("\n")
+    }
+
+    private fun append(value: String) {
+        if (value.isEmpty()) return
+        totalChars += value.length
+        var offset = 0
+        if (head.length < headLimit) {
+            val count = minOf(headLimit - head.length, value.length)
+            head.append(value, 0, count)
+            offset = count
+        }
+        if (offset >= value.length) return
+
+        var suffix = value.substring(offset)
+        if (suffix.length >= tailLimit) {
+            suffix = suffix.takeLast(tailLimit)
+            tail.clear()
+            tail.addLast(suffix)
+            tailChars = suffix.length
+            return
+        }
+        tail.addLast(suffix)
+        tailChars += suffix.length
+        while (tailChars > tailLimit && tail.isNotEmpty()) {
+            val first = tail.removeFirst()
+            val excess = tailChars - tailLimit
+            if (first.length <= excess) {
+                tailChars -= first.length
+            } else {
+                val kept = first.substring(excess)
+                tail.addFirst(kept)
+                tailChars -= excess
+            }
+        }
+    }
+
+    fun value(): String {
+        val omitted = (totalChars - head.length - tailChars).coerceAtLeast(0L)
+        return buildString(head.length + tailChars + 64) {
+            append(head)
+            if (omitted > 0L) {
+                if (isNotEmpty() && last() != '\n') append('\n')
+                append("[... ")
+                append(omitted)
+                append(" characters omitted ...]\n")
+            }
+            tail.forEach { this.append(it) }
+        }
+    }
+}
+
+internal data class BoundedLine(
+    val text: String,
+    val omittedChars: Long,
+) {
+    val truncated: Boolean get() = omittedChars > 0L
+}
+
+/** Chunked line reader with an explicit per-line allocation ceiling. */
+internal class BoundedLineReader(
+    private val source: Reader,
+    private val maxChars: Int,
+) {
+    init {
+        require(maxChars > 0) { "maxChars must be positive" }
+    }
+
+    private val buffer = CharArray(8 * 1024)
+    private var offset = 0
+    private var available = 0
+    private var eof = false
+
+    fun readLine(): BoundedLine? {
+        if (eof && offset >= available) return null
+        val out = StringBuilder(minOf(maxChars, 1024))
+        var omitted = 0L
+        var sawAny = false
+        while (true) {
+            if (offset >= available) {
+                val count = source.read(buffer)
+                if (count < 0) {
+                    eof = true
+                    if (!sawAny) return null
+                    return BoundedLine(stripTrailingCr(out), omitted)
+                }
+                if (count == 0) continue
+                offset = 0
+                available = count
+            }
+
+            val ch = buffer[offset++]
+            sawAny = true
+            if (ch == '\n') {
+                return BoundedLine(stripTrailingCr(out), omitted)
+            }
+            if (out.length < maxChars) {
+                out.append(ch)
+            } else {
+                omitted++
+            }
+        }
+    }
+
+    private fun stripTrailingCr(value: StringBuilder): String {
+        if (value.isNotEmpty() && value.last() == '\r') {
+            value.setLength(value.length - 1)
+        }
+        return value.toString()
     }
 }
