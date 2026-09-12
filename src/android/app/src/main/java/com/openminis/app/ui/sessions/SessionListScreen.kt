@@ -20,7 +20,6 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -476,7 +475,7 @@ fun SessionListScreen(
     // doesn't flash the "add a provider" onboarding before the real config emits.
     val configLoaded by providerRepository.configLoaded.collectAsState()
     val scope = rememberCoroutineScope()
-    val isDark = isSystemInDarkTheme()
+    val isDark = ChatColors.isDark
 
     // [T-android-search-focus-sticky] When the user opens search but types
     // nothing (or only whitespace) and then navigates into a chat, the
@@ -2032,7 +2031,7 @@ private enum class FolderSegment { LONE, TOP, MIDDLE, BOTTOM }
  */
 @Composable
 private fun folderEdgeColor(): Color =
-    if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.30f)
+    if (ChatColors.isDark) Color.White.copy(alpha = 0.30f)
     else Color.Black.copy(alpha = 0.08f)
 
 @Composable

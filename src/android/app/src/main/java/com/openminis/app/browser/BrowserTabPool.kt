@@ -368,7 +368,7 @@ class BrowserTabPool(private val context: Context) {
     }
 
 
-    /** The session's guest workspace — downloads land in minisd-managed storage. */
+    /** The session's guest workspace — downloads land in its App-owned storage. */
     private fun sessionWorkspacePath(): String? {
         if (sessionId == null) return null
         return "/var/minis/workspace"

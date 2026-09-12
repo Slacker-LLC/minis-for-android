@@ -1147,7 +1147,7 @@ fun SkillFileViewerScreen(
 
     // For SKILL.md, reconstruct from the in-memory record (so frontmatter
     // edits stay in sync with DB metadata). For sibling files, read straight
-    // from disk. The latter is a synchronous broker call, so load it from IO
+    // from disk. The latter is a synchronous guest-file call, so load it from IO
     // rather than during composition on the main thread.
     var initialContent by remember(skillId, relativePath, skill.updatedAt) {
         mutableStateOf("")

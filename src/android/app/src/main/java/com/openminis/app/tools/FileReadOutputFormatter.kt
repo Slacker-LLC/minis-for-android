@@ -2,8 +2,8 @@ package com.openminis.app.tools
 
 /**
  * Formats the line-range metadata and content returned by [FileReadTool].
- * Keeping this pure makes the truncation contract testable without a Context
- * or a live minisd instance.
+ * Keeping this pure makes the truncation contract testable without Android
+ * runtime or filesystem dependencies.
  */
 internal object FileReadOutputFormatter {
     fun format(

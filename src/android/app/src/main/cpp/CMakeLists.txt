@@ -3,6 +3,11 @@ project(minis_native CXX C)
 
 add_library(pty_bridge SHARED pty_bridge.c)
 
+# Directory-handle based creation for the App-owned workspace file API. Java
+# NIO's SecureDirectoryStream covers existing entries; this tiny JNI bridge is
+# only needed for mkdirat-style creation of missing directory components.
+add_library(minis_securefs SHARED secure_file_ops.cpp)
+
 # T283: NDK signal handler for native crashes (SIGSEGV/SIGABRT/...).
 # Separate library so loadLibrary() can pull it in independently of
 # pty_bridge — the crash handler must be installed before any other
@@ -20,6 +25,7 @@ target_include_directories(jieba_jni PRIVATE
 
 find_library(log-lib log)
 target_link_libraries(pty_bridge ${log-lib})
+target_link_libraries(minis_securefs ${log-lib})
 target_link_libraries(minis_crash_handler ${log-lib})
 target_link_libraries(jieba_jni ${log-lib})
 
@@ -27,5 +33,6 @@ target_link_libraries(jieba_jni ${log-lib})
 # libraries by default. Keep every app-owned JNI library compatible with
 # Android devices that use 16 KB pages.
 target_link_options(pty_bridge PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+target_link_options(minis_securefs PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 target_link_options(minis_crash_handler PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 target_link_options(jieba_jni PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")

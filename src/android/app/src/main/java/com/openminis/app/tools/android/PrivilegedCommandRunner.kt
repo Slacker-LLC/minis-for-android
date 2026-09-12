@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Backend selected for one privileged Android command. */
 enum class PrivilegedBackend { ROOT, SHIZUKU, NONE }
@@ -124,6 +125,36 @@ data class RootProbeResult(
     fun hasCapability(bit: Int): Boolean = LinuxCapabilityParser.hasBit(effectiveCapabilitiesHex, bit)
 }
 
+/** Explicit Root lifecycle states used by capability reporting and probes. */
+enum class RootAccessState {
+    SU_NOT_FOUND,
+    AUTHORIZATION_REQUIRED,
+    PROBING,
+    AUTHORIZED,
+    AUTHORIZATION_FAILED,
+}
+
+data class RootAccessSnapshot(
+    val state: RootAccessState,
+    val suPath: String?,
+    val probe: RootProbeResult?,
+)
+
+/** Pure state transition logic; passive discovery never starts or retries su. */
+object RootAccessStateResolver {
+    fun resolve(
+        suPath: String?,
+        probe: RootProbeResult?,
+        probing: Boolean = false,
+    ): RootAccessState = when {
+        suPath.isNullOrBlank() -> RootAccessState.SU_NOT_FOUND
+        probing -> RootAccessState.PROBING
+        probe?.authorized == true -> RootAccessState.AUTHORIZED
+        probe != null -> RootAccessState.AUTHORIZATION_FAILED
+        else -> RootAccessState.AUTHORIZATION_REQUIRED
+    }
+}
+
 /** Pure parsers for `id`, `/proc/self/status`, and SELinux probe output. */
 object RootProbeParser {
     private val uidRegex = Regex("""uid=(\d+)(?:\(([^)]*)\))?""")
@@ -175,7 +206,7 @@ object LinuxCapabilityParser {
     }
 }
 
-/** Passive Root discovery and the last broker-backed probe result. */
+/** Passive Root discovery and the last probe result. */
 object RootCommandRunner {
     private val knownPaths = listOf(
         "/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su",
@@ -183,6 +214,7 @@ object RootCommandRunner {
     )
 
     @Volatile private var lastProbe: RootProbeResult? = null
+    private val probeInFlight = AtomicBoolean(false)
 
     fun passiveSuPath(): String? {
         knownPaths.firstOrNull { File(it).canExecute() }?.let { return it }
@@ -193,8 +225,31 @@ object RootCommandRunner {
 
     fun cachedProbe(): RootProbeResult? = lastProbe
 
+    fun accessState(): RootAccessState = RootAccessStateResolver.resolve(
+        suPath = passiveSuPath(),
+        probe = lastProbe,
+        probing = probeInFlight.get(),
+    )
+
+    fun snapshot(): RootAccessSnapshot {
+        val suPath = passiveSuPath()
+        return RootAccessSnapshot(
+            state = RootAccessStateResolver.resolve(suPath, lastProbe, probeInFlight.get()),
+            suPath = suPath,
+            probe = lastProbe,
+        )
+    }
+
     internal fun updateProbe(probe: RootProbeResult) {
         lastProbe = probe
+    }
+
+    internal fun beginProbe() {
+        probeInFlight.set(true)
+    }
+
+    internal fun endProbe() {
+        probeInFlight.set(false)
     }
 }
 
@@ -256,6 +311,46 @@ internal object AppCommandRunner {
 /** Unified seam for operations that genuinely need shell privilege. */
 object PrivilegedCommandRunner {
     private const val TAG = "PrivilegedCommand"
+    /** Match the upstream structured Root argv contract: 32 command args. */
+    internal const val MAX_ROOT_ARGS = 32
+    internal const val MAX_ROOT_ARG_BYTES = 4096
+    private val trustedToolPrefixes = listOf(
+        "/system/bin/",
+        "/system/xbin/",
+        "/vendor/bin/",
+    )
+
+    /**
+     * Validate the part of the Root contract that is independent of the
+     * device filesystem. Keeping this separate makes the negative cases
+     * testable without pretending a JVM host has Android's /system tree.
+     */
+    internal fun validateRootArgv(argv: List<String>): String? {
+        if (argv.isEmpty()) return "argv must not be empty"
+        val tool = argv.first()
+        if (tool.isEmpty()) return "tool is required"
+        if (tool.contains('/')) return "tool must be an executable basename"
+        if (tool.contains('\u0000')) return "tool contains NUL"
+        if (argv.drop(1).size > MAX_ROOT_ARGS) return "too many arguments"
+        argv.drop(1).forEachIndexed { index, arg ->
+            if (arg.contains('\u0000')) return "args[$index] contains NUL"
+            if (arg.toByteArray(Charsets.UTF_8).size > MAX_ROOT_ARG_BYTES) {
+                return "args[$index] exceeds $MAX_ROOT_ARG_BYTES bytes"
+            }
+        }
+        return null
+    }
+
+    /** Resolve only a basename from trusted Android system executable trees. */
+    internal fun resolveTrustedToolPath(tool: String): String? {
+        if (tool.isEmpty() || tool.contains('/') || tool.contains('\u0000')) return null
+        return trustedToolPrefixes
+            .asSequence()
+            .map { "$it$tool" }
+            .map(::File)
+            .firstOrNull { it.isFile && it.canExecute() }
+            ?.absolutePath
+    }
 
     suspend fun run(
         context: Context,
@@ -269,6 +364,23 @@ object PrivilegedCommandRunner {
         require(argv.isNotEmpty()) { "privileged command argv must not be empty" }
         val tool = argv.first()
         val commandArgs = argv.drop(1)
+        validateRootArgv(argv)?.let { detail ->
+            return AndroidCommandResult(
+                backend = PrivilegedBackend.NONE,
+                exitCode = 126,
+                stdout = "",
+                stderr = "",
+                unavailableReason = "BAD_PARAMS: $detail",
+            )
+        }
+        val resolvedTool = resolveTrustedToolPath(tool)
+            ?: return AndroidCommandResult(
+                backend = PrivilegedBackend.NONE,
+                exitCode = 126,
+                stdout = "",
+                stderr = "",
+                unavailableReason = "BAD_PARAMS: trusted Android Root tool not found: $tool",
+            )
         val effectiveRisk = CommandRisk.max(risk, PrivilegedCommandRisk.classify(tool, commandArgs))
         Log.i(
             TAG,
@@ -276,7 +388,7 @@ object PrivilegedCommandRunner {
                 "tool=$tool session=$sessionId",
         )
         val result = try {
-            DirectRootRunner.runArgv(argv, timeoutMs)
+            DirectRootRunner.runArgv(listOf(resolvedTool) + commandArgs, timeoutMs)
         } catch (cancelled: CancellationException) {
             throw cancelled
         }
@@ -295,9 +407,12 @@ object PrivilegedCommandRunner {
     /** Explicit Root authorization probe; passive capability reads never invoke su. */
     suspend fun requestActiveRootProbe(context: Context, sessionId: String): RootProbeResult {
         if (RootCommandRunner.passiveSuPath() == null) {
-            return RootProbeResult(false, error = "su executable not found")
+            return RootProbeResult(false, error = "su executable not found").also {
+                RootCommandRunner.updateProbe(it)
+            }
         }
         Log.i(TAG, "active root probe requested session=$sessionId")
+        RootCommandRunner.beginProbe()
         val script = """
             id
             cat /proc/self/status 2>/dev/null || true
@@ -306,13 +421,17 @@ object PrivilegedCommandRunner {
             echo __MODE__
             getenforce 2>/dev/null || echo unknown
         """.trimIndent()
-        val result = DirectRootRunner.runScript(script, 15_000L)
-        val probe = if (result.error != null || result.timedOut) {
-            RootProbeResult(false, error = result.error ?: "Root probe timed out")
-        } else {
-            RootProbeParser.parse(result.stdout, result.exitCode, result.stderr)
+        try {
+            val result = DirectRootRunner.runScript(script, 15_000L)
+            val probe = if (result.error != null || result.timedOut) {
+                RootProbeResult(false, error = result.error ?: "Root probe timed out")
+            } else {
+                RootProbeParser.parse(result.stdout, result.exitCode, result.stderr)
+            }
+            RootCommandRunner.updateProbe(probe)
+            return probe
+        } finally {
+            RootCommandRunner.endProbe()
         }
-        RootCommandRunner.updateProbe(probe)
-        return probe
     }
 }

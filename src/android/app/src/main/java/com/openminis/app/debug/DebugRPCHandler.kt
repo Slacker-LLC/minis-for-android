@@ -333,8 +333,6 @@ class DebugRPCHandler(private val context: Context) {
             put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
             put("androidVersion", Build.VERSION.RELEASE)
             val ubuntuRunning = com.openminis.app.runtime.ubuntu.UbuntuRuntime.snapshot.value.running
-            // P2: PRoot gone; prootBooted kept as an alias for old tooling.
-            put("prootBooted", ubuntuRunning)
             put("ubuntu", ubuntuRunning)
             put("filesDir", filesDir.absolutePath)
             put("logFiles", AppLogger.listLogFiles().size)
@@ -553,11 +551,10 @@ class DebugRPCHandler(private val context: Context) {
     }
 
     /**
-     * [diag] Raw list of a host-filesystem directory, bypassing the PRoot
-     * bindMounts/rootfs resolver. Constrained to filesDir to avoid poking
-     * at arbitrary paths. Use `minis-sessions` (default) to enumerate every
-     * session's attachments/workspace/... directories and find files that
-     * were written into a session we no longer have mounted.
+     * [diag] Raw list of an App-owned directory, bypassing guest-path
+     * resolution. Constrained to filesDir to avoid poking at arbitrary paths.
+     * Use `minis-sessions` (default) to enumerate session attachments,
+     * workspaces and other App-owned data.
      */
     private fun handleRawLS(params: JSONObject): Any {
         val subPath = params.optString("path", "minis-sessions")
@@ -682,7 +679,7 @@ class DebugRPCHandler(private val context: Context) {
             val length = minOf(WorkspaceFileClient.MAX_READ_CHUNK, limit - output.size())
             val chunk = WorkspaceFileClient.readChunk(null, path, nextOffset, length)
             if (chunk.offset != nextOffset) {
-                throw RPCException(-32000, "Broker returned offset ${chunk.offset}, expected $nextOffset: $path")
+                throw RPCException(-32000, "Workspace read returned offset ${chunk.offset}, expected $nextOffset: $path")
             }
             output.write(chunk.bytes)
             nextOffset += chunk.bytes.size
@@ -1197,10 +1194,10 @@ class DebugRPCHandler(private val context: Context) {
         return result
     }
 
-    // ── Shell Execute (PRoot sandbox) ────────────────────────────────────────
+    // ── Shell Execute (Direct Ubuntu guest) ──────────────────────────────────
 
     /**
-     * Run a command inside the PRoot sandbox for the given session and return
+     * Run a command inside the Direct Ubuntu guest for the given session and return
      * `{ output, exit_code }`. Mirrors iOS `debug.shellExecute`. Debug-only;
      * meant for integration-test harnesses that need to drive shell tools
      * (`minis-browser-use`, `minis-open`, …) without going through the agent.
@@ -1221,7 +1218,7 @@ class DebugRPCHandler(private val context: Context) {
 
         // Mirror ChatViewModel's terminal lineCallback: scan raw lines for
         // OSC MinisOpenURL markers before TerminalSanitizer strips them and
-        // hand captured URLs to the broker so test harnesses driving
+        // hand captured URLs to the URL handoff coordinator so test harnesses driving
         // `minis-open` via this RPC trigger the same in-app preview flow as
         // real chat shell output.
         val capturedUrls = mutableListOf<String>()
@@ -1413,7 +1410,7 @@ class DebugRPCHandler(private val context: Context) {
         }
     }
 
-    /** Write a file into the guest namespace or the minisd-owned mount broker. */
+    /** Write a file into the guest namespace or an authorized external mount. */
     private suspend fun handleWriteFile(params: JSONObject): JSONObject {
         val path = params.optString("path").ifEmpty {
             throw RPCException(-32602, "Invalid params: 'path' is required")
@@ -1423,7 +1420,6 @@ class DebugRPCHandler(private val context: Context) {
         val content = params.optString("content")
         val encoding = params.optString("encoding", "utf8").lowercase().ifEmpty { "utf8" }
         val overwrite = params.optBoolean("overwrite", true)
-        val modeStr = params.optString("mode", "0644")
 
         val bytes = when (encoding) {
             "utf8" -> content.toByteArray(Charsets.UTF_8)
@@ -1442,7 +1438,7 @@ class DebugRPCHandler(private val context: Context) {
             if (!overwrite) {
                 val existing = runCatching { WorkspaceFileClient.info(params.optString("sessionId"), path) }
                     .getOrNull()
-                if (existing != null) {
+                if (existing?.optBoolean("exists", false) == true) {
                     throw RPCException(-32000, "File exists and overwrite=false: $path")
                 }
             }
@@ -1455,7 +1451,8 @@ class DebugRPCHandler(private val context: Context) {
         }
 
         if (ExternalMountAccess.isPath(path)) {
-            if (!overwrite && runCatching { ExternalMountAccess.info(path) }.getOrNull() != null) {
+            if (!overwrite && runCatching { ExternalMountAccess.info(path) }
+                    .getOrNull()?.optBoolean("exists", false) == true) {
                 throw RPCException(-32000, "File exists and overwrite=false: $path")
             }
             val size = ExternalMountAccess.write(path, bytes, append = false)
@@ -1466,40 +1463,10 @@ class DebugRPCHandler(private val context: Context) {
             }
         }
 
-        // Pre-boot fallback: resolveHostPath returns null until proot boots
-        // (it lazy-initializes its RootfsManager). Test harnesses commonly
-        // want to stage files BEFORE booting, so route through the rootfs
-        // dir directly when the kernel isn't ready yet.
-        val hostFile = RuntimePathRegistry.resolveHostPath(path) ?: run {
-            val rootfsDir = com.openminis.app.sandbox.RootfsManager.getInstance(context).rootfsDir
-            File(rootfsDir, path.removePrefix("/"))
-        }
-
-        if (hostFile.exists() && !overwrite) {
-            throw RPCException(-32000, "File exists and overwrite=false: $path")
-        }
-
-        hostFile.parentFile?.mkdirs()
-        hostFile.writeBytes(bytes)
-
-        // Best-effort mode application — on most Android filesystems we can
-        // only set readable/writable/executable via java.io.File flags.
-        runCatching {
-            val modeOct = if (modeStr.startsWith("0")) modeStr.toInt(8) else modeStr.toInt(10)
-            val ownerExec = (modeOct and 0b001_000_000) != 0
-            val ownerWrite = (modeOct and 0b010_000_000) != 0
-            val ownerRead = (modeOct and 0b100_000_000) != 0
-            hostFile.setReadable(ownerRead, true)
-            hostFile.setWritable(ownerWrite, true)
-            hostFile.setExecutable(ownerExec, true)
-        }
-
-        return JSONObject().apply {
-            put("ok", true)
-            put("path", path)
-            put("hostPath", hostFile.absolutePath)
-            put("size", bytes.size)
-        }
+        throw RPCException(
+            -32602,
+            "path must be inside the App-owned guest workspace or an authorized external mount: $path",
+        )
     }
 
     private fun isCanonicalGuestPath(path: String): Boolean {
@@ -1600,7 +1567,7 @@ class DebugRPCHandler(private val context: Context) {
     /**
      * Direct invocation of [com.openminis.app.runtime.guest.ModelUseOffloadHandler]
      * for e2e harnesses. Mirrors [handleShizukuExec]; lets callers exercise the
-     * `minis-model-use` CLI without going through a real Alpine shell prompt.
+     * `minis-model-use` CLI without going through a real Ubuntu shell prompt.
      * DEBUG-only.
      */
     private fun handleModelUseExec(params: JSONObject): JSONObject {
@@ -1616,17 +1583,22 @@ class DebugRPCHandler(private val context: Context) {
             else -> throw RPCException(-32602, "Missing 'args' (array) or 'command' (string)")
         }
 
-        // Optional `input` blob: write to host /tmp and inject `--input <linuxPath>`
-        // so the handler reads it via readLinuxPath() exactly like a real shell
-        // invocation would. We resolve the host path via RuntimePathRegistry to honour
-        // the same rootfs layout the offload server uses.
+        // Optional `input` blob: stage it in the App-owned global workspace and
+        // inject `--input <linuxPath>` so the handler reads it through the same
+        // secure WorkspaceFileClient path as a real guest invocation. Rootfs is
+        // Root-owned and is never used as an App-side temporary directory.
+        var stagedInputPath: String? = null
         val finalArgv: List<String> = if (params.has("input")) {
             val inputBlob = params.optString("input", "")
-            val linuxPath = "/tmp/.debug-modeluse-input-${System.currentTimeMillis()}.json"
-            val hostFile = com.openminis.app.runtime.RuntimePathRegistry.resolveHostPath(linuxPath)
-                ?: throw RPCException(-32603, "cannot resolve $linuxPath under rootfs")
-            hostFile.parentFile?.mkdirs()
-            hostFile.writeText(inputBlob)
+            val linuxPath = "/var/minis/workspace/.debug-modeluse-input-${java.util.UUID.randomUUID()}.json"
+            try {
+                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                    WorkspaceFileClient.writeBytes(null, linuxPath, inputBlob.toByteArray(Charsets.UTF_8))
+                }
+                stagedInputPath = linuxPath
+            } catch (error: Exception) {
+                throw RPCException(-32603, "cannot stage model-use input in App-owned workspace: ${error.message}")
+            }
             argvTail + listOf("--input", linuxPath)
         } else argvTail
 
@@ -1640,7 +1612,17 @@ class DebugRPCHandler(private val context: Context) {
             cwd = "/",
             sessionId = null,
         )
-        val result = handler.handle(request)
+        val result = try {
+            handler.handle(request)
+        } finally {
+            stagedInputPath?.let { path ->
+                runCatching {
+                    kotlinx.coroutines.runBlocking(Dispatchers.IO) { WorkspaceFileClient.delete(null, path) }
+                }.onFailure { error ->
+                    AppLogger.warning("DebugRPC", "failed to remove staged model-use input: ${error.message}")
+                }
+            }
+        }
         return JSONObject().apply {
             put("exitCode", result.exitCode)
             put("output", result.output)
@@ -1653,7 +1635,7 @@ class DebugRPCHandler(private val context: Context) {
      * [com.openminis.app.runtime.guest.SessionsOffloadHandler] for e2e
      * harnesses. Mirrors [handleModelUseExec]; lets callers exercise the
      * `minis-sessions-cli` CLI (list / search / messages, incl. --full)
-     * without going through a real Alpine shell prompt. DEBUG-only.
+     * without going through a real Ubuntu shell prompt. DEBUG-only.
      */
     private fun handleSessionsExec(params: JSONObject): JSONObject {
         val argvTail: List<String> = when {

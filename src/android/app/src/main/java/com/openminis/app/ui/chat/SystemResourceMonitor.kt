@@ -41,10 +41,9 @@ import java.io.File
  *   capture the system-wide load thinking shell_execute child processes
  *   wouldn't be attributed to the app — but in practice `/proc/stat` is
  *   permission-denied to apps on Android 8+, so the read silently failed
- *   and the HUD read "CPU 0%" under any load. PRoot on Android works via
- *   ptrace, so foreign syscalls run inside the app's own PID anyway and
- *   `/proc/self/stat` does cover hf-render etc. (verified: `top` reports
- *   the same ~110% on com.openminis.app while hf-render runs).
+ *   and the HUD read "CPU 0%" under any load. Direct Ubuntu guest processes
+ *   are separate PIDs, so this monitor deliberately reports the Android app's
+ *   own CPU only; guest-process accounting belongs to the runtime diagnostics.
  * - **Memory**: `Debug.getMemoryInfo().totalPss * 1024` for "used" (matches
  *   what task_info(TASK_VM_INFO) reports on iOS — proportional set size,
  *   the closest cross-platform equivalent to "what this process owns now");
@@ -153,9 +152,9 @@ class SystemResourceMonitor {
      * fields are 0-indexed: state=0, ppid=1, ..., utime=11, stime=12.
      *
      * cutime/cstime (waited-for-children CPU) are intentionally excluded —
-     * shell_execute doesn't actually fork (PRoot uses ptrace), so the work
-     * runs inside the app's own utime/stime; folding cutime in would only
-     * double-count any genuine child reaper work.
+     * Direct shell commands run in child processes rather than inside this
+     * Android PID; folding cutime in would also double-count any genuine
+     * child-reaper work.
      */
     private fun readSelfCpuTicks(): Long? = try {
         val raw = File("/proc/self/stat").readText()

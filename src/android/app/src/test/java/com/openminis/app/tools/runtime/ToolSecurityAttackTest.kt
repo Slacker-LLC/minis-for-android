@@ -46,15 +46,16 @@ class ToolSecurityAttackTest {
         )) {
             assertNotAllowed(tool)
         }
-        // The retired root.shell compatibility name is denied to both local Agents and MCP.
+        // The structured root.shell entry is local-only, never a remote MCP tool.
         assertEquals(
-            ToolPermissionManager.Level.MCP_DENIED,
+            ToolPermissionManager.Level.LOCAL_ONLY,
             ToolPermissionManager.levelFor("root.shell", attacker),
         )
         assertEquals(
-            ToolPermissionManager.Level.MCP_DENIED,
+            ToolPermissionManager.Level.LOCAL_ONLY,
             ToolPermissionManager.levelFor("root.shell", ToolPermissionManager.CALLER_LOCAL),
         )
+        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", ToolPermissionManager.CALLER_LOCAL))
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("root.shell"))
     }
 

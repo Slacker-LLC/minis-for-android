@@ -573,8 +573,9 @@ class BackupImporter(
             else File(dest, path.removePrefix("shared/"))
         }
         applyFileResult(report, files)
-        // Per §3.2 no meta.db equivalent is needed here: PRoot bind-mounts this
-        // directory, so the guest sees the files on the next boot.
+        // Per §3.2 no meta.db equivalent is needed here: Direct Ubuntu
+        // bind-mounts this App-owned directory, so the guest sees the files
+        // on the next session launch.
         return report
     }
 

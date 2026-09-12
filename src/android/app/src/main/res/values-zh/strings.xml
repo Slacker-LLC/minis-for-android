@@ -622,8 +622,8 @@
     <string name="rootfs_result_section">结果</string>
     <string name="rootfs_info_section">信息</string>
     <string name="rootfs_about_title">关于 Rootfs</string>
-    <string name="rootfs_about_description">rootfs 包含沙箱使用的 Ubuntu Linux 文件系统。重置将删除所有数据并恢复出厂状态。</string>
-    <string name="rootfs_about_operations">重置：删除全部 | 备份：保存 /root 目录 | 恢复：恢复已保存的数据</string>
+    <string name="rootfs_about_description">rootfs 包含沙箱使用的 Ubuntu 24.04 文件系统。重置只会删除 rootfs；App 自有的工作区、记忆、技能和共享文件会保留。</string>
+    <string name="rootfs_about_operations">重置：删除 Ubuntu rootfs | App 自有数据单独管理</string>
     <string name="rootfs_reset_confirm_title">重置 Rootfs？</string>
     <string name="rootfs_reset_confirm_message">这将删除整个 rootfs。所有数据将丢失。</string>
     <string name="rootfs_reset_backup_confirm_title">备份并重置？</string>

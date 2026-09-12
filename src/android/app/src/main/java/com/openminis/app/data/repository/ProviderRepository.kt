@@ -2232,12 +2232,15 @@ class ProviderRepository(private val context: Context) {
                     ProviderType.openAI, ProviderType.openAIResponses ->
                         OpenAIModelsApi.fetchModels(apiKey, baseURL, customUserAgent = instance.customUserAgent)
                     ProviderType.openRouter -> OpenRouterModelsApi.fetchModels(apiKey)
-                    // xAI: the OAuth model list is fixed (no /v1/models gating
-                    // call needed — XAIModelsApi exposes the spec-mandated set).
-                    // For API-key users we still call the same static list; if
-                    // xAI later exposes a dynamic /v1/models endpoint this is
-                    // the place to swap in OpenAI-compatible fetch.
-                    ProviderType.xAI -> com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth()
+                    // xAI exposes an OpenAI-compatible live catalog. Keep the
+                    // built-in list as a vendor-specific fallback so a failed
+                    // refresh never empties the model picker or substitutes
+                    // models from the wrong provider.
+                    ProviderType.xAI -> OpenAIModelsApi.fetchModels(
+                        apiKey,
+                        baseURL ?: "https://api.x.ai/v1",
+                        customUserAgent = instance.customUserAgent,
+                    ).ifEmpty { com.openminis.app.provider.xai.XAIModelsApi.fetchModelsOAuth() }
                     // [T-kimi-oauth] Kimi Code: unlike Codex OAuth, the Kimi
                     // OAuth token CAN call the models endpoint — real fetch
                     // from GET /coding/v1/models (OpenAI-compatible shape).

@@ -14,7 +14,7 @@ Android app → ExecutionCoordinator → RootPersistentShell → UbuntuKernel
             → setpriv(real App UID/GID, clear groups/caps) → bash
 ```
 
-The former privileged broker and the PRoot/Alpine runtime are not active production backends. Generic Agent/model/MCP-controlled Root execution is forbidden; `DirectRootRunner` is internal infrastructure only.
+The former privileged broker and the PRoot/Alpine runtime are not active production backends. Raw Agent/model/MCP-controlled Root shell or RPC execution is forbidden. The local Agent may use the upstream-compatible structured `root.shell` capability (`tool` basename plus `args`); it is local-only, bounded, and separate from the internal `DirectRootRunner` infrastructure.
 
 Active guest user data is App-owned and derived from `Context.filesDir`. `/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are migration sources only.
 

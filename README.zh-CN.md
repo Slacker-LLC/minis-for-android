@@ -24,7 +24,7 @@ Ubuntu 24.04 userspace
 
 当前产品运行时为 **Direct Ubuntu 24.04 chroot**。PRoot、Alpine 兼容层和旧特权 broker 不属于现役生产路径。
 
-Root 只用于 rootfs、mount namespace、bind mount、chroot、受控 legacy 数据迁移等必要基础设施。普通 Guest/Agent 命令最终必须降到设备实际 App UID/GID，并清空 supplementary groups 与 Linux capabilities。`DirectRootRunner` 不是 Agent/MCP/模型可调用的通用 Root shell。
+`DirectRootRunner` 只用于 rootfs、mount namespace、bind mount、chroot、受控 legacy 数据迁移等必要基础设施。普通 Guest 命令最终必须降到设备实际 App UID/GID，并清空 supplementary groups 与 Linux capabilities。本地 Agent 按上游权限模型可另外使用结构化 `root.shell`（`tool` basename + `args`）；它是 local-only、有限参数/时间/输出并负责进程清理的能力，不是 raw shell、主机文件 API 或通用 RPC，MCP 仍不可见。
 
 ## Android 身份
 

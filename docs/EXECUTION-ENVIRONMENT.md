@@ -32,7 +32,7 @@ The app owns application/database state, provider/model state, tool registration
 
 Root is used narrowly for operations that genuinely require privilege: Root capability probing, rootfs validation/repair, private mount namespace creation, bind mounts, entering the chroot, and controlled one-time legacy-data migration.
 
-`DirectRootRunner` is internal infrastructure. It is not an Agent/MCP command surface and must never accept raw model-controlled commands. Generic `root.shell` access is denied.
+`DirectRootRunner` is internal infrastructure and must never accept raw model-controlled commands. The local Agent may use the structured `root.shell` capability (`tool` basename plus `args`); trusted Android system-directory resolution, argv bounds, timeout/output limits, and process cleanup remain mandatory. `root.shell` is local-only and invisible to MCP; it is not a host-filesystem or generic RPC surface.
 
 ### Ubuntu guest
 
@@ -98,6 +98,29 @@ DNS handling and route behavior must follow the active Android network. Host tes
 ## Rootfs lifecycle
 
 The Ubuntu rootfs is runtime state, not user data. Runtime upgrade/recovery may replace `/data/adb/minis/rootfs`, but must not replace App-owned workspace, sessions, memory, skills, shared data, MCP data, or home.
+
+## Shutdown and recovery
+
+Normal runtime Stop follows the same ownership chain in reverse: interactive
+`TerminalSession` PTYs are stopped first, then the per-session
+`ExecutionCoordinator` shells, then the standalone `RootNetworkProxy`. The
+App-owned `NativeOffloadServer` and `GuestCommandBridge` are process-wide
+owners; they are stopped during application teardown rather than per-session
+runtime Stop.
+
+Rootfs replacement, managed-rootfs configuration writes, and external-mount
+reconciliation use the runtime lifecycle gate. They stop guest owners before
+changing Root-owned state, and a new shell can be prepared only after the
+maintenance operation releases that gate. A failed readiness check also
+invalidates the shell generation so a command that raced the failure cannot
+silently recreate an old shell.
+
+If Android force-kills the App, normal Stop code may not run. The next Root-
+authorized readiness pass reconciles only this runtime's Root-owned PID
+markers, and signals a PID only while its current command line/environment
+still identifies the expected helper. Backgrounding the App does not stop an
+active Agent runtime: the foreground service keeps active work alive. A real
+process death is recovered on the next launch instead.
 
 ## SELinux and capability model
 

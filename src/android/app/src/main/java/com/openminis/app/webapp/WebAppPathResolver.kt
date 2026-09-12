@@ -12,14 +12,14 @@ import java.io.File
  * T-pwa-1 (renamed Pwa → WebApp): resolve the stored
  * ([WebAppShortcutEntity.pathScope], [WebAppShortcutEntity.scopeContext],
  * [WebAppShortcutEntity.htmlPath]) triple back to a local File. Canonical
- * guest files are staged through minisd; returns
+ * guest files are staged through [WorkspaceFileClient]; returns
  * null if the file no longer exists — caller should surface a "source
  * missing" UI instead of crashing.
  *
- *   - session_attachment → `/var/minis/attachments/<htmlPath>` through minisd
+ *   - session_attachment → `/var/minis/attachments/<htmlPath>` through the guest file API
  *     (with a legacy app-private fallback for already-persisted shortcuts)
- *   - shared             → staged through minisd
- *   - mount              → staged through the minisd broker
+ *   - shared             → staged through the guest file API
+ *   - mount              → staged through the authorized external-mount API
  */
 object WebAppPathResolver {
 
@@ -78,7 +78,8 @@ object WebAppPathResolver {
 
     private suspend fun resolveSession(context: Context, shortcut: WebAppShortcutEntity): File? {
         val sessionId = shortcut.scopeContext ?: return null
-        // Absolute guest paths are owned by the broker, not the Android host.
+        // Absolute guest paths are resolved by the guest file API, not by
+        // treating the Linux spelling as an Android host path.
         if (shortcut.htmlPath.startsWith("/var/minis/")) {
             return stageGuestFile(context, shortcut.htmlPath, sessionId, shortcut.id)
         }
@@ -102,8 +103,8 @@ object WebAppPathResolver {
         val id = shortcutId.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val staged = File(File(context.cacheDir, "webapp"), "$id-$name")
         return runCatching {
-            val brokerSession = if (ExternalMountAccess.isPath(guestPath)) null else sessionId.orEmpty()
-            WorkspaceFileClient.readToFile(brokerSession, guestPath, staged)
+            val accessSession = if (ExternalMountAccess.isPath(guestPath)) null else sessionId.orEmpty()
+            WorkspaceFileClient.readToFile(accessSession, guestPath, staged)
             staged.takeIf { it.isFile }
         }.getOrNull()
     }

@@ -21,7 +21,7 @@ if [[ -n "${RELEASE_KEYSTORE:-}" ]]; then
     "--ks-pass=file:$CHECK_DIR/store-password" "--key-pass=file:$CHECK_DIR/key-password")
 fi
 # Verify the actual APK generated from the bundle, including compressed JNI
-# packaging required for minisd. The disposable APK is never distributed.
+# packaging required by the native runtime. The disposable APK is never distributed.
 java -jar "$BUNDLETOOL_JAR" build-apks --bundle="$BUNDLE" \
   --output="$CHECK_DIR/bundle.apks" --mode=universal "${SIGNING[@]}"
 unzip -p "$CHECK_DIR/bundle.apks" universal.apk > "$CHECK_DIR/universal.apk"

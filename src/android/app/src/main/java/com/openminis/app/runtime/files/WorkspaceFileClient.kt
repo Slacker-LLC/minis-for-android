@@ -7,22 +7,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.InputStream
-import java.io.RandomAccessFile
-import java.util.ArrayDeque
-import java.util.UUID
 
 /**
- * Compatibility name for the App-owned workspace file API.
+ * App-owned guest workspace file API.
  *
- * Despite the historical package, this implementation contains no minisd/RPC
- * transport. Canonical user data lives in app-private storage and Android file
- * tools access it directly, matching upstream's storage model. The object will
- * retain the guest-path API while using direct App-owned file I/O.
+ * Guest names are resolved to a trusted directory root plus components and
+ * then opened with directory-handle operations. In particular, no operation
+ * reopens a previously checked path through java.io.File.
  */
 internal object WorkspaceFileClient {
     const val MAX_READ_CHUNK = 512 * 1024
@@ -47,18 +40,7 @@ internal object WorkspaceFileClient {
         offset: Long = 0,
         length: Int = MAX_READ_CHUNK,
     ): ReadChunk = withContext(Dispatchers.IO) {
-        require(offset >= 0L) { "offset must be non-negative" }
-        require(length in 1..MAX_READ_CHUNK) { "length must be between 1 and $MAX_READ_CHUNK" }
-        val file = requireFile(sessionId, path)
-        val total = file.length()
-        if (offset >= total) return@withContext ReadChunk(ByteArray(0), offset, total, true)
-        val count = minOf(length.toLong(), total - offset).toInt()
-        val bytes = ByteArray(count)
-        RandomAccessFile(file, "r").use { raf ->
-            raf.seek(offset)
-            raf.readFully(bytes)
-        }
-        ReadChunk(bytes, offset, total, offset + count >= total)
+        SecureFileAccess.readChunk(requirePath(sessionId, path), offset, length, MAX_READ_CHUNK)
     }
 
     suspend fun readAll(
@@ -66,10 +48,7 @@ internal object WorkspaceFileClient {
         path: String,
         maxBytes: Long = MAX_FILE_BYTES,
     ): ByteArray = withContext(Dispatchers.IO) {
-        val file = requireFile(sessionId, path)
-        val size = file.length()
-        if (size > maxBytes) throw Failure("BAD_PARAMS", "file exceeds $maxBytes bytes: $path")
-        FileInputStream(file).use { it.readBytes() }
+        SecureFileAccess.readAll(requirePath(sessionId, path), maxBytes)
     }
 
     fun readAllBlocking(
@@ -84,28 +63,7 @@ internal object WorkspaceFileClient {
         destination: File,
         maxBytes: Long = MAX_FILE_BYTES,
     ): Long = withContext(Dispatchers.IO) {
-        val source = requireFile(sessionId, path)
-        if (source.length() > maxBytes) throw Failure("BAD_PARAMS", "file exceeds $maxBytes bytes: $path")
-        val parent = destination.absoluteFile.parentFile
-            ?: throw Failure("INTERNAL", "destination has no parent: $destination")
-        if (!parent.isDirectory && !parent.mkdirs()) {
-            throw Failure("INTERNAL", "cannot create destination directory: $parent")
-        }
-        val temporary = File(parent, ".${destination.name}.minis-tmp-${UUID.randomUUID()}")
-        var committed = false
-        try {
-            FileInputStream(source).use { input ->
-                FileOutputStream(temporary).use { output ->
-                    input.copyTo(output, MAX_WRITE_CHUNK)
-                    output.fd.sync()
-                }
-            }
-            replaceFile(temporary, destination)
-            committed = true
-            destination.length()
-        } finally {
-            if (!committed) temporary.delete()
-        }
+        SecureFileAccess.readToFile(requirePath(sessionId, path), destination, maxBytes)
     }
 
     fun readToFileBlocking(
@@ -117,42 +75,14 @@ internal object WorkspaceFileClient {
 
     suspend fun writeBytes(sessionId: String?, path: String, bytes: ByteArray): Long =
         withContext(Dispatchers.IO) {
-            if (bytes.size.toLong() > MAX_FILE_BYTES) {
-                throw Failure("BAD_PARAMS", "file exceeds $MAX_FILE_BYTES bytes: $path")
-            }
             requireWritablePath(path)
-            val target = resolveRequired(sessionId, path)
-            val parent = target.parentFile ?: throw Failure("BAD_PARAMS", "path has no parent: $path")
-            if (!parent.isDirectory && !parent.mkdirs()) throw Failure("IO_ERROR", "cannot create $parent")
-            val temporary = File(parent, ".${target.name}.minis-tmp-${UUID.randomUUID()}")
-            var committed = false
-            try {
-                FileOutputStream(temporary).use { output ->
-                    output.write(bytes)
-                    output.fd.sync()
-                }
-                replaceFile(temporary, target)
-                committed = true
-                bytes.size.toLong()
-            } finally {
-                if (!committed) temporary.delete()
-            }
+            SecureFileAccess.writeBytes(requirePath(sessionId, path), bytes, MAX_FILE_BYTES)
         }
 
     suspend fun appendBytes(sessionId: String?, path: String, bytes: ByteArray): Long =
         withContext(Dispatchers.IO) {
             requireWritablePath(path)
-            val target = resolveRequired(sessionId, path)
-            val current = if (target.isFile) target.length() else 0L
-            if (current + bytes.size > MAX_FILE_BYTES) {
-                throw Failure("BAD_PARAMS", "file exceeds $MAX_FILE_BYTES bytes: $path")
-            }
-            target.parentFile?.let { if (!it.isDirectory && !it.mkdirs()) throw Failure("IO_ERROR", "cannot create $it") }
-            FileOutputStream(target, true).use { output ->
-                output.write(bytes)
-                output.fd.sync()
-            }
-            target.length()
+            SecureFileAccess.appendBytes(requirePath(sessionId, path), bytes, MAX_FILE_BYTES)
         }
 
     suspend fun writeStream(
@@ -161,38 +91,9 @@ internal object WorkspaceFileClient {
         input: InputStream,
         maxBytes: Long = MAX_FILE_BYTES,
         onChunk: suspend (ByteArray, Long) -> Unit = { _, _ -> },
-    ): Long {
+    ): Long = withContext(Dispatchers.IO) {
         requireWritablePath(path)
-        val target = resolveRequired(sessionId, path)
-        val parent = target.parentFile ?: throw Failure("BAD_PARAMS", "path has no parent: $path")
-        if (!parent.isDirectory && !parent.mkdirs()) throw Failure("IO_ERROR", "cannot create $parent")
-        val temporary = File(parent, ".${target.name}.minis-tmp-${UUID.randomUUID()}")
-        var total = 0L
-        var committed = false
-        try {
-            withContext(Dispatchers.IO) {
-                FileOutputStream(temporary).use { output ->
-                    val buffer = ByteArray(MAX_WRITE_CHUNK)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        if (count == 0) continue
-                        if (total + count > maxBytes) {
-                            throw Failure("BAD_PARAMS", "file exceeds $maxBytes bytes: $path")
-                        }
-                        output.write(buffer, 0, count)
-                        total += count
-                        onChunk(buffer.copyOf(count), total)
-                    }
-                    output.fd.sync()
-                }
-                replaceFile(temporary, target)
-                committed = true
-            }
-            return total
-        } finally {
-            if (!committed) temporary.delete()
-        }
+        SecureFileAccess.writeStream(requirePath(sessionId, path), input, maxBytes, onChunk)
     }
 
     suspend fun uniqueChildPath(sessionId: String?, directory: String, filename: String): String {
@@ -204,7 +105,7 @@ internal object WorkspaceFileClient {
             buildSet {
                 for (i in 0 until array.length()) array.optJSONObject(i)?.optString("name")?.let(::add)
             }
-        }.getOrDefault(emptySet())
+        }.getOrDefault(emptySet<String>())
         if (filename !in used) return childPath(directory, filename)
         val dot = filename.lastIndexOf('.')
         val base = if (dot > 0) filename.substring(0, dot) else filename
@@ -225,11 +126,10 @@ internal object WorkspaceFileClient {
         destinationSessionId: String? = null,
     ): JSONObject = withContext(Dispatchers.IO) {
         requireWritablePath(destination)
-        val sourceFile = resolveRequired(sourceSessionId ?: sessionId, source)
-        if (!sourceFile.exists()) throw Failure("NOT_FOUND", "source does not exist: $source")
-        val destinationFile = resolveRequired(destinationSessionId ?: sessionId, destination)
-        copyEntry(sourceFile, destinationFile)
-        JSONObject().put("copied", true).put("type", fileType(destinationFile))
+        val sourcePath = requirePath(sourceSessionId ?: sessionId, source)
+        val destinationPath = requirePath(destinationSessionId ?: sessionId, destination)
+        val type = SecureFileAccess.copy(sourcePath, destinationPath)
+        JSONObject().put("copied", true).put("type", type)
     }
 
     suspend fun move(
@@ -241,34 +141,25 @@ internal object WorkspaceFileClient {
     ): JSONObject = withContext(Dispatchers.IO) {
         requireWritablePath(source)
         requireWritablePath(destination)
-        val sourceFile = resolveRequired(sourceSessionId ?: sessionId, source)
-        if (!sourceFile.exists()) throw Failure("NOT_FOUND", "source does not exist: $source")
-        val destinationFile = resolveRequired(destinationSessionId ?: sessionId, destination)
-        destinationFile.parentFile?.mkdirs()
-        if (SafeFileTree.existsNoFollow(destinationFile) && !SafeFileTree.deleteRecursively(destinationFile)) {
-            throw Failure("IO_ERROR", "cannot replace destination: $destination")
-        }
-        if (!sourceFile.renameTo(destinationFile)) {
-            copyEntry(sourceFile, destinationFile)
-            if (!SafeFileTree.deleteRecursively(sourceFile)) {
-                throw Failure("IO_ERROR", "cannot remove source after copy: $source")
-            }
-        }
-        JSONObject().put("moved", true).put("type", fileType(destinationFile))
+        val sourcePath = requirePath(sourceSessionId ?: sessionId, source)
+        val destinationPath = requirePath(destinationSessionId ?: sessionId, destination)
+        val type = SecureFileAccess.move(sourcePath, destinationPath)
+        JSONObject().put("moved", true).put("type", type)
     }
 
     suspend fun mkdir(sessionId: String?, path: String): JSONObject = withContext(Dispatchers.IO) {
         requireWritablePath(path)
-        val directory = resolveRequired(sessionId, path)
-        if (directory.exists() && !directory.isDirectory) throw Failure("NOT_DIR", "path is not a directory: $path")
-        if (!directory.isDirectory && !directory.mkdirs()) throw Failure("IO_ERROR", "cannot create directory: $path")
-        infoJson(directory)
+        val attributes = SecureFileAccess.mkdir(requirePath(sessionId, path))
+        infoJson(attributes)
     }
 
     suspend fun deleteSession(sessionId: String): JSONObject = withContext(Dispatchers.IO) {
         if (!UbuntuPaths.isSafeSessionId(sessionId)) throw Failure("BAD_PARAMS", "invalid session id")
-        val target = UbuntuPaths.sessionDir(sessionId) ?: throw Failure("BAD_PARAMS", "invalid session path")
-        val deleted = SafeFileTree.deleteRecursively(target)
+        val path = UbuntuPaths.SecureFilePath(
+            root = File(UbuntuPaths.hostSessions).absoluteFile,
+            components = listOf(sessionId),
+        )
+        val deleted = SecureFileAccess.delete(path)
         if (!deleted) throw Failure("IO_ERROR", "cannot delete session $sessionId")
         JSONObject().put("deleted", true)
     }
@@ -277,10 +168,8 @@ internal object WorkspaceFileClient {
 
     suspend fun delete(sessionId: String?, path: String): JSONObject = withContext(Dispatchers.IO) {
         requireWritablePath(path)
-        val target = resolveRequired(sessionId, path)
-        if (!SafeFileTree.existsNoFollow(target)) return@withContext JSONObject().put("deleted", false)
-        if (!SafeFileTree.deleteRecursively(target)) throw Failure("IO_ERROR", "cannot delete: $path")
-        JSONObject().put("deleted", true)
+        val target = requirePath(sessionId, path)
+        JSONObject().put("deleted", SecureFileAccess.delete(target))
     }
 
     suspend fun list(sessionId: String?, path: String, limit: Int, offset: Int): JSONObject =
@@ -290,17 +179,10 @@ internal object WorkspaceFileClient {
             if (path.trimEnd('/') == "/var/minis/mounts") {
                 return@withContext listMountRoots(limit, offset)
             }
-            val directory = resolveRequired(sessionId, path)
-            if (!directory.isDirectory) throw Failure("NOT_DIR", "not a directory: $path")
-            val children = directory.listFiles()?.sortedBy { it.name.lowercase() }
-                ?: throw Failure("IO_ERROR", "cannot list directory: $path")
-            val page = children.drop(offset).take(limit)
+            val (entries, next) = SecureFileAccess.list(requirePath(sessionId, path), limit, offset)
             val array = JSONArray()
-            page.forEach { child -> array.put(infoJson(child).put("name", child.name)) }
-            val next = offset + page.size
-            JSONObject()
-                .put("entries", array)
-                .put("next_offset", if (next < children.size) next else -1)
+            entries.forEach { (name, attributes) -> array.put(infoJson(attributes).put("name", name)) }
+            JSONObject().put("entries", array).put("next_offset", next)
         }
 
     suspend fun info(sessionId: String?, path: String): JSONObject = withContext(Dispatchers.IO) {
@@ -313,8 +195,9 @@ internal object WorkspaceFileClient {
         }
         val target = resolveOptional(sessionId, path)
             ?: return@withContext JSONObject().put("exists", false)
-        if (!target.exists()) return@withContext JSONObject().put("exists", false)
-        infoJson(target)
+        val attributes = SecureFileAccess.infoOrNull(target)
+            ?: return@withContext JSONObject().put("exists", false)
+        infoJson(attributes)
     }
 
     suspend fun listAll(sessionId: String?, path: String): List<JSONObject> {
@@ -354,26 +237,15 @@ internal object WorkspaceFileClient {
 
     suspend fun deleteChildren(sessionId: String?, root: String) {
         val entries = listAll(sessionId, root)
-        for (entry in entries) {
-            delete(sessionId, childPath(root, entry.optString("name")))
-        }
+        for (entry in entries) delete(sessionId, childPath(root, entry.optString("name")))
     }
 
-    private suspend fun resolveOptional(sessionId: String?, path: String): File? =
-        UbuntuPaths.resolveForFileAccess(sessionId, path)
+    private suspend fun resolveOptional(sessionId: String?, path: String): UbuntuPaths.SecureFilePath? =
+        UbuntuPaths.resolveSecureForFileAccess(sessionId, path)
 
-    private suspend fun resolveRequired(sessionId: String?, path: String): File =
+    private suspend fun requirePath(sessionId: String?, path: String): UbuntuPaths.SecureFilePath =
         resolveOptional(sessionId, path)
             ?: throw Failure("BAD_PARAMS", "path is outside the Minis guest namespace or unavailable: $path")
-
-    private suspend fun requireFile(sessionId: String?, path: String): File {
-        val file = resolveRequired(sessionId, path)
-        if (!file.isFile) {
-            if (!file.exists()) throw Failure("NOT_FOUND", "file does not exist: $path")
-            throw Failure("NOT_FILE", "path is not a file: $path")
-        }
-        return file
-    }
 
     private fun requireWritablePath(path: String) {
         if (UbuntuPaths.isExternalMountPath(path) && !UbuntuPaths.isExternalMountWritable(path)) {
@@ -381,17 +253,11 @@ internal object WorkspaceFileClient {
         }
     }
 
-    private fun infoJson(file: File): JSONObject = JSONObject()
-        .put("exists", file.exists())
-        .put("type", fileType(file))
-        .put("size", if (file.isFile) file.length() else 0L)
-        .put("modified", file.lastModified())
-
-    private fun fileType(file: File): String = when {
-        file.isDirectory -> "dir"
-        file.isFile -> "file"
-        else -> "other"
-    }
+    private fun infoJson(attributes: SecureFileAccess.Attributes): JSONObject = JSONObject()
+        .put("exists", true)
+        .put("type", attributes.type)
+        .put("size", attributes.size)
+        .put("modified", attributes.modified)
 
     private fun listMountRoots(limit: Int, offset: Int): JSONObject {
         val all = RuntimePathRegistry.mountedFoldersStore?.entries?.value.orEmpty()
@@ -409,64 +275,6 @@ internal object WorkspaceFileClient {
         }
         val next = offset + page.size
         return JSONObject().put("entries", array).put("next_offset", if (next < all.size) next else -1)
-    }
-
-    private fun copyEntry(source: File, destination: File) {
-        if (source.canonicalPath == destination.canonicalPath) return
-        if (SafeFileTree.isSymbolicLink(source)) {
-            throw Failure("BAD_PARAMS", "refusing to recursively copy symbolic link: $source")
-        }
-        if (SafeFileTree.isSymbolicLink(destination)) {
-            if (!SafeFileTree.deleteRecursively(destination)) {
-                throw Failure("IO_ERROR", "cannot replace symbolic-link destination: $destination")
-            }
-        }
-        destination.parentFile?.mkdirs()
-        if (source.isDirectory) {
-            if (SafeFileTree.existsNoFollow(destination) && !destination.isDirectory) {
-                if (!SafeFileTree.deleteRecursively(destination)) {
-                    throw Failure("IO_ERROR", "cannot replace $destination")
-                }
-            }
-            if (!destination.isDirectory && !destination.mkdirs()) throw Failure("IO_ERROR", "cannot create $destination")
-            source.listFiles()?.forEach { child -> copyEntry(child, File(destination, child.name)) }
-                ?: throw Failure("IO_ERROR", "cannot list $source")
-        } else if (source.isFile) {
-            val parent = destination.parentFile
-                ?: throw Failure("BAD_PARAMS", "destination has no parent: $destination")
-            val temp = File(parent, ".${destination.name}.minis-tmp-${UUID.randomUUID()}")
-            FileInputStream(source).use { input ->
-                FileOutputStream(temp).use { output ->
-                    input.copyTo(output, MAX_WRITE_CHUNK)
-                    output.fd.sync()
-                }
-            }
-            replaceFile(temp, destination)
-        } else {
-            throw Failure("BAD_PARAMS", "unsupported source type: $source")
-        }
-    }
-
-    private fun replaceFile(temporary: File, destination: File) {
-        if (SafeFileTree.existsNoFollow(destination) && !SafeFileTree.deleteRecursively(destination)) {
-            temporary.delete()
-            throw Failure("IO_ERROR", "cannot replace destination: $destination")
-        }
-        if (!temporary.renameTo(destination)) {
-            try {
-                FileInputStream(temporary).use { input ->
-                    FileOutputStream(destination).use { output ->
-                        input.copyTo(output, MAX_WRITE_CHUNK)
-                        output.fd.sync()
-                    }
-                }
-            } catch (error: Exception) {
-                destination.delete()
-                throw Failure("IO_ERROR", "cannot commit file: ${error.message}")
-            } finally {
-                temporary.delete()
-            }
-        }
     }
 
     private fun childPath(directory: String, name: String): String {

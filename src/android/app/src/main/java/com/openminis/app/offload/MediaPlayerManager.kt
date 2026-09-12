@@ -10,8 +10,9 @@ import java.security.MessageDigest
 /**
  * Manages multiple concurrent MediaPlayer sessions keyed by session ID.
  * Supports audio playback with play/pause/resume/seek/stop/status operations.
- * SAF mount paths are staged through the minisd broker. Canonical guest
- * files are staged through minisd into app cache before playback.
+ * SAF mount paths are staged through the authorized external-mount API.
+ * Canonical guest files are staged through the App-owned guest file API into
+ * app cache before playback.
  */
 object MediaPlayerManager {
 

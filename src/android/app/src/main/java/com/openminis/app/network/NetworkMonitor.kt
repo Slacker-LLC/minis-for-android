@@ -71,7 +71,16 @@ class NetworkMonitor {
      * @param context Application or activity context.
      * @param client Optional shared OkHttpClient for connection pool eviction.
      */
+    @Synchronized
     fun start(context: Context, client: OkHttpClient? = null) {
+        if (networkCallback != null) {
+            // Application.onCreate is normally once per process, but tests,
+            // host-side reinitialization and a few OEM process paths can call
+            // the wiring more than once. Never register a second callback and
+            // leak the first one; only the optional pool reference may change.
+            okHttpClient = client
+            return
+        }
         okHttpClient = client
         appContext = context.applicationContext
         connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
@@ -154,18 +163,27 @@ class NetworkMonitor {
             Log.d(TAG, "Network monitoring started (default network callback)")
         } catch (t: Throwable) {
             Log.w(TAG, "registerDefaultNetworkCallback failed, falling back: ${t.message}")
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                .build()
-            cm.registerNetworkCallback(request, callback)
-            Log.d(TAG, "Network monitoring started (fallback network request)")
+            try {
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build()
+                cm.registerNetworkCallback(request, callback)
+                Log.d(TAG, "Network monitoring started (fallback network request)")
+            } catch (fallback: Throwable) {
+                networkCallback = null
+                connectivityManager = null
+                appContext = null
+                okHttpClient = null
+                Log.w(TAG, "fallback network registration failed: ${fallback.message}")
+            }
         }
     }
 
     /**
      * Unregisters the network callback. Should be called during cleanup.
      */
+    @Synchronized
     fun stop() {
         networkCallback?.let { callback ->
             try {
@@ -197,7 +215,8 @@ class NetworkMonitor {
      * Refresh the sandbox rootfs' /etc/resolv.conf from the current system
      * DNS configuration. Runs on IO so we don't block the ConnectivityManager
      * callback thread with file I/O. Safe to call before the rootfs has been
-     * extracted — [RootfsManager.refreshDns] no-ops when the rootfs is missing.
+     * extracted — [RootfsManager.refreshDns] fails closed when the rootfs is
+     * missing or the Direct Root infrastructure is unavailable.
      *
      * Mirrors iOS NetworkMonitor.swift:26,60 which calls refreshDns() on every
      * NWPath update so already-running shells pick up the new nameservers the

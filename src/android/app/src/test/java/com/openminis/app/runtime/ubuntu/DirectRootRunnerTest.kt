@@ -11,8 +11,9 @@ class DirectRootRunnerTest {
             "echo ok",
             "/data/adb/minis/runtime/runner-test.pid",
         )
-        assertTrue(command.contains("command -v setsid"))
-        assertTrue(command.contains("exec setsid /system/bin/sh -c"))
+        assertTrue(command.contains("[ -x /system/bin/setsid ]"))
+        assertTrue(command.contains("exec /system/bin/setsid /system/bin/sh -c"))
+        assertTrue(command.contains("MINIS_DIRECT_ROOT_RUNNER=1"))
         assertTrue(command.contains("echo \$\$ >"))
         assertTrue(command.contains("__minis_status=\$?"))
         assertTrue(command.contains("rm -f --"))
@@ -40,5 +41,31 @@ class DirectRootRunnerTest {
         assertTrue(command.contains("kill -KILL -\$PID"))
         assertTrue(command.contains("rm -f --"))
         assertFalse(command.contains("rm -rf"))
+    }
+
+    @Test
+    fun `stale cleanup checks command identity before signaling reused pid`() {
+        val command = DirectRootRunner.buildStaleProcessCleanupCommand(
+            markerDir = "/data/adb/minis/runtime/proxy",
+            markerGlob = "proxy-*.pid",
+            commandNeedle = "libminisnetproxy.so",
+        )
+        assertTrue(command.contains("/proc/\$PID/cmdline"))
+        assertTrue(command.contains("cat \"/proc/\$PID/cmdline\""))
+        assertTrue(command.contains("libminisnetproxy.so"))
+        assertTrue(command.contains("\"\$PID\" -eq \"\$\$\""))
+        assertTrue(command.contains("CURRENT_PGID=\$(awk '{print \$5}' /proc/\$\$/stat"))
+        assertTrue(command.contains("kill -TERM -\$PID"))
+        assertTrue(command.contains("rm -f -- \"\$marker\""))
+
+        val shellCommand = DirectRootRunner.buildStaleProcessCleanupCommand(
+            markerDir = "/data/adb/minis/runtime/shells",
+            markerGlob = "shell-*.pid",
+            commandNeedle = "unshare",
+            environmentVariable = "MINIS_DIRECT_ROOT_SHELL",
+        )
+        assertTrue(shellCommand.contains("/proc/\$PID/environ"))
+        assertTrue(shellCommand.contains("cat \"/proc/\$PID/environ\""))
+        assertTrue(shellCommand.contains("MINIS_DIRECT_ROOT_SHELL="))
     }
 }

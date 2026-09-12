@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeout
  *
  * [GH#197] It used to await the entire agent loop before calling
  * pending.finish(), which held the broadcast for minutes and ANR-killed
- * the process — and with it every PRoot sandbox child. goAsync() alone
+ * the process — and with it every Direct Ubuntu guest child. goAsync() alone
  * does not buy unlimited time; it only defers the deadline, so the work
  * it wraps still has to be short.
  */
@@ -69,7 +69,7 @@ class ScheduledTaskAlarmReceiver : BroadcastReceiver() {
                     // lands back on the main thread. pending.finish() then
                     // sits behind it, blowing far past the ~10s budget a
                     // manifest-declared receiver gets, so the system ANRs the
-                    // process and kills it — taking every PRoot sandbox child
+                    // process and kills it — taking every Direct Ubuntu guest child
                     // with it. The UI "Run now" path already passes false
                     // (638f3eb0b); the alarm path silently kept the default.
                     //

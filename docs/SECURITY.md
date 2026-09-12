@@ -21,9 +21,9 @@ DebugServer remains loopback-bound and debug-only. The local MCP server binds lo
 
 There is no production privileged broker or generic Root RPC in the current architecture.
 
-`DirectRootRunner` is an internal launcher used by trusted Android runtime code only for operations that require privilege, such as Root capability probing, rootfs repair, mount namespace/bind/chroot setup, controlled one-time migration, and tightly scoped maintenance. Agent, MCP, Provider, and model output must not flow directly into its script input.
+`DirectRootRunner` is an internal launcher used by trusted Android runtime code for operations that require privilege, such as Root capability probing, rootfs repair, mount namespace/bind/chroot setup, controlled one-time migration, and tightly scoped maintenance. A local Agent may also request the structured `root.shell` tool: it supplies only an executable basename and argv, which are resolved from trusted Android system directories and bounded before execution. Agent, MCP, Provider, and model output must not flow as a raw command string into its script input.
 
-`root.shell` is denied for both local Agent and MCP callers. Guest execution is not Root execution: after Root establishes the namespace/chroot, `setpriv` switches to the real App UID/GID, clears supplementary groups, and drops Linux capabilities before bash starts.
+`root.shell` is local-only and hidden from MCP; it has no `command` string, host-filesystem API, or generic RPC transport. Guest execution is not Root execution: after Root establishes the namespace/chroot, `setpriv` switches to the real App UID/GID, clears supplementary groups, and drops Linux capabilities before bash starts.
 
 Root-provider identity is diagnostic only. `uid=0` does not prove SELinux, mount, namespace, or capability operations are permitted.
 

@@ -16,7 +16,7 @@ data class RootfsHealth(
     val detail: String,
     val metadata: JSONObject? = null,
     val provisioned: Boolean = false,
-    /** Broker-reported logical size in bytes; null means size was unavailable. */
+    /** Root-probed logical size in bytes; null means size was unavailable. */
     val sizeBytes: Long? = null,
 ) {
     val healthy: Boolean get() = code == RootfsHealthCode.HEALTHY

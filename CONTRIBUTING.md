@@ -2,7 +2,7 @@
 
 **Chinese contribution rules are authoritative:** [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md).
 
-This repository is independently maintained. The active Linux runtime is App-owned **direct Ubuntu 24.04 chroot**: Root establishes only the required rootfs/mount/chroot infrastructure, then guest shells drop to the real App UID/GID with no Linux capabilities. Active guest user data is App-owned; historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are migration sources only.
+This repository is independently maintained. The active Linux runtime is App-owned **direct Ubuntu 24.04 chroot**: `DirectRootRunner` establishes only the required rootfs/mount/chroot infrastructure, then guest shells drop to the real App UID/GID with no Linux capabilities. The local Agent may separately use the bounded structured `root.shell` tool for trusted Android system executables; it is not a raw command, host-file, or generic RPC surface. Active guest user data is App-owned; historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are migration sources only.
 
 Do not restore the former privileged broker, PRoot/Alpine dual runtime, or any Agent/model/MCP-controlled raw `su -c` / generic Root RPC path.
 

@@ -9,7 +9,7 @@ DIST="${DIST:-$ROOT/dist}"
 WORK="${WORK:-/tmp/minis-ubuntu-rootfs}"
 REL="${REL:-24.04.3}"
 ROOTFS_REVISION="${ROOTFS_REVISION:-1}"
-PROVISION_REVISION="${PROVISION_REVISION:-1}"
+PROVISION_REVISION="${PROVISION_REVISION:-2}"
 BASE_NAME="ubuntu-base-${REL}-base-arm64.tar.gz"
 BASE_URL="${BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/${BASE_NAME}}"
 SUMS_URL="${SUMS_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS}"
@@ -155,7 +155,7 @@ cat > "$STAGE/etc/minis/rootfs.json" <<EOF
   "preinstalled": "base-only",
   "source_url": "${BASE_URL}",
   "upstream_sha256": "${EXPECTED_BASE_SHA256}",
-  "note": "python3/git/curl installed on device by the App-owned UbuntuProvisioner"
+  "note": "python3/git/curl/ping installed on device by the App-owned UbuntuProvisioner"
 }
 EOF
 
@@ -188,7 +188,7 @@ cat > "$DIST/ubuntu-arm64-rootfs.manifest.json" <<EOF
   "source_url": "$BASE_URL",
   "checksums_url": "$SUMS_URL",
   "upstream_sha256": "$EXPECTED_BASE_SHA256",
-  "requiredCommands": ["python3", "git", "curl"]
+  "requiredCommands": ["python3", "git", "curl", "ping"]
 }
 EOF
 echo "==> $OUT"

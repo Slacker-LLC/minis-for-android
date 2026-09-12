@@ -359,7 +359,7 @@ data class LLMModel(
  * `"image" in modalities` checks, and capability fragments work uniformly.
  */
 fun String.normalizeModalityName(): String =
-    removeSuffix("_input").removeSuffix("_output").lowercase()
+    lowercase().removeSuffix("_input").removeSuffix("_output")
 
 fun List<String>?.normalizeModalities(): List<String>? =
     this?.map { it.normalizeModalityName() }?.distinct()?.takeIf { it.isNotEmpty() }

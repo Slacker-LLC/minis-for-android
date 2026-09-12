@@ -42,8 +42,8 @@ import java.util.concurrent.TimeUnit
  *   - `transcribe` is the new canonical subcommand; `listen` is an alias kept
  *     for back-compat with prompts that learned the old form.
  *   - `--source <mic|path>` mirrors apple-speech: defaults to system mic,
- *     also accepts a Linux file path under /var/minis/... validated through
- *     minisd. **Audio-file transcription is not
+     *     also accepts a Linux file path under /var/minis/... validated through
+     *     the App-owned workspace boundary. **Audio-file transcription is not
  *     yet wired through the recognizer** — Android's [SpeechRecognizer]
  *     only exposes microphone input on most vendor implementations
  *     (the API 31 `EXTRA_AUDIO_SOURCE` extension is not honoured by
@@ -221,7 +221,7 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
         return s.isEmpty() || s == "mic" || s == "system-mic" || s == "system_mic" || s == "microphone"
     }
 
-    /** Validate a guest path through minisd without exposing a host path. */
+    /** Validate a guest path through the App-owned file API without exposing a host path. */
     private data class SourcePathCheck(val exists: Boolean)
 
     private fun resolveSourcePath(source: String, sessionId: String?): SourcePathCheck {

@@ -137,14 +137,14 @@ object ProviderFactory {
                         },
                         model = model,
                         basePath = base,
-                    )
+                    ).also { it.supportsPriorityProcessing = true }
                 } else {
                     val effectiveKey = if (!manualBearer.isNullOrEmpty()) manualBearer else apiKey
                     OpenAIProvider(
                         apiKey = effectiveKey,
                         model = model,
                         basePath = base,
-                    )
+                    ).also { it.supportsPriorityProcessing = true }
                 }
             }
             ProviderType.kimiCode -> {

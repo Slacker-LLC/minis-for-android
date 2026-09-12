@@ -2,9 +2,15 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.files.SecureFileOps
+import com.openminis.app.runtime.files.SafeFileTree
 import kotlinx.coroutines.CancellationException
 import java.io.File
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
+import java.nio.file.LinkOption
 
 /**
  * Host/guest path contract for the direct Ubuntu backend.
@@ -15,6 +21,18 @@ import java.io.File
  * bind-mounts those directories into the chroot.
  */
 object UbuntuPaths {
+    /**
+     * A path split into a trusted directory root and untrusted name components.
+     * Consumers must walk it with directory-handle APIs; joining these fields
+     * into a normal File path would reintroduce the TOCTOU the split prevents.
+     */
+    internal data class SecureFilePath(
+        val root: File,
+        val components: List<String>,
+    ) {
+        fun child(name: String): SecureFilePath = copy(components = components + name)
+    }
+
     /** Legacy/root runtime root. Only rootfs and migration source remain here. */
     const val HOST_MINIS = "/data/adb/minis"
     const val HOST_ROOTFS = "$HOST_MINIS/rootfs"
@@ -98,7 +116,10 @@ object UbuntuPaths {
         hostMcpServers,
         hostSessions,
         hostHome,
-    ).all { path -> File(path).isDirectory || File(path).mkdirs() }
+    ).all { path -> ensureRealDirectory(File(path)) }
+
+    /** Ensure a host path is a real directory without following symlinks. */
+    internal fun ensureHostDirectory(directory: File): Boolean = ensureRealDirectory(directory)
 
     internal fun useLayoutForTest(root: File) {
         hostWorkspace = File(root, "workspace").absolutePath
@@ -152,7 +173,8 @@ object UbuntuPaths {
 
     /**
      * Resolve a path for Android-side file I/O. External mounts are re-derived
-     * from the persisted SAF grant on each access; no Root broker is involved.
+     * from the persisted SAF grant on each access; no Root process receives a
+     * host-path handoff from this resolver.
      */
     suspend fun resolveForFileAccess(sessionId: String?, linuxPath: String): File? {
         if (unsafePath(linuxPath)) return null
@@ -161,6 +183,49 @@ object UbuntuPaths {
             return resolveSessionPath(File(hostSessions), sessionId, linuxPath)
         }
         return resolveHostPath(linuxPath)
+    }
+
+    /**
+     * Resolve a guest path without returning a path that can later be reopened
+     * through a raced symlink. The returned root is trusted; every component
+     * below it must be opened with SecureDirectoryStream/openat semantics.
+     */
+    internal suspend fun resolveSecureForFileAccess(
+        sessionId: String?,
+        linuxPath: String,
+    ): SecureFilePath? {
+        if (unsafePath(linuxPath)) return null
+        if (isExternalMountPath(linuxPath)) return resolveExternalMountSecure(linuxPath)
+
+        if (!sessionId.isNullOrBlank() && isSessionScopedPath(linuxPath)) {
+            if (!isSafeSessionId(sessionId)) return null
+            val normalized = if (linuxPath.startsWith('/')) linuxPath else "/workspace/$linuxPath"
+            val match = sessionAliases
+                .filter { normalized == it.first || normalized.startsWith(it.first + "/") }
+                .maxByOrNull { it.first.length }
+                ?: return null
+            val rest = normalized.removePrefix(match.first).removePrefix("/")
+            val relative = secureComponents(rest) ?: return null
+            return SecureFilePath(
+                root = File(hostSessions).absoluteFile,
+                components = listOf(sessionId, match.second) + relative,
+            )
+        }
+
+        resolveSecureGuest(linuxPath)?.let { return it }
+        val sorted = bindMounts.keys.sortedByDescending { it.length }
+        for (mount in sorted) {
+            if (linuxPath == mount || linuxPath.startsWith("$mount/")) {
+                val hostBase = bindMounts[mount] ?: continue
+                val relative = secureComponents(linuxPath.removePrefix(mount).removePrefix("/"))
+                    ?: return null
+                return SecureFilePath(File(hostBase).absoluteFile, relative)
+            }
+        }
+        if (!linuxPath.startsWith('/')) {
+            return resolveSecureGuest("/workspace/$linuxPath")
+        }
+        return null
     }
 
     suspend fun externalMountRoot(name: String): File? {
@@ -190,7 +255,7 @@ object UbuntuPaths {
         val ctx = appContext ?: return null
         val rest = linuxPath.removePrefix("/var/minis/mounts/")
         val name = rest.substringBefore('/')
-        if (name.isEmpty()) return null
+        if (!isSafeComponent(name)) return null
         val entry = RuntimePathRegistry.mountedFoldersStore?.entries?.value
             ?.firstOrNull { it.name == name && it.isActive }
             ?: return null
@@ -207,6 +272,61 @@ object UbuntuPaths {
         return childOf(rootPath, rest.substringAfter('/', ""))
     }
 
+    private suspend fun resolveExternalMountSecure(linuxPath: String): SecureFilePath? {
+        if (!linuxPath.startsWith("/var/minis/mounts/")) return null
+        val ctx = appContext ?: return null
+        val rest = linuxPath.removePrefix("/var/minis/mounts/")
+        val name = rest.substringBefore('/')
+        if (!isSafeComponent(name)) return null
+        val entry = RuntimePathRegistry.mountedFoldersStore?.entries?.value
+            ?.firstOrNull { it.name == name && it.isActive }
+            ?: return null
+        val store = RuntimePathRegistry.mountedFoldersStore ?: return null
+        val uri = Uri.parse(entry.treeUri)
+        try {
+            store.validateMountEntries(listOf(entry))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return null
+        }
+        val rootPath = store.resolvePosixPath(uri, ctx) ?: return null
+        val relative = secureComponents(rest.substringAfter('/', "")) ?: return null
+        return SecureFilePath(File(rootPath).absoluteFile, relative)
+    }
+
+    private fun resolveSecureGuest(linuxPath: String): SecureFilePath? {
+        val match = aliases
+            .filter { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
+            .maxByOrNull { it.first.length }
+            ?: return null
+        val relative = secureComponents(linuxPath.removePrefix(match.first).removePrefix("/"))
+            ?: return null
+        return SecureFilePath(File(match.second()).absoluteFile, relative)
+    }
+
+    private fun secureComponents(rest: String): List<String>? {
+        if (rest.isEmpty()) return emptyList()
+        val parts = rest.split('/')
+        if (parts.lastOrNull() == "") {
+            if (parts.dropLast(1).any { it.isEmpty() }) return null
+            return parts.dropLast(1).map { component ->
+                if (!isSafeComponent(component)) return null
+                component
+            }
+        }
+        if (parts.any { !isSafeComponent(it) }) return null
+        return parts
+    }
+
+    private fun isSafeComponent(component: String): Boolean =
+        component.isNotEmpty() &&
+            component != "." &&
+            component != ".." &&
+            !component.contains('/') &&
+            !component.contains('\\') &&
+            !component.contains('\u0000')
+
     internal fun isSafeSessionId(sessionId: String): Boolean =
         sessionId.isNotEmpty() &&
             sessionId.length <= 128 &&
@@ -218,17 +338,24 @@ object UbuntuPaths {
 
     internal fun ensureSessionDirsAt(sessionsRoot: File, sessionId: String): File? {
         if (!isSafeSessionId(sessionId)) return null
-        if (!sessionsRoot.isDirectory && !sessionsRoot.mkdirs()) return null
+        if (!ensureRealDirectory(sessionsRoot)) return null
+
+        val rawSession = File(sessionsRoot, sessionId)
+        if (!ensureRealDirectory(rawSession)) return null
         val session = childOf(sessionsRoot.absolutePath, sessionId) ?: return null
-        listOf("workspace", "attachments", "offloads", "browser").forEach { subdir ->
-            val dir = File(session, subdir)
-            if (!dir.isDirectory && !dir.mkdirs()) return null
+        if (session.canonicalFile != rawSession.canonicalFile) return null
+
+        val namedDirs = listOf("workspace", "attachments", "offloads", "browser")
+        for (subdir in namedDirs) {
+            if (!ensureRealDirectory(File(session, subdir))) return null
         }
-        // Bind targets under /workspace must exist after the workspace bind is
-        // installed, so create harmless placeholders in the host workspace.
+
+        // Bind targets under /workspace must be real directories. A guest-created
+        // symlink here would otherwise be followed by Root mount --bind before
+        // privilege drop on the next shell launch.
         val workspace = File(session, "workspace")
-        listOf("attachments", "offloads", "browser").forEach { subdir ->
-            File(workspace, subdir).mkdirs()
+        for (subdir in listOf("attachments", "offloads", "browser")) {
+            if (!ensureRealDirectory(File(workspace, subdir))) return null
         }
         return session
     }
@@ -258,25 +385,107 @@ object UbuntuPaths {
             resolveHostPath(linuxPath)
         }
 
-    @Suppress("UNUSED_PARAMETER")
     fun deleteSession(context: Context, sessionId: String): Boolean {
         if (appContext == null) initialize(context)
-        if (!isSafeSessionId(sessionId)) return false
-        val root = File(hostSessions).canonicalFile
-        val target = childOf(root.absolutePath, sessionId) ?: return false
-        return !target.exists() || target.deleteRecursively()
+        return deleteSessionAt(File(hostSessions), sessionId)
     }
+
+    internal fun deleteSessionAt(sessionsRoot: File, sessionId: String): Boolean {
+        if (!isSafeSessionId(sessionId)) return false
+        if (SafeFileTree.isSymbolicLink(sessionsRoot)) return false
+        if (!SafeFileTree.existsNoFollow(sessionsRoot)) return true
+        if (!sessionsRoot.isDirectory) return false
+        val target = File(sessionsRoot, sessionId)
+        return !SafeFileTree.existsNoFollow(target) || SafeFileTree.deleteRecursively(target)
+    }
+
+    private fun ensureRealDirectory(directory: File): Boolean {
+        val path = try {
+            directory.toPath().toAbsolutePath().normalize()
+        } catch (_: Exception) {
+            return false
+        }
+
+        // Android app UIDs may traverse their own filesDir but cannot open
+        // the global /data directory as a directory fd. Find the nearest
+        // existing, non-symlink ancestor and let the native helper walk only
+        // the components below that trusted anchor.
+        var anchor = path
+        while (!Files.exists(anchor, LinkOption.NOFOLLOW_LINKS)) {
+            anchor = anchor.parent ?: return false
+        }
+        if (Files.isSymbolicLink(anchor) ||
+            !Files.isDirectory(anchor, LinkOption.NOFOLLOW_LINKS)
+        ) {
+            return false
+        }
+        if (path == anchor) return true
+        val components = try {
+            anchor.relativize(path).map { it.toString() }
+        } catch (_: Exception) {
+            return false
+        }
+
+        // Android's java.nio Files implementation does not consistently
+        // support the no-follow directory operations used below on all API
+        // levels/OEM builds. The bundled openat(O_NOFOLLOW) helper is the
+        // production path; plain JVM tests use the equivalent NIO fallback.
+        val nativeResult = try {
+            SecureFileOps.ensureDirectories(anchor.toString(), components)
+        } catch (error: UnsatisfiedLinkError) {
+            if (isAndroidRuntime()) return false
+            null
+        } catch (error: NoClassDefFoundError) {
+            if (isAndroidRuntime()) return false
+            null
+        }
+        if (nativeResult != null) {
+            if (nativeResult != 0) {
+                Log.w("UbuntuPaths", "secure directory creation failed for $path: errno=${-nativeResult}")
+            }
+            return nativeResult == 0
+        }
+
+        var current = anchor
+        for (component in components) {
+            current = current.resolve(component)
+            if (Files.isSymbolicLink(current)) return false
+            if (!Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+                try {
+                    Files.createDirectory(current)
+                } catch (_: FileAlreadyExistsException) {
+                    // Re-check below with NOFOLLOW_LINKS after a creator won
+                    // the race.
+                } catch (_: Exception) {
+                    return false
+                }
+            }
+            if (Files.isSymbolicLink(current) ||
+                !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)
+            ) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun isAndroidRuntime(): Boolean =
+        System.getProperty("java.vm.name")?.let { name ->
+            name.contains("Dalvik", ignoreCase = true) || name.contains("ART", ignoreCase = true)
+        } == true
 
     private fun isSessionScopedPath(linuxPath: String): Boolean {
         if (!linuxPath.startsWith('/')) return true
         return sessionAliases.any { linuxPath == it.first || linuxPath.startsWith(it.first + "/") }
     }
 
-    internal fun childOf(base: String, rest: String): File? = runCatching {
+    internal fun childOf(base: String, rest: String): File? = try {
         val root = File(base).canonicalFile
         val target = if (rest.isEmpty()) root else File(root, rest).canonicalFile
         if (target.path == root.path || target.path.startsWith(root.path + File.separator)) target else null
-    }.getOrNull()
+    } catch (_: Exception) {
+        null
+    }
 
     private fun unsafePath(path: String): Boolean =
         path.isEmpty() || path.contains('\u0000') || path.split('/').any { it == ".." }

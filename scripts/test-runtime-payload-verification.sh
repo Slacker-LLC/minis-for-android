@@ -31,7 +31,7 @@ manifest = {
     "schemaVersion": 3, "distro": "ubuntu", "release": "24.04.3", "arch": "arm64", "profile": "base",
     "revision": 1, "rootfsVersion": f"ubuntu-24.04-r1-{digest[:16]}", "rootfsSha256": digest,
     "upstreamSha256": "7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048",
-    "provisionRevision": 1, "requiredCommands": ["python3", "git", "curl"],
+    "provisionRevision": 2, "requiredCommands": ["python3", "git", "curl", "ping"],
 }
 (root / "runtime-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 PY

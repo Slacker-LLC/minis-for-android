@@ -11,7 +11,6 @@ import org.json.JSONObject
 object ToolRegistry {
     private val handlers = linkedMapOf<String, ToolHandler>()
     private val aliases = linkedMapOf<String, String>()
-    private val hiddenFromDiscovery = setOf("root.shell")
 
     internal fun normalize(name: String): String =
         name.lowercase().filter { it.isLetterOrDigit() }
@@ -68,9 +67,7 @@ object ToolRegistry {
     }
 
     fun definition(name: String): AgentToolDefinition? = canonicalName(name)?.let { handlers[it]?.definition }
-    fun definitions(): List<AgentToolDefinition> = handlers.values
-        .map { it.definition }
-        .filterNot { it.name in hiddenFromDiscovery }
+    fun definitions(): List<AgentToolDefinition> = handlers.values.map { it.definition }
     fun handler(name: String): ToolHandler? = canonicalName(name)?.let { handlers[it] }
     fun contains(name: String): Boolean = canonicalName(name) != null
 

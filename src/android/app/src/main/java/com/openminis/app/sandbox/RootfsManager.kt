@@ -2,7 +2,6 @@ package com.openminis.app.sandbox
 
 import android.content.Context
 import android.util.Log
-import com.openminis.app.runtime.ExecutionCoordinator
 import com.openminis.app.runtime.ubuntu.UbuntuKernel
 import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.runtime.ubuntu.RootfsHealth
@@ -15,8 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.io.InputStream
-import java.nio.charset.Charset
 
 sealed class RootfsInstallState {
     object Idle : RootfsInstallState()
@@ -60,7 +57,9 @@ class RootfsManager private constructor(private val context: Context) {
             return@withContext
         }
         _installState.value = RootfsInstallState.Extracting(0f)
-        val after = UbuntuKernel.ensureRootfs()
+        // Recovery replaces Root-owned runtime state. No interactive PTY may
+        // keep using a namespace backed by the old rootfs while that happens.
+        val after = UbuntuRuntime.withRuntimeStopped { UbuntuKernel.ensureRootfs() }
         _installState.value = if (after.healthy) {
             RootfsInstallState.Installed
         } else {
@@ -68,13 +67,11 @@ class RootfsManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun installProotIfNeeded() = withContext(Dispatchers.IO) { Unit }
-
     suspend fun reset(keepUserData: Boolean = false): File? = withContext(Dispatchers.IO) {
         if (keepUserData) Log.i(TAG, "reset: app-owned persistent user data will be preserved")
         if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
-        ExecutionCoordinator.stopCurrentCommand()
-        if (!UbuntuKernel.resetRootfs()) {
+        val reset = UbuntuRuntime.withRuntimeStopped { UbuntuKernel.resetRootfs() }
+        if (!reset) {
             val detail = "failed to reset Ubuntu rootfs"
             _installState.value = RootfsInstallState.Failed(detail)
             throw IllegalStateException(detail)
@@ -87,10 +84,6 @@ class RootfsManager private constructor(private val context: Context) {
 
     suspend fun restoreUserData(backupDir: File) = withContext(Dispatchers.IO) {
         Log.i(TAG, "restoreUserData ignored for ${backupDir.path}: persistent data is not stored in rootfs")
-    }
-
-    fun ensureSessionDirs(sessionId: String) {
-        com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
     }
 
     fun getSystemDnsServers(): List<String> {
@@ -109,118 +102,41 @@ class RootfsManager private constructor(private val context: Context) {
 
     suspend fun refreshDns(servers: List<String>? = null): Boolean = withContext(Dispatchers.IO) {
         dnsRefreshCoordinator.refresh({ servers ?: getSystemDnsServers() }) { nameservers ->
-            val resolvFile = File(rootfsDir, "etc/resolv.conf")
-            if (resolvFile.exists() && resolvFile.canWrite()) {
-                try {
-                    resolvFile.writeText(formatResolvConf(nameservers))
-                    resolvFile.setReadable(true, false)
-                } catch (t: Throwable) {
-                    Log.d(TAG, "direct write to resolv.conf: ${t.message}")
-                }
-            }
             if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
             UbuntuKernel.refreshDns(nameservers)
         }
     }
 
+    /**
+     * Update one of the small, user-selectable Ubuntu configuration files.
+     * These files are Root-owned with the rootfs, so the write must go through
+     * the bounded Root infrastructure path rather than an Android-side File.
+     */
+    suspend fun writeManagedRootfsConfig(relativePath: String, content: String): Boolean =
+        withContext(Dispatchers.IO) {
+            if (!isManagedRootfsConfig(relativePath) ||
+                content.toByteArray(Charsets.UTF_8).size > MAX_MANAGED_CONFIG_BYTES ||
+                content.contains('\u0000')
+            ) {
+                return@withContext false
+            }
+            if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+            UbuntuRuntime.withRuntimeStopped {
+                UbuntuKernel.writeManagedRootfsConfig(relativePath, content)
+            }
+        }
+
+    /** Restore a previously backed-up managed config through Root. */
+    suspend fun restoreManagedRootfsConfig(relativePath: String): Boolean =
+        withContext(Dispatchers.IO) {
+            if (!isManagedRootfsConfig(relativePath)) return@withContext false
+            if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+            UbuntuRuntime.withRuntimeStopped {
+                UbuntuKernel.restoreManagedRootfsConfig(relativePath)
+            }
+        }
+
     private val dnsRefreshCoordinator = com.openminis.app.runtime.ubuntu.DnsRefreshCoordinator()
-
-    suspend fun applyDefaultMountOverlay() = withContext(Dispatchers.IO) { Unit }
-
-    // --- POSIX tar extraction (kept for TarExtractionTest) ---
-
-    internal fun extractTar(input: InputStream, targetDir: File) {
-        val header = ByteArray(512)
-        while (true) {
-            val bytesRead = readFully(input, header)
-            if (bytesRead < 512) break
-            if (header.all { it == 0.toByte() }) break
-            val name = extractString(header, 0, 100)
-            val modeOctal = extractString(header, 100, 8)
-            val sizeOctal = extractString(header, 124, 12)
-            val typeFlag = header[156].toInt().toChar()
-            val linkName = extractString(header, 157, 100)
-            val mode = modeOctal.trim().toIntOrNull(8) ?: 0
-            val prefix = extractString(header, 345, 155)
-            val fullName = if (prefix.isNotEmpty()) "$prefix/$name" else name
-            if (fullName.isEmpty()) break
-            val size = sizeOctal.trim().toLongOrNull(8) ?: 0L
-            val outFile = File(targetDir, fullName)
-            when (typeFlag) {
-                '5', 'D' -> outFile.mkdirs()
-                '2' -> {
-                    outFile.parentFile?.mkdirs()
-                    try {
-                        java.nio.file.Files.createSymbolicLink(
-                            outFile.toPath(),
-                            java.nio.file.Paths.get(linkName),
-                        )
-                    } catch (_: Exception) {
-                        Log.w(TAG, "Failed to create symlink: $fullName -> $linkName")
-                    }
-                }
-                '0', '\u0000' -> {
-                    outFile.parentFile?.mkdirs()
-                    outFile.outputStream().use { output ->
-                        var remaining = size
-                        val buf = ByteArray(8192)
-                        while (remaining > 0) {
-                            val toRead = minOf(buf.size.toLong(), remaining).toInt()
-                            val n = input.read(buf, 0, toRead)
-                            if (n < 0) break
-                            output.write(buf, 0, n)
-                            remaining -= n
-                        }
-                    }
-                    if (mode and 0b001_001_001 != 0) outFile.setExecutable(true, false)
-                    val remainder = (size % 512).toInt()
-                    if (remainder != 0) skipFully(input, (512 - remainder).toLong())
-                    continue
-                }
-                '1' -> {
-                    outFile.parentFile?.mkdirs()
-                    val linkTarget = File(targetDir, linkName)
-                    if (linkTarget.exists()) linkTarget.copyTo(outFile, overwrite = true)
-                }
-                else -> Unit
-            }
-            if (typeFlag != '0' && typeFlag != '\u0000' && size > 0) {
-                val blocks = (size + 511) / 512 * 512
-                skipFully(input, blocks)
-            }
-        }
-    }
-
-    internal fun extractString(header: ByteArray, offset: Int, length: Int): String {
-        val end = minOf(offset + length, header.size)
-        var actualEnd = offset
-        for (i in offset until end) {
-            if (header[i] == 0.toByte()) break
-            actualEnd = i + 1
-        }
-        return String(header, offset, actualEnd - offset, Charset.forName("UTF-8"))
-    }
-
-    internal fun readFully(input: InputStream, buf: ByteArray): Int {
-        var offset = 0
-        while (offset < buf.size) {
-            val n = input.read(buf, offset, buf.size - offset)
-            if (n < 0) return offset
-            offset += n
-        }
-        return offset
-    }
-
-    internal fun skipFully(input: InputStream, count: Long) {
-        var remaining = count
-        val buf = ByteArray(8192)
-        while (remaining > 0) {
-            val toRead = minOf(buf.size.toLong(), remaining).toInt()
-            val n = input.read(buf, 0, toRead)
-            if (n < 0) break
-            remaining -= n
-        }
-    }
 
     companion object {
         private const val TAG = "RootfsManager"
@@ -231,8 +147,12 @@ class RootfsManager private constructor(private val context: Context) {
             return servers.joinToString(separator = "\n", postfix = "\n") { "nameserver $it" }
         }
 
-        internal const val STAGED_ROOTFS_ARCHIVE =
-            com.openminis.app.runtime.ubuntu.RuntimeProvision.STAGED_ROOTFS_ARCHIVE
+        internal const val MAX_MANAGED_CONFIG_BYTES = 64 * 1024
+        private val MANAGED_ROOTFS_CONFIGS = setOf(
+            "etc/apt/sources.list.d/ubuntu.sources",
+            "etc/pip/pip.conf",
+            "root/.npmrc",
+        )
         private val REQUIRED_LAYOUT = listOf(
             "etc/os-release",
             "etc/passwd",
@@ -255,12 +175,20 @@ class RootfsManager private constructor(private val context: Context) {
         fun getInstance(context: Context): RootfsManager =
             instance ?: RootfsManager(context.applicationContext).also { instance = it }
 
+        internal fun isManagedRootfsConfig(relativePath: String): Boolean =
+            relativePath in MANAGED_ROOTFS_CONFIGS
+
         internal fun buildProbeCommand(rootfs: String): String {
             val commands = mutableListOf<String>()
             commands += "ROOTFS=${shellQuote(rootfs)}"
-            commands += "[ -d \"\$ROOTFS\" ] || { echo 'MINIS_ROOTFS:MISSING'; exit 0; }"
+            commands += "[ -d \"\$ROOTFS\" ] && [ ! -L \"\$ROOTFS\" ] || { echo 'MINIS_ROOTFS:MISSING'; exit 0; }"
             REQUIRED_LAYOUT.forEach { rel ->
-                commands += "[ -e \"\$ROOTFS/$rel\" ] || { echo 'MINIS_ROOTFS:CORRUPT:$rel'; exit 0; }"
+                val checks = if (rel == "etc/os-release") {
+                    osReleaseLayoutChecks(rootfs)
+                } else {
+                    noSymlinkLayoutChecks(rootfs, rel)
+                }
+                commands += "$checks || { echo 'MINIS_ROOTFS:CORRUPT:$rel'; exit 0; }"
             }
             commands += "if [ ! -x \"\$ROOTFS/bin/bash\" ] && [ ! -x \"\$ROOTFS/usr/bin/bash\" ] && [ ! -x \"\$ROOTFS/bin/sh\" ]; then echo 'MINIS_ROOTFS:CORRUPT:shell'; exit 0; fi"
             commands += "echo 'MINIS_ROOTFS:METADATA'"
@@ -335,7 +263,12 @@ class RootfsManager private constructor(private val context: Context) {
             commands += "mkdir -p \"\$NEW\" || exit 72"
             commands += "tar -xzf \"\$ARCHIVE\" -C \"\$NEW\" || { rm -rf \"\$NEW\"; exit 73; }"
             REQUIRED_LAYOUT.forEach { rel ->
-                commands += "[ -e \"\$NEW/$rel\" ] || { echo 'recovery rootfs missing $rel' >&2; rm -rf \"\$NEW\"; exit 74; }"
+                val checks = if (rel == "etc/os-release") {
+                    osReleaseVariableLayoutChecks("NEW")
+                } else {
+                    noSymlinkVariableLayoutChecks("NEW", rel)
+                }
+                commands += "$checks || { echo 'recovery rootfs missing $rel' >&2; rm -rf \"\$NEW\"; exit 74; }"
             }
             commands += "if [ ! -x \"\$NEW/bin/bash\" ] && [ ! -x \"\$NEW/usr/bin/bash\" ] && [ ! -x \"\$NEW/bin/sh\" ]; then rm -rf \"\$NEW\"; exit 75; fi"
             commands += "META=\"\$NEW/etc/minis/rootfs.json\""
@@ -354,5 +287,77 @@ class RootfsManager private constructor(private val context: Context) {
 
         internal fun shellQuote(value: String): String =
             "'" + value.replace("'", "'\"'\"'") + "'"
+
+        /**
+         * Check every component of a required rootfs entry without following a
+         * symlink in the rootfs tree. The rootfs is Root-owned, but a corrupt or
+         * partially replaced image must fail closed before chroot/mount setup.
+         */
+        private fun noSymlinkLayoutChecks(rootfs: String, relativePath: String): String {
+            val root = rootfs.trimEnd('/')
+            var current = root
+            val checks = mutableListOf(
+                "[ -d ${shellQuote(current)} ]",
+                "[ ! -L ${shellQuote(current)} ]",
+            )
+            for (component in relativePath.split('/').filter { it.isNotEmpty() }) {
+                current = "$current/$component"
+                checks += "[ -e ${shellQuote(current)} ]"
+                checks += "[ ! -L ${shellQuote(current)} ]"
+            }
+            return checks.joinToString(" && ")
+        }
+
+        /**
+         * Ubuntu's standard /etc/os-release is a relative symlink into /usr.
+         * Permit only that exact in-tree target; every other rootfs path keeps
+         * the strict no-symlink validation above.
+         */
+        private fun osReleaseLayoutChecks(rootfs: String): String {
+            val root = rootfs.trimEnd('/')
+            val etc = "$root/etc"
+            val link = "$etc/os-release"
+            val target = "$root/usr/lib/os-release"
+            return listOf(
+                "[ -d ${shellQuote(root)} ]",
+                "[ ! -L ${shellQuote(root)} ]",
+                "[ -d ${shellQuote(etc)} ]",
+                "[ ! -L ${shellQuote(etc)} ]",
+                "(if [ -L ${shellQuote(link)} ]; then " +
+                    "[ \"\$(readlink ${shellQuote(link)})\" = '../usr/lib/os-release' ] && " +
+                    "[ -f ${shellQuote(target)} ] && [ ! -L ${shellQuote(target)} ]; " +
+                    "else [ -e ${shellQuote(link)} ] && [ ! -L ${shellQuote(link)} ]; fi)",
+            ).joinToString(" && ")
+        }
+
+        private fun noSymlinkVariableLayoutChecks(variableName: String, relativePath: String): String {
+            var current = "\$$variableName"
+            val checks = mutableListOf(
+                "[ -d \"$current\" ]",
+                "[ ! -L \"$current\" ]",
+            )
+            for (component in relativePath.split('/').filter { it.isNotEmpty() }) {
+                current = "$current/$component"
+                checks += "[ -e \"$current\" ]"
+                checks += "[ ! -L \"$current\" ]"
+            }
+            return checks.joinToString(" && ")
+        }
+
+        private fun osReleaseVariableLayoutChecks(variableName: String): String {
+            val root = "\$$variableName"
+            val link = "\"$root/etc/os-release\""
+            val target = "\"$root/usr/lib/os-release\""
+            return listOf(
+                "[ -d \"$root\" ]",
+                "[ ! -L \"$root\" ]",
+                "[ -d \"$root/etc\" ]",
+                "[ ! -L \"$root/etc\" ]",
+                "(if [ -L $link ]; then " +
+                    "[ \"\$(readlink $link)\" = '../usr/lib/os-release' ] && " +
+                    "[ -f $target ] && [ ! -L $target ]; " +
+                    "else [ -e $link ] && [ ! -L $link ]; fi)",
+            ).joinToString(" && ")
+        }
     }
 }

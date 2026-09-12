@@ -81,7 +81,7 @@ fun SessionMemorySheet(
     }
     val scope = rememberCoroutineScope()
 
-    // MemoryRepository uses synchronous broker calls for agent/tool callers.
+    // MemoryRepository uses synchronous guest-file calls for agent/tool callers.
     // Keep those calls off the Compose main thread when opening the sheet.
     LaunchedEffect(memoryRepository, context) {
         autoItems = withContext(Dispatchers.IO) {

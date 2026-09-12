@@ -2,7 +2,7 @@ package com.openminis.app.tools
 
 /**
  * Layered tool budgets. This intentionally has no global timeout: a local
- * process, a root broker call, and a remote MCP request have different costs
+ * process, a Root infrastructure call, and a remote MCP request have different costs
  * and different safe upper bounds.
  */
 object ToolTimeoutPolicy {

@@ -35,7 +35,7 @@
 
 1. 现役 guest 用户数据由 App 私有目录持有，host backing 从 `Context.filesDir` 派生；`/data/adb/minis/rootfs` 是 Root-owned、可替换 runtime state。
 2. Guest 使用设备实际 App UID/GID；进入 chroot 后必须清空 supplementary groups 与 Linux capabilities，禁止写死 `10000`。
-3. Root 只允许执行 App 构造的受控基础设施动作：rootfs、namespace、bind、chroot、必要探测/修复和受控 legacy migration。禁止新增模型/Agent/MCP 可控的任意 Root shell、Root RPC 或通用 broker。
+3. `DirectRootRunner` 只允许执行 App 构造的受控基础设施动作：rootfs、namespace、bind、chroot、必要探测/修复和受控 legacy migration。按上游权限模型，本地 Agent 可使用结构化 `root.shell`（tool basename + args）调用受信 Android system 工具；该能力必须 local-only、有参数/超时/输出/进程组边界，不接受 raw command、host 文件 API 或通用 Root RPC，MCP/远程调用方不可见。
 4. 网络代理和 Root/chroot 是不同概念。HTTP/CONNECT 代理协议本身不要求 Root；当前 helper 仅因 Android 出站 UID/VPN/BPF 兼容需求可由特权身份启动。不得把它扩展成命令、文件或通用 RPC 服务。
 5. 产品运行时不恢复 PRoot/Alpine 双栈；不要为了兼容全局关闭 SELinux。
 6. Session 执行必须保持对应 session workspace 语义，不能用全局 `/workspace` 绕过隔离。

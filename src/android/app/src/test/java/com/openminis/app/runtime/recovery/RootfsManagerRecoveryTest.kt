@@ -82,21 +82,30 @@ class RootfsManagerRecoveryTest {
         assertTrue(command.contains("shared"))
         assertTrue(command.contains("/bin/bash"))
         assertTrue(command.contains("MINIS_ROOTFS:MISSING"))
+        assertTrue(command.contains("[ ! -L '/data/adb/minis/rootfs/etc/minis/rootfs.json' ]"))
+        assertTrue(command.contains("[ \"\$(readlink '/data/adb/minis/rootfs/etc/os-release')\" = '../usr/lib/os-release' ]"))
+        assertTrue(command.contains("[ -f '/data/adb/minis/rootfs/usr/lib/os-release' ]"))
+        assertTrue(command.contains("else [ -e '/data/adb/minis/rootfs/etc/os-release' ] && [ ! -L '/data/adb/minis/rootfs/etc/os-release' ]"))
     }
 
     @Test
     fun `repair uses staged archive and swap only after validation`() {
+        val stagedArchive =
+            "/data/user/0/llc.slacker.minis/cache/minis-runtime/ubuntu-arm64-rootfs.tar.gz"
         val command = RootfsManager.buildRepairCommand(
             "/data/adb/minis/rootfs",
-            RootfsManager.STAGED_ROOTFS_ARCHIVE,
+            stagedArchive,
         )
 
         val extractAt = command.indexOf("tar -xzf")
         val metadataAt = command.indexOf("etc/minis/rootfs.json")
         val swapAt = command.indexOf("mv \"\$ROOTFS\" \"\$OLD\"")
-        assertTrue(command.contains("/data/adb/minis/runtime/staging/ubuntu-arm64-rootfs.tar.gz"))
+        assertTrue(command.contains(stagedArchive))
         assertTrue(extractAt >= 0)
         assertTrue(metadataAt > extractAt)
+        assertTrue(command.contains("[ ! -L \"\$NEW/etc/minis/rootfs.json\" ]"))
+        assertTrue(command.contains("[ \"\$(readlink \"\$NEW/etc/os-release\")\" = '../usr/lib/os-release' ]"))
+        assertTrue(command.contains("[ -f \"\$NEW/usr/lib/os-release\" ]"))
         assertTrue(swapAt > metadataAt)
         assertTrue(command.contains("mv \"\$NEW\" \"\$ROOTFS\""))
         assertTrue(command.contains("mv \"\$OLD\" \"\$ROOTFS\""))

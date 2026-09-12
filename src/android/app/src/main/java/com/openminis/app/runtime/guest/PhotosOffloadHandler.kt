@@ -463,8 +463,8 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
      * `/var/minis/offloads/` directly).
      *
      * [GH#139] This used to write to `<filesDir>/photos-export/` and return
-     * only `host_path`. That path is inside no PRoot bind mount, so the
-     * Linux sandbox cannot read it and `minis-open` rejects it (it accepts
+     * only `host_path`. That path is outside the Direct Ubuntu bind mounts, so
+     * the Linux guest cannot read it and `minis-open` rejects it (it accepts
      * only http/https/about/minis URLs) — the agent could list photo
      * metadata but never actually look at an exported photo. An older
      * comment here claimed the handler "doesn't see the session id"; that
@@ -527,8 +527,9 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
         )
 
         // [GH#139] Session-scoped when we know the caller's chat, so the export
-        // lands in the dir PRoot bind-mounts at /var/minis/offloads for THIS
-        // session. Canonical guest bytes are written through minisd.
+        // lands in the dir Direct Ubuntu bind-mounts at /var/minis/offloads for
+        // THIS session. Canonical guest bytes are written through the
+        // App-owned workspace file API.
         val sandboxVisible = sessionId != null
         val outDir = File(context.cacheDir, "photos-export").also { it.mkdirs() }
         val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(64)

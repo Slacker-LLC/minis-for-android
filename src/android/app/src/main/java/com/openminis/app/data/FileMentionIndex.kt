@@ -22,9 +22,9 @@ import java.util.UUID
  * roots, then (if mounts are attached) external mounts.
  *
  * ### Layers
- *   1. **Session roots** — broker views of `/var/minis/{workspace,attachments}`
+ *   1. **Session roots** — Direct Ubuntu views of `/var/minis/{workspace,attachments}`
  *      for the active session.
- *   2. **Shared roots** — broker views of `/var/minis/{shared,skills,memory}`.
+ *   2. **Shared roots** — App-owned views of `/var/minis/{shared,skills,memory}`.
  *   3. **Mount roots** — each entry in [mountsProvider] (e.g. SAF-attached
  *      folders). Each mount always gets a self-entry so `@<mountName>` works.
  *
@@ -154,7 +154,7 @@ class FileMentionIndex(
             var budget = GLOBAL_SCAN_BUDGET - collected.size
             for (mount in mountsProvider()) {
                 if (currentScanToken != token) return
-                // T219: align with PRoot bind path + iOS prompt wording.
+                // T219: align with the Direct Ubuntu bind path + iOS prompt wording.
                 // Each mount lives under /var/minis/mounts/<name> inside the
                 // sandbox; inserting that exact path keeps the agent's mental
                 // model coherent across @-mention, prompt copy, and shell.

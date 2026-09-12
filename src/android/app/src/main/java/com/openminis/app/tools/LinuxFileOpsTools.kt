@@ -10,8 +10,8 @@ import org.json.JSONObject
 
 /**
  * linux.file.* operations — host-side implementations over the workspace
- * (/data/adb/minis/workspace, bind-mounted into the Ubuntu guest as
- * /workspace). Pure [LinuxFileOps] + thin per-tool [ToolHandler]s so the
+ * (the App-owned backing bind-mounted into the Ubuntu guest as /workspace).
+ * Pure [LinuxFileOps] + thin per-tool [ToolHandler]s so the
  * permission table keeps one policy key per tool.
  */
 object LinuxFileOps {

@@ -34,7 +34,7 @@ data class FileItem(
     val size: Long,
     /** lastModified() in epoch ms, 0 when unavailable. */
     val modifiedMs: Long = 0L,
-    /** Canonical guest path when this item came from the workspace broker. */
+    /** Canonical guest path when this item came from the guest file API. */
     val guestPath: String? = null,
     /** Session context for [guestPath]; null means the global guest tree. */
     val guestSessionId: String? = null,
@@ -180,7 +180,7 @@ data class FileBrowserUiState(
      */
     val showHidden: Boolean = false,
     /**
-     * [T-android-file-context-copy-abs-path] Linux-side (PRoot) absolute path
+     * [T-android-file-context-copy-abs-path] Linux-side guest absolute path
      * of the directory currently shown, e.g. "/var/minis/workspace/foo". Null
      * when this browser isn't rooted under a Linux bind mount (a raw host-path
      * browser). The file context menu's "Copy Absolute Path" joins this with
@@ -197,7 +197,7 @@ class FileBrowserViewModel(
     // linuxRootPath: when set, directory listings route through RuntimePathRegistry
     // bind mounts so subdirs like /var/minis/{skills,memory,shared} list their
     // real content (filesDir/minis-global/*) instead of the empty placeholder
-    // dirs shipped inside the Alpine rootfs tarball.
+    // dirs represented by the App-owned Direct Ubuntu bind mounts.
     private val linuxRootPath: String? = null,
     // T147: when set together with [appContext], `/var/minis/{attachments,
     // workspace,offloads,browser}` resolves against THIS session's per-session
@@ -207,18 +207,18 @@ class FileBrowserViewModel(
     // when another session was the most recent shell to boot.
     private val sessionId: String? = null,
     private val appContext: android.content.Context? = null,
-    // [T-android-copy-abs-path-fullpath] Linux (PRoot) path of [rootPath] used
+    // [T-android-copy-abs-path-fullpath] Linux guest path of [rootPath] used
     // ONLY to compute the "Copy Absolute Path" value, decoupled from
     // [linuxRootPath] (which also re-routes directory listings). The session
     // storage browser roots its host listing directly at the per-session dir
     // (filesDir/minis-sessions/<sid>) — that listing already resolves correctly
-    // host-side, so we must NOT route it through the PRoot resolver (which would
+    // host-side, so we must NOT route it through the guest-path resolver (which would
     // redirect /var/minis to the global/empty placeholder dir). Instead this
     // prefix just lets the copy menu emit /var/minis/workspace/foo.py instead of
     // the opaque /data/user/0/.../minis-sessions/<sid>/workspace/foo.py host
     // path. When null, [linuxRootPath] (if any) drives the copy path as before.
     private val displayLinuxPrefix: String? = null,
-    /** When set, list and delete operations use the workspace broker. */
+    /** When set, list and delete operations use the guest file API. */
     private val guestRootPath: String? = null,
     private val guestSessionId: String? = null,
 ) : ViewModel() {
@@ -246,7 +246,7 @@ class FileBrowserViewModel(
      */
     private val initialRelativePath: String = relativePath
 
-    /** Current resolved host-side File (accounts for PRoot bind mounts). */
+    /** Current resolved host-side File (accounts for Direct Ubuntu mappings). */
     private val currentHostPath: File
         get() = resolveCurrentHostPath()
 
@@ -257,9 +257,8 @@ class FileBrowserViewModel(
             val linuxPath = if (relativePath.isEmpty()) linuxRoot
                             else "${linuxRoot.trimEnd('/')}/$relativePath"
             // T147: prefer the session-scoped resolver when we know which
-            // session's view we're rendering — global bindMounts is
-            // last-writer-wins and points at whichever session's PRoot
-            // booted most recently.
+            // session's view we're rendering — global bindMounts is not a
+            // substitute for the session's own App-owned directory.
             val sid = sessionId
             val ctx = appContext
             if (sid != null && ctx != null) {

@@ -396,7 +396,7 @@ fun AddToHomeSheet(
                                 is WebAppSource.HostFile -> {
                                     // T-pwa-3: link in place — htmlPath is the
                                     // /var/minis/... linux path; WebAppPathResolver
-                                    // stages canonical guest files through minisd.
+                                    // stages canonical guest files through the guest file API.
                                     app.webAppShortcutRepository.create(
                                         htmlPath = source.linuxPath,
                                         pathScope = source.pathScope,

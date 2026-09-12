@@ -108,7 +108,9 @@ object ToolPermissionManager {
         "android.deploy.*" to ToolPolicy(Level.MCP_CONFIRM, Level.MCP_CONFIRM),
         "android.root.probe" to ToolPolicy(Level.MCP_CONFIRM, Level.LOCAL_ONLY),
         "android.browser.*" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
-        "root.shell" to ToolPolicy(Level.MCP_DENIED, Level.MCP_DENIED),
+        // Upstream-compatible structured Root entry: available to the local
+        // Agent, never exposed to remote MCP callers.
+        "root.shell" to ToolPolicy(Level.LOCAL_ONLY, Level.LOCAL_ONLY),
         "agent.goal" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "agent.todo" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "agent.subagent" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
@@ -133,7 +135,8 @@ object ToolPermissionManager {
     /**
      * Adapter from fork-only structured tool names to the exact upstream
      * OpenMinis permission entries. Unmapped fork tools keep their existing
-     * execution semantics; generic Root/Ubuntu execution is deliberately absent.
+     * execution semantics; the structured local-only Root entry is handled by
+     * RootShellHandler and is not a remote MCP capability.
      */
     private fun upstreamAgentPermissionFor(tool: String): UpstreamAgentPermission? = when {
         tool.startsWith("android.calendar.") -> UpstreamAgentPermission("calendar", "Calendar")

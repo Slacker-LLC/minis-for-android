@@ -357,7 +357,7 @@ class ChatViewModel(
         // Removed once the retry-state regression is rooted out.
         private const val TAG_STREAM = "ChatVMStream"
         // Guest-backed prompt enrichment is best-effort; it must not hold the
-        // provider turn while minisd is starting or recovering.
+        // provider turn while the Direct Ubuntu runtime is starting or recovering.
         private const val PROMPT_FRAGMENT_TIMEOUT_MS = 2_000L
         /**
          * Hard ceiling on agent loop iterations within a single user turn.
@@ -2471,7 +2471,8 @@ class ChatViewModel(
         val plan = ImageBudget.planRequestBudget(images.map { it.image })
         if (!plan.mutated) return messages
 
-        // For dropped images without a linuxPath, lazily spill through minisd
+        // For dropped images without a linuxPath, lazily spill through the
+        // App-owned guest file API
         // so the placeholder still gives the model an addressable reference.
         val resolvedPaths = HashMap<ImageBudget.ImagePartId, String?>()
         for (ref in images) {
@@ -3837,7 +3838,7 @@ class ChatViewModel(
      * the first message, `realSessionId` is empty and we fall back to the draft
      * key. After `ensureSession()` runs, this returns the persisted id so
      * `/var/minis/{attachments,workspace,...}` mounts (P2: Ubuntu 侧经
-     * minisd bind 的 filesDir/minis 目录) and browser artifacts land in a
+     * Direct Root bind 的 App-owned filesDir 目录) and browser artifacts land in a
      * single directory that survives re-entry.
      */
     internal val activeSessionId: String
@@ -10110,7 +10111,7 @@ Android development debug loop (named agent tools):
 - After editing, rebuild and redeploy, then repeat the SAME observation and UI action. Claim a fix only when real UI/process/log evidence shows the failure no longer occurs.
 - Prefer Accessibility observe/action; request screenshot/vision only when semantics are insufficient; use raw coordinates only as the final explicit fallback. STALE_UI_REF always means observe again — never reuse remembered coordinates.
 - Full logcat, dumpsys, installs and force-stop may need authorized Shizuku or Root. Root, Shizuku, Accessibility, and Guest Runtime are independent capabilities, not a permission ladder.
-- The guest runtime is Ubuntu 24.04 in a managed chroot under minisd. Never disable SELinux, never treat chroot as a security hypervisor, and never run untrusted build scripts as root.
+- The guest runtime is Ubuntu 24.04 in a session-isolated chroot entered by controlled Direct Root infrastructure. Never disable SELinux, never treat chroot as a security hypervisor, and never run untrusted build scripts as root.
 - Continuous self-update of Minis for Android is UNSUPPORTED: replacing this APK kills the current Agent process. Debug other packages unless a separate companion is introduced.
 
 Android-only tools (android-* CLIs):
@@ -10150,7 +10151,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // appended only when non-null; absent fragments leave no separator.
         // Do not rescan the guest skill tree on the critical send path. The
         // repository already refreshes on startup, Settings entry, and after
-        // skill file writes. A minisd outage must not prevent the provider
+        // skill file writes. A guest-runtime outage must not prevent the provider
         // request from being launched just because a prompt fragment is stale.
         val skillFragment = skillRepository?.skillPromptFragment(activeSessionId)
         // [T-mcp-integration-android] Re-read servers.json (the CLI / file
@@ -10243,7 +10244,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
     /**
      * Prompt enrichment is optional. Keep the model turn independent from the
      * guest runtime and report a bounded miss instead of leaving the UI in a
-     * permanent streaming state while minisd recovers.
+     * permanent streaming state while the runtime recovers.
      */
     private suspend fun <T> bestEffortPromptFragment(
         label: String,
