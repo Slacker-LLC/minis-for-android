@@ -8,6 +8,17 @@ import org.junit.rules.TemporaryFolder
 class ToolCheckpointRecoveryTest {
     @get:Rule val temp = TemporaryFolder()
 
+    @Test fun `atomic completion retains unrelated pending intents`() {
+        val file = temp.newFile("atomic.jsonl")
+        file.writeText("old snapshot")
+        val content = """{"callId":"1","state":"done"}""" + "\n" +
+            """{"callId":"2","state":"pending","tool":"write"}"""
+        ToolCheckpointStore.replaceAtomically(file, content)
+        assertEquals(content, file.readText())
+        assertEquals(listOf("2"), ToolCheckpointStore.readPending(file).map { it.callId })
+        assertEquals(listOf("atomic.jsonl"), temp.root.list()!!.toList())
+    }
+
     @Test fun `inspection and restart preserve every unresolved intent`() {
         val file = temp.newFile("checkpoints.jsonl")
         val records = (1..60).joinToString("\n") {

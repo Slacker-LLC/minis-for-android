@@ -2558,11 +2558,10 @@ class ChatViewModel(
     private fun injectUnknownOutcomes(history: List<LLMMessage>): List<LLMMessage> {
         val sid = activeSessionId ?: return history
         // Reconcile a crash after Room committed but before checkpoint acknowledgement.
-        agentHistory.filter { it.dbMessageId != null }.forEach { message ->
-            message.contentParts.filterIsInstance<AgentContentPart.ToolResult>().forEach { result ->
-                ToolCheckpointStore.markDone(context, sid, result.id, !result.isError)
-            }
-        }
+        ToolCheckpointStore.markDoneBatch(context, sid,
+            agentHistory.filter { it.dbMessageId != null }.flatMap { message ->
+                message.contentParts.filterIsInstance<AgentContentPart.ToolResult>()
+            }.associate { it.id to !it.isError })
         val pending = ToolCheckpointStore.drainPending(context, sid)
         if (pending.isEmpty()) return history
         return history + pending.map { rec ->
@@ -11458,7 +11457,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
         val hadInflightTools = cancelledIds.isNotEmpty()
         val pending = pendingAssistantTurn?.takeIf { it.assistantId == last.id }
-        if (pending != null && pending.committed == null && updatedBlocks.drop(pending.startIndex).any { it.mediaRef != null }) {
+        if (pending != null && pending.committed == null) {
             msgs[lastIdx] = last.copy(toolBlocks = updatedBlocks, isStreaming = false)
             _messages.value = msgs
             persistInterruptedMediaTurn(pending, updatedBlocks, cancelledIds)

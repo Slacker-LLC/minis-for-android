@@ -58,7 +58,13 @@ object ToolCheckpointStore {
     /** Mark the intent settled AFTER the tool body returns (success or failure). */
     @Synchronized
     fun markDone(context: Context, sessionId: String, callId: String, success: Boolean) {
-        if (sessionId.isBlank() || callId.isBlank()) return
+        if (callId.isBlank()) return
+        markDoneBatch(context, sessionId, mapOf(callId to success))
+    }
+
+    @Synchronized
+    fun markDoneBatch(context: Context, sessionId: String, outcomes: Map<String, Boolean>) {
+        if (sessionId.isBlank() || outcomes.isEmpty()) return
         try {
             val f = fileFor(context, sessionId)
             if (!f.exists()) return
@@ -66,16 +72,32 @@ object ToolCheckpointStore {
             var changed = false
             for (i in lines.indices) {
                 val parsed = runCatching { JSONObject(lines[i]) }.getOrNull() ?: continue
-                if (parsed.optString("callId") == callId && parsed.optString("state") == "pending") {
+                val success = outcomes[parsed.optString("callId")]
+                if (success != null && parsed.optString("state") == "pending") {
                     parsed.put("state", if (success) "done" else "done-failed")
                     parsed.put("finishedAt", System.currentTimeMillis())
                     lines[i] = parsed.toString()
                     changed = true
                 }
             }
-            if (changed) f.writeText(lines.joinToString("\n") + "\n")
+            if (changed) replaceAtomically(f, lines.joinToString("\n") + "\n")
         } catch (t: Throwable) {
             Log.w(TAG, "markDone failed: ${t.message}")
+        }
+    }
+
+    internal fun replaceAtomically(file: File, content: String) {
+        val temporary = File.createTempFile("checkpoint-", ".tmp", file.absoluteFile.parentFile)
+        try {
+            java.io.FileOutputStream(temporary).use { output ->
+                output.write(content.toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            java.nio.file.Files.move(temporary.toPath(), file.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            temporary.delete()
         }
     }
 

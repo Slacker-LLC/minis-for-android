@@ -54,6 +54,7 @@ internal object GuestCommandBridge {
 
     private val configHandler by lazy { ConfigOffloadHandler() }
     private val requestLimiter = GuestBridgeConnectionLimiter(MAX_CONCURRENT_REQUESTS)
+    private val workers = java.util.concurrent.ConcurrentHashMap<Socket, Thread>()
 
     @Synchronized
     fun start(context: Context): Endpoint {
@@ -75,6 +76,10 @@ internal object GuestCommandBridge {
     @Synchronized
     fun stop() {
         runCatching { listener?.close() }
+        workers.forEach { (socket, worker) ->
+            runCatching { socket.close() }
+            worker.interrupt()
+        }
         listener = null
         endpoint = null
         cliInstalled = false
@@ -256,7 +261,12 @@ internal object GuestCommandBridge {
             }
             try {
                 thread(name = "guest-command-bridge-request", isDaemon = true) {
+                    workers[socket] = Thread.currentThread()
                     try {
+                        if (server.isClosed) {
+                            socket.close()
+                            return@thread
+                        }
                         socket.use { client ->
                             try {
                                 handleClient(client, expectedToken)
@@ -265,6 +275,7 @@ internal object GuestCommandBridge {
                             }
                         }
                     } finally {
+                        workers.remove(socket)
                         requestLimiter.release()
                     }
                 }
@@ -328,6 +339,15 @@ internal object GuestCommandBridge {
             } catch (error: IllegalArgumentException) {
                 return writeResponse(output, 1, "minis-bridge: ${error.message}\n")
             }
+            // One request per connection. The wrapper keeps its write side open
+            // while awaiting the result; EOF means its owning command exited.
+            socket.soTimeout = 0
+            val worker = Thread.currentThread()
+            val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+            val disconnectWatcher = thread(name = "guest-command-disconnect", isDaemon = true) {
+                try { input.read() } catch (_: Exception) { }
+                if (!finished.get()) worker.interrupt()
+            }
             val result = try {
                 dispatch(cmd, rewritten, session, cwd, stdin)
             } catch (error: IllegalArgumentException) {
@@ -335,9 +355,13 @@ internal object GuestCommandBridge {
             } catch (error: Exception) {
                 Log.w(TAG, "handler failed for $cmd: ${error.message}", error)
                 NativeOffloadResult(1, "minis-bridge: handler failed\n")
+            } finally {
+                finished.set(true)
             }
             Log.d(TAG, "handled command=$cmd exit=${result.exitCode} outputChars=${result.output.length}")
             writeResponse(output, result.exitCode.coerceIn(0, 255), result.output)
+            socket.close()
+            disconnectWatcher.join(1000)
         } catch (error: Exception) {
             writeResponse(output, 1, "minis-bridge: ${error.message ?: "invalid request"}\n")
         }
