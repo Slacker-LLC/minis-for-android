@@ -12,12 +12,14 @@ import java.util.concurrent.TimeUnit
 /**
  * Minimal Root launcher for the direct Ubuntu backend.
  *
- * This replaces minisd's transport role only. Policy remains in the Android
- * tool/runtime layer; guest commands are never sent through this class as Root.
+ * This is an internal launcher for fixed Root infrastructure scripts. Policy
+ * remains in the Android tool/runtime layer; guest commands are never sent
+ * through this class as Root.
  */
 internal object DirectRootRunner {
     private const val MAX_CAPTURE_CHARS = 1_048_576
-    private const val RUNNER_STATE_DIR = "/data/adb/minis/runtime"
+    /** Root-owned runtime state; App-owned guest data never lives here. */
+    internal const val ROOT_STATE_DIR = "/data/adb/minis/runtime"
     private const val CLEANUP_TIMEOUT_MS = 900L
 
     data class Result(
@@ -59,7 +61,7 @@ internal object DirectRootRunner {
             val su = findSu()
                 ?: return@withContext Result(126, "", "", error = "su executable not found")
             val runId = UUID.randomUUID().toString().replace("-", "")
-            val pidFile = "$RUNNER_STATE_DIR/runner-$runId.pid"
+            val pidFile = "$ROOT_STATE_DIR/runner-$runId.pid"
             val wrappedScript = buildProcessGroupCommand(script, pidFile)
             val process = try {
                 ProcessBuilder(su, "-c", wrappedScript).redirectErrorStream(false).start()
@@ -143,16 +145,18 @@ internal object DirectRootRunner {
 
     internal fun buildProcessGroupCommand(script: String, pidFile: String): String {
         val grouped = buildString {
+            append("MINIS_DIRECT_ROOT_RUNNER=1; export MINIS_DIRECT_ROOT_RUNNER; ")
             append("umask 077; ")
-            append("mkdir -p ${shellQuote(RUNNER_STATE_DIR)} || exit 126; ")
+            append("mkdir -p ${shellQuote(ROOT_STATE_DIR)} || exit 126; ")
+            append("chmod 711 ${shellQuote(ROOT_STATE_DIR)} || exit 126; ")
             append("echo \$\$ > ${shellQuote(pidFile)} || exit 126; ")
             append("/system/bin/sh -c ${shellQuote(script)}; ")
             append("__minis_status=\$?; ")
             append("rm -f -- ${shellQuote(pidFile)}; ")
             append("exit \$__minis_status")
         }
-        return "if command -v setsid >/dev/null 2>&1; then " +
-            "exec setsid /system/bin/sh -c ${shellQuote(grouped)}; " +
+        return "if [ -x /system/bin/setsid ]; then " +
+            "exec /system/bin/setsid /system/bin/sh -c ${shellQuote(grouped)}; " +
             "else echo 'setsid is required for isolated Root maintenance' >&2; exit 125; fi"
     }
 
@@ -164,6 +168,74 @@ internal object DirectRootRunner {
             "sleep 0.05; " +
             "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; " +
             "fi ;; esac; rm -f -- ${shellQuote(pidFile)}"
+
+    /** Best-effort cleanup for a prepared Root process tree owned by a caller. */
+    internal fun cleanupProcessGroup(pidFile: File?) {
+        if (pidFile == null) return
+        val su = findSu()
+        if (su != null) {
+            runCatching {
+                val killer = ProcessBuilder(
+                    su,
+                    "-c",
+                    buildProcessGroupCleanupCommand(pidFile.absolutePath),
+                ).start()
+                if (!killer.waitFor(CLEANUP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    killer.destroyForcibly()
+                } else {
+                    killer.destroy()
+                }
+            }
+        }
+        // Root owns the marker directory; this succeeds only in writable test
+        // layouts, but is harmless as a fallback after Root cleanup.
+        runCatching { pidFile.delete() }
+    }
+
+    /**
+     * Reap process groups left behind by a previous app process. Markers live
+     * in Root-owned directories, and the command-line check prevents a reused
+     * PID from turning recovery into a signal to an unrelated process.
+     */
+    internal fun buildStaleProcessCleanupCommand(
+        markerDir: String,
+        markerGlob: String,
+        commandNeedle: String,
+        environmentVariable: String? = null,
+    ): String =
+        "set -eu; " +
+            "DIR=${shellQuote(markerDir)}; " +
+            "[ -d \"\$DIR\" ] || exit 0; " +
+            "for marker in \"\$DIR\"/$markerGlob; do " +
+            "[ -f \"\$marker\" ] || continue; " +
+            "PID=\$(sed -n '1p' \"\$marker\" 2>/dev/null || true); " +
+            "case \"\$PID\" in ''|*[!0-9]*) rm -f -- \"\$marker\"; continue;; esac; " +
+            "if [ \"\$PID\" -le 1 ]; then rm -f -- \"\$marker\"; continue; fi; " +
+            // The marker stores the setsid group leader, while this cleanup
+            // script runs in a child shell within that same process group.
+            // Comparing only against $$ would therefore let the current
+            // maintenance group kill itself with SIGTERM (exit 143).
+            "CURRENT_PGID=\$(awk '{print \$5}' /proc/\$\$/stat 2>/dev/null || true); " +
+            "if [ \"\$PID\" -eq \"\$\$\" ] || " +
+            "[ -n \"\$CURRENT_PGID\" ] && [ \"\$PID\" -eq \"\$CURRENT_PGID\" ]; then continue; fi; " +
+            // A process can exit between reading its marker and inspecting
+            // /proc. Read through cat so that a disappearing proc entry is a
+            // benign stale-marker race, not a failed readiness check.
+            "CMD=\$(cat \"/proc/\$PID/cmdline\" 2>/dev/null | tr '\\000' ' ' || true); " +
+            "MATCH=0; case \"\$CMD\" in *${shellQuote(commandNeedle)}*) MATCH=1;; esac; " +
+            if (environmentVariable != null) {
+                "TOKEN=\$(sed -n '2p' \"\$marker\" 2>/dev/null || true); " +
+                    "if [ \"\$MATCH\" -eq 0 ] && [ -n \"\$TOKEN\" ]; then " +
+                    "ENV=\$(cat \"/proc/\$PID/environ\" 2>/dev/null | tr '\\000' '\\n' || true); " +
+                    "if printf '%s\\n' \"\$ENV\" | grep -F -x -- ${shellQuote("$environmentVariable=")}\"\$TOKEN\" >/dev/null 2>&1; then MATCH=1; fi; fi; "
+            } else {
+                ""
+            } +
+            "if [ \"\$MATCH\" -eq 1 ]; then " +
+            "kill -TERM -\$PID 2>/dev/null || kill -TERM \$PID 2>/dev/null || true; " +
+            "sleep 0.05; " +
+            "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; fi; " +
+            "rm -f -- \"\$marker\"; done"
 
     private fun terminateProcessGroup(su: String, pidFile: String, process: Process) {
         try {

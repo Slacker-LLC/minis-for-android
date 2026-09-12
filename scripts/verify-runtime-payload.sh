@@ -231,7 +231,7 @@ if revision != manifest.get("revision"):
     raise SystemExit("runtime rootfsVersion revision does not match manifest")
 if not isinstance(manifest.get("provisionRevision"), int) or isinstance(manifest.get("provisionRevision"), bool) or manifest["provisionRevision"] <= 0:
     raise SystemExit("runtime manifest provisionRevision must be positive")
-if manifest.get("requiredCommands") != ["python3", "git", "curl"]:
+if manifest.get("requiredCommands") != ["python3", "git", "curl", "ping"]:
     raise SystemExit("runtime manifest requiredCommands mismatch")
 
 print(f"rootfs runtime payload verified: rootfs={rootfs_sha}")

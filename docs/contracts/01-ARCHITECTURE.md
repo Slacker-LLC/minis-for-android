@@ -43,7 +43,7 @@ Root 仅用于确实需要特权的 App-owned Direct Ubuntu 基础设施：
 
 进入 guest 后必须通过 `setpriv` 降到真实 App UID/GID并清空 supplementary groups/capabilities。
 
-`DirectRootRunner` 是 internal launcher，不是 Agent 工具，也不是通用 Root RPC。Agent、MCP、Provider、模型输出不得直接成为 Root 脚本或 `su -c` 参数；`root.shell` 不得成为任何模型调用方的通用执行入口。
+`DirectRootRunner` 是 internal launcher，不是通用 Root RPC，也不接受原始模型命令字符串。需要 Android Root 能力的本地 Agent 可使用结构化 `root.shell`：只提交 executable basename + argv，经过可信 Android system 目录解析、参数/输出/超时边界和进程清理后进入该 launcher。它是 local-only，不对 MCP 暴露，也不提供 host 文件系统或 socket RPC 面；`su -c` 仍只承载 App 构造的受控脚本。
 
 ## Ubuntu guest
 

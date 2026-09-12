@@ -34,11 +34,11 @@ import com.openminis.app.network.NetworkMonitor
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.provider.ModelsDevApi
 import com.openminis.app.runtime.ExecutionCoordinator
-import com.openminis.app.runtime.ExternalMountCoordinator
 import com.openminis.app.runtime.guest.NativeOffloadServer
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.runtime.ubuntu.UbuntuRuntime
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 import com.openminis.app.runtime.guest.AccessibilityOffloadHandler
 import com.openminis.app.runtime.guest.AlarmOffloadHandler
 import com.openminis.app.runtime.guest.BrowserUseOffloadHandler
@@ -279,7 +279,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         // SIGABRT/SIGBUS/SIGFPE/SIGILL/SIGSYS). Writes a one-shot text
         // report to filesDir/logs/native-crash-<stamp>.log before re-raising
         // the signal so the system tombstone is also generated. Runs
-        // before any other native lib (proot, pty_bridge, …) is dlopen'd
+        // before any other native lib (pty_bridge, …) is dlopen'd
         // by the rest of onCreate so the handler is in place when those
         // libs first execute.
         try {
@@ -341,7 +341,7 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.crash.CrashFrequencyDetector.checkAtLaunch(this)
 
         // Hard short-circuit: when checkAtLaunch flips safe-mode ON, skip
-        // every heavy subsystem (DB, repositories, offload server, PRoot
+        // every heavy subsystem (DB, repositories, offload server, Direct Ubuntu
         // bind mounts, network monitor, …). The only thing MainActivity
         // will do is pop the share-or-dismiss dialog and finish. Without
         // this guard, anything from `chatRepository = ChatRepository(...)`
@@ -407,8 +407,8 @@ class MinisApp : Application(), ImageLoaderFactory {
                     "(code=${DatabaseVersionGuard.CODE_DB_VERSION}); refusing to open it; database left untouched"
             )
         }
-        // Repositories that read canonical guest files must have a configured
-        // broker client before their constructors run.
+        // Repositories that read canonical guest files must have the
+        // App-owned Direct Ubuntu path contract initialized first.
         UbuntuRuntime.init(this)
         database = AppDatabase.getInstance(this)
         botRepository = BotRepository(database.botDao())
@@ -470,8 +470,8 @@ class MinisApp : Application(), ImageLoaderFactory {
         }
 
         // [T-soul-md] Seed SOUL.md and warm the cached identity after the
-        // application has become renderable. Both operations use minisd and
-        // can encounter root authorization or stale-broker delays; keeping
+        // application has become renderable. Both operations may encounter
+        // Root authorization or Direct Ubuntu readiness delays; keeping
         // them in SoulStore's IO scope prevents another Application.onCreate
         // startup ANR (the same failure mode fixed for SkillRepository/GH#129).
         com.openminis.app.agent.SoulStore.initializeAsync(this)
@@ -684,26 +684,22 @@ class MinisApp : Application(), ImageLoaderFactory {
 
         // Register global /var/minis/{memory,skills,shared} bind mounts up-front
         // so direct file I/O tools (file_read) resolve these paths even before
-        // PRoot has booted or any shell has started.
+        // any guest shell has started.
         RuntimePathRegistry.registerGlobalBindMounts(this)
 
-        // T219-1: load user-mounted external folders. Their URI-derived
-        // identities are sent to minisd only after the keeper is ready.
+        // T219-1: load user-mounted external folders. SAF grants are
+        // revalidated before each Direct Ubuntu namespace is built.
         mountedFoldersStore = MountedFoldersStore(this)
         // Candidate snapshots are reconciled before persistence. A failed
-        // replacement keeper therefore leaves the old Store state intact.
+        // replacement therefore leaves the old Store state intact.
         RuntimePathRegistry.mountedFoldersStore = mountedFoldersStore
         mountedFoldersStore.onSnapshotChange = { candidate ->
             com.openminis.app.runtime.ubuntu.UbuntuRuntime.reconcileExternalMounts(candidate)
         }
-        mountedFoldersStore.onChange = {
-            ExecutionCoordinator.stopCurrentCommand()
-        }
 
-        // Register native_offload handlers and start the server eagerly —
-        // the server only needs the rootfs tmp directory, which can be
-        // materialized lazily. Starting here means the abstract socket is
-        // reachable even before any shell session is launched.
+        // Register native_offload handlers and start the server eagerly. Reply
+        // files live in App-owned workspace/offloads; each session launch binds
+        // its own offloads directory to guest /tmp.
         NativeOffloadServer.register("android-alarm", AlarmOffloadHandler(this))
         NativeOffloadServer.register("android-calendar", CalendarOffloadHandler(this))
         NativeOffloadServer.register("android-clipboard", ClipboardOffloadHandler(this))
@@ -729,11 +725,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         )
         NativeOffloadServer.register("minis-browser-use", BrowserUseOffloadHandler(this))
         // T188: minis-sessions-cli — agent-side query of chat history.
-        // Registers next to the other minis-* tools so RuntimePathRegistry.
-        // installHandlerStubs() picks it up on the next rootfs boot
-        // (writes a 17-byte exit-0 stub at /usr/local/bin/minis-sessions-cli
-        // so PATH lookup succeeds; PRoot intercepts the execve before
-        // the stub runs and routes to this handler).
+        // Registers next to the other minis-* tools so the Direct Ubuntu
+        // guest bridge installs its authenticated command wrapper on the next
+        // boot.
         NativeOffloadServer.register("minis-sessions-cli", SessionsOffloadHandler(chatRepository))
         // [T-android-scheduled-tasks-full] minis-scheduled — create/list/run
         // timed AI tasks (new chat / follow-up / re-run), mirroring the in-app
@@ -753,8 +747,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         // T-android-minis-debug-cli: shell-side CLI wrapper around the in-app
         // DebugServer (127.0.0.1:5321) JSON-RPC. DEBUG-only — Release builds
         // ship neither the DebugServer nor this handler, so the
-        // `/usr/local/bin/minis-debug` stub is also absent (RuntimePathRegistry.
-        // installHandlerStubs enumerates currently-registered handlers).
+        // `/usr/local/bin/minis-debug` wrapper is also absent. The Direct Root
+        // GuestCommandBridge enumerates currently-registered handlers and
+        // installs authenticated PATH wrappers for this Debug-only command.
         if (BuildConfig.DEBUG) {
             NativeOffloadServer.register(
                 "minis-debug",
@@ -762,7 +757,7 @@ class MinisApp : Application(), ImageLoaderFactory {
             )
         }
 
-        NativeOffloadServer.start(java.io.File(filesDir, "minis-offload"))
+        NativeOffloadServer.start(java.io.File(UbuntuPaths.hostWorkspace, "offloads"))
 
         // Initialize session activity tracker for foreground service management
         SessionActivityTracker.init(this)
@@ -910,8 +905,8 @@ class MinisApp : Application(), ImageLoaderFactory {
 
         // Propagate system timezone and HTTP-proxy changes into the sandbox.
         // iOS recomputes TZ for every command (ISHShellExecutor.m:335-353);
-        // here we update RuntimePathRegistry.customEnvironment and push `export …`
-        // into every live shell so interactive sessions pick up the change
+        // here we push `export …` into every live shell so interactive sessions
+        // pick up the change
         // without a restart.
         val sandboxSystemReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
@@ -1117,6 +1112,22 @@ class MinisApp : Application(), ImageLoaderFactory {
     }
 
     override fun onTerminate() {
+        // Real devices normally kill an Application without calling this
+        // callback; the Root marker reconciliation in UbuntuKernel handles
+        // that case on the next runtime start. When the callback is delivered
+        // (emulators/tests), close every process/socket owner deterministically
+        // so the next instance does not inherit a live helper.
+        runCatching {
+            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                UbuntuRuntime.stop()
+            }
+        }.onFailure { Log.w("MinisApp", "Ubuntu runtime stop failed: ${it.message}") }
+        runCatching { networkMonitor.stop() }
+            .onFailure { Log.w("MinisApp", "Network monitor stop failed: ${it.message}") }
+        runCatching { NativeOffloadServer.stop() }
+            .onFailure { Log.w("MinisApp", "Native offload stop failed: ${it.message}") }
+        runCatching { com.openminis.app.runtime.guest.GuestCommandBridge.stop() }
+            .onFailure { Log.w("MinisApp", "Guest bridge stop failed: ${it.message}") }
         // onTerminate is called only on emulators or when the system
         // explicitly tears down — real devices usually skip it. Still
         // worth marking the beacon: a present clean_exit on a real

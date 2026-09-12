@@ -17,7 +17,7 @@
 
 - Linux runtime：Direct Ubuntu 24.04 chroot；
 - Android App 持有 session/shell/工具/数据真源；
-- Root 只用于建立 direct chroot 所需的最小基础设施；
+- `DirectRootRunner` 只用于建立 direct chroot 所需的最小基础设施；本地 Agent 另有上游兼容的结构化 `root.shell`，MCP 不可见且不接受 raw command；
 - 普通 guest 命令最终以真实 App UID/GID 且无 Linux capabilities 运行；
 - 旧特权 broker、PRoot、Alpine 不属于生产 runtime；
 - `127.0.0.1:18787` HTTP/CONNECT helper 是独立网络兼容组件，代理协议本身不依赖 Root；当前实现仅可为 Android UID/VPN/BPF 出站兼容以特权身份启动。
@@ -46,6 +46,8 @@
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行、UID/GID、mount 与网络关系 |
 | [`SECURITY.md`](SECURITY.md) | 安全模型 |
 | [`runtime-package-boundary.md`](runtime-package-boundary.md) | Android runtime 包职责边界 |
+| [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md) | Direct Ubuntu 分支与外部上游的对账快照、双方特有内容和复核命令 |
+| [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md) | 小米真机实测记录、通过项、证据边界与未完成矩阵 |
 | [`../BUILDING.md`](../BUILDING.md) | 构建与验证 |
 | [`../CONTRIBUTING.zh-CN.md`](../CONTRIBUTING.zh-CN.md) | 贡献规则 |
 

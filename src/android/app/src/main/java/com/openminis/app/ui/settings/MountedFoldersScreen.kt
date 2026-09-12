@@ -129,7 +129,7 @@ fun MountedFoldersScreen(
     // READ + WRITE directly rather than pushing the user to a Settings page that
     // (on HarmonyOS/EMUI) may not exist. WRITE is required for two things the read
     // grant alone doesn't cover: probeWritable's write test (drives the R/W vs
-    // read-only badge) and the agent's raw proot writes into the bound folder —
+    // read-only badge) and the agent's Direct Ubuntu writes into the bound folder —
     // without it those writes report success but land in a shadow FUSE view instead
     // of shared storage. Re-check on grant so the banner clears.
     val legacyStorageLauncher = rememberLauncherForActivityResult(
@@ -145,7 +145,7 @@ fun MountedFoldersScreen(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        // Only on-device storage maps to a POSIX path PRoot can bind. Reject
+        // Only on-device storage maps to a POSIX path Direct Ubuntu can bind. Reject
         // cloud providers (Drive, Dropbox, OneDrive) with a clear toast —
         // the spec defers Option B mirror-copy to a follow-up.
         if (uri.authority != "com.android.externalstorage.documents") {
@@ -445,14 +445,14 @@ private fun AllFilesAccessBanner(onClick: () -> Unit) {
 }
 
 /**
- * Whether the app currently has enough storage access for PRoot to readdir a
+ * Whether the app currently has enough storage access for Direct Ubuntu to readdir a
  * mounted external folder's real contents.
  *
  * - Android 11+ (R): needs MANAGE_EXTERNAL_STORAGE. It's a special permission
  *   granted only via a system Settings page, never the runtime flow.
  * - Android 10 (Q) base ROMs — including HarmonyOS 2.x / EMUI 11 (Mate 40
  *   ELS-AN00 etc.) that never expose the "All Files Access" page: legacy
- *   storage is what feeds proot the /mnt/runtime/write FUSE view, and that
+ *   storage is what feeds the Direct Ubuntu bind view, and that
  *   requires READ_EXTERNAL_STORAGE to actually be granted. Returning true
  *   unconditionally here (the old behaviour) hid the banner even when the
  *   user hadn't granted "允许访问文件", leaving them stuck on an empty mount.
@@ -561,7 +561,7 @@ private fun MountRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // The URI-derived volume/segments stay in the broker contract;
+            // The URI-derived volume/segments stay in the persisted mount contract;
             // the settings screen displays the provider's stable label.
             val source = entry.sourceDisplayName.ifEmpty { stringResource(R.string.mount_path_unavailable) }
             Text(

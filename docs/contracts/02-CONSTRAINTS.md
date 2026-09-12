@@ -16,9 +16,9 @@
 
 ## Root 与特权
 
-- Root 只允许执行 App 构造的受控基础设施动作；禁止新增 Agent/MCP/模型可控的任意 Root shell、Root RPC 或通用 broker。
-- `DirectRootRunner` 不是工具 API。任何来自模型或远程调用方的原始命令字符串都不得直接进入 `runScript` / `su -c`。
-- `root.shell` 对 local Agent 和 MCP 都必须拒绝；若未来改变，需要单独安全设计与维护者明确授权。
+- Root 基础设施仍只执行 App 构造的受控动作；本地 Agent 通过结构化 `root.shell` 使用明确的 Android Root 工具能力，不得扩展成通用 Root RPC、broker 或原始 shell 字符串入口。
+- `DirectRootRunner` 不是脚本工具 API。任何来自模型或远程调用方的原始命令字符串都不得直接进入 `runScript` / `su -c`；`root.shell` 只接受 tool basename + argv，解析范围固定为可信 Android system 目录，参数数量/大小、超时、输出和进程组回收受界定。
+- `root.shell` 对 local Agent 为 `LOCAL_ONLY`，对 MCP 不可见且不可调用；MCP 不能借 token scope 或配置把它升级为远程 Root 能力。
 - Guest 命令进入 chroot 后必须使用真实 App UID/GID，并清空 supplementary groups 与 Linux capabilities。
 - 禁止恢复旧 broker、PRoot/Alpine 双栈或为了兼容全局关闭 SELinux。
 - Accessibility、悬浮窗、默认助手、通知监听、安装未知应用等能力必须由用户/系统独立授权。

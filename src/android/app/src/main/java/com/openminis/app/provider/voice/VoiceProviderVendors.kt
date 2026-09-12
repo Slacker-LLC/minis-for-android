@@ -664,6 +664,57 @@ class MimoVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     override fun defaultVoiceOutputModel() = "mimo-v2.5-tts"
     override fun defaultVoiceOutputVoice() = "mimo_default"
 
+    private data class TtsRoute(
+        val apiModel: String,
+        val voiceId: String?,
+    )
+
+    private fun ttsRoute(request: VoiceOutputRequest): TtsRoute {
+        val rawModel = request.model ?: defaultVoiceOutputModel()
+        return if (rawModel in API_MODELS) {
+            TtsRoute(rawModel, request.voice)
+        } else {
+            // The model picker can pass a model entry id as `model` when the
+            // provider's API model is selected separately. MiMo's voice
+            // namespace is separate, so keep the API route stable and do not
+            // forward that model id as a voice id.
+            TtsRoute("mimo-v2.5-tts", rawModel)
+        }
+    }
+
+    override fun buildVoiceOutputRequest(request: VoiceOutputRequest): Request {
+        val route = ttsRoute(request)
+        // The model picker can pass the selected model id as both `model` and
+        // `voice` for a base TTS entry. MiMo's voice namespace is separate:
+        // `mimo-v2.5-tts` is not a valid built-in voice id. Use the documented
+        // cluster-aware default in that case, while preserving explicit voice
+        // ids such as `冰糖`, `Mia`, or `mimo_default`.
+        val normalizedVoice = if (route.apiModel == "mimo-v2.5-tts") {
+            route.voiceId?.takeUnless { it in API_MODELS } ?: defaultVoiceOutputVoice()
+        } else {
+            route.voiceId
+        }
+        val audioParams = JSONObject().put("format", "wav")
+        if (route.apiModel != "mimo-v2.5-tts-voicedesign" && normalizedVoice != null) {
+            audioParams.put("voice", normalizedVoice)
+        }
+        val body = JSONObject().apply {
+            put("model", route.apiModel)
+            put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "user").put("content", ""))
+                    .put(JSONObject().put("role", "assistant").put("content", request.input)),
+            )
+            put("audio", audioParams)
+        }
+        val builder = Request.Builder()
+            .url(composedUrlString("/v1/chat/completions"))
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+        applyVoiceAuth(builder)
+        return builder.build()
+    }
+
     // ASR ----------------------------------------------------------------------
 
     override suspend fun transcribe(request: VoiceInputRequest): VoiceInputResponse {
@@ -711,37 +762,7 @@ class MimoVoiceProvider(providerId: String, baseURL: String, apiKey: String?) :
     // TTS ----------------------------------------------------------------------
 
     override suspend fun synthesize(request: VoiceOutputRequest): ByteArray {
-        val url = composedUrlString("/v1/chat/completions")
-        val rawModel = request.model ?: defaultVoiceOutputModel()
-        val apiModel: String
-        val voiceId: String?
-        if (rawModel in API_MODELS) {
-            apiModel = rawModel
-            voiceId = request.voice
-        } else {
-            apiModel = "mimo-v2.5-tts"
-            voiceId = rawModel
-        }
-        val audioParams = JSONObject().put("format", "wav")
-        if (apiModel != "mimo-v2.5-tts-voicedesign" && voiceId != null) {
-            audioParams.put("voice", voiceId)
-        }
-        val body = JSONObject().apply {
-            put("model", apiModel)
-            put(
-                "messages",
-                JSONArray()
-                    .put(JSONObject().put("role", "user").put("content", ""))
-                    .put(JSONObject().put("role", "assistant").put("content", request.input)),
-            )
-            put("audio", audioParams)
-        }
-        val builder = Request.Builder()
-            .url(url)
-            .post(body.toString().toRequestBody("application/json".toMediaType()))
-        applyVoiceAuth(builder)
-
-        val data = executeRequest(builder.build())
+        val data = executeRequest(buildVoiceOutputRequest(request))
         val b64 = runCatching { JSONObject(String(data, Charsets.UTF_8)) }.getOrNull()
             ?.optJSONArray("choices")
             ?.optJSONObject(0)

@@ -24,7 +24,7 @@ import java.io.FileNotFoundException
 import java.io.RandomAccessFile
 
 /**
- * Exposes the broker-owned global Minis scopes to the system Files app.
+ * Exposes the App-owned global Minis scopes to the system Files app.
  *
  * Document IDs are virtual guest paths (`memory/foo.txt`), never host paths.
  * Every metadata and mutation operation goes through `workspace.file`, and
@@ -110,7 +110,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
             addDocumentRow(cursor, ROOT_DOC_ID, "Minis", "dir", 0L, 0L)
             return cursor
         }
-        val info = broker { WorkspaceFileClient.info(null, guestPath(documentId)) }
+        val info = runFileOp { WorkspaceFileClient.info(null, guestPath(documentId)) }
         addDocumentRow(
             cursor = cursor,
             documentId = documentId,
@@ -131,7 +131,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         if (parentDocumentId.isEmpty()) {
             TOP_LEVEL.forEach { name ->
                 runCatching {
-                    broker { WorkspaceFileClient.info(null, "/$name") }
+                    runFileOp { WorkspaceFileClient.info(null, "/$name") }
                 }.onSuccess { info ->
                     if (info.optString("type") == "dir") {
                         addDocumentRow(cursor, name, name, "dir", 0L, info.optLong("modified", 0L))
@@ -142,11 +142,11 @@ class MinisDocumentsProvider : DocumentsProvider() {
         }
 
         val parentPath = guestPath(parentDocumentId)
-        val parentInfo = broker { WorkspaceFileClient.info(null, parentPath) }
+        val parentInfo = runFileOp { WorkspaceFileClient.info(null, parentPath) }
         if (parentInfo.optString("type") != "dir") {
             throw FileNotFoundException("Not a directory: $parentDocumentId")
         }
-        val listing = broker { WorkspaceFileClient.list(null, parentPath, 500, 0) }
+        val listing = runFileOp { WorkspaceFileClient.list(null, parentPath, 500, 0) }
         val entries = listing.optJSONArray("entries") ?: return cursor
         for (index in 0 until entries.length()) {
             val entry = entries.optJSONObject(index) ?: continue
@@ -171,7 +171,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         signal: CancellationSignal?,
     ): ParcelFileDescriptor {
         val path = guestPath(documentId)
-        val info = broker { WorkspaceFileClient.info(null, path) }
+        val info = runFileOp { WorkspaceFileClient.info(null, path) }
         if (info.optString("type") != "file") {
             throw FileNotFoundException("Not a regular file: $documentId")
         }
@@ -180,7 +180,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         if (writable && isReadOnly(documentId)) {
             throw UnsupportedOperationException("${topLevel(documentId)} is read-only")
         }
-        val callback = BrokerFileCallback(
+        val callback = DocumentFileCallback(
             documentId = documentId,
             path = path,
             modeFlags = modeFlags,
@@ -206,16 +206,16 @@ class MinisDocumentsProvider : DocumentsProvider() {
         }
         val name = safeName(displayName)
         val parentPath = guestPath(parentDocumentId)
-        val parentInfo = broker { WorkspaceFileClient.info(null, parentPath) }
+        val parentInfo = runFileOp { WorkspaceFileClient.info(null, parentPath) }
         if (parentInfo.optString("type") != "dir") {
             throw FileNotFoundException("Not a directory: $parentDocumentId")
         }
         val documentId = "$parentDocumentId/$name"
         val path = guestPath(documentId)
         if (mimeType == Document.MIME_TYPE_DIR) {
-            broker { WorkspaceFileClient.mkdir(null, path) }
+            runFileOp { WorkspaceFileClient.mkdir(null, path) }
         } else {
-            broker { WorkspaceFileClient.writeBytes(null, path, ByteArray(0)) }
+            runFileOp { WorkspaceFileClient.writeBytes(null, path, ByteArray(0)) }
         }
         return documentId
     }
@@ -224,7 +224,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         if (isReadOnly(documentId)) {
             throw UnsupportedOperationException("${topLevel(documentId)} is read-only")
         }
-        broker { WorkspaceFileClient.delete(null, guestPath(documentId)) }
+        runFileOp { WorkspaceFileClient.delete(null, guestPath(documentId)) }
     }
 
     override fun renameDocument(documentId: String, displayName: String): String {
@@ -234,7 +234,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         val name = safeName(displayName)
         val parent = documentId.substringBeforeLast('/', "")
         val renamed = if (parent.isEmpty()) name else "$parent/$name"
-        broker {
+        runFileOp {
             WorkspaceFileClient.move(
                 sessionId = null,
                 source = guestPath(documentId),
@@ -244,7 +244,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         return renamed
     }
 
-    private inner class BrokerFileCallback(
+    private inner class DocumentFileCallback(
         private val documentId: String,
         private val path: String,
         private val modeFlags: Int,
@@ -260,7 +260,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
         private val localAccess: RandomAccessFile? = localFile?.let { file ->
             try {
                 if (initialSize > MAX_DOCUMENT_BYTES) {
-                    throw IllegalArgumentException("document exceeds broker limit: $documentId")
+                    throw IllegalArgumentException("document exceeds file size limit: $documentId")
                 }
                 if (!isTruncating(modeFlags)) {
                     WorkspaceFileClient.readToFileBlocking(null, path, file, MAX_DOCUMENT_BYTES)
@@ -285,7 +285,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
                     localAccess.read(data, 0, size).coerceAtLeast(0)
                 }
             }
-            val chunk = broker {
+            val chunk = runFileOp {
                 WorkspaceFileClient.readChunk(
                     sessionId = null,
                     path = path,
@@ -308,7 +308,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
             if (writeOffset < 0 || writeOffset > MAX_DOCUMENT_BYTES ||
                 size.toLong() > MAX_DOCUMENT_BYTES - writeOffset
             ) {
-                throw errno(OsConstants.EFBIG, "document exceeds broker limit")
+                throw errno(OsConstants.EFBIG, "document exceeds file size limit")
             }
             synchronized(lock) {
                 localAccess.seek(writeOffset)
@@ -337,7 +337,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
                 if (committed || localFile == null) return
                 localAccess?.fd?.sync()
                 localFile.inputStream().use { input ->
-                    broker {
+                    runFileOp {
                         WorkspaceFileClient.writeStream(
                             sessionId = null,
                             path = path,
@@ -418,7 +418,7 @@ class MinisDocumentsProvider : DocumentsProvider() {
     private fun providerContext(): Context =
         context ?: throw IllegalStateException("Provider has no context")
 
-    private fun <T> broker(block: suspend () -> T): T =
+    private fun <T> runFileOp(block: suspend () -> T): T =
         runBlocking(Dispatchers.IO) { block() }
 
     private fun errno(code: Int, message: String): ErrnoException =

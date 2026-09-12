@@ -176,7 +176,7 @@ class UbuntuPathsTest {
         val sessionsRoot = Files.createTempDirectory("minis-session-delete-link")
         val outside = Files.createTempDirectory("minis-session-delete-outside")
         val marker = outside.resolve("keep.txt")
-        Files.writeString(marker, "keep")
+        Files.write(marker, "keep".toByteArray())
         val link = sessionsRoot.resolve("session-a")
         try {
             try {
@@ -200,7 +200,7 @@ class UbuntuPathsTest {
         val sessionsRoot = Files.createTempDirectory("minis-session-delete-nested")
         val outside = Files.createTempDirectory("minis-session-delete-nested-outside")
         val marker = outside.resolve("keep.txt")
-        Files.writeString(marker, "keep")
+        Files.write(marker, "keep".toByteArray())
         try {
             val session = UbuntuPaths.ensureSessionDirsAt(sessionsRoot.toFile(), "session-a")!!
             val link = File(session, "workspace/escape").toPath()

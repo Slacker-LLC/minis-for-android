@@ -12,7 +12,6 @@ class RuntimePackageBoundaryTest {
     @Test
     fun activeComponentsLiveUnderCurrentRuntimeBoundary() {
         assertEquals("com.openminis.app.runtime", RuntimePathRegistry::class.java.packageName)
-        assertEquals("com.openminis.app.runtime", ExternalMountCoordinator::class.java.packageName)
         assertEquals("com.openminis.app.runtime", ExecutionCoordinator::class.java.packageName)
         assertEquals("com.openminis.app.runtime.ubuntu", UbuntuRuntime::class.java.packageName)
         assertEquals("com.openminis.app.runtime.terminal", TerminalSanitizer::class.java.packageName)

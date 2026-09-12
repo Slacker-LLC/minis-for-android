@@ -300,17 +300,16 @@ fun RootfsManagementScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "The rootfs contains the Alpine Linux filesystem used by " +
-                            "the sandbox. Resetting will delete all data and restore to " +
-                            "factory state.",
+                        text = "The rootfs contains the Ubuntu 24.04 filesystem used by " +
+                            "the sandbox. Resetting deletes only the rootfs; App-owned " +
+                            "workspace, memory, skills, and shared files are preserved.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Reset: Delete everything\n" +
-                            "Backup: Save /root directory\n" +
-                            "Restore: Recover saved data",
+                        text = "Reset: Delete the Ubuntu rootfs\n" +
+                            "Backup/Restore: App-owned user data is managed separately",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

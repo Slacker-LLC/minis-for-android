@@ -10,8 +10,10 @@ import java.io.File
 /**
  * [T-android-offload-tmp-leak] The sweep policy for native_offload reply files.
  *
- * Each offload call writes `<rootfs>/tmp/.native-offload-<pid>-<seq>` and returns
- * the GUEST path; proot rewrites the tracee's execve into `/bin/cat <tmpfile>`.
+ * Each offload call writes an App-owned workspace/offloads
+ * `.native-offload-<pid>-<seq>` file and returns the matching GUEST `/tmp` path;
+ * the guest bridge routes the handler result through its
+ * temporary-file framing contract.
  * The host therefore CANNOT delete at reply time — `cat` has not run yet — and
  * nothing else ever did, so one file leaked per call forever (measured on a dev
  * device: 38 files spanning 12 days, surviving many app restarts).

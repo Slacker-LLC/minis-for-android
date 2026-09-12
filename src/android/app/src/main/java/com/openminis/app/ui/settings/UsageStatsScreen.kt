@@ -74,6 +74,25 @@ private data class GrandTotal(
  */
 private const val UNKNOWN_MODEL_KEY = "(unknown model)"
 
+/** Trust level of the model identity shown for a usage row. */
+internal enum class Attribution {
+    MEASURED,
+    ESTIMATED,
+    UNKNOWN_SESSION,
+    MEASURED_REMOVED,
+}
+
+internal fun classifyAttribution(
+    modelId: String?,
+    hasSnapshot: Boolean,
+    resolvesInConfig: Boolean,
+): Attribution = when {
+    modelId == null -> Attribution.UNKNOWN_SESSION
+    !hasSnapshot -> Attribution.ESTIMATED
+    !resolvesInConfig -> Attribution.MEASURED_REMOVED
+    else -> Attribution.MEASURED
+}
+
 @Composable
 fun UsageStatsScreen(
     chatDao: ChatDao,
@@ -117,7 +136,7 @@ fun UsageStatsScreen(
             val displayName = record.modelDisplayName?.takeIf { it.isNotBlank() }
                 ?: legacyInfo?.first
                 ?: rawModelId
-            val provider = providerDisplayName(record.providerType)
+            val provider = record.providerType?.takeIf { it.isNotBlank() }?.let(::providerDisplayName)
                 ?: legacyInfo?.second
                 ?: "Unknown"
             // Include the provider instance when present: the same model id
@@ -291,9 +310,8 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-private fun providerDisplayName(raw: String?): String? {
-    val value = raw?.takeIf { it.isNotBlank() } ?: return null
-    return runCatching { ProviderType.valueOf(value).displayName }.getOrDefault(value)
+internal fun providerDisplayName(rawValue: String): String {
+    return runCatching { ProviderType.valueOf(rawValue).displayName }.getOrDefault(rawValue)
 }
 
 private fun formatCount(n: Long): String = when {

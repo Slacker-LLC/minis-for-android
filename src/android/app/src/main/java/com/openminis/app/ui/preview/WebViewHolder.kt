@@ -54,7 +54,7 @@ class WebViewHolder(
         settings.allowContentAccess = true
         // Same-origin file:// access is needed so `<script src="game.js">`
         // sitting next to a sandbox HTML loads correctly. We accept the small
-        // attack surface because all paths come from PRoot-resolved sandbox
+        // attack surface because all paths come from guest-resolved sandbox
         // outputs, never untrusted user content from the network.
         @Suppress("DEPRECATION")
         settings.allowFileAccessFromFileURLs = true

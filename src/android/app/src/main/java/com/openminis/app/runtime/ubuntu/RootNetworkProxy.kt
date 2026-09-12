@@ -2,6 +2,7 @@ package com.openminis.app.runtime.ubuntu
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,6 +24,16 @@ import java.util.concurrent.TimeUnit
  */
 internal object RootNetworkProxy {
     const val PROXY_LISTEN = "127.0.0.1:18787"
+    internal val PROXY_ENV_KEYS: Set<String> = setOf(
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "all_proxy",
+        "ALL_PROXY",
+        "no_proxy",
+        "NO_PROXY",
+    )
     private const val PROXY_USER = "minis"
     private const val TAG = "RootNetworkProxy"
     private const val BINARY = "libminisnetproxy.so"
@@ -78,7 +89,10 @@ internal object RootNetworkProxy {
         if (uid <= 0) {
             return@withLock Status(false, "invalid Android app uid for outbound network proxy")
         }
-        val pidDir = File(context.cacheDir, "minis-root-proxy").apply { mkdirs() }
+        // The Root launcher writes this marker before starting the
+        // Root-owned helper. An App-writable cache directory would allow a
+        // guest to race the path with a symlink and redirect a Root write.
+        val pidDir = File(DirectRootRunner.ROOT_STATE_DIR, "proxy")
         val pidFile = File(pidDir, "proxy-${UUID.randomUUID()}.pid")
         val command = buildLaunchCommand(binary.absolutePath, pidFile.absolutePath, uid)
         val child = try {
@@ -104,47 +118,45 @@ internal object RootNetworkProxy {
             terminateManagedProxy(child, pidFile)
             return@withLock Status(false, "cannot authenticate Root network proxy startup: ${error.message}")
         }
-        Thread({
-            try {
-                child.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { line ->
-                        if (isReadyAnnouncement(line) && process === child) {
-                            processReady = true
+        try {
+            Thread({
+                try {
+                    child.inputStream.bufferedReader().useLines { lines ->
+                        lines.forEach { line ->
+                            if (isReadyAnnouncement(line) && process === child) {
+                                processReady = true
+                            }
+                            Log.d(TAG, line)
                         }
-                        Log.d(TAG, line)
                     }
+                } catch (_: Exception) {
+                    // Child exit or pipe teardown is observed by the lifecycle poll/next readiness check.
                 }
-            } catch (_: Exception) {
-                // Child exit or pipe teardown is observed by the lifecycle poll/next readiness check.
+            }, "minis-root-network-proxy-log").apply {
+                isDaemon = true
+                start()
             }
-        }, "minis-root-network-proxy-log").apply {
-            isDaemon = true
-            start()
-        }
 
-        repeat(80) {
-            if (!child.isAlive) {
-                if (process === child) {
-                    process = null
-                    processPidFile = null
-                    processReady = false
+            repeat(80) {
+                if (!child.isAlive) {
+                    clearOwnedProcess(child, pidFile)
+                    return@withLock Status(false, "Root network proxy exited before becoming ready")
                 }
-                terminateManagedProxy(child, pidFile)
-                return@withLock Status(false, "Root network proxy exited before becoming ready")
+                // The TCP probe alone is insufficient: another local process could
+                // win the bind race after our preflight check. Trust the listener
+                // only after this exact child emitted READY after its successful bind.
+                if (processReady && listenerReady() && child.isAlive) return@withLock Status(true)
+                delay(25)
             }
-            // The TCP probe alone is insufficient: another local process could
-            // win the bind race after our preflight check. Trust the listener
-            // only after this exact child emitted READY after its successful bind.
-            if (processReady && listenerReady() && child.isAlive) return@withLock Status(true)
-            delay(25)
+            clearOwnedProcess(child, pidFile)
+            Status(false, "Root network proxy did not bind $PROXY_LISTEN")
+        } catch (cancelled: CancellationException) {
+            clearOwnedProcess(child, pidFile)
+            throw cancelled
+        } catch (error: Exception) {
+            clearOwnedProcess(child, pidFile)
+            Status(false, "Root network proxy startup failed: ${error.message}")
         }
-        if (process === child) {
-            process = null
-            processPidFile = null
-            processReady = false
-        }
-        terminateManagedProxy(child, pidFile)
-        Status(false, "Root network proxy did not bind $PROXY_LISTEN")
     }
 
     suspend fun stop() = lock.withLock {
@@ -161,13 +173,24 @@ internal object RootNetworkProxy {
         Log.w(TAG, "Root network proxy listener is still bound after stop: $PROXY_LISTEN")
     }
 
-    fun proxyEnv(): Map<String, String> = linkedMapOf(
-        "http_proxy" to PROXY_URI,
-        "https_proxy" to PROXY_URI,
-        "HTTP_PROXY" to PROXY_URI,
-        "HTTPS_PROXY" to PROXY_URI,
-        "all_proxy" to PROXY_URI,
-        "ALL_PROXY" to PROXY_URI,
+    /**
+     * Return proxy variables only while this process owns a live helper.
+     * Direct App-UID guest networking is a valid deployment, so an absent or
+     * failed compatibility helper must not poison the guest with a dead URI.
+     */
+    fun proxyEnv(): Map<String, String> {
+        val child = process
+        if (!processReady || child == null || !child.isAlive) return emptyMap()
+        return buildProxyEnv(PROXY_URI)
+    }
+
+    internal fun buildProxyEnv(proxyUri: String): Map<String, String> = linkedMapOf(
+        "http_proxy" to proxyUri,
+        "https_proxy" to proxyUri,
+        "HTTP_PROXY" to proxyUri,
+        "HTTPS_PROXY" to proxyUri,
+        "all_proxy" to proxyUri,
+        "ALL_PROXY" to proxyUri,
         "no_proxy" to "localhost,127.0.0.1,::1",
         "NO_PROXY" to "localhost,127.0.0.1,::1",
     )
@@ -183,13 +206,15 @@ internal object RootNetworkProxy {
 
     internal fun buildLaunchCommand(binaryPath: String, pidFilePath: String, uid: Int): String {
         require(uid > 0) { "invalid app uid" }
+        val pidParent = File(pidFilePath).parent ?: pidFilePath
         val child = "umask 077; " +
+            "mkdir -p ${DirectRootRunner.shellQuote(pidParent)} || exit 126; " +
+            "chmod 711 ${DirectRootRunner.shellQuote(pidParent)} || exit 126; " +
             "echo \$\$ > ${DirectRootRunner.shellQuote(pidFilePath)} || exit 126; " +
-            "chown $uid:$uid ${DirectRootRunner.shellQuote(pidFilePath)} || exit 126; " +
             "exec ${DirectRootRunner.shellQuote(binaryPath)} " +
             "--listen ${DirectRootRunner.shellQuote(PROXY_LISTEN)} --auth-stdin"
-        return "if command -v setsid >/dev/null 2>&1; then " +
-            "exec setsid /system/bin/sh -c ${DirectRootRunner.shellQuote(child)}; " +
+        return "if [ -x /system/bin/setsid ]; then " +
+            "exec /system/bin/setsid /system/bin/sh -c ${DirectRootRunner.shellQuote(child)}; " +
             "else echo 'setsid is required for isolated Root proxy' >&2; exit 125; fi"
     }
 
@@ -201,6 +226,15 @@ internal object RootNetworkProxy {
             "sleep 0.05; " +
             "kill -KILL -\$PID 2>/dev/null || kill -KILL \$PID 2>/dev/null || true; " +
             "fi ;; esac; rm -f -- ${DirectRootRunner.shellQuote(pidFilePath)}"
+
+    private fun clearOwnedProcess(child: Process, pidFile: File) {
+        if (process === child) {
+            process = null
+            processPidFile = null
+            processReady = false
+        }
+        terminateManagedProxy(child, pidFile)
+    }
 
     private fun terminateManagedProxy(child: Process?, pidFile: File?) {
         val su = DirectRootRunner.findSu()

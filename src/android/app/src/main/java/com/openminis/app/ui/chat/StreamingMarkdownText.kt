@@ -2313,7 +2313,7 @@ private fun BrokenImagePlaceholder(alt: String?) {
 /**
  * Resolve a markdown media URL (`minis://attachments/foo.mp4`, file://, or
  * plain absolute path) to a local File. Canonical guest files are staged from
- * minisd; SAF mounts and rootfs files retain their Android-side File mapping.
+ * the guest file API; SAF mounts and rootfs files retain their Android-side File mapping.
  *
  * A caller with a session id resolves only within that session. Sessionless
  * callers can resolve global guest roots but never search another session.

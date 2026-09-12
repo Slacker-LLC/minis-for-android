@@ -24,12 +24,12 @@ class ToolPermissionManagerTest {
     }
 
     @Test
-    fun `root shell is denied for every external caller`() {
-        assertEquals(ToolPermissionManager.Level.MCP_DENIED, ToolPermissionManager.levelFor("root.shell", "local_agent"))
-        assertEquals(ToolPermissionManager.Level.MCP_DENIED, ToolPermissionManager.levelFor("root.shell", "mcp:tok1"))
-        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
+    fun `root shell is local only and denied to mcp`() {
+        assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor("root.shell", "local_agent"))
+        assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor("root.shell", "mcp:tok1"))
+        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
         assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "mcp:tok1"))
-        assertFalse(ToolPermissionManager.localOnlyTools.contains("root.shell"))
+        assertTrue(ToolPermissionManager.localOnlyTools.contains("root.shell"))
         assertFalse(ToolPermissionManager.mcpVisibleTools().contains("root.shell"))
     }
 
@@ -120,9 +120,9 @@ class ToolPermissionManagerTest {
     }
 
     @Test
-    fun `local caller can use intended local only tools while root shell stays denied`() {
+    fun `local caller can use intended local only tools including root shell`() {
         assertTrue(ToolPermissionManager.isAllowedFor("android.logs.clear", "local_agent"))
-        assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
+        assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
         assertFalse(ToolPermissionManager.isAllowedFor("root.shell", "mcp:tok1"))
     }
 

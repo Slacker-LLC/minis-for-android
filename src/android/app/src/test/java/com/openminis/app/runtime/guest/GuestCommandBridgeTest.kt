@@ -8,6 +8,48 @@ import org.junit.Test
 
 class GuestCommandBridgeTest {
     @Test
+    fun `generated bridge wrapper keeps protocol newlines real`() {
+        val script = GuestCommandBridge.wrapperScriptForTest()
+
+        assertTrue(script.contains("MINISCFG3\\n%s\\n%s\\n%s\\n"))
+        assertTrue(script.contains("tr -d ' \\n'"))
+        assertFalse(script.contains("MINISCFG3\\\\n%s\\\\n"))
+    }
+
+    @Test
+    fun `managed guest CLI set includes registered Android handlers and preview aliases`() {
+        val names = GuestCommandBridge.managedCommandNames(
+            setOf("android-device", "minis-scheduled", "unsafe/name"),
+        )
+
+        assertTrue(names.contains("minis-config"))
+        assertTrue(names.contains("minis-model-use"))
+        assertTrue(names.contains("android-device"))
+        assertTrue(names.contains("minis-scheduled"))
+        assertTrue(names.contains("minis-open"))
+        assertTrue(names.contains("xdg-open"))
+        assertFalse(names.contains("unsafe/name"))
+    }
+
+    @Test
+    fun `registered Android handler names are accepted by the direct bridge`() {
+        val result = GuestCommandBridge.dispatch(
+            cmd = "android-device",
+            args = listOf("info"),
+            session = "",
+            cwd = "/workspace",
+            stdin = "",
+            pid = 123,
+        ) { name ->
+            assertEquals("android-device", name)
+            NativeOffloadHandler { NativeOffloadResult(0, "ok\n") }
+        }
+
+        assertEquals(0, result.exitCode)
+        assertEquals("ok\n", result.output)
+    }
+
+    @Test
     fun `dispatch preserves stdin session cwd and shell-sensitive arguments`() {
         val prompt = "quote=\"x\"\n中文 $ ` \\ end\n"
         var received: NativeOffloadRequest? = null

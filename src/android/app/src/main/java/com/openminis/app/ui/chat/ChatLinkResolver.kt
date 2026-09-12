@@ -51,7 +51,7 @@ object ChatLinkResolver {
         }
 
         // 2. Sandbox file resolution — canonical guest files are staged through
-        // minisd; only SAF mounts and app-local file:// paths use host files.
+        // the guest file API; only SAF mounts and app-local file:// paths use host files.
         if (context != null) {
             val staged = resolveDecodedPath(fileInput) { candidate ->
                 val guestPath = resolveGuestPath(candidate, scheme) ?: return@resolveDecodedPath null

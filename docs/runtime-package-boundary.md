@@ -18,8 +18,7 @@ There is no active privileged-broker package, socket protocol, or generic Root R
 | Package/component | Responsibility |
 | --- | --- |
 | `com.openminis.app.runtime.ExecutionCoordinator` | Android-side orchestration of guest commands, per-session serialization, cancellation, and shell lifecycle. |
-| `com.openminis.app.runtime.RuntimePathRegistry` | App-visible host/guest path registry, SAF mount snapshot, bind inputs, TZ and Android-side helpers. |
-| `com.openminis.app.runtime.ExternalMountCoordinator` | Read-only enforcement and compatibility seam for user-selected SAF mounts. |
+| `com.openminis.app.runtime.RuntimePathRegistry` | App-visible host/guest path registry, SAF mount snapshot, bind inputs, read-only enforcement, TZ and Android-side helpers. |
 | `com.openminis.app.runtime.ubuntu.UbuntuRuntime` | Public readiness/execution facade for the Ubuntu backend. |
 | `com.openminis.app.runtime.ubuntu.UbuntuKernel` | Rootfs readiness, one-time legacy-data migration, per-shell namespace/bind/chroot construction, and guest privilege drop. |
 | `com.openminis.app.runtime.ubuntu.DirectRootRunner` | Internal launcher for App-constructed Root infrastructure scripts. Not an Agent/MCP command surface. |
@@ -28,7 +27,7 @@ There is no active privileged-broker package, socket protocol, or generic Root R
 | `com.openminis.app.runtime.guest.*` | Guest-to-Android command/offload bridge; exposes approved Android capabilities without owning Root/Ubuntu lifecycle. |
 | `com.openminis.app.runtime.terminal.*` | Terminal output/timeout policy and active terminal responsibilities. |
 
-`MinisKernel` was replaced by `RuntimePathRegistry`, and `MountedFolderCoordinator` was replaced by `ExternalMountCoordinator`. Neither legacy type may return as an active runtime abstraction.
+`MinisKernel` and `MountedFolderCoordinator` were replaced by the active `RuntimePathRegistry` and `UbuntuPaths` responsibilities. Neither legacy type may return as an active runtime abstraction.
 
 ## Legacy package allowlist
 
@@ -47,7 +46,7 @@ No other production class may be added there without an intentional boundary cha
 - Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}`: migration sources only.
 - Guest workspace: `/workspace`, bound from selected global/per-session App-owned backing.
 - Guest identity: current Android App UID/GID, supplementary groups/capabilities cleared by `setpriv`.
-- Root execution: only App-constructed infrastructure through `DirectRootRunner`; Agent/model/MCP output must never become arbitrary Root commands.
+- Root infrastructure scripts remain App-constructed through `DirectRootRunner`; the local Agent may use structured `root.shell` through the tool registry, but Agent/model/MCP output must never become an arbitrary raw Root command.
 - Network compatibility: current helper listens on `127.0.0.1:18787` and provides HTTP/CONNECT only. HTTP/CONNECT proxying itself does not require Root; privileged deployment is an Android egress compatibility choice.
 
 ## Regression policy

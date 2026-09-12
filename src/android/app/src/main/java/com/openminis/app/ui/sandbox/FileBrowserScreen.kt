@@ -286,14 +286,14 @@ private fun FileItemRow(
     onAddToHome: (com.openminis.app.webapp.WebAppSource.HostFile) -> Unit,
 ) {
     // T-pwa-3: long-press menu for .html / .htm files whose host path
-    // sits under a recognised PRoot bind mount (`/var/minis/shared` or
+    // sits under a recognised Direct Ubuntu bind mount (`/var/minis/shared` or
     // `/var/minis/mounts/<n>`). Computed lazily because the bindMounts
     // map can change while the screen is open (mount add/remove).
     val ext = item.file.extension.lowercase()
     val isHtml = !item.isDirectory && (ext == "html" || ext == "htm")
     var menuExpanded by remember(item.file.absolutePath) { mutableStateOf(false) }
 
-    // [T-android-file-context-copy-abs-path] The file's Linux (PRoot) absolute
+    // [T-android-file-context-copy-abs-path] The file's Linux guest absolute
     // path = current dir's linux path + name. Falls back to the host absolute
     // path when this browser isn't rooted under a bind mount (raw host view).
     val absolutePath = currentLinuxPath?.let { "${it.trimEnd('/')}/${item.name}" }

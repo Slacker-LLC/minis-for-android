@@ -238,7 +238,7 @@ fun AppNavigation(
     // T219-5: use the application-scoped singleton from MinisApp so UI
     // add/remove shares state with RuntimePathRegistry and the lifecycle re-probe
     // path. Pre-T219-5 this `remember { MountedFoldersStore(...) }` created
-    // a SECOND independent instance — UI list updated but PRoot never
+    // a SECOND independent instance — UI list updated but Direct Ubuntu never
     // saw the change because RuntimePathRegistry.mountedFoldersStore pointed at
     // the application-scoped singleton in MinisApp.
     val mountedFoldersStore = remember {
@@ -1072,12 +1072,12 @@ fun AppNavigation(
                     // their backing host dirs (filesDir/minis-global/<subdir>).
                     // Without this the browser walks the rootfs tarball
                     // directly and shows the empty placeholder dirs that ship
-                    // inside Alpine's var/minis/ — every subdir reads as
+            // inside the rootfs's placeholder var/minis/ — every subdir reads as
                     // "Empty folder" even though the agent has files there.
                     linuxRootPath = "/",
                     // T147: scope per-session subdirs (attachments / workspace
                     // / offloads / browser) to THIS chat's host dir even when
-                    // another session was the last to boot a PRoot — that
+            // another session was the last to boot — that
                     // global bindMounts state is last-writer-wins and would
                     // otherwise hide the agent's generated files for the
                     // session the user is looking at.

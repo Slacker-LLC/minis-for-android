@@ -295,6 +295,13 @@ android {
     }
 }
 
+// Room schema JSON is part of the migration contract, not disposable build
+// output. Keep it next to the app module so JVM and instrumentation guards can
+// inspect the same generated history.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 // Keep the shared bashism rule table and test vectors as a single source of
 // truth under src/shared/bashism, copied into Android assets at build time.
 // Deterministic, non-secret diagnostic used by CI to exercise public,
@@ -350,7 +357,7 @@ val stageRuntimePayload by tasks.registering {
         if (manifest["rootfsSha256"] != sha256(packagedRootfs)) {
             throw GradleException("Runtime manifest rootfs SHA-256 mismatch")
         }
-        if (manifest["requiredCommands"] != listOf("python3", "git", "curl")) {
+        if (manifest["requiredCommands"] != listOf("python3", "git", "curl", "ping")) {
             throw GradleException("Runtime manifest requiredCommands mismatch")
         }
 

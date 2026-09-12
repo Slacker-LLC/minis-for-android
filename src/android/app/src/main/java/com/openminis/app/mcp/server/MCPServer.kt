@@ -249,7 +249,7 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
 
         // A5: liveness first — a dead Ubuntu runtime answers immediately
         // without burning a user confirmation (ACC-T-02 semantics). One-shot
-        // revive: when minisd is already up this is a cheap status refresh.
+        // revive: when Direct Ubuntu is already ready this is a cheap status refresh.
         if (canonicalName.startsWith("linux.") && !canonicalName.startsWith("linux.file.") && !MCPServerManager.linuxToolsAvailable()) {
             if (!com.openminis.app.runtime.ubuntu.UbuntuRuntime.ensureReady().running) {
                 val err = com.openminis.app.tools.ToolExecutionResult(

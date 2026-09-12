@@ -27,6 +27,21 @@ class RootNetworkProxyTest {
     }
 
     @Test
+    fun `proxy environment is a pure optional compatibility overlay`() {
+        val uri = "http://minis:${"0".repeat(64)}@127.0.0.1:18787"
+        val env = RootNetworkProxy.buildProxyEnv(uri)
+        assertEquals(uri, env["http_proxy"])
+        assertEquals(uri, env["ALL_PROXY"])
+        assertEquals("localhost,127.0.0.1,::1", env["NO_PROXY"])
+        assertEquals(RootNetworkProxy.PROXY_ENV_KEYS, env.keys)
+    }
+
+    @Test
+    fun `dead or absent helper does not inject a proxy into direct guest networking`() {
+        assertTrue(RootNetworkProxy.proxyEnv().isEmpty())
+    }
+
+    @Test
     fun `ready handshake accepts only the managed child announcement`() {
         assertTrue(RootNetworkProxy.isReadyAnnouncement("READY 127.0.0.1:18787"))
         assertFalse(RootNetworkProxy.isReadyAnnouncement("READY 0.0.0.0:18787"))
@@ -44,7 +59,10 @@ class RootNetworkProxyTest {
         assertTrue(command.contains("setsid"))
         assertTrue(command.contains("echo ${'$'}${'$'}"))
         assertTrue(command.contains("proxy.pid"))
-        assertTrue(command.contains("chown 10234:10234"))
+        assertTrue(command.contains("mkdir -p"))
+        assertTrue(command.contains("chmod 711"))
+        assertTrue(command.contains("umask 077"))
+        assertFalse(command.contains("chown 10234:10234"))
         assertTrue(command.contains("--auth-stdin"))
         assertFalse(command.contains("0123456789abcdef"))
     }

@@ -74,7 +74,7 @@ fun MCPIntegrationsScreen(
     mcpRepository: MCPRepository,
     onBack: () -> Unit,
     // [T-mcp-env-var-picker-android] App env vars, for the STDIO env field's
-    // "insert app var" picker ($$VAR references resolve at runtime in PRoot).
+    // "insert app var" picker ($$VAR references resolve at runtime in the guest).
     // Null when the caller hasn't wired it — the picker affordance hides.
     envVarRepository: com.openminis.app.data.repository.EnvVarRepository? = null,
 ) {
@@ -607,7 +607,7 @@ private fun MCPFormTab(
             // [T-mcp-env-var-picker-android] Env label + "insert app var"
             // affordance. Tapping opens a picker of App env var keys; selecting
             // one appends a `KEY=$$KEY` line so the value resolves at runtime
-            // from the PRoot guest env (App env vars are injected there). The
+            // from the guest env (App env vars are injected there). The
             // affordance only shows when an EnvVarRepository was wired in.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FieldLabel(stringResource(R.string.mcp_form_env))

@@ -23,7 +23,9 @@ const val APP_DATABASE_VERSION = 20
         BotInboxEventEntity::class,
     ],
     version = APP_DATABASE_VERSION,
-    exportSchema = false,
+    // Keep the Room schema history committed so migration and downgrade
+    // checks can inspect the real entity shape, including custom tables.
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao

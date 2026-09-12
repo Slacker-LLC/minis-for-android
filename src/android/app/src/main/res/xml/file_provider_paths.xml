@@ -15,8 +15,8 @@
          FileProvider.getUriForFile threw IllegalArgumentException and the
          user saw "分享失败" toasts instead of the share sheet. -->
     <cache-path name="share" path="share/" />
-    <!-- Browser download preview copies; canonical guest bytes remain behind
-         minisd and are mirrored here for ACTION_VIEW. -->
+    <!-- Browser download preview copies; canonical guest bytes are staged
+         here for ACTION_VIEW. -->
     <cache-path name="browser-downloads" path="browser_downloads/" />
     <!-- Guest file browser cache (FileBrowserViewModel.guestCacheFile) -->
     <cache-path name="guest-file-browser" path="guest-file-browser/" />

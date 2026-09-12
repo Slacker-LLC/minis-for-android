@@ -19,7 +19,7 @@ import java.net.SocketTimeoutException
  * minis-debug — DEBUG-ONLY CLI wrapper for the local DebugServer JSON-RPC
  * endpoint at 127.0.0.1:5321.
  *
- * Lets a user (or agent) in the PRoot shell drive the in-app debug RPC
+ * Lets a user (or agent) in the Direct Ubuntu shell drive the in-app debug RPC
  * without hand-rolling curl + JSON. Each subcommand maps to one RPC
  * method registered in DebugMethodRegistry; the response envelope from
  * the server is forwarded verbatim through OffloadOutput so the standard
@@ -326,7 +326,7 @@ SUBCOMMANDS:
   read <path> [--offset N] [--limit N] [--base64]
                                      Read a file from guest rootfs (debug.readFile)
   write <path> --content <text> [--encoding utf8|base64]
-                                     Write a file inside guest rootfs (debug.writeFile)
+                                     Write a file inside App-owned guest storage (debug.writeFile)
   exec <command...>                  Run a shell command via debug.shellExecute
 
 Android-only (DEBUG_ONLY_METHODS in DebugMethodRegistry):

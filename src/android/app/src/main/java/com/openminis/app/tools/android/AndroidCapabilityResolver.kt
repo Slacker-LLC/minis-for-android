@@ -33,15 +33,20 @@ object AndroidCapabilityResolver {
     private const val CAP_SYS_ADMIN = 21
 
     fun resolve(context: Context): JSONObject {
-        val root = RootCommandRunner.cachedProbe()
-        val suPath = RootCommandRunner.passiveSuPath()
+        val rootSnapshot = RootCommandRunner.snapshot()
+        val root = rootSnapshot.probe
+        val suPath = rootSnapshot.suPath
+        val rootState = rootSnapshot.state
         val shizuku = ShizukuManager.snapshot.value
         val service = MinisAccessibilityService.getInstance()
         val serviceInfo = service?.serviceInfo
-        val rootStatus = when {
-            root?.authorized == true -> CapabilityStatus.AVAILABLE
-            suPath != null -> CapabilityStatus.REQUIRES_USER_GRANT
-            else -> CapabilityStatus.UNAVAILABLE
+        val rootStatus = when (rootState) {
+            RootAccessState.AUTHORIZED -> CapabilityStatus.AVAILABLE
+            RootAccessState.SU_NOT_FOUND -> CapabilityStatus.UNAVAILABLE
+            RootAccessState.AUTHORIZATION_REQUIRED,
+            RootAccessState.PROBING,
+            RootAccessState.AUTHORIZATION_FAILED
+            -> CapabilityStatus.REQUIRES_USER_GRANT
         }
         val shizukuStatus = when (shizuku.state) {
             ShizukuManager.State.READY -> CapabilityStatus.AVAILABLE
@@ -54,6 +59,7 @@ object AndroidCapabilityResolver {
         return JSONObject().apply {
             put("root", JSONObject().apply {
                 put("status", rootStatus.name)
+                put("state", rootState.name)
                 put("passiveSuDetected", suPath != null)
                 suPath?.let { put("suPath", it) }
                 put("authorized", root?.authorized == true)
@@ -67,10 +73,13 @@ object AndroidCapabilityResolver {
                 put("provider", JSONObject.NULL)
             })
             put("privilegedShell", JSONObject().apply {
-                put("root", CapabilityFact(rootStatus, when (rootStatus) {
-                    CapabilityStatus.AVAILABLE -> "active su probe confirmed effective uid 0"
-                    CapabilityStatus.REQUIRES_USER_GRANT -> "su exists; active authorization was not requested"
-                    else -> "no executable su was passively detected"
+                put("root", CapabilityFact(rootStatus, when (rootState) {
+                    RootAccessState.AUTHORIZED -> "active su probe confirmed effective uid 0"
+                    RootAccessState.PROBING -> "active su probe is in progress"
+                    RootAccessState.AUTHORIZATION_REQUIRED -> "su exists; active authorization was not requested"
+                    RootAccessState.AUTHORIZATION_FAILED ->
+                        "active su probe failed: ${root?.error ?: "authorization was not established"}"
+                    RootAccessState.SU_NOT_FOUND -> "no executable su was passively detected"
                 }, "root").toJson())
                 put("shizuku", CapabilityFact(
                     shizukuStatus,

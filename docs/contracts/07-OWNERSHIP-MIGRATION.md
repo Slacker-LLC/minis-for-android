@@ -34,6 +34,7 @@ marker 已存在
 
 marker 不存在
   → 对每个固定 source：source 不存在则跳过
+  → 校验 destination 及其已有子树不含 symlink
   → mkdir -p destination
   → cp -a source/. destination/
   → chown -R 当前 App UID:GID destination
@@ -47,7 +48,7 @@ marker 不存在
 - 这是一次性前向迁移，不是长期双向同步。
 - marker 写入后，旧 `/data/adb/minis/*` 用户目录不再参与运行时 path resolution 或 bind source 选择。
 - 旧 source 默认保留，用于避免迁移本身执行破坏性删除；后续清理必须是独立、明确授权的任务。
-- 当前实现使用固定 source 常量和 `cp -a`，没有逐文件 WAL、逆向 rollback 或 fd-relative 事务遍历；文档不得宣称这些尚未实现的保证。
+- 当前实现使用固定 source 常量和 `cp -a`，并在 Root copy 前拒绝 destination 及其已有子树中的 symlink；没有逐文件 WAL、逆向 rollback 或 fd-relative 事务遍历，文档不得宣称这些尚未实现的保证。
 - 因此迁移期间不应并发启动 guest 或允许同一目标被其它写入者修改。当前 `UbuntuKernel` readiness mutex 和迁移发生在 shell 启动前是必要前提。
 
 ## 不允许

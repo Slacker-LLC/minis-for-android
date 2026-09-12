@@ -193,7 +193,7 @@ object RcloneBridge {
      *
      * `core/version` needs no config, no network and no credentials, so a
      * successful reply isolates exactly one thing — that the linked-in Go
-     * runtime is alive inside this app, next to PRoot.
+     * runtime is alive inside this app, independently of the Ubuntu guest.
      */
     fun smokeTest(): String = try {
         val v = rpc("core/version")

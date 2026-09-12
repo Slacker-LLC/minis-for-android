@@ -1,6 +1,8 @@
 package com.openminis.app.runtime.guest
 
 import com.openminis.app.BuildConfig
+import com.openminis.app.runtime.files.SecureFileAccess
+import com.openminis.app.runtime.ubuntu.UbuntuPaths
 
 import android.net.LocalServerSocket
 import android.net.LocalSocket
@@ -11,11 +13,12 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
 /**
- * Android-side endpoint for the guest offload RPC compatibility transport.
+ * Android-side endpoint for the fixed-purpose guest offload bridge.
  *
  * Guest tools issue `execve("<handler-name>", argv, envp)` and a guest-side
  * compatibility shim forwards argv/env/cwd over an abstract unix socket. This
@@ -23,7 +26,8 @@ import kotlin.concurrent.thread
  * returns output through the retained tmp-file framing contract.
  *
  * This bridge does not own Ubuntu process, mount-namespace, or chroot
- * lifecycle. Those privileged runtime boundaries belong to minisd.
+ * lifecycle. Those boundaries belong to [UbuntuKernel] and
+ * [com.openminis.app.runtime.ExecutionCoordinator].
  */
 data class NativeOffloadRequest(
     val pid: Int,
@@ -60,6 +64,12 @@ object NativeOffloadServer {
     private const val MAGIC_REQ = 0x46464F4E  // 'N' 'O' 'F' 'F' little-endian
     private const val MAGIC_RSP = 0x52464F4E  // 'N' 'O' 'F' 'R'
     private const val VERSION = 1
+    private const val MAX_CONCURRENT_REQUESTS = 16
+    private const val MAX_ARGC = 256
+    private const val MAX_ENVC = 1024
+    private const val MAX_STRING_BYTES = 256 * 1024
+    private const val MAX_REQUEST_BYTES = 4 * 1024 * 1024
+    private const val MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 
     /** [T-android-offload-tmp-leak] Filename prefix of a handler reply file. */
     private const val REPLY_PREFIX = ".native-offload-"
@@ -80,11 +90,12 @@ object NativeOffloadServer {
 
     private val handlers = ConcurrentHashMap<String, NativeOffloadHandler>()
     private val counter = AtomicLong(0)
+    private val requestLimiter = NativeOffloadConnectionLimiter(MAX_CONCURRENT_REQUESTS)
     private var serverSocket: LocalServerSocket? = null
     private var acceptThread: Thread? = null
 
     @Volatile
-    private var rootfsTmpDir: File? = null
+    private var replyRootDir: File? = null
 
     val registeredHandlers: Set<String> get() = handlers.keys.toSet()
 
@@ -97,9 +108,12 @@ object NativeOffloadServer {
     }
 
     @Synchronized
-    fun start(rootfsDir: File) {
-        rootfsTmpDir = File(rootfsDir, "tmp")
+    fun start(replyDir: File) {
         if (serverSocket != null) return
+        check(UbuntuPaths.ensureHostDirectory(replyDir)) {
+            "native offload reply directory is not a safe App-owned directory: ${replyDir.absolutePath}"
+        }
+        replyRootDir = replyDir
 
         // T287-followup: bind with bounded retry. Linux abstract sockets are
         // freed by the kernel only after the owning process is fully reaped —
@@ -121,19 +135,20 @@ object NativeOffloadServer {
             runAcceptLoop(s)
         }
         Log.i(TAG, "listening on abstract socket '$SOCKET_NAME' " +
-            "handlers=${handlers.keys.sorted()} tmpDir=${rootfsTmpDir?.absolutePath}")
+            "handlers=${handlers.keys.sorted()} replyDir=${replyRootDir?.absolutePath}")
 
         // [T-android-offload-tmp-leak] Sweep reply files orphaned by earlier
         // app processes. See sweepStaleReplies for why this is safe here and
         // why the mechanism leaks in the first place.
-        sweepStaleReplies(all = true)
+        sweepAllReplyDirectories()
     }
 
     /**
      * [T-android-offload-tmp-leak] Delete `.native-offload-*` reply files.
      *
      * WHY THESE LEAK. Each offload call writes the handler's combined output to
-     * `<rootfs>/tmp/.native-offload-<pid>-<seq>` and returns the GUEST path;
+     * an App-owned workspace/offloads `.native-offload-<pid>-<seq>` file and
+     * returns the matching GUEST `/tmp` path;
      * the guest-side native_offload compatibility shim then rewrites the
      * tracee's execve into `/bin/cat <tmpfile>`. So the host cannot delete the
      * file at reply time — `cat` has not run yet, and deleting it would turn
@@ -159,8 +174,7 @@ object NativeOffloadServer {
      * Failures are logged and swallowed: a leaked temp file must never break an
      * offload call.
      */
-    private fun sweepStaleReplies(all: Boolean) {
-        val dir = rootfsTmpDir ?: return
+    private fun sweepStaleReplies(dir: File, all: Boolean) {
         try {
             val cutoff = System.currentTimeMillis() - REPLY_TTL_MS
             var removed = 0
@@ -178,6 +192,19 @@ object NativeOffloadServer {
             }
         } catch (e: Exception) {
             Log.w(TAG, "sweepStaleReplies failed: ${e.message}")
+        }
+    }
+
+    private fun sweepAllReplyDirectories() {
+        val root = replyRootDir ?: return
+        sweepStaleReplies(root, all = true)
+        if (!UbuntuPaths.ensureHostDirectory(File(UbuntuPaths.hostSessions))) return
+        File(UbuntuPaths.hostSessions).listFiles()?.forEach { sessionDir ->
+            if (!UbuntuPaths.ensureHostDirectory(sessionDir)) return@forEach
+            val offloads = File(sessionDir, "offloads")
+            if (UbuntuPaths.ensureHostDirectory(offloads)) {
+                sweepStaleReplies(offloads, all = true)
+            }
         }
     }
 
@@ -210,15 +237,31 @@ object NativeOffloadServer {
                 Log.i(TAG, "accept loop terminated: ${e.message}")
                 return
             }
+            if (!requestLimiter.tryAcquire()) {
+                Log.w(TAG, "rejecting offload connection: too many concurrent requests")
+                runCatching { client.close() }
+                continue
+            }
             Log.d(TAG, "accepted client from guest offload transport")
-            thread(name = "native-offload-worker", isDaemon = true) {
-                try {
-                    handleClient(client)
-                } catch (e: Exception) {
-                    Log.w(TAG, "worker error: ${e.message}", e)
-                } finally {
-                    try { client.close() } catch (_: Exception) {}
+            try {
+                thread(name = "native-offload-worker", isDaemon = true) {
+                    try {
+                        handleClient(client)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "worker error: ${e.message}", e)
+                    } finally {
+                        try { client.close() } catch (_: Exception) {}
+                        requestLimiter.release()
+                    }
                 }
+            } catch (failure: Throwable) {
+                // If the runtime cannot create a worker, this accepted
+                // connection still owns a limiter slot. Release it here so a
+                // transient thread-resource failure cannot permanently reduce
+                // bridge capacity.
+                runCatching { client.close() }
+                requestLimiter.release()
+                Log.e(TAG, "cannot create native offload worker", failure)
             }
         }
     }
@@ -226,36 +269,41 @@ object NativeOffloadServer {
     private fun handleClient(client: LocalSocket) {
         val input = DataInputStream(client.inputStream)
         val output = DataOutputStream(client.outputStream)
+        val budget = NativeOffloadRequestBudget(MAX_REQUEST_BYTES)
 
-        val magic = input.readLEInt()
+        val magic = input.readLEInt(budget)
         if (magic != MAGIC_REQ) {
             Log.w(TAG, "bad magic: 0x${magic.toUInt().toString(16)}")
             return
         }
-        val version = input.readLEInt()
+        val version = input.readLEInt(budget)
         if (version != VERSION) {
             Log.w(TAG, "unsupported version $version")
             return
         }
 
-        val pid = input.readLEInt()
-        val argc = input.readLEInt()
-        if (argc < 0 || argc > 256) throw IllegalStateException("bad argc=$argc")
+        val pid = input.readLEInt(budget)
+        val argc = input.readLEInt(budget)
+        if (argc < 0 || argc > MAX_ARGC) throw IllegalStateException("bad argc=$argc")
         val argv = ArrayList<String>(argc)
-        repeat(argc) { argv.add(input.readLEString()) }
+        repeat(argc) { argv.add(input.readLEString(budget)) }
 
-        val envc = input.readLEInt()
-        if (envc < 0 || envc > 4096) throw IllegalStateException("bad envc=$envc")
+        val envc = input.readLEInt(budget)
+        if (envc < 0 || envc > MAX_ENVC) throw IllegalStateException("bad envc=$envc")
         val env = LinkedHashMap<String, String>(envc)
         repeat(envc) {
-            val s = input.readLEString()
+            val s = input.readLEString(budget)
             val eq = s.indexOf('=')
             if (eq >= 0) env[s.substring(0, eq)] = s.substring(eq + 1) else env[s] = ""
         }
-        val cwd = input.readLEString()
+        val cwd = input.readLEString(budget)
 
         val name = argv.firstOrNull().orEmpty().substringAfterLast('/')
-        Log.d(TAG, "recv pid=$pid name='$name' argc=$argc argv=$argv cwd=$cwd envc=$envc")
+        val sessionId = env["MINIS_CHAT_SESSION_ID"]?.takeIf { it.isNotEmpty() }
+        if (sessionId != null && !UbuntuPaths.isSafeSessionId(sessionId)) {
+            throw IllegalStateException("invalid Minis chat session id")
+        }
+        Log.d(TAG, "recv pid=$pid name='$name' argc=$argc cwd=$cwd envc=$envc requestBytes=${budget.used}")
 
         val t0 = System.nanoTime()
         val handler = handlers[name]
@@ -269,7 +317,7 @@ object NativeOffloadServer {
                     argv = argv,
                     env = env,
                     cwd = cwd,
-                    sessionId = env["MINIS_CHAT_SESSION_ID"]?.takeIf { it.isNotEmpty() },
+                    sessionId = sessionId,
                 ))
             } catch (e: Exception) {
                 Log.w(TAG, "handler '$name' threw: ${e.message}", e)
@@ -278,11 +326,12 @@ object NativeOffloadServer {
         }
         val elapsedMs = (System.nanoTime() - t0) / 1_000_000
 
-        val tmpDir = rootfsTmpDir ?: throw IllegalStateException("server not started")
-        tmpDir.mkdirs()
+        val tmpDir = replyDirectory(sessionId)
         val seq = counter.incrementAndGet()
         val tmpHost = File(tmpDir, "$REPLY_PREFIX$pid-$seq")
-        tmpHost.writeText(result.output)
+        val outputBytes = boundedOutput(result.output)
+        val secureReply = UbuntuPaths.SecureFilePath(tmpDir.absoluteFile, listOf(tmpHost.name))
+        SecureFileAccess.writeBytes(secureReply, outputBytes, MAX_OUTPUT_BYTES.toLong())
         val tmpGuest = "/tmp/${tmpHost.name}"
 
         // [T-android-offload-tmp-leak] Bound growth WITHIN a long-running
@@ -292,9 +341,9 @@ object NativeOffloadServer {
         // moves from "across restarts" to "within one run". Age-gated, so the
         // file just written — and any other still awaiting its `cat` — is never
         // touched. Sampled rather than run per reply to keep the hot path cheap.
-        if (seq % SWEEP_EVERY_N_REPLIES == 0L) sweepStaleReplies(all = false)
+        if (seq % SWEEP_EVERY_N_REPLIES == 0L) sweepStaleReplies(tmpDir, all = false)
 
-        Log.d(TAG, "reply name='$name' exit=${result.exitCode} outBytes=${result.output.length} " +
+        Log.d(TAG, "reply name='$name' exit=${result.exitCode} outBytes=${outputBytes.size} " +
             "tmpGuest=$tmpGuest elapsed=${elapsedMs}ms")
 
         output.writeLEInt(MAGIC_RSP)
@@ -303,18 +352,35 @@ object NativeOffloadServer {
         output.flush()
     }
 
+    private fun replyDirectory(sessionId: String?): File {
+        val root = replyRootDir ?: throw IllegalStateException("server not started")
+        val directory = if (sessionId == null) {
+            root
+        } else {
+            val session = UbuntuPaths.sessionDir(sessionId)
+                ?: throw IllegalStateException("session reply directory is unavailable")
+            File(session, "offloads")
+        }
+        check(UbuntuPaths.ensureHostDirectory(directory)) {
+            "native offload reply directory is not a safe App-owned directory: ${directory.absolutePath}"
+        }
+        return directory
+    }
+
     // ---- little-endian helpers ----
 
-    private fun DataInputStream.readLEInt(): Int {
+    private fun DataInputStream.readLEInt(budget: NativeOffloadRequestBudget): Int {
+        budget.consume(4)
         val buf = ByteArray(4)
         readFully(buf)
         return ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).int
     }
 
-    private fun DataInputStream.readLEString(): String {
-        val len = readLEInt()
-        if (len < 0 || len > 1 shl 20) throw IllegalStateException("bad string len $len")
+    private fun DataInputStream.readLEString(budget: NativeOffloadRequestBudget): String {
+        val len = readLEInt(budget)
+        if (len < 0 || len > MAX_STRING_BYTES) throw IllegalStateException("bad string len $len")
         if (len == 0) return ""
+        budget.consume(len)
         val buf = ByteArray(len)
         readFully(buf)
         return String(buf, Charsets.UTF_8)
@@ -330,4 +396,52 @@ object NativeOffloadServer {
         writeLEInt(bytes.size)
         if (bytes.isNotEmpty()) write(bytes)
     }
+
+    private fun boundedOutput(output: String): ByteArray {
+        val bytes = output.toByteArray(Charsets.UTF_8)
+        if (bytes.size <= MAX_OUTPUT_BYTES) return bytes
+        val marker = "\n[native_offload output truncated at $MAX_OUTPUT_BYTES bytes]\n"
+            .toByteArray(Charsets.UTF_8)
+        var prefixLength = (MAX_OUTPUT_BYTES - marker.size).coerceAtLeast(0)
+        while (prefixLength > 0 && (bytes[prefixLength].toInt() and 0xC0) == 0x80) prefixLength--
+        return bytes.copyOf(prefixLength) + marker
+    }
+
+    internal fun boundOutputForTest(output: String): ByteArray = boundedOutput(output)
+
+    internal class NativeOffloadRequestBudget(private val limit: Int) {
+        var used: Int = 0
+            private set
+
+        fun consume(bytes: Int) {
+            if (bytes < 0 || used > limit - bytes) {
+                throw IllegalStateException("request exceeds $limit bytes")
+            }
+            used += bytes
+        }
+    }
+}
+
+/** Fixed-capacity gate applied before a native offload worker is created. */
+internal class NativeOffloadConnectionLimiter(private val maxConcurrent: Int) {
+    init {
+        require(maxConcurrent > 0) { "maxConcurrent must be positive" }
+    }
+
+    private val active = AtomicInteger(0)
+
+    fun tryAcquire(): Boolean {
+        while (true) {
+            val current = active.get()
+            if (current >= maxConcurrent) return false
+            if (active.compareAndSet(current, current + 1)) return true
+        }
+    }
+
+    fun release() {
+        val remaining = active.decrementAndGet()
+        check(remaining >= 0) { "offload connection limiter released without acquisition" }
+    }
+
+    internal fun activeCount(): Int = active.get()
 }

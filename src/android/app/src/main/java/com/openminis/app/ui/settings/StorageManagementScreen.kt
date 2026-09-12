@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.db.ChatDao
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.sandbox.RootfsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,7 +88,9 @@ fun StorageManagementScreen(
         scope.launch {
             isLoading = true
             withContext(Dispatchers.IO) {
-                shellSize = directorySize(File(context.filesDir, "alpine-rootfs"))
+                shellSize = runCatching {
+                    RootfsManager.getInstance(context.applicationContext).getRootfsSize()
+                }.getOrDefault(0L)
                 dbSize = databaseSize(context)
 
                 val allSessions = chatDao.listSessions()
@@ -376,15 +379,6 @@ private fun StorageOverviewRow(
             )
         }
     }
-}
-
-private fun directorySize(dir: File): Long {
-    if (!dir.exists()) return 0L
-    var total = 0L
-    dir.walkTopDown().forEach { file ->
-        if (file.isFile) total += file.length()
-    }
-    return total
 }
 
 private fun databaseSize(context: Context): Long {

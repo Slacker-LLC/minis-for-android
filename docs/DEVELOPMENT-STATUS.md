@@ -1,73 +1,84 @@
-# Development Status
+# 开发状态
 
-> This document describes the current state of `refactor/direct-ubuntu-runtime` after PR #235 merged into `main` on 2026-09-10. Source/tests on the branch remain authoritative for this branch; physical-device behavior is tracked separately from CI evidence.
+> 本文记录 `refactor/direct-ubuntu-runtime` 当前状态。PR #235 已于 2026-09-10 合入 `main`；本分支的源码和测试仍是本分支实现的最终依据，真机行为单独记录，不用 CI 结果替代。
 
-## Project state
+## 项目状态
 
-- Repository: `Slacker-LLC/minis-for-android`
-- Reference branch: `refactor/direct-ubuntu-runtime`
-- PR #235: merged into `main` on 2026-09-10
-- Platform: rooted Android
-- Linux runtime: Android App-owned orchestration + Direct Ubuntu 24.04 chroot
-- `applicationId`: `llc.slacker.minis`
-- Android/Kotlin namespace: `com.openminis.app`
-- Distribution: source-first
+- 仓库：`Slacker-LLC/minis-for-android`
+- 参考分支：`refactor/direct-ubuntu-runtime`
+- PR #235：2026-09-10 已合入 `main`
+- 平台：已 Root 的 Android 设备
+- Linux runtime：Android App 自有协调 + Ubuntu 24.04 Direct chroot
+- `applicationId`：`llc.slacker.minis`
+- Android/Kotlin namespace：`com.openminis.app`
+- 发布方式：源码优先
 
-## Active architecture
+## 当前架构
 
 ```text
-Android app
-├─ Agent / sessions / Room / providers / tools / MCP / voice
-└─ ExecutionCoordinator / App-owned shell lifecycle
+Android App
+├─ Agent / session / Room / Provider / 工具 / MCP / 语音
+└─ ExecutionCoordinator / App-owned shell 生命周期
    ↓
 UbuntuKernel / DirectRootRunner
    ↓
-su → setsid → unshare -m → explicit bind mounts → chroot
+su → setsid → unshare -m → 显式 bind mount → chroot
    ↓
-setpriv(real App UID/GID, clear groups, drop capabilities)
+setpriv（真实 App UID/GID、清空 supplementary groups、丢弃 capabilities）
    ↓
 Ubuntu 24.04 userspace
 ```
 
-The former privileged broker is not an active source/build/runtime component. PRoot/Alpine compatibility is not an active backend.
+旧特权 broker 不再是现役源码、构建或运行时组件；PRoot/Alpine 兼容栈也不再是现役后端。
 
-`root.shell` is denied for local Agent and MCP callers. Direct Root execution is reserved for trusted App-owned infrastructure and is not a generic tool surface.
+`root.shell` 是结构化、local-only 的 Agent 能力：只接受 Android 可执行文件 basename 和 argv，只解析可信系统目录，并由 Direct Root launcher 负责超时和进程清理。它对 MCP 隐藏，不是 raw command、宿主文件系统入口或通用 RPC。Direct Root 基础设施脚本仍由 App 构造。
 
-## Storage
+## Guest CLI 状态
 
-`/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Active guest user data is App-owned and derived from `Context.filesDir`: global workspace/home, global memory/skills/shared/MCP data, and per-session workspace/attachments/offloads/browser backing.
+上游的 `android-*` / `minis-*` 命令在 PRoot 路径中由 `/usr/local/bin` stub 触发 `native_offload`；当前 Direct Root 不恢复这套机制。现役实现由 `GuestCommandBridge` 在 Ubuntu 启动/恢复时按 `NativeOffloadServer` 的注册表生成带 token 鉴权的 loopback wrapper，所以命令入口和 Android handler 都存在，但 Root 权限边界没有扩大。
 
-Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are one-time migration sources only. The migration marker is `<filesDir>/minis/.root-data-migrated-v1` and is written only after all required copies succeed.
+小米 `24129PN74C` 真机已经验证命令入口和代表性实际调用：全部 Android/Minis handler 命令可由 `command -v` 找到，`android-device info` 返回设备 JSON，多个 `--help`/`--version` 正常返回。完整清单与限制见 [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md)。上游另有 Python `minis-mcp-cli` 资产，因依赖旧 PRoot/Alpine 自安装流程，尚未直接移植到当前 Guest；这不影响当前 Android 原生 MCP client/server 路径。
 
-## Network compatibility is separate from Root/chroot
+## 存储
 
-The current build contains a fixed `127.0.0.1:18787` HTTP/CONNECT helper. It is a network-compatibility component, not a property of chroot and not a reason Root exists.
+`/data/adb/minis/rootfs` 是 Root-owned、可替换的 runtime state。现役 Guest 用户数据由 App 持有，并从 `Context.filesDir` 派生，包括全局 workspace/home、memory/skills/shared/MCP 数据，以及每个 session 的 workspace/attachments/offloads/browser backing。
 
-HTTP/CONNECT proxying itself does not require Root. The current Android deployment may start the helper with privileged identity so outbound sockets can avoid restrictions that apply to the App-UID guest on some VPN/BPF configurations. The helper has no shell/file/plugin/generic RPC interface.
+历史 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` 只作为一次性迁移源。迁移标记是 `<filesDir>/minis/.root-data-migrated-v1`，只有全部复制成功后才写入。
 
-Device networking remains an acceptance item: VPN/TUN transitions, DNS selection, `198.18.0.0/15` Fake-IP behavior, Android BPF/UID policy, and OEM differences cannot be proven by host CI.
+## 网络兼容与 Root/chroot 分离
 
-## Runtime payload/native artifacts
+当前构建包含固定监听 `127.0.0.1:18787` 的 HTTP/CONNECT helper。它是网络兼容组件，不是 chroot 的属性，也不是 Root 存在的理由。
 
-- Rootfs payload: `ubuntu-arm64-rootfs.tar.gz` + rootfs-only `runtime-manifest.json`.
-- Network helper: independently built arm64 native artifact, packaged as `libminisnetproxy.so`.
-- rclone AAR: separate Android dependency/artifact.
-- Obsolete broker binary/socket/runtime package identities are rejected by build/package guards.
+HTTP/CONNECT 代理协议本身不要求 Root。某些 VPN/BPF 配置限制 App UID Guest 出站时，Android 部署可以让 helper 以特权身份建立出站 socket；helper 没有 shell、文件、插件或通用 RPC 接口。
 
-## Verification status
+真机网络仍是验收项：VPN/TUN 切换、DNS 选择、`198.18.0.0/15` Fake-IP、Android BPF/UID policy 和不同 OEM 行为不能由宿主 CI 证明。
 
-The Direct Ubuntu migration passed canonical CI before PR #235 was merged, including rootfs/payload checks, network-helper Rust quality/build/tests, rclone, Android unit tests, Debug/Release lint/build/package verification, 16 KiB checks, fail-closed release signing, and bundle-generated APK validation.
+## Runtime payload / native 产物
 
-Documentation follow-up commits made on `refactor/direct-ubuntu-runtime` after the merge must be treated as branch-only until separately merged to `main`.
+- Rootfs payload：`ubuntu-arm64-rootfs.tar.gz` + 仅包含 rootfs 信息的 `runtime-manifest.json`；
+- 网络 helper：独立构建的 arm64 native 产物，打包为 `libminisnetproxy.so`；
+- rclone AAR：独立的 Android 依赖/产物；
+- 旧 broker 的二进制、socket 和 runtime package 身份由构建/打包守卫拒绝。
 
-## Remaining validation boundary
+## 验证状态
 
-CI does **not** prove physical-device operation. Still requiring explicit rooted-device evidence where relevant:
+PR #235 合入前，Direct Ubuntu 迁移已经通过既有 CI，包括 rootfs/payload、网络 helper Rust 质量与测试、rclone、Android 单测、Debug/Release lint/build/package、16 KiB 检查、签名失败关闭和 bundle APK 校验。
 
-- Root authorization on the target Root solution;
-- `su → unshare → mount/bind → chroot → setpriv` behavior under device SELinux policy;
-- real App UID/GID ownership and per-session workspace consistency;
-- VPN/DNS/BPF/Fake-IP behavior, including guest `curl` / `apt` on representative configurations;
-- OEM process/service lifecycle behavior.
+2026-09-12 的审计又补充了当前工作树和小米真机证据：设备 `24129PN74C`/HyperOS 已安装 Debug APK，进入 Direct Ubuntu Terminal，报告动态 App UID/GID，完成 workspace 文件读写，并在关闭时回收 Terminal shell；还执行了强停后的冷启动、MiMo v2.5 文本和 TTS 请求。详细记录见 [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md)，上游/共享功能对账见 [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md)。
 
-Open GitHub Issues remain independent work items. Their descriptions may contain historical runtime terminology and must be re-audited against the final Direct Ubuntu source before being treated as current implementation facts.
+该设备的 HyperOS 拒绝安装 instrumentation APK，因此真机手测不能替代 instrumentation 执行证据。
+
+本次合并之后在 `refactor/direct-ubuntu-runtime` 上产生的文档和工作树改动，在再次合入 `main` 前都只能视为本分支改动。
+
+## 仍需补齐的验证边界
+
+CI **不能**证明真机运行。以下项目仍需要明确的 Root 真机证据：
+
+- 目标 Root 方案的授权拒绝/允许分支；
+- 设备 SELinux 下完整的 `su → unshare → mount/bind → chroot → setpriv`；
+- 真实 App UID/GID 的 owner、读写和每个 session workspace 一致性；
+- 手机重启恢复、APK 升级保留数据、多个 Terminal session；
+- VPN/DNS/BPF/Fake-IP，包括代表性配置下 Guest 的 `curl` / `apt`；
+- OEM 后台策略下的进程/服务生命周期。
+
+GitHub Issue 是独立工作队列。Issue 正文可能保留历史 runtime 术语，必须重新对照最终 Direct Ubuntu 源码后，才能当作当前实现事实。

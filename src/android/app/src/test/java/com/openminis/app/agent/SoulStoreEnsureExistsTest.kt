@@ -30,8 +30,6 @@ class SoulStoreEnsureExistsTest {
         val errors = listOf(
             SocketTimeoutException("Read timed out"),
             WorkspaceFileClient.Failure("POLICY_DENIED", "permission denied"),
-            WorkspaceFileClient.Failure("RUNTIME_UNAVAILABLE", "daemon socket: No such file or directory (os error 2)"),
-            WorkspaceFileClient.Failure("RUNTIME_UNAVAILABLE", "open persistent root: No such file or directory (os error 2)"),
             CancellationException("startup cancelled"),
         )
         for (expected in errors) {
@@ -57,15 +55,6 @@ class SoulStoreEnsureExistsTest {
     }
 
     @Test
-    fun `isMissingFileNotFound detects true ENOENT error`() {
-        val failure = WorkspaceFileClient.Failure(
-            code = "RUNTIME_UNAVAILABLE",
-            detail = "open path: No such file or directory (os error 2)",
-        )
-        assertTrue(SoulStore.isMissingFileNotFound(failure))
-    }
-
-    @Test
     fun `isMissingFileNotFound detects not_found error code`() {
         val failure = WorkspaceFileClient.Failure(
             code = "NOT_FOUND",
@@ -82,10 +71,7 @@ class SoulStoreEnsureExistsTest {
         val ioError = IOException("Connection reset by peer")
         assertFalse(SoulStore.isMissingFileNotFound(ioError))
 
-        val failure = WorkspaceFileClient.Failure(
-            code = "RUNTIME_UNAVAILABLE",
-            detail = "daemon socket disconnected",
-        )
+        val failure = WorkspaceFileClient.Failure("POLICY_DENIED", "permission denied")
         assertFalse(SoulStore.isMissingFileNotFound(failure))
     }
 }

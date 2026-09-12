@@ -11,6 +11,7 @@ import com.openminis.app.data.model.LLMResponse
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
 import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.provider.thinking.ThinkingResolveContext
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
@@ -109,6 +110,17 @@ class OpenAIProvider private constructor(
      * cache. Null → no custom rules (identical to Phase-1 built-in-only behaviour).
      */
     var thinkingRuleInstanceId: String? = null
+
+    /** Whether this instance is allowed to request xAI Priority Processing. */
+    var supportsPriorityProcessing: Boolean = false
+
+    /** Return the xAI-only tier when Fast Mode is enabled, otherwise omit it. */
+    internal fun resolvedServiceTier(): String? =
+        if (supportsPriorityProcessing && com.openminis.app.data.FastModePrefs.isEnabled()) {
+            "priority"
+        } else {
+            null
+        }
 
     /** API Key constructor (Chat Completions API by default; set useResponsesAPI=true for /v1/responses). */
     constructor(
@@ -902,6 +914,12 @@ class OpenAIProvider private constructor(
         // True once the [DONE] branch has emitted Finished, so the tail below
         // does not send a second one.
         var sentFinished = false
+        // Responses API can terminate with `response.incomplete` after already
+        // sending visible text. Keep the accumulated text separately from the
+        // streamed chunks so we can distinguish a useful partial answer from
+        // a body containing only whitespace before deciding whether to finish
+        // or surface a provider error.
+        val responsesOutputText = StringBuilder()
 
         try {
             send(LLMStreamChunk.Started)
@@ -1018,7 +1036,10 @@ class OpenAIProvider private constructor(
                         }
                         type == "response.output_text.delta" -> {
                             val delta = event.optString("delta", "")
-                            if (delta.isNotEmpty()) send(LLMStreamChunk.Text(delta))
+                            if (delta.isNotEmpty()) {
+                                responsesOutputText.append(delta)
+                                send(LLMStreamChunk.Text(delta))
+                            }
                         }
                         // function_call item announced — capture call_id + name, start accumulator.
                         type == "response.output_item.added" -> {
@@ -1101,23 +1122,37 @@ class OpenAIProvider private constructor(
                         type == "response.incomplete" -> {
                             // [T-responses-terminal-events] The server ended the
                             // response early; incomplete_details.reason is
-                            // "max_output_tokens" or "content_filter". Partial
-                            // output has already been streamed — surface WHY it
-                            // stopped instead of silently ending the stream.
+                            // "max_output_tokens" or "content_filter".
+                            //
+                            // A Responses relay may send useful output before
+                            // this terminal event. Treat that like Chat
+                            // Completions' finish_reason=length so the already
+                            // visible text is retained. A body with no usable
+                            // text remains an error; otherwise the UI would
+                            // persist an empty/whitespace-only assistant turn.
                             val reason = event.optJSONObject("response")
                                 ?.optJSONObject("incomplete_details")
                                 ?.optString("reason")?.takeIf { it.isNotEmpty() }
                                 ?: "unknown"
-                            com.openminis.app.logging.AppLogger.error(
-                                "OpenAIProvider",
-                                "Responses API response.incomplete — reason=$reason"
-                            )
-                            throw LLMError.ProviderError(
-                                "Response ended incomplete (reason: $reason)" +
-                                    if (reason == "max_output_tokens") {
-                                        " — output hit max_output_tokens; raise the model's Max Output Tokens or shorten the request."
-                                    } else ""
-                            )
+                            if (responsesOutputText.toString().isNotBlank()) {
+                                finishReason = "length"
+                                sawFinishReason = true
+                                com.openminis.app.logging.AppLogger.warning(
+                                    "OpenAIProvider",
+                                    "Responses API response.incomplete — preserving partial text, reason=$reason"
+                                )
+                            } else {
+                                com.openminis.app.logging.AppLogger.error(
+                                    "OpenAIProvider",
+                                    "Responses API response.incomplete without usable text — reason=$reason"
+                                )
+                                throw LLMError.ProviderError(
+                                    "Response ended incomplete (reason: $reason)" +
+                                        if (reason == "max_output_tokens") {
+                                            " — no visible answer was produced; the output budget was consumed by Thinking/reasoning."
+                                        } else " — no visible answer was produced."
+                                )
+                            }
                         }
                         type == "response.completed" -> {
                             val resp = event.optJSONObject("response")
@@ -1809,7 +1844,7 @@ class OpenAIProvider private constructor(
         return LLMResponse(text, "end_turn", null, attachments)
     }
 
-    private fun buildRequestBody(
+    internal fun buildRequestBody(
         messages: List<LLMMessage>,
         systemPrompt: String?,
         maxTokens: Int,
@@ -1827,7 +1862,7 @@ class OpenAIProvider private constructor(
         // server returns "400 unknown variant `image_url`". Decided once
         // here so the structured-contentParts loop and the legacy
         // imageParts loop below stay consistent.
-        val supportsImages = "image" in (model.inputModalities ?: emptyList())
+        val supportsImages = model.hasImageInput
         val body = JSONObject()
         body.put("model", model.id)
         if (isOpenRouter) {
@@ -1836,6 +1871,10 @@ class OpenAIProvider private constructor(
             body.put("max_completion_tokens", maxTokens)
         }
         body.put("stream", stream)
+
+        // xAI's extension is emitted only for an xAI-capable instance; other
+        // OpenAI-compatible providers keep their request shape unchanged.
+        resolvedServiceTier()?.let { body.put("service_tier", it) }
 
         if (temperature != null && supportsTemperatureOverride) {
             body.put("temperature", temperature)
@@ -1989,6 +2028,34 @@ class OpenAIProvider private constructor(
                                 put("tool_call_id", capChatToolCallId(tr.id))
                                 put("content", tr.content)
                             })
+                            // Chat Completions accepts plain text only on a
+                            // tool message. Carry read_image pixels on a
+                            // following user turn so vision models receive
+                            // the bytes instead of only the metadata text.
+                            val trBytes = tr.imageData
+                            if (trBytes != null && trBytes.isNotEmpty() && supportsImages) {
+                                val safeBytes = com.openminis.app.provider.ImageBudget
+                                    .compressUnderBudget(trBytes)
+                                val safeMime = if (safeBytes === trBytes) {
+                                    tr.imageMimeType ?: "image/jpeg"
+                                } else "image/jpeg"
+                                val b64 = Base64.encodeToString(safeBytes, Base64.NO_WRAP)
+                                messagesArray.put(JSONObject().apply {
+                                    put("role", "user")
+                                    put("content", JSONArray().apply {
+                                        put(JSONObject().apply {
+                                            put("type", "text")
+                                            put("text", "[Image returned by ${tr.name}]")
+                                        })
+                                        put(JSONObject().apply {
+                                            put("type", "image_url")
+                                            put("image_url", JSONObject().apply {
+                                                put("url", "data:$safeMime;base64,$b64")
+                                            })
+                                        })
+                                    })
+                                })
+                            }
                         }
                         // T132: emit text + image_url parts as a structured user
                         // message. The previous structured-contentParts branch
@@ -2714,7 +2781,7 @@ class OpenAIProvider private constructor(
         }
     }
 
-    private fun buildResponsesAPIBody(
+    internal fun buildResponsesAPIBody(
         messages: List<LLMMessage>,
         systemPrompt: String?,
         maxTokens: Int,
@@ -2744,7 +2811,7 @@ class OpenAIProvider private constructor(
         // keeping the two paths symmetric prevents future regressions when
         // a non-vision model gets routed through Responses (e.g. via
         // forceResponsesAPI on a custom provider).
-        val supportsImages = "image" in (model.inputModalities ?: emptyList())
+        val supportsImages = model.hasImageInput
         val body = JSONObject()
         body.put("model", model.id)
         body.put("stream", stream)
@@ -2865,11 +2932,7 @@ class OpenAIProvider private constructor(
         // through, so no isOAuth narrowing. Ineligible upstreams ignore the
         // field or silently downgrade (receipt visible via the
         // response.completed service_tier log).
-        if (com.openminis.app.data.FastModePrefs.isEnabled() &&
-            model.id.contains("gpt", ignoreCase = true)
-        ) {
-            body.put("service_tier", "priority")
-        }
+        resolvedServiceTier()?.let { body.put("service_tier", it) }
 
         if (systemPrompt != null) {
             body.put("instructions", systemPrompt)
@@ -2937,6 +3000,29 @@ class OpenAIProvider private constructor(
                                 put("call_id", capResponsesId(callId))
                                 put("output", tr.content)
                             })
+                            // Responses function_call_output is also textual;
+                            // attach tool-returned pixels as a following user
+                            // content item carrying input_image.
+                            val trBytes = tr.imageData
+                            if (trBytes != null && trBytes.isNotEmpty() && supportsImages) {
+                                input.put(JSONObject().apply {
+                                    put("role", "user")
+                                    put("content", JSONArray().apply {
+                                        put(JSONObject().apply {
+                                            put("type", "input_text")
+                                            put("text", "[Image returned by ${tr.name}]")
+                                        })
+                                        put(
+                                            responsesImageBlock(
+                                                trBytes,
+                                                tr.imageMimeType ?: "image/jpeg",
+                                                supportsImages,
+                                                null,
+                                            ),
+                                        )
+                                    })
+                                })
+                            }
                         }
                         // T132: emit text + input_image content for the user
                         // turn so vision-capable Responses-API models actually

@@ -31,7 +31,7 @@ object TerminalSanitizer {
         // Pass 3: Remove null bytes and non-printable control chars (except \n \t)
         val cleaned = stripped.filter { it == '\n' || it == '\t' || it.code >= 0x20 }
 
-        // Pass 4: Remove "null" artifacts from PRoot/pipe issues
+        // Pass 4: Remove "null" artifacts from shell/pipe issues
         // - Lines that are entirely "null"
         // - Runs of repeated "null" (e.g., "nullnullnull" → "")
         // - Lines that are just "null" appended to a prefix (e.g., "file:nullnullnull")

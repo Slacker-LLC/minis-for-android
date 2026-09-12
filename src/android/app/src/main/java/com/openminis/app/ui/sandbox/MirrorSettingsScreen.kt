@@ -1,6 +1,7 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.sandbox.RootfsManager
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -69,10 +70,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
@@ -174,6 +176,8 @@ object MirrorCatalog {
         allMirrors.firstOrNull { it.id == id }
 
     fun categoryFromKey(key: String): MirrorCategory? = when (key) {
+        // Compatibility preference/navigation key; it maps to the current
+        // Ubuntu APT category and does not select another backend.
         "alpine", "apt" -> MirrorCategory.UBUNTU_APT
         else -> MirrorCategory.entries.firstOrNull { it.key == key }
     }
@@ -192,6 +196,7 @@ object MirrorSpeedTestViewModel {
         .build()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val rootfsConfigLock = Mutex()
     @Volatile private var currentJob: Job? = null
 
     // Observable state — Compose observes these Snapshot-backed maps.
@@ -367,9 +372,8 @@ object MirrorSpeedTestViewModel {
 
     /**
      * Re-apply the user's selected mirror for every category that has
-     * stringResource(R.string.mirror_use_mirror_toggle) enabled. Call this after the default_mount overlay runs on
-     * boot — the overlay ships stock config files that would otherwise wipe
-     * user-chosen mirrors.
+     * stringResource(R.string.mirror_use_mirror_toggle) enabled. Call this
+     * after Ubuntu rootfs provisioning or reset recreates stock config files.
      */
     fun applyAllActiveMirrors(context: Context) {
         ensureLoaded(context)
@@ -381,9 +385,9 @@ object MirrorSpeedTestViewModel {
     }
 
     /**
-     * On the first boot after a fresh rootfs install, auto-detect the fastest
-     * mirror for each category and apply it. The `rootfs.freshInstall` flag is
-     * set by RootfsManager.installIfNeeded() and cleared here.
+     * On the first boot after a fresh Ubuntu rootfs install, auto-detect the
+     * fastest mirror for each category and apply it. The
+     * `rootfs.freshInstall` flag is a compatibility preference marker.
      */
     fun autoDetectOnceIfNeeded(context: Context) {
         ensureLoaded(context)
@@ -421,24 +425,8 @@ object MirrorSpeedTestViewModel {
     fun isActive(category: MirrorCategory): Boolean =
         useCustomMirror[category] == true && selectedMirrorId[category] != null
 
-    private fun rootfsDataDir(context: Context): File =
-        File(com.openminis.app.runtime.ubuntu.UbuntuPaths.HOST_ROOTFS).takeIf { it.exists() && it.isDirectory }
-            ?: File(context.applicationContext.filesDir, "rootfs")
-
     private fun applyMirror(context: Context, category: MirrorCategory) {
         val mirror = selectedMirror(category) ?: return
-        val dataDir = rootfsDataDir(context)
-        val configFile = File(dataDir, category.configPath)
-        val bakFile = File(dataDir, category.configPath + ".bak")
-
-        try {
-            if (!bakFile.exists() && configFile.exists()) {
-                configFile.copyTo(bakFile, overwrite = false)
-                Log.i(TAG, "Backed up ${category.configPath} -> .bak")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to backup ${category.configPath}: ${e.message}")
-        }
 
         val content = when (category) {
             MirrorCategory.UBUNTU_APT ->
@@ -463,31 +451,31 @@ object MirrorSpeedTestViewModel {
             MirrorCategory.NPM -> "registry=${mirror.baseURL}\n"
         }
 
-        try {
-            configFile.parentFile?.mkdirs()
-            configFile.writeText(content)
-            Log.i(TAG, "Applied mirror ${mirror.name} to ${category.configPath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write ${category.configPath}: ${e.message}")
+        rootfsConfigLock.launchExclusive {
+            val applied = RootfsManager.getInstance(context)
+                .writeManagedRootfsConfig(category.configPath, content)
+            if (applied) {
+                Log.i(TAG, "Applied mirror ${mirror.name} to ${category.configPath}")
+            } else {
+                Log.e(TAG, "Failed to write managed Ubuntu config ${category.configPath}")
+            }
         }
     }
 
     private fun restoreOfficial(context: Context, category: MirrorCategory) {
-        val dataDir = rootfsDataDir(context)
-        val configFile = File(dataDir, category.configPath)
-        val bakFile = File(dataDir, category.configPath + ".bak")
+        rootfsConfigLock.launchExclusive {
+            val restored = RootfsManager.getInstance(context)
+                .restoreManagedRootfsConfig(category.configPath)
+            if (restored) {
+                Log.i(TAG, "Restored ${category.configPath} from Root-owned backup")
+            } else {
+                Log.i(TAG, "No managed backup for ${category.configPath}, skipping restore")
+            }
+        }
+    }
 
-        if (!bakFile.exists()) {
-            Log.i(TAG, "No .bak for ${category.configPath}, skipping restore")
-            return
-        }
-        try {
-            if (configFile.exists()) configFile.delete()
-            bakFile.copyTo(configFile, overwrite = true)
-            Log.i(TAG, "Restored ${category.configPath} from .bak")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to restore ${category.configPath}: ${e.message}")
-        }
+    private fun Mutex.launchExclusive(block: suspend () -> Unit) {
+        scope.launch { withLock { block() } }
     }
 }
 

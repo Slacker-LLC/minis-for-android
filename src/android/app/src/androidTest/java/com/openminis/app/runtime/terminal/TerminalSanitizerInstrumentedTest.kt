@@ -16,13 +16,13 @@ class TerminalSanitizerInstrumentedTest {
 
     @Test
     fun sanitizeStripsAnsiFromRealTerminalOutput() {
-        // Simulate typical Alpine apk output with colors
-        val input = "\u001B[32m(1/3) Installing busybox\u001B[0m\n" +
-                "\u001B[32m(2/3) Installing musl\u001B[0m\n" +
-                "\u001B[32m(3/3) Installing alpine-base\u001B[0m"
+        // Simulate typical Ubuntu apt output with colors
+        val input = "\u001B[32mSetting up bash\u001B[0m\n" +
+                "\u001B[32mSetting up ca-certificates\u001B[0m\n" +
+                "\u001B[32mSetting up ubuntu-base\u001B[0m"
         val result = TerminalSanitizer.sanitize(input)
         assertEquals(
-            "(1/3) Installing busybox\n(2/3) Installing musl\n(3/3) Installing alpine-base",
+            "Setting up bash\nSetting up ca-certificates\nSetting up ubuntu-base",
             result
         )
     }

@@ -64,8 +64,8 @@ class SkillRepository(private val context: Context) {
         private const val SKILLS_ROOT = "/var/minis/skills"
         /**
          * Skill metadata is useful but never allowed to hold up application
-         * startup. A broken/stale minisd broker gets one bounded background
-         * load attempt and can be retried when the skills screen is opened.
+         * startup. A transient guest-file/runtime failure gets one bounded
+         * background load attempt and can be retried when the skills screen is opened.
          */
         private const val SKILL_LOAD_TIMEOUT_MS = 15_000L
     }
@@ -130,7 +130,7 @@ class SkillRepository(private val context: Context) {
     init {
         // [T-android-safemode-lateinit-crash-147] and GH#129: this constructor
         // runs inline in MinisApp.onCreate. Disk-backed skill loading performs
-        // broker RPCs and may encounter a stale identity or a dead socket, so
+        // guest-file reads may encounter a transient runtime failure, so
         // it must never run on the application/main thread. Keep the complete
         // initialization sequence in the repository-owned IO scope; the app
         // can finish creating all other subsystems and render its UI while
@@ -1183,7 +1183,7 @@ class SkillRepository(private val context: Context) {
      */
     fun reloadFromDisk() {
         // Keep the public fire-and-forget API used by Compose and ChatViewModel,
-        // but move all broker I/O off their caller threads. The mutex also
+        // but move guest-file I/O off their caller threads. The mutex also
         // prevents a screen-entry rescan from racing the initial load.
         backgroundScope.launch {
             loadMutex.withLock {
@@ -1215,9 +1215,9 @@ class SkillRepository(private val context: Context) {
     }
 
     private suspend fun loadAll() {
-        // A broker failure must not look like an empty guest tree. Keep the
+        // A guest-file failure must not look like an empty tree. Keep the
         // nullable result so a transient runtime outage cannot prune valid DB
-        // rows before the broker becomes ready again.
+        // rows before the guest runtime becomes ready again.
         val onDisk = listSkillDirectoriesForLoad()
 
         // Load from DB
@@ -1254,7 +1254,7 @@ class SkillRepository(private val context: Context) {
             // before the installer re-materializes the file.
             //
              // Only one location to check, unlike iOS's Library+rootfs pair:
-             // the broker owns the canonical `/var/minis/skills` tree.
+             // the App-owned guest file API owns the canonical `/var/minis/skills` view.
              if (importSource != ImportSource.BUNDLED &&
                  onDisk != null &&
                  (id !in onDisk || readSkillFileForLoad(id, "SKILL.md") == null)
@@ -1264,8 +1264,8 @@ class SkillRepository(private val context: Context) {
                 Log.i(TAG, "Pruned orphan skill row (no SKILL.md on disk): $id")
                 continue
             }
-            // When the broker is unavailable, keep the DB metadata instead of
-            // issuing one more blocking-looking RPC per row. The next bounded
+            // When guest file access is unavailable, keep the DB metadata instead of
+            // issuing one more blocking-looking read per row. The next bounded
             // rescan will fill the body once the runtime is healthy again.
             val body = if (onDisk == null) "" else readSkillMdBodyForLoad(id)
             val sourceUrlIdx = cursor.getColumnIndex("source_url")
@@ -1391,7 +1391,7 @@ class SkillRepository(private val context: Context) {
 
     /**
      * Suspending variant used exclusively by [loadAll]. Keeping the startup
-     * path free of `runBlocking` is what makes a dead/stale broker unable to
+     * path free of `runBlocking` is what makes an unavailable guest-file backend unable to
      * trigger an Android application-start ANR.
      */
     private suspend fun listSkillDirectoriesForLoad(): List<String>? = try {

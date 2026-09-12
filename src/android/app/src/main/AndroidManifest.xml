@@ -68,21 +68,15 @@
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Legacy WRITE grant needed on Android 10 base ROMs (e.g. HarmonyOS 2.x /
-         EMUI 11, Huawei Mate 40 ELS-AN00) so requestLegacyExternalStorage can
-         hand PRoot the /mnt/runtime/write FUSE view. Those ROMs never expose the
-         Android-11 "All Files Access" page, so MANAGE_EXTERNAL_STORAGE is
-         ungrantable there; legacy storage is the only path that lets proot
-         readdir a mounted external folder. Capped at API 29 — ignored on 11+. -->
+         EMUI 11, Huawei Mate 40 ELS-AN00) so the Direct Root bind mount can
+         see the /mnt/runtime/write FUSE view. Capped at API 29 — ignored on
+         Android 11+. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <!-- T219: Mount External Folders bind-mounts SAF-picked tree URIs into
-         /var/minis/mounts/ via PRoot. PRoot's bind translates `readdir(/var/minis/mounts/X)`
-         into a host-side `readdir(/storage/emulated/0/...)` running as the app uid.
-         Without MANAGE_EXTERNAL_STORAGE, FuseDaemon (MediaProvider) silently filters
-         out files owned by other packages from getdents64 results — so an Obsidian
-         vault mounted into Minis would only show files Minis itself wrote, not the
-         vault's actual notes. This permission grants the app uid full POSIX access
-         (read + write + readdir) to /storage/emulated/0/, matching the user's mental
-         model of "the folder they picked is the folder Minis sees". -->
+    <!-- T219: Mount External Folders exposes SAF-picked tree URIs at
+         /var/minis/mounts/ through a Direct Root bind mount. The persisted
+         grant is still checked before each Android-side access and before each
+         launch; MANAGE_EXTERNAL_STORAGE is required on ROMs whose FUSE layer
+         filters other packages' files from the mounted tree. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <!-- "Take Photo" composer entry. We never use the camera background; the
          permission is requested at the moment the user taps the menu item. -->

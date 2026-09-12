@@ -11,7 +11,6 @@ fail() { echo "runtime package boundary violation: $*" >&2; exit 54; }
 
 for required in \
   "$RUNTIME/RuntimePathRegistry.kt" \
-  "$RUNTIME/ExternalMountCoordinator.kt" \
   "$RUNTIME/ExecutionCoordinator.kt" \
   "$RUNTIME/ubuntu/UbuntuRuntime.kt" \
   "$RUNTIME/ubuntu/UbuntuKernel.kt" \
@@ -66,7 +65,9 @@ for legacy_name in MinisKernel MountedFolderCoordinator; do
 done
 
 grep -Fq 'object RuntimePathRegistry' "$RUNTIME/RuntimePathRegistry.kt" || fail 'RuntimePathRegistry declaration missing'
-grep -Fq 'object ExternalMountCoordinator' "$RUNTIME/ExternalMountCoordinator.kt" || fail 'ExternalMountCoordinator declaration missing'
+grep -Fq 'fun registerGlobalBindMounts' "$RUNTIME/RuntimePathRegistry.kt" || fail 'global bind registry missing'
+grep -Fq 'var mountedFoldersStore' "$RUNTIME/RuntimePathRegistry.kt" || fail 'mounted-folder registry missing'
+grep -Fq 'fun isLinuxPathUnderReadOnlyMount' "$RUNTIME/RuntimePathRegistry.kt" || fail 'mounted-folder write boundary missing'
 grep -Fq 'object UbuntuKernel' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'UbuntuKernel declaration missing'
 grep -Fq 'object RootNetworkProxy' "$RUNTIME/ubuntu/RootNetworkProxy.kt" || fail 'Root network proxy boundary missing'
 grep -Fq 'const val PROXY_LISTEN = "127.0.0.1:18787"' "$RUNTIME/ubuntu/RootNetworkProxy.kt" || fail 'Root network proxy loopback contract changed'
@@ -74,9 +75,9 @@ grep -Fq 'const val HOST_MINIS = "/data/adb/minis"' "$RUNTIME/ubuntu/UbuntuPaths
 grep -Fq 'const val HOST_ROOTFS = "$HOST_MINIS/rootfs"' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'rootfs contract changed'
 grep -Fq 'const val LEGACY_WORKSPACE = "$HOST_MINIS/workspace"' "$RUNTIME/ubuntu/UbuntuPaths.kt" || fail 'legacy workspace migration contract changed'
 grep -Fq 'Bind(workspace.absolutePath, "/workspace")' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'guest workspace bind contract changed'
-grep -Fq -- '--reuid=$uid --regid=$uid --clear-groups' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'guest App UID drop missing'
+grep -Eq -- '--reuid=\$uid --regid=\$gid --clear-groups' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'guest App UID/GID drop missing'
 grep -Fq -- '--inh-caps=-all --ambient-caps=-all --bounding-set=-all' "$RUNTIME/ubuntu/UbuntuKernel.kt" || fail 'guest capability drop missing'
-if grep -Eiq 'proot|proot -b' "$RUNTIME/ExternalMountCoordinator.kt"; then fail "ExternalMountCoordinator documents removed PRoot semantics"; fi
-if grep -Eiq 'minisd|broker-owned' "$RUNTIME/ExternalMountCoordinator.kt"; then fail "ExternalMountCoordinator documents removed broker semantics"; fi
+if grep -Eiq 'proot|proot -b|broker-owned' "$RUNTIME/RuntimePathRegistry.kt"; then fail "RuntimePathRegistry documents removed runtime semantics"; fi
+if grep -Eiq 'minisd\.sock|/data/adb/minis/bin/minisd' "$RUNTIME/RuntimePathRegistry.kt"; then fail "RuntimePathRegistry contains obsolete broker paths"; fi
 
 echo 'runtime package boundary contract: OK'

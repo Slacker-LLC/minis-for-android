@@ -48,4 +48,10 @@ object FastModePrefs {
         cachedEnabled = enabled
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
+
+    /** JVM-test hook for exercising the same cached path used by request builders. */
+    @androidx.annotation.VisibleForTesting
+    internal fun setCachedEnabledForTest(enabled: Boolean) {
+        cachedEnabled = enabled
+    }
 }

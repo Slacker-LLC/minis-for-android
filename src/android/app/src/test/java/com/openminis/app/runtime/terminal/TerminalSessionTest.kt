@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -70,11 +71,51 @@ class TerminalSessionTest {
         oldReader.complete(Unit)
         runCurrent()
         assertEquals(TerminalSession.State.RUNNING, session.state.value)
+        TerminalSession.broadcastTimezone("UTC")
+        repeat(32) { backend.reads.trySend(-11) }
+        runCurrent()
+        assertTrue(backend.written.toString().contains("export TZ='UTC'\r"))
         assertEquals(listOf(11), backend.closed)
         session.stop()
         runCurrent()
         assertEquals(listOf(11, 12), backend.closed)
         assertEquals(listOf(101, 102), backend.reaped)
+    }
+
+    @Test
+    fun `proxy broadcast clears stale helper variables`() = runTest {
+        val readStarted = CompletableDeferred<Unit>()
+        val releaseRead = CompletableDeferred<Unit>()
+        val backend = FakePty().apply {
+            var firstRead = true
+            readHook = {
+                if (firstRead) {
+                    firstRead = false
+                    readStarted.complete(Unit)
+                    withContext(NonCancellable) {
+                        releaseRead.await()
+                    }
+                    -11
+                } else {
+                    reads.receive()
+                }
+            }
+        }
+        val session = TerminalSession(this, { launch }, backend)
+        session.start()
+        runCurrent()
+        readStarted.await()
+
+        TerminalSession.broadcastProxy(mapOf("http_proxy" to "http://127.0.0.1:18787"))
+        TerminalSession.broadcastProxy(emptyMap())
+        releaseRead.complete(Unit)
+        repeat(1024) { backend.reads.trySend(-11) }
+        runCurrent()
+
+        assertTrue(backend.written.toString().contains("export http_proxy='http://127.0.0.1:18787'\r"))
+        assertTrue(backend.written.toString().contains("unset http_proxy\r"))
+        session.stop()
+        runCurrent()
     }
 
     @Test
@@ -93,6 +134,58 @@ class TerminalSessionTest {
         assertEquals("abcd\u0003", backend.written.toString())
         session.stop()
         runCurrent()
+    }
+
+    @Test
+    fun `global stop reaps booting and running terminals`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val bootingBackend = FakePty()
+        val runningBackend = FakePty().apply { reads.trySend(0) }
+        val booting = TerminalSession(this, { gate.await(); launch }, bootingBackend)
+        val running = TerminalSession(this, { launch }, runningBackend)
+
+        booting.start()
+        running.start()
+        runCurrent()
+        TerminalSession.stopAll()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertEquals(TerminalSession.State.STOPPED, booting.state.value)
+        assertEquals(TerminalSession.State.STOPPED, running.state.value)
+        assertEquals(0, bootingBackend.opened)
+        assertEquals(listOf(11), runningBackend.closed)
+        assertEquals(listOf(101), runningBackend.reaped)
+    }
+
+    @Test
+    fun `joined global stop waits for terminal cleanup`() = runTest {
+        val readStarted = CompletableDeferred<Unit>()
+        val releaseRead = CompletableDeferred<Unit>()
+        val backend = FakePty().apply {
+            readHook = {
+                readStarted.complete(Unit)
+                withContext(NonCancellable) {
+                    releaseRead.await()
+                }
+                -11
+            }
+        }
+        val session = TerminalSession(this, { launch }, backend)
+        session.start()
+        runCurrent()
+        readStarted.await()
+
+        val stopper = launch { TerminalSession.stopAllAndJoin() }
+        runCurrent()
+        assertFalse(stopper.isCompleted)
+        assertEquals(TerminalSession.State.STOPPED, session.state.value)
+
+        releaseRead.complete(Unit)
+        stopper.join()
+        runCurrent()
+        assertEquals(listOf(11), backend.closed)
+        assertEquals(listOf(101), backend.reaped)
     }
 
     private class FakePty : PtyBackend {

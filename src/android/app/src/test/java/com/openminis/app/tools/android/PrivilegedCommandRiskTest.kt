@@ -1,6 +1,8 @@
 package com.openminis.app.tools.android
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class PrivilegedCommandRiskTest {
@@ -62,5 +64,22 @@ class PrivilegedCommandRiskTest {
             CommandRisk.ROOT_SETUP,
             CommandRisk.max(CommandRisk.ROOT_SETUP, CommandRisk.READ_ONLY),
         )
+    }
+
+    @Test
+    fun `structured root argv rejects paths nul and oversized input`() {
+        assertNotNull(PrivilegedCommandRunner.validateRootArgv(listOf("/system/bin/sh")))
+        assertNotNull(PrivilegedCommandRunner.validateRootArgv(listOf("sh\u0000")))
+        assertNotNull(PrivilegedCommandRunner.validateRootArgv(listOf("sh", "bad\u0000arg")))
+        assertNotNull(PrivilegedCommandRunner.validateRootArgv(listOf("sh", "x".repeat(PrivilegedCommandRunner.MAX_ROOT_ARG_BYTES + 1))))
+        assertNotNull(PrivilegedCommandRunner.validateRootArgv(listOf("sh") + List(PrivilegedCommandRunner.MAX_ROOT_ARGS + 1) { "x" }))
+        assertNull(PrivilegedCommandRunner.validateRootArgv(listOf("sh") + List(PrivilegedCommandRunner.MAX_ROOT_ARGS) { "x" }))
+    }
+
+    @Test
+    fun `trusted root tool resolver never accepts a caller supplied path`() {
+        assertNull(PrivilegedCommandRunner.resolveTrustedToolPath("/system/bin/sh"))
+        assertNull(PrivilegedCommandRunner.resolveTrustedToolPath("../sh"))
+        assertNull(PrivilegedCommandRunner.resolveTrustedToolPath("sh\u0000"))
     }
 }

@@ -9,6 +9,14 @@ import java.io.StringReader
 
 class RootPersistentShellOutputTest {
     @Test
+    fun `shell exit classifier reports signal deaths without guessing normal exits`() {
+        assertEquals("SIGKILL", ShellExitClassifier.signalName(137))
+        assertEquals("SIGSYS", ShellExitClassifier.signalName(159))
+        assertNull(ShellExitClassifier.signalName(0))
+        assertNull(ShellExitClassifier.signalName(127))
+    }
+
+    @Test
     fun `bounded output preserves head and tail`() {
         val output = BoundedCommandOutput(20)
         output.appendLine("abcdefghij")

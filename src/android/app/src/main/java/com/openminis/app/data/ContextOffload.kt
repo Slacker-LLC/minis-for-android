@@ -4,7 +4,6 @@ import android.content.Context
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import com.openminis.app.tools.internal.TextRetainer
-import java.io.File
 import java.util.UUID
 
 /**
@@ -20,8 +19,8 @@ import java.util.UUID
  * session is opened on iOS (or vice versa) via cloud sync.
  *
  * Linux-visible mount: `/var/minis/offloads/tools/<file>`. The bytes are
- * written through minisd because the App UID cannot open the canonical host
- * backing directory under SELinux enforcing.
+ * written through the App-owned guest file API and become visible in the
+ * matching session workspace bind.
  */
 object ContextOffload {
     /** Linux-side mount point — keep in lock-step with iOS `minisOffloadsLinuxDir`. */
@@ -30,18 +29,6 @@ object ContextOffload {
     /** Sentinel prefix on stub strings — the agent loop checks this to skip
      *  re-offloading parts that have already been processed. Mirrors iOS. */
     const val OFFLOADED_PREFIX = "[CONTEXT OFFLOADED]"
-
-    /**
-     * Compatibility directory for the diagnostics log spill path. The
-     * diagnostics subsystem still uses its own [com.openminis.app.tools.internal.SpillPolicy]
-     * until that subsystem is migrated; canonical context offloads below use
-     * the broker exclusively.
-     */
-    @Deprecated("Use WorkspaceFileClient-backed offload methods for canonical guest files")
-    fun toolsDir(context: Context, sessionId: String): File {
-        val session = com.openminis.app.runtime.ubuntu.UbuntuPaths.ensureSessionDirs(sessionId)
-        return File(session ?: File(com.openminis.app.runtime.ubuntu.UbuntuPaths.hostSessions, sessionId), "offloads/tools")
-    }
 
     /**
      * Take the last 12 chars of [toolId] as a short, locally-unique suffix

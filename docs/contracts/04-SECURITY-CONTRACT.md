@@ -11,9 +11,9 @@
 ## Root
 
 - 当前不存在生产 Root broker / 通用 Root RPC。
-- `DirectRootRunner` 是 internal launcher，只能执行 App 构造的受控基础设施脚本；禁止 Agent、MCP、Provider 或模型输出直接进入 Root 命令参数。
-- `root.shell` 对 local Agent 和 MCP 都是 denied；不能用 `LOCAL_ONLY` 作为“本地模型可执行任意 Root”的替代说法。
-- Root 动作限于确实需要权限的 rootfs 探测/修复、namespace/bind/chroot、受控 legacy 数据迁移及同类明确基础设施需求。
+- `DirectRootRunner` 是 internal launcher，直接脚本入口只服务于 App 构造的受控基础设施；本地 Agent 的 Root 请求走结构化 `root.shell`，由可信 Android system executable 解析、argv 边界、超时/输出上限和进程清理统一约束。
+- `root.shell` 是 local-only：本地 Agent 可以使用它完成需要 Root 的 Android 工具动作，MCP 不可见且不可调用；它不接受 `command` 字符串，不提供 host 文件或通用 RPC 面。
+- `DirectRootRunner` 的内部脚本动作限于确实需要权限的 rootfs 探测/修复、namespace/bind/chroot、受控 legacy 数据迁移及同类明确基础设施需求；本地 Agent 的 `root.shell` 只走结构化 Android tool/argv 合同，不得被扩展成 raw shell、host 文件或通用 RPC。
 - Guest shell 进入 chroot 后必须通过 `setpriv` 切到真实 App UID/GID，清空 supplementary groups 与 Linux capabilities。
 - Root-provider identity 只是可用性信号；uid=0 不代表 SELinux、mount、namespace 或 capability 一定允许操作。
 

@@ -7,6 +7,33 @@ import org.junit.Test
 
 class RootProbeParserTest {
     @Test
+    fun `root access state distinguishes missing su pending probe and denial`() {
+        val authorized = RootProbeResult(authorized = true, effectiveUid = 0)
+        val denied = RootProbeResult(authorized = false, error = "permission denied")
+
+        assertEquals(
+            RootAccessState.SU_NOT_FOUND,
+            RootAccessStateResolver.resolve(null, authorized),
+        )
+        assertEquals(
+            RootAccessState.AUTHORIZATION_REQUIRED,
+            RootAccessStateResolver.resolve("/system/bin/su", null),
+        )
+        assertEquals(
+            RootAccessState.PROBING,
+            RootAccessStateResolver.resolve("/system/bin/su", authorized, probing = true),
+        )
+        assertEquals(
+            RootAccessState.AUTHORIZED,
+            RootAccessStateResolver.resolve("/system/bin/su", authorized),
+        )
+        assertEquals(
+            RootAccessState.AUTHORIZATION_FAILED,
+            RootAccessStateResolver.resolve("/system/bin/su", denied),
+        )
+    }
+
+    @Test
     fun `parses uid gid groups capabilities and SELinux`() {
         val output = """
             __ID__

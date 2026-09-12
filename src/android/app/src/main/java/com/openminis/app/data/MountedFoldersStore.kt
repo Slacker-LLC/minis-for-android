@@ -8,6 +8,8 @@ import android.os.Environment
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.files.SecureFileAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,9 +76,6 @@ class MountedFoldersStore(private val context: Context) {
     private val mutex = Mutex()
     private val _entries = MutableStateFlow<List<Entry>>(emptyList())
     val entries: StateFlow<List<Entry>> = _entries.asStateFlow()
-
-    /** Fires after a candidate mount set has been accepted and persisted. */
-    var onChange: (() -> Unit)? = null
 
     /**
      * Candidate mount sets are offered to the runtime before they are persisted.
@@ -259,6 +258,9 @@ class MountedFoldersStore(private val context: Context) {
         withContext(Dispatchers.IO) {
             entries.forEach { entry ->
                 if (!entry.isActive) return@forEach
+                check(isSafeMountName(entry.name)) {
+                    "active mount ${entry.id} has invalid mount name"
+                }
                 val uri = Uri.parse(entry.treeUri)
                 check(mountIdentity(uri) != null) {
                     "active mount ${entry.id} has invalid storage identity"
@@ -307,9 +309,25 @@ class MountedFoldersStore(private val context: Context) {
                 AppLogger.warning(TAG, "resolvePosixPath: unknown volume=$volume in docId=$docId")
                 return@withContext null
             }
-            val full = identity.pathSegments.fold(File(volumeRoot)) { current, segment ->
-                File(current, segment)
+            // Canonicalize only the system-provided volume root. Every
+            // user-selected component is then checked with NOFOLLOW so a SAF
+            // tree containing a symlink cannot redirect the bind source.
+            val canonicalRoot = runCatching { File(volumeRoot).canonicalFile }.getOrNull()
+                ?: return@withContext null
+            var fullPath = canonicalRoot.toPath()
+            if (!java.nio.file.Files.isDirectory(fullPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                return@withContext null
             }
+            for (segment in identity.pathSegments) {
+                fullPath = fullPath.resolve(segment)
+                if (java.nio.file.Files.isSymbolicLink(fullPath) ||
+                    !java.nio.file.Files.isDirectory(fullPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ) {
+                    AppLogger.warning(TAG, "resolvePosixPath: symlink/non-directory component in ${fullPath}")
+                    return@withContext null
+                }
+            }
+            val full = fullPath.toFile()
             if (!full.exists() || !full.isDirectory) {
                 AppLogger.warning(TAG, "resolvePosixPath: path missing or not dir: ${full.absolutePath}")
                 return@withContext null
@@ -347,6 +365,10 @@ class MountedFoldersStore(private val context: Context) {
         value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
             !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
 
+    private fun isSafeMountName(value: String): Boolean =
+        value.isNotEmpty() && value.length <= 64 && value != "." && value != ".." &&
+            !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
+
     private fun hasPersistedRead(uri: Uri): Boolean =
         context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
 
@@ -370,11 +392,16 @@ class MountedFoldersStore(private val context: Context) {
     }
 
     private suspend fun commitSnapshot(after: List<Entry>): Boolean {
-        if (onSnapshotChange?.invoke(after) == false) return false
-        _entries.value = after
-        saveToDisk(after)
-        onChange?.invoke()
-        return true
+        // Hold the same gate used by UbuntuRuntime.prepareLaunch. The
+        // callback stops current shells before the candidate becomes the
+        // authoritative Store snapshot; keeping the gate through publication
+        // closes the old-snapshot relaunch window.
+        return RuntimePathRegistry.withMountMutationLock {
+            if (onSnapshotChange?.invoke(after) == false) return@withMountMutationLock false
+            _entries.value = after
+            saveToDisk(after)
+            true
+        }
     }
 
     /**
@@ -386,15 +413,9 @@ class MountedFoldersStore(private val context: Context) {
     fun probeWritable(hostPath: String): Boolean {
         val dir = File(hostPath)
         if (!dir.isDirectory) return false
-        val probe = File(dir, ".minis-probe-${UUID.randomUUID()}")
-        return runCatching {
-            probe.outputStream().use { it.write(0) }
-            true
-        }.onFailure { e ->
-            AppLogger.warning(TAG, "probeWritable: $hostPath not writable: ${e.message}")
-        }.getOrDefault(false).also {
-            runCatching { probe.delete() }
-        }
+        val writable = SecureFileAccess.probeWritable(dir)
+        if (!writable) AppLogger.warning(TAG, "probeWritable: $hostPath is not securely writable")
+        return writable
     }
 
     private fun resolveVolumeRoot(context: Context, volume: String): String? {
@@ -431,7 +452,9 @@ class MountedFoldersStore(private val context: Context) {
     private fun sanitizeName(raw: String): String {
         val trimmed = raw.trim()
         if (trimmed == "." || trimmed == "..") return ""
-        if (trimmed.contains('/') || trimmed.contains('\u0000')) return ""
+        if (trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains('\u0000') ||
+            trimmed.any(Char::isISOControl)
+        ) return ""
         return trimmed.take(64)
     }
 

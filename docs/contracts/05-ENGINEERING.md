@@ -33,7 +33,7 @@ README / 专题 docs → 面向读者说明
 - 用户数据：App-owned backing；Root-owned 持久 runtime 主要是 `/data/adb/minis/rootfs` 等明确基础设施；
 - UID/GID 动态取得，guest 通过 `setpriv` 降权并清空 groups/capabilities；禁止固定 `10000`；
 - Session 相关入口保持 session workspace 语义；
-- Root launcher 只执行 App 构造的基础设施脚本，禁止模型可控 Root shell/RPC；`root.shell` 对模型调用方保持拒绝。
+- Root launcher 的原始脚本入口只执行 App 构造的基础设施脚本；本地 Agent 的 Root 能力使用结构化 `root.shell`（tool basename + argv），通过可信路径、参数/超时/输出和进程清理边界，且保持 local-only、MCP 不可见。不得新增 raw command、Root RPC 或通用 broker。
 
 ## 网络边界
 

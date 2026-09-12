@@ -12,7 +12,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -195,11 +194,6 @@ object SoulStore {
     private const val SOUL_INIT_TIMEOUT_MS = 15_000L
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun fileLocation(context: Context): File =
-        // Kept as a diagnostic location for legacy callers. Actual I/O must
-        // use [GUEST_PATH] through minisd; this File is never opened.
-        File(GUEST_PATH)
-
     /**
      * Compatibility constants kept so older source/tests continue to compile.
      * They are not enforced by Settings, minis-config, or prompt construction.
@@ -245,19 +239,10 @@ lang: "auto"
 **Act first, ask second.** If you can look it up, look it up. Come back with answers, not questions.
 """
 
-    /**
-     * Create SOUL.md with [DEFAULT_CONTENT] iff it does not exist yet.
-     * Safe to call on every launch — never overwrites existing user edits.
-     */
+    /** Return true only for the direct guest-file API's confirmed absence result. */
     internal fun isMissingFileNotFound(error: Throwable): Boolean {
         if (error !is WorkspaceFileClient.Failure) return false
-        if (error.code == "NOT_FOUND") return true
-        val msg = error.message.orEmpty().lowercase()
-        // Legacy minisd reports path ENOENT as RUNTIME_UNAVAILABLE. A missing
-        // daemon socket or backing root is not evidence that SOUL.md is absent.
-        return error.code == "RUNTIME_UNAVAILABLE" &&
-            msg.startsWith("runtime_unavailable: open path:") &&
-            (msg.contains("no such file") || msg.contains("os error 2"))
+        return error.code == "NOT_FOUND"
     }
 
     /**
@@ -301,7 +286,7 @@ lang: "auto"
     /**
      * Complete in-memory snapshot used by the prompt path. The prompt is
      * assembled synchronously by ChatViewModel, so it must never perform a
-     * broker/RPC read here. initializeAsync() and save()/refreshCache() are
+     * guest file read here. initializeAsync() and save()/refreshCache() are
      * the only paths that replace this snapshot.
      */
     private val _cachedFile = MutableStateFlow(SoulFile(SoulMetadata.DEFAULT, ""))
@@ -317,8 +302,8 @@ lang: "auto"
 
     /**
      * Warm the persistent identity without delaying Application.onCreate.
-     * Both existence checks and cache refresh use minisd, so the startup path
-     * must be asynchronous when root authorization or the broker is stale.
+     * Both existence checks and cache refresh use the guest file API, so the
+     * startup path remains asynchronous and cannot block Application.onCreate.
      */
     fun initializeAsync(context: Context) {
         val appContext = context.applicationContext
@@ -401,7 +386,8 @@ lang: "auto"
  *    Personality editor — that internal scaffolding stays out of view
  *    so users can't accidentally delete or duplicate it.
  *  - The runtime identity stays aligned with the current Android execution
- *    backend: Ubuntu 24.04 userspace managed through minisd + chroot.
+ *    backend: an App-owned Ubuntu 24.04 session entered through controlled
+ *    Direct Root infrastructure.
  *  - When the user hasn't authored a personality body, the assembled
  *    prompt falls back to the identity sentence plus the SOUL editing hint.
  */
@@ -431,7 +417,7 @@ object SystemPromptBuilder {
 
     /** Current Android runtime identity exposed to the model. */
     private const val IDENTITY_TEMPLATE =
-        "You are {name}, a capable AI assistant running on an Android device with a fully functional Linux sandbox (Ubuntu 24.04 aarch64, uid 10000, workspace /workspace). "
+        "You are {name}, a capable AI assistant running on an Android device with a fully functional Linux sandbox (Ubuntu 24.04 aarch64, session workspace /workspace). "
 
     /**
      * Render the identity sentence (template + name) and optionally
@@ -440,8 +426,8 @@ object SystemPromptBuilder {
     fun identitySection(context: Context): String {
         // Prompt construction runs on the send path and must remain bounded by
         // local string work. SoulStore.initializeAsync() warms this snapshot
-        // through minisd; reading it here avoids a synchronous RPC/runBlocking
-        // when the broker is stale or unavailable.
+        // through the asynchronous guest-file warm-up; reading it here avoids
+        // a synchronous disk operation on the prompt path.
         return identitySection(SoulStore.cachedFile.value)
     }
 

@@ -60,7 +60,7 @@ object DebugMethodRegistry {
             params = listOf(
                 ParamSpec("args", "[string]", required = false, description = "argv past `minis-model-use` (e.g. [\"run\", \"--model\", \"gpt-5.3-codex\"])."),
                 ParamSpec("command", "string", required = false, description = "Whitespace-separated alternative to args."),
-                ParamSpec("input", "string", required = false, description = "Raw JSON/text fed to the handler as the --input file contents (written to a temp file under /tmp)."),
+                ParamSpec("input", "string", required = false, description = "Raw JSON/text fed to the handler as the --input file contents (staged briefly under the App-owned guest workspace)."),
             ),
             returns = "{exitCode, output, argv}",
             example = ex(
@@ -116,7 +116,7 @@ object DebugMethodRegistry {
             name = "debug.appInfo",
             description = "Return app metadata, device info, and disk usage.",
             params = emptyList(),
-            returns = "{platform, sdkVersion, device, androidVersion, prootBooted, filesDir, logFiles, totalLogSize, diskUsage:{filesDir, sessions, global}}",
+            returns = "{platform, sdkVersion, device, androidVersion, ubuntu, filesDir, logFiles, totalLogSize, diskUsage:{filesDir, sessions, global}}",
             example = JSONObject(),
         ),
         MethodSpec(
@@ -341,16 +341,16 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "debug.writeFile",
-            description = "Write a file into the app's filesDir-rooted Linux-path namespace (resolved through guest bind mounts). Intended for staging test fixtures before debug.shellExecute.",
+            description = "Write a file into the App-owned guest workspace or an authorized external mount. Intended for staging test fixtures before debug.shellExecute; Root-owned rootfs paths are rejected.",
             params = listOf(
-                ParamSpec("path", "string", required = true, description = "Linux path under the guest rootfs (e.g. /tmp/test.sh, /var/minis/skills/example.md)."),
+                ParamSpec("path", "string", required = true, description = "Linux path under App-owned guest storage (e.g. /var/minis/workspace/test.sh, /var/minis/skills/example.md)."),
                 ParamSpec("content", "string", required = true, description = "File content. Encoded per the 'encoding' field."),
                 ParamSpec("encoding", "string", required = false, default = "utf8", description = "'utf8' or 'base64'."),
                 ParamSpec("overwrite", "bool", required = false, default = true, description = "Whether to overwrite an existing file."),
-                ParamSpec("mode", "string", required = false, default = "0644", description = "Octal file mode, e.g. '0644' or '0755'. Setting mode is best-effort on Android."),
+                ParamSpec("mode", "string", required = false, default = "0644", description = "Accepted for cross-platform compatibility; App-owned workspace files use the secure file API's default mode."),
             ),
             returns = "{ok, path, hostPath, size}",
-            example = ex("path" to "/tmp/hello.sh", "content" to "IyEvYmluL3NoCmVjaG8gaGVsbG8K", "encoding" to "base64", "mode" to "0755"),
+            example = ex("path" to "/var/minis/workspace/hello.sh", "content" to "IyEvYmluL3NoCmVjaG8gaGVsbG8K", "encoding" to "base64"),
         ),
         MethodSpec(
             name = "debug.screenshot.capture",

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Execution reuses [AgentRunner], which is the same ChatViewModel-backed
  * loop the app and the debug RPC already drive, so a child has the full tool
- * set, the persistent PRoot shell and streaming — without a second agent
+ * set, the persistent Ubuntu shell and streaming — without a second agent
  * implementation to keep in sync.
  */
 object SubagentTool {

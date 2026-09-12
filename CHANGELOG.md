@@ -8,7 +8,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 - Finalized the production Linux path as Android App-owned orchestration + Ubuntu 24.04 direct chroot.
 - Removed the obsolete privileged broker source/build/runtime path, socket protocol, Android client package, payload fields, and packaged broker binary.
-- Kept Root execution internal to trusted runtime infrastructure; generic Agent/model/MCP-controlled Root shell/RPC is denied.
+- Kept raw Root scripts and generic Root RPC internal to trusted runtime infrastructure; the local Agent has the upstream-compatible structured `root.shell` capability, while MCP remains denied.
 - Guest commands run as the real Android App UID/GID after `setpriv` clears supplementary groups and Linux capabilities.
 - Moved active guest user data to App-owned backing derived from `Context.filesDir`; `/data/adb/minis/rootfs` remains Root-owned replaceable runtime state.
 - Added one-time migration from historical Root-owned user-data trees into App-owned storage.
@@ -20,7 +20,7 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ### Security and tool boundary
 
-- `root.shell` is denied for both local Agent and MCP callers; Direct Root execution remains internal infrastructure only.
+- `root.shell` is a bounded structured local-Agent capability (`tool` + `args`); it remains hidden from MCP and does not expose raw commands, host files, or generic RPC.
 - Android capability/tool descriptions now report Direct Ubuntu rather than the removed runtime architecture.
 - Production residue guards distinguish real obsolete runtime identities from unrelated identifiers such as `MinisDocumentsProvider`.
 
