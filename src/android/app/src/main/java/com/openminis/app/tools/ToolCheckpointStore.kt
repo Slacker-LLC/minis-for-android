@@ -22,7 +22,6 @@ import java.io.File
  */
 object ToolCheckpointStore {
     private const val TAG = "ToolCheckpointStore"
-    private const val MAX_PENDING_PER_SESSION = 50
 
     data class IntentRecord(
         val callId: String,
@@ -82,18 +81,23 @@ object ToolCheckpointStore {
 
     /**
      * Intents that are still pending (tool body started, no result persisted).
-     * Returns them and flips them to "reported" so they are injected exactly
-     * once, even if history is rebuilt multiple times.
+     * Non-destructive snapshot: history inspection must not acknowledge delivery.
      */
     @Synchronized
     fun drainPending(context: Context, sessionId: String): List<IntentRecord> {
         if (sessionId.isBlank()) return emptyList()
         return try {
-            val f = fileFor(context, sessionId)
+            readPending(fileFor(context, sessionId))
+        } catch (t: Throwable) {
+            Log.w(TAG, "drainPending failed: ${t.message}")
+            emptyList()
+        }
+    }
+
+    internal fun readPending(f: File): List<IntentRecord> {
             if (!f.exists()) return emptyList()
-            val lines = f.readLines().toMutableList()
+            val lines = f.readLines()
             val pending = mutableListOf<IntentRecord>()
-            var changed = false
             for (i in lines.indices) {
                 val parsed = runCatching { JSONObject(lines[i]) }.getOrNull() ?: continue
                 if (parsed.optString("state") == "pending") {
@@ -104,17 +108,11 @@ object ToolCheckpointStore {
                         at = parsed.optLong("at"),
                         state = "pending",
                     )
-                    parsed.put("state", "reported")
-                    lines[i] = parsed.toString()
-                    changed = true
+                    // Reading history is not delivery or durable acknowledgement.
+                    // Keep the intent pending until a result has been persisted.
                 }
             }
-            if (changed) f.writeText(lines.joinToString("\n") + "\n")
-            pending.take(MAX_PENDING_PER_SESSION)
-        } catch (t: Throwable) {
-            Log.w(TAG, "drainPending failed: ${t.message}")
-            emptyList()
-        }
+            return pending
     }
 
     /** Drop all checkpoints for a session (session deleted / compacted). */

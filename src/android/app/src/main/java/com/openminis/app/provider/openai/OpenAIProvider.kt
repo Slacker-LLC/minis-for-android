@@ -1975,6 +1975,12 @@ class OpenAIProvider private constructor(
                         obj.put("role", "assistant")
                         if (echoReasoning) {
                             val rc = msg.reasoningContent
+                            if (thinkingLevel.isEnabled && model.id.contains("deepseek", ignoreCase = true) &&
+                                rc == null && msg.contentParts.any { it is AgentContentPart.ToolUse }) {
+                                throw LLMError.ProviderError(
+                                    "Incomplete tool history: DeepSeek reasoning is missing. Restore a complete turn before retrying.",
+                                )
+                            }
                             if (rc != null) {
                                 // Round-trip exactly what the server emitted,
                                 // including empty strings. DeepSeek V4 emits

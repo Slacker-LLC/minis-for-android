@@ -14,6 +14,7 @@ internal class PendingAssistantTurn(val assistantId: String, val sessionId: Stri
         private set
     @Volatile var historyMessage: LLMMessage? = null
     @Volatile var toolInputs: Map<String, String> = emptyMap()
+    @Volatile var reasoningContent: String? = null
 
     suspend fun commit(turn: AssistantTurnCodec.Turn, write: suspend () -> String?): String? =
         withContext(NonCancellable) {

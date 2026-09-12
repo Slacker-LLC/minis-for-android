@@ -2553,10 +2553,16 @@ class ChatViewModel(
      * TOOL_OUTCOME_UNKNOWN): if the process died while a tool was running,
      * the persisted intent has no result. Inject a model-visible message so
      * the agent does not blindly re-run a call that may already have had
-     * side effects. Drain-once: reported intents are not re-injected.
+     * side effects. Inspection never consumes a recovery warning.
      */
     private fun injectUnknownOutcomes(history: List<LLMMessage>): List<LLMMessage> {
         val sid = activeSessionId ?: return history
+        // Reconcile a crash after Room committed but before checkpoint acknowledgement.
+        agentHistory.filter { it.dbMessageId != null }.forEach { message ->
+            message.contentParts.filterIsInstance<AgentContentPart.ToolResult>().forEach { result ->
+                ToolCheckpointStore.markDone(context, sid, result.id, !result.isError)
+            }
+        }
         val pending = ToolCheckpointStore.drainPending(context, sid)
         if (pending.isEmpty()) return history
         return history + pending.map { rec ->
@@ -6957,8 +6963,30 @@ class ChatViewModel(
             } else {
                 AppLogger.info(
                     TAG_STREAM,
-                    "retryLast: agentHistory tail was user(tool_result) — no DB cleanup needed",
+                    "retryLast: retaining completed turns; checking persisted tool pairing",
                 )
+            }
+            // The in-memory orphan sweep above does not repair persisted rows.
+            // Keep unrelated parts and remove only results without a preceding call.
+            val persistedCalls = mutableSetOf<String>()
+            for (row in chatRepository.loadMessages(sid)) {
+                val parts = org.json.JSONArray(row.partsJson)
+                val kept = org.json.JSONArray()
+                for (i in 0 until parts.length()) {
+                    val part = parts.getJSONObject(i)
+                    val value = part.optJSONObject("value")
+                    val type = part.optString("type")
+                    if (row.role == "assistant" && type == "toolUse") {
+                        value?.optString("toolUseId")?.takeIf { it.isNotBlank() }?.let(persistedCalls::add)
+                    }
+                    if (row.role == "user" && type == "toolResult" &&
+                        value?.optString("toolUseId") !in persistedCalls) continue
+                    kept.put(part)
+                }
+                if (kept.length() != parts.length()) {
+                    if (kept.length() == 0) chatRepository.deleteSingleMessage(row.id)
+                    else chatRepository.updateMessageParts(row.id, kept.toString())
+                }
             }
 
             // Refresh OAuth token if needed
@@ -7996,6 +8024,7 @@ class ChatViewModel(
                             chunk.text,
                         )
                         turnThinking.append(chunk.text)
+                        pendingTurn.reasoningContent = turnReasoningBlob ?: turnThinking.toString()
                         // Update thinking block in UI
                         val thinkIdx = allToolBlocks.indexOfFirst { it.kind == "thinking" && it.id == "thinking_$turn" }
                         if (thinkIdx < 0) {
@@ -8343,6 +8372,7 @@ class ChatViewModel(
                         // turns and we must round-trip exactly that). No live UI surface;
                         // the thinking panel is driven by ThinkingDelta events above.
                         turnReasoningBlob = chunk.content
+                        pendingTurn.reasoningContent = chunk.content
                     }
                     is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.Finished -> {
@@ -9383,9 +9413,6 @@ class ChatViewModel(
             timedOut = true,
             toolTitle = toolTitle,
         )
-        if (!sid.isNullOrBlank()) {
-            ToolCheckpointStore.markDone(context, sid, toolId, result.success)
-        }
         return applyRepeatGuard(name, argsJson, result)
     }
 
@@ -9905,7 +9932,7 @@ class ChatViewModel(
         val write: suspend () -> String? = {
             chatRepository.appendMessage(
                 pendingTurn?.sessionId ?: realSessionId.ifEmpty { sessionId }, "assistant", partsJson, tokenJson,
-                reasoningContent = reasoningContent,
+                reasoningContent = reasoningContent ?: pendingTurn?.reasoningContent,
                 modelSnapshot = modelSnapshot,
             ).id
         }
@@ -9971,6 +9998,10 @@ class ChatViewModel(
             append("]")
         }
         val entity = chatRepository.appendMessage(realSessionId.ifEmpty { sessionId }, "user", partsJson)
+        val checkpointSession = realSessionId.ifEmpty { sessionId }
+        results.forEach { result ->
+            ToolCheckpointStore.markDone(context, checkpointSession, result.id, !result.isError)
+        }
         return entity.id
     }
 
