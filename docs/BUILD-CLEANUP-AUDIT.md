@@ -1,53 +1,27 @@
-# Build Cleanup Audit
+# 构建入口与清理边界
 
-This document began as the Issue #53 build-path audit and now records the post-Direct-Ubuntu cleanup boundary. Historical decisions are retained only where useful; current build truth comes from the final branch source, scripts, and CI.
+最初的 Issue #53 审计已结束。本文只保留仍有用途的入口/守卫索引，操作步骤统一见[中文构建指南](../BUILDING.zh-CN.md)。
 
-## Current canonical build entry points
+| 产物或检查 | 当前入口 |
+|---|---|
+| Android APK/AAB | `src/android/gradlew` |
+| Ubuntu rootfs | `scripts/build-ubuntu-rootfs.sh` |
+| rootfs-only payload | `scripts/build-runtime-payload.sh` |
+| 独立网络 helper | `scripts/build-root-network-proxy-android.sh` |
+| rclone Android AAR | `deps/build_rclone_android.sh` |
+| Windows Debug 包装脚本 | `scripts/build-android-debug.ps1` |
+| CI | `.github/workflows/ci.yml` |
 
-- Android: `src/android/gradlew`
-- Direct Ubuntu rootfs: `scripts/build-ubuntu-rootfs.sh`
-- Rootfs-only runtime payload: `scripts/build-runtime-payload.sh`
-- Network compatibility helper: `scripts/build-root-network-proxy-android.sh`
-- rclone Android binding: `deps/build_rclone_android.sh`
-- Windows debug convenience wrapper: `scripts/build-android-debug.ps1`
-- CI: `.github/workflows/ci.yml`
+runtime payload 只含 Ubuntu rootfs 及 manifest；HTTP/CONNECT helper 是单独验证和打包的 native 产物，不因当前特权部署而成为 Root/chroot 的固有组件。
 
-There is no active privileged-broker build stage, Android client package, socket protocol, broker native source tree, or broker binary packaged into the APK.
+旧 broker 源码、构建步骤、Android client、socket 与二进制，以及一次性迁移辅助脚本已退出生产路径。历史五份 PR patch 副本和已被合同替代的七步计划已从文档树删除，需要追溯时查 Git 历史，不再将归档代码当构建输入。
 
-## Runtime package split
+## 回归守卫
 
-The runtime payload contains only the verified Ubuntu rootfs archive and manifest. The loopback network helper is an independent native artifact and is verified separately.
+- `scripts/check_build_cleanup.py` / `scripts/test_build_cleanup_guard.py`：防止旧构建与 runtime 身份回归。
+- `scripts/check-runtime-package-boundary.sh`：现役 runtime 包与有限旧包白名单。
+- `scripts/test-build-ubuntu-rootfs-verification.sh` / `scripts/test-runtime-payload-verification.sh`：rootfs/payload 验证否定用例。
+- `scripts/verify-runtime-payload.sh` / `scripts/verify-root-network-proxy.sh`：产物验证。
+- `scripts/verify-android-16k.sh` / `scripts/verify-android-bundle.sh`：APK/AAB 与 16 KiB 兼容检查。
 
-The network helper's current privileged deployment identity is not a reason to treat it as part of Root/chroot packaging. HTTP/CONNECT proxying is a separate network-compatibility function.
-
-## Removed/dead paths
-
-The cleanup history includes removal of:
-
-- obsolete developer-only model verifier paths with no current Android/Rust build role;
-- the legacy pet-named PowerShell APK wrapper while retaining its useful behavior under `scripts/build-android-debug.ps1`;
-- the old privileged-broker native source/build/package path;
-- one-off Phase 1/2/3 migration scripts and temporary CI workflow used only during the Direct Ubuntu refactor.
-
-Historical patch snapshots under `docs/archive/snapshots/` are not executable build inputs.
-
-## Regression guards
-
-`scripts/check_build_cleanup.py` and `scripts/test_build_cleanup_guard.py` enforce the active build cleanup boundary. They reject obsolete runtime identities in production source/build/package paths while allowing clearly historical/negative guard text where required to prevent regression.
-
-`scripts/check-runtime-package-boundary.sh` separately enforces Android runtime package ownership and the narrow legacy-package allowlist.
-
-Runtime payload/network/APK verification is additionally covered by:
-
-```text
-scripts/test-build-ubuntu-rootfs-verification.sh
-scripts/test-runtime-payload-verification.sh
-scripts/verify-runtime-payload.sh
-scripts/verify-root-network-proxy.sh
-scripts/verify-android-16k.sh
-scripts/verify-android-bundle.sh
-```
-
-## Historical note
-
-Older revisions of this audit named the former privileged broker as the Rust build entry point. That statement is obsolete after the Direct Ubuntu refactor and must not be used as a current build instruction.
+守卫通过不等于 Root 真机通过；设备证据见[实测报告](REAL-DEVICE-TEST-REPORT.md)。

@@ -21,7 +21,7 @@ Gradle、Android 网络兼容代理与 rclone 默认使用 NDK `28.2.13676358`�
 ```bash
 git clone https://github.com/Slacker-LLC/minis-for-android.git
 cd minis-for-android
-git switch refactor/direct-ubuntu-runtime
+git switch main
 ```
 
 当前运行时不需要初始化 Git submodule。
@@ -98,14 +98,12 @@ Debug 使用本机持久调试签名：Windows/WSL 默认 `C:\Users\<用户名>\
 
 ## 6. 测试与校验
 
-Android：
+以下各组命令均从仓库根目录开始；上一节进入了 `src/android` 时，先执行 `cd ../..`。Android 命令单独在子 shell 中运行：
 
 ```bash
-cd src/android
-./gradlew :app:testDebugUnitTest --no-daemon
-./gradlew :app:lintDebug --no-daemon
-./gradlew :app:lintRelease --no-daemon
-./gradlew :app:assembleDebugAndroidTest --no-daemon
+(cd src/android && ./gradlew test --no-daemon)
+(cd src/android && ./gradlew :app:lintDebug :app:lintRelease --no-daemon)
+(cd src/android && ./gradlew :app:assembleDebugAndroidTest --no-daemon)
 ```
 
 Runtime/build guard：
@@ -171,3 +169,17 @@ Root 只负责建立 Direct Ubuntu 环境所需的最小基础设施；普通 gu
 KernelSU/Magisk/APatch、SELinux、mount namespace、VPN/DNS/BPF/Fake-IP 与 OEM 生命周期仍需真机验收。
 
 更多内容：[README.zh-CN.md](README.zh-CN.md)、[docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)、[docs/SECURITY.md](docs/SECURITY.md)。
+
+## 增量编译与内存
+
+保留 Gradle 用户缓存、项目 `.gradle/`、`build/` 和未跟踪的 `rclone.aar`，普通改动不必运行 `clean`。新 worktree 不会自动继承未跟踪的 native 产物，需按第 3 节准备；不要把缓存、APK 或私有配置提交到 Git。
+
+2026-09-12 合并验证中，冷构建的 Kotlin daemon 在 1.5 GiB 堆上内存不足；使用 Gradle 4 GiB、Kotlin 3 GiB、单 worker 后测试和 Debug 构建通过。内存充足的机器可从仓库根目录复用：
+
+```bash
+(cd src/android && ./gradlew test assembleDebug --no-daemon --max-workers=1 \
+  -Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' \
+  -Pkotlin.daemon.jvmargs=-Xmx3g)
+```
+
+两套 JVM 的堆上限不等于总内存需求，还需为系统、编译器和 native 工具预留空间；内存较小的机器不要照搬。文档修改只需跑文档守卫，不必重新冷编译整个 Android 项目。

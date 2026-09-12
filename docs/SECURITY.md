@@ -1,84 +1,49 @@
-# Security Model
+# 安全模型
 
-Minis for Android is a high-privilege Android agent project. Root access, MCP, Accessibility, provider credentials, package management, and device-control tools are security boundaries rather than convenience features.
+本文解释现役安全边界，不额外改变权限策略。长期约束见[安全合同](contracts/04-SECURITY-CONTRACT.md)，实现事实看源码、否定用例与[当前缺口](contracts/06-CURRENT-GAPS.md)。
 
-## Security principles
+## 不同权限不能混为一谈
 
-1. Fail closed when identity, policy, path containment, signing, checksum, credential, rootfs, or direct-runtime prerequisites are not satisfied.
-2. Keep privileged operations App-owned, narrow, and separate from Agent/model command input.
-3. Reuse one canonical tool permission/runtime layer.
-4. Treat local Agent, MCP callers, Android services, Root infrastructure, and network compatibility as distinct capability domains.
-5. Require negative tests for security-sensitive behavior.
-6. Do not disable SELinux or platform protections globally to make a feature work.
+本地 Agent、MCP 调用方、Android API、无障碍、Shizuku、Root 基础设施和网络兼容 helper 是不同能力域。工具复用现有注册表和权限/审批层；UI 勾选不代替执行授权，未知工具默认拒绝，仅本地工具不向 MCP 暴露。
 
-## Credentials and local services
+安全检查围绕已知身份、路径、凭证和调用边界，并有失败/越界测试；不能为了“安全”随意删除正常功能、建立重复权限层或全局关闭 SELinux。
 
-Provider API keys, OAuth tokens, MCP tokens, DebugServer tokens, signing material, and other secrets must not be committed to the repository or returned through diagnostic APIs. Secure-storage failures must not downgrade secrets to plaintext.
+## Direct Root 与 Guest
 
-DebugServer remains loopback-bound and debug-only. The local MCP server binds loopback by default, requires bearer authentication, filters tools by caller policy, and must not expose arbitrary Root shell or unrestricted host filesystem access.
+`DirectRootRunner` 是 App-owned 内部 launcher，用于受控 rootfs 探测/修复、mount namespace、bind/chroot、迁移及必要维护。没有生产通用 Root broker/RPC。
 
-## Direct Root boundary
+本地 Agent 可经工具层调用结构化 root.shell，输入为 Android executable basename 与 argv，经过可信系统目录解析、参数/输出/超时限制和进程清理；不接受模型原始命令字符串，不提供 host 文件 API，对 MCP 隐藏。
 
-There is no production privileged broker or generic Root RPC in the current architecture.
+普通 Guest 命令通过 setpriv 切到实际 App UID/GID，清空附加组和 capabilities。chroot 共享 Android 内核，不是完整容器安全边界。uid=0 不证明 SELinux、namespace 或 mount 一定允许。
 
-`DirectRootRunner` is an internal launcher used by trusted Android runtime code for operations that require privilege, such as Root capability probing, rootfs repair, mount namespace/bind/chroot setup, controlled one-time migration, and tightly scoped maintenance. A local Agent may also request the structured `root.shell` tool: it supplies only an executable basename and argv, which are resolved from trusted Android system directories and bounded before execution. Agent, MCP, Provider, and model output must not flow as a raw command string into its script input.
+## 文件与数据
 
-`root.shell` is local-only and hidden from MCP; it has no `command` string, host-filesystem API, or generic RPC transport. Guest execution is not Root execution: after Root establishes the namespace/chroot, `setpriv` switches to the real App UID/GID, clears supplementary groups, and drops Linux capabilities before bash starts.
+- `/data/adb/minis/rootfs` 为 Root-owned 可替换运行状态；用户数据为 Context.filesDir 派生的 App-owned backing。
+- 有效 session 只使用对应 backing，不用全局 workspace 旁路。
+- 文件层检查路径穿越、NUL、canonical escape 与相关 symlink escape；缓存/staging、SAF、App 数据和 rootfs 是不同信任域。
+- SAF 以有效 grant 为准，只读授权以只读 bind 进入 guest。
+- rootfs 按 pin/checksum/manifest 校验，修复不覆盖用户数据；大输出有界或溢写到受控目录。
 
-Root-provider identity is diagnostic only. `uid=0` does not prove SELinux, mount, namespace, or capability operations are permitted.
+## 本地服务与凭证
 
-## Network compatibility proxy
+Provider key、OAuth/MCP/DebugServer token 与签名材料不得进仓库、诊断输出或未脱敏日志；安全存储失败不得降级写明文。
 
-The standalone `minis-root-network-proxy` is a separate network compatibility component. Its current name/deployment reflects that it may run with privileged identity on Android; **HTTP/CONNECT proxying itself is not a Root primitive and is not part of the chroot security boundary.**
+- DebugServer 仅 Debug 构建、仅 loopback，并要求 token。
+- 本地 MCP server 默认 loopback，要求 bearer，按调用方过滤工具，保留敏感操作审批；不提供任意 Root shell 或不受限 host 文件访问。
+- Guest 命令桥以独立 token 验证 Android handler 调用，不是网络代理或通用 Root RPC。
 
-Current hard limits:
+## 网络兼容代理
 
-- listener fixed to `127.0.0.1:18787`;
-- HTTP absolute-form and CONNECT only;
-- no shell, filesystem, plugin, configuration, or generic RPC API;
-- bounded request headers and connection concurrency;
-- ordinary loopback/private/link-local/broadcast destinations rejected;
-- `198.18.0.0/15` retained only for explicit VPN Fake-IP compatibility;
-- controlled Android DNS discovery/fallback behavior.
+`minis-root-network-proxy` 仅监听 `127.0.0.1:18787`，只做 HTTP absolute-form / CONNECT，限制请求头与并发，不提供 shell、文件、插件或动态配置 RPC。普通 loopback/private/link-local/broadcast 目标拒绝，`198.18.0.0/15` 只保留 VPN Fake-IP 兼容。
 
-On devices where App-UID guest sockets work correctly, the Direct Ubuntu architecture does not conceptually require privileged proxy egress. On devices where Android VPN/BPF/UID policy blocks those sockets, privileged helper egress may be used as a compatibility mechanism. This distinction must remain explicit in code comments and documentation.
+HTTP/CONNECT 本身不要求 Root。当前 helper 可用特权身份建立出站 socket，只为兼容 Android UID/VPN/BPF 策略，不是 chroot 权限边界，也不得暴露为远程代理。不能用 Guest 命令桥的 token 测试代替代理自身访问边界测试。
 
-## Ubuntu chroot boundary
+云 Provider、OAuth、更新与带凭证请求应使用 HTTPS；本地/私有 HTTP 端点遵循应用显式策略，不允许隐式公网明文 fallback 或凭证请求 HTTPS→HTTP 降级跳转。
 
-The Ubuntu guest is not a VM or complete container security boundary. It shares the Android kernel.
+## 构建、恢复与验收
 
-Active user data is App-owned; `/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Per-session data must bind only from its corresponding App-owned session backing. SAF external locations remain a separate grant-based trust domain and are bound read-only when the effective grant is read-only.
+Release 缺少生产签名必须失败，不能回退 Debug key。runtime payload 只含 rootfs/manifest，网络 helper 单独构建/验证；旧 broker 二进制、socket 和 package 由守卫防止回归。APK/AAB 与密钥不提交到 Git。
 
-Host/guest mounts are explicit, guest paths are contained, global SELinux is not disabled, and rootfs input is pinned/checksum/manifest verified before use.
+恢复须区分未开始、干净失败、已完成、结果未知；不能盲目重试结果未知的副作用。
 
-## File and path boundaries
-
-File and mount paths must reject traversal, NUL input, canonical escape, and relevant symlink escape. App-owned data, App cache/staging, SAF locations, and Root-owned rootfs are distinct storage domains and must not be silently substituted for one another.
-
-Large tool output should be bounded or spilled to controlled storage.
-
-## Tool authorization
-
-All Agent/MCP tools enter the canonical tool registry and runtime permission layer. Unknown tools default deny; local-only tools are not exposed to MCP; UI checks are not execution authorization; side-effecting tools retain checkpoint/approval/recovery semantics.
-
-No tool may convert internal Direct Ubuntu Root infrastructure into a model-controlled shell.
-
-## Network transport
-
-Cloud providers, OAuth, update metadata, and credential-bearing requests should use HTTPS. Local/private HTTP provider endpoints require explicit application policy; broad public cleartext must not become an implicit fallback. Credential-bearing flows must not follow HTTPS-to-HTTP downgrade redirects.
-
-The local compatibility proxy is an internal guest-egress path, not permission to expose a remote proxy service.
-
-## Release security
-
-Release signing is fail-closed. Debug signing must never be accepted as a production release fallback. Runtime packaging verifies the rootfs-only manifest and network helper independently; obsolete privileged-broker binaries/socket contracts are rejected by regression guards.
-
-APKs/AABs are build artifacts and are not committed to Git.
-
-## Process death and uncertain outcomes
-
-Recovery must distinguish operation never started, clean failure, completed, and outcome unknown. Unknown side effects must not be blindly retried.
-
-## Device-verification boundary
-
-CI and host tests can prove payload integrity, native proxy policy/build behavior, package contents, and Android compile/unit behavior. They cannot prove Root authorization, SELinux behavior, real mount semantics, VPN/DNS/BPF/Fake-IP behavior, or OEM process lifecycle on a physical device. Those claims require explicit device tests.
+CI/宿主测试可证明输入完整性、解析/策略、打包和编译行为，不能代替 Root 授权、SELinux、真实挂载、VPN/DNS/BPF/Fake-IP 与 OEM 生命周期的设备证据。本轮文档更新不代表新增了这些实测结果。

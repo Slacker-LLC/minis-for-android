@@ -1,4 +1,6 @@
-# Android DebugServer API
+# Android DebugServer 调试接口
+
+中文摘要：这是仅 Debug APK 启用的设备 loopback JSON-RPC 接口，调用必须带本机 token；可用方法以 `rpc.discover` 为准。它不是生产 MCP server、Guest 命令桥或 `127.0.0.1:18787` 网络代理。不要把 token 写进报告或提交到仓库。下面的请求示例用于明确授权的开发设备。
 
 This document describes the current **Minis for Android** DebugServer. It is a developer-only JSON-RPC surface for inspecting and exercising a debug build.
 

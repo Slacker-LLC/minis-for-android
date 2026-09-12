@@ -1,7 +1,8 @@
 # External MCP `tools/list` contract for Minis for Android
 
-Status: repository-observed integration contract for Issue #41.
-Baseline inspected: `master@ba129724d943317e15c5be05ce77cb52be237db8`.
+状态：Android 原生 MCP 客户端的仓库行为说明，不是官方协议规范。原始审计基线为 `master@ba129724d943317e15c5be05ce77cb52be237db8`；2026-09-12 在 `main` 的 `422cc29f` 重新确认 parser 仍读取 `input_schema`。完整协议兼容性仍需单独验证。
+
+中文要点：提示词中的 20 是 MCP 服务器数量上限，不是工具数量上限；分页另有保护。原生工具发现链与 Guest CLI 是两条不同入口。**当前 Guest 缺少 `minis-mcp-cli`，不能照提示词运行它**，详见[当前缺口](../contracts/06-CURRENT-GAPS.md)。下文保留具体 parser/schema 的技术审计细节。
 
 This guide documents what the current Minis for Android code actually accepts and exposes when it acts as an MCP client. It deliberately does **not** promote repository behavior into an official MCP requirement. Where the repository cannot prove an upstream protocol rule, that item is marked **Unresolved upstream constraint** and paired with a reproducible experiment.
 
@@ -73,7 +74,7 @@ External MCP discovery follows a different path:
 
 `MCPProvider` -> `MCPClientSession.connect()` -> `initialize` / `notifications/initialized` -> `MCPClientSession.listTools()` -> `tools/list` pages -> `MCPToolHandler` -> `ToolRegistry`.
 
-The user-facing MCP prompt reinforces this boundary by instructing the agent to run `minis-mcp-cli tools <server>` to inspect available tools and `minis-mcp-cli call <server> <tool> [args]` to invoke them. No repository evidence shows an MCP-side `rpc.discover` equivalent that third-party servers must implement.
+`MCPRepository.mcpPromptFragment()` still instructs the agent to use `minis-mcp-cli tools/call`, but that executable is absent from the current Guest. This is a prompt/deployment mismatch, not evidence that CLI discovery works. The native discovery chain above is separate. No repository evidence establishes an MCP-side `rpc.discover` requirement.
 
 ## Unresolved upstream constraints and reproducible experiments
 

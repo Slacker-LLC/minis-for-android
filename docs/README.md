@@ -1,5 +1,7 @@
 # 文档索引
 
+本轮整理基于 2026-09-12 合并后的 `main`（源码基线 `422cc29f`）。中文为主要阅读入口；历史审计采样日期保留，不能把旧报告当作新一轮验收。
+
 当前事实与长期合同分开判断：
 
 ```text
@@ -7,7 +9,7 @@
 长期行为边界：AGENTS.md + docs/contracts/*
 当前缺口/设备验收边界：docs/contracts/06-CURRENT-GAPS.md
 产品入口：README.zh-CN.md / CONTRIBUTING.zh-CN.md
-历史记录：docs/issue-*.md、旧计划、docs/archive/*
+历史记录：docs/issue-*.md、docs/archive/RUNTIME-HISTORY.md、Git 历史
 法律来源：PROVENANCE.md
 ```
 
@@ -48,7 +50,8 @@
 | [`runtime-package-boundary.md`](runtime-package-boundary.md) | Android runtime 包职责边界 |
 | [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md) | Direct Ubuntu 分支与外部上游的对账快照、双方特有内容和复核命令 |
 | [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md) | 小米真机实测记录、通过项、证据边界与未完成矩阵 |
-| [`../BUILDING.md`](../BUILDING.md) | 构建与验证 |
+| [`../BUILDING.zh-CN.md`](../BUILDING.zh-CN.md) | 构建、安装、缓存与内存、验证 |
+| [`BUILD-CLEANUP-AUDIT.md`](BUILD-CLEANUP-AUDIT.md) | 构建入口与旧路径回归守卫 |
 | [`../CONTRIBUTING.zh-CN.md`](../CONTRIBUTING.zh-CN.md) | 贡献规则 |
 
 ## 专题实现说明
@@ -64,4 +67,6 @@
 
 ## 历史文档
 
-`docs/issue-*.md`、`minis-seven-step-execution-plan.md`、`BUILD-CLEANUP-AUDIT.md` 中保留的旧 branch、PR、SHA、broker/runtime 名称属于历史证据。`archive/` 仅用于历史追溯。判断当前实现必须回到现役 contracts、目标分支源码与测试。
+[`archive/RUNTIME-HISTORY.md`](archive/RUNTIME-HISTORY.md) 保留迁移背景；`docs/issue-*.md` 保留有独立解释价值的历史决策，文件头明确标记历史。备份 RFC 也属于设计参考，不是当前功能清单。
+
+已删除被合同完全替代的七步计划，以及五份不参与构建的旧 PR patch 副本；它们仍可从 Git 历史恢复。保留法律文件、现役合同、实测报告和上游对账，不为了减少文件数删除验收缺口。

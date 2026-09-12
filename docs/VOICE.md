@@ -1,4 +1,6 @@
-# Voice Runtime
+# 语音运行链
+
+中文摘要：语音输入经系统或 Provider ASR 转成文字，复用现有 Chat/Pet 模型链，再由系统或 Provider TTS 播放；不另建 Runtime。2026-09-12 小米实测分别取得 MiMo 文本、独立 MiMo TTS 请求与 Xiaomi 系统朗读证据，三者不能混写为同一个出口。完整 ASR、打断、通话与 Pi 语音矩阵仍待验收，见[实测报告](REAL-DEVICE-TEST-REPORT.md)。下文保留组件/API 明细。
 
 This document describes the current speech-recognition, model, TTS, and voice-entry paths inside the Android application. It is not a separate APK or a second agent runtime.
 

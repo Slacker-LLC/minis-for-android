@@ -1,4 +1,6 @@
-# Agent foreground-service contract
+# Agent 前台服务与生命周期
+
+中文摘要：前台服务跟随真实活跃 Agent turn，首个 turn 启动、最后一个结束/取消后停止；不是进入聊天页面就常驻。Android 14+ 使用 `specialUse`，不借音频或数据同步类型延长后台寿命。系统杀进程后不盲目重放结果未知的副作用。小米 HyperOS 拒装本轮 instrumentation APK，不能将下面的编译检查写成真机执行通过；见[实测报告](REAL-DEVICE-TEST-REPORT.md)。
 
 This document describes the foreground-service boundary for interactive and headless Agent execution on Android.
 

@@ -1,6 +1,6 @@
 # Direct Ubuntu 分支与外部上游对账
 
-这是一份针对当前 Direct Ubuntu 分支的对账快照，不是持续同步政策。产品的法律来源与衍生关系仍以 [`../PROVENANCE.md`](../PROVENANCE.md) 为准；当前行为仍以目标分支源码、测试和中文合同为准。
+这是一份 2026-09-12 Direct Ubuntu 审计快照，不是持续同步政策。审计改动已提交为 `53dada42`，经 `422cc29f` 合入 `main` 并推送 origin；下文“本轮工作树”指当时的审计对象，不表示现在仍有未提交改动。文件数、上游 SHA 和设备结果保留原始采样范围，不冒充最新上游或合并后的全功能验收。法律来源见 [`../PROVENANCE.md`](../PROVENANCE.md)，当前行为以 `main` 源码、测试和中文合同为准。
 
 ## 快照范围
 
@@ -10,7 +10,7 @@
 |---|---|
 | 分支 | `refactor/direct-ubuntu-runtime` |
 | 分支基线 HEAD | `b89f117989e77188194c332da4c5a539b1a1f519` |
-| 同仓库 `origin/main` | `6f9b12149f8af676c5eb576170c0b636d64cc2f` |
+| 审计开始时的同仓库 `origin/main` | `6f9b12149f8af676c5eb576170c0b636d64cc2f` |
 | 与 `origin/main` 的合并基点 | `36941d17440267e88358e3102f28cb41bfdab0d4` |
 | 外部上游 main 快照 | `4ef29002e88db1e20e462ec2ff46916e8a7dcb45` |
 | 外部上游快照日期 | 2026-09-02 |
@@ -76,7 +76,7 @@ Direct Root 禁止把 PRoot/native broker 重新放回生产路径，因此当�
 
 真机上 `command -v` 均返回 `/usr/local/bin/<命令>`；`android-device --help`、`android-device info` 和 `minis-config --help` 已获得实际输出。无障碍和 Shizuku 命令本轮只做帮助/版本等无副作用检查，未把未授权状态伪装成通过。这个补齐没有放宽 Root 权限，也不恢复 PRoot、Alpine 或旧 broker。
 
-上游另外存在一个 Python 版 `minis-mcp-cli` 资产，它依赖上游已经退出的脚本和 Python transport；当前分支的 MCP client/server 已由 Android 原生实现承载，本次没有把那套会 `apk add`/自安装依赖的旧资产直接复制进 Direct Ubuntu rootfs。若后续要求在 Guest shell 中提供同名 MCP CLI，需要单独按当前 App-owned MCP 权限和生命周期合同实现，不能直接搬运上游脚本。
+上游 Python `minis-mcp-cli` 尚未恢复到 Direct Ubuntu Guest，这是明确的用户命令缺口，不是已被 Android 原生 MCP client/server 等价替代。旧 launcher 的 `apk add`/pip 自安装步骤需要适配 Ubuntu，但 Python 客户端本身不天然依赖旧 PRoot。当前 `MCPRepository.mcpPromptFragment()` 仍提示调用不存在的 CLI；后续需补齐安装、配置、权限、生命周期和回归测试，不能将整个能力归为无价值残留。
 
 ### 自定义能力
 
@@ -105,7 +105,7 @@ Direct Root 禁止把 PRoot/native broker 重新放回生产路径，因此当�
 
 同仓库 `origin/main` 已经包含一轮共享行为对齐，例如命令结果形状、shell 创建锁、shell 执行策略、Terminal 环境/输入、文件读写语义、agent tool 暴露和多项 Root/proxy 失败清理。当前目标分支 HEAD 相对该合并基点新增的已提交提交，均集中在 Direct Runtime、Root、proxy、文件边界、取消传播和遗留路径清理；本轮工作树额外回移的共享修复单独列在下面，不能被误读为 Direct Root 的权限扩张或 UI 重写。
 
-当前工作树还保留了本轮为文件安全、Guest identity、MiMo 语音路由和 runtime lifecycle 增加的未提交测试/实现。它们必须继续经过全量 JVM test、Debug 构建和真实设备证据检查，不能仅凭文件树相同判定完成。
+本轮为文件安全、Guest identity、MiMo 语音路由和 runtime lifecycle 增加的测试/实现已随 `53dada42` 提交并合入 `main`。合并后的 JVM test 与 Debug 构建通过；完整真机矩阵仍未完成，不能仅凭文件树相同判定功能等价。
 
 ### 本轮工作树差异的逐项归因
 
@@ -180,7 +180,9 @@ diff -rq "$AUDIT_TREE/src/android/app/src" src/android/app/src
 
 对账时不要使用工作树外的设备数据替代源码证据。`adb install -r` 会保留 App 私有数据，`/data/adb/minis/rootfs` 是 Root-owned runtime state；当前小米机还并存旧包 `com.openminis.app` 和新包 `llc.slacker.minis`，两者的数据目录与进程不能混为一谈。设备上残留的旧进程或旧数据应单独按设备清理范围处理，不能据此把旧 runtime 重新写回生产代码。
 
-## 当前验收证据
+## 审计期间验收证据
+
+以下检查来自审计的不同阶段；较早的 R8 通过不等于最后一次 CLI 改动后的完整 Release 验证。测试对象和未执行范围以[实测报告](REAL-DEVICE-TEST-REPORT.md)为准。
 
 - `./gradlew test --no-daemon`：通过；
 - `./gradlew assembleDebug --no-daemon`：通过；

@@ -36,7 +36,7 @@
 
 - [ ] 无密钥 / token / 签名材料进仓库或未脱敏日志
 - [ ] 未新增模型/Agent/MCP 可控的 `su -c` / `DirectRootRunner` 通道
-- [ ] `root.shell` 等通用 Root 执行面未被重新开放
+- [ ] `root.shell` 仍为结构化 basename + argv、本地专用且 MCP 不可见，未扩展成原始 shell 字符串或通用 Root RPC
 - [ ] Guest 仍以真实 App UID/GID 运行并清空 supplementary groups/capabilities
 - [ ] 网络 helper 仍固定 loopback 且无命令/文件/插件/通用 RPC 面
 - [ ] 路径 / 输出 / payload 校验仍然 fail-closed

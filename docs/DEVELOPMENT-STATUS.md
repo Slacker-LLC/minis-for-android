@@ -1,11 +1,11 @@
 # 开发状态
 
-> 本文记录 `refactor/direct-ubuntu-runtime` 当前状态。PR #235 已于 2026-09-10 合入 `main`；本分支的源码和测试仍是本分支实现的最终依据，真机行为单独记录，不用 CI 结果替代。
+> 更新：2026-09-12。Direct Ubuntu 审计提交 `53dada42` 已通过合并提交 `422cc29f` 进入 `main` 并推送 origin。本文以该源码基线为准；真机记录保留各自测试范围，不用合并后的宿主构建替代设备验收。
 
 ## 项目状态
 
 - 仓库：`Slacker-LLC/minis-for-android`
-- 参考分支：`refactor/direct-ubuntu-runtime`
+- 参考分支：`main`（Direct Ubuntu 已合入）
 - PR #235：2026-09-10 已合入 `main`
 - 平台：已 Root 的 Android 设备
 - Linux runtime：Android App 自有协调 + Ubuntu 24.04 Direct chroot
@@ -37,7 +37,7 @@ Ubuntu 24.04 userspace
 
 上游的 `android-*` / `minis-*` 命令在 PRoot 路径中由 `/usr/local/bin` stub 触发 `native_offload`；当前 Direct Root 不恢复这套机制。现役实现由 `GuestCommandBridge` 在 Ubuntu 启动/恢复时按 `NativeOffloadServer` 的注册表生成带 token 鉴权的 loopback wrapper，所以命令入口和 Android handler 都存在，但 Root 权限边界没有扩大。
 
-小米 `24129PN74C` 真机已经验证命令入口和代表性实际调用：全部 Android/Minis handler 命令可由 `command -v` 找到，`android-device info` 返回设备 JSON，多个 `--help`/`--version` 正常返回。完整清单与限制见 [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md)。上游另有 Python `minis-mcp-cli` 资产，因依赖旧 PRoot/Alpine 自安装流程，尚未直接移植到当前 Guest；这不影响当前 Android 原生 MCP client/server 路径。
+小米 `24129PN74C` 真机已经验证命令入口和代表性实际调用：全部已注册 Android/Minis handler 命令可由 `command -v` 找到，`android-device info` 返回设备 JSON，多个 `--help`/`--version` 正常返回。完整清单与限制见 [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md)。**Guest 的 `minis-mcp-cli` 仍缺失**，Android 原生 MCP client/server 不能替代这个 shell 命令。`MCPRepository.mcpPromptFragment()` 仍提示调用它，属于尚未闭合的命令/提示词不一致；详见[当前缺口](contracts/06-CURRENT-GAPS.md)。
 
 ## 存储
 
@@ -68,7 +68,7 @@ PR #235 合入前，Direct Ubuntu 迁移已经通过既有 CI，包括 rootfs/pa
 
 该设备的 HyperOS 拒绝安装 instrumentation APK，因此真机手测不能替代 instrumentation 执行证据。
 
-本次合并之后在 `refactor/direct-ubuntu-runtime` 上产生的文档和工作树改动，在再次合入 `main` 前都只能视为本分支改动。
+合并提交 `422cc29f` 的宿主 JVM 测试与 `assembleDebug` 已通过。合并后的 APK 没有额外完成一轮全功能真机验收；下列设备缺口不因合并而自动关闭。
 
 ## 仍需补齐的验证边界
 

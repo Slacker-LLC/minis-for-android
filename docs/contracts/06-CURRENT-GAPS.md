@@ -1,6 +1,6 @@
 # 06 — 当前已确认缺口
 
-> 基线更新：2026-09-10，`refactor/direct-ubuntu-runtime`（PR #235 已合并到 `main`）。本文件只维护重新核验后的当前状态。更早的 broker/PRoot/旧 storage 审计结论保留在 Git 历史、`docs/issue-*.md` 与 `docs/archive/`，不再混入当前缺口正文。
+> 基线更新：2026-09-12，`main` 合并提交 `422cc29f`（包含审计提交 `53dada42`）。本文件区分已确认实现缺口、未验证设备行为与历史 Issue 快照；旧 broker/PRoot/storage 结论不作为现役实现依据。
 
 ## 已完成的 Direct Ubuntu 迁移边界
 
@@ -38,7 +38,9 @@ HTTP/DNS 检查仍可用受控的 `curl`。
 
 小米 `24129PN74C` 真机已验证这些命令的 PATH 入口：`android-alarm`、`android-calendar`、`android-clipboard`、`android-contacts`、`android-device`、`android-location`、`android-notification`、`android-open`、`android-photos`、`android-player`、`android-speak`、`android-speech`、`android-weather`、`android-a11y-cli`、`android-shizuku-cli`、`minis-browser-use`、`minis-scheduled`、`minis-sessions-cli`、`minis-config`、`minis-model-use`、`minis-open` 及其浏览器别名；Debug APK 另有 `minis-debug`。`android-device info` 和多个 `--help`/`--version` 调用已获得实际输出。
 
-上游另有 Python 版 `minis-mcp-cli` 资产；它依赖旧 PRoot/Alpine 脚本的自安装 transport。当前分支的 MCP client/server 由 Android 原生实现承载，因此这套 Python 命令未直接复制到 Direct Ubuntu rootfs；若产品要求在 Guest shell 中保留同名命令，仍需单独按当前 MCP 权限、配置和生命周期合同实现。
+**仍未补齐：`minis-mcp-cli`。** 上游 Python 命令随旧资产树删除后，当前 Guest 没有同名入口；Android 原生 MCP client/server 不是 CLI 的等价替代。`MCPRepository.mcpPromptFragment()` 仍引导模型运行 `minis-mcp-cli tools/call`，实际会遇到命令不存在。
+
+旧 launcher 的 `apk add`/pip 自安装逻辑需要适配 Ubuntu，但 Python MCP 客户端并不天然依赖旧 PRoot。后续应补齐显式安装、依赖、App-owned 配置、权限与进程生命周期，再测试 `tools/list`、调用、配置重载和退出清理；不能把缺失的用户能力归为“旧架构所以不用保留”。本次文档整理只如实记录，不声称已经修复。
 
 ## 本轮基线复核（2026-09-12）
 
@@ -76,39 +78,9 @@ CI/宿主测试不能替代以下证据：
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
-## 当前开放问题
+## 历史队列
 
-GitHub Issue 是独立工作队列，不等于每条描述都仍与当前 Direct Ubuntu 源码一致。2026-09-10 仍 open 的主要项包括：
-
-### 安全 / 数据完整性
-
-- #230 OAuth 回调与 token 响应日志泄露风险；
-- #231 备份恢复读取端缺少资源上限；
-- #232 加密备份允许未认证的额外 payload；
-- #233 旧闹钟迁移 idempotency 问题。
-
-### Android / Chat / 文件 / 终端
-
-- #229 进程恢复时文件浏览/预览 Holder 丢失；
-- #184 消息删除 DB-first 一致性；
-- #185 SOUL.md 默认写入与读取失败区分；
-- #186 PTY UID/GID 与 session workspace；
-- #187 文件链接 staging 主线程 I/O；
-- #188 粘贴内容提交前消费；
-- #189 PTY child reap/zombie；
-- #190 VPN 下 Ubuntu DNS/网络切换；
-- #183 `minis://` 双编码与 `+` 解码；
-- #182 Release VAD JNI/R8 兼容。
-
-### UI / 维护性
-
-- #192 Root 权限模式页面导航入口；
-- #216 ProviderRepository 同步 `runBlocking` 持久化；
-- #217 ChatViewModel 职责拆分；
-- #218 ChatScreen / StreamingMarkdownText 拆分；
-- #223 rclone AAR 构建前 16 KiB/ABI 校验建议。
-
-其中部分 Issue 的正文仍引用旧 runtime/broker 术语，或描述的是早于 PR #235 的代码。处理前必须先对最终当前源码重新审计；如果问题已被后续提交解决，应关闭/更新 Issue，而不是照旧正文重复实现。
+旧 Issue 编号和 2026-09-10 的状态快照移至[历史记录](../archive/RUNTIME-HISTORY.md)，不再混入当前缺口。是否仍开放、是否已修复，处理前查源码和远端状态。
 
 ## 文档已知非缺口
 
@@ -117,7 +89,7 @@ GitHub Issue 是独立工作队列，不等于每条描述都仍与当前 Direct
 - `docs/archive/**`；
 - `docs/issue-*.md` 中明确标记的历史实现记录；
 - regression guard / negative test 中用于阻止旧实现回归的字符串；
-- Git 历史与历史 patch snapshots。
+- Git 历史中的旧计划与 patch snapshots（不再随当前文档树保存副本）。
 
 这些不是生产依赖。
 

@@ -1,4 +1,6 @@
-# Android runtime package boundary
+# Android Runtime 包职责边界
+
+中文摘要：`runtime/` 持有执行协调、路径、Ubuntu、Guest bridge 与终端策略；旧 `sandbox/` 仅保留白名单兼容文件，不能按名字误删仍被调用的 `RootfsManager` 或 `TerminalSession`。路径由 `UbuntuPaths` / `RuntimePathRegistry` 统一，文件访问复用 `WorkspaceFileClient`，外部挂载通过 `UbuntuRuntime.reconcileExternalMounts()` / `UbuntuKernel` 和路径注册表协调；旧 `ExternalMountCoordinator` 已不在生产树。下表保留精确包名供源码定位；守卫只证明包边界，不代替设备验收。
 
 This document describes active package ownership after the Direct Ubuntu refactor. Final branch source and `scripts/check-runtime-package-boundary.sh` are authoritative.
 

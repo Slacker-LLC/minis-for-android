@@ -1,6 +1,6 @@
 # Android `minis://` URL Scheme
 
-**Status:** current Android implementation on `refactor/direct-ubuntu-runtime`.
+**状态：** Direct Ubuntu 已合入 `main`（2026-09-12，`422cc29f`）；具体路由以当前源码和路径测试为准。
 
 Source of truth: `ChatLinkResolver`, `DeepLinkHandler`, `RuntimePathRegistry`, `runtime.ubuntu.UbuntuPaths`, and `runtime.files.WorkspaceFileClient`.
 

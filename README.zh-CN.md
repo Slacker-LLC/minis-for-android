@@ -62,6 +62,10 @@ Ubuntu 24.04 userspace
 
 ## 构建与文档
 
+Direct Ubuntu 审计改动已于 2026-09-12 合入 `main`（源码合并基线 `422cc29f`）。入口：[文档索引](docs/README.md)、[开发状态](docs/DEVELOPMENT-STATUS.md)、[真机实测报告](docs/REAL-DEVICE-TEST-REPORT.md)、[上游对账](docs/UPSTREAM-COMPARISON.md)。
+
+基础包和 Android Guest 命令见[执行环境](docs/EXECUTION-ENVIRONMENT.md)。`minis-mcp-cli` 仍缺失，完整真机功能矩阵也未完成；[当前缺口](docs/contracts/06-CURRENT-GAPS.md)明确区分这些项目与已经通过的检查。
+
 源码分发，不承诺生产 APK / GitHub Release。构建见 [BUILDING.zh-CN.md](BUILDING.zh-CN.md) / [BUILDING.md](BUILDING.md)。运行时见 [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md)，安全边界见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## 许可证
