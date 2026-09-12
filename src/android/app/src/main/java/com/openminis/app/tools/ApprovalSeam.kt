@@ -88,13 +88,16 @@ object ApprovalSeam {
                 else -> ApprovalDecision("cancelled", null)
             }
         } finally {
-            pending.remove(req.id)
+            pending.remove(req.id, req)
         }
     }
 
     /** Answer a pending request (from phone UI / Web Remote RPC). */
     fun answer(approvalId: String, allowed: Boolean): Boolean {
         val req = pending[approvalId] ?: return false
+        // Remove before completing so a concurrent UI poll cannot render the
+        // same ticket again while the suspended executor is resuming.
+        if (!pending.remove(approvalId, req)) return false
         val decided = req.deferred.complete(allowed)
         if (decided) {
             Log.i(TAG, "approval/decided id=${approvalId.take(8)} allowed=$allowed")
@@ -110,8 +113,9 @@ object ApprovalSeam {
     /** Cancel all pending approvals for a session (run cancelled). */
     fun cancelForSession(sessionId: String) {
         pending.values.filter { it.sessionId == sessionId }.forEach { req ->
-            req.deferred.complete(false)
-            pending.remove(req.id)
+            if (pending.remove(req.id, req)) {
+                req.deferred.complete(false)
+            }
         }
     }
 }

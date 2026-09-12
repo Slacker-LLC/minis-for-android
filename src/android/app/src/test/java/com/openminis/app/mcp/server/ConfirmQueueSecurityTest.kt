@@ -1,16 +1,16 @@
 package com.openminis.app.mcp.server
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Attack cases for the CONFIRM gate (T-android-mcp-server 07 §6): forged
  * ids, replays, and cross-tool theft attempts must never execute.
  *
- * Note: the API has no per-caller/owner dimension — issue/consume/approve/
- * reject bind only (id, method) — so "steal another caller's confirm" cannot
- * be modeled against this API. The closest guard is the method binding
- * asserted here (WRONG_METHOD): a valid id can't be spent on another tool.
+ * A ticket is bound to the authenticated caller and complete request digest in
+ * addition to the method. This prevents a leaked id from being replayed by
+ * another MCP token or with changed arguments.
  */
 class ConfirmQueueSecurityTest {
 
@@ -65,6 +65,50 @@ class ConfirmQueueSecurityTest {
         assertEquals(ConfirmQueue.Result.WRONG_METHOD, q.reject(id, "pet.play", now = t0 + 1))
         // the real owner can still use it exactly once
         assertEquals(ConfirmQueue.Result.OK, q.consume(id, "pet.feed", now = t0 + 1))
+    }
+
+    @Test
+    fun `a confirm is bound to caller and complete request`() {
+        val q = queueAt()
+        val id = q.issue(
+            method = "android.deploy",
+            summary = "install",
+            caller = "mcp:owner",
+            requestKey = "request-a",
+        )!!
+        q.approve(id, "android.deploy", now = t0 + 1)
+
+        assertEquals(
+            ConfirmQueue.Result.WRONG_CALLER,
+            q.consume(id, "android.deploy", now = t0 + 1, caller = "mcp:other", requestKey = "request-a"),
+        )
+        assertEquals(
+            ConfirmQueue.Result.WRONG_REQUEST,
+            q.consume(id, "android.deploy", now = t0 + 1, caller = "mcp:owner", requestKey = "request-b"),
+        )
+        assertEquals(
+            ConfirmQueue.Result.OK,
+            q.consume(id, "android.deploy", now = t0 + 1, caller = "mcp:owner", requestKey = "request-a"),
+        )
+    }
+
+    @Test
+    fun `request key is independent of JSON object insertion order`() {
+        val first = org.json.JSONObject().put("action", "install").put("artifactPath", "/tmp/a.apk")
+        val second = org.json.JSONObject().put("artifactPath", "/tmp/a.apk").put("action", "install")
+
+        assertEquals(
+            ConfirmQueue.requestKey("mcp:t1", "android.deploy", first),
+            ConfirmQueue.requestKey("mcp:t1", "android.deploy", second),
+        )
+        assertTrue(
+            ConfirmQueue.requestKey("mcp:t1", "android.deploy", first) !=
+                ConfirmQueue.requestKey(
+                    "mcp:t1",
+                    "android.deploy",
+                    org.json.JSONObject().put("action", "launch").put("artifactPath", "/tmp/a.apk"),
+                ),
+        )
     }
 
     @Test

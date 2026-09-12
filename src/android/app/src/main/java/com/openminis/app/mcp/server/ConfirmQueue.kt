@@ -1,5 +1,9 @@
 package com.openminis.app.mcp.server
 
+import org.json.JSONArray
+import org.json.JSONObject
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -19,7 +23,9 @@ class ConfirmQueue(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
-    enum class Result { OK, PENDING, REJECTED, EXPIRED, WRONG_METHOD, UNKNOWN, REUSED }
+    enum class Result {
+        OK, PENDING, REJECTED, EXPIRED, WRONG_METHOD, WRONG_CALLER, WRONG_REQUEST, UNKNOWN, REUSED,
+    }
 
     data class Pending(
         val id: String,
@@ -27,6 +33,10 @@ class ConfirmQueue(
         val summary: String,
         val expiresAt: Long,
         val approved: Boolean = false,
+        /** Stable MCP caller identity; never the bearer secret itself. */
+        val caller: String = "",
+        /** Digest of the complete canonical method + arguments request. */
+        val requestKey: String = "",
     )
 
     private val pending = LinkedHashMap<String, Pending>()
@@ -40,13 +50,25 @@ class ConfirmQueue(
      * full (capacity exhausted, including not-yet-swept expired entries).
      */
     @Synchronized
-    fun issue(method: String, summary: String): String? {
+    fun issue(
+        method: String,
+        summary: String,
+        caller: String = "",
+        requestKey: String = "",
+    ): String? {
         // A3: evict expired entries first so unanswered confirms cannot
         // permanently exhaust capacity.
         sweep(now = clock())
         if (pending.size >= capacity) return null
         val id = "c-" + UUID.randomUUID().toString()
-        pending[id] = Pending(id, method, summary, clock() + ttlMillis)
+        pending[id] = Pending(
+            id = id,
+            method = method,
+            summary = summary,
+            expiresAt = clock() + ttlMillis,
+            caller = caller,
+            requestKey = requestKey,
+        )
         return id
     }
 
@@ -57,11 +79,19 @@ class ConfirmQueue(
      * user approves (or gives up on a reject, which reads REJECTED).
      */
     @Synchronized
-    fun consume(id: String, method: String, now: Long = System.currentTimeMillis()): Result {
+    fun consume(
+        id: String,
+        method: String,
+        now: Long = System.currentTimeMillis(),
+        caller: String = "",
+        requestKey: String = "",
+    ): Result {
         if (id in rejected) return Result.REJECTED
         if (id in used) return Result.REUSED
         val entry = pending[id] ?: return Result.UNKNOWN
         if (entry.method != method) return Result.WRONG_METHOD
+        if (entry.caller.isNotEmpty() && entry.caller != caller) return Result.WRONG_CALLER
+        if (entry.requestKey.isNotEmpty() && entry.requestKey != requestKey) return Result.WRONG_REQUEST
         if (now > entry.expiresAt) {
             pending.remove(id)
             used[id] = entry.expiresAt
@@ -128,6 +158,43 @@ class ConfirmQueue(
          */
         @Volatile
         var shared: ConfirmQueue? = null
+
+        /**
+         * Binds a ticket to the authenticated MCP caller, method, and every
+         * argument. The bearer secret itself is never stored or logged.
+         */
+        fun requestKey(caller: String, method: String, params: JSONObject): String {
+            val canonical = canonicalJson(params)
+            val input = "$caller\u0000$method\u0000$canonical"
+                .toByteArray(StandardCharsets.UTF_8)
+            val digest = MessageDigest.getInstance("SHA-256").digest(input)
+            val hex = "0123456789abcdef"
+            return buildString(digest.size * 2) {
+                digest.forEach { byte ->
+                    val value = byte.toInt() and 0xff
+                    append(hex[value ushr 4])
+                    append(hex[value and 0x0f])
+                }
+            }
+        }
+
+        /** Deterministic JSON encoding so object key order cannot alter a ticket. */
+        private fun canonicalJson(value: Any?): String = when (value) {
+            null, JSONObject.NULL -> "null"
+            is JSONObject -> {
+                val keys = mutableListOf<String>()
+                value.keys().forEach { keys += it }
+                keys.sort()
+                keys.joinToString(prefix = "{", postfix = "}") { key ->
+                    JSONObject.quote(key) + ":" + canonicalJson(value.opt(key))
+                }
+            }
+            is JSONArray -> (0 until value.length())
+                .joinToString(prefix = "[", postfix = "]") { index -> canonicalJson(value.opt(index)) }
+            is String -> JSONObject.quote(value)
+            is Number, is Boolean -> value.toString()
+            else -> JSONObject.quote(value.toString())
+        }
     }
 
     init {

@@ -40,6 +40,10 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         private const val CODE_CONFIRM_REJECTED = -32002
         private const val CODE_CONFIRM_QUEUE_FULL = -32003
 
+        private val SENSITIVE_ARGUMENT_KEY = Regex(
+            "(?i)^(token|password|passwd|secret|authorization|api[_-]?key|private[_-]?key)$",
+        )
+
         /** A4: connection cap — local slowloris must not exhaust the accept loop. */
         const val MAX_CONNECTIONS = 16
 
@@ -267,14 +271,26 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
         if (com.openminis.app.tools.runtime.ToolPermissionManager.needsConfirm(canonicalName, caller)) {
             val confirmId = params.optString("confirm_id")
             if (confirmId.isEmpty()) {
-                val id = confirmQueue.issue(canonicalName, canonicalName)
+                val requestKey = ConfirmQueue.requestKey(caller, canonicalName, arguments)
+                val id = confirmQueue.issue(
+                    method = canonicalName,
+                    summary = confirmationSummary(arguments),
+                    caller = caller,
+                    requestKey = requestKey,
+                )
                 if (id == null) {
                     return errorWithData(req.id, CODE_CONFIRM_QUEUE_FULL, "confirm_queue_full", JSONObject())
                 }
-                Log.i(TAG, "confirm required for $canonicalName (confirm_id=$id)")
+                Log.i(TAG, "confirm required for $canonicalName (confirm_id=$id, request_bound=true)")
                 // context is null in unit-test paths: log only, no notification.
                 context?.let {
-                    McpConfirmNotifier.show(it, canonicalName, canonicalName, id, ConfirmQueue.DEFAULT_TTL_MILLIS)
+                    McpConfirmNotifier.show(
+                        it,
+                        canonicalName,
+                        confirmationSummary(arguments),
+                        id,
+                        ConfirmQueue.DEFAULT_TTL_MILLIS,
+                    )
                 }
                 return errorWithData(
                     req.id, CODE_CONFIRM_REQUIRED, "confirm_required",
@@ -283,7 +299,12 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                         .put("expires_in_ms", ConfirmQueue.DEFAULT_TTL_MILLIS),
                 )
             }
-            val consume = confirmQueue.consume(confirmId, canonicalName)
+            val consume = confirmQueue.consume(
+                id = confirmId,
+                method = canonicalName,
+                caller = caller,
+                requestKey = ConfirmQueue.requestKey(caller, canonicalName, arguments),
+            )
             if (consume != ConfirmQueue.Result.OK) {
                 return errorWithData(
                     req.id, CODE_CONFIRM_REJECTED, "confirm_rejected",
@@ -329,6 +350,31 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                 JSONObject().put("code", code).put("message", message).put("data", data),
             )
             .toString()
+
+    /** Keep confirmation reviewable without putting bearer-like values in a notification. */
+    private fun confirmationSummary(arguments: JSONObject): String =
+        "参数=" + redactJson(arguments).take(800)
+
+    private fun redactJson(value: Any?): String = when (value) {
+        null, JSONObject.NULL -> "null"
+        is JSONObject -> {
+            val keys = mutableListOf<String>()
+            value.keys().forEach { keys += it }
+            keys.sort()
+            keys.joinToString(prefix = "{", postfix = "}") { key ->
+                JSONObject.quote(key) + ":" + if (SENSITIVE_ARGUMENT_KEY.matches(key)) {
+                    JSONObject.quote("<redacted>")
+                } else {
+                    redactJson(value.opt(key))
+                }
+            }
+        }
+        is JSONArray -> (0 until value.length())
+            .joinToString(prefix = "[", postfix = "]") { index -> redactJson(value.opt(index)) }
+        is String -> JSONObject.quote(value)
+        is Number, is Boolean -> value.toString()
+        else -> JSONObject.quote(value.toString())
+    }
 
     private fun sendHttp(output: OutputStream, code: Int, body: String) {
         BoundedHttp.writeResponse(output, code, body)

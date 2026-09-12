@@ -162,6 +162,11 @@ class MCPServerTest {
         // the server's queue via ConfirmQueue.shared.
         assertEquals(ConfirmQueue.Result.OK, ConfirmQueue.shared!!.approve(confirmId, "android.app.force_stop"))
 
+        // The approved ticket cannot be moved to a different argument set.
+        val changedArgsBody = """{"jsonrpc":"2.0","id":111,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{"packageName":"com.example.other"},"confirm_id":"$confirmId"}}"""
+        val changedArgs = org.json.JSONObject(post(changedArgsBody, token = "secret-token").body!!.string())
+        assertEquals("wrong_request", changedArgs.getJSONObject("error").getJSONObject("data").getString("reason"))
+
         // consume OK → enters the execution path (result frame, no confirm_required)
         val execBody = """{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"android.app.force_stop","arguments":{},"confirm_id":"$confirmId"}}"""
         val execText = post(execBody, token = "secret-token").body!!.string()

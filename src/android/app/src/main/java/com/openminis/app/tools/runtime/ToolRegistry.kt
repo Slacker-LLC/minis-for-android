@@ -94,7 +94,25 @@ object ToolExecutor {
             return ToolExecutionResult("Error: permission_denied: $canonical", false)
         }
         if (ToolPermissionManager.needsConfirm(canonical, caller) && !confirmBypassed) {
-            return ToolExecutionResult("Error: confirm_required: $canonical", false)
+            // MCP callers must arrive here only after MCPServer consumed its
+            // caller+method+arguments-bound ticket. Local Agent calls use the
+            // existing in-app approval seam instead of retrying forever with a
+            // confirm_required result that has no ticket to approve.
+            if (caller != ToolPermissionManager.CALLER_LOCAL) {
+                return ToolExecutionResult("Error: confirm_required: $canonical", false)
+            }
+            val decision = com.openminis.app.tools.ApprovalSeam.request(
+                context = context,
+                sessionId = sessionId,
+                toolName = canonical,
+                summary = "参数=${argsJson.take(800)}",
+            )
+            if (decision.decision != "allowed-once") {
+                return ToolExecutionResult(
+                    "Error: approval_${decision.decision}: $canonical",
+                    false,
+                )
+            }
         }
         val handler = ToolRegistry.handler(canonical)
             ?: return ToolExecutionResult("Error: no handler for $canonical", false)
