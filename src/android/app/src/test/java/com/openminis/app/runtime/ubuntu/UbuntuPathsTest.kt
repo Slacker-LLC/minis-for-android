@@ -1,5 +1,6 @@
 package com.openminis.app.runtime.ubuntu
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeNoException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +27,28 @@ class UbuntuPathsTest {
             "/data/adb/minis/memory/notes.md",
             UbuntuPaths.resolveGuest("/memory/notes.md")!!.androidPath(),
         )
+    }
+
+    @Test
+    fun `sessionless terminal offloads resolve to the global guest backing`() = runBlocking {
+        val filesDir = Files.createTempDirectory("minis-terminal-offloads").toFile()
+        try {
+            UbuntuPaths.useLayoutForTest(filesDir)
+            assertEquals(
+                File(filesDir, "workspace/offloads/photo.jpg").path.replace('\\', '/'),
+                UbuntuPaths.resolveSecureForFileAccess(null, "/var/minis/offloads/photo.jpg")!!
+                    .let { File(it.root, it.components.joinToString(File.separator)).path.replace('\\', '/') },
+            )
+            val sessionPath = UbuntuPaths.resolveSessionPath(
+                File(filesDir, "sessions"),
+                "chat-a",
+                "/var/minis/offloads/photo.jpg",
+            )!!
+            assertTrue(sessionPath.path.contains("sessions${File.separator}chat-a${File.separator}offloads"))
+        } finally {
+            UbuntuPaths.resetLayoutForTest()
+            filesDir.deleteRecursively()
+        }
     }
 
     @Test

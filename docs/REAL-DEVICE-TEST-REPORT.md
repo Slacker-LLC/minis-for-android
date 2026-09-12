@@ -78,6 +78,10 @@ MiMo 凭据只在应用界面配置，未写入源码、测试夹具、日志或
 
 上述结果证明当前 APK 的 Guest shell 基本启动、UID/GID、workspace 文件 I/O、关闭回收和单 shell 异常退出路径在这台小米机上可用；不等于 Root 授权、VPN/BPF 或全部 OEM 生命周期矩阵已经完成。
 
+### 本报告后的源码回归（待重连小米机）
+
+DNS 失败时现在会用同一个服务器再试 TCP；图片导出现在直接写入 Terminal 能看到的 `/var/minis/offloads/...`。代码和单测已通过，但这两项还没在小米机上重测。HTTPS 测 IP 时保留域名，不关闭证书检查。
+
 ### Guest CLI / Android 工具命令面
 
 旧 APK 的问题不是 Android handler 不存在，而是 Direct Ubuntu 的 `/usr/local/bin` 没有对应入口；因此终端里只能看到 `minis-config` 和 `minis-model-use`，文档中声明的其它 CLI 无法被 shell 找到。当前 APK 已通过 `GuestCommandBridge` 在启动/恢复 Ubuntu 时安装动态 PATH wrapper，并修复了 wrapper 与 App bridge 之间换行协议被写成字面量 `\\n` 的问题。

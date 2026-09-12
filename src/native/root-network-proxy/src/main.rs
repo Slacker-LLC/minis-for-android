@@ -12,6 +12,8 @@ const MAX_HEADER_BYTES: usize = 16 * 1024;
 const MAX_CONCURRENT: usize = 64;
 const AUTH_REQUIRED: &str = "proxy authentication required";
 const PROXY_USER: &str = "minis";
+const DNS_TIMEOUT: Duration = Duration::from_secs(3);
+const MAX_DNS_TCP_RESPONSE_BYTES: usize = 4096;
 const FALLBACK_DNS: &[&str] = &[
     "223.5.5.5",
     "114.114.114.114",
@@ -454,6 +456,15 @@ fn next_dns_query_id() -> u16 {
 
 fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
     let transaction_id = next_dns_query_id();
+    let query = build_dns_query(host, transaction_id)?;
+    match dns_query_a_udp(&query, server, transaction_id) {
+        Ok(ip) => Ok(ip),
+        Err(udp_error) => dns_query_a_tcp(&query, server, transaction_id)
+            .map_err(|tcp_error| format!("udp: {udp_error}; tcp: {tcp_error}")),
+    }
+}
+
+fn build_dns_query(host: &str, transaction_id: u16) -> Result<Vec<u8>, String> {
     let mut query = Vec::new();
     query.extend_from_slice(&transaction_id.to_be_bytes());
     query.extend_from_slice(&[0x01, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
@@ -466,15 +477,50 @@ fn dns_query_a(host: &str, server: &str) -> Result<Ipv4Addr, String> {
     }
     query.push(0);
     query.extend_from_slice(&[0, 1, 0, 1]);
+    Ok(query)
+}
+
+fn dns_query_a_udp(query: &[u8], server: &str, transaction_id: u16) -> Result<Ipv4Addr, String> {
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
     socket
-        .set_read_timeout(Some(Duration::from_secs(3)))
+        .set_read_timeout(Some(DNS_TIMEOUT))
         .map_err(|e| e.to_string())?;
     socket.connect(server).map_err(|e| e.to_string())?;
-    socket.send(&query).map_err(|e| e.to_string())?;
+    socket.send(query).map_err(|e| e.to_string())?;
     let mut buf = [0u8; 512];
     let size = socket.recv(&mut buf).map_err(|e| e.to_string())?;
     parse_dns_a(&buf[..size], transaction_id)
+}
+
+/// Some VPNs and restrictive networks drop UDP/53 while allowing ordinary TCP.
+/// Preserve the same configured resolver and validation; this is a transport
+/// fallback, never a bypass to an arbitrary DNS endpoint.
+fn dns_query_a_tcp(query: &[u8], server: &str, transaction_id: u16) -> Result<Ipv4Addr, String> {
+    let address: SocketAddr = server.parse().map_err(|e| format!("bad dns server: {e}"))?;
+    let mut stream =
+        TcpStream::connect_timeout(&address, DNS_TIMEOUT).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(DNS_TIMEOUT))
+        .map_err(|e| e.to_string())?;
+    stream
+        .set_write_timeout(Some(DNS_TIMEOUT))
+        .map_err(|e| e.to_string())?;
+    let length = u16::try_from(query.len()).map_err(|_| "dns query too large")?;
+    stream
+        .write_all(&length.to_be_bytes())
+        .map_err(|e| e.to_string())?;
+    stream.write_all(query).map_err(|e| e.to_string())?;
+    let mut size = [0u8; 2];
+    stream.read_exact(&mut size).map_err(|e| e.to_string())?;
+    let size = u16::from_be_bytes(size) as usize;
+    if size == 0 || size > MAX_DNS_TCP_RESPONSE_BYTES {
+        return Err(format!("invalid dns tcp response size {size}"));
+    }
+    let mut response = vec![0u8; size];
+    stream
+        .read_exact(&mut response)
+        .map_err(|e| e.to_string())?;
+    parse_dns_a(&response, transaction_id)
 }
 
 fn skip_dns_name(msg: &[u8], index: &mut usize) -> Result<(), String> {
@@ -724,6 +770,34 @@ mod tests {
 
         let wrong_class = dns_response(0x1234, 0x8180, 3);
         assert!(parse_dns_a(&wrong_class, 0x1234).is_err());
+    }
+
+    #[test]
+    fn dns_tcp_fallback_uses_the_same_query_and_validates_the_response() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut length = [0u8; 2];
+            stream.read_exact(&mut length).unwrap();
+            let mut query = vec![0u8; u16::from_be_bytes(length) as usize];
+            stream.read_exact(&mut query).unwrap();
+            let id = u16::from_be_bytes([query[0], query[1]]);
+            let response = dns_response(id, 0x8180, 1);
+            stream
+                .write_all(&(response.len() as u16).to_be_bytes())
+                .unwrap();
+            stream.write_all(&response).unwrap();
+        });
+        let query = build_dns_query("example.com", 0x1234).unwrap();
+        assert_eq!(
+            dns_query_a_tcp(&query, &address.to_string(), 0x1234).unwrap(),
+            Ipv4Addr::new(8, 8, 8, 8),
+        );
+        server.join().unwrap();
     }
 
     #[test]

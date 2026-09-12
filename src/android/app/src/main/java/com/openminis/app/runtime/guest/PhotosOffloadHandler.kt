@@ -473,9 +473,11 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
      * way `ModelUseOffloadHandler.sessionScopedHostFile` already does it.
      *
      * `sessionId` is null for offloads launched outside a chat (interactive
-     * terminal). There is no session offloads dir to write into then, so we
-     * keep the app-private fallback — but say plainly in the response that
-     * the file is NOT reachable from Linux, instead of implying it is.
+     * terminal). In that case [WorkspaceFileClient] resolves the same guest
+     * path to the App-owned global workspace backing. That backing is already
+     * bind-mounted at `/var/minis/offloads`, so a Terminal export must remain
+     * readable from the Terminal instead of falling back to an unmounted cache
+     * file.
      *
      * --size thumb / medium re-encode to JPEG at 256px / 1024px max edge
      * via BitmapFactory; original copies the resource bytes as-is.
@@ -526,11 +528,9 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             ) + "\n",
         )
 
-        // [GH#139] Session-scoped when we know the caller's chat, so the export
-        // lands in the dir Direct Ubuntu bind-mounts at /var/minis/offloads for
-        // THIS session. Canonical guest bytes are written through the
-        // App-owned workspace file API.
-        val sandboxVisible = sessionId != null
+        // Session callers use their session offloads backing; a session-less
+        // interactive Terminal uses the global App-owned offloads backing.
+        // Both are explicit Direct Ubuntu bind sources for the same guest path.
         val outDir = File(context.cacheDir, "photos-export").also { it.mkdirs() }
         val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(64)
         val ext = displayName.substringAfterLast('.', "")
@@ -546,52 +546,41 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 val maxEdge = if (size == "thumb") 256 else 1024
                 copyResized(src, outFile, maxEdge)
             }
-            val linuxPath = if (sandboxVisible) {
-                val guestPath = "/var/minis/offloads/${outFile.name}"
-                runBlocking {
-                    outFile.inputStream().use { input ->
-                        WorkspaceFileClient.writeStream(sessionId!!, guestPath, input)
-                    }
+            val linuxPath = "/var/minis/offloads/${outFile.name}"
+            runBlocking {
+                outFile.inputStream().use { input ->
+                    WorkspaceFileClient.writeStream(sessionId, linuxPath, input)
                 }
-                guestPath
-            } else {
-                null
             }
-            AppLogger.info(TAG, "export: id=$id size=$size bytes=$bytesWritten path=${linuxPath ?: outFile.absolutePath}")
+            AppLogger.info(TAG, "export: id=$id size=$size bytes=$bytesWritten path=$linuxPath")
             val data = JSONObject()
                 .put("id", id)
                 .put("size_bytes", bytesWritten)
                 .put("media_type", mediaType)
                 .put("format", if (size == "original") "original" else "jpeg")
                 .put("export_size", size)
-            // [GH#139] Hand back the paths the agent can actually USE: the
-            // sandbox path for shell tools, and the minis:// URL that
-            // `minis-open` accepts for in-chat preview / model rendering.
-            if (sandboxVisible) {
-                data.put("linux_path", linuxPath)
-                    .put("minis_url", "minis://offloads/${outFile.name}")
-                    .put(
-                        "note",
-                        "Exported into this chat's offloads dir. Use `linux_path` from shell " +
-                            "tools, or `minis_url` with minis-open to preview it in chat.",
-                    )
-            } else {
-                data.put("host_path", outFile.absolutePath)
-                data.put(
+            // Hand back the paths the caller can actually use. `minis://` is
+            // useful to chat/web consumers; the Linux path works in both a
+            // session Terminal and the standalone global Terminal.
+            data.put("linux_path", linuxPath)
+                .put("minis_url", "minis://offloads/${outFile.name}")
+                .put(
                     "note",
-                    "No chat session for this offload (interactive terminal), so the export " +
-                        "went to app-private storage: `host_path` is NOT reachable from the " +
-                        "Linux sandbox and minis-open cannot open it. Run the export from a " +
-                        "chat to get a /var/minis/offloads path.",
+                    if (sessionId != null) {
+                        "Exported into this chat's offloads dir. Use `linux_path` from shell tools, " +
+                            "or `minis_url` with minis-open to preview it in chat."
+                    } else {
+                        "Exported into the Terminal's global offloads dir. Use `linux_path` with " +
+                            "read_image, minis-model-use, or minis-open."
+                    },
                 )
-            }
             if (width > 0) data.put("width", width)
             if (height > 0) data.put("height", height)
             val result = NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
-            if (sandboxVisible) runCatching { outFile.delete() }
+            runCatching { outFile.delete() }
             result
         } catch (e: Throwable) {
-            if (sandboxVisible) runCatching { outFile.delete() }
+            runCatching { outFile.delete() }
             val body = JSONObject().put("error", "export_failed").put("id", id)
                 .put("message", e.message ?: "Failed to copy asset bytes")
                 .toString()
@@ -1062,12 +1051,11 @@ Android edge cases vs apple-photos:
   - On Android 11+ modifying or deleting another app's media triggers
     RecoverableSecurityException. Surfaced as `error: write_denied`
     since the CLI sandbox can't show the system consent dialog.
-  - Export writes into the calling chat's offloads dir and returns
+  - Export writes into the calling chat's offloads dir, or the global Terminal
+    offloads dir when no chat session exists, and returns
     `linux_path` (/var/minis/offloads/...) and `minis_url`
-    (minis://offloads/...) alongside `host_path`, matching iOS. Outside a
-    chat (interactive terminal) there is no session dir, so only
-    `host_path` is returned and the note says it is not reachable from
-    the Linux sandbox.
+    (minis://offloads/...). The returned Linux path is readable from the
+    corresponding Direct Ubuntu namespace.
 
 Errors return JSON: {"error":"...","message":"..."}.
 """

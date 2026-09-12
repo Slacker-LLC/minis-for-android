@@ -35,6 +35,8 @@ Terminal、Agent shell、附件、浏览器与文件工具必须使用同一 ses
 
 旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` 只作为迁移源。迁移成功才写 `.root-data-migrated-v1`；普通 rootfs 修复不清除 App 用户数据。完整路径见[存储合同](contracts/03-STORAGE-CONTRACT.md)。
 
+`android-photos export` 会把图片放到当前 Terminal 能看到的 `/var/minis/offloads/...`。有会话时放到会话目录，没有会话时放到全局目录；返回的 `linux_path` 可以直接读取。
+
 ## 启动与就绪
 
 1. 初始化 App-owned 路径和 session/global backing。
@@ -64,6 +66,14 @@ Android 命令存在不代表已获系统授权或每个子命令全部实测通
 `minis-root-network-proxy` 固定在 `127.0.0.1:18787` 提供 HTTP absolute-form / CONNECT。协议本身不需要 Root；当前 Android 部署可借特权出站身份兼容 App-UID guest 的 VPN/BPF/UID 限制，不提供命令、文件、插件或通用 RPC。
 
 普通 private/loopback 目标拒绝，`198.18.0.0/15` 只保留 VPN Fake-IP 兼容。DNS/路由应跟随 Android 有效网络；宿主测试不能证明真实设备的 VPN 切换、Fake-IP、DNS 与 BPF 行为。
+
+DNS 查询现在会先走 UDP，失败后用同一个 DNS 服务器再走 TCP。HTTPS 测指定 IP 时要保留域名，不要用 `-k` 跳过证书检查：
+
+```bash
+curl --resolve example.com:443:203.0.113.10 -I https://example.com/
+```
+
+真机还需要再测一次。
 
 Guest-to-Android 命令桥是另一套带 token 鉴权的 loopback 服务，不是上述代理，也不是 Root 权限通道。不能把一个服务的认证或验收结果套到另一个服务。
 

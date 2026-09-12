@@ -25,6 +25,8 @@
 
 因此当前缺口不是“Root 必须有代理”，而是：**真实设备上何时需要该兼容路径、VPN/DNS/BPF/Fake-IP 切换是否可靠，仍需要设备证据。**
 
+源码已经补上 DNS 的 UDP 失败后 TCP 重试，单测通过；小米真机还没重测。HTTPS 测指定 IP 时要保留域名，用 `curl --resolve <host>:443:<ip> https://<host>/`，不要关闭证书检查。
+
 旧 APK 的精简 rootfs 基础包只保证 `curl`/`wget`，因此 Guest 中曾出现
 `ping: command not found`。当前分支已将 `iputils-ping` 纳入 provision 包和 readiness probe；
 最新 Debug APK 已部署到小米 `24129PN74C` 真机；Guest 内 `command -v ping` 返回
@@ -75,6 +77,7 @@ CI/宿主测试不能替代以下证据：
 6. Root 授权拒绝/允许分支、手机重启后重开、升级 APK 保留数据和多个 Terminal session；
 7. 终端反复打开/关闭、App 进程死亡与 OEM 后台策略下的完整矩阵，以及 VPN/TUN/BPF
    切换下的真实 guest 网络行为。
+8. 真机确认 DNS 回退和 `android-photos export` 返回的 `/var/minis/offloads/...` 能直接读取。
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
