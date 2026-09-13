@@ -3,6 +3,7 @@ import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application") version "8.10.1" apply false
+    id("com.android.library") version "8.10.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     id("org.jetbrains.kotlin.jvm") version "2.1.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0" apply false
@@ -15,6 +16,7 @@ subprojects {
         if (path == ":app") {
             dependencies.add("implementation", project(":core:model"))
             dependencies.add("implementation", project(":core:tool-contract"))
+            dependencies.add("implementation", project(":platform:logging"))
         }
 
         // Keep debug installs upgradeable across Windows, WSL, and repeated
