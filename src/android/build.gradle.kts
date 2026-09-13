@@ -4,6 +4,7 @@ import org.gradle.api.GradleException
 plugins {
     id("com.android.application") version "8.10.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.1.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0" apply false
     id("com.google.devtools.ksp") version "2.1.0-1.0.29" apply false
@@ -11,6 +12,10 @@ plugins {
 
 subprojects {
     pluginManager.withPlugin("com.android.application") {
+        if (path == ":app") {
+            dependencies.add("implementation", project(":core:model"))
+        }
+
         // Keep debug installs upgradeable across Windows, WSL, and repeated
         // checkouts without committing signing material to the repository.
         val sharedWindowsDebugKeystore = file(
