@@ -17,6 +17,7 @@ subprojects {
             dependencies.add("implementation", project(":core:model"))
             dependencies.add("implementation", project(":core:tool-contract"))
             dependencies.add("implementation", project(":platform:logging"))
+            dependencies.add("implementation", project(":data:database"))
         }
 
         // Keep debug installs upgradeable across Windows, WSL, and repeated
