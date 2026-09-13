@@ -14,6 +14,7 @@ subprojects {
     pluginManager.withPlugin("com.android.application") {
         if (path == ":app") {
             dependencies.add("implementation", project(":core:model"))
+            dependencies.add("implementation", project(":core:tool-contract"))
         }
 
         // Keep debug installs upgradeable across Windows, WSL, and repeated

@@ -26,3 +26,4 @@ dependencyResolutionManagement {
 rootProject.name = "Minis"
 include(":app")
 include(":core:model")
+include(":core:tool-contract")
