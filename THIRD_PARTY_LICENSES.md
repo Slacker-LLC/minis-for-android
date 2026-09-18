@@ -122,6 +122,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `browser/BrowserTextWindowPolicy.kt` and the windowed text reads (`offset` / `max_chars` through `browser/BrowserActionInput.kt`, `browser/BrowserUseJS.kt`, `browser/BrowserUseManager.kt` and the `browser_use` schema) | `agent/browser/BrowserDomScripts.kt` (`text` / `readable`) and the read-page arguments in `agent/browser/AgentBrowserSession.kt` |
 | `browser/BrowserDomScripts.kt` (the shared DOM preamble: visibility rule, bounded field / URL / selector helpers, visible-text collector, and the Markdown emitter behind `get_readable`) | `agent/browser/BrowserDomScripts.kt` |
 | `browser/BrowserElementListFormatter.kt` and `findElements` in `browser/BrowserDomScripts.kt` (the per-element row: verified selector, accessibility fields, box) | `agent/browser/BrowserDomScripts.kt` (`findElements` and `describe`) |
+| `browser/BrowserSelectorWaitPolicy.kt`, `selectorState` in `browser/BrowserDomScripts.kt` and the `wait_for_selector` action (budget clamps, poll interval, visible-match rule) | `agent/browser/AgentBrowserSession.kt` (`waitForSelector`) and `agent/browser/BrowserDomScripts.kt` (`selectorState`) |
 
 
 ## Active native/runtime components

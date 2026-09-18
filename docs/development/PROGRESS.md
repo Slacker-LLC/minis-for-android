@@ -600,6 +600,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2295 个用例 = 上一项后的 2282 + 13）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：生成的选择器在页面跳转后是否仍然唯一、以及几千个匹配的页面上 500 ms 扫描预算的实际表现，都未验证。
 
+**wait_for_selector：等指定的元素，而不是等「页面看起来不动了」** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 新动作 | 我们此前只有 `wait_for_dom_stable`（两次采样 body 长度相同就宣布稳定）——在点一下才渲染的页面上这是猜：转圈时变更会暂停，而下一步要点的元素可能还没出现。上游等的是调用方**点名**的东西：`wait_for_selector` 每 250 ms 问一次页面侧 `selectorState`，直到出现**可见**匹配（只检查前 2000 个匹配，所以折叠菜单里那份隐藏的不算数），默认 5 s、钳制 0.5–30 s，并回报匹配是否 `enabled`（马上要点的控件是禁用状态，值得当面说清） | `51591354` | ✅ `BrowserSelectorWaitPolicyTest`（5 例）+ `BrowserDomScriptsTest` 增 2 例 |
+| 失败关闭与边界 | 非法选择器在**第一次轮询**就失败（页面侧 `querySelectorAll` 抛错、包装层把错误交回来），不会白等满预算；结果文案与预算收在 `BrowserSelectorWaitPolicy`（数值是上游的，措辞是本仓库的）。`selectorState` 本体是上游的，进共享前导脚本 | `51591354` | ✅ 上述用例 + `scripts/test_browser_js_syntax.py`（14 个脚本） |
+| 顺带修掉的自造缺陷 | 本片暴露出我们自己的一处描述错误：工具 schema 告诉模型 `wait_for_dom_stable` 的 `timeout` 单位是**秒**，而动作按**毫秒**钳制——模型填 `timeout: 10` 实际只等了 1 秒。schema 与参数表都改成毫秒，并接受上游的 `timeout_ms` 拼写（guest CLI 同步加了 `--timeout-ms`） | `51591354` | ✅ 编译 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2302 个用例 = 上一项后的 2295 + 7）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：页面正在导航时 250 ms 轮询的实际表现、以及「可见但尚未绘制」的元素在这台 WebView 上会不会被算作可见，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
