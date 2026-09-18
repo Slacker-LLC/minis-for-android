@@ -641,6 +641,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2314 个用例 = 上一项后的 2311 + 3）与 `:app:lintDebug`（0 error），另有 `node --check`（13 脚本）、文档溯源与构建清理守卫全绿。**没有任何设备结论**：内层容器搜索在真实 app 型页面上是否挑到用户会滚的那个元素、以及页面平滑滚动时 `before/after` 是否仍然可读，都未验证。
 
+**read_image：模型可以不要那张图** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `read_image`（默认 true） | 上游的 `screenshot` 有这个入参：截图是否附进模型上下文。我们此前**一律附**——只想拿页面几何的调用方、以及并不想看图的点击（本仓库在视觉类动作后会自动补一张截图）都要为那张图付上下文。现在 `read_image=false` 时图仍然落盘给用户（缩略图、artifact、`minis://` 路径都在），模型只拿元数据；它同样覆盖视觉类动作后自动补的那张，因为那才是附图的大头 | `97742f8e` | ✅ `BrowserActionInputTest`（5 例：默认值、显式 false、随点击生效、`timeout_ms`/`timeout` 两种拼写、未知动作不臆造） |
+| 顺手删掉一条死路 | `ChatViewModel.executeBrowserUse` 与其 `BrowserToolResult` 全仓无调用方，而且是**绕开工具路径**的第二个浏览器入口（不落 artifact、不走无视觉模型占位、不认这些新参数）。工程合同要求「替换旧实现后删除死路径」，故删除 | `97742f8e` | ✅ 编译 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2319 个用例 = 上一项后的 2314 + 5）与 `:app:lintDebug`（0 error），另有浏览器 JS、构建清理与文档溯源守卫全绿。**没有任何设备结论**：`read_image=false` 时聊天气泡里的缩略图在真机上是否仍然可用，未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
