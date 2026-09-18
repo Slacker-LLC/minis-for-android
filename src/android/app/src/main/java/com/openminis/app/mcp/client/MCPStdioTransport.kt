@@ -21,6 +21,8 @@ class MCPStdioTransport(
     companion object {
         private const val TAG = "MCPStdioTransport"
         private const val MAX_LINE = 64 * 1024
+        /** A server's stderr is diagnostic only; keep its lines short. */
+        private const val MAX_STDERR_LINE = 8 * 1024
     }
 
     @Volatile
@@ -29,6 +31,14 @@ class MCPStdioTransport(
     private var writer: java.io.BufferedWriter? = null
     @Volatile
     private var reader: BufferedReader? = null
+
+    /**
+     * [T-mcp-stdio-line-bound-android] The stdout line reader that refuses a line the
+     * server never finished: see [MCPBoundedLineReader] for why a length check after
+     * `readLine()` is not a bound.
+     */
+    @Volatile
+    private var lines: MCPBoundedLineReader? = null
 
     suspend fun start() = withContext(Dispatchers.IO) {
         if (process != null) return@withContext
@@ -44,12 +54,21 @@ class MCPStdioTransport(
         }
         process = p
         writer = p.outputStream.bufferedWriter()
-        reader = p.inputStream.bufferedReader()
+        val stdout = p.inputStream.bufferedReader()
+        reader = stdout
+        lines = MCPBoundedLineReader(stdout, MAX_LINE, command)
         Thread {
             runCatching {
                 p.errorStream.bufferedReader().use { err ->
+                    val stderrLines = MCPBoundedLineReader(err, MAX_STDERR_LINE, "$command stderr")
                     while (true) {
-                        val line = err.readLine() ?: break
+                        val line = try {
+                            stderrLines.readLine()
+                        } catch (tooLong: MCPTransportException) {
+                            Log.w(TAG, tooLong.message ?: "stderr line too long")
+                            stderrLines.skipToEndOfLine()
+                            null
+                        } ?: break
                         Log.d(TAG, "[$command] stderr: ${line.take(500)}")
                     }
                 }
@@ -59,7 +78,7 @@ class MCPStdioTransport(
 
     suspend fun send(frame: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val w = writer ?: throw MCPTransportException("stdio transport not started")
-        val r = reader ?: throw MCPTransportException("stdio transport not started")
+        val r = lines ?: throw MCPTransportException("stdio transport not started")
         val p = process ?: throw MCPTransportException("stdio transport process missing")
         val line = MCPClientCodec.encodeFrame(frame).replace("\n", "")
         try {
@@ -77,7 +96,14 @@ class MCPStdioTransport(
             continuation.invokeOnCancellation { close() }
             Thread {
                 try {
-                    val reply = r.readLine()
+                    val reply = try {
+                        r.readLine()
+                    } catch (tooLong: MCPTransportException) {
+                        // A server that floods one frame is broken: drop the whole
+                        // transport (kills the process) instead of trying to resync.
+                        close()
+                        throw tooLong
+                    }
                     if (!continuation.isActive) return@Thread
                     if (reply == null) {
                         continuation.resumeWith(
@@ -88,10 +114,6 @@ class MCPStdioTransport(
                                 ),
                             ),
                         )
-                        return@Thread
-                    }
-                    if (reply.length > MAX_LINE) {
-                        continuation.resumeWith(Result.failure(MCPTransportException("oversized reply from $command")))
                         return@Thread
                     }
                     val parsed = try {
@@ -130,6 +152,7 @@ class MCPStdioTransport(
         writer = null
         val r = reader
         reader = null
+        lines = null
 
         // A reader thread may be blocked in BufferedReader.readLine(). Closing
         // that same reader first can wait on its lock and prevent us from ever
