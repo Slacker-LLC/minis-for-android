@@ -130,6 +130,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `text` in `browser/BrowserDomScripts.kt` and the `get_text` wiring in `browser/BrowserUseManager.kt` (the visible-text collector path and its window) | `agent/browser/BrowserDomScripts.kt` (`text`) |
 | `runtime/ubuntu/RootAccess.kt` (the root state, the probe and the ask-once policy, on top of this repository's `DirectRootRunner`) and the enhancement summary in `ui/settings/SystemEnhanceScreen.kt` | `agent/device/RootAccess.kt` and `ui/screens/enhance/SystemEnhanceScreen.kt` |
 | `mcp/client/McpToolHeaders.kt` (the `x-mcp-header` schema walk, value rendering and base64 wrapper) and the per-call header plumbing in `mcp/client/MCPClientSession.kt` / `mcp/client/MCPHttpTransport.kt` | `agent/mcp/McpToolHeaders.kt` and the header handling in `agent/mcp/McpHttpClient.kt` |
+| `data/model/AgentToolDefinition.kt` (`apiName`: the wire-name sanitisation and its digest suffix) | `agent/mcp/McpRunContext.kt` (`modelToolName`) |
 
 
 ## Active native/runtime components

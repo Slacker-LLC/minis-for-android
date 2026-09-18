@@ -678,6 +678,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2343 个用例 = 上一项后的 2331 + 12）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：要求 `x-mcp-header` 的真实服务器如何对待包装形式、以及没有被要求时收到 `Mcp-Param-` 前缀头会不会拒绝，都未验证。
 
+**工具 wire 名的防碰撞（自查出来的缺陷）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 截断不再让两个工具同名 | 发给 provider 的 `tools[].name` 必须匹配 `^[a-zA-Z0-9_-]{1,64}$`，本仓库早已据此把 `mcp.<server>.<tool>` 的点换成下划线并截到 64 字符。**截断本身**是漏洞：两个前 64 字符相同的工具（例如同一服务器上两个很长的远端工具名）会拿到**同一个** wire 名，而本地 registry 正是用 wire 名反查工具——模型的调用会被静默派发到后注册的那个工具。现在超长名以**规范名的 SHA-256 前 4 字节**结尾（上游 `modelToolName` 出于同样理由也用 digest 尾缀），短名一字不变 | `633b02b6` | ✅ `AgentToolDefinitionApiNameTest`（7 例：短名不动、点变下划线、超长恰为 64 且合法、共享前缀的两个长名不再相同、同输入稳定、dispatch 仍认规范名与 wire 名） |
+| 纯符号名 | 只由标点构成的名字（`。。。`）会 sanitize 成 `___`：合法，但完全无法区分两个工具。这类名字改用 `tool_<digest>`，同样确定性 | `633b02b6` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2350 个用例 = 上一项后的 2343 + 7）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**设备结论**：无（这是命名算术，wire 名本来就被 provider 接受）。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
