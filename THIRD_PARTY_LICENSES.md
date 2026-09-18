@@ -95,6 +95,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/LogSafety.kt` (`safeLogType`, `toSafeLogToken`) | `core/LogSafety.kt` |
 | `xposed/system/AccessibilityServiceEnforcer.kt`, `xposed/system/AccessibilityProtectionHooks.kt` (including its system-context resolver), `xposed/system/AccessibilityProtectionProtocol.kt` | `hook/system/AccessibilityServiceEnforcer.kt`, `hook/system/AccessibilityProtectionHooks.kt`, `agent/accessibility/AccessibilityProtectionProtocol.kt` |
 | `xposed/system/AccessibilityProtectionClient.kt` (app-side caller), the module-protection section in `ui/settings/SystemPermissionsScreen.kt` and `accessibility/MinisAccessibilityHealthProvider.kt` | `agent/accessibility/AccessibilityProtectionClient.kt`, `agent/accessibility/AgentAccessibilityHealthProvider.kt` and Eta's accessibility settings surface |
+| `xposed/system/HotwordSelfHealHooks.kt`, `xposed/system/HotwordSelfHealPolicy.kt`, `xposed/system/AssistantHotword.kt` (the hotword half of Eta's assistant manager) | `hook/system/HotwordSelfHealHooks.kt` and the software-hotword path in `hook/system/AssistantManager.kt` |
 
 
 ## Active native/runtime components

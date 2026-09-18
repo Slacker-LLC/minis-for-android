@@ -6,6 +6,7 @@ import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
 import com.openminis.app.xposed.system.ContextualSearchHooks
 import com.openminis.app.xposed.system.AccessibilityProtectionHooks
+import com.openminis.app.xposed.system.HotwordSelfHealHooks
 
 /**
  * [T-eta-xposed-groups] The groups this module knows, wired to the targets they belong to.
@@ -40,6 +41,10 @@ object HookGroups {
         // tool in this app depends on it.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             AccessibilityProtectionHooks.install(module, classLoader, log)
+        }
+        // And the assistant's hotword detection, which some builds drop when the screen goes off.
+        HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
+            HotwordSelfHealHooks.install(module, classLoader, log)
         }
         // Google's own floaty assistant surface, in the Google app's process.
         HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->
