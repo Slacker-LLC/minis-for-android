@@ -17,6 +17,7 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.accessibility.PackageWindowVisibility
 import com.openminis.app.accessibility.ClipboardRestorePolicy
 import com.openminis.app.accessibility.TextEditPlanner
+import com.openminis.app.accessibility.TextInputBoundsPolicy
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.offload.OffloadPermissionManager
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +85,7 @@ object AndroidUiController {
                 "set_text" -> setText(context, service, args)
                 "input_text" -> insertText(context, service, args, allowClipboardFallback = false)
                 "paste_text" -> insertText(context, service, args, allowClipboardFallback = true)
+                "ime_enter" -> imeEnter(service, args)
                 "scroll" -> scroll(service, args)
                 // [T-eta-ui-system-panel] back/home plus the system panels the guest
                 // android-a11y-cli already drives and Eta exposes as open_system_panel.
@@ -307,6 +309,10 @@ object AndroidUiController {
             return error("UI_NODE_NOT_EDITABLE", "the observed ref is not an enabled editable node")
         }
         val text = args.optString("text", "")
+        // [T-eta-text-insert] Upstream refuses an oversized write before touching the device.
+        TextInputBoundsPolicy.replaceRefusal(text)?.let { refusal ->
+            return error(refusal.code, refusal.message)
+        }
         var method = "ACTION_SET_TEXT"
         var ok = service.setNodeText(resolved.node, text)
         if (!ok) {
@@ -358,6 +364,10 @@ object AndroidUiController {
             )
         }
         val inserted = args.optString("text", "")
+        // [T-eta-text-insert] An insertion may be neither empty nor oversized (upstream's bounds).
+        TextInputBoundsPolicy.insertRefusal(inserted)?.let { refusal ->
+            return error(refusal.code, refusal.message)
+        }
         val plan = TextEditPlanner.insertAtSelection(
             currentText = current.toString(),
             insertedText = inserted,
@@ -436,6 +446,38 @@ object AndroidUiController {
 
     /** One number per temporary clip, so a restore can tell its own clip from the user's. */
     private val pasteSequence = java.util.concurrent.atomic.AtomicLong()
+
+    /**
+     * [T-eta-text-insert] Eta's ime_enter (its press_key ENTER): the IME action on the field that
+     * has input focus, which is how a search or a message is submitted without guessing at a button.
+     * Ported from Eta `imeEnter` (agent/accessibility/AgentAccessibilityService.kt @ c15de97); the
+     * action needs Android 11, and anything older is refused with the reason.
+     */
+    private fun imeEnter(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return error("IME_ENTER_UNAVAILABLE", "ACTION_IME_ENTER needs Android 11 or newer")
+        }
+        val node = if (args.optString("ref", "").isNotBlank()) {
+            val resolved = resolveRef(args)
+            if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
+            (resolved as UiRefResolution.Found).node
+        } else {
+            service.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        }
+        if (node == null || !node.isEditable) {
+            return error("NO_FOCUSED_EDITABLE", "no editable node has input focus; observe first")
+        }
+        val ok = node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        val report = AndroidUiActionEvidence.ofTextInput(ok, verified = null)
+        return UiToolResult(
+            report.into(
+                JSONObject().put("action", "ime_enter")
+                    .put("success", ok).put("verified", JSONObject.NULL)
+                    .put("inputMethod", "ACTION_IME_ENTER"),
+            ),
+            ok,
+        )
+    }
 
     private suspend fun scroll(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
         if (args.optString("ref", "").isNotBlank()) {
