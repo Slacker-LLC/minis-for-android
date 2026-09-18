@@ -83,6 +83,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `roleplay/CharacterWorldbookDraft.kt` (world book draft read/write) | `agent/roleplay/CharacterWorldbookDraft.kt` |
 | `ui/settings/CharacterDetailScreen.kt` (character detail and world-book editor) | Eta's character detail and world-book editor screens |
 | `roleplay/CharacterMemoryDocument.kt`, `roleplay/CharacterMemoryRepository.kt`, `tools/CharacterMemoryTools.kt` and the memory lines in `roleplay/CharacterPrompt.kt` | `data/repository/CharacterMemoryRepository.kt`, `agent/roleplay/CharacterMemoryTools.kt` and the memory half of `RoleplayRunContext.kt` |
+| `xposed/HookInstallStatus.kt`, `xposed/ModuleTargets.kt` (hook install ledger and module target tables) | `core/HookRegistrar.kt`, `core/ModuleConfig.kt` and the process filter in `ModuleMain.kt` |
 
 
 ## Active native/runtime components

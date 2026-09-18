@@ -1,0 +1,66 @@
+package com.openminis.app.xposed
+
+/**
+ * [T-eta-xposed-entry] Which processes this module may run in, and which packages it knows how to
+ * enter.
+ *
+ * Ported from Eta `core/ModuleConfig.kt` (Mangi-11/Eta @ c15de97); attribution in
+ * THIRD_PARTY_LICENSES.md. Eta keeps the target list in one place because the module is injected
+ * into several OEM surfaces at once, and a name typed twice in two files is how a hook silently
+ * stops matching after a ROM update.
+ *
+ * The predicates are the part that runs before anything else: a module that keeps its lifecycle
+ * callbacks in a process it does not hook pays for every app start on the device, so only the own
+ * package and declared targets stay alive.
+ */
+object ModuleTargets {
+
+    const val OWN_PACKAGE = "llc.slacker.minis"
+
+    const val SYSTEM_SERVER_PROCESS = "system"
+    const val SYSTEM_UI_PACKAGE = "com.android.systemui"
+    const val GOOGLE_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
+    const val BREENO_PACKAGE = "com.heytap.speechassist"
+    const val COLOROS_DIRECT_PACKAGE = "com.coloros.colordirectservice"
+    const val COLOROS_MEMORY_PACKAGE = "com.oplus.aimemory"
+    const val XIAOAI_PACKAGE = "com.miui.voiceassist"
+    const val XIAOMI_LAUNCHER_PACKAGE = "com.miui.home"
+    const val XIAOMI_GLOBAL_LAUNCHER_PACKAGE = "com.mi.android.globallauncher"
+
+    /** Assistant surfaces whose agent loop this module may take over. */
+    val ASSISTANT_PACKAGES = setOf(BREENO_PACKAGE, XIAOAI_PACKAGE)
+
+    val LAUNCHER_PACKAGES = setOf(XIAOMI_LAUNCHER_PACKAGE, XIAOMI_GLOBAL_LAUNCHER_PACKAGE)
+
+    /** Every package the module is declared for, in the order the scope list states them. */
+    val SCOPED_PACKAGES = listOf(
+        SYSTEM_SERVER_PROCESS,
+        SYSTEM_UI_PACKAGE,
+        GOOGLE_SEARCH_PACKAGE,
+        COLOROS_DIRECT_PACKAGE,
+        BREENO_PACKAGE,
+        COLOROS_MEMORY_PACKAGE,
+        XIAOAI_PACKAGE,
+        XIAOMI_LAUNCHER_PACKAGE,
+        XIAOMI_GLOBAL_LAUNCHER_PACKAGE,
+    )
+
+    /** True when [processName] is a process of [packageName] (Android appends ":suffix"). */
+    fun isProcessOf(processName: String?, packageName: String): Boolean {
+        val process = processName?.trim().orEmpty()
+        if (process.isEmpty() || packageName.isEmpty()) return false
+        return process == packageName || process.startsWith("$packageName:")
+    }
+
+    /**
+     * Whether the module keeps its lifecycle callbacks in this process at all: its own process, or
+     * one of the declared targets. Anything else detaches, so the device pays nothing for a process
+     * the module cannot touch.
+     */
+    fun shouldKeepLifecycleCallbacks(processName: String?, ownPackage: String = OWN_PACKAGE): Boolean {
+        val process = processName?.trim().orEmpty()
+        if (process.isEmpty()) return false
+        if (isProcessOf(process, ownPackage)) return true
+        return SCOPED_PACKAGES.any { target -> isProcessOf(process, target) }
+    }
+}
