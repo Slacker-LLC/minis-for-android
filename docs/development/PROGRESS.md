@@ -114,12 +114,22 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1918 个用例 = 上一项后的 1906 + 12，0 失败）。真机未验证：真实相册 URI（含 photopicker）的读取、授权弹窗与后台 service 场景下能否拿到结果、超大原图的读取上限行为。
 
+**Phase 3 起步：Skills 暴露给模型（只读面）** — 分支 `codex/eta-phase3-skills-tools`，基于 `82009103`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 技能发现 | 模型此前只能在提示词里看到最多 20 条技能条目，读全文只能猜 `/var/minis/skills/<id>/SKILL.md` 再用文件/shell 工具打开。新增 `skill.list`（别名 `skills_list`）：id/名称/启用状态/路径/描述，支持关键词过滤与 1–200 条上限（默认 50），并报告被上限截掉多少条 | `7741677c` | ✅ `SkillToolPolicyTest`（10 例） |
+| 技能正文与资源 | `skill.read`（别名 `skills_read`）按 id/名称/SKILL.md 路径读全文，512–64000 字符（默认 16000）并显式标注截断；`skill.read_resource`（别名 `skills_read_resource`）读技能内的有界 UTF-8 文本资源（如 `references/guide.md`） | `7741677c` | ✅ 上述用例 |
+| 复用而非新建通道 | 读路径全部走既有 `SkillRepository`，共用其跨进程变更锁与路径守卫；工具只加边界与 id/名称/路径解析，不写、不装、不执行；资源读失败时列出该技能实际包含的文件 | `7741677c` | ✅ 路径拒绝用例（空/绝对/反斜杠/控制字符/`..`/超长） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1928 个用例 = Phase 2 分支的 1918 + 10，0 失败）。未做：`skills_list_curated` / `skills_inspect_github` / `skills_install_from_github`（安装面仍走既有事务，尚未暴露给模型）；真机未验证：模型在真实会话里发现并读取技能、禁用技能在列表里的可见性、大技能正文的截断观感。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、Skills 暴露给模型、会话级编辑 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、会话级编辑（Skills 的只读面已在 `codex/eta-phase3-skills-tools` 落地；GitHub 发现/安装面待做） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
