@@ -578,6 +578,7 @@
     <string name="sessionlist_export">エクスポート</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">プレーンテキスト</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <string name="sessionlist_edit_title_category">タイトルとカテゴリを編集</string>
     <string name="sessionlist_regenerate_title">タイトルを再生成</string>
     <string name="sessionlist_regenerating_title">タイトルを再生成中…</string>

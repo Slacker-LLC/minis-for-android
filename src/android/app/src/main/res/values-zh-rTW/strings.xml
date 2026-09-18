@@ -140,6 +140,7 @@
     <string name="sessionlist_export">匯出</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">純文字</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <!-- T-export-optimize (b443b54d) — 分批/打包匯出進度 + 預覽 -->
     <string name="export_summary_format">匯出格式</string>
     <string name="export_summary_format_value_json">JSON</string>

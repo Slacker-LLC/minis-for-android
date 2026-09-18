@@ -1329,4 +1329,5 @@
     <string name="assistant_memory_pressure_high">Le système signale une pression mémoire.</string>
     <string name="assistant_memory_pressure_normal">La pression mémoire semble normale.</string>
     <string name="assistant_memory_close">Fermer</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
 </resources>

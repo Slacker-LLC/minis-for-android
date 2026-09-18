@@ -91,7 +91,14 @@ object ChatExporter {
         format: String,
     ): Pair<Uri, Summary> = withContext(Dispatchers.IO) {
         val isJson = format == "json"
-        val ext = if (isJson) "json" else "txt"
+        // [T-eta-conversation-export] Markdown joins the two existing formats; the zip
+        // shape and the share path are unchanged.
+        val isMarkdown = format == "markdown"
+        val ext = when {
+            isJson -> "json"
+            isMarkdown -> "md"
+            else -> "txt"
+        }
         val stagingRoot = File(context.cacheDir, "export-staging")
         val workDir = File(stagingRoot, UUID.randomUUID().toString())
         if (!workDir.mkdirs() && !workDir.isDirectory) {
@@ -99,8 +106,16 @@ object ChatExporter {
         }
 
         try {
-            val transcriptFile = File(workDir, "messages.$ext")
-            val summary = streamTranscript(repository, session, isJson, transcriptFile)
+            // [T-eta-conversation-export] A Markdown transcript keeps the readable name in
+            // the archive, so an unzipped document is self-describing; the other two
+            // formats stay on the historical `messages.<ext>` entry.
+            val transcriptName = if (isMarkdown) {
+                ConversationMarkdownExporter.defaultFileName(session.title ?: "conversation")
+            } else {
+                "messages.$ext"
+            }
+            val transcriptFile = File(workDir, transcriptName)
+            val summary = streamTranscript(repository, session, isJson, isMarkdown, transcriptFile)
 
             val metaFile = File(workDir, "session.json")
             writeSessionMeta(metaFile, session, summary)
@@ -115,7 +130,7 @@ object ChatExporter {
             if (zipFile.exists()) zipFile.delete()
 
             ZipOutputStream(FileOutputStream(zipFile).buffered()).use { zos ->
-                zipFileEntry(zos, "messages.$ext", transcriptFile)
+                zipFileEntry(zos, transcriptName, transcriptFile)
                 zipFileEntry(zos, "session.json", metaFile)
             }
 
@@ -138,6 +153,7 @@ object ChatExporter {
         repository: ChatRepository,
         session: ChatSessionEntity,
         isJson: Boolean,
+        isMarkdown: Boolean,
         out: File,
     ): Summary {
         val total = repository.messageCount(session.id)
@@ -180,6 +196,82 @@ object ChatExporter {
                     _progress.value = Progress.Running(done, total)
                 }
                 writer.write("]")
+            } else if (isMarkdown) {
+                val labels = ConversationMarkdownExporter.Labels()
+                writer.write(ConversationMarkdownExporter.documentTitle(session.title ?: "Conversation"))
+                writer.write("\n")
+                // [T-eta-conversation-export] A tool call is written when its result
+                // arrives on the next user-role row, so the document can say ok/failed
+                // instead of guessing; anything still open at the end is unrecorded.
+                val openTools = mutableListOf<MarkdownToolDraft>()
+                fun writeBlock(block: ConversationMarkdownExporter.Block) {
+                    val rendered = ConversationMarkdownExporter.renderBlock(block, labels) ?: return
+                    writer.write("\n")
+                    writer.write(rendered)
+                    writer.write("\n")
+                }
+                fun closeOpenTools(results: Map<String, Pair<String, Boolean>>) {
+                    for (draft in openTools) {
+                        val result = results[draft.toolUseId]
+                        writeBlock(
+                            ConversationMarkdownExporter.Block.Tool(
+                                name = draft.name,
+                                status = when {
+                                    result == null -> ConversationMarkdownExporter.ToolStatus.UNKNOWN
+                                    result.second -> ConversationMarkdownExporter.ToolStatus.SUCCESS
+                                    else -> ConversationMarkdownExporter.ToolStatus.FAILED
+                                },
+                                description = draft.description,
+                                arguments = draft.arguments,
+                                result = result?.first,
+                            ),
+                        )
+                    }
+                    openTools.clear()
+                }
+                forEachBatch(repository, session.id, total) { batch ->
+                    for (msg in batch) {
+                        val parts = parseExportParts(msg.partsJson)
+                        if (msg.role == "user") {
+                            closeOpenTools(toolResultsOf(parts))
+                            writeBlock(
+                                ConversationMarkdownExporter.Block.User(
+                                    text = extractPlainText(msg.partsJson),
+                                    attachmentCount = parts.count { it.optString("type") == "mediaRef" },
+                                ),
+                            )
+                        } else {
+                            closeOpenTools(emptyMap())
+                            msg.reasoningContent?.takeIf { it.isNotBlank() }?.let { reasoning ->
+                                writeBlock(ConversationMarkdownExporter.Block.Thinking(reasoning))
+                            }
+                            writeBlock(ConversationMarkdownExporter.Block.Assistant(extractPlainText(msg.partsJson)))
+                            for (part in parts) {
+                                if (part.optString("type") != "toolUse") continue
+                                val value = part.optJSONObject("value") ?: continue
+                                val name = value.optString("name")
+                                if (name.isBlank()) continue
+                                openTools += MarkdownToolDraft(
+                                    toolUseId = value.optString("toolUseId"),
+                                    name = name,
+                                    description = value.optString("description").takeIf { it.isNotBlank() },
+                                    arguments = value.optString("input").takeIf { it.isNotBlank() },
+                                )
+                            }
+                        }
+                        bytes += extractPlainText(msg.partsJson).length.toLong() +
+                            (msg.reasoningContent?.length ?: 0).toLong()
+                        if (first == null) first = msg.createdAt
+                        last = msg.createdAt
+                        val (img, vid) = countAttachments(msg.partsJson)
+                        images += img
+                        videos += vid
+                        done += 1
+                    }
+                    writer.flush()
+                    _progress.value = Progress.Running(done, total)
+                }
+                closeOpenTools(emptyMap())
             } else {
                 writer.write(session.title ?: "Conversation")
                 writer.write("\n\n")
@@ -286,6 +378,33 @@ object ChatExporter {
     } catch (_: Throwable) {
         partsJson
     }
+
+    /** [T-eta-conversation-export] parts_json as objects; a malformed row degrades to none. */
+    private fun parseExportParts(partsJson: String): List<JSONObject> = try {
+        val array = JSONArray(partsJson)
+        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+    } catch (_: Throwable) {
+        emptyList()
+    }
+
+    /** One turn's tool results, keyed by tool_use id. */
+    private fun toolResultsOf(parts: List<JSONObject>): Map<String, Pair<String, Boolean>> = buildMap {
+        for (part in parts) {
+            if (part.optString("type") != "toolResult") continue
+            val value = part.optJSONObject("value") ?: continue
+            val id = value.optString("toolUseId")
+            if (id.isBlank()) continue
+            put(id, value.optString("output") to value.optBoolean("success", true))
+        }
+    }
+
+    /** A tool call written into the Markdown document once its result is known. */
+    private data class MarkdownToolDraft(
+        val toolUseId: String,
+        val name: String,
+        val description: String?,
+        val arguments: String?,
+    )
 
     /** Best-effort `(images, videos)` count by walking parts_json. */
     private fun countAttachments(partsJson: String): Pair<Int, Int> = try {

@@ -578,6 +578,7 @@
     <string name="sessionlist_export">내보내기</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">일반 텍스트</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <string name="sessionlist_edit_title_category">제목 및 카테고리 편집</string>
     <string name="sessionlist_regenerate_title">제목 다시 생성</string>
     <string name="sessionlist_regenerating_title">제목 재생성 중…</string>

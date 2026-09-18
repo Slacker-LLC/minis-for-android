@@ -747,6 +747,7 @@
     <string name="sessionlist_export">导出</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">纯文本</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <!-- T-export-optimize (b443b54d) — 分批/打包导出进度 + 预览 -->
     <string name="export_summary_format">导出格式</string>
     <string name="export_summary_format_value_json">JSON</string>

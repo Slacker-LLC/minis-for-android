@@ -1908,6 +1908,15 @@ private fun SessionItemContent(
                             onExportRequest(session, "text")
                         },
                     )
+                    // [T-eta-conversation-export] Markdown transcript: headings, folded
+                    // thinking and quoted tool activity, instead of the plain-text dump.
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.sessionlist_export_markdown), modifier = Modifier.padding(start = 24.dp)) },
+                        onClick = {
+                            showContextMenu = false
+                            onExportRequest(session, "markdown")
+                        },
+                    )
                 }
                 // Edit Title & Category
                 DropdownMenuItem(

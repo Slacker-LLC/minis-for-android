@@ -543,6 +543,7 @@
     <string name="sessionlist_export">Export</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">Plain Text</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <!-- T-export-optimize (b443b54d) — batched/zipped export progress + preview -->
     <string name="export_summary_format">Format</string>
     <string name="export_summary_format_value_json">JSON</string>

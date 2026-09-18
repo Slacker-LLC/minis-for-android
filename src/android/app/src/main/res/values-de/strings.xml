@@ -578,6 +578,7 @@
     <string name="sessionlist_export">Exportieren</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">Klartext</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <string name="sessionlist_edit_title_category">Titel und Kategorie bearbeiten</string>
     <string name="sessionlist_regenerate_title">Titel neu erzeugen</string>
     <string name="sessionlist_regenerating_title">Titel wird neu erzeugt…</string>

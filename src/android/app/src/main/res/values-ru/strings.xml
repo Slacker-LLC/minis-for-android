@@ -360,6 +360,7 @@
     <string name="sessionlist_export">Экспорт</string>
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">Обычный текст</string>
+    <string name="sessionlist_export_markdown">Markdown</string>
     <string name="export_summary_format">Формат</string>
     <string name="export_summary_format_value_json">JSON</string>
     <string name="export_summary_format_value_txt">Обычный текст</string>
