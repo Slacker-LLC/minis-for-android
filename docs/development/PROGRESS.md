@@ -581,6 +581,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2273 个用例 = 上一项后的 2250 + 23）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：真实页面 200000 字符 `innerText` 的开销、重 DOM 上窗口算术经 WebView 桥的稳定性、以及模型会不会照着 `next_offset` 续读，都未验证。
 
+**get_readable 走上游的 Markdown 采集器（含共享 DOM 前导脚本）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 共享 DOM 前导脚本 | 上游把 DOM 助手集中在一个前导里（`wrap(body)` 把动作体拼进同一作用域）：有界字段/URL/选择器助手、可见性判定（hidden / inert / aria-hidden / display / visibility / clip / opacity 0 / 视口外）、绝对 URL 解析、选择器生成，以及按**节点数 + 截止时间 + 字符数**三重上界的可见文本采集。本仓库此前每个动作各写一段内联 JS，可见性只看 `display`，也没有节点/时间预算 | `a5e657d5` | ✅ `BrowserDomScriptsTest`（9 例） |
+| readable 输出 Markdown | 上游的 `readable` 不是「取第一个匹配容器 + 空格归一」：它先按**可见文本长度给候选打分**（最大的那个当正文），再用发射器输出 Markdown——标题、列表（有序带编号）、链接 `[label](href)`、图片、表格（≤60 行 × 12 列）、代码块与引用，并且跳过 nav/form/button 这类镶边；整棵树受节点 8000、750 ms 截止与文档 200000 字符约束。本仓库此前拿到的是压成一整段的纯文本，链接的 href 全部丢失，正文不在候选表里的页面会读到导航栏 | `a5e657d5` | ✅ 上述用例 |
+| 注入脚本的语法守卫（新增） | 注入脚本是 Kotlin 原始字符串，Kotlin 编译器看不见里面的语法——少个括号只会在真机上表现为「动作静默失败」。新增 `scripts/test_browser_js_syntax.py`：把两个浏览器源文件里的脚本抽出来、按编译器的方式解开模板、逐个交给 `node --check`（没装 node 就跳过并说明），已接进 CI 的 unit tests 作业 | `a5e657d5` | ✅ 本机 node 22：13 个脚本全过；注入一处语法错误时守卫退出 1（反向验证过） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2282 个用例 = 上一项后的 2273 + 9）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：真实页面上发射器产出的 Markdown 长什么样、重 DOM 上三重上界够不够、以及按字数打分会不会选错正文容器，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |

@@ -120,6 +120,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `util/BoundedStreams.kt` (the per-chunk cancellation check and the typed too-large failure) and the bounded copy in `webapp/AddToHomeSheet.kt` | `agent/device/BoundedFileCopy.kt` |
 | `browser/BrowserPayloadLimiter.kt` (the JSON ladder; its text-level half is this repository's, for payloads that never become an envelope) | `agent/browser/BrowserPayloadLimiter.kt` |
 | `browser/BrowserTextWindowPolicy.kt` and the windowed text reads (`offset` / `max_chars` through `browser/BrowserActionInput.kt`, `browser/BrowserUseJS.kt`, `browser/BrowserUseManager.kt` and the `browser_use` schema) | `agent/browser/BrowserDomScripts.kt` (`text` / `readable`) and the read-page arguments in `agent/browser/AgentBrowserSession.kt` |
+| `browser/BrowserDomScripts.kt` (the shared DOM preamble: visibility rule, bounded field / URL / selector helpers, visible-text collector, and the Markdown emitter behind `get_readable`) | `agent/browser/BrowserDomScripts.kt` |
 
 
 ## Active native/runtime components
