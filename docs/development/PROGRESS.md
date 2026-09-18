@@ -1012,6 +1012,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 仍未闭合的最后一跳 | **真正调用远端工具需要一次 agent 回合（要 provider）**，所以「注册成功 → 实际调用远端工具」这一跳仍挂在待办②上；此外远程调用方目前无法从 `mcp.list` 读到连接状态（只有日志与界面），列为可选后续 |
 | 设备复原 | 测试用 MCP 集成已删除（`mcp.list` 为空）、自家 MCP 服务端已停、token prefs 还原为 `<map />`、`adb forward/reverse` 撤销、主机测试服务端进程已退出 |
 
+### 会话目录清理：证据、删除路径核对与一个未决问题（2026-09-19，无代码改动）
+
+| 项 | 结果 |
+|---|---|
+| 设备事实 | 真机 `files/minis-sessions/` 有 **110 个目录、约 55 MB**（`du -sk` = 56 158 KB），而数据库 `sessions` 表 **0 行**；其中 **97 个是 UUID 形态**（聊天会话）、14 个是命名会话（`debug-rpc`、`mcp`、`physical-model-cli-check` 等 CLI/RPC 用名）。时间跨度 2026-09-05 至 09-19 |
+| 删除路径核对（代码） | 会话删除**确实**接了清理：`MinisApp` 构造 `ChatRepository(dao) { id -> UbuntuPaths.deleteSession(ctx, id) }`；`deleteSessionAt` 有 id 合法性校验、拒绝符号链接根、目标不存在视为成功、用 `SafeFileTree.deleteRecursively`。所有删除入口（会话列表=单删/多删/删分组、抽屉、Bot 协调器、调试 `chat.session.delete`）都走这一条 |
+| 为什么还是堆了 55 MB（推断，未证实） | ① 命名会话（CLI/RPC 自己传的 session id）没有任何「删除」事件，天然不会被清；② UUID 目录多来自「行已不在而目录还在」的历史（早于清理接线、或某次数据库行消失），而清理只在**逐个删除会话**时触发，没有任何孤儿回收 |
+| 端点验证受挫（未决） | 为验证「删会话会不会清目录」，我手工往设备库里插入一行会话（`model_id=sweep-model`，无消息）并推回数据库：应用起来后 `chat.sessions.get` 回 **`Session not found`**，随后（主库 + WAL 合并）看该行已被删除。**两种解释未区分**：(a) 我的文件手术与 WAL 语义造成的假象；(b) 应用启动时确实删了这行。代码层面 grep 不到任何「自动删除会话」的路径（只有 UI/机器人/调试入口），倾向 (a)，但**没有证实**，故列为未决 |
+| 设备复原 | 已把手术前的原始 `minis.db` 推回（该库本就无用户数据）、删除手搭的 `sweep-fake-session` 目录、重启应用：进程正常、crash 缓冲为空、`chat.sessions.list` 回 0 条（与实验前一致） |
+| 待你拍板 | ① 是否要做**孤儿会话目录**回收（约 55 MB，含 97 个 UUID 目录）：这属于删除用户目录，我不擅自动手；② 未决问题要不要继续查（最干净的验证方式是先用真实 provider 建一个会话再删——正好卡在待办②上） |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
