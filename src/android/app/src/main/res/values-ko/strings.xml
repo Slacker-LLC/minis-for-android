@@ -579,6 +579,15 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">일반 텍스트</string>
     <string name="sessionlist_export_markdown">Markdown</string>
+    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
+    <string name="characters_title">Characters</string>
+    <string name="characters_import">Import a character card (PNG or JSON)</string>
+    <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
+    <string name="characters_export">Export or share this character</string>
+    <string name="characters_delete">Delete this character</string>
+    <string name="characters_delete_confirm">Delete "%1$s"? Sessions already bound to this character keep working from the card snapshot they stored.</string>
+    <string name="characters_import_failed">The card could not be imported.</string>
+    <string name="characters_export_failed">The character could not be exported.</string>
     <string name="sessionlist_edit_title_category">제목 및 카테고리 편집</string>
     <string name="sessionlist_regenerate_title">제목 다시 생성</string>
     <string name="sessionlist_regenerating_title">제목 재생성 중…</string>

@@ -113,7 +113,9 @@ fun SettingsScreen(
     onModelGroupsClick: () -> Unit,
     onRootfsClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
-    onSkillsClick: () -> Unit = {},
+   onSkillsClick: () -> Unit = {},
+    // [T-eta-character-cards] Character library entry, next to Skills.
+    onCharactersClick: () -> Unit = {},
     onTerminalClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
     // [T-mcp-integration-android] MCP Integrations page, listed directly below
@@ -275,6 +277,14 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_skills),
                     subtitle = stringResource(R.string.settings_skills_subtitle),
                     onClick = onSkillsClick,
+                )
+                // [T-eta-character-cards] Imported cards and the library they live in.
+                SettingsItem(
+                    icon = Icons.Outlined.RecordVoiceOver,
+                    iconColor = Color(0xFFAF52DE),
+                    title = stringResource(R.string.characters_title),
+                    subtitle = stringResource(R.string.characters_subtitle),
+                    onClick = onCharactersClick,
                 )
                 // [T-soul-md] insertion between Skills and Memory per spec.
                 SettingsItem(

@@ -130,7 +130,10 @@ object Routes {
     const val FILE_BROWSER = "file_browser"
     const val FILE_PREVIEW = "file_preview"
     const val ENV_VARS = "env_vars"
-    const val SKILLS = "skills"
+   const val SKILLS = "skills"
+
+    /** [T-eta-character-cards] Imported character cards. */
+    const val CHARACTERS = "characters"
     const val SKILL_DETAIL = "skill/{skillId}"
     const val SKILL_FILE = "skill_file/{skillId}/{relativePath}"
     const val MINIS_SKILLS_BROWSER = "minis_skills_browser"
@@ -603,7 +606,8 @@ fun AppNavigation(
                 onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
                 onRootfsClick = { navController.safeNavigate(Routes.STORAGE) },
                 onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
-                onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
+               onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
+                onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
                 onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                 onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
                 onMcpClick = { navController.safeNavigate(Routes.MCP) },
@@ -1187,6 +1191,13 @@ fun AppNavigation(
                     onBack = { navController.safePopBackStack() },
                 )
             }
+        }
+
+        // [T-eta-character-cards] The character library: import, share, delete.
+        composable(Routes.CHARACTERS) {
+            com.openminis.app.ui.settings.CharactersScreen(
+                onBack = { navController.safePopBackStack() },
+            )
         }
 
         composable(Routes.SKILLS) {
