@@ -148,4 +148,51 @@ class BrowserDomScriptsTest {
         assertTrue(script.contains("\\\"]\\\"]"))
         assertFalse(script.contains("querySelectorAll(\"a[title=\"]\"]\")"))
     }
+
+    @Test
+    fun `click names its target, scrolls it in and reports the real coordinates`() {
+        val bySelector = BrowserDomScripts.click("#submit", null, null)
+
+        assertTrue(bySelector.contains("var target = resolveTarget(\"#submit\", null, null);"))
+        assertTrue(bySelector.contains("if (!enabled(target)) throw new Error('TARGET_NOT_ENABLED"))
+        assertTrue(bySelector.contains("target.scrollIntoView({ block: 'center', inline: 'center' });"))
+        assertTrue(bySelector.contains("clientX: centreX, clientY: centreY"))
+        assertTrue(bySelector.contains("matched_element: describe(target)"))
+    }
+
+    @Test
+    fun `click by coordinate asks the page for the element at that point`() {
+        val byPoint = BrowserDomScripts.click(null, 120, 340)
+
+        assertTrue(byPoint.contains("var target = resolveTarget(null, 120, 340);"))
+    }
+
+    @Test
+    fun `type refuses a field a user could not type into`() {
+        val script = BrowserDomScripts.type("#search", null, null, "hello", submit = false)
+
+        assertTrue(script.contains("if (!editable(target)) throw new Error('TARGET_NOT_EDITABLE"))
+        assertTrue(script.contains("target.focus();"))
+        assertTrue(script.contains("Object.getOwnPropertyDescriptor(prototype, 'value')"))
+        assertTrue(script.contains("target.isContentEditable"))
+        assertTrue(script.contains("matched_element: describe(target)"))
+    }
+
+    @Test
+    fun `type submits only when the caller asked it to`() {
+        assertTrue(BrowserDomScripts.type("#q", null, null, "x", submit = true).contains("if (true) {"))
+        assertTrue(BrowserDomScripts.type("#q", null, null, "x", submit = false).contains("if (false) {"))
+        assertTrue(BrowserDomScripts.type("#q", null, null, "x", submit = true).contains("form.requestSubmit()"))
+    }
+
+    @Test
+    fun `hover fires the events the DOM defines, enter included`() {
+        val script = BrowserDomScripts.hover(".menu")
+
+        assertTrue(script.contains("new MouseEvent('mouseover'"))
+        assertTrue(script.contains("new MouseEvent('mouseenter'"))
+        assertTrue(script.contains("bubbles: false, cancelable: true, view: window, clientX: centreX"))
+        assertTrue(script.contains("target.scrollIntoView({ block: 'center', inline: 'center' });"))
+        assertTrue(script.contains("matched_element: describe(target)"))
+    }
 }

@@ -70,8 +70,13 @@ internal object BrowserElementListFormatter {
         }
     }
 
-    /** The selectors and boxes, printed only for the fields the element actually has. */
-    private fun detail(element: JSONObject): String? {
+    /**
+     * The selectors and boxes, printed only for the fields the element actually has.
+     * Shared with the click / type / hover results, which carry the same
+     * `describe()` object as one of these rows.
+     */
+    fun detail(element: JSONObject?): String? {
+        if (element == null) return null
         val parts = mutableListOf<String>()
         text(element, "selector", MAX_FIELD_CHARS).takeIf { it.isNotEmpty() }?.let { parts += "sel=$it" }
         text(element, "role", 48).takeIf { it.isNotEmpty() }?.let { parts += "role=$it" }

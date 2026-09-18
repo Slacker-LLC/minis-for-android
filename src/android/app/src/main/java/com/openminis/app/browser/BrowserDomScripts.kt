@@ -464,4 +464,142 @@ internal object BrowserDomScripts {
           enabled: target ? enabled(target) : false
         };
     """.trimIndent())
+
+    /**
+     * [T-browser-targeting-android] Upstream's `resolveTarget`: the caller names the
+     * element, by selector or by viewport point, and a miss is a typed failure
+     * (`TARGET_NOT_FOUND`) rather than a silent no-op.
+     */
+    private fun targetPrologue(selector: String?, x: Int?, y: Int?): String =
+        "var target = resolveTarget(" +
+            (selector?.let { org.json.JSONObject.quote(it) } ?: "null") + ", " +
+            (x?.toString() ?: "null") + ", " +
+            (y?.toString() ?: "null") + ");\n"
+
+    /**
+     * Upstream's `click` plus this app's event sequence: scroll the target to the
+     * middle first, then dispatch the pointer events at its real centre. The
+     * coordinates matter — frameworks that read `clientX/clientY` (canvases, drag
+     * surfaces, maps) ignore a click that reports 0,0, which is what our events used
+     * to carry. A target the browser would not deliver a click to (disabled, inert,
+     * hidden) is refused instead of reporting success.
+     */
+    fun click(selector: String?, x: Int?, y: Int?): String = wrap(
+        targetPrologue(selector, x, y) + """
+        if (!enabled(target)) throw new Error('TARGET_NOT_ENABLED: the element is disabled, inert or hidden');
+        target.scrollIntoView({ block: 'center', inline: 'center' });
+        var rect = target.getBoundingClientRect();
+        var centreX = rect.left + rect.width / 2;
+        var centreY = rect.top + rect.height / 2;
+        var bubbling = { bubbles: true, cancelable: true, view: window, clientX: centreX, clientY: centreY };
+        var nonBubbling = { bubbles: false, cancelable: true, view: window, clientX: centreX, clientY: centreY };
+        target.dispatchEvent(new MouseEvent('mouseover', bubbling));
+        target.dispatchEvent(new MouseEvent('mouseenter', nonBubbling));
+        target.dispatchEvent(new MouseEvent('mousemove', bubbling));
+        target.dispatchEvent(new MouseEvent('mousedown', bubbling));
+        target.dispatchEvent(new MouseEvent('mouseup', bubbling));
+        target.click();
+        target.dispatchEvent(new MouseEvent('mouseleave', nonBubbling));
+        target.dispatchEvent(new MouseEvent('mouseout', bubbling));
+        return {
+          clicked: true,
+          tag: target.tagName,
+          text: visibleText(target, 160, 400, Date.now() + 100),
+          matched_element: describe(target)
+        };
+        """.trimIndent(),
+    )
+
+    /**
+     * Upstream's `type`: refuse a field the user could not type into (`editable()`
+     * covers readonly, disabled, inert and the input types that take no text), scroll
+     * it in, set the value through the native setter so a framework's own state
+     * updates, then fire this app's per-character keyboard events and the
+     * Angular/Vue shims. `submit` is upstream's: ask the form to submit when there is
+     * one, otherwise press Enter in the field.
+     */
+    fun type(selector: String?, x: Int?, y: Int?, text: String, submit: Boolean): String = wrap(
+        targetPrologue(selector, x, y) + """
+        if (!editable(target)) throw new Error('TARGET_NOT_EDITABLE: the element is readonly, disabled or does not take text');
+        target.scrollIntoView({ block: 'center', inline: 'center' });
+        target.focus();
+        var value = ${org.json.JSONObject.quote(text)};
+        if (target.isContentEditable) {
+          target.textContent = value;
+        } else {
+          var prototype = target.tagName.toLowerCase() === 'textarea' ?
+            window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+          var setter = Object.getOwnPropertyDescriptor(prototype, 'value');
+          if (setter && setter.set) setter.set.call(target, value); else target.value = value;
+        }
+        for (var index = 0; index < value.length; index++) {
+          var character = value[index];
+          target.dispatchEvent(new KeyboardEvent('keydown', {key: character, bubbles: true}));
+          target.dispatchEvent(new KeyboardEvent('keypress', {key: character, bubbles: true}));
+          target.dispatchEvent(new InputEvent('input', {data: character, inputType: 'insertText', bubbles: true}));
+          target.dispatchEvent(new KeyboardEvent('keyup', {key: character, bubbles: true}));
+        }
+        target.dispatchEvent(new Event('change', {bubbles: true}));
+        try {
+          if (window.angular) {
+            var ngEl = window.angular.element(target);
+            var scope = ngEl.scope() || (ngEl.injector && ngEl.injector().get('${'$'}rootScope'));
+            if (scope && !scope.${'$'}${'$'}phase) scope.${'$'}apply();
+          }
+        } catch (e) {}
+        try {
+          if (target.__vue__) target.__vue__.${'$'}forceUpdate();
+          if (target._vei || target.__vueParentComponent) target.dispatchEvent(new Event('input', {bubbles: true}));
+        } catch (e) {}
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          target.dispatchEvent(new FocusEvent('blur', {bubbles: true, relatedTarget: null}));
+          target.dispatchEvent(new FocusEvent('focusout', {bubbles: true, relatedTarget: null}));
+        }
+        var submitted = false;
+        if ($submit) {
+          var form = target.form || target.closest('form');
+          if (form && form.requestSubmit) form.requestSubmit(); else {
+            target.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', bubbles: true}));
+          }
+          submitted = true;
+        }
+        return {
+          typed: true,
+          selector: ${org.json.JSONObject.quote(selector ?: "")},
+          length: value.length,
+          submitted: submitted,
+          matched_element: describe(target)
+        };
+        """.trimIndent(),
+    )
+
+    /**
+     * This app's hover, moved onto upstream's targeting so it scrolls the element
+     * into view, reports which element it landed on, and fires `mouseenter` the way
+     * the DOM does (non-bubbling — our old one bubbled it).
+     */
+    fun hover(selector: String?): String = wrap(
+        targetPrologue(selector, null, null) + """
+        if (!enabled(target)) throw new Error('TARGET_NOT_ENABLED: the element is disabled, inert or hidden');
+        target.scrollIntoView({ block: 'center', inline: 'center' });
+        var rect = target.getBoundingClientRect();
+        var centreX = rect.left + rect.width / 2;
+        var centreY = rect.top + rect.height / 2;
+        target.dispatchEvent(new MouseEvent('mouseover', {
+          bubbles: true, cancelable: true, view: window, clientX: centreX, clientY: centreY
+        }));
+        target.dispatchEvent(new MouseEvent('mouseenter', {
+          bubbles: false, cancelable: true, view: window, clientX: centreX, clientY: centreY
+        }));
+        target.dispatchEvent(new MouseEvent('mousemove', {
+          bubbles: true, cancelable: true, view: window, clientX: centreX, clientY: centreY
+        }));
+        return {
+          hovered: true,
+          tag: target.tagName,
+          text: visibleText(target, 160, 400, Date.now() + 100),
+          matched_element: describe(target)
+        };
+        """.trimIndent(),
+    )
 }

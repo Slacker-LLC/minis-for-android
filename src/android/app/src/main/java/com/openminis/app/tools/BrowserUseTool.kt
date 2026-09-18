@@ -53,12 +53,18 @@ object BrowserUseTool {
 
         properties.put("coordinate_x", JSONObject().apply {
             put("type", "integer")
-            put("description", "X coordinate for click-by-position")
+            put("description", "X coordinate for click or type by position (used with coordinate_y when no selector is given)")
         })
 
         properties.put("coordinate_y", JSONObject().apply {
             put("type", "integer")
-            put("description", "Y coordinate for click-by-position")
+            put("description", "Y coordinate for click or type by position (used with coordinate_x when no selector is given)")
+        })
+
+        properties.put("submit", JSONObject().apply {
+            put("type", "boolean")
+            put("default", false)
+            put("description", "type: after the text lands, submit the field's form (or press Enter in the field when it has none).")
         })
 
         properties.put("direction", JSONObject().apply {

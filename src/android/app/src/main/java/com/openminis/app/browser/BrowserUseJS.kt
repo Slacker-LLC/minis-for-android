@@ -22,93 +22,6 @@ object BrowserUseJS {
         }
     }
 
-    // -- Click --
-
-    fun click(selector: String): String = """
-        (function() {
-            var el = document.querySelector('${jsQuote(selector)}');
-            if (!el) return JSON.stringify({error: 'Element not found: ${jsQuote(selector)}'});
-            if (el.disabled) return JSON.stringify({error: 'Element is disabled', tag: el.tagName});
-            var bOpts = {bubbles: true, cancelable: true, view: window};
-            var nbOpts = {bubbles: false, cancelable: true, view: window};
-            el.dispatchEvent(new MouseEvent('mouseover', bOpts));
-            el.dispatchEvent(new MouseEvent('mouseenter', nbOpts));
-            el.dispatchEvent(new MouseEvent('mousemove', bOpts));
-            el.dispatchEvent(new MouseEvent('mousedown', bOpts));
-            el.dispatchEvent(new MouseEvent('mouseup', bOpts));
-            el.click();
-            el.dispatchEvent(new MouseEvent('mouseleave', nbOpts));
-            el.dispatchEvent(new MouseEvent('mouseout', bOpts));
-            return JSON.stringify({clicked: true, tag: el.tagName, text: (el.innerText || '').substring(0, 100)});
-        })()
-    """.trimIndent()
-
-    fun clickCoordinate(x: Int, y: Int): String = """
-        (function() {
-            var el = document.elementFromPoint($x, $y);
-            if (!el) return JSON.stringify({error: 'No element at ($x, $y)'});
-            if (el.disabled) return JSON.stringify({error: 'Element is disabled', tag: el.tagName, x: $x, y: $y});
-            var bOpts = {bubbles: true, cancelable: true, view: window};
-            var nbOpts = {bubbles: false, cancelable: true, view: window};
-            el.dispatchEvent(new MouseEvent('mouseover', bOpts));
-            el.dispatchEvent(new MouseEvent('mouseenter', nbOpts));
-            el.dispatchEvent(new MouseEvent('mousemove', bOpts));
-            el.dispatchEvent(new MouseEvent('mousedown', bOpts));
-            el.dispatchEvent(new MouseEvent('mouseup', bOpts));
-            el.click();
-            el.dispatchEvent(new MouseEvent('mouseleave', nbOpts));
-            el.dispatchEvent(new MouseEvent('mouseout', bOpts));
-            return JSON.stringify({clicked: true, tag: el.tagName, x: $x, y: $y, text: (el.innerText || '').substring(0, 100)});
-        })()
-    """.trimIndent()
-
-    // -- Type --
-
-    fun type(selector: String, text: String): String = """
-        (function() {
-            var el = document.querySelector('${jsQuote(selector)}');
-            if (!el) return JSON.stringify({error: 'Element not found: ${jsQuote(selector)}'});
-            el.focus();
-            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                var nativeSetter = Object.getOwnPropertyDescriptor(
-                    el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value'
-                );
-                if (nativeSetter && nativeSetter.set) {
-                    nativeSetter.set.call(el, '${jsQuote(text)}');
-                } else {
-                    el.value = '${jsQuote(text)}';
-                }
-            } else {
-                el.innerText = '${jsQuote(text)}';
-            }
-            var chars = '${jsQuote(text)}';
-            for (var i = 0; i < chars.length; i++) {
-                var c = chars[i];
-                el.dispatchEvent(new KeyboardEvent('keydown', {key: c, bubbles: true}));
-                el.dispatchEvent(new KeyboardEvent('keypress', {key: c, bubbles: true}));
-                el.dispatchEvent(new InputEvent('input', {data: c, inputType: 'insertText', bubbles: true}));
-                el.dispatchEvent(new KeyboardEvent('keyup', {key: c, bubbles: true}));
-            }
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-            try {
-                if (window.angular) {
-                    var ngEl = window.angular.element(el);
-                    var scope = ngEl.scope() || (ngEl.injector && ngEl.injector().get('${'$'}rootScope'));
-                    if (scope && !scope.${'$'}${'$'}phase) scope.${'$'}apply();
-                }
-            } catch(e) {}
-            try {
-                if (el.__vue__) el.__vue__.${'$'}forceUpdate();
-                if (el._vei || el.__vueParentComponent) el.dispatchEvent(new Event('input', {bubbles: true}));
-            } catch(e) {}
-            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
-                el.dispatchEvent(new FocusEvent('blur', {bubbles: true, relatedTarget: null}));
-                el.dispatchEvent(new FocusEvent('focusout', {bubbles: true, relatedTarget: null}));
-            }
-            return JSON.stringify({typed: true, selector: '${jsQuote(selector)}', length: chars.length});
-        })()
-    """.trimIndent()
-
     // -- Get Text --
 
     /**
@@ -221,18 +134,6 @@ object BrowserUseJS {
             })()
         """.trimIndent()
     }
-
-    // -- Hover --
-
-    fun hover(selector: String): String = """
-        (function() {
-            var el = document.querySelector('${jsQuote(selector)}');
-            if (!el) return JSON.stringify({error: 'Element not found: ${jsQuote(selector)}'});
-            el.dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
-            el.dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
-            return JSON.stringify({hovered: true, tag: el.tagName, text: (el.innerText || '').substring(0, 100)});
-        })()
-    """.trimIndent()
 
     // -- Get Page Info --
 

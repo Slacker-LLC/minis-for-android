@@ -48,6 +48,11 @@ data class BrowserActionInput(
     /** When true on screenshot, stretch viewport to full document.scrollHeight before capture. */
     val fullPage: Boolean = false,
     /**
+     * When true on type, submit the field's form after the text lands (upstream's
+     * `submit`: form.requestSubmit, or Enter in the field when there is no form).
+     */
+    val submit: Boolean = false,
+    /**
      * Cookies to write (set_cookies). Each entry has keys name + value
      * (required) and optional domain, path, secure, http_only, expires
      * (Unix seconds). Values are loosely typed (String / Boolean / Number).
@@ -94,6 +99,7 @@ data class BrowserActionInput(
                         else -> null
                     },
                     fullPage = obj.optBoolean("full_page", false),
+                    submit = obj.optBoolean("submit", false),
                     cookies = parseCookies(obj),
                 )
             } catch (_: Exception) {

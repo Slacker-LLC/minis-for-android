@@ -583,7 +583,7 @@ class BrowserUseManager(
             BrowserAction.NAVIGATE -> navigate(input.url)
             BrowserAction.SCREENSHOT -> return screenshot(fullPage = input.fullPage)
             BrowserAction.CLICK -> click(input.selector, input.coordinateX, input.coordinateY)
-            BrowserAction.TYPE -> type(input.selector, input.text)
+            BrowserAction.TYPE -> type(input.selector, input.coordinateX, input.coordinateY, input.text, input.submit)
             BrowserAction.GET_TEXT -> return getText(input.selector, input.offset, input.maxChars)
             BrowserAction.SCROLL -> scroll(input.selector, input.direction, input.amount)
             BrowserAction.GET_PAGE_INFO -> return getPageInfo()
@@ -920,20 +920,26 @@ class BrowserUseManager(
     // -- Click --
 
     private suspend fun click(selector: String?, x: Int?, y: Int?): BrowserActionResult {
-        val js = when {
-            selector != null -> BrowserUseJS.click(selector)
-            x != null && y != null -> BrowserUseJS.clickCoordinate(x, y)
-            else -> return BrowserActionResult.error("click requires 'selector' or 'coordinate_x'/'coordinate_y'")
+        if (selector == null && (x == null || y == null)) {
+            return BrowserActionResult.error("click requires 'selector' or 'coordinate_x'/'coordinate_y'")
         }
-        return evaluateAndReturn(js)
+        return evaluateAndReturn(BrowserDomScripts.click(selector, x, y))
     }
 
     // -- Type --
 
-    private suspend fun type(selector: String?, text: String?): BrowserActionResult {
-        if (selector == null) return BrowserActionResult.error("type requires 'selector'")
+    private suspend fun type(
+        selector: String?,
+        x: Int?,
+        y: Int?,
+        text: String?,
+        submit: Boolean,
+    ): BrowserActionResult {
         if (text == null) return BrowserActionResult.error("type requires 'text'")
-        return evaluateAndReturn(BrowserUseJS.type(selector, text))
+        if (selector == null && (x == null || y == null)) {
+            return BrowserActionResult.error("type requires 'selector' or 'coordinate_x'/'coordinate_y'")
+        }
+        return evaluateAndReturn(BrowserDomScripts.type(selector, x, y, text, submit))
     }
 
     // -- Get Text --
@@ -1048,7 +1054,7 @@ class BrowserUseManager(
 
     private suspend fun hover(selector: String?): BrowserActionResult {
         if (selector == null) return BrowserActionResult.error("hover requires 'selector'")
-        return evaluateAndReturn(BrowserUseJS.hover(selector))
+        return evaluateAndReturn(BrowserDomScripts.hover(selector))
     }
 
     // -- Get Backbone --
@@ -1394,16 +1400,29 @@ class BrowserUseManager(
     private fun formatJSONResult(json: JSONObject): String = buildString {
         when {
             json.optBoolean("clicked") -> {
-                val tag = json.optString("tag", "?")
-                appendLine("Clicked <$tag>")
-                if (json.has("x") && json.has("y")) appendLine("  Position: (${json.optInt("x")}, ${json.optInt("y")})")
-                val text = json.optString("text", "")
-                if (text.isNotEmpty()) append("  Text: ${text.take(200)}")
+                // [T-browser-targeting-android] The hit element is reported the way
+                // find_elements reports one, so a click that landed on the wrong node
+                // is visible in the transcript instead of implied by a tag name.
+                val tag = json.optString("tag", "?").lowercase()
+                val text = json.optString("text", "").take(160).replace('"', '\'')
+                appendLine(
+                    buildString {
+                        append("Clicked <").append(tag).append('>')
+                        if (text.isNotEmpty()) append(" \"").append(text).append('"')
+                    },
+                )
+                BrowserElementListFormatter
+                    .detail(json.optJSONObject("matched_element"))
+                    ?.let { appendLine(it) }
             }
             json.optBoolean("typed") -> {
                 val sel = json.optString("selector", "?")
                 val len = json.optInt("length", 0)
                 append("Typed $len chars into $sel")
+                if (json.optBoolean("submitted", false)) append(" (form submitted)")
+                BrowserElementListFormatter
+                    .detail(json.optJSONObject("matched_element"))
+                    ?.let { appendLine(); append(it) }
             }
             json.optBoolean("scrolled") -> {
                 val dir = json.optString("direction", "?")
