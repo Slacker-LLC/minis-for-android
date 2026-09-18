@@ -71,6 +71,20 @@ object AndroidCapabilityResolver {
                 root?.selinuxMode?.let { put("selinuxMode", it) }
                 root?.error?.let { put("lastProbeError", it) }
                 put("provider", JSONObject.NULL)
+                // AUTHORIZATION_REQUIRED covers two very different situations:
+                // the user never granted, and the user granted but no probe has
+                // run in this process (this inventory never starts su). On the
+                // Xiaomi 24129PN74C the second one was the truth — the report
+                // said "requires user grant" while active_root_probe returned
+                // uid 0 under KernelSU. Name the call that settles it, so a model
+                // does not send the user to grant something they already granted.
+                if (rootState == RootAccessState.AUTHORIZATION_REQUIRED && suPath != null) {
+                    put(
+                        "nextStep",
+                        "su is present but no probe ran in this process — call android_capabilities " +
+                            "with action=active_root_probe to confirm the grant before asking the user for anything.",
+                    )
+                }
             })
             put("privilegedShell", JSONObject().apply {
                 put("root", CapabilityFact(rootStatus, when (rootState) {
