@@ -88,6 +88,10 @@ object ToolPermissionManager {
         // [T-eta-device-context] Read-only, but it carries the last known location, so a
         // remote caller goes through the same confirmation gate as android.location.get.
         "android.context" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        // [T-eta-media-search] Same gate as the photo listing it mirrors.
+        "android.media.audio" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "search_audio" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "list_audio" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.control" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.weather" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),

@@ -559,6 +559,11 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.DeviceContextHandler(),
             aliasNames = com.openminis.app.tools.DeviceContextTool.aliases,
         )
+        // [T-eta-media-search] Audio search alongside the existing photo/video listing.
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.AndroidMediaAudioHandler(),
+            aliasNames = listOf("search_audio", "list_audio"),
+        )
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here

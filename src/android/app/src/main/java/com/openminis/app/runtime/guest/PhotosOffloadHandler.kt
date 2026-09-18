@@ -99,20 +99,32 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
     // ── list (T59: + --type, --start, --end, --days, --limit) ────────────
 
     private fun handleList(args: OffloadArgs): NativeOffloadResult {
-        val limit = (args.getInt("limit") ?: args.getInt("max") ?: 20).coerceIn(1, 100)
-        val type = (args.get("type") ?: "all").lowercase()
-        if (type !in setOf("photo", "video", "all")) {
-            return NativeOffloadResult(2, "android-photos list: --type must be photo|video|all\n")
-        }
+        val limit = MediaQueryPolicy.clampLimit(args.getInt("limit") ?: args.getInt("max"))
+        val type = MediaQueryPolicy.type(args.get("type"))
+            ?: return NativeOffloadResult(
+                2,
+                "android-photos list: --type must be ${MediaQueryPolicy.TYPES.joinToString("|")}\n",
+            )
+        // [T-eta-media-search] Same name filter Eta's search_media/search_audio apply, so a
+        // photo, video and audio listing can all be narrowed by file name.
+        val nameFilter = MediaQueryPolicy.nameFilter(args.get("query"))
         val (startMs, endMs) = resolveDateRange(args)
         AppLogger.info(TAG, "list: type=$type limit=$limit range=${startMs?.let { formatIso(it) }}..${endMs?.let { formatIso(it) }}")
         val arr = JSONArray()
-        if (type == "photo" || type == "all") queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "photo", startMs, endMs, limit - arr.length(), arr)
-        if (type == "video" || type == "all") queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video", startMs, endMs, limit - arr.length(), arr)
+        if (type == "photo" || type == "all") {
+            queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "photo", startMs, endMs, limit - arr.length(), arr, nameFilter)
+        }
+        if (type == "video" || type == "all") {
+            queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video", startMs, endMs, limit - arr.length(), arr, nameFilter)
+        }
+        if (type == "audio" || type == "all") {
+            queryAudio(startMs, endMs, limit - arr.length(), arr, nameFilter)
+        }
         val data = JSONObject()
             .put("media", arr)
             .put("count", arr.length())
             .put("type", type)
+        args.get("query")?.trim()?.takeIf { it.isNotEmpty() }?.let { data.put("query", it) }
         if (startMs != null) data.put("range_start", formatIso(startMs))
         if (endMs != null) data.put("range_end", formatIso(endMs))
         return NativeOffloadResult(0, OffloadOutput.formatBody(data.toString(2), args) + "\n")
@@ -125,7 +137,15 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
      * supply a window, and fall back to the (cheaper) implicit "all rows"
      * query when no range is set.
      */
-    private fun queryMedia(uri: Uri, kind: String, startMs: Long?, endMs: Long?, max: Int, sink: JSONArray) {
+    private fun queryMedia(
+        uri: Uri,
+        kind: String,
+        startMs: Long?,
+        endMs: Long?,
+        max: Int,
+        sink: JSONArray,
+        nameFilter: Pair<String, String>? = null,
+    ) {
         if (max <= 0) return
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -148,6 +168,10 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             selectionParts.add("${MediaStore.Images.Media.DATE_TAKEN} <= ?")
             selectionArgs.add(endMs.toString())
         }
+        nameFilter?.let { (clause, argument) ->
+            selectionParts.add(clause)
+            selectionArgs.add(argument)
+        }
         val selection = if (selectionParts.isEmpty()) null else selectionParts.joinToString(" AND ")
         val selArgs = if (selectionArgs.isEmpty()) null else selectionArgs.toTypedArray()
         context.contentResolver.query(uri, projection, selection, selArgs, "${MediaStore.Images.Media.DATE_TAKEN} DESC")?.use { c ->
@@ -167,6 +191,77 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                     .put("mime_type", c.getString(6) ?: "")
                     .put("bucket_id", c.getLong(7))
                     .put("bucket_name", c.getString(8) ?: "")
+                sink.put(p)
+                n++
+            }
+        }
+    }
+
+    /**
+     * [T-eta-media-search] Audio rows. DATE_ADDED is stored in SECONDS (unlike the photo/video
+     * DATE_TAKEN column), so the window is converted here instead of leaking that difference
+     * into the tool layer.
+     */
+    private fun queryAudio(
+        startMs: Long?,
+        endMs: Long?,
+        max: Int,
+        sink: JSONArray,
+        nameFilter: Pair<String, String>?,
+    ) {
+        if (max <= 0) return
+        val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.MIME_TYPE,
+            MediaStore.Audio.Media.ALBUM,
+            MediaStore.Audio.Media.ARTIST,
+        )
+        val selectionParts = mutableListOf<String>()
+        val selectionArgs = mutableListOf<String>()
+        startMs?.let {
+            selectionParts.add("${MediaStore.Audio.Media.DATE_ADDED} >= ?")
+            selectionArgs.add((it / 1000L).toString())
+        }
+        endMs?.let {
+            selectionParts.add("${MediaStore.Audio.Media.DATE_ADDED} <= ?")
+            selectionArgs.add((it / 1000L).toString())
+        }
+        nameFilter?.let { (clause, argument) ->
+            selectionParts.add(clause)
+            selectionArgs.add(argument)
+        }
+        val selection = if (selectionParts.isEmpty()) null else selectionParts.joinToString(" AND ")
+        val selArgs = if (selectionArgs.isEmpty()) null else selectionArgs.toTypedArray()
+        context.contentResolver.query(
+            uri,
+            projection,
+            selection,
+            selArgs,
+            "${MediaStore.Audio.Media.DATE_ADDED} DESC",
+        )?.use { c ->
+            var n = 0
+            while (c.moveToNext() && n < max) {
+                val id = c.getLong(0)
+                val addedSeconds = c.getLong(2)
+                val p = JSONObject()
+                    .put("id", id)
+                    .put("content_uri", ContentUris.withAppendedId(uri, id).toString())
+                    .put("name", c.getString(1) ?: "")
+                    .put("media_type", "audio")
+                    .put("duration_ms", c.getLong(3))
+                    .put("size_bytes", c.getLong(4))
+                    .put("mime_type", c.getString(5) ?: "")
+                    .put("album", c.getString(6) ?: "")
+                    .put("artist", c.getString(7) ?: "")
+                if (addedSeconds > 0) {
+                    val addedMs = addedSeconds * 1000L
+                    p.put("date", dateFormat.format(Date(addedMs))).put("date_iso", formatIso(addedMs))
+                }
                 sink.put(p)
                 n++
             }
