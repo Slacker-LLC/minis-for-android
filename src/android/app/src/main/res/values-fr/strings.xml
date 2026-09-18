@@ -1378,4 +1378,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">Ces interrupteurs sont lus par le module LSPosed Minis : installez-le et activez Minis dans sa portée. Un changement prend effet à la prochaine interception, sans redémarrage.</string>
 
+    <string name="modeldetail_hosted_web_search">Recherche web côté serveur</string>
+    <string name="modeldetail_hosted_web_search_sub">Autorise le modèle à utiliser la recherche du fournisseur. Les sources reviennent sous forme de citations ; cela consomme le quota du fournisseur, et seule l\'API Responses la connaît.</string>
+
 </resources>

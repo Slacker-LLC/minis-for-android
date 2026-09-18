@@ -68,6 +68,10 @@ fun ModelEntryDetailScreen(
     var thinkingEnabled by remember {
         mutableStateOf(overrides.supportsReasoning ?: baseModel.supportsReasoning ?: false)
     }
+    // [T-eta-hosted-web-search] The provider's own web search; off unless the entry asked for it.
+    var hostedWebSearch by remember {
+        mutableStateOf(overrides.hostedWebSearch ?: baseModel.hostedWebSearch)
+    }
     var isHidden by remember { mutableStateOf(entry.isHidden) }
     var showQuickTest by remember { mutableStateOf(false) }
 
@@ -130,6 +134,7 @@ fun ModelEntryDetailScreen(
                         contextWindow = contextWindowText.trim().toIntOrNull()?.takeIf { it > 0 },
                         // supportsReasoning: persist only when user diverged from base.
                         supportsReasoning = thinkingEnabled.takeIf { it != (baseModel.supportsReasoning ?: false) },
+                        hostedWebSearch = hostedWebSearch.takeIf { it != baseModel.hostedWebSearch },
                         // Modality lists: persist only when user-edited set differs
                         // from baseModel's set; otherwise leave null so the entry
                         // tracks future provider updates to the base modalities.
@@ -221,6 +226,12 @@ fun ModelEntryDetailScreen(
                 title = stringResource(R.string.modeldetail_thinking),
                 checked = thinkingEnabled,
                 onCheckedChange = { thinkingEnabled = it },
+            )
+            SettingsSwitchRow(
+                title = stringResource(R.string.modeldetail_hosted_web_search),
+                subtitle = stringResource(R.string.modeldetail_hosted_web_search_sub),
+                checked = hostedWebSearch,
+                onCheckedChange = { hostedWebSearch = it },
                 showDivider = false,
             )
         }

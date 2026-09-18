@@ -1492,4 +1492,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">これらのスイッチは Minis LSPosed モジュールが読みます。モジュールをインストールし、スコープで Minis を有効にしてください。変更は次のインターセプトで有効になり、再起動は不要です。</string>
 
+    <string name="modeldetail_hosted_web_search">サーバー側ウェブ検索</string>
+    <string name="modeldetail_hosted_web_search_sub">モデルがプロバイダー自身の検索を呼び出せるようにします。出典は引用として返り、プロバイダーの枠を消費します。対応するのは Responses API のみです。</string>
+
 </resources>

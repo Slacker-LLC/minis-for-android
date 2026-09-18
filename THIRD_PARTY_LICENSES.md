@@ -110,6 +110,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/PersonalDataQueryTools.kt` (the shared content-query read, extracted from the ColorOS tools) and `tools/DownloadsTools.kt` | `agent/tool/AgentPersonalDataTools.kt` (`search_downloads` and the `query` helper behind every provider read) and its catalog entry |
 | `xposed/ModuleSettingsStore.kt` and `ui/settings/ModuleSettingsScreen.kt` | `config/Prefs.kt` and the module settings screen behind it |
 | `xposed/system/PowerKeyHooks.kt`, `xposed/system/PowerKeyPolicy.kt` (the assist message id, the OEM haptic and the dedup window as values) | `hook/system/PowerHooks.kt` and the constants it reads in `core/ModuleConfig.kt` |
+| `provider/HostedWebSearchPolicy.kt`, the `hostedWebSearch` field in `data/model/LLMModel.kt` / `data/model/ProviderConfig.kt` and its toggle in `ui/settings/ModelEntryDetailScreen.kt` | `agent/model/ResponsesRequestBuilder.kt` and the `hosted_web_search_enabled` column behind it |
 
 
 ## Active native/runtime components

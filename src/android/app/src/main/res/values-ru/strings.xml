@@ -1737,4 +1737,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">Эти переключатели читает модуль Minis для LSPosed: установите его и включите Minis в его области. Изменение действует со следующего перехвата, перезапуск не нужен.</string>
 
+    <string name="modeldetail_hosted_web_search">Веб-поиск на стороне провайдера</string>
+    <string name="modeldetail_hosted_web_search_sub">Разрешает модели вызывать поиск провайдера. Источники возвращаются как цитаты; это расходует квоту провайдера, и поддерживает это только Responses API.</string>
+
 </resources>

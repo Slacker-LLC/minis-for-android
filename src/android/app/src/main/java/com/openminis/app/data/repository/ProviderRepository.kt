@@ -2485,6 +2485,9 @@ class ProviderRepository(private val context: Context) {
                         entry.overrides.maxOutputTokens?.let { o.put("maxOutputTokens", it) }
                         entry.overrides.contextWindow?.let { o.put("contextWindow", it) }
                         entry.overrides.supportsReasoning?.let { o.put("supportsReasoning", it) }
+                        entry.overrides.hostedWebSearch?.let {
+                            o.put("hostedWebSearch", it)
+                        }
                         entry.overrides.inputModalities?.let {
                             o.put("inputModalities", JSONArray(it))
                         }

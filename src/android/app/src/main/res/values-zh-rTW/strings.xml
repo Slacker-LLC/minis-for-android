@@ -1034,4 +1034,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">這些開關由 Minis 的 LSPosed 模組讀取：先安裝模組，並在其作用範圍勾選 Minis。變更在下一次攔截即生效，不需要重新啟動。</string>
 
+    <string name="modeldetail_hosted_web_search">伺服端聯網搜尋</string>
+    <string name="modeldetail_hosted_web_search_sub">允許模型呼叫服務商自己的聯網搜尋。來源以引用形式回傳；會消耗服務商配額，且只有 Responses API 支援。</string>
+
 </resources>

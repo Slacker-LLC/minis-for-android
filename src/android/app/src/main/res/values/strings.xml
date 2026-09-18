@@ -1889,4 +1889,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">These switches are read by the Minis LSPosed module: install it and enable Minis in its scope. A change takes effect at the next interception, with no restart.</string>
 
+    <string name="modeldetail_hosted_web_search">Server-side web search</string>
+    <string name="modeldetail_hosted_web_search_sub">Let the model call the search the provider runs itself. Sources come back as citations; this spends the provider\'s quota, and only the Responses API has it.</string>
+
 </resources>

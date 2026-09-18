@@ -1484,4 +1484,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">이 스위치는 Minis LSPosed 모듈이 읽습니다. 모듈을 설치하고 범위에서 Minis를 활성화하세요. 변경은 다음 가로채기에서 적용되며 재시작은 필요 없습니다.</string>
 
+    <string name="modeldetail_hosted_web_search">서버 측 웹 검색</string>
+    <string name="modeldetail_hosted_web_search_sub">모델이 공급자 자체 검색을 호출하도록 허용합니다. 출처는 인용으로 돌아오고, 공급자 할당량을 사용하며, Responses API에서만 지원됩니다.</string>
+
 </resources>

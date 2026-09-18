@@ -16,6 +16,7 @@ import com.openminis.app.provider.thinking.ThinkingResolveContext
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.CustomHeaderPolicy
+import com.openminis.app.provider.HostedWebSearchPolicy
 import com.openminis.app.provider.RequestBodyMerge
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
@@ -3015,12 +3016,15 @@ class OpenAIProvider private constructor(
         // parameters}), distinct from Chat Completions' wrapped {type, function:{...}}.
         // Until this branch existed, Responses-API requests went out with no `tools`
         // field at all, so the model invented its own <tool_call>{...} text format.
-        if (tools.isNotEmpty()) {
-            val toolsArray = JSONArray()
-            for (tool in tools) {
-                toolsArray.put(tool.toResponsesAPIJson())
-            }
-            body.put("tools", toolsArray)
+        val toolsArray = JSONArray()
+        for (tool in tools) {
+            toolsArray.put(tool.toResponsesAPIJson())
+        }
+        // [T-eta-hosted-web-search] The provider's own web search rides in the same array; with the
+        // entry's opt-in off (the default) this is exactly the array the managed tools produce.
+        val requestTools = HostedWebSearchPolicy.apply(toolsArray, model.hostedWebSearch)
+        if (requestTools.length() > 0) {
+            body.put("tools", requestTools)
             body.put("tool_choice", "auto")
         }
 

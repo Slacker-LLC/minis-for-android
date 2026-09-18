@@ -1487,4 +1487,7 @@
     <string name="module_settings_target_gemini">Google Gemini</string>
     <string name="module_settings_footer">Diese Schalter liest das Minis-LSPosed-Modul: installieren und Minis im Geltungsbereich aktivieren. Änderungen greifen beim nächsten Abfangen, ohne Neustart.</string>
 
+    <string name="modeldetail_hosted_web_search">Serverseitige Websuche</string>
+    <string name="modeldetail_hosted_web_search_sub">Erlaubt dem Modell die Suche des Anbieters selbst zu nutzen. Quellen kommen als Zitate zurück; das verbraucht das Kontingent des Anbieters, und nur die Responses-API kennt sie.</string>
+
 </resources>

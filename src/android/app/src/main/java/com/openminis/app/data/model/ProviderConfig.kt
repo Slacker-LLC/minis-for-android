@@ -344,6 +344,8 @@ data class ModelOverrides(
     // of older JSON (unlike adding an enum case) — old configs simply lack the
     // key and it defaults to null.
     val maxThinkingLevel: ThinkingLevel? = null,
+    /** [T-eta-hosted-web-search] Per-entry opt-in for the provider's own web search. */
+    val hostedWebSearch: Boolean? = null,
 ) {
     val isEmpty: Boolean
         get() = displayName == null
@@ -353,6 +355,7 @@ data class ModelOverrides(
             && inputModalities == null
             && outputModalities == null
             && maxThinkingLevel == null
+            && hostedWebSearch == null
 }
 
 @Serializable
@@ -377,6 +380,7 @@ data class ModelEntry(
             supportsReasoning = overrides.supportsReasoning ?: baseModel.supportsReasoning,
             inputModalities = overrides.inputModalities ?: baseModel.inputModalities,
             outputModalities = overrides.outputModalities ?: baseModel.outputModalities,
+            hostedWebSearch = overrides.hostedWebSearch ?: baseModel.hostedWebSearch,
         )
 
     /** True when this entry carries user intent beyond API-reported defaults. */

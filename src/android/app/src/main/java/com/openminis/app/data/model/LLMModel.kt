@@ -10,6 +10,13 @@ data class LLMModel(
     val contextWindow: Int? = null,
     val maxOutputTokens: Int? = null,
     val supportsReasoning: Boolean? = null,
+    /**
+     * [T-eta-hosted-web-search] Whether this entry may use the provider's own web search, which the
+     * Responses request expresses as a `web_search` tool. Off unless the user asked for it: it
+     * spends the provider's quota and lets the model search without going through this app's own
+     * tools.
+     */
+    val hostedWebSearch: Boolean = false,
     val interleavedReasoningField: String? = null,
     // [T-reasoning-effort-data-driven] Effort tiers this model accepts, from the
     // models.dev `reasoning_options` entry of type `effort` (e.g. ["high","max"]
