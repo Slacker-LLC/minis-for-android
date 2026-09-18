@@ -410,6 +410,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2180 个用例 = 上一项后的 2177 + 3，0 失败）。**没有任何设备结论**：某一版 ColorOS 是否有这个 Activity 与这套 payload 形状、JSON 键是否还在、转场覆盖是否生效，全部未验证——没有目标时台账记 MISSING 并保留原手势。真机判据：logcat 里 `ColorDirect` 前缀的台账行 + 双指手势后是否出现系统一圈即搜。
 
+**Phase 6 第十二组：ColorOS 便签/录音/摘要检索** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 三个个人数据检索 | `android.coloros.notes` / `android.coloros.recordings` / `android.coloros.recording_summaries`（别名 `search_coloros_notes` / `search_coloros_recordings` / `search_recording_summaries`）照上游走厂商应用自己的 provider（`com.nearme.note/rich_notes`、`com.coloros.soundrecorder.provider/records` 与 `/summary`），经本仓库结构化的特权通道发出一**一个 `content query` argv**（无 shell 文本）——这些 provider 本应用本来读不到。三个规范名已进 `ToolSensitivePolicy` 敏感表（别名本来就在 Eta 原表里） | `bba72496` | ✅ `PersonalDataContentParserTest`（2 例，上游测试移植）+ `PersonalDataQueryPolicyTest`（4 例） |
+| 解析与边界 | `PersonalDataContentParser` 是上游整段搬来的，两条性质正是它的价值：provider 异常（stderr 里的 `Error while accessing provider:` / `IllegalArgumentException` / `SecurityException`）判为**失败并给出错误码**，绝不冒充「没查到」；行按**请求的列**切分，值里的逗号不会把一条记录切碎。关键词要进别人的 SQL，因此 `\` `%` `_` `'` 都做转义、按列大小写不敏感匹配；关键词超 200 字符**拒绝**（不截断），行数 1–30 默认 10 | `bba72496` | ✅ 上述用例（含逗号正文与通配符转义） |
+| 没做 | Eta 同文件的 `search_qq_chat_images`/`search_wechat_chat_images`（读 QQ/微信私有缓存目录）仍在「待拍板」里，没有随本片落地 | — | — |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2186 个用例 = 上一项后的 2180 + 6，0 失败）。**没有任何设备结论**：某一版 ColorOS 是否暴露这些 provider、root 调用能否到达、列返回什么，全部未验证；失败时工具给出带原因的错误码而不是空列表。真机判据：三个工具调用返回的 JSON 是数据还是某个带原因的 `PERSONAL_DATA_*` 错误码。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -418,7 +428,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、ColorOS 便签/录音检索、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
