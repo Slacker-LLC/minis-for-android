@@ -39,8 +39,6 @@ object ModulePrefs {
         const val POWER_KEY_TAKEOVER = "power_key_takeover"
         const val HOTWORD_SELF_HEAL = "hotword_self_heal"
         const val ASSISTANT_AUTO_CONFIG = "assistant_auto_config"
-        const val LOCKSCREEN_VOICE_COMMAND = "lockscreen_voice_command"
-        const val SCREEN_ON_VOICE_COMMAND = "screen_on_voice_command"
     }
 
     /**
@@ -55,8 +53,6 @@ object ModulePrefs {
         Keys.POWER_KEY_TAKEOVER to false,
         Keys.HOTWORD_SELF_HEAL to false,
         Keys.ASSISTANT_AUTO_CONFIG to false,
-        Keys.LOCKSCREEN_VOICE_COMMAND to false,
-        Keys.SCREEN_ON_VOICE_COMMAND to false,
     )
 
     @Volatile

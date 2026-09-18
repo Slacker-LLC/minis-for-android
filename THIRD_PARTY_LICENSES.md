@@ -89,7 +89,6 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/ModulePrefs.kt` (module switches and their defaults) | `config/Prefs.kt` |
 | `xposed/LogThrottle.kt`, `xposed/HookGroups.kt`, `xposed/system/CircleToSearchInvoker.kt`, `xposed/hyperos/HyperOsScreenSearchHooks.kt`, `xposed/hyperos/HyperOsScreenSearchRequest.kt` | `core/LogThrottle.kt`, `hook/system/CircleToSearchInvoker.kt`, `hook/hyperos/HyperOsScreenSearch*.kt` |
 | `xposed/AssistantLaunch.kt`, `xposed/hyperos/HyperOsPowerHooks.kt`, `xposed/hyperos/HyperOsPowerPolicy.kt` | `hook/hyperos/HyperOsPower*.kt` and the launch half of `hook/system/PowerHooks.kt` / `AssistantManager.kt` |
-| `xposed/google/GoogleVoiceCommandHooks.kt`, `xposed/google/GoogleVoiceCommandPolicy.kt` | `hook/google/GoogleAppHooks.kt` (the `FloatyActivity` voice-command half) |
 | `xposed/google/GoogleEligibilityHooks.kt`, `xposed/google/GoogleSpoofProfile.kt` | `hook/google/GoogleEligibilityHooks.kt` and the device-identity half of `hook/google/GoogleAppHooks.kt` (values from the `SPOOF_*` constants in `core/ModuleConfig.kt`) |
 | `xposed/system/ContextualSearchHooks.kt`, `xposed/system/ContextualSearchCallerPolicy.kt` | `hook/system/ContextualSearchHooks.kt`, `hook/system/ContextualSearchCallerPolicy.kt` (the system-package check behind the caller policy joined `xposed/HookSupport.kt`) |
 | `xposed/LogSafety.kt` (`safeLogType`, `toSafeLogToken`) | `core/LogSafety.kt` |

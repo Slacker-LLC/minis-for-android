@@ -335,16 +335,6 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2142 个用例 = 上一项后的 2132 + 10，0 失败）。**没有任何设备结论**：特定 HyperOS 版本是否暴露这个分发器、电源键快捷方式是否真的走到它、拉起的 intent 是否打开助手，全部未验证——ROM 上没有目标时台账记 MISSING/SKIPPED 并保留原行为。真机判据：logcat 里 `HyperOsPower` 前缀的台账行。
 
-**Phase 6 第三组：Gemini 浮窗语音补偿** — 同一分支 `codex/eta-phase6-xposed`：
-
-| 项 | 内容 | 提交 | 验证 |
-|---|---|---|---|
-| 第三组真 hook：Gemini 浮窗补语音输入 | Google 的助手浮窗（`FloatyActivity`）在锁屏/亮屏路径回到前台时可能没带上本该开始收音的语音指令，用户看到浮层却还得再点一下麦克风。这组盯着该 Activity 的 `onResume`，把一条 `ACTION_VOICE_COMMAND` 补发回 Google 自己的应用。两个开关默认都关——锁屏与亮屏是两件独立的选择，「装了但没配」必须等价于没装。开关在 resume 时读一次、350 ms 后连同 Activity 是否还活着、锁屏状态是否仍是当初那个一起复查：为锁屏排队的那条指令绝不会在已解锁的会话上开麦。每个浮窗实例每个窗口只补一条（弱引用作键，不泄漏 Activity）；发送失败的尝试会清掉自己的标记而不是吃掉窗口 | `e818b8cf` | ✅ `GoogleVoiceCommandPolicyTest`（6 例） |
-| 目标与回落 | 优先 hook 浮窗自己的 `onResume`；该类没声明 `onResume` 时回落到 `Activity.onResume` 并用类名把自己限制在浮窗上——Google App 更新挪走方法后 hook 仍然有效；两者都没有则记 MISSING。指令带 `setPackage(Google 包)`，因为这条 hook 本来就跑在它的进程里 | `e818b8cf` | ✅ 上述用例覆盖开关默认、状态翻转拒绝、去重窗口与清标记 |
-| 同文件另一半 | Eta 同一文件的另一半是在 Google 进程里补齐机型档案与资格（`Build` 五个静态字段、`ro.opa.eligible_device`、`GOOGLE_BUILD`/`GOOGLE_EXPERIENCE` 两个 feature）。这一半当轮没落，下一组已按 Eta 原样补上 | 见下一组 | — |
-
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2148 个用例 = 上一项后的 2142 + 6，0 失败）。**没有任何设备结论**：这一版 Google App 是否暴露 `FloatyActivity`、它的 resume 路径是否真的缺语音指令、补发的指令是否会让浮窗开始收音，全部未验证——没有目标时台账记 MISSING 并保留原行为。真机判据：logcat 里 `GoogleVoiceCommand` 前缀的台账行。
-
 **Phase 6 第四组：Google 机型档案与资格** — 同一分支 `codex/eta-phase6-xposed`：
 
 | 项 | 内容 | 提交 | 验证 |
@@ -401,7 +391,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈。未落地：小布、超级小爱、ColorOS 记忆/直连，以及路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈。未落地：小布、超级小爱、ColorOS 记忆/直连，以及路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
@@ -410,6 +400,7 @@
 | PRoot / Alpine / 多发行版安装器（不引入） | 与「单一 Direct Ubuntu 24.04 chroot」合同冲突 |
 | systemizer（把 Google App 装成系统应用） | 扩大 Root 面，超出「Root 只做受控基础设施」边界 |
 | 厂商私有内部类实现（HyperOS/ColorOS 内部方法） | 跨版本不稳定，且无法在宿主复现验证 |
+| Gemini 浮窗语音补偿（Eta `GoogleAppHooks` 的浮窗那一半） | 用户 2026-09-18 明确表示不需要：原先落地的版本（`e818b8cf`）连同文件、注册与归属登记一并移除；同一文件的机型档案与资格那一半保留 |
 | 第二套跨进程 runtime 协议 / 终态 outbox | 单进程应用以 Room + ViewModel 为真源，重复实现会造成两套状态源 |
 | 在线商店类分发面 | 产品定位与服务端依赖不在本仓库范围 |
 
