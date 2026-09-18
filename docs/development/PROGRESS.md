@@ -299,7 +299,13 @@
 |---|---|---|---|
 | Hook 台账与目标表 | Phase 6 先落不需要框架的那一半：模块怎么汇报自己的 hook，以及在哪些进程里才该存在。`HookInstallStatus/Entry/Report/Journal` 照 Eta 原样——每个 hook 四态（installed/missing/failed/skipped）、每组计数与一行摘要；`capture()` 会把安装期异常先记成 FAILED 再抛出，因此半装完的组不可能汇报成功，而厂商 ROM 集成只有在「装上了 / 这版 ROM 没这个目标 / 它抛了」三者可区分时才可诊断。`ModuleTargets` 是 Eta 的单一目标表（自身包 + system_server + SystemUI + 路线图点名的助手/桌面/厂商入口），外加模块在一切之前要跑的两个判定：只在自身包与声明目标里保留生命周期回调（否则设备每次启动应用都要为空进程付费），`isProcessOf` 匹配包的子进程但不误配同前缀的包 | `6ed1918c` | ✅ `HookInstallJournalTest`（4 例）+ `ModuleTargetsTest`（3 例） |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2109 个用例 = Phase 5 分支的 2102 + 7，0 失败）。**本项刻意不含**：`compileOnly` 的 libxposed 依赖、`META-INF/xposed/` 模块声明与 `XposedModule` 入口类——这三样改变 APK 对 LSPosed 声明的身份，属于独立一步；工件已确认能从 Maven Central 取到（`io.github.libxposed:api:102.0.0` 返回 200），因此不存在阻塞。**没有任何设备结论**：入口类存在之前这些代码不会运行。
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2109 个用例 = Phase 5 分支的 2102 + 7，0 失败）。
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 作为 LSPosed 模块加载 | 台账与目标表有了，但没有任何东西声明这个模块，LSPosed 无从加载。本轮补上：`compileOnly` 的 libxposed API（102.0.0，与 Eta 同一固定版本）、`META-INF/xposed/` 声明（`module.prop` / `java_init.list` / `scope.list`）与框架实例化的入口类。`MinisXposedModule` 保留 Eta 的生命周期：先记录被加载进哪个进程，在任何与模块无关的进程里立刻 `detach()`，system_server 走自己的入口，包目标只在该包**自己的进程**里安装（从错误的进程装 hook 等于静默什么都没打）。派发问 `HookGroupRegistry` 而不是写一串厂商分支——本仓库的厂商支持一片一片长；注册表为空时模块照常加载、不碍事，并在日志里明说该目标还没有可安装的组 | `bfcea758` | ✅ 编译 + `assembleDebug` 后核对 APK 内含 `META-INF/xposed/` 三个文件且 `module.prop` 内容正确 + `HookGroupRegistryTest`（3 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2112 个用例 = 上一项后的 2109 + 3，0 失败），`:app:assembleDebug` 通过并**在产出的 APK 里核对到 `META-INF/xposed/{module.prop,java_init.list,scope.list}`**（内容与预期一致，说明 `resources.merges` 规则有效、声明不会被 release 打包裁掉），libxposed 工件已从 Maven Central 解析成功（Gradle 缓存中可见）。`build.gradle` 用 `compileOnly`，因此 App 不会自带一份可能与已装管理器版本漂移的框架副本。**没有任何设备结论**：LSPosed 是否加载该模块、hook 是否生效均未验证——目前还没有注册任何 hook 组。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
