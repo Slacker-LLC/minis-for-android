@@ -61,7 +61,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `data/model/LLMStreamChunk.kt` (`ProviderOutputItem`), `data/model/LLMMessage.kt` (`providerOutputItems`), `provider/openai/OpenAIProvider.kt` (capture and replay of opaque output items) | `agent/model/ResponsesEphemeralState.kt`, item handling in `agent/model/OpenAiResponsesProvider.kt` |
 | `tools/android/UiCoordinateSpace.kt` (coordinate-space contract, frame conversion and refusals) | `agent/model/AgentToolSchema.kt` (`coordinateSpace`), `agent/model/AgentScreenObservationContract.kt` |
 | `tools/ImageSourcePolicy.kt`, `tools/ReadImageTool.kt` (image source classification incl. gallery URIs) | `agent/model/AgentFileVisionToolCatalog.kt` |
-| `tools/skills/SkillToolPolicy.kt`, `tools/skills/SkillTools.kt` (skill listing, SKILL.md and resource reads) | `agent/model/AgentSkillToolCatalog.kt` |
+| `tools/skills/SkillToolPolicy.kt`, `tools/skills/SkillTools.kt` (skill listing, SKILL.md and resource reads), `tools/skills/SkillSourcePolicy.kt` and the GitHub inspect/install additions in `data/repository/SkillRepository.kt` | `agent/model/AgentSkillToolCatalog.kt` and the discovery/install path behind it |
 
 
 ## Active native/runtime components

@@ -798,6 +798,158 @@ class SkillRepository(private val context: Context) {
         data class Failure(val reason: String) : UpdateResult()
     }
 
+    // -- Public GitHub skill sources [T-eta-skill-tools] -------------------------
+
+    /**
+     * The skill id a SKILL.md would install as, without writing anything — used to
+     * detect a conflict before an install starts.
+     */
+    fun candidateSkillId(content: String): String? =
+        parseSkillMd(content)?.name?.let { slugify(it) }?.takeIf { it.isNotBlank() }
+
+    /** Result of [inspectGitHub]: the pinned commit plus the directories that hold a SKILL.md. */
+    data class GitHubInspection(
+        val commitSha: String?,
+        val paths: List<String>,
+        val truncated: Boolean,
+        val error: String?,
+    )
+
+    /** Result of [installFromGitHub]. */
+    sealed class SkillInstallOutcome {
+        data class Installed(
+            val skill: Skill,
+            val commitSha: String,
+            val filesWritten: Int,
+            /** Non-null when the SKILL.md landed but the sibling walk did not finish. */
+            val partialReason: String?,
+        ) : SkillInstallOutcome()
+
+        data class Conflict(val existingId: String, val bundled: Boolean) : SkillInstallOutcome()
+
+        data class Failure(val reason: String) : SkillInstallOutcome()
+    }
+
+    /**
+     * List the directories that contain a SKILL.md in a public repository, pinned to the
+     * commit the ref resolved to. Read-only: nothing is downloaded into the skills tree,
+     * and the returned sha is what an install should be pinned to.
+     */
+    suspend fun inspectGitHub(repository: String, ref: String?, path: String?): GitHubInspection =
+        withContext(Dispatchers.IO) {
+            val parsed = com.openminis.app.tools.skills.SkillSourcePolicy.parseRepository(repository)
+                ?: return@withContext GitHubInspection(
+                    null, emptyList(), false,
+                    "repository must be owner/repo or a github.com URL",
+                )
+            val targetRef = ref?.trim()?.takeIf { it.isNotEmpty() } ?: parsed.ref ?: "HEAD"
+            val commitSha = resolveCommitSha(parsed.owner, parsed.repo, targetRef)
+                ?: return@withContext GitHubInspection(
+                    null, emptyList(), false,
+                    "GitHub returned no commit for ${parsed.owner}/${parsed.repo}@$targetRef " +
+                        "(private repository, unknown ref, or API rate limit)",
+                )
+            val treeJson = httpGetString(
+                com.openminis.app.tools.skills.SkillSourcePolicy.treeApiUrl(parsed.owner, parsed.repo, commitSha),
+            ) ?: return@withContext GitHubInspection(
+                commitSha, emptyList(), false,
+                "GitHub returned no file tree for ${parsed.owner}/${parsed.repo}@$commitSha",
+            )
+            val candidates = com.openminis.app.tools.skills.SkillSourcePolicy.skillDirectories(
+                treeJson,
+                path ?: parsed.path,
+            )
+            GitHubInspection(commitSha, candidates.paths, candidates.truncated, null)
+        }
+
+    /**
+     * Install one skill directory from a public repository. The SKILL.md and its sibling
+     * files are fetched at the SAME commit, so a branch that moves between inspection and
+     * install cannot mix two versions. An existing id is never overwritten: the caller
+     * gets the conflicting id back and updates it through the Skills screen instead.
+     */
+    suspend fun installFromGitHub(
+        repository: String,
+        ref: String?,
+        path: String?,
+    ): SkillInstallOutcome = withContext(Dispatchers.IO) {
+        val policy = com.openminis.app.tools.skills.SkillSourcePolicy
+        val parsed = policy.parseRepository(repository)
+            ?: return@withContext SkillInstallOutcome.Failure(
+                "repository must be owner/repo or a github.com URL",
+            )
+        val directory = path?.trim('/')?.takeIf { it.isNotEmpty() } ?: parsed.path
+        if (directory != null && policy.safeRelativeDirectory(directory) == null) {
+            return@withContext SkillInstallOutcome.Failure(
+                "path must be a repository-relative directory without '..' or backslashes",
+            )
+        }
+        val targetRef = ref?.trim()?.takeIf { it.isNotEmpty() } ?: parsed.ref ?: "HEAD"
+        val commitSha = resolveCommitSha(parsed.owner, parsed.repo, targetRef)
+            ?: return@withContext SkillInstallOutcome.Failure(
+                "GitHub returned no commit for ${parsed.owner}/${parsed.repo}@$targetRef",
+            )
+        val markdown = httpGetString(policy.rawSkillMdUrl(parsed.owner, parsed.repo, commitSha, directory))
+            ?: return@withContext SkillInstallOutcome.Failure(
+                "SKILL.md was not found at ${directory ?: "(repository root)"} in " +
+                    "${parsed.owner}/${parsed.repo}@$commitSha",
+            )
+        val candidateId = candidateSkillId(markdown)
+            ?: return@withContext SkillInstallOutcome.Failure("the fetched SKILL.md has no usable frontmatter name")
+        _skills.value.find { it.id == candidateId }?.let { existing ->
+            return@withContext SkillInstallOutcome.Conflict(
+                existingId = existing.id,
+                bundled = existing.importSource == ImportSource.BUNDLED,
+            )
+        }
+
+        val sourceURL = policy.htmlSkillUrl(parsed.owner, parsed.repo, commitSha, directory)
+        val installed = importFromContent(markdown, ImportSource.URL, sourceURL = sourceURL)
+            ?: return@withContext SkillInstallOutcome.Failure("the skill transaction refused $candidateId")
+
+        val files = mutableListOf<SkillInstallFile>()
+        val agg = AggregateOutcome(files)
+        downloadGitHubDirectory(
+            user = parsed.owner,
+            repo = parsed.repo,
+            branch = commitSha,
+            remotePath = directory.orEmpty(),
+            relativeTo = "",
+            depth = 0,
+            outcome = agg,
+        )
+        var partialReason = agg.firstReason
+        if (files.isNotEmpty()) {
+            val result = commitSkillFiles(
+                skillId = installed.id,
+                registration = registrationOf(installed),
+                files = files,
+                base = SkillInstallBase.PRESERVE,
+            )
+            if (result is SkillInstallResult.Failure) {
+                logRefusedTransaction("GitHub install siblings", installed.id, result)
+                partialReason = "sibling files were refused: ${result.error.message}"
+            }
+        }
+        SkillInstallOutcome.Installed(
+            skill = _skills.value.find { it.id == installed.id } ?: installed,
+            commitSha = commitSha,
+            filesWritten = agg.filesWritten,
+            partialReason = partialReason,
+        )
+    }
+
+    private fun resolveCommitSha(owner: String, repo: String, ref: String): String? {
+        val body = httpGetString(
+            com.openminis.app.tools.skills.SkillSourcePolicy.commitApiUrl(owner, repo, ref),
+        ) ?: return null
+        return try {
+            JSONObject(body).optString("sha").takeIf { it.isNotEmpty() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /**
      * Aggregate outcome of a sibling-file download walk — surfaced through
      * [UpdateResult.PartialSuccess] when SKILL.md imported but sibling files

@@ -28,17 +28,23 @@ object SkillTools {
     const val LIST = "skill.list"
     const val READ = "skill.read"
     const val RESOURCE = "skill.read_resource"
+    const val INSPECT = "skill.inspect_github"
+    const val INSTALL = "skill.install_github"
 
     val aliases: Map<String, List<String>> = mapOf(
         LIST to listOf("skills_list"),
         READ to listOf("skills_read"),
         RESOURCE to listOf("skills_read_resource"),
+        INSPECT to listOf("skills_inspect_github"),
+        INSTALL to listOf("skills_install_from_github"),
     )
 
     fun handlers(): List<ToolHandler> = listOf(
         SkillListHandler(),
         SkillReadHandler(),
         SkillReadResourceHandler(),
+        SkillInspectGitHubHandler(),
+        SkillInstallGitHubHandler(),
     )
 
     internal fun repository(context: Context): SkillRepository? =
@@ -132,6 +138,97 @@ object SkillTools {
         if (files.isEmpty()) return ""
         return "\nFiles in this skill: " + files.joinToString(", ")
     }
+
+    internal suspend fun inspectGitHub(argsJson: String, context: Context): ToolExecutionResult {
+        val args = JSONObject(argsJson)
+        val request = args.optString("repository")
+        if (request.isBlank()) return ToolExecutionResult("Error: INVALID_ARGS: repository is required", false)
+        val rawPath = args.optString("path")
+        val path = if (rawPath.isBlank()) {
+            null
+        } else {
+            SkillSourcePolicy.safeRelativeDirectory(rawPath)
+                ?: return ToolExecutionResult(
+                    "Error: INVALID_PATH: path must be a repository-relative directory without '..' or backslashes",
+                    false,
+                )
+        }
+        val store = repository(context) ?: return notReady()
+        val inspection = store.inspectGitHub(
+            repository = request,
+            ref = args.optString("ref").ifBlank { null },
+            path = path,
+        )
+        inspection.error?.let { return ToolExecutionResult("Error: GITHUB_INSPECTION_FAILED: $it", false) }
+        if (inspection.paths.isEmpty()) {
+            return ToolExecutionResult(
+                "No directory in $request contains a SKILL.md, so there is nothing to install.",
+                false,
+            )
+        }
+        val header = buildString {
+            append("repository: ").append(request).append('\n')
+            append("commitSha: ").append(inspection.commitSha).append('\n')
+            append(inspection.paths.size).append(" candidate skill director")
+                .append(if (inspection.paths.size == 1) "y:" else "ies:")
+        }
+        val listing = inspection.paths.joinToString("\n") { "- $it" }
+        val footer = buildString {
+            if (inspection.truncated) {
+                append("\n(listing stops at ").append(SkillSourcePolicy.MAX_CANDIDATES)
+                    .append(" directories; narrow with path=)")
+            }
+            append("\nInstall one with ").append(INSTALL)
+            append(" using the same repository, the path above and this commitSha as ref, so the content cannot move.")
+        }
+        return ToolExecutionResult("$header\n$listing\n$footer", true)
+    }
+
+    internal suspend fun installGitHub(argsJson: String, context: Context): ToolExecutionResult {
+        val args = JSONObject(argsJson)
+        val request = args.optString("repository")
+        if (request.isBlank()) return ToolExecutionResult("Error: INVALID_ARGS: repository is required", false)
+        val rawPath = args.optString("path")
+        if (rawPath.isBlank()) {
+            return ToolExecutionResult(
+                "Error: INVALID_ARGS: path is required — run " + INSPECT +
+                    " first and install one of the directories it returned",
+                false,
+            )
+        }
+        val store = repository(context) ?: return notReady()
+        return when (
+            val outcome = store.installFromGitHub(
+                repository = request,
+                ref = args.optString("ref").ifBlank { null },
+                path = rawPath,
+            )
+        ) {
+            is SkillRepository.SkillInstallOutcome.Installed -> {
+                val text = buildString {
+                    append("installed: ").append(outcome.skill.id)
+                    append(" | name: ").append(outcome.skill.name)
+                    append("\ncommitSha: ").append(outcome.commitSha)
+                    append("\nfiles: ").append(outcome.filesWritten).append(" sibling file(s)")
+                    append("\npath: ").append(SkillToolPolicy.skillMdPath(outcome.skill.id))
+                    outcome.partialReason?.let { append("\npartial: ").append(it) }
+                    append("\nThe skill is available from the next turn.")
+                }
+                ToolExecutionResult(text, true)
+            }
+            is SkillRepository.SkillInstallOutcome.Conflict -> ToolExecutionResult(
+                "Error: SKILL_CONFLICT: ${outcome.existingId} already exists as a " +
+                    (if (outcome.bundled) "built-in skill" else "user skill") +
+                    ". This tool never overwrites a skill — update it from Settings → Skills, " +
+                    "or install a different directory.",
+                false,
+            )
+            is SkillRepository.SkillInstallOutcome.Failure -> ToolExecutionResult(
+                "Error: GITHUB_INSTALL_FAILED: ${outcome.reason}",
+                false,
+            )
+        }
+    }
 }
 
 class SkillListHandler : ToolHandler {
@@ -181,4 +278,42 @@ class SkillReadResourceHandler : ToolHandler {
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
         SkillTools.readResource(argsJson, context)
+}
+
+
+class SkillInspectGitHubHandler : ToolHandler {
+    override val definition = AgentToolDefinition(
+        name = SkillTools.INSPECT,
+        description = "Inspect a public GitHub repository and list every directory that contains a SKILL.md. " +
+            "This never installs anything. Use the returned commitSha as ref for installation; " +
+            "when several candidates match, ask the user which directory they mean.",
+        parameters = mapOf(
+            "repository" to AgentToolParam("string", "Public owner/repository or https://github.com/... URL"),
+            "ref" to AgentToolParam("string", "Optional branch, tag or commit; omit for the default branch"),
+            "path" to AgentToolParam("string", "Optional repository-relative directory used to narrow discovery"),
+        ),
+        required = listOf("repository"),
+    )
+
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
+        SkillTools.inspectGitHub(argsJson, context)
+}
+
+class SkillInstallGitHubHandler : ToolHandler {
+    override val definition = AgentToolDefinition(
+        name = SkillTools.INSTALL,
+        description = "Install one skill directory from a public GitHub repository. Use a path returned by " +
+            "${SkillTools.INSPECT} and pass its commitSha as ref, so a moving branch cannot change what is installed. " +
+            "An existing skill is never overwritten: a conflict names the id to update from Settings → Skills. " +
+            "Bundled scripts are not executed, and the skill becomes available next turn.",
+        parameters = mapOf(
+            "repository" to AgentToolParam("string", "Public owner/repository or https://github.com/... URL"),
+            "path" to AgentToolParam("string", "Exact repository-relative skill directory returned by inspection"),
+            "ref" to AgentToolParam("string", "Optional branch, tag or commit — pass the inspection's commitSha to pin it"),
+        ),
+        required = listOf("repository", "path"),
+    )
+
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
+        SkillTools.installGitHub(argsJson, context)
 }
