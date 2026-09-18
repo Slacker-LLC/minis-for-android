@@ -542,6 +542,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2232 个用例 = 上一项后的 2227 + 5），`:app:lintDebug` 0 error。**没有任何设备结论**：真实流进行中这一行的位置观感、以及根本不发这些事件的 relay 的表现均未验证——不发这些事件时产生的行与改动前完全一致。
 
+**Phase 3 补片：按选区输入文本（`input_text`）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 按选区输入 | 上游 GUI 动作清单里我们还缺的那一个：`set_text` 只能写整个值，没有办法在字段已有内容上追加。`input_text` 用字段**自己的文本与选区**（UTF-16 偏移）重建写入后的值与光标，写下去并把光标留在插入点之后——这才是「在这里打字」，也是已有内容的搜索框需要的动作 | `9d7e31be` | ✅ `TextEditPlannerTest`（4 例） |
+| 上游的拒绝判据一并搬来 | 重建一个我们读不到的字段的值，等于悄悄覆盖用户打过的字，所以上游的门留着：密码字段或不肯交出文本的字段答 `TEXT_CONTENT_UNAVAILABLE`，报不出可用光标/选区的答 `TEXT_SELECTION_UNAVAILABLE`，两者都提示改用 `set_text` 发完整值；不可能成立的选区只在**空字段**上被容忍（那里只有一个插入点）。服务侧补上上游写法的光标那半：`setNodeText(node, text, cursor)` 写完再放光标，放之前先 `refresh`（过期节点会把它早就不带的文本的选区接过去）；原来的整体写入改为以「光标在末尾」委托，与上游同形 | `9d7e31be` | ✅ 上述用例 + 结果里区分 `ACTION_SET_TEXT_AND_SELECTION`/`ACTION_SET_TEXT` |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2236 个用例 = 上一项后的 2232 + 4）。**没有任何设备结论**：某个 App 的编辑框如何上报选区、是否在 `ACTION_SET_TEXT` 之后接受 `ACTION_SET_SELECTION`，均未验证——两种情形结果里都有证据字段。**未做**：上游的 `paste_text`（同样按选区、但目标拒绝 `SET_TEXT` 时回退剪贴板粘贴）不在本次范围内（本仓库 `set_text` 已有整体值级的剪贴板回退）。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
