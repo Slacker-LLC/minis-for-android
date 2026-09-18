@@ -119,6 +119,7 @@ class ToolOverlayController(private val context: Context) {
     private var replyView: TextView? = null
     private var statusIconView: StatusGlyphView? = null
     private var closeView: View? = null
+    private var stopView: View? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     // [T-android-overlay-reply-status-34599] Session ID associated with
     // the current overlay capsule. The whole-capsule tap builds a
@@ -134,6 +135,13 @@ class ToolOverlayController(private val context: Context) {
      * by [AgentForegroundService] right after construction.
      */
     var onDismissByUser: (() -> Unit)? = null
+
+    /**
+     * [T-eta-overlay-run-panel] Called when the user taps the capsule's stop control:
+     * the same cancellation the notification's Stop action performs. Wired by
+     * [AgentForegroundService]; null leaves the control inert.
+     */
+    var onStopRequested: (() -> Unit)? = null
 
     @Volatile
     var isShown: Boolean = false
@@ -166,6 +174,7 @@ class ToolOverlayController(private val context: Context) {
         replyExcerpt: String? = null,
         targetSessionId: String? = null,
         toolTitle: String? = null,
+        stoppable: Boolean = false,
     ) {
         Log.d(
             TAG,
@@ -186,6 +195,7 @@ class ToolOverlayController(private val context: Context) {
                     attach()
                 }
                 updateContent(toolName, statusText, isRunning, outcome, replyExcerpt, toolTitle)
+                updateStopVisibility(stoppable)
             } catch (e: Throwable) {
                 Log.w(TAG, "show failed: ${e.message}", e)
             }
@@ -420,6 +430,22 @@ class ToolOverlayController(private val context: Context) {
 
         container.addView(textCol)
 
+        // [T-eta-overlay-run-panel] Stop control: the destructive action the panel
+        // offers while a run is live, next to the X that only dismisses. Hidden on a
+        // finished turn, so a lingered completion can never look cancellable.
+        val stopBtn = StopGlyphView(context).apply {
+            val s = dpToPx(14)
+            layoutParams = LinearLayout.LayoutParams(s, s).apply {
+                leftMargin = dpToPx(10)
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            visibility = View.GONE
+            setOnClickListener { onStopRequested?.invoke() }
+            contentDescription = context.getString(R.string.bg_service_stop_action)
+        }
+        stopView = stopBtn
+        container.addView(stopBtn)
+
         // [T-android-overlay-reply-status-34599] Trailing X button to
         // let the user dismiss the overlay without having to wait for
         // a foreground transition. Sized small so it doesn't dominate
@@ -439,6 +465,11 @@ class ToolOverlayController(private val context: Context) {
         container.addView(closeBtn)
 
         return container
+    }
+
+    /** [T-eta-overlay-run-panel] Stop is offered exactly while the run can be cancelled. */
+    private fun updateStopVisibility(stoppable: Boolean) {
+        stopView?.visibility = if (stoppable) View.VISIBLE else View.GONE
     }
 
     private fun updateContent(
@@ -823,6 +854,33 @@ class ToolOverlayController(private val context: Context) {
      * ship a new vector drawable resource. Color is provided by
      * [setState] so callers can swap success/failure tinting.
      */
+    /**
+     * [T-eta-overlay-run-panel] Filled rounded square: the conventional stop glyph,
+     * drawn like the other capsule glyphs so no new drawable resource is needed.
+     */
+    private class StopGlyphView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = Color.argb(235, 235, 235, 235)
+        }
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            if (w <= 0f || h <= 0f) return
+            val insetX = w * 0.24f
+            val insetY = h * 0.24f
+            canvas.drawRoundRect(
+                insetX,
+                insetY,
+                w - insetX,
+                h - insetY,
+                w * 0.12f,
+                h * 0.12f,
+                paint,
+            )
+        }
+    }
+
     private class StatusGlyphView(context: Context) : View(context) {
 
         enum class State { Success, Error }

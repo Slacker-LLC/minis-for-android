@@ -65,6 +65,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/android/UiGlobalActions.kt`, `tools/android/AndroidUiController.kt` (system panel actions) | `agent/device/RootShellDeviceController.kt` (`openSystemPanel`), `agent/model/AgentDeviceToolCatalog.kt` |
 | `tools/android/AppSearchPolicy.kt`, `tools/android/PackageWaitPolicy.kt`, the `search` action in `tools/android/AndroidPackageController.kt` and `wait_for_package` in `tools/android/AndroidUiController.kt` | `agent/model/AgentDeviceToolCatalog.kt` + `agent/tool/AgentLocalTools.kt` (`search_apps`, `wait_for_package`) |
 | `share/ConversationMarkdownExporter.kt` and the markdown format in `share/ChatExporter.kt` | `ui/app/ConversationMarkdownExporter.kt` |
+| `service/OverlayRunActions.kt` and the stop control in `service/ToolOverlayController.kt` / `service/AgentForegroundService.kt` | assistant overlay panel in Eta `ui/app/*` (stop affordance and its rule) |
 
 
 ## Active native/runtime components

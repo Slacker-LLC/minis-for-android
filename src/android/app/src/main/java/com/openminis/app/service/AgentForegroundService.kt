@@ -202,9 +202,7 @@ class AgentForegroundService : Service() {
             // Notification Stop is a user cancellation, not merely a request to
             // hide the notification. Fan out to every live stream first so each
             // ChatViewModel records its normal cancelled/resumable state.
-            SessionActivityTracker.cancelAllActiveStreams()
-            stopForegroundNow()
-            stopSelf()
+            requestUserStop()
             return AgentForegroundServicePolicy.restartMode
         }
 
@@ -299,6 +297,18 @@ class AgentForegroundService : Service() {
      * backgrounded. Foreground transitions always hide instantly so the
      * overlay doesn't draw on top of the chat itself.
      */
+    /**
+     * [T-eta-overlay-run-panel] One cancellation path for both entry points: the
+     * notification's Stop action and the capsule's stop control. Fan out to every live
+     * stream first so each ChatViewModel records its normal cancelled/resumable state,
+     * then drop the foreground service and its overlay.
+     */
+    private fun requestUserStop() {
+        SessionActivityTracker.cancelAllActiveStreams()
+        stopForegroundNow()
+        stopSelf()
+    }
+
     private fun startOverlayObserver() {
         val app = applicationContext as? MinisApp ?: return
         overlayController = ToolOverlayController(applicationContext).apply {
@@ -315,6 +325,10 @@ class AgentForegroundService : Service() {
                 hasCompletionPending = false
                 SessionActivityTracker.dismissOverlay()
             }
+            // [T-eta-overlay-run-panel] The capsule's stop control runs the same
+            // cancellation as the notification action, so both entry points leave the
+            // app with one consistent stopped state.
+            onStopRequested = { requestUserStop() }
         }
         val backgroundRepo = app.backgroundSettingsRepository
 
@@ -518,6 +532,12 @@ class AgentForegroundService : Service() {
                     replyExcerpt = null,
                     targetSessionId = state.currentSessionId,
                     toolTitle = effectiveToolTitle,
+                    // [T-eta-overlay-run-panel] The capsule is showing a live turn, so
+                    // it may offer the stop control; a lingered completion cannot.
+                    stoppable = OverlayRunActions.offersStop(
+                        toolRunning = state.isRunning,
+                        streamActive = state.hasActiveStream,
+                    ),
                 )
             } else {
                 // [T-android-overlay-completion-pending] Completion linger:
