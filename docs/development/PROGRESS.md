@@ -384,6 +384,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` + `:app:lintDebug` 通过（2172 个用例 = 上一项后的 2170 + 2，0 失败；lint 0 error、141 条既有 warning）。**适配说明**：Eta 面向 Android 37 一代 ROM，本仓库 minSdk 26——因此身份开关与带 options 的广播在 34 以下走旧路径、发送者 UID 只在 34+ 读取（更低版本由同一套校验拒绝），包管理器查询保留旧的 int 标志重载。**没有任何设备结论**：后端接收器是否已注册、有序广播能否到达 system_server、自声明签名权限是否按预期授予、provider 的答案与平台判断是否一致，全部未验证。**未做**：`requestRecoveryBlocking`（工具路径的「现在修一下」入口）已随客户端移植但还没有调用方，等把恢复路径接进来。
 
+**Phase 6 第八组：热词自愈** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第八组真 hook：熄屏后的热词自愈 | 有些 ROM 在熄屏时把助手的软件热词检测拆掉、之后不再拉回来——而那正是唤醒词最该可用的时候。这组盯 `PhoneWindowManager` 的 `screenTurnedOff`/`screenTurnedOn`：确认设备真的处于非交互状态后，通过启动时捕获的 voice interaction manager 服务把**平台自己已建好的**那条软件热词会话重新开始监听。谨慎之处正是移植重点：只认 0 号屏、8 秒冷却窗口内只修一次、最多三次（1.2 s/1.4 s 间隔）、每次重读开关（排队期间可能被关掉）、每次都重新确认非交互、亮屏取消待办、所有返回路径都过 generation 计数（过期尝试不可能恢复别人的会话）；只有 Google 自己的助手有这条会话，开关默认关 | `b1cf5b7a` | ✅ `HotwordSelfHealPolicyTest`（4 例） |
+| 热词桥 | `AssistantHotword` 是 Eta `AssistantManager` 的热词那一半：`VoiceInteractionManagerService.onBootPhase` 时捕获 `mServiceStub`；恢复时沿 `mImpl → mComponent`（必须是 Google 包）→ `mHotwordDetectionConnection.mDetectorSessions` 找 `SoftwareTrustedHotwordDetectorSession`，用平台自己的 `mSoftwareCallback` 调 `startListeningFromMicLocked`——重启已有会话而不是新建一个。失败只在最后一次尝试时记节流日志 | `b1cf5b7a` | ✅ 上述用例（显示号/冷却边界/重试预算/非 Google 组件拒绝） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2176 个用例 = 上一项后的 2172 + 4，0 失败）。**没有任何设备结论**：某一版 ROM 是否真的在熄屏时拆掉检测、那条会话是否就是 Google 的、`startListeningFromMicLocked` 是否仍是这个签名、修完唤醒词是否真的能唤醒，全部未验证；没有目标时台账记 MISSING/SKIPPED 并保留原行为。**未做**：Eta `AssistantManager` 的其余部分（助手选择、角色设置、会话展示）没有随此片移植。真机判据：logcat 里 `HotwordSelfHeal` 前缀的台账行 + 熄屏后再喊唤醒词是否响应。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -392,7 +401,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）。未落地：小布、超级小爱、热词自愈、ColorOS 记忆/直连，以及路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈。未落地：小布、超级小爱、ColorOS 记忆/直连，以及路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
