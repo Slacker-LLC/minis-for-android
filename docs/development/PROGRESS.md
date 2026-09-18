@@ -571,6 +571,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2250 个用例 = 上一项后的 2248 + 2）。**没有任何设备结论**：某个 provider 的流在拷贝中途被打断时如何表现未验证；拷贝会停下并说明，这是调用方依赖的行为。
 
+**浏览器结果的载荷闸门与分页读取** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 12 KiB 载荷闸门 | 上游给模型看的浏览器结果封顶 12 KiB，用一条确定的阶梯裁：先丢尾部的 `elements` 行（记下剩几条），再按 `safePrefixEnd` 把文本字段切成**不劈开代理对**的前缀并写上续读偏移，最后还超就塌成只留身份字段的最小信封。本仓库此前两级都没有——各动作在页面脚本里各切各的（10000/15000 字符），而没走这两条路径的结果（`execute_js` 的裸返回、收集行列表、backbone 转储）**完全没有上界**。搬过来时补了两处：文本级的一半（裸文本从来不是 JSON 信封，用同一条预算与同一条代理对规则），以及把分页键加进最小信封白名单（否则被裁的读取会丢掉续读偏移，等于断头路） | `8ea484a0` | ✅ `BrowserPayloadLimiterTest`（13 例：阶梯两条腿、代理对、最小信封、`serialize` 契约、`boundText` 标记与预算下限） |
+| 分页读取 | 上游 `readPage` 的 `offset`（0–200000）与 `max_chars`（256–12000，默认 8000）照搬；页面脚本按同一套算术把文档（上限 200000 字符）切成窗口，返回 `text_length`/`returned_chars`/`offset`/`next_offset`/`truncated`/`source_truncated`。模型看到的结果头因此从「Text (10000 chars)」变成「Text (chars 0-8000 of 34821; next_offset=8000)」或「… end of document」——此前被裁的页面和短页面长得一模一样，模型没法知道还有下文 | `8ea484a0` | ✅ `BrowserTextWindowPolicyTest`（10 例：两端钳制、中段/末段/越界/空文档窗口、三种表头） |
+| 闸门只装一处 | 上游是每个动作都过 `toolResult()`；本仓库的浏览器结果此前有多个出口（JS 评估三条、骨架、cookie、标签页）。现在 `BrowserTabPool.execute` 是唯一出口（动作本体拆成 `executeUnbounded`），标签页列举与不产信封的文本路径和页面读取走同一条预算；JSON 路径另在评估处先过阶梯，所以结构化结果优先按行丢、而不是被盲目切头 | `8ea484a0` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2273 个用例 = 上一项后的 2250 + 23）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：真实页面 200000 字符 `innerText` 的开销、重 DOM 上窗口算术经 WebView 桥的稳定性、以及模型会不会照着 `next_offset` 续读，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |

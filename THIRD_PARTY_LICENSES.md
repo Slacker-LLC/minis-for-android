@@ -118,6 +118,8 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `runtime/guest/ClipboardBoundsPolicy.kt` and the read/write bounds in `runtime/guest/ClipboardOffloadHandler.kt` | the clipboard bounds in `agent/device/RootShellDeviceController.kt` (`clipboardSet` / `clipboardGet`) |
 | `tools/android/UiWaitPolicy.kt` and the `match` / `include_desc` parameters of the `android_ui wait` action | `RootShellDeviceController.matches` and the `wait_for_text` parameters behind it |
 | `util/BoundedStreams.kt` (the per-chunk cancellation check and the typed too-large failure) and the bounded copy in `webapp/AddToHomeSheet.kt` | `agent/device/BoundedFileCopy.kt` |
+| `browser/BrowserPayloadLimiter.kt` (the JSON ladder; its text-level half is this repository's, for payloads that never become an envelope) | `agent/browser/BrowserPayloadLimiter.kt` |
+| `browser/BrowserTextWindowPolicy.kt` and the windowed text reads (`offset` / `max_chars` through `browser/BrowserActionInput.kt`, `browser/BrowserUseJS.kt`, `browser/BrowserUseManager.kt` and the `browser_use` schema) | `agent/browser/BrowserDomScripts.kt` (`text` / `readable`) and the read-page arguments in `agent/browser/AgentBrowserSession.kt` |
 
 
 ## Active native/runtime components
