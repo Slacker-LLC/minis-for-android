@@ -592,6 +592,16 @@
 | 第二套跨进程 runtime 协议 / 终态 outbox | 单进程应用以 Room + ViewModel 为真源，重复实现会造成两套状态源 |
 | 在线商店类分发面 | 产品定位与服务端依赖不在本仓库范围 |
 
+**上游区域清点结论（2026-09-19）** — 逐目录扫过 Eta 之后，除上表明确排除者，剩余未移植文件都属于下面几类之一，**不是漏搬**，后续不要重复扫：
+
+| 上游区域 | 结论 |
+|---|---|
+| `agent/terminal/*`（AnsiSgr、TerminalScreenBuffer、各种 EnvironmentInstaller/ProotCommandBuilder 等） | ① PRoot/Alpine/各发行版安装器 —— 合同明确排除；② `AnsiSgr`+`TerminalScreenBuffer`（终端**解释** SGR 并着色、472 行屏幕缓冲）—— 本仓库的终端/工具输出在**源头**就把 ANSI 剥成纯文本（`TerminalSanitizer`，模型侧也必须纯文本），要着色等于改消息存储 + UI 渲染，属产品决策而非缺能力；③ 其余（Supervisor/FileExplorer/PackageProfiles/BusyBox 等）本仓库有等价物（JobRegistry/TerminalSession/rootfs+apt/Ubuntu coreutils） |
+| `agent/device/*` 余项（AgentFileReferenceGateway、RootAccess、RootCommandEnvelope、DeviceLocationProvider 等） | 文件引用网关依附 Eta 的 composer 附件 UX（本仓库的文件模型是 guest 工作区 + 共享/挂载目录）；RootAccess/RootCommandEnvelope 由 `PrivilegedCommandRunner` + argv 校验覆盖；位置由 `android.location.get` / `android.context` 覆盖 |
+| `agent/tool/*` 余项（AgentImageTools、AgentBrowserToolCatalog、terminal 工具目录等） | 图像工具由 `ReadImageTool`（50 MiB 读上限 + 2000px 缩放 + JPEG q85）覆盖，编码体积由缩放天然有界，上游的 12 MiB 编码上限在此路径上是死检查；浏览器工具与终端工具是本仓库自己的 `browser_use`、guest CLI |
+| `agent/runtime/*`、`agent/voice/*`、`agent/overlay/*`、`ui/*` | runtime 是 Eta 的跨进程 agent 协议（本仓库合同不做第二套）；voice/overlay 见「浮层连续追问」待拍板项；UI 是本仓库刻意保留自有设计系统 |
+| `agent/media/AgentModelImageEncoder`、`AgentImageCodec` | 同上：本仓库的解码/缩放/编码是一条有界路径，不需要第二个编码器 |
+
 ## 七、未验证清单（不得据此声称设备结论）
 
 - 技能事务在真机上的 `rename`/`fsync` 行为、进程被杀后的 journal 回滚、跨进程锁竞争。
