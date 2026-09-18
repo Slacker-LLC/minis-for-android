@@ -860,6 +860,18 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
+
+### 升级安装的第二处崩溃：Room 身份哈希（2026-09-19，模拟器发现，两机复验） — `0b94af54`
+
+| 项 | 结果 |
+|---|---|
+| 现象 | 模拟器上应用**每次启动即退出**（三次，ACRA 各自落盘）：`files/logs/crash-2026-09-19_04-51-46 / 04-51-58 / 04-59-38.log` 全是 `IllegalStateException: Room cannot verify the data integrity … Expected identity hash: f827a661e72dcc535735beed70f6f416, found: 8ab8a11f432e9c3c3fe63e2b09177772`。这不是旧崩溃没修好，而是**修复本身带出来的第二处**：`4d3eefde` 在实体上补声明索引，改变了 Room 为**第 22 版**算出的身份哈希，版本号却没动，而 `checkIdentity` 跑在迁移之前——于是「修复前构建写过的库」被「修复后的构建」永久拒绝打开 |
+| 两台设备正好是两种形态 | 模拟器库是修复前**全新安装**时在 22 建的：走建表路径、`MIGRATION_20_21` 从未执行，所以身份是 `8ab8a11f` 且**物理上连索引都没有**（只有 `sqlite_autoindex_characters_1`）；真机库是修复后构建迁移出来的：身份 `f827a661`、索引在。同一个 APK，只有模拟器崩 |
+| 修法 | 数据库版本 22 → 23 + `MIGRATION_22_23`（`CREATE INDEX IF NOT EXISTS index_characters_updated_at ON characters(updated_at)`）：版本差让 `checkIdentity` 让开，索引语句把两种形态收敛到同一形状（缺的建出来、已有的成 no-op），迁移后 Room 再校验声明 schema 并重写身份。导出 `schemas/…/23.json`——身份仍是 `f827a661`，声明形状没变，只有版本号变了 |
+| 复验（模拟器） | 就着那台**正在崩溃循环**的库直接 `adb install -r -t`：启动干净、`mCurrentFocus` 回到 `MainActivity`、crash 缓冲为空、`files/logs/` 无新文件；库变成 `user_version=23`、身份 `f827a661`、`index_characters_updated_at` 存在 |
+| 复验（真机） | 同一 APK 装到小米 24129PN74C（HyperOS / Android 37，库为 22/`f827a661` 那一形态）：启动干净、crash 缓冲为空、`user_version=23`、索引在 |
+| 验证口径 | `:app:testDebugUnitTest` **2390 例 0 失败**（`DatabaseVersionGuardTest` 现在读 `23.json`）+ `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
