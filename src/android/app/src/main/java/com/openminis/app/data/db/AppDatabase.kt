@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val APP_DATABASE_VERSION = 22
+const val APP_DATABASE_VERSION = 23
 
 @Database(
     entities = [
@@ -369,6 +369,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * [T-android-room-identity-drift] Declaring the characters index on the entity (see
+         * [CharacterEntity]) changed the identity hash Room computes for version 22, so a
+         * database written by a build from before that change aborts the open with
+         * `Room cannot verify the data integrity … Expected identity hash: …` — the check runs
+         * before migrations, so raising nothing but the declared schema would brick every
+         * install that has not been recreated since.
+         *
+         * The two shapes differ, and the index statement covers both: a database upgraded to
+         * 22 by an older build already carries `index_characters_updated_at` (created by
+         * [MIGRATION_20_21]), while one created fresh at 22 took the create path from the
+         * entity and has no index. Bumping the version lets the open proceed and this
+         * migration converges either shape before Room rewrites the identity.
+         */
+        val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_characters_updated_at ON characters(updated_at)")
+            }
+        }
+
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -524,6 +544,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_19_20,
                         MIGRATION_20_21,
                         MIGRATION_21_22,
+                        MIGRATION_22_23,
                         MIGRATION_14_13,
                     )
                     .build()
