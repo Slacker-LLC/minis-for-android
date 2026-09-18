@@ -207,6 +207,10 @@ object ToolSensitivePolicy {
         // same person-linked data in its arguments).
         "android.sms.read",
         "read_sms",
+        // [T-eta-xposed-groups] Eta's read_sms_code under this catalog's name: the payload is a
+        // one-time code, which is exactly the kind of value that must not sit in the transcript.
+        "android.sms.code",
+        "read_sms_code",
         "android.call_log.read",
         "read_call_log",
         "android.contacts.search",

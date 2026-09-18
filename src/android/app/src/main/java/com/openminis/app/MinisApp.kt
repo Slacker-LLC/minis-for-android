@@ -641,6 +641,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSettingsSetHandler(), listOf("system.set_setting"))
         // P10 Gate 3b: telephony read-only (SMS/Call Log).
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSmsReadHandler(), listOf("read_sms"))
+        // [T-eta-xposed-groups] Verification codes only (Eta read_sms_code): the extraction rule is
+        // upstream's, the provider read is this app's own SMS path.
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidSmsCodeHandler(), listOf("read_sms_code"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidCallLogReadHandler(), listOf("read_call_log"))
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.LinuxFileReadHandler(),

@@ -38,10 +38,7 @@ object AndroidTelephonyOps {
     ): ToolExecutionResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             return@withContext ToolExecutionResult(
-                buildString {
-                    append("{\"permission\":\"denied\",\"permission_name\":\"READ_SMS\",")
-                    append("\"hint\":\"Grant the runtime permission, then call again. On some OEMs reading SMS also requires the default SMS app role.\"}")
-                },
+                smsPermissionDenied(),
                 true,
             )
         }
@@ -88,7 +85,7 @@ object AndroidTelephonyOps {
             }
         } catch (e: SecurityException) {
             return@withContext ToolExecutionResult(
-                "{\"error\":\"SMS provider denied\",\"hint\":\"READ_SMS granted but the provider rejected the read — the default SMS app role is required on this device.\"}",
+                smsProviderDenied(),
                 true,
             )
         }
@@ -98,6 +95,73 @@ object AndroidTelephonyOps {
                 put("returned", out.length())
                 put("total_matching", total)
                 put("messages", out)
+            }.toString(2),
+            true,
+        )
+    }
+
+    /** The wording both SMS readers use when the runtime permission is missing. */
+    private fun smsPermissionDenied(): String =
+        """{"permission":"denied","permission_name":"READ_SMS","hint":"Grant the runtime permission, then call again. On some OEMs reading SMS also requires the default SMS app role."}"""
+
+    /** …and when the provider rejected a read that the permission allowed. */
+    private fun smsProviderDenied(): String =
+        """{"error":"SMS provider denied","hint":"READ_SMS granted but the provider rejected the read — the default SMS app role is required on this device."}"""
+
+    /**
+     * [T-eta-xposed-groups] Verification codes only: the sender and the time a message arrived,
+     * never its body (Eta's `read_sms_code`).
+     *
+     * Ported from Eta `agent/tool/AgentStructuredDeviceTools.kt` (Mangi-11/Eta @ c15de97). Eta
+     * reaches the inbox through root; this app already holds READ_SMS and reads the same provider
+     * for `android.sms.read`, so the same query is used and only the extraction rule is shared with
+     * upstream: a message counts when it carries a word that names the code, and the code is the
+     * 4-8 digit run nearest to that word.
+     */
+    suspend fun readSmsCodes(
+        context: Context,
+        maxAgeMinutes: Int,
+    ): ToolExecutionResult = withContext(Dispatchers.IO) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return@withContext ToolExecutionResult(smsPermissionDenied(), true)
+        }
+        val cutoff = System.currentTimeMillis() - maxAgeMinutes * 60_000L
+        val items = JSONArray()
+        try {
+            context.contentResolver.query(
+                android.net.Uri.parse("content://sms/inbox"),
+                arrayOf("address", "body", "date"),
+                null,
+                null,
+                "date DESC",
+            )?.use { cursor ->
+                val addressColumn = cursor.getColumnIndexOrThrow("address")
+                val bodyColumn = cursor.getColumnIndexOrThrow("body")
+                val dateColumn = cursor.getColumnIndexOrThrow("date")
+                while (cursor.moveToNext() && items.length() < SmsCodeExtractionPolicy.MAX_RESULTS) {
+                    val date = cursor.getLong(dateColumn)
+                    if (date < cutoff) continue
+                    val code = SmsCodeExtractionPolicy.codeIn(cursor.getString(bodyColumn).orEmpty())
+                        ?: continue
+                    items.put(
+                        JSONObject().apply {
+                            put("code", code)
+                            put("sender", cursor.getString(addressColumn).orEmpty())
+                            put("timestamp_ms", date)
+                        },
+                    )
+                }
+            }
+        } catch (e: SecurityException) {
+            return@withContext ToolExecutionResult(smsProviderDenied(), true)
+        }
+        ToolExecutionResult(
+            JSONObject().apply {
+                put("ok", true)
+                put("tool", "read_sms_code")
+                put("max_age_minutes", maxAgeMinutes)
+                put("returned", items.length())
+                put("items", items)
             }.toString(2),
             true,
         )
@@ -194,6 +258,38 @@ class AndroidSmsReadHandler : AndroidTelephonyHandler() {
             a.optString("folder"),
             a.optInt("limit", 20),
             a.optBoolean("unread_only"),
+        )
+    }
+}
+
+class AndroidSmsCodeHandler : AndroidTelephonyHandler() {
+    override val definition = AgentToolDefinition(
+        name = "android.sms.code",
+        description = "Extract only the verification code (4 to 8 digits), its sender and the time " +
+            "it arrived from recent messages. Message bodies are never returned. Requires the " +
+            "READ_SMS runtime permission.",
+        parameters = mapOf(
+            "max_age_minutes" to AgentToolParam(
+                "integer",
+                "How far back to look (default " +
+                    "${SmsCodeExtractionPolicy.DEFAULT_MAX_AGE_MINUTES}, " +
+                    "max ${SmsCodeExtractionPolicy.MAX_MAX_AGE_MINUTES})",
+            ),
+        ),
+    )
+
+    override suspend fun execute(
+        argsJson: String,
+        sessionId: String,
+        context: Context,
+        toolId: String,
+    ): ToolExecutionResult {
+        val a = args(argsJson)
+        return AndroidTelephonyOps.readSmsCodes(
+            context,
+            SmsCodeExtractionPolicy.clampMaxAgeMinutes(
+                if (a.has("max_age_minutes")) a.optInt("max_age_minutes") else null,
+            ),
         )
     }
 }
