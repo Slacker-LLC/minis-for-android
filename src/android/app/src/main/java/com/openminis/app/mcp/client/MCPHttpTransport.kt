@@ -43,6 +43,19 @@ class MCPHttpTransport(
 
     @Volatile
     private var sessionId: String? = null
+
+    /**
+     * [T-mcp-protocol-headers-android] The version negotiated by `initialize`. The
+     * streamable-HTTP spec requires every request after initialization to name it, and
+     * Eta sends it on every request (its `HEADER_PROTOCOL_VERSION`); a server that
+     * enforces the requirement would otherwise reject our `tools/list` and `tools/call`.
+     */
+    @Volatile
+    private var protocolVersion: String? = null
+
+    fun setProtocolVersion(version: String) {
+        protocolVersion = version.takeIf { it.isNotBlank() }
+    }
     private val activeCalls = ConcurrentHashMap.newKeySet<Call>()
 
     /**
@@ -63,6 +76,17 @@ class MCPHttpTransport(
         if (!bearerToken.isNullOrBlank()) {
             reqBuilder.header("Authorization", "Bearer $bearerToken")
         }
+        // Routing headers derived from the frame itself, applied after the caller's so a
+        // tool parameter cannot displace them (Eta orders its request the same way).
+        frame.optString("method").takeIf { it.isNotBlank() }?.let { method ->
+            reqBuilder.header("Mcp-Method", method)
+        }
+        frame.optJSONObject("params")?.optString("name").orEmpty().takeIf { it.isNotBlank() }?.let { name ->
+            // The spec's header-safe form of the name; the encoder is the same one the
+            // x-mcp-header parameters use.
+            reqBuilder.header("Mcp-Name", encodeMcpHeaderValue(name))
+        }
+        protocolVersion?.let { reqBuilder.header("MCP-Protocol-Version", it) }
         sessionId?.let { reqBuilder.header("Mcp-Session-Id", it) }
 
         return suspendCancellableCoroutine { continuation ->

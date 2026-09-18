@@ -6,6 +6,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
@@ -68,6 +69,52 @@ class MCPHttpTransportParamHeaderTest {
 
             val recorded = server.takeRequest()
             assertEquals(null, recorded.getHeader("Mcp-Param-X-Api-Key"))
+        } finally {
+            transport.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun theNegotiatedProtocolVersionRidesEveryRequestAfterInitialization() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setBody("""{"jsonrpc":"2.0","id":1,"result":{}}"""))
+        server.enqueue(MockResponse().setBody("""{"jsonrpc":"2.0","id":2,"result":{}}"""))
+        server.start()
+        val transport = MCPHttpTransport(url = server.url("/mcp").toString(), client = client())
+        try {
+            transport.send(MCPClientCodec.buildToolsList(null))
+            assertEquals(null, server.takeRequest().getHeader("MCP-Protocol-Version"))
+
+            transport.setProtocolVersion(MCPClientCodec.PROTOCOL_VERSION)
+            transport.send(MCPClientCodec.buildToolsCall("lookup", JSONObject(), 2))
+
+            val recorded = server.takeRequest()
+            assertEquals(MCPClientCodec.PROTOCOL_VERSION, recorded.getHeader("MCP-Protocol-Version"))
+            assertEquals("tools/call", recorded.getHeader("Mcp-Method"))
+            assertEquals("lookup", recorded.getHeader("Mcp-Name"))
+        } finally {
+            transport.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun aToolNameAHeaderCannotCarryIsWrapped() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setBody("""{"jsonrpc":"2.0","id":1,"result":{}}"""))
+        server.start()
+        val transport = MCPHttpTransport(url = server.url("/mcp").toString(), client = client())
+        try {
+            transport.send(MCPClientCodec.buildToolsCall("读取", JSONObject(), 1))
+
+            val name = server.takeRequest().getHeader("Mcp-Name").orEmpty()
+            assertTrue(name.startsWith("=?base64?"))
+            val decoded = String(
+                java.util.Base64.getDecoder().decode(name.removePrefix("=?base64?").removeSuffix("?=")),
+                Charsets.UTF_8,
+            )
+            assertEquals("读取", decoded)
         } finally {
             transport.close()
             server.shutdown()

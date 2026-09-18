@@ -1,6 +1,5 @@
 package com.openminis.app.mcp.client
 
-import android.content.Context
 import android.util.Log
 import com.openminis.app.data.repository.MCPRepository
 import com.openminis.app.tools.runtime.MCPToolHandler
@@ -70,19 +69,14 @@ object MCPProvider {
     @Volatile
     private var reloadJob: Job? = null
 
-    /** App context placeholder for handler dispatch (handlers ignore it). */
-    @Volatile
-    var context: Context? = null
-
     /**
      * Attaches the config source and its hot-update callback; call [reload] once
      * after init for the initial connection set. Re-init detaches the previous
      * Repository so a stale object cannot trigger reloads against the new one.
      */
-    fun init(repository: MCPRepository, context: Context? = null) {
+    fun init(repository: MCPRepository) {
         this.repository?.onServerConfigsChanged = null
         this.repository = repository
-        this.context = context
         repository.onServerConfigsChanged = ::reload
     }
 
@@ -197,20 +191,6 @@ object MCPProvider {
         registeredTools.clear()
         sessions.values.forEach { it.close() }
         sessions.clear()
-    }
-
-    /** Dispatches a call to a connected remote tool; null when unknown. */
-    suspend fun callRemoteTool(
-        fullName: String,
-        arguments: org.json.JSONObject,
-    ): com.openminis.app.tools.ToolExecutionResult? {
-        val handler = registeredTools[fullName] ?: return null
-        // MCPToolHandler ignores context; only needs a non-null placeholder.
-        val ctx = MCPProvider.context ?: return com.openminis.app.tools.ToolExecutionResult(
-            "mcp provider not initialized",
-            false,
-        )
-        return handler.execute(arguments.toString(), "", ctx, "")
     }
 
     /** Tool-name-safe server id (ToolRegistry names are dot-separated). */

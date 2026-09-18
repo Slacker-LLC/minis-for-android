@@ -42,12 +42,15 @@ class MCPClientSession(
          * headers (`x-mcp-header`); transports that have no headers ignore them.
          */
         suspend fun send(frame: JSONObject, extraHeaders: Map<String, String> = emptyMap()): JSONObject
+        /** Records the negotiated protocol version for transports that must send it. */
+        fun setProtocolVersion(version: String) {}
         fun close()
     }
 
     private class HttpAdapter(private val http: MCPHttpTransport) : Transport {
         override suspend fun send(frame: JSONObject, extraHeaders: Map<String, String>): JSONObject =
             http.send(frame, extraHeaders)
+        override fun setProtocolVersion(version: String) = http.setProtocolVersion(version)
         override fun close() = http.close()
     }
 
@@ -77,6 +80,9 @@ class MCPClientSession(
         }
         serverName = info.serverName
         serverVersion = info.serverVersion
+        // [T-mcp-protocol-headers-android] Every request after the handshake names the
+        // negotiated version; stdio has no headers and ignores this.
+        t.setProtocolVersion(info.protocolVersion)
         // Spec: client must send notifications/initialized after initialize.
         t.send(MCPClientCodec.buildNotificationsInitialized())
         Log.i(TAG, "connected ${config.id} -> ${info.serverName}@${info.serverVersion}")
