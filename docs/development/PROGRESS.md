@@ -967,6 +967,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2410 例 0 失败**（新增 `AgentToolDefinitionMcpShapeTest` 3 例：规范键在、Anthropic 键不在、两种形状 schema 一致）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
 | 设备复原 | MCP 服务已停、`shared_prefs/minis_mcp_prefs.xml` 已还原为 `<map />`、转发已撤、工作区临时文件已删；过程中出现的蓝牙权限提示已「拒绝」关闭（没有替你授权任何权限） |
 
+### 工具面续测：诊断/a11y/图片工具 + root 被动视图的误导（2026-09-19，真机） — `42fa73b0`
+
+| 项 | 结果 |
+|---|---|
+| 诊断类工具 | `android_capabilities`（被动清单）、`android_logs` / `android_diagnose` / `system_jobs` / `android_media_info`（均走 `confirm_required` → 批准 → 重试链路）逐条可用 |
+| **root 被动视图的误导（已修）** | `action=get` 报 `root.status: REQUIRES_USER_GRANT` / `state: AUTHORIZATION_REQUIRED`，而同一台机器 `action=active_root_probe` 回 **`authorized: true, effectiveUid: 0, groups=[0(root) context=u:r:ksu:s0], selinuxContext: u:r:ksu:s0`**——用户早已在 KernelSU Next 里授权；被动清单按设计不启动 `su`，且本进程启动后没跑过探测。修法：正是在这个歧义点补 `root.nextStep`，明确「su 在、但本进程没探测过 → 先调 `active_root_probe` 再向用户要权限」；状态值本身不动（被动清单只能诚实地报它知道的东西） |
+| a11y 工具 | `android_ui` 回 `PERMISSION_DENIED: android-a11y-cli integration is disabled; enable it under Settings → Permissions → Integrations`——设计内的集成开关（默认关）且信息可执行，**不是缺陷**；要用 UI 自动化需要你显式打开该开关 |
+| 图片工具 | `linux_file_image_read` 对**浏览器截图 JPEG**（1339×2973）与 **App 自己产出的 PNG**（300×667，经调试截图环验证）都正常；先前那枚手工 8×8 PNG 失败属**测试图本身**不被 Android 解码器接受（文件逐字节校验一致、`file` 认为合法），不是产品问题 |
+| 另一处自我纠错 | 第一轮把 `linux_file_copy/move` 判成「绝对路径被拒」，实际是我参数名猜错（应为 `source`/`destination`，现已在 `inputSchema` 里公布）；改用正确名字后 write → copy → move → read → delete → list 全绿 |
+| 验证口径 | `:app:testDebugUnitTest` **2410 例 0 失败** + `:app:lintDebug` 0 error + `:app:assembleDebug`；设备复原：MCP 已停、token prefs 还原 `<map />`、转发撤销、工作区临时文件（`sweep-probe.*`、`sweep-shot.png`）已删、调试截图环已清 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
