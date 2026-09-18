@@ -9,6 +9,7 @@ import com.openminis.app.xposed.hyperos.HyperOsLauncherHooks
 import com.openminis.app.xposed.system.AccessibilityProtectionHooks
 import com.openminis.app.xposed.system.ContextualSearchHooks
 import com.openminis.app.xposed.system.HotwordSelfHealHooks
+import com.openminis.app.xposed.system.SystemUiHooks
 
 /**
  * [T-eta-xposed-groups] The groups this module knows, wired to the targets they belong to.
@@ -47,6 +48,10 @@ object HookGroups {
         // And the assistant's hotword detection, which some builds drop when the screen goes off.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             HotwordSelfHealHooks.install(module, classLoader, log)
+        }
+        // The navigation bar itself: ColorOS SystemUI's OCR long press.
+        HookGroupRegistry.register(ModuleTargets.SYSTEM_UI_PACKAGE) { module, classLoader, log ->
+            SystemUiHooks.install(module, classLoader, log)
         }
         // The launcher's own long press on the navigation bar, in both launcher packages.
         ModuleTargets.LAUNCHER_PACKAGES.forEach { launcher ->

@@ -100,6 +100,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/colordirect/ColorDirectHooks.kt`, `xposed/colordirect/ColorDirectTriggerPolicy.kt` (the trigger rule and the dedup window as values) | `hook/colordirect/ColorDirectHooks.kt` |
 | `tools/ColorOsPersonalDataTools.kt` (notes, recordings, recording summaries plus their bounds and LIKE escaping), `tools/PersonalDataContentParser.kt` | `agent/tool/AgentPersonalDataTools.kt` (the query path and its parser) and the matching entries in `agent/model/AgentDeviceToolCatalog.kt` |
 | `xposed/hyperos/HyperOsLauncherHooks.kt`, `xposed/hyperos/HyperOsSearchTrigger.kt`, `xposed/hyperos/HyperOsLongPressGesture.kt`, `xposed/hyperos/HyperOsLegacyGesture.kt`, `xposed/hyperos/HyperOsGesturePolicy.kt` (the takeover answer as a value) | `hook/hyperos/HyperOsLauncherHooks.kt`, `hook/hyperos/HyperOsSearchTrigger.kt`, `hook/hyperos/HyperOsLongPressGesture.kt`, `hook/hyperos/HyperOsLegacyGesture.kt` |
+| `xposed/system/SystemUiHooks.kt`, `xposed/system/SystemUiOcrPolicy.kt` (the haptic id and the context lookup order as values) | `hook/system/SystemUiHooks.kt` |
 
 
 ## Active native/runtime components
