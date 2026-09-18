@@ -581,6 +581,16 @@ class MinisApp : Application(), ImageLoaderFactory {
                 aliasNames = com.openminis.app.tools.ColorOsMemoryTools.aliases[handler.definition.name].orEmpty(),
             )
         }
+        // [T-eta-xposed-groups] ColorOS notes and recordings, through the providers those apps
+        // publish (Eta search_coloros_notes / search_coloros_recordings /
+        // search_recording_summaries). A provider that refuses is reported as a failure, never as
+        // an empty result.
+        com.openminis.app.tools.ColorOsPersonalDataTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.ColorOsPersonalDataTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-character-cards] The bound character's story memory: read it, update it. The
         // character comes from the session binding, so the model cannot name another one.
         com.openminis.app.tools.CharacterMemoryTools.handlers().forEach { handler ->

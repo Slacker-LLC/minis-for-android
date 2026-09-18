@@ -253,6 +253,9 @@ object ToolSensitivePolicy {
         "android.coloros.memory",
         "android.coloros.orders",
         "android.coloros.places",
+        "android.coloros.notes",
+        "android.coloros.recordings",
+        "android.coloros.recording_summaries",
 
         // [T-eta-notification-history] Minis catalog — notification shade and history
         // (Eta recent_notifications, search_notification_history). Notification bodies

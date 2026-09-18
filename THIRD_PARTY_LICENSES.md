@@ -98,6 +98,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/aimemory/ColorOsMemoryHooks.kt`, `xposed/aimemory/ColorOsMemoryBridgeProtocol.kt` (method and result ids renamed for this app), `xposed/aimemory/ColorOsMemoryDatabaseQuery.kt` | `hook/aimemory/ColorOsMemoryHooks.kt`, `core/ColorOsMemoryBridgeProtocol.kt`, `agent/tool/ColorOsMemoryDatabaseQuery.kt` |
 | `tools/ColorOsMemoryTools.kt` (three tools and their bounds; the caller of the bridge) | `agent/tool/AgentColorOsMemoryTools.kt` and the ColorOS memory entries in `agent/model/AgentDeviceToolCatalog.kt` |
 | `xposed/colordirect/ColorDirectHooks.kt`, `xposed/colordirect/ColorDirectTriggerPolicy.kt` (the trigger rule and the dedup window as values) | `hook/colordirect/ColorDirectHooks.kt` |
+| `tools/ColorOsPersonalDataTools.kt` (notes, recordings, recording summaries plus their bounds and LIKE escaping), `tools/PersonalDataContentParser.kt` | `agent/tool/AgentPersonalDataTools.kt` (the query path and its parser) and the matching entries in `agent/model/AgentDeviceToolCatalog.kt` |
 
 
 ## Active native/runtime components
