@@ -600,6 +600,14 @@ class MinisApp : Application(), ImageLoaderFactory {
                 aliasNames = com.openminis.app.tools.ChatImageTools.aliases[handler.definition.name].orEmpty(),
             )
         }
+        // [T-eta-xposed-groups] Download records (Eta search_downloads) through the provider's own
+        // my_downloads view, which is the one an ordinary app may read.
+        com.openminis.app.tools.DownloadsTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.DownloadsTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-character-cards] The bound character's story memory: read it, update it. The
         // character comes from the session binding, so the model cannot name another one.
         com.openminis.app.tools.CharacterMemoryTools.handlers().forEach { handler ->

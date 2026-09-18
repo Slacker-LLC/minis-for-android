@@ -176,6 +176,8 @@ object ToolSensitivePolicy {
         // somebody's private conversations.
         "android.chat_images.qq",
         "android.chat_images.wechat",
+        // [T-eta-xposed-groups] Download records name the files this app fetched.
+        "android.downloads.search",
         "search_clipboard_history",
         "get_health_summary",
         "read_sms_code",
