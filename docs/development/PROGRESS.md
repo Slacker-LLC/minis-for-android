@@ -551,7 +551,10 @@
 
 | `paste_text` 与剪贴板卫生 | 上游 `paste_text` = `input_text` + 「目标直接拒绝写入时改走粘贴」——有些编辑器只认粘贴。重读它时翻出**两个我们旧写法没有的细节，价值比这个动作本身更大**：①临时剪贴项要标 **sensitive**，否则文本会出现在剪贴板预览里、也会被其它读剪贴板的应用拿到；②**只有剪贴板里还是我们那条**（按标签判断）才还原原来内容——用户中途复制了别的东西，就不能用旧快照盖掉，而本仓库原来的回退正是无条件还原（真实缺陷）。两者收进 `ClipboardRestorePolicy`（标签格式、还原判据、平台敏感标记）并有用例；一次「借用-归还」助手现在同时服务 `set_text` 的回退与 `paste_text`，剪贴板只有一处被碰 | `7998463a` | ✅ `ClipboardRestorePolicyTest`（3 例） |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2239 个用例 = 上一项后的 2236 + 3）。**没有任何设备结论**：某个编辑器是否接受 `ACTION_PASTE`、各 ROM 是否把标签如实回传给剪贴板元数据，均未验证——被拒的粘贴如实记为拒绝而不是成功。**说明**：本片只改代码与工具 schema，未动资源/清单，按验证矩阵未复跑 lint。
+| `ime_enter` 与写入上限 | 上游 `press_key` 的 ENTER 支路：在**持有输入焦点**的输入框上按字段自己的 IME 动作（搜索/完成/发送），提交搜索框或消息不用去猜哪个按钮——需要 Android 11，更老的平台带原因拒绝而不是静默无操作。写入上限一并搬：插入 ≤1000 字符且不得为空，整值 ≤4000 且**可以**为空（清空字段就是写空值），上游是在碰设备之前就拒绝 | `9964e554` | ✅ `TextInputBoundsPolicyTest`（2 例） |
+| 刻意没搬的其余部分 | 上游 `press_key` 还把 BACK/HOME/RECENTS/PASTE/NOTIFICATIONS/QUICK_SETTINGS 统一成一个动作并带 root `input keyevent` 回退；本仓库这些面板/按键本来就是各自的动作、且宁可拒绝也不接第二套实现（第二实现＝两条真相），所以只取 ENTER 那支。`clear_text` 是上游的 `replace_text("")`，本仓库 `set_text` 传空值即等价，不再加重复动作 | `9964e554` | — |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2241 个用例 = 上一项后的 2239 + 2）。**没有任何设备结论**：某个编辑器是否真的响应 `ACTION_IME_ENTER` 未验证，被拒时如实记为拒绝。**说明**：本片只改代码与工具 schema，未动资源/清单，按验证矩阵未复跑 lint。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
