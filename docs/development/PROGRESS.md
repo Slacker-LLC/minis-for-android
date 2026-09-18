@@ -690,6 +690,19 @@
 | `agent/runtime/*`、`agent/voice/*`、`agent/overlay/*`、`ui/*` | runtime 是 Eta 的跨进程 agent 协议（本仓库合同不做第二套）；voice/overlay 见「浮层连续追问」待拍板项；UI 是本仓库刻意保留自有设计系统 |
 | `agent/media/AgentModelImageEncoder`、`AgentImageCodec` | 同上：本仓库的解码/缩放/编码是一条有界路径，不需要第二个编码器 |
 
+**上游文件级核对（2026-09-19，机械核对，可复跑）** —— 上面那张表是逐目录的判断，这张是把 Eta 的每个 Kotlin 文件对到本仓库：
+
+方法：`for f in $(find <eta>/app/src/main/kotlin -name '*.kt'); do basename`，逐个查本仓库有无同名文件；没有同名的，再在各文档里找该名字是否已被点名。复跑所需的上游快照是 `Mangi-11/Eta @ c15de97`（本机副本 `/tmp/eta-upstream-clone`）。
+
+结果：上游 **389** 个 Kotlin 文件，其中 **317** 个在本仓库没有同名文件；这 317 个里 **97** 个已被文档点名，其余 **220** 个按目录归类为：`ui/*` 90（自有设计系统）、`agent/runtime` 23（跨进程协议，合同不做第二套）、`agent/terminal` 22（发行版安装器属于明确排除项，ANSI 着色属待拍板项，见上表）、`agent/model` 19 与 `data/*` 30（本仓库自己的 provider/模型/Room/仓库层，同名不同名而已）、`agent/voice` 7 与 `hook/xiaoai` 5 与 `hook/breeno` 3（待拍板）、其余为各目录零散同名不同实现者。
+
+本轮核对新增的两条结论（都不需要移植）：
+
+- **provider 推理参数**：上游 `ProviderReasoning`/`ReasoningCapabilityResolver` 是按厂商源码类型硬编码的请求字段映射（bailian/siliconflow/deepseek/moonshot/mimo/minimax/openrouter/stepfun/openai/custom）。本仓库这条线是**数据 + 逐实例规则**驱动：`ThinkingLevelCatalog`（models.dev 的 `reasoning_options`）、`thinking/ThinkingRuleResolver` 与 `ThinkingWireFormat`（`reasoning_effort`/`reasoning_effort_nested`/`boolean_toggle` 等线格式，已含 DashScope 的 `enable_thinking`+`thinking_budget` 一类特例）。把上游的硬编码表搬过来只会多一份真相，故不搬。
+- **工具能力/需求声明**：上游 `AgentToolRequirements`/`AgentToolCapabilities`/`ToolCapabilityProjection` 是**给 UI 用的投影**（按 root/ColorOS 过滤工具卡、挑按钮动作）。本仓库没有工具卡列表，工具在调用时就带原因拒绝（例如桥不可用、参数越界），功能面等价，故不搬。
+
+**仍然未落地、且不依赖任何拍板的路线图项**：Phase 6 的「增强设置页」（上游 `SystemEnhanceScreen`：root 状态 + 模块连接状态 + 各接管说明）。本仓库已有「模块保护」开关与「模块设置页」，这一页是聚合与说明性质的入口，尚未开工。
+
 ## 七、未验证清单（不得据此声称设备结论）
 
 - 技能事务在真机上的 `rename`/`fsync` 行为、进程被杀后的 journal 回滚、跨进程锁竞争。
