@@ -533,11 +533,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2227 个用例 = 上一项后的 2222 + 5），`:app:lintDebug` 0 error（字符串补齐 8 个 locale）。**没有任何设备结论**：某个 relay 是否真的接受这条 hosted tool、以及不支持该工具的 provider 上开关的表现，均未验证。**未做**：上游还会把 `response.web_search_call.{in_progress,searching,completed,failed}` 四个事件渲染成一条「网页搜索」工具行；来源本身已经通过引用格式化渲染出来，这一步留作后续。
 
+**Phase 2 收尾（二）：服务端工具的活动行** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 服务端工具的活动行 | 上一项开关的配套：上游把 `response.<kind>_call.<phase>` 渲染成独立一行，否则「用了服务端搜索」的回合在问答之间什么都看不到。`HostedCallEventPolicy` 把上游读法变成值：相位对应（`in_progress`/`searching`→开始，`completed`→完成，`failed`→失败）、**未知相位不渲染错行**、id 选择顺序（事件名 → item → 确定性回退）、以及「一次调用只报一次开始与一次结束、只有结束没有开始时两条都补」的账本（与上游那张 map 同义） | `cd602827` | ✅ `HostedCallEventPolicyTest`（5 例） |
+| 渲染接法 | provider 从策略发 `LLMStreamChunk.HostedToolActivity`，聊天层把它追加为**一条 info 行**——它永远不会变成 `tool_use` 块，所以没有任何路径会去「执行」一个本应用没跑过的工具。**一处刻意适配**：上游把行的中文名硬编码在 provider 里，本仓库让 chunk 只带类型 token（`web_search`/`file_search`/`code_interpreter`/`computer`/`image_generation`/`mcp`），由 UI 取字符串（8 个 locale），不认识的类型也有通用行 | `cd602827` | ✅ 上述用例 + `:app:lintDebug` 0 error |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2232 个用例 = 上一项后的 2227 + 5），`:app:lintDebug` 0 error。**没有任何设备结论**：真实流进行中这一行的位置观感、以及根本不发这些事件的 relay 的表现均未验证——不发这些事件时产生的行与改动前完全一致。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | 已落地：请求头过滤与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册、服务端联网搜索开关（按条目）。未落地：`web_search_call` 流事件渲染成工具行；屏幕观察的其余合同 Minis 侧本就更强，未再移植。工具能力投影与终态门在本仓库由既有 schema/证据机制覆盖 | Eta `agent/model/*` |
+| Phase 2 底层 AI | 已落地：请求头过滤与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册、服务端联网搜索开关（按条目）与它的活动行。屏幕观察的其余合同 Minis 侧本就更强，未再移植；工具能力投影与终态门在本仓库由既有 schema/证据机制覆盖 | Eta `agent/model/*` |
 | Phase 3 数字助手 | 就地展示/可停止/可接管已落地；Skills 暴露给模型、GUI 动作补齐、Markdown 导出同样已落地。**连续追问与面板内屏幕上下文未落地**：无头驱动 seam 其实**已经存在**（本仓库早有 `agent/AgentRunner`：prompt/cancel/waitForSettle/sessionEvents），卡的是面板设计——上游是一套 708 行的展开式面板（26 态状态模型 + `BasicTextField` 追问输入 + 手势/震动），直接搬会替换掉本仓库现有的胶囊浮层设计（当初的分析明确要保留 Minis 的工作台风格），属于要先拍板的产品改动；若要做，最自然的形态是在现有胶囊上加密实输入（需处理 overlay 窗口的 IME/焦点） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 清单已全部落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存、下载记录。其中 QQ/微信缓存与下载记录先被登记为「待拍板 / 不值得」，后来按上游补齐（限制写在各自工具描述里） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
