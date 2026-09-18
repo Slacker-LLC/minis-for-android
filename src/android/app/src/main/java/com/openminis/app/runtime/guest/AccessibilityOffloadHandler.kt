@@ -94,9 +94,12 @@ First-run: enable "Minis" under Settings → Accessibility, then `service ping`.
                 "confirm", "deny", "children", "ancestors",
             ),
         )
-        if (args.hasFlag("h", "help") || args.positional.isEmpty()) {
-            return NativeOffloadResult(if (args.positional.isEmpty()) 2 else 0, TOP_HELP)
-        }
+        // --help is never a usage error: the other guest CLIs answer it with
+        // exit 0, and an agent that asked for usage should not have to tell a
+        // failed call apart from a printed one. No arguments stays a usage
+        // error, as before.
+        if (args.hasFlag("h", "help")) return NativeOffloadResult(0, TOP_HELP)
+        if (args.positional.isEmpty()) return NativeOffloadResult(2, TOP_HELP)
         val sub = args.positional[0]
         // T330: tri-state agent gate via OffloadPermissionManager. `service`
         // and `--version` are diagnostic and pass through so the agent (or

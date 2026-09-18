@@ -43,9 +43,12 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
 
     override fun handle(request: NativeOffloadRequest): NativeOffloadResult {
         val args = OffloadArgs(request.argv.drop(1))
-        if (args.hasFlag("h", "help") || args.positional.isEmpty()) {
-            return NativeOffloadResult(if (args.positional.isEmpty()) 2 else 0, HELP)
-        }
+        // --help is never a usage error: the other guest CLIs answer it with
+        // exit 0, and an agent that asked for usage should not have to tell a
+        // failed call apart from a printed one. No arguments stays a usage
+        // error, as before.
+        if (args.hasFlag("h", "help")) return NativeOffloadResult(0, HELP)
+        if (args.positional.isEmpty()) return NativeOffloadResult(2, HELP)
 
         return try {
             when (val sub = args.positional[0]) {
