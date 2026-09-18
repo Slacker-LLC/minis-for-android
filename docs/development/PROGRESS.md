@@ -999,6 +999,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机复验 | 非整数写入被拒、**没有落盘**（回读仍是 `2`）；整数写入 → `{updated:true, valueAfter:"2", verified:true}`；探针键（未设置）可写任意值、删除回 `{valueAfter:null, verified:true}`，测完已删；`settings get system screen_brightness` = `2` |
 | 验证口径 | `:app:testDebugUnitTest` **2412 例 0 失败**（新增 `AndroidSettingsTypeGuardTest` 2 例：带符号与空白的整数算整数，`not-a-number`/`2.5`/`0x10` 不算）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
 
+### MCP 客户端（接外部 MCP 服务端）首次真机验证（2026-09-19，无代码改动）
+
+| 项 | 结果 |
+|---|---|
+| 测试方法 | 主机跑一个最小 MCP streamable-HTTP 服务端（`initialize` / `notifications/initialized` / `tools/list` / `tools/call`，一个 `echo` 工具），再用 `adb reverse tcp:8931 tcp:8931` 让手机经 `http://127.0.0.1:8931/mcp` 访问——**没有动用户主机的防火墙**（ufw 只放行 22，LAN 直连会被拦，这也正是第一次尝试失败的原因） |
+| 配置面 | `mcp.create` / `mcp.update` / `mcp.list` / `mcp.delete` 走通（字段 serverId / url 或 command / note / enabled / headers / timeout） |
+| 连接与握手（主机侧日志为证） | 应用启动后自动连接：`initialize`（`clientInfo {minis-android, 1.0}`、protocolVersion 2025-06-18）→ `notifications/initialized`（回 202）→ `tools/list`；后续请求都带规范头 **`MCP-Protocol-Version`** |
+| 注册结果（应用侧日志） | `MCPProvider: reload done: 1/1 connected, 1 tools registered` |
+| 失败路径 | LAN 直连被防火墙拦时给出清晰超时：`connect sweep-echo failed: MCP HTTP transport timed out: failed to connect to /192.168.8.163 (port 8931) … after 15000ms`，随后 `reload done: 0/1 connected, 0 tools registered`（不吞错、不假装连上） |
+| 有意边界（代码确认） | `ToolPermissionManager` 中 `"mcp.*" to ToolPolicy(MCP_ALLOWED, LOCAL_ONLY)`：远端 MCP 工具**只对本机 agent 可见**，不会经自家 MCP 服务端再次暴露（58 个工具里确实没有它），避免回环调用 |
+| 仍未闭合的最后一跳 | **真正调用远端工具需要一次 agent 回合（要 provider）**，所以「注册成功 → 实际调用远端工具」这一跳仍挂在待办②上；此外远程调用方目前无法从 `mcp.list` 读到连接状态（只有日志与界面），列为可选后续 |
+| 设备复原 | 测试用 MCP 集成已删除（`mcp.list` 为空）、自家 MCP 服务端已停、token prefs 还原为 `<map />`、`adb forward/reverse` 撤销、主机测试服务端进程已退出 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
