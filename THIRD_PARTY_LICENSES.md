@@ -80,6 +80,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `roleplay/RoleplayTurnProjection.kt` (per-request lore, depth note and character block) | `agent/roleplay/RoleplayRunContext.kt` (`projectMessages`) |
 | `ui/settings/CharactersScreen.kt` (character library: import, share, delete) | Eta's character screens and its file-picker import path |
 | `ui/settings/CharacterPickerDialog.kt` and the session-menu entry in `ui/sessions/SessionListScreen.kt` | Eta's conversation binding UI |
+| `roleplay/CharacterWorldbookDraft.kt` (world book draft read/write) | `agent/roleplay/CharacterWorldbookDraft.kt` |
 
 
 ## Active native/runtime components
