@@ -502,6 +502,18 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2218 个用例 = 上一项后的 2218 + 0，0 失败）。**没有任何设备结论**：某一版 ROM 的 Download provider 是否经特权通道应答，未验证；被拒时返回带错误码的失败而不是空列表。真机判据：`android.downloads.search` 返回本应用的下载记录或一个带原因的 `PERSONAL_DATA_*` 错误码。
 
+**Phase 6 第十六组：模块设置页 + 两处「自己造的轮子」对齐上游** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 模块设置页 | 此前所有 hook 组都从模块偏好里读开关，但这些开关只能改偏好文件——App 没有入口。本轮补上设置页（挂在「系统权限」旁边）与它下面的 `ModuleSettingsStore`：写的就是框架交给被注入进程的**同一个偏好组**，键与默认值都取自 `ModulePrefs`，所以界面写不出模块不会读的开关，没写过的值回落到模块自己的默认（每个接管默认都是关）。只展示**已落地**的开关（手势条识屏、双指识屏、热词自愈、电源键助手三选一）——给还不存在的功能做开关等于许一个模块兑现不了的承诺 | `19000ea8` | ✅ 编译 + 全量单测 + `:app:lintDebug`（0 error）；字符串补齐 8 个 locale |
+| 模块入口对齐上游 | 对着上游 `ModuleMain` 复核我自己的注册表，找到两处真实差距：①上游有些目标**只装在包自己的主进程**（桌面 / SystemUI / 记忆应用），其余（Google / ColorDirect / Breeno / 小爱）才匹配子进程；②上游用 `isFirstPackage` 保证**每进程只装一次**。本仓库此前对所有目标都用「进程属于该包」，也没有一次性保护——SystemUI 的 hook 可能装进它某个子进程（那里根本没有这个表面），桌面则可能把整组 hook 叠第二份。现在 `ModuleTargets.MAIN_PROCESS_TARGETS` + `installsInProcess` 写明这个划分，入口类对每个目标每进程只装一次，生命周期回调过滤同规则（这也正是上游的理由：模块装不进 hook 的进程不该为它付费） | `3ccc22b0` | ✅ `ModuleTargetsTest` 补 2 例（主进程/子进程、回调过滤） |
+| 电源键启动对齐上游 | 我此前只搬了「活动意图」那一半。上游的启动半侧还有两条：**先确认自己的 App 真是系统助手角色持有者**（`AssistantManager.isAssistantConfigured`，读 assistant 安全设置）才打开它，以及**先问目标是否应答该 action**（`PowerHooks` 的 `resolvesActivity`）；Gemini 会依次试 `ACTION_ASSIST` 与 `ACTION_VOICE_COMMAND`。三条都补进 `AssistantLaunch`——于是「选了 Minis 但角色还没给它」时保持系统行为，而不是劫持电源键 | `3ccc22b0` | ✅ `AssistantLaunchTest` 更新（action 列表、Gemini 组件、角色门） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2220 个用例 = 上一项后的 2218 + 2），`:app:lintDebug`/`:app:lintRelease` 均 0 error。**没有任何设备结论**：框架是否把该偏好组交给某一版 ROM 上的被注入进程、assistant 安全设置对 hook 进程是否可读、桌面是否应答这两个 action，均未验证。
+
+**全量检查（本轮一次跑完）**：`:app:assembleDebug` 通过（产物 APK 内含 `META-INF/xposed/{module.init,module.prop,scope.list}` 三个声明文件）；`verify-android-16k.sh` 通过（24 个 native 库 16 KB 对齐）；`python3 scripts/test_pty_bridge.py` 通过；Rust 代理 `cargo fmt --check` / `clippy -D warnings` / `cargo test`（9 例）通过；`check-runtime-package-boundary.sh`、`check_build_cleanup.py`、`test_build_cleanup_guard.py`（14 例）、`test_docs_provenance.py`（18 例）全通过。**跑不了的两项（附原因）**：`:app:assembleRelease` 停在仓库自己的 `requireReleaseSigning`（要求生产签名环境变量，且明确禁止用 debug 签名——Release 编译与 R8 本身已跑过并通过）；`verify-runtime-payload.sh` 找不到 `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz`，因为本环境没有构建 rootfs dist（该 payload 在本仓库是可选的，只有 `MINIS_REQUIRE_RUNTIME_PAYLOAD=1` 时才强制）。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
