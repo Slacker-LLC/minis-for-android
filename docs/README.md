@@ -15,6 +15,15 @@
 
 历史 PR、Issue 实施稿或阶段计划可以解释“当时为什么这样改”，但不能证明当前实现仍然如此。
 
+## 项目与移植文档
+
+| 文件 | 用途 |
+|---|---|
+| [PROJECT.md](PROJECT.md) | 本仓库（minis-eta）的项目说明：来源、许可、结构、构建、文档地图 |
+| [development/PORTING.md](development/PORTING.md) | 开发移植规范：复用规则、落地 SOP、验证矩阵、归属登记 |
+| [development/PROGRESS.md](development/PROGRESS.md) | 开发移植进度：已完成、进行中、待办阶段、排除项、未验证清单 |
+| [REFERENCES.md](REFERENCES.md) | 资料索引：Eta 源码速查、上游链接、许可文本、工具链版本 |
+
 ## 当前 runtime 结论
 
 - Linux runtime：Direct Ubuntu 24.04 chroot；

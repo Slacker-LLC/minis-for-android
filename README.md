@@ -1,5 +1,10 @@
 # Minis for Android
 
+> **This repository is minis-eta**: the home of Minis for Android merged with the Eta capability port line.
+> Project description: [docs/PROJECT.md](docs/PROJECT.md) · Porting rules and progress: [docs/development/PORTING.md](docs/development/PORTING.md) ·
+> Reference index: [docs/REFERENCES.md](docs/REFERENCES.md) · Roadmap: [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)
+
+
 **Chinese contracts define intended behavior. Final branch source and tests define current implementation.** Start with [README.zh-CN.md](README.zh-CN.md), [AGENTS.md](AGENTS.md), and [docs/contracts/](docs/contracts/00-IDENTITY.md).
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](BUILDING.md)

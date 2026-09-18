@@ -70,7 +70,7 @@
 - 先复用现状（自有 VoiceInteractionService 助手角色）；只对现有入口覆盖不到的部分引入 libxposed
   `102.0.0`：电源键、小布、超级小爱、一圈即搜、Google/Gemini 解锁；配套模块元数据、模块入口类
   （进程过滤）、清单 meta-data、release 合并规则与接线状态账本（INSTALLED/MISSING/FAILED/SKIPPED）。
-- 附带无障碍保活与增强设置页。不做：systemizer、厂商私有内部类、PRoot/Alpine 与多发行版安装器。
+- 附带无障碍保活与增强设置页。不做：systemizer、厂商私有内部类；不引入 PRoot/Alpine 与多发行版安装器。
 
 ## 三、测试与验收
 

@@ -1,5 +1,10 @@
 # Minis for Android
 
+> **本仓库是 minis-eta**：Minis for Android 与 Eta 能力移植线合并后的新起点。
+> 项目说明见 [docs/PROJECT.md](docs/PROJECT.md)，移植规范与进度见 [docs/development/PORTING.md](docs/development/PORTING.md)，
+> 资料索引见 [docs/REFERENCES.md](docs/REFERENCES.md)，路线图见 [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)。
+
+
 面向 **已 Root Android 设备** 的 AI Agent Runtime。原生 Android App + Ubuntu 24.04 userspace，共用 Android 内核，不是虚拟机。
 
 **中文合同定义应保持的行为边界；最终目标分支源码与测试定义当前实现事实。** Agent 先读 [`AGENTS.md`](AGENTS.md) 与 [`docs/contracts/`](docs/contracts/00-IDENTITY.md)。
