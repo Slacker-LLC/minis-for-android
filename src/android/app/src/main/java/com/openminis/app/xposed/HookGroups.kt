@@ -1,6 +1,7 @@
 package com.openminis.app.xposed
 
 import com.openminis.app.xposed.aimemory.ColorOsMemoryHooks
+import com.openminis.app.xposed.colordirect.ColorDirectHooks
 import com.openminis.app.xposed.google.GoogleEligibilityHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
@@ -54,6 +55,10 @@ object HookGroups {
         // The ColorOS memory app is asked through its own provider, from inside its own process.
         HookGroupRegistry.register(ModuleTargets.COLOROS_MEMORY_PACKAGE) { module, classLoader, log ->
             ColorOsMemoryHooks.install(module, classLoader, log)
+        }
+        // ColorOS's direct-service gesture surface: the two-finger recognition it owns.
+        HookGroupRegistry.register(ModuleTargets.COLOROS_DIRECT_PACKAGE) { module, classLoader, log ->
+            ColorDirectHooks.install(module, classLoader, log)
         }
     }
 }
