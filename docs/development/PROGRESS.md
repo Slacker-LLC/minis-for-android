@@ -788,8 +788,11 @@
 | 挂载外部文件夹 | 「未授予『所有文件访问权限』」——缺权限时如实说明，而不是装作能用 | 无 |
 | 关于 Minis | 「Minis for Android」 | 无 |
 | Minis Shell（本轮新增入口） | 终端 + guest 运行时（见上一节） | 无 |
+| 备份与恢复 | 「恢复」 | 无 |
+| 权限 | 自身页面 | 无 |
+| 内置浏览器（会话菜单 →「打开浏览器」） | 浏览器底部面板打开：会话标签「Example Domain」、`1/3`、地址栏；WebView 进程启动（`com.google.android.webview:sandboxed_process0`），在地址栏输入 `example.com` 回车后**页面真的加载出来**（标题 Example Domain、`https://example.com/`、正文渲染完整） | 无 |
 
-**crash 缓冲在整个扫描过程中保持为空**（每轮开始都单独清 `-b crash`，第一轮那批「CRASH」是清缓冲方式不对造成的误报，已修正后重跑）。本轮未点到的还剩「备份与恢复」「权限」两项（滚动预算用尽），下一轮补。
+**crash 缓冲在整个扫描过程中保持为空**（每轮开始都单独清 `-b crash`，第一轮那批「CRASH」是清缓冲方式不对造成的误报，已修正后重跑）。设置里 19 个入口全部点开过；界面标题是用 uiautomator 抓文本得出的，个别条目因抓取时序显示成上一页的标题（例如「权限」那行）——**崩溃判定只依赖 crash 缓冲与 logcat，不依赖标题文本**。
 
 **共享 rootfs 复用的结论（读代码得出，不是猜）**：`RootfsManager.checkHealth`/`evaluateProbeOutput`/`validateMetadata` 判定「健康」的条件是**布局完整 + 元数据兼容**（distro=ubuntu、24.04.x、arch=arm64、profile=base、`upstream_sha256` 是合法 64 位十六进制），并要求 `bin/sh` 或 `bin/bash` 可执行；它**不要求**该 rootfs 与当前 APK 的 payload 逐字节相同。也就是说：别的安装（或别的 App）早先 provision 出来的 rootfs 只要兼容就会被复用，这正符合合同里「`/data/adb/minis/rootfs` 是 Root-owned、可替换的 runtime state」。payload 解包路径因此不是「没生效」，而是「本轮没被触发」。
 
