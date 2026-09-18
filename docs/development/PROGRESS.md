@@ -898,6 +898,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2396 例 0 失败**（新增 `OffloadPermissionFailureTest` 6 例：各结果的失败体、能力专用码、detail、无宿主 2 s 内返回）+ `:app:lintDebug` 0 error + `:app:assembleDebug` + `verify-runtime-payload.sh` / `verify-android-16k.sh`；同一 APK 在 API 36 模拟器安装启动、调试面可用、crash 缓冲为空 |
 | 设备状态变化（如实记录） | 复验时在系统弹窗上点的是「拒绝且不再询问」，所以这台小米上「日历」权限现为永久拒绝（可在系统设置里重新打开）。本轮没有替你批准任何个人数据授权 |
 
+### guest CLI 全量清点：`--help` 一律 exit 0（2026-09-19，真机逐条） — `40a32997`
+
+| 项 | 结果 |
+|---|---|
+| 清点方式 | 在 guest 里对 `/usr/local/bin` 的 **28 个入口**逐个跑 `--help` 记退出码（真机，KernelSU Next 授权后） |
+| 发现 | 五个入口（`android-a11y-cli` / `android-alarm` / `android-photos` / `android-speech` / `minis-model-use`）**打印了用法却以 2 退出**，其余 23 个是 0。五处是同一行写法：`if (hasFlag("h","help") || positional.isEmpty()) return NativeOffloadResult(if (positional.isEmpty()) 2 else 0, HELP)`——单独 `--help`（也就是 agent 实际用的形式）永远走「无参数」分支被当成用法错误，只有 `--help` 旁边带位置参数才返回 0 |
+| 修法 | 拆成它本来想表达的两种情况：`--help` → 0；无参数 → 2（用法错误），与其余 handler 和 `MinisConfigPublicInterfaceTest` 的假设一致 |
+| 复验 | 同一台机器重扫 28 个入口：**`--help` 全部 0**；五个入口**无参数时仍为 2** 并打印用法 |
+| 验证口径 | `:app:testDebugUnitTest` **2396 例 0 失败** + `:app:assembleDebug`；本轮顺带记下一条排障经验：往 guest 发命令时，**主机侧拼 shell 文本会让 `$VAR` 在主机上就被展开**（`JSON.stringify` 不是 shell 转义），曾经因此把一条命令打成语法错误并让持久 shell 卡在悬空引号里——正确做法是把 JSON-RPC 载荷写进文件再用 `curl --data-binary @file` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
