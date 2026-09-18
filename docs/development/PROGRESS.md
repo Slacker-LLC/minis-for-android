@@ -174,13 +174,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1975 个用例 = 上一项后的 1969 + 6，0 失败），`:app:lintDebug` 0 error（首轮因 `isNotificationListenerAccessGranted` 需 API 27 而失败，已按 API 级别回退修掉）。真机未验证：授权后监听器是否收到通知、通知栏实时读取、1000 条/7 天淘汰在真实投递量下的行为、各 ROM（MIUI/HyperOS 等）的通知访问授权路径。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 会话历史回读 | 压缩会把旧回合换成摘要，早先指令的原话或某次工具结果可能只剩在持久记录里，而此前模型既不能搜也不能翻自己所在的会话。新增 `conversation.history`（别名 `conversation_history`）：带 `query` 时扫最多 1000 条、返回最多 20 条命中（含 message_index 与有界片段）；不带时按 `message_index`/`offset` 翻页，最多 `max_chars`（256–8000，默认 4000），并给出 `next_message_index`/`next_offset` 续读 | `4cc5c5b7` | ✅ `ConversationHistoryPolicyTest`（9 例） |
+| 边界与诚实 | 会话不可由调用方指定（id 来自当前回合）；每条记录按自身 parts 渲染（正文、tool_use 名称与截断参数、tool_result 成功标志与截断输出、`[image]`），单条上限 2000 字符；整页未读完时必给续读指针而不是谎报读完；结果里写明持久记录**不含**敏感工具原文与瞬时图片 | `4cc5c5b7` | ✅ 续读/中途续读/搜不到/扫描截断用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1984 个用例 = 上一项后的 1975 + 9，0 失败）。本项无新资源/清单改动，未跑 lint（工程矩阵里 Android 代码只要 compile+test）。真机未验证：超大会话的翻页耗时、模型在真实压缩后是否真的用它找回旧指令、工具片段截断在长会话里的可读性。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境（通知历史检索与会话历史检索已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
