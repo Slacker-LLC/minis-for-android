@@ -1357,4 +1357,9 @@
     <string name="characters_entry_unnamed">Unnamed entry</string>
     <string name="characters_import_failed">The card could not be imported.</string>
     <string name="characters_export_failed">The character could not be exported.</string>
+    <string name="system_permissions_module_a11y_header">Protection par module</string>
+    <string name="system_permissions_module_a11y_toggle">Maintenir le service d\'accessibilité activé</string>
+    <string name="system_permissions_module_a11y_unavailable">Le module Minis n\'est pas installé ou n\'est pas actif</string>
+    <string name="system_permissions_module_a11y_footer">Fonctionne uniquement avec le module LSPosed Minis installé et limité à Minis. Le module maintient alors le service d\'accessibilité activé dans le système, sans Shizuku.</string>
+
 </resources>

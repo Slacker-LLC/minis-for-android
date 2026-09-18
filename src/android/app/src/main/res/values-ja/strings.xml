@@ -1471,4 +1471,9 @@
     <string name="assistant_memory_pressure_high">システムがメモリ圧迫を報告しています。</string>
     <string name="assistant_memory_pressure_normal">メモリ圧迫は正常です。</string>
     <string name="assistant_memory_close">閉じる</string>
+    <string name="system_permissions_module_a11y_header">モジュール保護</string>
+    <string name="system_permissions_module_a11y_toggle">ユーザー補助サービスを有効に保つ</string>
+    <string name="system_permissions_module_a11y_unavailable">Minis モジュールがインストールされていないか、有効ではありません</string>
+    <string name="system_permissions_module_a11y_footer">Minis の LSPosed モジュールをインストールし、Minis にスコープした場合のみ動作します。モジュールは Shizuku なしでシステム内でユーザー補助サービスを有効に保ちます。</string>
+
 </resources>

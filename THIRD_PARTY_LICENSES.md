@@ -94,6 +94,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/system/ContextualSearchHooks.kt`, `xposed/system/ContextualSearchCallerPolicy.kt` | `hook/system/ContextualSearchHooks.kt`, `hook/system/ContextualSearchCallerPolicy.kt` (the system-package check behind the caller policy joined `xposed/HookSupport.kt`) |
 | `xposed/LogSafety.kt` (`safeLogType`, `toSafeLogToken`) | `core/LogSafety.kt` |
 | `xposed/system/AccessibilityServiceEnforcer.kt`, `xposed/system/AccessibilityProtectionHooks.kt` (including its system-context resolver), `xposed/system/AccessibilityProtectionProtocol.kt` | `hook/system/AccessibilityServiceEnforcer.kt`, `hook/system/AccessibilityProtectionHooks.kt`, `agent/accessibility/AccessibilityProtectionProtocol.kt` |
+| `xposed/system/AccessibilityProtectionClient.kt` (app-side caller), the module-protection section in `ui/settings/SystemPermissionsScreen.kt` and `accessibility/MinisAccessibilityHealthProvider.kt` | `agent/accessibility/AccessibilityProtectionClient.kt`, `agent/accessibility/AgentAccessibilityHealthProvider.kt` and Eta's accessibility settings surface |
 
 
 ## Active native/runtime components

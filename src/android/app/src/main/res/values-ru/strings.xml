@@ -1716,4 +1716,9 @@
     <string name="assistant_memory_pressure_high">Система сообщает о нехватке памяти.</string>
     <string name="assistant_memory_pressure_normal">Давление на память в норме.</string>
     <string name="assistant_memory_close">Закрыть</string>
+    <string name="system_permissions_module_a11y_header">Защита модулем</string>
+    <string name="system_permissions_module_a11y_toggle">Поддерживать службу доступности включённой</string>
+    <string name="system_permissions_module_a11y_unavailable">Модуль Minis не установлен или неактивен</string>
+    <string name="system_permissions_module_a11y_footer">Работает только с установленным модулем LSPosed Minis, включённым в область Minis. Модуль сам поддерживает службу доступности включённой, без Shizuku.</string>
+
 </resources>

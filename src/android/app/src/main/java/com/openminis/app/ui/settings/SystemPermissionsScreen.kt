@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LockOpen
@@ -48,6 +49,7 @@ import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.xposed.system.AccessibilityProtectionClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -117,6 +119,40 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                         stringResource(R.string.system_permissions_a11y_disabled)
                     },
                     onClick = { openAccessibilitySettings(context) },
+                    showDivider = false,
+                )
+            }
+
+            // [T-eta-xposed-groups] The module's accessibility protection: it keeps this app's
+            // service enabled from inside system_server, so it needs neither Shizuku nor the user
+            // coming back to this screen. Off until asked, and the row says when the module is not
+            // there instead of pretending the switch did something.
+            var moduleProtectionEnabled by remember {
+                mutableStateOf(AccessibilityProtectionClient.isEnabled(context))
+            }
+            var moduleProtectionUnavailable by remember { mutableStateOf(false) }
+
+            SettingsSection(
+                header = stringResource(R.string.system_permissions_module_a11y_header),
+                footer = stringResource(R.string.system_permissions_module_a11y_footer),
+            ) {
+                SettingsSwitchRow(
+                    icon = Icons.Outlined.HealthAndSafety,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.system_permissions_module_a11y_toggle),
+                    subtitle = if (moduleProtectionUnavailable) {
+                        stringResource(R.string.system_permissions_module_a11y_unavailable)
+                    } else {
+                        null
+                    },
+                    checked = moduleProtectionEnabled,
+                    onCheckedChange = { on ->
+                        AccessibilityProtectionClient.setEnabled(context, on) { result ->
+                            moduleProtectionEnabled = result.enabled
+                            moduleProtectionUnavailable =
+                                result.status != AccessibilityProtectionClient.ControlStatus.APPLIED
+                        }
+                    },
                     showDivider = false,
                 )
             }

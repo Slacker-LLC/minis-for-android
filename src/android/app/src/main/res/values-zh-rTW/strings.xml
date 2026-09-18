@@ -1013,4 +1013,9 @@
     <string name="assistant_memory_pressure_high">系統回報記憶體壓力偏高。</string>
     <string name="assistant_memory_pressure_normal">記憶體壓力正常。</string>
     <string name="assistant_memory_close">關閉</string>
+    <string name="system_permissions_module_a11y_header">模組保護</string>
+    <string name="system_permissions_module_a11y_toggle">保持無障礙服務開啟</string>
+    <string name="system_permissions_module_a11y_unavailable">Minis 模組未安裝或未啟用</string>
+    <string name="system_permissions_module_a11y_footer">僅在已安裝 LSPosed 模組並作用於 Minis 時可用；模組會在系統內保持無障礙服務開啟，無需 Shizuku。</string>
+
 </resources>

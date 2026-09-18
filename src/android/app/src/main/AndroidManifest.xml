@@ -3,6 +3,14 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- [T-eta-xposed-groups] The accessibility-protection backend that runs inside system_server
+         accepts a control request only from this app's own UID and only from a sender holding this
+         signature permission. The permission is declared here so the app can hold it; the backend
+         still validates the UID as well, because a permission alone would not say who asked. -->
+    <permission
+        android:name="llc.slacker.minis.permission.CONTROL_ACCESSIBILITY_PROTECTION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="llc.slacker.minis.permission.CONTROL_ACCESSIBILITY_PROTECTION" />
     <!-- T33: Check Update — needed to launch the system installer for the
          downloaded APK. The user must additionally grant "install unknown
          apps" for this package the first time they upgrade. -->
@@ -533,6 +541,17 @@
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- [T-eta-xposed-groups] The accessibility-protection backend in system_server asks this
+             provider whether this app's accessibility service is connected. Only the system may
+             call it (MANAGE_ACCESSIBILITY), the authority must stay in step with
+             AccessibilityProtectionProtocol.HEALTH_AUTHORITY, and the answer is one status word. -->
+        <provider
+            android:name=".accessibility.MinisAccessibilityHealthProvider"
+            android:authorities="${applicationId}.accessibility.health"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            android:permission="android.permission.MANAGE_ACCESSIBILITY" />
 
         <!-- [T-android-privileged-backend] AXManager (Axeron) reuses this
              same `<applicationId>.shizuku` ShizukuProvider — its

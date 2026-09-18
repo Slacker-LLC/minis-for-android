@@ -1463,4 +1463,9 @@
     <string name="assistant_memory_pressure_high">시스템이 메모리 압박을 보고합니다.</string>
     <string name="assistant_memory_pressure_normal">메모리 압박이 정상입니다.</string>
     <string name="assistant_memory_close">닫기</string>
+    <string name="system_permissions_module_a11y_header">모듈 보호</string>
+    <string name="system_permissions_module_a11y_toggle">접근성 서비스 활성 상태 유지</string>
+    <string name="system_permissions_module_a11y_unavailable">Minis 모듈이 설치되어 있지 않거나 활성 상태가 아닙니다</string>
+    <string name="system_permissions_module_a11y_footer">Minis LSPosed 모듈을 설치하고 Minis 범위로 지정한 경우에만 동작합니다. 모듈은 Shizuku 없이 시스템에서 접근성 서비스를 활성 상태로 유지합니다.</string>
+
 </resources>

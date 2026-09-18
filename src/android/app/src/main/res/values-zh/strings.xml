@@ -1721,4 +1721,9 @@
     <string name="assistant_memory_pressure_high">系统报告内存压力偏高。</string>
     <string name="assistant_memory_pressure_normal">内存压力正常。</string>
     <string name="assistant_memory_close">关闭</string>
+    <string name="system_permissions_module_a11y_header">模块保护</string>
+    <string name="system_permissions_module_a11y_toggle">保持无障碍服务开启</string>
+    <string name="system_permissions_module_a11y_unavailable">Minis 模块未安装或未启用</string>
+    <string name="system_permissions_module_a11y_footer">仅在已安装 LSPosed 模块并作用于 Minis 时可用；模块会在系统内保持无障碍服务开启，无需 Shizuku。</string>
+
 </resources>

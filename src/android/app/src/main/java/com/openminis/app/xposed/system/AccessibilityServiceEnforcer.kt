@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.SystemClock
 import android.os.UserManager
@@ -282,7 +283,14 @@ internal class AccessibilityServiceEnforcer(
 
     private fun createControlReceiver(): BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(receiverContext: Context, intent: Intent) {
-            val senderUid = sentFromUid
+            // Below Android 14 a receiver cannot learn who sent a broadcast, and this backend only
+            // accepts a request it can attribute to the app's own UID; the sentinel is refused by
+            // the same validation the platform path goes through, so nothing is assumed.
+            val senderUid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                sentFromUid
+            } else {
+                UNKNOWN_SENDER_UID
+            }
             val ordered = isOrderedBroadcast
             val action = intent.action
             val protocolVersion = intent.getIntExtra(
@@ -739,10 +747,8 @@ internal class AccessibilityServiceEnforcer(
     private fun isExpectedServiceValid(context: Context): Boolean {
         val directBootFlags = directBootFlags()
         val serviceInfo = try {
-            context.packageManager.getServiceInfo(
-                SERVICE_COMPONENT,
-                PackageManager.ComponentInfoFlags.of(directBootFlags.toLong()),
-            )
+            @Suppress("DEPRECATION")
+            context.packageManager.getServiceInfo(SERVICE_COMPONENT, directBootFlags)
         } catch (_: PackageManager.NameNotFoundException) {
             return false
         } catch (failure: RuntimeException) {
@@ -766,10 +772,8 @@ internal class AccessibilityServiceEnforcer(
     ): Boolean {
         val directBootFlags = directBootFlags()
         val applicationInfo = try {
-            context.packageManager.getApplicationInfo(
-                APP_PACKAGE,
-                PackageManager.ApplicationInfoFlags.of(directBootFlags.toLong()),
-            )
+            @Suppress("DEPRECATION")
+            context.packageManager.getApplicationInfo(APP_PACKAGE, directBootFlags)
         } catch (_: PackageManager.NameNotFoundException) {
             return false
         } catch (failure: RuntimeException) {
@@ -829,6 +833,8 @@ internal class AccessibilityServiceEnforcer(
             "com.openminis.app.accessibility.MinisAccessibilityService"
         const val DISABLED = 0
         const val ENABLED = 1
+        /** No sender UID is available below Android 14; the validation refuses it. */
+        const val UNKNOWN_SENDER_UID = -1
         const val LOG_INTERVAL_MS = 10_000L
         const val SERVICE_REBIND_GRACE_MS = 4_000L
         val REGISTRATION_RETRY_DELAYS_MS = longArrayOf(1_000L, 5_000L, 30_000L)

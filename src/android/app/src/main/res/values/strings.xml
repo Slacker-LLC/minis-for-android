@@ -1868,4 +1868,9 @@
     <string name="assistant_memory_pressure_high">The system reports memory pressure.</string>
     <string name="assistant_memory_pressure_normal">Memory pressure looks normal.</string>
     <string name="assistant_memory_close">Close</string>
+    <string name="system_permissions_module_a11y_header">Module protection</string>
+    <string name="system_permissions_module_a11y_toggle">Keep the accessibility service enabled</string>
+    <string name="system_permissions_module_a11y_unavailable">The Minis module is not installed or not active</string>
+    <string name="system_permissions_module_a11y_footer">Works only with the Minis LSPosed module installed and scoped to Minis. The module then keeps the accessibility service enabled inside the system, without Shizuku.</string>
+
 </resources>

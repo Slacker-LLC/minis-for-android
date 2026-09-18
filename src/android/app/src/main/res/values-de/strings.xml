@@ -1466,4 +1466,9 @@
     <string name="assistant_memory_pressure_high">Das System meldet Speicherdruck.</string>
     <string name="assistant_memory_pressure_normal">Der Speicherdruck ist normal.</string>
     <string name="assistant_memory_close">Schließen</string>
+    <string name="system_permissions_module_a11y_header">Modulschutz</string>
+    <string name="system_permissions_module_a11y_toggle">Bedienungshilfen-Dienst aktiv halten</string>
+    <string name="system_permissions_module_a11y_unavailable">Das Minis-Modul ist nicht installiert oder nicht aktiv</string>
+    <string name="system_permissions_module_a11y_footer">Funktioniert nur mit installiertem Minis-LSPosed-Modul im Geltungsbereich von Minis. Das Modul hält den Bedienungshilfen-Dienst dann ohne Shizuku aktiv.</string>
+
 </resources>
