@@ -483,23 +483,38 @@ class MCPRepository internal constructor(
 
         val selected = enabled.take(MAX_MCPS_IN_PROMPT)
 
-        return buildString {
-            append("Available MCP Servers (use minis-mcp-cli to discover and call):\n")
-            for (s in selected) {
-                var note = s.note ?: ""
-                if (note.length > MAX_NOTE_LENGTH) note = note.substring(0, MAX_NOTE_LENGTH) + "…"
-                append("- ").append(s.id)
-                if (note.isNotBlank()) append(": ").append(note)
-                append("\n")
-            }
+        return mcpPromptFragmentText(selected.map { it.id to it.note })
+    }
+
+    /**
+     * The agent-facing text [mcpPromptFragment] returns, built from plain pairs so
+     * the wording is unit-testable — the caller reads session overrides through
+     * SQLite and cannot run in a JVM test.
+     *
+     * The instructions name the registered tool form on purpose: every enabled
+     * server's tools are registered in the tool registry as `mcp.<server>.<tool>`
+     * (model-facing `mcp_<server>_<tool>`), so the model calls them like any other
+     * tool. The text used to send the model to `minis-mcp-cli`, a guest command
+     * that does not exist — a model that followed it lost the turn to "command not
+     * found" (06-CURRENT-GAPS has the gap; it closes here for the prompt path).
+     */
+    internal fun mcpPromptFragmentText(servers: List<Pair<String, String?>>): String = buildString {
+        append("Available MCP Servers (their tools are already registered for you):\n")
+        for ((id, rawNote) in servers) {
+            var note = rawNote ?: ""
+            if (note.length > MAX_NOTE_LENGTH) note = note.substring(0, MAX_NOTE_LENGTH) + "…"
+            append("- ").append(id)
+            if (note.isNotBlank()) append(": ").append(note)
             append("\n")
-            append("To use: run `minis-mcp-cli tools <server>` to see available tools,\n")
-            append("then `minis-mcp-cli call <server> <tool> [args]` to invoke.\n")
-            // [T-mcp-dollar-var-systemprompt-android] Document the $$VAR runtime
-            // env placeholder (mirrors iOS 5fa9e6a9). Agent-facing English — not
-            // localized; wording must match iOS verbatim.
-            append("When adding or modifying an MCP server config (via minis-mcp-cli add / the UI), use \$\$VARNAME in env/headers/url values as a placeholder resolved at runtime from the system/App environment variables — do not hardcode secrets; reference an existing App environment variable as \$\$NAME.")
         }
+        append("\n")
+        append("To use one, call the tool directly: each remote tool is registered as ")
+        append("`mcp_<server>_<tool>` — for server `docs` and tool `search`, call `mcp_docs_search`. ")
+        append("No shell command is involved.\n")
+        // [T-mcp-dollar-var-systemprompt-android] Document the $$VAR runtime
+        // env placeholder (mirrors iOS 5fa9e6a9). Agent-facing English — not
+        // localized.
+        append("When adding or modifying an MCP server config (in Settings → MCP Integrations, or through the web-remote mcp.* methods), use \$\$VARNAME in env/headers/url values as a placeholder resolved at runtime from the system/App environment variables — do not hardcode secrets; reference an existing App environment variable as \$\$NAME.")
     }
 
     // -- Database Helper (session overrides only) --
