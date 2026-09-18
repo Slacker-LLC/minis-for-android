@@ -8390,6 +8390,15 @@ class ChatViewModel(
                 lastFileToolInputMs = 0L
                 lastOtherToolInputMs = 0L
             }
+            // [T-eta-character-cards] A bound session freezes its character for this run: the live
+            // card wins while the character exists, the binding's snapshot is the fallback. A
+            // failure here must never stop the turn - an unreadable binding simply means no
+            // character block.
+            val roleplayTurn = if (activeSessionId.isNotBlank()) {
+                runCatching {
+                    com.openminis.app.roleplay.CharacterRepository.resolveForSession(activeSessionId)
+                }.getOrNull()
+            } else null
             while (!collectDone) {
                 try {
                     // [T-android-enhanced-cache] Stamp the per-turn Enhanced
@@ -8403,9 +8412,24 @@ class ChatViewModel(
                     // [_compactSummary] is prepended as a `<context-summary>`
                     // user message. Falls through to the raw agentHistory when
                     // no compact has happened, so the common path stays zero-copy.
+                    val requestMessages = applyRequestImageBudget(effectiveAgentHistory())
+                    // [T-eta-character-cards] A bound character adds its block and any lore or
+                    // depth projection to THIS request only - the stored transcript and the
+                    // history the next turn reads back are untouched.
+                    val roleplayProjection = roleplayTurn?.let { (binding, card) ->
+                        com.openminis.app.roleplay.RoleplayTurnProjection.project(
+                            messages = requestMessages,
+                            card = card,
+                            userName = binding.userName,
+                            userDescription = binding.userDescription,
+                            contextWindow = effectiveContextWindowTokens(),
+                        )
+                    }
                     currentProvider.streamMessage(
-                        messages = applyRequestImageBudget(effectiveAgentHistory()),
-                        systemPrompt = effectiveSystemPrompt,
+                        messages = roleplayProjection?.messages ?: requestMessages,
+                        systemPrompt = roleplayProjection
+                            ?.let { "$effectiveSystemPrompt\n\n${it.characterBlock}" }
+                            ?: effectiveSystemPrompt,
                         maxTokens = sessionOverrides.effectiveMaxTokens(
                             dynamicMaxTokens(currentProvider, lastContextTokens),
                         ),

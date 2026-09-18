@@ -77,6 +77,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `roleplay/CharacterRepository.kt`, `roleplay/CharacterStoragePolicy.kt`, `data/db/CharacterEntity.kt`, `data/db/CharacterDao.kt` and the `characters` table in `data/db/AppDatabase.kt` | `data/repository/CharacterRepository.kt` and `data/db/CharacterEntity.kt` |
 | `roleplay/CharacterPrompt.kt` (character block and depth-note placement) | `agent/roleplay/RoleplayRunContext.kt` |
 | `roleplay/CharacterBinding.kt`, the session-binding additions in `roleplay/CharacterRepository.kt`, `data/db/ChatDao.kt`, `data/db/ChatSessionEntity.kt` and the `roleplay_json` column in `data/db/AppDatabase.kt` | `agent/roleplay/CharacterCard.kt` (`RoleplayBinding`) and the conversation binding in `RoleplayRunContext.kt` |
+| `roleplay/RoleplayTurnProjection.kt` (per-request lore, depth note and character block) | `agent/roleplay/RoleplayRunContext.kt` (`projectMessages`) |
 
 
 ## Active native/runtime components
