@@ -942,7 +942,7 @@ class BrowserUseManager(
      * [BrowserTextWindowPolicy].
      */
     private suspend fun getText(selector: String?, offset: Int?, maxChars: Int?): BrowserActionResult {
-        val js = BrowserUseJS.getText(
+        val js = BrowserDomScripts.text(
             selector = selector,
             offset = BrowserTextWindowPolicy.offset(offset),
             maxChars = BrowserTextWindowPolicy.maxChars(maxChars),

@@ -716,4 +716,49 @@ internal object BrowserDomScripts {
           images: document.images.length
         };
     """.trimIndent())
+
+    /**
+     * [T-browser-visible-text-android] Upstream's `text`: the page's visible text
+     * through the shared collector — visibility-filtered text nodes, with node and
+     * deadline bounds, skipping script / style / noscript / template / svg / canvas /
+     * iframe — windowed the way `readable` is.
+     *
+     * This app read `document.body.innerText` here instead, which leaves "what counts
+     * as visible text" to the browser's own renderer while `get_readable` used the
+     * collector above, so the two reads could disagree about the same page. The title
+     * is ours: our results have no envelope to carry it.
+     */
+    fun text(selector: String?, offset: Int, maxChars: Int): String {
+        val selectorLiteral = selector?.let { org.json.JSONObject.quote(it) } ?: "null"
+        return wrap("""
+        var selector = $selectorLiteral;
+        var target = null;
+        if (selector) {
+          var matches = document.querySelectorAll(selector);
+          for (var index = 0; index < matches.length && index < 2000; index++) {
+            if (visible(matches[index])) { target = matches[index]; break; }
+          }
+        } else {
+          target = document.body || document.documentElement;
+        }
+        if (!target || !visible(target)) throw new Error('TARGET_NOT_VISIBLE');
+        var collected = collectVisibleText(target, MAX_DOCUMENT_CHARS, 12000);
+        var value = collected.text;
+        var total = value.length;
+        var start = Math.min($offset, total);
+        var end = Math.min(start + $maxChars, total);
+        return {
+          title: document.title || '',
+          text: value.slice(start, end),
+          text_length: total,
+          returned_chars: end - start,
+          offset: start,
+          next_offset: end < total ? end : null,
+          truncated: end < total || collected.truncated,
+          source_truncated: collected.truncated,
+          visited_nodes: collected.nodes,
+          selector_used: selector || selectorFor(target)
+        };
+        """.trimIndent())
+    }
 }

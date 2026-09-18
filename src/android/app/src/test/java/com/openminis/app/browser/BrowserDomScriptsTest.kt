@@ -228,4 +228,26 @@ class BrowserDomScriptsTest {
         assertTrue(script.contains("content_height: Math.max("))
         assertTrue(script.contains("ready_state: document.readyState"))
     }
+
+    @Test
+    fun `get_text reads through the shared collector, not innerText`() {
+        val script = BrowserDomScripts.text(selector = null, offset = 0, maxChars = 8_000)
+
+        assertTrue(script.contains("var collected = collectVisibleText(target, MAX_DOCUMENT_CHARS, 12000);"))
+        assertTrue(script.contains("target = document.body || document.documentElement;"))
+        assertTrue(script.contains("if (!target || !visible(target)) throw new Error('TARGET_NOT_VISIBLE');"))
+        assertFalse(script.contains("innerText"))
+    }
+
+    @Test
+    fun `get_text windows the collected text and names the selector it used`() {
+        val script = BrowserDomScripts.text(selector = ".post", offset = 400, maxChars = 512)
+
+        assertTrue(script.contains("var selector = \".post\";"))
+        assertTrue(script.contains("Math.min(400, total)"))
+        assertTrue(script.contains("Math.min(start + 512, total)"))
+        assertTrue(script.contains("selector_used: selector || selectorFor(target)"))
+        assertTrue(script.contains("visited_nodes: collected.nodes"))
+        assertTrue(script.contains("title: document.title || ''"))
+    }
 }
