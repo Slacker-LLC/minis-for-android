@@ -60,6 +60,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `provider/openai/ResponsesCitationFormatter.kt` (formatter plus `ResponsesCitationStream`) | `agent/model/ResponsesCitationFormatter.kt`, annotation handling in `agent/model/OpenAiResponsesProvider.kt` |
 | `data/model/LLMStreamChunk.kt` (`ProviderOutputItem`), `data/model/LLMMessage.kt` (`providerOutputItems`), `provider/openai/OpenAIProvider.kt` (capture and replay of opaque output items) | `agent/model/ResponsesEphemeralState.kt`, item handling in `agent/model/OpenAiResponsesProvider.kt` |
 | `tools/android/UiCoordinateSpace.kt` (coordinate-space contract, frame conversion and refusals) | `agent/model/AgentToolSchema.kt` (`coordinateSpace`), `agent/model/AgentScreenObservationContract.kt` |
+| `tools/ImageSourcePolicy.kt`, `tools/ReadImageTool.kt` (image source classification incl. gallery URIs) | `agent/model/AgentFileVisionToolCatalog.kt` |
 
 
 ## Active native/runtime components
