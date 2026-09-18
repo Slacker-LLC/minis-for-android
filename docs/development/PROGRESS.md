@@ -1023,6 +1023,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 设备复原 | 已把手术前的原始 `minis.db` 推回（该库本就无用户数据）、删除手搭的 `sweep-fake-session` 目录、重启应用：进程正常、crash 缓冲为空、`chat.sessions.list` 回 0 条（与实验前一致） |
 | 待你拍板 | ① 是否要做**孤儿会话目录**回收（约 55 MB，含 97 个 UUID 目录）：这属于删除用户目录，我不擅自动手；② 未决问题要不要继续查（最干净的验证方式是先用真实 provider 建一个会话再删——正好卡在待办②上） |
 
+### 功能缺口收一条：提示词不再让模型跑不存在的 `minis-mcp-cli`（2026-09-19，真机结论 + 单测） — `9ae555e7`
+
+| 项 | 结果 |
+|---|---|
+| 缺口（06-CURRENT-GAPS 里唯一确认的 guest CLI 缺口） | guest 里**没有** `minis-mcp-cli` 这个命令，但 MCP 的系统提示词片段仍在教模型 `minis-mcp-cli tools <server>` / `minis-mcp-cli call <server> <tool>`——照着做的模型只会拿到 `command not found` |
+| 为什么现在能改提示词而不是补 CLI | 远端 MCP 工具**已经注册进工具表**（`MCPProvider` → `ToolRegistry.register`，规范名 `mcp.<server>.<tool>`、模型侧 `mcp_<server>_<tool>`），而 `AgentTools` 正是从 `ToolRegistry.definitions()` 构造模型工具表——所以模型本就能**像普通工具一样直接调用**，CLI 那条路是多余的 |
+| 改法 | 片段改成：`Each remote tool is registered as mcp_<server>_<tool>`（给出 `mcp_docs_search` 例子）、`No shell command is involved`；`$$VARNAME` 那段改指「Settings → MCP Integrations 或 web-remote `mcp.*`」而不是 `minis-mcp-cli add`。文本抽成 `mcpPromptFragmentText(servers)` 以便 JVM 单测（原方法要读 SQLite 的 session 覆盖） |
+| 诚信说明 | 只闭合了**提示词这条路径**；「guest 里没有 `minis-mcp-cli`」本身仍留在 06-CURRENT-GAPS 里（补 CLI 是另一件事，需要显式安装/依赖策略） |
+| 验证口径 | `:app:testDebugUnitTest` **2415 例 0 失败**（新增 `MCPPromptFragmentTest` 3 例：点名注册工具形式、绝不出现 `minis-mcp-cli`、仍列服务器/备注并保留 `$$VARNAME` 句）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
