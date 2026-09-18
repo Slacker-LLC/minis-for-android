@@ -155,12 +155,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1965 个用例 = 上一项后的 1954 + 11，0 失败），`:app:lintDebug` 无新增问题（新增字符串已补齐 8 个 locale）。真机未验证：分享面板收到 `.md` 的行为、长会话导出的观感与耗时、`<details>` 在各 Markdown 阅读器里的折叠表现。
 
+**Phase 3 助手浮层面板（第一片：就地控制）** — 同一分支 `codex/eta-phase3-skills-tools`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 就地停止 | 浮层胶囊此前只有 X（仅收起胶囊）：用户在其他 App 里看着任务跑，却没法取消，只能回 App 或下拉通知。现在胶囊在「可取消」时多一个停止控件，走与通知 Stop 完全相同的取消路径（先向所有活跃流广播，让各 ChatViewModel 记录正常的已取消/可恢复状态，再停前台服务）——两个入口合并为 `requestUserStop()`，状态不会分叉 | `cb941c0c` | ✅ `OverlayRunActionsTest`（4 例） |
+| 单一规则的可见性 | 「是否提供停止」由 `OverlayRunActions.offersStop` 一处判定（有工具在执行，或流仍打开）；刚结束、仍在胶囊上停留的回合绝不显示停止，避免给出一个说谎的按钮 | `cb941c0c` | ✅ 用例覆盖工具运行中/仅流打开/空闲/两者同时 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1969 个用例 = 上一项后的 1965 + 4，0 失败），`:app:lintDebug` 无新增问题（复用既有 `bg_service_stop_action` 文案，未新增资源）。**本项只覆盖 Eta 面板五项里的三项「就地展示/可停止/可接管」**：就地展示与点击接管（深链回会话）本仓库原本就有，本轮补的是停止。**未做**：连续追问（需要先把 agent 运行从前台 Activity 解耦成可无头驱动的 seam，目前 `runAgentLoop` 仍是 ChatViewModel 私有）与面板内的屏幕上下文。真机未验证：胶囊停止控件的点击热区与拖拽手势是否冲突、各 ROM 下停止后通知与胶囊的收起时序。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板（Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出已在 `codex/eta-phase3-skills-tools` 落地；复制/编辑/删除/重新生成本仓库原本就有） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
