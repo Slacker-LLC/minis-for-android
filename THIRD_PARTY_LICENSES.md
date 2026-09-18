@@ -69,6 +69,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `notifications/NotificationHistoryPolicy.kt`, `notifications/MinisNotificationListenerService.kt`, `data/repository/NotificationHistoryRepository.kt`, `tools/NotificationTools.kt` | `agent/device/AgentNotificationHistoryService.kt`, `data/repository/NotificationHistoryRepository.kt`, and the `recent_notifications` / `search_notification_history` device tools |
 | `tools/history/ConversationHistoryPolicy.kt`, `tools/history/ConversationHistoryTool.kt` | `agent/model/AgentConversationToolCatalog.kt` and the runtime history seam that executes it |
 | `tools/alarm/AlarmToolPolicy.kt`, `tools/AlarmTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_alarm`, `set_timer`) and the alarm table in `agent/model/AgentDeviceToolCatalog.kt` |
+| `tools/context/DeviceContextPolicy.kt`, `tools/DeviceContextTool.kt` | `agent/tool/DeviceContextTool.kt` (`get_current_context`) |
 
 
 ## Active native/runtime components

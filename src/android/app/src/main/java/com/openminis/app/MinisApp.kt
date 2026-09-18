@@ -553,6 +553,12 @@ class MinisApp : Application(), ImageLoaderFactory {
                 aliasNames = com.openminis.app.tools.AlarmTools.aliases[handler.definition.name].orEmpty(),
             )
         }
+        // [T-eta-device-context] One read for the environment a turn reasons about: time with
+        // offset and weekday, screen, battery, transport, foreground app, last-known location.
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.DeviceContextHandler(),
+            aliasNames = com.openminis.app.tools.DeviceContextTool.aliases,
+        )
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here
