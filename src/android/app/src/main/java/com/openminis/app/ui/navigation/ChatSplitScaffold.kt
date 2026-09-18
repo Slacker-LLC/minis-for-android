@@ -880,6 +880,9 @@ fun ChatSplitScaffoldRoute(
                     onRootfsClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
                     onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
                     onBotsClick = { showBots = true },
+                    // [T-android-assistant-home] Top-of-list entry into the
+                    // assistant home page (roadmap Phase 1 item 2).
+                    onOpenAssistantHome = { navController.safeNavigate(Routes.ASSISTANT_HOME) },
                     selectedSessionId = selectedSessionId,
                     draftPlaceholderId = draftPlaceholderId,
                 )

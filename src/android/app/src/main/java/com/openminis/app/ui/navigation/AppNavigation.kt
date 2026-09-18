@@ -88,6 +88,8 @@ private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
 
 object Routes {
     const val SESSION_LIST = "sessions"
+    /** [T-android-assistant-home] Greeting + 2×2 quick actions; optional start page. */
+    const val ASSISTANT_HOME = "assistant_home"
     const val CHAT = "chat/{sessionId}"
     const val SETTINGS = "settings"
     const val BOTS = "bots"
@@ -244,6 +246,12 @@ fun AppNavigation(
     val mountedFoldersStore = remember {
         (context.applicationContext as com.openminis.app.MinisApp).mountedFoldersStore
     }
+
+    // [T-android-assistant-home] The home page's persisted state has to be
+    // accurate on the very first frame — the start destination below is chosen
+    // from it — so prime it here, once, before the graph is built. The flows are
+    // then read by the session-list entry and the home page itself.
+    remember(context) { com.openminis.app.data.AssistantHomePrefs.prime(context) }
 
     // Handle initial deep link after composition
     LaunchedEffect(initialDeepLink) {
@@ -451,6 +459,12 @@ fun AppNavigation(
             Routes.chat(htmlShortcut.sessionId)
         }
         quickActionStart != null -> quickActionStart
+        // [T-android-assistant-home] "Open the assistant home on launch" swaps
+        // the list start destination for the home page. Explicit session
+        // targets still win: launch mode 1/2/0 navigates after the graph mounts,
+        // so only the "stay on the list" case (mode 3, or the hang/crash circuit
+        // breaker) is replaced — which is exactly what the user asked for.
+        com.openminis.app.data.AssistantHomePrefs.startPage.value -> Routes.ASSISTANT_HOME
         else -> Routes.SESSION_LIST
     }
     NavHost(
@@ -510,6 +524,38 @@ fun AppNavigation(
             ) + fadeOut(animationSpec = tween(200, easing = EmphasizedAccelerate))
         },
     ) {
+        // [T-android-assistant-home] Greeting + 2×2 quick actions. Reached from
+        // the session list's top entry, or used as the start destination when
+        // the user turned on "Open the assistant home on launch". The session
+        // list stays the primary surface: "All conversations" always lands
+        // there, and when this route IS the start destination there is nothing
+        // to pop back to — the back affordance is hidden instead of exiting.
+        composable(Routes.ASSISTANT_HOME) {
+            val isStartDestination = navController.previousBackStackEntry == null
+            val openSessionList: () -> Unit = {
+                if (isStartDestination) {
+                    navController.safeNavigate(Routes.SESSION_LIST) {
+                        popUpTo(Routes.ASSISTANT_HOME) { inclusive = true }
+                    }
+                } else {
+                    navController.safePopBackStack()
+                }
+            }
+            com.openminis.app.ui.home.AssistantHomeScreen(
+                onOpenSessions = openSessionList,
+                onBack = if (isStartDestination) null else openSessionList,
+                onAnalyzeScreen = {
+                    // Seed the pending action so the fresh draft's ChatScreen
+                    // fills the composer with the screen-analysis prompt rather
+                    // than the agent firing a request the user never saw.
+                    DeepLinkCoordinator.setPendingChatAction(
+                        DeepLinkCoordinator.ChatAction.ANALYZE_SCREEN,
+                    )
+                    navController.safeNavigate(Routes.chat("__new__${java.util.UUID.randomUUID()}"))
+                },
+            )
+        }
+
        composable(Routes.SESSION_LIST) {
             ChatSplitScaffoldRoute(
                 initialSessionId = null,

@@ -1780,4 +1780,36 @@
     <string name="appearance_steps_presentation_off">Every thinking block and tool call keeps its own row.</string>
     <string name="appearance_steps_presentation_footer">A collapsed row auto-expands while steps are running and folds back when they finish; a failed step writes its reason on the collapsed row. Turn this off for one row per step with the unchanged long-press menu (re-run, copy, stop).</string>
 
+    <!-- [T-android-assistant-home] Assistant home page + its quick action cards. -->
+    <string name="assistant_home_title">Assistant home</string>
+    <string name="assistant_home_back">Back</string>
+    <string name="assistant_home_greeting_morning">Good morning</string>
+    <string name="assistant_home_greeting_afternoon">Good afternoon</string>
+    <string name="assistant_home_greeting_evening">Good evening</string>
+    <string name="assistant_home_greeting_night">Still up?</string>
+    <string name="assistant_home_subtitle">What would you like to do?</string>
+    <string name="assistant_home_open_sessions">All conversations</string>
+    <string name="assistant_home_start_page_title">Open the assistant home on launch</string>
+    <string name="assistant_home_start_page_subtitle">The session list stays one tap away.</string>
+    <string name="assistant_home_configure_actions">Choose quick actions</string>
+    <string name="assistant_home_configure_hint">Cards shown on the 2×2 grid. At least one stays on.</string>
+    <string name="assistant_home_entry_title">Assistant home</string>
+    <string name="assistant_home_entry_subtitle">Quick actions and shortcuts</string>
+    <string name="assistant_action_screen_title">Analyze screen</string>
+    <string name="assistant_action_screen_subtitle">Look at what is on screen now</string>
+    <string name="assistant_action_screen_prompt">Look at my current screen and tell me what it is and what I can do here.</string>
+    <string name="assistant_action_wechat_title">Open WeChat</string>
+    <string name="assistant_action_wechat_subtitle">Launch the WeChat app</string>
+    <string name="assistant_action_wechat_missing">WeChat is not installed</string>
+    <string name="assistant_action_web_title">Browse the web</string>
+    <string name="assistant_action_web_subtitle">Open the built-in browser</string>
+    <string name="assistant_action_memory_title">Memory pressure</string>
+    <string name="assistant_action_memory_subtitle">Device and app memory right now</string>
+    <string name="assistant_memory_device_used">Device memory</string>
+    <string name="assistant_memory_device_value">%1$s / %2$s (%3$d%%)</string>
+    <string name="assistant_memory_available">Available</string>
+    <string name="assistant_memory_app_pss">This app (PSS)</string>
+    <string name="assistant_memory_pressure_high">The system reports memory pressure.</string>
+    <string name="assistant_memory_pressure_normal">Memory pressure looks normal.</string>
+    <string name="assistant_memory_close">Close</string>
 </resources>

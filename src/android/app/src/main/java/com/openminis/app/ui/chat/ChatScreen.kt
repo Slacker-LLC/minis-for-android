@@ -950,6 +950,23 @@ fun ChatScreen(
         }
     }
 
+    // [T-android-assistant-home] "Analyze screen" quick action: the home page
+    // opens a fresh draft and seeds this action, so the composer arrives with
+    // the prompt visible — the user reads (and can edit) what will be asked
+    // before anything is sent. Consumed once so re-entering the draft later
+    // does not overwrite whatever the user typed meanwhile.
+    LaunchedEffect(sessionId) {
+        val pending = com.openminis.app.deeplink.DeepLinkCoordinator
+            .pendingChatAction.value
+        if (pending == com.openminis.app.deeplink.DeepLinkCoordinator
+                .ChatAction.ANALYZE_SCREEN
+        ) {
+            com.openminis.app.deeplink.DeepLinkCoordinator
+                .consumePendingChatAction()
+            viewModel.setInputText(context.getString(R.string.assistant_action_screen_prompt))
+        }
+    }
+
     // File picker launcher — T129: multi-select via OpenMultipleDocuments
     // (GetContent has no multi-select equivalent). The launch arg is now a
     // mime-type array; "*/*" stays as the wildcard. Selections above

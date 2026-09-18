@@ -70,7 +70,13 @@ object DeepLinkCoordinator {
      * `minis://action/camera_chat`; consumed exactly once by ChatScreen
      * so re-entering the same chat later doesn't fire the action again.
      */
-    enum class ChatAction { START_VOICE, OPEN_CAMERA }
+    /**
+     * [T-android-assistant-home] ANALYZE_SCREEN is set by the assistant home
+     * page's "analyze screen" card: it opens a fresh draft and the ChatScreen
+     * prefills the composer with the screen-analysis prompt, so the user sees
+     * (and can edit) what the agent is about to be asked.
+     */
+    enum class ChatAction { START_VOICE, OPEN_CAMERA, ANALYZE_SCREEN }
 
     private val _pendingChatAction = MutableStateFlow<ChatAction?>(null)
     val pendingChatAction: StateFlow<ChatAction?> = _pendingChatAction.asStateFlow()

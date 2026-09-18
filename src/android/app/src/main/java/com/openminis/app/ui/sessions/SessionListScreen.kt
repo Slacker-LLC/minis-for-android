@@ -425,6 +425,10 @@ fun SessionListScreen(
    // [T-android-scheduled-tasks-design] Entry to the scheduled-tasks list.
    onScheduledTasksClick: () -> Unit = {},
     onBotsClick: () -> Unit = {},
+    // [T-android-assistant-home] Top-of-list entry into the assistant home page.
+    // Kept as a parameter (with a no-op default) so every existing call site
+    // compiles unchanged and a surface without the home page simply omits it.
+    onOpenAssistantHome: () -> Unit = {},
     selectedSessionId: String? = null,
     draftPlaceholderId: String? = null,
 ) {
@@ -813,6 +817,10 @@ fun SessionListScreen(
             // iOS `didInitialLoad` on ContentView. The transition is usually
             // sub-200ms, so no spinner.
             if (isInitialLoadComplete) Column(modifier = Modifier.fillMaxSize()) {
+                // [T-android-assistant-home] The home-page entry sits at the top
+                // of the session list: the list stays the primary surface, the
+                // home page hangs off its first row.
+                com.openminis.app.ui.home.AssistantHomeEntryRow(onClick = onOpenAssistantHome)
                 if (sessions.isEmpty()) {
                     if (isSearchActive && searchQuery.isNotBlank()) {
                         Box(

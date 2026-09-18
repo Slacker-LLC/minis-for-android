@@ -1633,4 +1633,36 @@
     <string name="appearance_steps_presentation_off">每个思考块与工具调用各自单独一行。</string>
     <string name="appearance_steps_presentation_footer">收束行在步骤运行中自动展开、结束后自动折叠；失败的步骤会把原因写在折叠行上。关闭后保持每步一行，长按菜单（重跑 / 复制 / 停止）不变。</string>
 
+    <!-- [T-android-assistant-home] 助手首页与快捷动作卡。 -->
+    <string name="assistant_home_title">助手首页</string>
+    <string name="assistant_home_back">返回</string>
+    <string name="assistant_home_greeting_morning">早上好</string>
+    <string name="assistant_home_greeting_afternoon">下午好</string>
+    <string name="assistant_home_greeting_evening">晚上好</string>
+    <string name="assistant_home_greeting_night">夜深了</string>
+    <string name="assistant_home_subtitle">今天想做点什么？</string>
+    <string name="assistant_home_open_sessions">全部会话</string>
+    <string name="assistant_home_start_page_title">启动时打开助手首页</string>
+    <string name="assistant_home_start_page_subtitle">会话列表仍然一键可达。</string>
+    <string name="assistant_home_configure_actions">配置快捷动作</string>
+    <string name="assistant_home_configure_hint">显示在 2×2 快捷卡上的动作，至少保留一个。</string>
+    <string name="assistant_home_entry_title">助手首页</string>
+    <string name="assistant_home_entry_subtitle">快捷动作与常用入口</string>
+    <string name="assistant_action_screen_title">分析当前屏幕</string>
+    <string name="assistant_action_screen_subtitle">看看当前屏幕上的内容</string>
+    <string name="assistant_action_screen_prompt">看看我现在的屏幕，告诉我这是什么界面、能在这里做什么。</string>
+    <string name="assistant_action_wechat_title">打开微信</string>
+    <string name="assistant_action_wechat_subtitle">直接拉起微信</string>
+    <string name="assistant_action_wechat_missing">未安装微信</string>
+    <string name="assistant_action_web_title">浏览网页</string>
+    <string name="assistant_action_web_subtitle">打开内置浏览器</string>
+    <string name="assistant_action_memory_title">查看内存压力</string>
+    <string name="assistant_action_memory_subtitle">查看设备与 App 当前内存</string>
+    <string name="assistant_memory_device_used">设备内存</string>
+    <string name="assistant_memory_device_value">%1$s / %2$s（%3$d%%）</string>
+    <string name="assistant_memory_available">可用</string>
+    <string name="assistant_memory_app_pss">本应用（PSS）</string>
+    <string name="assistant_memory_pressure_high">系统报告内存压力偏高。</string>
+    <string name="assistant_memory_pressure_normal">内存压力正常。</string>
+    <string name="assistant_memory_close">关闭</string>
 </resources>
