@@ -81,6 +81,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `ui/settings/CharactersScreen.kt` (character library: import, share, delete) | Eta's character screens and its file-picker import path |
 | `ui/settings/CharacterPickerDialog.kt` and the session-menu entry in `ui/sessions/SessionListScreen.kt` | Eta's conversation binding UI |
 | `roleplay/CharacterWorldbookDraft.kt` (world book draft read/write) | `agent/roleplay/CharacterWorldbookDraft.kt` |
+| `ui/settings/CharacterDetailScreen.kt` (character detail and world-book editor) | Eta's character detail and world-book editor screens |
 
 
 ## Active native/runtime components

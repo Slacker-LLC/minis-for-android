@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,7 +74,7 @@ import java.util.Date
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CharactersScreen(onBack: () -> Unit) {
+fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var characters by remember { mutableStateOf<List<CharacterProfile>>(emptyList()) }
@@ -164,6 +165,7 @@ fun CharactersScreen(onBack: () -> Unit) {
                             }
                         },
                         onDelete = { pendingDelete = profile },
+                        onOpen = { onOpen(profile.id) },
                     )
                 }
             }
@@ -194,9 +196,14 @@ fun CharactersScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun CharacterRow(profile: CharacterProfile, onShare: () -> Unit, onDelete: () -> Unit) {
+private fun CharacterRow(
+    profile: CharacterProfile,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    onOpen: () -> Unit,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

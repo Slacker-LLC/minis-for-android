@@ -134,11 +134,17 @@ object Routes {
 
     /** [T-eta-character-cards] Imported character cards. */
     const val CHARACTERS = "characters"
+
+    /** [T-eta-character-cards] One stored character: its card and its world book. */
+    const val CHARACTER_DETAIL = "character/{characterId}"
     const val SKILL_DETAIL = "skill/{skillId}"
     const val SKILL_FILE = "skill_file/{skillId}/{relativePath}"
     const val MINIS_SKILLS_BROWSER = "minis_skills_browser"
 
     fun skillDetail(skillId: String) = "skill/$skillId"
+
+    /** [T-eta-character-cards] One stored character: its card and its world book. */
+    fun characterDetail(characterId: String) = "character/$characterId"
     fun skillFile(skillId: String, relativePath: String = "SKILL.md"): String {
         // Path may contain `/`, which the nav library treats as a route
         // separator. URL-encode so subdirectory paths survive a round-trip.
@@ -1194,9 +1200,17 @@ fun AppNavigation(
         }
 
         // [T-eta-character-cards] The character library: import, share, delete.
+        composable(Routes.CHARACTER_DETAIL) { entry ->
+            val characterId = entry.arguments?.getString("characterId").orEmpty()
+            com.openminis.app.ui.settings.CharacterDetailScreen(
+                characterId = characterId,
+                onBack = { navController.safePopBackStack() },
+            )
+        }
         composable(Routes.CHARACTERS) {
             com.openminis.app.ui.settings.CharactersScreen(
                 onBack = { navController.safePopBackStack() },
+                onOpen = { id -> navController.safeNavigate(Routes.characterDetail(id)) },
             )
         }
 

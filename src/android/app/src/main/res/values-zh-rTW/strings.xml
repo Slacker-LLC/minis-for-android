@@ -151,6 +151,21 @@
     <string name="characters_pick_title">Character for this session</string>
     <string name="characters_pick_none">No character (keep this session an ordinary chat)</string>
     <string name="characters_pick_empty">No characters yet. Import one under Settings -> Characters.</string>
+    <string name="characters_detail_missing">This character is no longer stored.</string>
+    <string name="characters_book_settings">World book</string>
+    <string name="characters_book_scan_depth">Scan depth (messages, empty = default)</string>
+    <string name="characters_book_token_budget">Token budget (empty = a quarter of the window)</string>
+    <string name="characters_book_recursive">Let matched entries reveal others</string>
+    <string name="characters_entries">Entries (%1$d)</string>
+    <string name="characters_entry_add">Add an entry</string>
+    <string name="characters_entry_edit">Edit entry</string>
+    <string name="characters_entry_name">Name</string>
+    <string name="characters_entry_keys">Keywords, comma separated</string>
+    <string name="characters_entry_content">What the entry says</string>
+    <string name="characters_entry_before">Insert before the character block</string>
+    <string name="characters_entry_constant">Always active</string>
+    <string name="characters_entry_delete">Delete this entry</string>
+    <string name="characters_entry_unnamed">Unnamed entry</string>
     <string name="characters_import_failed">The card could not be imported.</string>
     <string name="characters_export_failed">The character could not be exported.</string>
     <!-- T-export-optimize (b443b54d) — 分批/打包匯出進度 + 預覽 -->
