@@ -76,19 +76,37 @@ data class AgentToolDefinition(
 
     /** Anthropic format: {name, description, input_schema: {type:object, properties, required}} */
     fun toAnthropicJson(): JSONObject {
+        return JSONObject().apply {
+            put("name", apiName)
+            put("description", description)
+            put("input_schema", inputSchemaJson())
+        }
+    }
+
+    /**
+     * MCP `tools/list` shape: same name/description/schema, but the schema field
+     * is `inputSchema` — the spelling the MCP spec uses. The Anthropic shape
+     * above spells it `input_schema`; a spec client that reads only `inputSchema`
+     * saw every tool with no parameters and had to guess argument names
+     * (measured on device: all 58 exposed tools came back with the snake key
+     * alone, and `linux_file_copy` answered a call that used the wrong names).
+     */
+    fun toMcpJson(): JSONObject = JSONObject().apply {
+        put("name", apiName)
+        put("description", description)
+        put("inputSchema", inputSchemaJson())
+    }
+
+    /** The JSON-Schema object the Anthropic and MCP shapes share. */
+    private fun inputSchemaJson(): JSONObject {
         val props = JSONObject()
         for ((key, param) in parameters) {
             props.put(key, param.toJson())
         }
-        val schema = JSONObject().apply {
+        return JSONObject().apply {
             put("type", "object")
             put("properties", props)
             if (required.isNotEmpty()) put("required", JSONArray(required))
-        }
-        return JSONObject().apply {
-            put("name", apiName)
-            put("description", description)
-            put("input_schema", schema)
         }
     }
 

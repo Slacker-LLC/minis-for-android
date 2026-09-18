@@ -204,7 +204,10 @@ class MCPServer(private val context: Context?, private val port: Int = MCPServer
                         .filter { scopeAllows(tokenRecord.scope, it.name) }
                     val arr = JSONArray()
                     for (d in defs) {
-                        arr.put(d.toAnthropicJson())
+                        // MCP's own shape, not the Anthropic one: the schema field
+                        // name differs (`inputSchema`), and publishing the Anthropic
+                        // spelling left every tool parameterless for spec clients.
+                        arr.put(d.toMcpJson())
                     }
                     MCPCodec.response(req.id, MCPCodec.toolsListResult(arr))
                 }
