@@ -562,6 +562,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2248 个用例 = 上一项后的 2244 + 4）。**没有任何设备结论**：某一屏把文字摆在哪几个节点上未验证；决定比较方式的是模式，遍历范围与之前一致（text 与可选 contentDescription，深度 30）。**说明**：本片只改代码与工具 schema，未动资源/清单，按验证矩阵未复跑 lint。
 
+**自造轮子复核（二）：有界拷贝的两点对齐 + 一处漏网** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 我们的 `BoundedStreams` vs 上游 `BoundedFileCopy` | 本仓库早就有有界拷贝助手，所以轮子在——但与上游差在**快乐路径之后**的两点：①上游**每块之间检查取消**并抛 `InterruptedIOException`，我们没有：从慢速 provider 拷大文件时，就算调用方取消了工作，拷贝仍会跑到对方文件的尽头；②上游抛**可区分的** `TooLargeException`，调用方能说清是"源太大"还是"流坏了"，我们只抛带消息的 IOException。两点都补进助手（异常保持是 IOException 子类，既有 catch 不受影响） | `62eaffec` | ✅ `BoundedStreamsTest` 补 2 例（类型区分、取消即停） |
+| 漏网的一处无界导入 | 把全部 `openInputStream` 调用点扫了一遍找同类缺陷，抓到一处仍然无界：Add to Home Screen 的网页源文件是裸 `input.copyTo(out)` 直接写进缓存，用户误选一个大归档就会灌满缓存目录。现在按 8 MiB 预算拷贝，拒绝时带上原因。其余导入点早已有界（分享接收器的带预算拷贝、技能/角色卡/Provider 导入、宠物包解包、`read_image` 的 50 MiB） | `62eaffec` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2250 个用例 = 上一项后的 2248 + 2）。**没有任何设备结论**：某个 provider 的流在拷贝中途被打断时如何表现未验证；拷贝会停下并说明，这是调用方依赖的行为。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
