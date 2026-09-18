@@ -311,7 +311,13 @@
 |---|---|---|---|
 | Hook 安装骨架 | 模块能加载了，但还没有任何办法登记目标和汇报结果。本轮补上 Eta 的 `HookRegistrar`/`HookSupport`/`ModuleLogger`：注册器只管注册与记账（找目标仍是功能组的活），每条路径都写台账——installed、这版 ROM 没有（missing）、抛了（failed，带异常类名）、跳过（skipped）；重复注册被拒绝而不是把两个 hook 叠到同一个方法上；`install()` 会记下组级异常但**保留已注册的部分**（半个有用的组好过没有，且报告会说明缺哪块）；框架自身的失败以 Error 形式出现，刻意不吞。`HookSupport` 是各组共用的反射习惯：查找沿父类链、ROM 上不存在的类/方法返回 null（最终记进 MISSING）、`LinkageError` 当作「这里没有」、绝不把异常抛进别人的进程；另附各组需要的便利函数（字段读取、无参调用、组件→包名、包是否安装、Activity 是否可解析）。`HookLogger` 是日志缝：入口类持有 tag 与 sink，组只写行（自动带组名前缀），消息是 lambda 所以热路径不会构造没人打印的字符串 | `b1b7e86d` | ✅ `HookSupportTest`（6 例） |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2118 个用例 = 上一项后的 2112 + 6，0 失败）。**没有任何设备结论**：真正跑这套骨架的是 hook 组，而目前还没有注册任何组。下一步就是第一组真 hook（按路线图：一圈即搜 / 无障碍保活 / 电源键 / 小布 / 超级小爱 / Google 解锁），每组都会把 installed/missing/failed/skipped 如实写进台账。
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2118 个用例 = 上一项后的 2112 + 6，0 失败）。**没有任何设备结论**：真正跑这套骨架的是 hook 组，而目前还没有注册任何组。
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 模块开关缝 | Eta 的每一组 hook 都要问一个用户开关，而开关此前没有落脚处：hook 跑在 system_server 或厂商应用进程里，读不到 App 私有设置。`ModulePrefs`（源自 Eta `config/Prefs.kt`）：框架会把模块设置的只读视图交给每个被注入的进程，入口类在加载时接上，组在拦截时用开关——所以切换开关在下一次拦截就生效，不必重启。两条规则比管道更重要：**每个开关有自己的默认值**，且「会接管按键或助手」的开关一律默认关，于是「装了但没配」的模块行为等同没装；手势条搜索路由保持默认开（把该手势接到系统自己的搜索就是这个功能本身）。设置读取失败、或该进程根本没拿到设置时，回落到默认值而不是猜——并且有日志，所以「开关没反应」有可见原因 | `ad620d73` | ✅ `ModulePrefsTest`（5 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2123 个用例 = 上一项后的 2118 + 5，0 失败）。缝做成一方法的 reader（而不是直接吃 `SharedPreferences`），默认值与回落因此能在无 Android 运行时的情况下测到；`attachSharedPreferences` 把框架对象适配到它上面。**没有任何设备结论**：还没有任何代码读这些开关——读它的是第一组 hook。下一步：第一组真 hook（一圈即搜 / 无障碍保活 / 电源键 / 小布 / 超级小爱 / Google 解锁），每组把 installed/missing/failed/skipped 写进台账并按开关决定是否接管。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
