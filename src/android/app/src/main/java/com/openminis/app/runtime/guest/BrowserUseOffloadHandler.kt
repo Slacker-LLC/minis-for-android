@@ -469,6 +469,9 @@ ACTIONS:
   scroll_and_collect --scroll-count <n> --item-selector <css> [--keywords <list>]
   wait_for_dom_stable [--timeout <ms>]
   wait_for_selector --selector <css> [--timeout-ms <ms>]
+  go_back
+  go_forward
+  reload
 
 COMMON OPTIONS:
   --tab-id <n>     Route the action to a specific tab (default: active tab)

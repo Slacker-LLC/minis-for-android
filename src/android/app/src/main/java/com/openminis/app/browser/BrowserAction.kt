@@ -26,7 +26,10 @@ enum class BrowserAction(val value: String) {
     SET_COOKIES("set_cookies"),
     SCROLL_AND_COLLECT("scroll_and_collect"),
     WAIT_FOR_DOM_STABLE("wait_for_dom_stable"),
-    WAIT_FOR_SELECTOR("wait_for_selector");
+    WAIT_FOR_SELECTOR("wait_for_selector"),
+    GO_BACK("go_back"),
+    GO_FORWARD("go_forward"),
+    RELOAD("reload");
 
     /**
      * [T-browser-readaction-follow-tab-and-yolo-android] True when this action

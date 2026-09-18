@@ -130,6 +130,7 @@ object AgentTools {
             "Use set_cookies to write cookies into the current page's cookie store via the native cookie store (so even HttpOnly cookies, which JS cannot set, land). Pass a 'cookies' array of objects, each with name + value (required) and optional domain (defaults to the current page host), path (defaults to '/'), secure, http_only, and expires (Unix timestamp in seconds; omit for a session cookie). " +
             "Use wait_for_dom_stable to wait until the page DOM stops changing (useful after navigation or interactions that trigger async data loading — polls every 0.5s, resolves when mutation rate gradient is stable for 3+ intervals, default timeout 10s). " +
             "Use wait_for_selector to wait for one specific element to become visible (the precise form: poll every 250ms up to timeout_ms, default 5s) — prefer it when the next call clicks or reads a known selector. " +
+            "Use go_back / go_forward to move through this tab's own history (refused with a reason when there is nothing to move to) and reload to refresh the current page. " +
             "Use tab_id to target a specific tab (defaults to the most recently used tab).",
         parameters = mapOf(
             "tool_title" to AgentToolParam("string", "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Open Wikipedia homepage', 'Take screenshot of current page'). Use the same language as the user."),

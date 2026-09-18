@@ -12,7 +12,7 @@ object BrowserUseTool {
 
     const val NAME = "browser_use"
 
-    val description = """Control web browser with up to 3 tabs. Actions: navigate to URL, take screenshot, click elements, type text, get page text, scroll, get page info, execute JavaScript, find elements by selector, hover, get readable content, set user agent, get page backbone (DOM structure), fetch resource, wait for an element to appear (wait_for_selector), manage tabs (new_tab, close_tab, list_tabs). get_text and get_readable read the page in windows (offset + max_chars) and report next_offset while more text remains — pass it back as offset to continue the same page. find_elements without a selector lists the page's interactive elements and gives each a verified selector to click.""".trimIndent()
+    val description = """Control web browser with up to 3 tabs. Actions: navigate to URL, take screenshot, click elements, type text, get page text, scroll, get page info, execute JavaScript, find elements by selector, hover, get readable content, set user agent, get page backbone (DOM structure), fetch resource, wait for an element to appear (wait_for_selector), move through the tab's history (go_back, go_forward) or reload (reload), manage tabs (new_tab, close_tab, list_tabs). get_text and get_readable read the page in windows (offset + max_chars) and report next_offset while more text remains — pass it back as offset to continue the same page. find_elements without a selector lists the page's interactive elements and gives each a verified selector to click.""".trimIndent()
 
     /**
      * Build the JSON tool definition for the Anthropic / OpenAI / Gemini API.

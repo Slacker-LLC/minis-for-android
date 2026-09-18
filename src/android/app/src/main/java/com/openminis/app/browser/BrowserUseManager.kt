@@ -603,6 +603,9 @@ class BrowserUseManager(
             )
             BrowserAction.WAIT_FOR_DOM_STABLE -> return waitForDomStable(input.timeoutMs)
             BrowserAction.WAIT_FOR_SELECTOR -> return waitForSelector(input.selector, input.timeoutMs)
+            BrowserAction.GO_BACK -> return historyNavigation(backwards = true)
+            BrowserAction.GO_FORWARD -> return historyNavigation(backwards = false)
+            BrowserAction.RELOAD -> return reloadPage()
             BrowserAction.NEW_TAB, BrowserAction.CLOSE_TAB, BrowserAction.LIST_TABS ->
                 return BrowserActionResult.error("Tab management actions must be routed through BrowserTabPool")
         }
@@ -654,11 +657,7 @@ class BrowserUseManager(
         var normalized = urlString
         if (!normalized.contains("://")) normalized = "https://$normalized"
 
-        val deferred = CompletableDeferred<Unit>()
-        navigationDeferred = deferred
-        _isLoading.value = true
-
-        withContext(Dispatchers.Main) {
+        awaitNavigation(label = "navigation to $normalized") {
             // Re-assert the last applied viewport before loadUrl. Intercepted
             // navigations (minis://) served via shouldInterceptRequest skip
             // the layout pass that a real network load triggers, so without
@@ -668,26 +667,7 @@ class BrowserUseManager(
             webView.loadUrl(normalized)
         }
 
-        // Wait with timeout
-        val handler = Handler(Looper.getMainLooper())
-        val timeoutRunnable = Runnable {
-            if (navigationDeferred === deferred) {
-                Log.w(TAG, "Navigation timed out for $normalized")
-                _isLoading.value = false
-                deferred.complete(Unit)
-                navigationDeferred = null
-            }
-        }
-        handler.postDelayed(timeoutRunnable, NAVIGATION_TIMEOUT_MS)
-
-        try {
-            deferred.await()
-        } finally {
-            handler.removeCallbacks(timeoutRunnable)
-        }
-
         _currentURL.value = _currentURL.value.ifEmpty { normalized }
-        _isLoading.value = false
 
         val meta = navigationMetadata()
         return BrowserActionResult(text = meta)
@@ -1271,32 +1251,56 @@ class BrowserUseManager(
      * viewport-change callers still get a deterministic page refresh.
      */
     suspend fun reloadAndWait() {
+        val url = _currentURL.value
+        awaitNavigation(label = "reload") {
+            if (url.isEmpty() || url == "about:blank") {
+                // Android WebView's `about:blank` reports `window.innerWidth=980`
+                // regardless of container size (the no-meta-viewport fallback),
+                // so a plain blank reload wouldn't reflect the new viewport. Load
+                // an empty page that declares `width=device-width` instead —
+                // `window.innerWidth` then tracks the container we just laid out.
+                // `loadDataWithBaseURL(null, html, ...)` lands on `about:blank`
+                // as the reported URL but with our meta-viewport in effect.
+                webView.loadDataWithBaseURL(null, BLANK_PAGE_HTML, "text/html", "utf-8", null)
+            } else {
+                webView.reload()
+            }
+        }
+    }
+
+    /**
+     * [T-browser-history-actions-android] Run [trigger] on the main thread and wait
+     * for the page to report itself finished, bounded by [NAVIGATION_TIMEOUT_MS].
+     * This is the one copy of a wait that navigate, reload, the blank load and the
+     * history moves used to repeat — five near-identical deferred/timeout blocks,
+     * each of which could drift from the others.
+     */
+    private suspend fun awaitNavigation(label: String, trigger: () -> Unit) {
         val deferred = CompletableDeferred<Unit>()
         navigationDeferred = deferred
         _isLoading.value = true
-        val url = _currentURL.value
-        if (url.isEmpty() || url == "about:blank") {
-            // Android WebView's `about:blank` reports `window.innerWidth=980`
-            // regardless of container size (the no-meta-viewport fallback),
-            // so a plain blank reload wouldn't reflect the new viewport. Load
-            // an empty page that declares `width=device-width` instead —
-            // `window.innerWidth` then tracks the container we just laid out.
-            // `loadDataWithBaseURL(null, html, ...)` lands on `about:blank`
-            // as the reported URL but with our meta-viewport in effect.
-            webView.loadDataWithBaseURL(null, BLANK_PAGE_HTML, "text/html", "utf-8", null)
-        } else {
-            webView.reload()
+        try {
+            withContext(Dispatchers.Main) { trigger() }
+        } catch (t: Throwable) {
+            if (navigationDeferred === deferred) navigationDeferred = null
+            _isLoading.value = false
+            throw t
         }
         val handler = Handler(Looper.getMainLooper())
         val timeoutRunnable = Runnable {
             if (navigationDeferred === deferred) {
+                Log.w(TAG, "Timed out waiting for $label")
                 _isLoading.value = false
                 deferred.complete(Unit)
                 navigationDeferred = null
             }
         }
         handler.postDelayed(timeoutRunnable, NAVIGATION_TIMEOUT_MS)
-        try { deferred.await() } finally { handler.removeCallbacks(timeoutRunnable) }
+        try {
+            deferred.await()
+        } finally {
+            handler.removeCallbacks(timeoutRunnable)
+        }
         _isLoading.value = false
     }
 
@@ -1308,24 +1312,48 @@ class BrowserUseManager(
      * WebView's hardcoded `about:blank` 980px fallback.
      *
      * Suspends until `onPageFinished` fires so a follow-up JS evaluation sees
-     * `document.body` populated. Must be called on the main thread.
+     * `document.body` populated. The load runs on the main thread internally, so
+     * any caller may suspend on it.
      */
     suspend fun loadBlankPage() {
-        val deferred = CompletableDeferred<Unit>()
-        navigationDeferred = deferred
-        _isLoading.value = true
-        webView.loadDataWithBaseURL(null, BLANK_PAGE_HTML, "text/html", "utf-8", null)
-        val handler = Handler(Looper.getMainLooper())
-        val timeoutRunnable = Runnable {
-            if (navigationDeferred === deferred) {
-                _isLoading.value = false
-                deferred.complete(Unit)
-                navigationDeferred = null
-            }
+        awaitNavigation(label = "blank page load") {
+            webView.loadDataWithBaseURL(null, BLANK_PAGE_HTML, "text/html", "utf-8", null)
         }
-        handler.postDelayed(timeoutRunnable, NAVIGATION_TIMEOUT_MS)
-        try { deferred.await() } finally { handler.removeCallbacks(timeoutRunnable) }
-        _isLoading.value = false
+    }
+
+    /**
+     * [T-browser-history-actions-android] Upstream's `go_back` / `go_forward`: move
+     * through the tab's own history and wait for the page it lands on. Nothing to
+     * move to is a refusal with a reason, not the silent no-op our UI helper is —
+     * read back, a no-op looks exactly like "the page changed".
+     */
+    private suspend fun historyNavigation(backwards: Boolean): BrowserActionResult {
+        val possible = withContext(Dispatchers.Main) {
+            if (backwards) webView.canGoBack() else webView.canGoForward()
+        }
+        if (!possible) {
+            return BrowserActionResult(
+                text = BrowserHistoryPolicy.unavailable(backwards),
+                success = false,
+                pageURL = _currentURL.value,
+            )
+        }
+        awaitNavigation(label = if (backwards) "go back" else "go forward") {
+            if (backwards) webView.goBack() else webView.goForward()
+        }
+        return BrowserActionResult(
+            text = BrowserHistoryPolicy.moved(backwards) + "\n" + navigationMetadata(),
+            pageURL = _currentURL.value,
+        )
+    }
+
+    /** Upstream's `reload` action: reload the tab, then say where it landed. */
+    private suspend fun reloadPage(): BrowserActionResult {
+        reloadAndWait()
+        return BrowserActionResult(
+            text = BrowserHistoryPolicy.reloaded() + "\n" + navigationMetadata(),
+            pageURL = _currentURL.value,
+        )
     }
 
     fun loadURL(urlString: String) {
