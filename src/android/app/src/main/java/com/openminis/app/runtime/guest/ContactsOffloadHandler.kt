@@ -103,53 +103,27 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
         }
         AppLogger.warning(TAG, "${perms.joinToString("+")} not granted — routing through permission flow")
         val result = runBlocking {
-            var r = OffloadPermissionManager.requestAndroidPermission(perms)
-            if (r == OffloadPermissionManager.AndroidPermissionResult.DENIED &&
-                OffloadPermissionManager.pollForPermissionGrant({ hasPermission(needsWrite) })
-            ) {
-                AppLogger.info(TAG, "Contacts permission granted during post-DENY poll")
-                r = OffloadPermissionManager.AndroidPermissionResult.GRANTED
-            }
-            if (r == OffloadPermissionManager.AndroidPermissionResult.DENIED) {
-                r = OffloadPermissionManager.requestSettingsGate(
-                    OffloadPermissionManager.SettingsGateRequest(
-                        id = if (needsWrite) "CONTACTS_RW" else Manifest.permission.READ_CONTACTS,
-                        title = "Contacts permission needed",
-                        message = if (needsWrite) {
-                            "Minis needs read + write contacts permission to delete entries. Open Settings to allow it."
-                        } else {
-                            "Minis needs contacts permission to read your address book. Open Settings to allow it."
-                        },
-                        settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        requiresPackageUri = true,
-                        positiveLabel = "Open Settings",
-                    ),
-                    check = { hasPermission(needsWrite) },
-                )
-            }
-            r
-        }
-        return when (result) {
-            OffloadPermissionManager.AndroidPermissionResult.GRANTED -> null
-            OffloadPermissionManager.AndroidPermissionResult.DENIED -> NativeOffloadResult(
-                77,
-                OffloadOutput.formatBody(
-                    JSONObject().put("error", "permission_denied")
-                        .put("message", "The user declined the contacts permission.")
-                        .toString(),
-                    args,
-                ) + "\n",
-            )
-            OffloadPermissionManager.AndroidPermissionResult.TIMEOUT -> NativeOffloadResult(
-                77,
-                OffloadOutput.formatBody(
-                    JSONObject().put("error", "timeout")
-                        .put("message", "Timed out waiting for the user to grant the contacts permission.")
-                        .toString(),
-                    args,
-                ) + "\n",
+            OffloadPermissionManager.requestPermissionFlow(
+                permissions = perms,
+                satisfied = { hasPermission(needsWrite) },
+                settingsGate = OffloadPermissionManager.SettingsGateRequest(
+                    id = if (needsWrite) "CONTACTS_RW" else Manifest.permission.READ_CONTACTS,
+                    title = "Contacts permission needed",
+                    message = if (needsWrite) {
+                        "Minis needs read + write contacts permission to delete entries. Open Settings to allow it."
+                    } else {
+                        "Minis needs contacts permission to read your address book. Open Settings to allow it."
+                    },
+                    settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    requiresPackageUri = true,
+                    positiveLabel = "Open Settings",
+                ),
             )
         }
+        OffloadPermissionManager.permissionFailure("android-contacts", perms, result)?.let { body ->
+            return NativeOffloadResult(77, OffloadOutput.formatBody(body.toString(), args) + "\n")
+        }
+        return null
     }
 
     private fun doList(args: List<String>, parsedArgs: OffloadArgs): NativeOffloadResult {

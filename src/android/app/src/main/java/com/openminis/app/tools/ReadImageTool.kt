@@ -191,9 +191,11 @@ object ReadImageTool {
             val granted = outcome == OffloadPermissionManager.AndroidPermissionResult.GRANTED &&
                 ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
             if (!granted) {
+                val failure = OffloadPermissionManager.permissionFailure(NAME, listOf(permission), outcome)
                 return ToolExecutionResult(
-                    "Error: permission_denied: $permission (${outcome.name.lowercase()}) — grant photo access to " +
-                        "Minis, or export the image first (android-photos export --id <id>) and read the exported path",
+                    "Error: ${failure?.optString("error") ?: "permission_denied"}: " +
+                        (failure?.optString("message") ?: "$permission is required to read this image") +
+                        " Or export the image first (android-photos export --id <id>) and read the exported path",
                     false,
                     toolTitle = toolTitle,
                 )

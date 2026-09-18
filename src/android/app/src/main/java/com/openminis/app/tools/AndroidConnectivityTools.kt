@@ -36,19 +36,29 @@ import org.json.JSONObject
  */
 object AndroidConnectivityOps {
 
-    private suspend fun requirePermissions(context: Context, permissions: List<String>): ToolExecutionResult? {
-        val missing = permissions.filter {
-            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (missing.isEmpty()) return null
-        val result = OffloadPermissionManager.requestAndroidPermission(missing)
-        val granted = result == OffloadPermissionManager.AndroidPermissionResult.GRANTED &&
-            missing.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-        return if (granted) null else ToolExecutionResult(
-            "Error: permission_denied: ${missing.joinToString(", ")} (${result.name.lowercase()})",
+    private suspend fun requirePermissions(
+        context: Context,
+        tool: String,
+        permissions: List<String>,
+    ): ToolExecutionResult? {
+       val missing = permissions.filter {
+           ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+       }
+       if (missing.isEmpty()) return null
+       val result = OffloadPermissionManager.requestAndroidPermission(missing)
+       val granted = result == OffloadPermissionManager.AndroidPermissionResult.GRANTED &&
+           missing.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+        if (granted) return null
+        // Same body the guest CLIs print: names the permission and says what
+        // the user has to do, including the case where Minis is not on screen
+        // and no dialog can be shown at all.
+        val failure = OffloadPermissionManager.permissionFailure(tool, missing, result)
+        return ToolExecutionResult(
+            "Error: ${failure?.optString("error") ?: "permission_denied"}: " +
+                (failure?.optString("message") ?: missing.joinToString(", ")),
             false,
         )
-    }
+   }
 
     private fun wifiPermissions(): List<String> = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -67,8 +77,8 @@ object AndroidConnectivityOps {
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun wifiInfo(context: Context): ToolExecutionResult {
-        requirePermissions(context, wifiPermissions())?.let { return it }
+   suspend fun wifiInfo(context: Context): ToolExecutionResult {
+        requirePermissions(context, "android.wifi.info", wifiPermissions())?.let { return it }
         return withContext(Dispatchers.IO) {
             try {
                 val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
@@ -94,9 +104,9 @@ object AndroidConnectivityOps {
         context: Context,
         groupBySsid: Boolean,
         includeHidden: Boolean,
-        timeoutMs: Int,
-    ): ToolExecutionResult {
-        requirePermissions(context, wifiPermissions())?.let { return it }
+       timeoutMs: Int,
+   ): ToolExecutionResult {
+        requirePermissions(context, "android.wifi.scan", wifiPermissions())?.let { return it }
         return withContext(Dispatchers.IO) {
             try {
                 val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
@@ -135,8 +145,8 @@ object AndroidConnectivityOps {
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun bluetoothStatus(context: Context): ToolExecutionResult {
-        requirePermissions(context, bluetoothPermissions(scan = false))?.let { return it }
+   suspend fun bluetoothStatus(context: Context): ToolExecutionResult {
+        requirePermissions(context, "android.bluetooth.status", bluetoothPermissions(scan = false))?.let { return it }
         return withContext(Dispatchers.IO) {
             try {
                 val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
@@ -167,8 +177,8 @@ object AndroidConnectivityOps {
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun bluetoothPaired(context: Context): ToolExecutionResult {
-        requirePermissions(context, bluetoothPermissions(scan = false))?.let { return it }
+   suspend fun bluetoothPaired(context: Context): ToolExecutionResult {
+        requirePermissions(context, "android.bluetooth.paired", bluetoothPermissions(scan = false))?.let { return it }
         return withContext(Dispatchers.IO) {
             try {
                 val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
@@ -183,8 +193,8 @@ object AndroidConnectivityOps {
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun bluetoothScan(context: Context, durationSeconds: Int): ToolExecutionResult {
-        requirePermissions(context, bluetoothPermissions(scan = true))?.let { return it }
+   suspend fun bluetoothScan(context: Context, durationSeconds: Int): ToolExecutionResult {
+        requirePermissions(context, "android.bluetooth.scan", bluetoothPermissions(scan = true))?.let { return it }
         return withContext(Dispatchers.IO) {
             val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
             val adapter = manager?.adapter ?: return@withContext ToolExecutionResult("Error: bluetooth_unavailable", false)

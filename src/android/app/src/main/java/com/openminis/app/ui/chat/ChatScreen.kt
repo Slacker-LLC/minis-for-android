@@ -995,39 +995,11 @@ fun ChatScreen(
         }
     }
 
-    // Android system permission launcher for agent tools (e.g. location).
-    //
-    // The launcher's `results` map can't be trusted alone: on several Android
-    // versions `RequestMultiplePermissions` returns an empty map (or `false`
-    // entries) for permissions that were already granted and thus didn't need
-    // a dialog. Re-query the live permission state via checkSelfPermission to
-    // decide success — this is what actually matters to the caller.
-    val currentPermissionsRef = remember { mutableStateOf<Array<String>>(emptyArray()) }
-    val androidPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        val perms = currentPermissionsRef.value
-        val grantedNow = perms.isNotEmpty() && perms.any { p ->
-            ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
-        }
-        OffloadPermissionManager.respondToAndroidPermission(grantedNow)
-    }
-    val pendingAndroidPermission by OffloadPermissionManager.pendingAndroidPermission.collectAsState()
-    LaunchedEffect(pendingAndroidPermission) {
-        val req = pendingAndroidPermission ?: return@LaunchedEffect
-        val perms = req.permissions.toTypedArray()
-        // Short-circuit when everything's already granted — some OEM builds
-        // launch a no-op dialog that still flashes on screen otherwise.
-        val alreadyGranted = perms.isNotEmpty() && perms.any { p ->
-            ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
-        }
-        if (alreadyGranted) {
-            OffloadPermissionManager.respondToAndroidPermission(true)
-            return@LaunchedEffect
-        }
-        currentPermissionsRef.value = perms
-        androidPermissionLauncher.launch(perms)
-    }
+    // The system permission dialog for agent tools (location, photos, …) is
+    // hosted by MainActivity, not here. The chat screen is not always composed
+    // (session list, settings, background service), so a request raised while
+    // it wasn't had nobody to answer it and burned the whole gate. One host,
+    // registered with OffloadPermissionManager.setPermissionHostAttached().
 
     val tagScroll = "ChatScrollFollow"
     // Scroll wrappers used by every code path that mutates the LazyColumn

@@ -654,6 +654,12 @@ class MainActivity : ComponentActivity() {
      */
     override fun onStart() {
         super.onStart()
+        // The permission dialog and the in-app "open settings" prompt are
+        // hosted here, so the gate knows it has somewhere to ask. Without this
+        // a CLI invoked with the app off screen waited the whole budget for a
+        // dialog nobody could see and the caller only saw a bare timeout;
+        // OffloadPermissionManager now reports NO_UI straight away instead.
+        OffloadPermissionManager.setPermissionHostAttached(true)
         if (!hasResumedFromBackground) {
             hasResumedFromBackground = true
             return
@@ -666,6 +672,18 @@ class MainActivity : ComponentActivity() {
         nav.safeNavigate(newRoute) {
             popUpTo(Routes.SESSION_LIST) { inclusive = false }
         }
+    }
+
+    /**
+     * No host, no dialog: a permission request raised while this Activity is
+     * stopped fails fast (see [OffloadPermissionManager.setPermissionHostAttached])
+     * instead of waiting out the gate for a prompt nobody can see. Companion of
+     * [onStart]; STARTED is exactly the window in which the ActivityResult
+     * launchers may be used.
+     */
+    override fun onStop() {
+        OffloadPermissionManager.setPermissionHostAttached(false)
+        super.onStop()
     }
 
     /**

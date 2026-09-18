@@ -119,44 +119,21 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             )
             val result = runBlocking {
-                var r = OffloadPermissionManager.requestAndroidPermission(permissions)
-                if (r == OffloadPermissionManager.AndroidPermissionResult.DENIED &&
-                    OffloadPermissionManager.pollForPermissionGrant({ hasPermission() })
-                ) {
-                    AppLogger.info(TAG, "Location permission granted during post-DENY poll")
-                    r = OffloadPermissionManager.AndroidPermissionResult.GRANTED
-                }
-                if (r == OffloadPermissionManager.AndroidPermissionResult.DENIED) {
-                    r = OffloadPermissionManager.requestSettingsGate(
-                        OffloadPermissionManager.SettingsGateRequest(
-                            id = Manifest.permission.ACCESS_FINE_LOCATION,
-                            title = "Location permission needed",
-                            message = "Minis needs location permission to get your current location. Open Settings to allow it.",
-                            settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            requiresPackageUri = true,
-                            positiveLabel = "Open Settings",
-                        ),
-                        check = { hasPermission() },
-                    )
-                }
-                r
+                OffloadPermissionManager.requestPermissionFlow(
+                    permissions = permissions,
+                    satisfied = { hasPermission() },
+                    settingsGate = OffloadPermissionManager.SettingsGateRequest(
+                        id = Manifest.permission.ACCESS_FINE_LOCATION,
+                        title = "Location permission needed",
+                        message = "Minis needs location permission to get your current location. Open Settings to allow it.",
+                        settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        requiresPackageUri = true,
+                        positiveLabel = "Open Settings",
+                    ),
+                )
             }
-            when (result) {
-                OffloadPermissionManager.AndroidPermissionResult.GRANTED -> {} // fall through
-                OffloadPermissionManager.AndroidPermissionResult.DENIED -> {
-                    val body = JSONObject()
-                        .put("error", "permission_denied")
-                        .put("message", "The user declined the location permission.")
-                        .toString()
-                    return NativeOffloadResult(77, OffloadOutput.formatBody(body, args) + "\n")
-                }
-                OffloadPermissionManager.AndroidPermissionResult.TIMEOUT -> {
-                    val body = JSONObject()
-                        .put("error", "timeout")
-                        .put("message", "Timed out waiting for the user to grant location permission.")
-                        .toString()
-                    return NativeOffloadResult(77, OffloadOutput.formatBody(body, args) + "\n")
-                }
+            OffloadPermissionManager.permissionFailure("android-location", permissions, result)?.let { body ->
+                return NativeOffloadResult(77, OffloadOutput.formatBody(body.toString(), args) + "\n")
             }
         }
 

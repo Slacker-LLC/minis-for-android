@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Manages offload permissions for privacy-sensitive agent tools.
@@ -124,13 +126,53 @@ object OffloadPermissionManager {
     // ── Android system runtime permission request (for location etc.) ──────────
 
     /** Result of a runtime permission or settings-gate flow. */
-    enum class AndroidPermissionResult { GRANTED, DENIED, TIMEOUT }
+    enum class AndroidPermissionResult {
+        GRANTED,
+        DENIED,
+        TIMEOUT,
+        /**
+         * Nobody can answer: no Activity is started, so the dialog cannot be
+         * shown and the request would only sit until it timed out. Reported
+         * straight away — see [setPermissionHostAttached].
+         */
+        NO_UI,
+    }
+
+    /**
+     * True while the Activity that owns the permission launchers is started
+     * (`MainActivity.onStart` / `onStop`). The system dialog and the in-app
+     * settings prompt can only come from that host, so a request raised
+     * without one is answered with [AndroidPermissionResult.NO_UI]
+     * immediately instead of waiting the timeouts out.
+     *
+     * The device pass is why this exists: a permission-gated CLI invoked with
+     * the app off screen waited the full budget for a dialog nobody could
+     * see, and the caller learned only `command timed out after 120000ms`.
+     */
+    @Volatile
+    var permissionHostAttached: Boolean = false
+        private set
+
+    fun setPermissionHostAttached(attached: Boolean) {
+        permissionHostAttached = attached
+    }
 
     /** Timeout for a single system permission dialog round-trip. */
     const val SYSTEM_DIALOG_TIMEOUT_MS: Long = 120_000L
 
     /** Timeout for the "bounce the user to a settings page" flow. */
     const val SETTINGS_GATE_TIMEOUT_MS: Long = 120_000L
+
+    /**
+     * Budget for the whole interactive gate — system dialog, post-DENY grant
+     * poll and the settings trip together. Each stage on its own allows two
+     * minutes, so a gate could spend 120 s + 5 s + 120 s and still be running
+     * when the guest CLI's own command timeout (measured at 120 s on the
+     * device: `command timed out after 120000ms`) cut the call short — the
+     * structured result never reached the caller. Bounding the gate keeps
+     * [permissionFailure] inside the caller's window.
+     */
+    const val PERMISSION_FLOW_BUDGET_MS: Long = 90_000L
 
     data class AndroidPermissionRequest(val permissions: List<String>)
 
@@ -154,6 +196,7 @@ object OffloadPermissionManager {
      * elapses.
      */
     suspend fun requestAndroidPermission(permissions: List<String>): AndroidPermissionResult {
+        if (!permissionHostAttached) return AndroidPermissionResult.NO_UI
         val timed = withTimeoutOrNull(SYSTEM_DIALOG_TIMEOUT_MS) {
             suspendCancellableCoroutine<AndroidPermissionResult> { cont ->
                 androidPermissionContinuation = cont
@@ -239,6 +282,7 @@ object OffloadPermissionManager {
         request: SettingsGateRequest,
         check: () -> Boolean,
     ): AndroidPermissionResult {
+        if (!permissionHostAttached) return AndroidPermissionResult.NO_UI
         val decision = suspendCancellableCoroutine<SettingsGateDecision> { cont ->
             settingsGateContinuation = cont
             _pendingSettingsGate.value = request
@@ -288,6 +332,87 @@ object OffloadPermissionManager {
         _pendingSettingsGate.value = null
         settingsGateContinuation?.resume(decision)
         settingsGateContinuation = null
+    }
+
+    /**
+     * The single permission-gate round trip every caller shares: system
+     * dialog, one post-DENY grant poll (the dialog can return before the
+     * grant propagates), then the in-app settings trip when the user said no
+     * or the dialog cannot re-appear. Bounded by [PERMISSION_FLOW_BUDGET_MS].
+     *
+     * Callers only render [permissionFailure] when the result is not
+     * [AndroidPermissionResult.GRANTED]. Six guest handlers and two in-app
+     * tools had each copy-pasted this sequence with their own wording, which
+     * is how the unattended case ended up reporting a bare timeout.
+     */
+    suspend fun requestPermissionFlow(
+        permissions: List<String>,
+        satisfied: () -> Boolean,
+        settingsGate: SettingsGateRequest,
+    ): AndroidPermissionResult {
+        val outcome = withTimeoutOrNull(PERMISSION_FLOW_BUDGET_MS) {
+            var result = requestAndroidPermission(permissions)
+            if (result == AndroidPermissionResult.DENIED && pollForPermissionGrant(satisfied)) {
+                result = AndroidPermissionResult.GRANTED
+            }
+            if (result == AndroidPermissionResult.DENIED) {
+                result = requestSettingsGate(settingsGate, check = satisfied)
+            }
+            result
+        }
+        // The inner stages clear whatever the UI was showing when they are
+        // cancelled, so an expired budget only has to be reported: naming the
+        // permission beats another bare "timed out".
+        return outcome ?: AndroidPermissionResult.TIMEOUT
+    }
+
+    /**
+     * Failure body for a permission gate, or null when the gate was granted.
+     * Names the permission and what the user has to do, so an agent (or a
+     * person reading the transcript) does not have to guess why the call
+     * stopped. Pure, so the wording is pinned by a unit test.
+     *
+     * [permissions] is the list of Android permission names, or a capability
+     * label when the grant does not come from one (Notification access has no
+     * runtime permission — it lives on its own settings page). [deniedCode]
+     * keeps a capability-specific code where one exists, because agents act on
+     * the difference between "ask the user again" and "this is not a runtime
+     * permission at all".
+     */
+    fun permissionFailure(
+        tool: String,
+        permissions: List<String>,
+        result: AndroidPermissionResult,
+        detail: String? = null,
+        deniedCode: String = "permission_denied",
+    ): JSONObject? {
+        if (result == AndroidPermissionResult.GRANTED) return null
+        val names = permissions.joinToString(", ")
+        val error = when (result) {
+            AndroidPermissionResult.NO_UI -> "permission_required"
+            AndroidPermissionResult.DENIED -> deniedCode
+            AndroidPermissionResult.TIMEOUT -> "permission_timeout"
+            AndroidPermissionResult.GRANTED -> return null
+        }
+        val message = when (result) {
+            AndroidPermissionResult.NO_UI ->
+                "Minis is not on screen, so the prompt for $names cannot be shown. " +
+                    "Open Minis, grant it, then retry."
+            AndroidPermissionResult.DENIED ->
+                "The user declined $names; $tool cannot run until it is granted."
+            AndroidPermissionResult.TIMEOUT ->
+                "No answer to the $names prompt within " +
+                    "${PERMISSION_FLOW_BUDGET_MS / 1000} s. The prompt may still be on " +
+                    "screen — ask the user before retrying."
+            AndroidPermissionResult.GRANTED -> return null
+        }
+        val body = JSONObject()
+            .put("error", error)
+            .put("tool", tool)
+            .put("permissions", JSONArray(permissions))
+            .put("message", if (detail.isNullOrBlank()) message else "$message $detail")
+        if (!detail.isNullOrBlank()) body.put("detail", detail)
+        return body
     }
 
     /**
