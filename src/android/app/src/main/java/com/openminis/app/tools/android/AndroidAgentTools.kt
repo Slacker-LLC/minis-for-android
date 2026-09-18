@@ -65,13 +65,14 @@ object AndroidAgentTools {
                 "resourceIdFilter" to AgentToolParam("string", "Resource-id filter"),
                 "packageFilter" to AgentToolParam("string", "Package filter"),
                 "text" to AgentToolParam("string", "Text for set_text"),
-                "x" to AgentToolParam("number", "Explicit pixel X coordinate (last-resort fallback)"),
-                "y" to AgentToolParam("number", "Explicit pixel Y coordinate (last-resort fallback)"),
+                "x" to AgentToolParam("number", "Explicit pixel X coordinate in coordinateSpace (last-resort fallback)"),
+                "y" to AgentToolParam("number", "Explicit pixel Y coordinate in coordinateSpace (last-resort fallback)"),
                 "coordinateSpace" to AgentToolParam(
                     "string",
                     "Pixel space of x/y and deltaX/deltaY. screenshot (default) = pixels of the most recent " +
                         "android_ui screenshot image (that image is scaled, so this is what you actually see); " +
-                        "screen = real device pixels. A screenshot-space action fails closed when no screenshot " +
+                        "screen = real device pixels, which is what observe node bounds and the screenshot's " +
+                        "originalWidth/originalHeight are in. A screenshot-space action fails closed when no screenshot " +
                         "was taken yet, when the screen size changed since, or when the point is outside the image.",
                     UiCoordinateSpace.wireValues,
                 ),

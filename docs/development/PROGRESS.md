@@ -94,11 +94,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1892 个用例 = 上一项后的 1887 + 5，0 失败）。未做：Eta 是把**全部** output items 逐字回放并跳过重建；这里只回放正文与 `function_call` 无法重建的那一项（reasoning/encrypted），其余仍按既有重建路径生成（`function_call` 的 `id`/`call_id` 本来就逐字保留）。Codex OAuth 真机链路（加密思维链是否真的被接受）未验证。
 
+**Phase 2-4 UI 坐标空间契约** — 同一分支 `codex/eta-phase2-provider-passthrough`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 坐标空间 | `android_ui screenshot` 默认按 `scale=0.5` 缩放，但 `click`/`long_press`/`scroll` 一直把 `x`/`y` 当设备像素直接下发——模型照着截图上读到的位置点下去，实际只走了一半距离（静默点错，事后也查不出，因为轨迹里只有下发的数字）。现在新增 `coordinateSpace` 契约（Eta 在 schema、执行器、轨迹之间共享同一套定义）：`screenshot`（默认）= 最近一次截图像素，按该次采集的几何换算；`screen` = 真实设备像素，原样下发 | `5509b963` | ✅ `UiCoordinateSpaceTest`（14 例） |
+| 轨迹与降级 | 结果 JSON 记下 `coordinateSpace`、请求值与下发值；`scroll` 的锚点与两个方向增量走同一契约；截图动作记录 frame | `5509b963` | ✅ 上述用例 |
+| 失败关闭 | 没有可用截图 → `COORDINATE_SPACE_UNAVAILABLE`；截图后屏幕尺寸变了 → `SCREENSHOT_FRAME_STALE`；点落在图像之外 → `COORDINATE_OUT_OF_SCREENSHOT`，消息里直接给出「重新截图」或 `coordinateSpace=screen`；全部拒绝而不是猜测。`screen` 空间不受图像边界约束 | `5509b963` | ✅ 用例覆盖四条拒绝路径与边界点 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1906 个用例 = 上一项后的 1892 + 14，0 失败）。**这一项有唯一一处显式行为变化**：默认空间从「隐式的设备像素」变成「截图空间」。因此按 `observe` 的节点 bounds 或 `originalWidth/Height` 直接传 `x`/`y` 的调用方必须显式写 `coordinateSpace=screen`（若超出缩放后图像范围会被拒绝并提示，只有落在图像范围内的这种调用会被静默换算）。真机未验证：缩放截图下的实际点击落点、旋屏后的 frame 失效判断、系统繁忙时 `resources.displayMetrics` 与截图尺寸是否始终一致。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门、屏幕观察契约、文件视觉（请求头与请求体合并、引用格式化、Responses opaque output 回放已在 `codex/eta-phase2-provider-passthrough` 落地） | Eta `agent/model/*` |
+| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门、文件视觉（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、Skills 暴露给模型、会话级编辑 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
