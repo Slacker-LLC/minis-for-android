@@ -33,6 +33,16 @@ data class BrowserActionInput(
     val itemSelector: String? = null,
     /** Scroll iterations for scroll_and_collect. */
     val scrollCount: Int? = null,
+    /**
+     * [T-browser-paged-text-android] Character offset for get_text / get_readable.
+     * Mirrors Eta's `offset` (0..200000, clamped by [BrowserTextWindowPolicy]).
+     */
+    val offset: Int? = null,
+    /**
+     * [T-browser-paged-text-android] Requested window size for get_text / get_readable.
+     * Mirrors Eta's `max_chars` (256..12000, default 8000).
+     */
+    val maxChars: Int? = null,
     /** Milliseconds to wait (wait_for_dom_stable). */
     val timeoutMs: Int? = null,
     /** When true on screenshot, stretch viewport to full document.scrollHeight before capture. */
@@ -74,6 +84,8 @@ data class BrowserActionInput(
                     fuzzy = obj.optBoolean("fuzzy", false),
                     itemSelector = obj.optString("item_selector").ifEmpty { null },
                     scrollCount = if (obj.has("scroll_count")) obj.optInt("scroll_count") else null,
+                    offset = if (obj.has("offset")) obj.optInt("offset") else null,
+                    maxChars = if (obj.has("max_chars")) obj.optInt("max_chars") else null,
                     timeoutMs = if (obj.has("timeout")) obj.optInt("timeout") else null,
                     fullPage = obj.optBoolean("full_page", false),
                     cookies = parseCookies(obj),

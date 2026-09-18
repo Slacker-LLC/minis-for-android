@@ -118,7 +118,8 @@ object AgentTools {
             "The browser supports both web URLs and minis:// resource URLs. Use minis:// URLs to preview session files (e.g. navigate to minis://workspace/index.html). " +
             "Sub-resources (JS, CSS, images, fonts) referenced via minis:// absolute paths or relative paths within HTML pages resolve correctly. " +
             "Use navigate to open URLs, screenshot to see the page (returns an image), " +
-            "click/type to interact with elements, get_text/get_readable to extract content, " +
+            "click/type to interact with elements, get_text/get_readable to extract page text in windows " +
+            "(each read prints next_offset while more text remains — pass it back as offset to keep reading the same page), " +
             "scroll to navigate long pages, scroll_and_collect to scroll through infinite-scroll/virtual-rendered pages (like Twitter/X timelines) and accumulate unique content items across scroll positions in a single call, " +
             "find_elements to discover interactive elements, " +
             "get_page_info for page metadata, get_backbone to get a structural overview of the page DOM as a simplified tree, " +

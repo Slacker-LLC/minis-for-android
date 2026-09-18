@@ -111,32 +111,70 @@ object BrowserUseJS {
 
     // -- Get Text --
 
-    fun getText(selector: String?): String {
+    /**
+     * [T-browser-paged-text-android] The windowing tail is Eta
+     * `BrowserDomScripts.text` (Mangi-11/Eta @ c15de97): the document is collected
+     * up to [BrowserTextWindowPolicy.MAX_DOCUMENT_CHARS] and the returned slice is
+     * described by `text_length` / `returned_chars` / `offset` / `next_offset`, so a
+     * long page is read in resumable windows instead of being cut at 10000 chars
+     * with no way to ask for the rest. [offset] and [maxChars] must already have
+     * been normalized by [BrowserTextWindowPolicy], whose arithmetic the page-side
+     * code below mirrors exactly.
+     */
+    fun getText(selector: String?, offset: Int, maxChars: Int): String {
+        val documentCap = BrowserTextWindowPolicy.MAX_DOCUMENT_CHARS
         if (selector != null) {
             val sel = jsQuote(selector)
             return """
                 (function() {
                     var el = document.querySelector('$sel');
                     if (!el) return JSON.stringify({error: 'Element not found: $sel'});
-                    var innerTextVal = el.innerText || '';
-                    var textContentVal = el.textContent || '';
-                    var text = innerTextVal.substring(0, 10000);
-                    return JSON.stringify({text: text, length: text.length});
+                    var source = el.innerText || '';
+                    var value = source.substring(0, $documentCap);
+                    var total = value.length;
+                    var start = Math.min($offset, total);
+                    var end = Math.min(start + $maxChars, total);
+                    return JSON.stringify({
+                        text: value.substring(start, end),
+                        text_length: total,
+                        returned_chars: end - start,
+                        offset: start,
+                        next_offset: end < total ? end : null,
+                        truncated: end < total,
+                        source_truncated: source.length > $documentCap,
+                        selector: '$sel'
+                    });
                 })()
             """.trimIndent()
         }
         return """
             (function() {
-                var innerTextVal = document.body.innerText || '';
-                var text = innerTextVal.substring(0, 10000);
-                return JSON.stringify({text: text, length: text.length, url: location.href, title: document.title});
+                var source = document.body ? (document.body.innerText || '') : '';
+                var value = source.substring(0, $documentCap);
+                var total = value.length;
+                var start = Math.min($offset, total);
+                var end = Math.min(start + $maxChars, total);
+                return JSON.stringify({
+                    text: value.substring(start, end),
+                    text_length: total,
+                    returned_chars: end - start,
+                    offset: start,
+                    next_offset: end < total ? end : null,
+                    truncated: end < total,
+                    source_truncated: source.length > $documentCap,
+                    url: location.href,
+                    title: document.title
+                });
             })()
         """.trimIndent()
     }
 
     // -- Get Readable --
 
-    fun getReadable(): String = """
+    /** The readable-mode half of [getText]'s contract; the source is whitespace-collapsed first. */
+    fun getReadable(offset: Int, maxChars: Int): String {
+        val documentCap = BrowserTextWindowPolicy.MAX_DOCUMENT_CHARS
+        return """
         (function() {
             var candidateSelectors = [
                 'article', '[role="main"]', 'main', '.post-content',
@@ -152,11 +190,25 @@ object BrowserUseJS {
             }
             if (!el) { el = document.body; matchedSelector = 'document.body (fallback)'; }
             var title = document.title || '';
-            var innerTextVal = el.innerText || '';
-            var text = innerTextVal.replace(/\s+/g, ' ').trim().substring(0, 15000);
-            return JSON.stringify({title: title, text: text, length: text.length, source: matchedSelector});
+            var source = (el.innerText || '').replace(/\s+/g, ' ').trim();
+            var value = source.substring(0, $documentCap);
+            var total = value.length;
+            var start = Math.min($offset, total);
+            var end = Math.min(start + $maxChars, total);
+            return JSON.stringify({
+                title: title,
+                text: value.substring(start, end),
+                text_length: total,
+                returned_chars: end - start,
+                offset: start,
+                next_offset: end < total ? end : null,
+                truncated: end < total,
+                source_truncated: source.length > $documentCap,
+                source: matchedSelector
+            });
         })()
     """.trimIndent()
+    }
 
     // -- Scroll --
 

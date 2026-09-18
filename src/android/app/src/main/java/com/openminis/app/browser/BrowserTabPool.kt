@@ -555,6 +555,17 @@ class BrowserTabPool(private val context: Context) {
     suspend fun execute(
         input: BrowserActionInput,
         singleTab: Boolean = false,
+    ): BrowserActionResult = BrowserPayloadLimiter.boundResult(executeUnbounded(input, singleTab))
+
+    /**
+     * [T-browser-payload-budget-android] The action itself, before the payload
+     * budget. Kept separate so the budget is the pool's single exit: every action
+     * (page reads, script returns, tab listings, collected rows) leaves through
+     * [execute] and none of them can hand the model an oversized blob.
+     */
+    private suspend fun executeUnbounded(
+        input: BrowserActionInput,
+        singleTab: Boolean,
     ): BrowserActionResult {
         // Handle tab management actions at pool level
         return when (input.action) {

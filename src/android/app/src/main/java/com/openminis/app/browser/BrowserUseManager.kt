@@ -584,13 +584,13 @@ class BrowserUseManager(
             BrowserAction.SCREENSHOT -> return screenshot(fullPage = input.fullPage)
             BrowserAction.CLICK -> click(input.selector, input.coordinateX, input.coordinateY)
             BrowserAction.TYPE -> type(input.selector, input.text)
-            BrowserAction.GET_TEXT -> return getText(input.selector)
+            BrowserAction.GET_TEXT -> return getText(input.selector, input.offset, input.maxChars)
             BrowserAction.SCROLL -> scroll(input.selector, input.direction, input.amount)
             BrowserAction.GET_PAGE_INFO -> return getPageInfo()
             BrowserAction.EXECUTE_JS -> return executeJS(input.script)
             BrowserAction.FIND_ELEMENTS -> return findElements(input.selector)
             BrowserAction.HOVER -> hover(input.selector)
-            BrowserAction.GET_READABLE -> return getReadable()
+            BrowserAction.GET_READABLE -> return getReadable(input.offset, input.maxChars)
             BrowserAction.SET_USER_AGENT -> return setUserAgent(input.userAgent)
             BrowserAction.SET_VIEWPORT ->
                 return BrowserActionResult.error("set_viewport must be routed through BrowserTabPool")
@@ -937,15 +937,30 @@ class BrowserUseManager(
 
     // -- Get Text --
 
-    private suspend fun getText(selector: String?): BrowserActionResult {
-        val js = BrowserUseJS.getText(selector)
+    /**
+     * [T-browser-paged-text-android] `offset` / `max_chars` are Eta's read-page
+     * arguments (Mangi-11/Eta @ c15de97): the window is normalized here so the
+     * page-side arithmetic and the model-facing header both come from
+     * [BrowserTextWindowPolicy].
+     */
+    private suspend fun getText(selector: String?, offset: Int?, maxChars: Int?): BrowserActionResult {
+        val js = BrowserUseJS.getText(
+            selector = selector,
+            offset = BrowserTextWindowPolicy.offset(offset),
+            maxChars = BrowserTextWindowPolicy.maxChars(maxChars),
+        )
         return evaluateJSAndParse(js)
     }
 
     // -- Get Readable --
 
-    private suspend fun getReadable(): BrowserActionResult {
-        return evaluateJSAndParse(BrowserUseJS.getReadable())
+    private suspend fun getReadable(offset: Int?, maxChars: Int?): BrowserActionResult {
+        return evaluateJSAndParse(
+            BrowserUseJS.getReadable(
+                offset = BrowserTextWindowPolicy.offset(offset),
+                maxChars = BrowserTextWindowPolicy.maxChars(maxChars),
+            ),
+        )
     }
 
     // -- Scroll --
@@ -1004,10 +1019,14 @@ class BrowserUseManager(
                 if (json.has("error")) {
                     BrowserActionResult.error(json.getString("error"))
                 } else {
-                    BrowserActionResult(text = formatJSONResult(json))
+                    BrowserActionResult(
+                        text = formatJSONResult(BrowserPayloadLimiter.bound(json)),
+                    )
                 }
             } else {
-                BrowserActionResult(text = raw)
+                // A raw script return is whatever the page decided to hand back —
+                // the payload budget is the only bound on it.
+                BrowserActionResult(text = BrowserPayloadLimiter.boundText(raw))
             }
         } catch (e: Exception) {
             asyncJsDeferred = null
@@ -1335,10 +1354,12 @@ class BrowserUseManager(
                 if (json.has("error")) {
                     BrowserActionResult.error(json.getString("error"))
                 } else {
-                    BrowserActionResult(text = formatJSONResult(json))
+                    BrowserActionResult(
+                        text = formatJSONResult(BrowserPayloadLimiter.bound(json)),
+                    )
                 }
             } else {
-                BrowserActionResult(text = raw)
+                BrowserActionResult(text = BrowserPayloadLimiter.boundText(raw))
             }
         } catch (e: Exception) {
             BrowserActionResult.error("JavaScript error: ${e.message}")
@@ -1353,10 +1374,12 @@ class BrowserUseManager(
                 if (json.has("error")) {
                     BrowserActionResult.error(json.getString("error"))
                 } else {
-                    BrowserActionResult(text = formatJSONResult(json))
+                    BrowserActionResult(
+                        text = formatJSONResult(BrowserPayloadLimiter.bound(json)),
+                    )
                 }
             } else {
-                BrowserActionResult(text = raw)
+                BrowserActionResult(text = BrowserPayloadLimiter.boundText(raw))
             }
         } catch (e: Exception) {
             BrowserActionResult.error("JavaScript error: ${e.message}")
@@ -1398,19 +1421,35 @@ class BrowserUseManager(
                 val text = json.optString("text", "")
                 if (text.isNotEmpty()) append("  Text: ${text.take(200)}")
             }
-            json.has("text") && json.has("length") -> {
+            json.has("text") && (json.has("text_length") || json.has("length")) -> {
                 val title = json.optString("title", "")
                 if (title.isNotEmpty()) appendLine("Title: $title")
                 val text = json.optString("text", "")
-                val len = json.optInt("length", text.length)
-                appendLine("Text ($len chars):")
-                append(text.take(10000))
+                if (json.has("text_length")) {
+                    // [T-browser-paged-text-android] The header says which slice of the
+                    // document this is and the offset that continues it; without it a
+                    // clipped page reads exactly like a short one, and the model has no
+                    // way to ask for the rest.
+                    val total = json.optInt("text_length", text.length)
+                    val offset = json.optInt("offset", 0)
+                    val returned = json.optInt("returned_chars", text.length)
+                    val window = BrowserTextWindowPolicy.window(offset, returned, total)
+                    appendLine(
+                        BrowserTextWindowPolicy
+                            .describe(window, total, json.optBoolean("source_truncated", false)) + ":",
+                    )
+                } else {
+                    val len = json.optInt("length", text.length)
+                    appendLine("Text ($len chars):")
+                }
+                append(text)
             }
             json.has("count") && json.has("elements") -> {
                 val count = json.optInt("count")
                 val elements = json.optJSONArray("elements")
-                val shown = json.optInt("shown", elements?.length() ?: 0)
-                appendLine("Found $count element(s) (showing $shown):")
+                // The payload limiter drops trailing rows; print the rows that are
+                // actually here, not the page-side count the envelope started with.
+                appendLine("Found $count element(s) (showing ${elements?.length() ?: 0}):")
                 if (elements != null) {
                     for (i in 0 until elements.length()) {
                         val el = elements.getJSONObject(i)
@@ -1437,6 +1476,20 @@ class BrowserUseManager(
                     appendLine("  $key: ${json.opt(key)}")
                 }
             }
+        }
+        // [T-browser-payload-budget-android] Upstream budgets every browser payload
+        // at 12 KiB; when that gate (or its element ladder) had to cut this one the
+        // model is told, instead of reading a clipped result as a complete one.
+        if (json.optBoolean("payload_truncated") || json.optBoolean("elements_truncated")) {
+            appendLine()
+            append("Payload truncated to stay within the browser result budget")
+            if (json.optBoolean("elements_truncated")) {
+                append("; element_count=").append(json.optInt("element_count", 0))
+            }
+            if (json.optBoolean("payload_truncated")) {
+                append("; text_length=").append(json.optInt("text_length", 0))
+            }
+            append('.')
         }
     }.trimEnd()
 
