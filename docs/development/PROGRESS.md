@@ -872,6 +872,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 复验（真机） | 同一 APK 装到小米 24129PN74C（HyperOS / Android 37，库为 22/`f827a661` 那一形态）：启动干净、crash 缓冲为空、`user_version=23`、索引在 |
 | 验证口径 | `:app:testDebugUnitTest` **2390 例 0 失败**（`DatabaseVersionGuardTest` 现在读 `23.json`）+ `:app:assembleDebug` |
 
+### 模拟器 RPC 扫面、真机截图/搜索/检查、root 授权复验（2026-09-19，同一 APK）
+
+| 调用 | 结果 |
+|---|---|
+| 模拟器 `debug.appInfo` / `debug.permissions.list` | `sdkVersion 36`、`ubuntu:false`（该机没有 root，如实上报）；14 个工具的 `defaultLevel`/`currentLevel` 全表返回 |
+| 模拟器 `debug.screenshot.capture` / `list` / `clear` | `scale=0.3` → 10 588 B PNG；`list` 回 1 条；`clear` → `cleared:1` |
+| 模拟器 `debug.viewTree` / `search` / `inspect` | 实时树（DecorView 1080×2400 起）；关键词「设置」4 命中；首个地址 `inspect` → `SemanticsNode role=Image description=设置` |
+| 模拟器 `debug.shellExecute` | **失败关闭**：`{"output":"ubuntu unavailable: su executable not found","exit_code":1}`——没有 su 的机器不会假装 guest 可用 |
+| 真机 `debug.screenshot.capture` / `get` | `scale=0.5` → 28 962 B PNG；`get` 回 38 616 字符 base64（PNG 头 `iVBORw0KGgo`）、`encoding=png` |
+| 真机 `debug.search` / `inspect` | 「设置」4 命中（`SemanticsNode`），`inspect` 返回 description/role/bounds |
+| 真机 root 授权复验 | KernelSU Next 里放行后，**新装的这一版**：`run-as llc.slacker.eta /system/bin/su -c 'id -u'` → **0**；同一版本经 `debug.shellExecute` 进 guest → `uid=10186(minis) gid=10186(minis) groups=10186(minis)`、`PRETTY_NAME="Ubuntu 24.04.3 LTS"`、内核 `6.6.118-android15` |
+| 产物校验 | 同一 APK：`verify-runtime-payload.sh`（rootfs `06dcdf94…`）与 `verify-android-16k.sh`（25 个 native 库）通过；`:app:lintDebug` **0 error**（145 warning / 7 hint，全部改前既有） |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
