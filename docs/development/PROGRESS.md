@@ -75,6 +75,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1874 个用例 = 分支既有 1856 + 新增 18，0 失败）。行为变化只有一处需要在真机复核：调用方此前可以用 `extra_headers` 顶掉 App 自己的凭据或协议头，现在失败关闭（头被丢弃 + 结果 JSON 的 `warnings` 里出现原因）；其余自定义头与既有请求体字段语义不变。
 
+**Phase 2-2 Responses 引用格式化** — 同一分支 `codex/eta-phase2-provider-passthrough`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `url_citation` 渲染 | Responses 流此前把 `response.output_text.annotation.added` 当未知事件丢掉，带搜索来源的回答没有任何出处；现在按 Eta 规则渲染：只收 http(s)、同一 URL 只编号一次、编号按首次出现顺序、URL 中的 `>` 转义为 `%3E`、无标题回退 `来源 N` | `8041a065` | ✅ `ResponsesCitationFormatterTest`（13 例） |
+| 降级路径 | 与 Eta 的唯一差异（流式架构决定）：Eta 在完整文本上格式化，可在任意偏移插入角标；Minis 的文本只追加、已上屏和已入库的增量无法改写，因此只有「结束位置正好等于当前流头」的引用就地插入，其余一律降级为末尾来源列表——即 Eta 对失效偏移用的同一种降级 | `8041a065` | ✅ 上述用例覆盖就地/降级/重复 URL/非法偏移/非 http/只输出一次 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1887 个用例 = 上一项后的 1874 + 13，0 失败）。未做的部分：服务端 `web_search` 开关（默认关）本项没有新增——当前调用方仍可经 `extra_body` 自带 `tools`，是否需要专门开关待定；真机观感（来源列表排版、链接可点）未验证。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
