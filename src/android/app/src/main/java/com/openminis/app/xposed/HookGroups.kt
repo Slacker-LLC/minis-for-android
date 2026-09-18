@@ -4,6 +4,7 @@ import com.openminis.app.xposed.google.GoogleEligibilityHooks
 import com.openminis.app.xposed.google.GoogleVoiceCommandHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
+import com.openminis.app.xposed.system.ContextualSearchHooks
 
 /**
  * [T-eta-xposed-groups] The groups this module knows, wired to the targets they belong to.
@@ -28,6 +29,11 @@ object HookGroups {
         // The power-key dispatcher lives in system_server.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             HyperOsPowerHooks.install(module, classLoader, log)
+        }
+        // So does the system's own contextual search, which the gesture takeovers hand the user's
+        // gesture to when the ROM never brought it up.
+        HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
+            ContextualSearchHooks.install(module, classLoader, log)
         }
         // Google's own floaty assistant surface, in the Google app's process.
         HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->

@@ -3,6 +3,7 @@ package com.openminis.app.xposed
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -146,6 +147,20 @@ object HookSupport {
     fun isPackageInstalled(context: Context, packageName: String): Boolean = try {
         context.packageManager.getPackageInfo(packageName, 0)
         true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
+
+    /**
+     * Whether the package belongs to the system image (or is an updated system app). A caller check
+     * that matched on the package name alone would also match a side-loaded app wearing the same
+     * name; the flag is what makes it the platform's own surface.
+     */
+    fun isSystemPackage(context: Context, packageName: String): Boolean = try {
+        val info = context.packageManager.getApplicationInfo(packageName, 0)
+        info.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
     } catch (_: PackageManager.NameNotFoundException) {
         false
     } catch (_: SecurityException) {
