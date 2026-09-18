@@ -18,6 +18,10 @@ class AndroidMediaImagesHandler : AndroidSystemHandler() {
             "end_date" to AgentToolParam("string", "Optional ISO range end (supply start_date too)"),
             "media_type" to AgentToolParam("string", "photo (default) or video", listOf("photo", "video")),
             "query" to AgentToolParam("string", "Optional file-name keyword; wildcards are matched literally"),
+            "recordings_only" to AgentToolParam(
+                "boolean",
+                "Set true to keep only audio under a recording directory (Eta's search_recordings)",
+            ),
         ),
     )
 
@@ -40,6 +44,48 @@ class AndroidMediaImagesHandler : AndroidSystemHandler() {
             "list",
             "--type",
             mediaType,
+            "--limit",
+            MediaQueryPolicy.clampLimit(args.optInt("limit", MediaQueryPolicy.DEFAULT_LIMIT)).toString(),
+        )
+        start?.let { argv += listOf("--start", it) }
+        end?.let { argv += listOf("--end", it) }
+        args.optString("query").trim().takeIf { it.isNotEmpty() }?.let { argv += listOf("--query", it) }
+        if (args.optBoolean("recordings_only", false)) argv += "--recordings"
+        return AndroidSystemOps.offload(context, sessionId, PhotosOffloadHandler(context), argv)
+    }
+}
+
+/**
+ * [T-eta-media-search] Documents from the same MediaStore surface Eta reads as `search_files`.
+ * The name is matched against the file name and its path; rows this app cannot see are absent
+ * rather than reported as "no such file".
+ */
+class AndroidMediaFilesHandler : AndroidSystemHandler() {
+    override val definition = AgentToolDefinition(
+        name = "android.media.files",
+        description = "List recent documents from MediaStore (Eta's search_files): file name, mime type, " +
+            "path, size and a content URI. Only rows this app is allowed to see are returned, so an " +
+            "empty result can also mean the file lives in another app's private storage.",
+        parameters = mapOf(
+            "limit" to AgentToolParam("integer", "Max rows (default 20, max 100)"),
+            "start_date" to AgentToolParam("string", "Optional ISO range start (supply end_date too)"),
+            "end_date" to AgentToolParam("string", "Optional ISO range end (supply start_date too)"),
+            "query" to AgentToolParam("string", "Optional keyword matched against file name or path"),
+        ),
+    )
+
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
+        val args = args(argsJson)
+        val start = args.optString("start_date").ifBlank { null }
+        val end = args.optString("end_date").ifBlank { null }
+        if ((start == null) != (end == null)) {
+            return ToolExecutionResult("Error: start_date and end_date must be supplied together", false)
+        }
+        val argv = mutableListOf(
+            "android-photos",
+            "list",
+            "--type",
+            "file",
             "--limit",
             MediaQueryPolicy.clampLimit(args.optInt("limit", MediaQueryPolicy.DEFAULT_LIMIT)).toString(),
         )

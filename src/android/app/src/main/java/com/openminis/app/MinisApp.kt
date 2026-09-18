@@ -562,7 +562,11 @@ class MinisApp : Application(), ImageLoaderFactory {
         // [T-eta-media-search] Audio search alongside the existing photo/video listing.
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.AndroidMediaAudioHandler(),
-            aliasNames = listOf("search_audio", "list_audio"),
+            aliasNames = listOf("search_audio", "list_audio", "search_recordings"),
+        )
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.AndroidMediaFilesHandler(),
+            aliasNames = listOf("search_files"),
         )
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same

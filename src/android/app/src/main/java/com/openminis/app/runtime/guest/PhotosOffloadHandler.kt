@@ -118,7 +118,20 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video", startMs, endMs, limit - arr.length(), arr, nameFilter)
         }
         if (type == "audio" || type == "all") {
-            queryAudio(startMs, endMs, limit - arr.length(), arr, nameFilter)
+            queryAudio(
+                startMs = startMs,
+                endMs = endMs,
+                max = limit - arr.length(),
+                sink = arr,
+                nameFilter = nameFilter,
+                recordingsOnly = args.hasFlag("recordings"),
+            )
+        }
+        if (type == "file") {
+            // [T-eta-media-search] Documents, the same MediaStore.Files surface Eta's
+            // search_files reads. Only rows this app may see are returned; the visibility
+            // caveat is stated in the payload instead of being implied away.
+            queryFiles(startMs, endMs, limit - arr.length(), arr, args.get("query"))
         }
         val data = JSONObject()
             .put("media", arr)
@@ -208,6 +221,7 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
         max: Int,
         sink: JSONArray,
         nameFilter: Pair<String, String>?,
+        recordingsOnly: Boolean = false,
     ) {
         if (max <= 0) return
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
@@ -235,6 +249,7 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
             selectionParts.add(clause)
             selectionArgs.add(argument)
         }
+        if (recordingsOnly) selectionParts.add(MediaQueryPolicy.RECORDINGS_PATH_CLAUSE)
         val selection = if (selectionParts.isEmpty()) null else selectionParts.joinToString(" AND ")
         val selArgs = if (selectionArgs.isEmpty()) null else selectionArgs.toTypedArray()
         context.contentResolver.query(
@@ -261,6 +276,75 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 if (addedSeconds > 0) {
                     val addedMs = addedSeconds * 1000L
                     p.put("date", dateFormat.format(Date(addedMs))).put("date_iso", formatIso(addedMs))
+                }
+                sink.put(p)
+                n++
+            }
+        }
+    }
+
+    /**
+     * [T-eta-media-search] Documents from MediaStore.Files, the surface Eta's search_files
+     * reads: media_type=0 means "not one of the media kinds", the query matches the file name
+     * or its relative path, and DATE_MODIFIED is in seconds. Rows outside this app's
+     * visibility are simply absent, which is why the payload says so.
+     */
+    private fun queryFiles(
+        startMs: Long?,
+        endMs: Long?,
+        max: Int,
+        sink: JSONArray,
+        query: String?,
+    ) {
+        if (max <= 0) return
+        val uri = MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns._ID,
+            MediaStore.Files.FileColumns.DISPLAY_NAME,
+            MediaStore.Files.FileColumns.MIME_TYPE,
+            MediaStore.Files.FileColumns.RELATIVE_PATH,
+            MediaStore.Files.FileColumns.DATE_MODIFIED,
+            MediaStore.Files.FileColumns.SIZE,
+        )
+        val selectionParts = mutableListOf("${MediaStore.Files.FileColumns.MEDIA_TYPE} = 0")
+        val selectionArgs = mutableListOf<String>()
+        startMs?.let {
+            selectionParts.add("${MediaStore.Files.FileColumns.DATE_MODIFIED} >= ?")
+            selectionArgs.add((it / 1000L).toString())
+        }
+        endMs?.let {
+            selectionParts.add("${MediaStore.Files.FileColumns.DATE_MODIFIED} <= ?")
+            selectionArgs.add((it / 1000L).toString())
+        }
+        MediaQueryPolicy.anyColumnFilter(
+            query,
+            listOf(MediaStore.Files.FileColumns.DISPLAY_NAME, MediaStore.Files.FileColumns.RELATIVE_PATH),
+        )?.let { (clause, arguments) ->
+            selectionParts.add(clause)
+            selectionArgs.addAll(arguments)
+        }
+        context.contentResolver.query(
+            uri,
+            projection,
+            selectionParts.joinToString(" AND "),
+            selectionArgs.toTypedArray(),
+            "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC",
+        )?.use { c ->
+            var n = 0
+            while (c.moveToNext() && n < max) {
+                val id = c.getLong(0)
+                val modifiedSeconds = c.getLong(4)
+                val p = JSONObject()
+                    .put("id", id)
+                    .put("content_uri", ContentUris.withAppendedId(uri, id).toString())
+                    .put("name", c.getString(1) ?: "")
+                    .put("media_type", "file")
+                    .put("mime_type", c.getString(2) ?: "")
+                    .put("relative_path", c.getString(3) ?: "")
+                    .put("size_bytes", c.getLong(5))
+                if (modifiedSeconds > 0) {
+                    val modifiedMs = modifiedSeconds * 1000L
+                    p.put("date", dateFormat.format(Date(modifiedMs))).put("date_iso", formatIso(modifiedMs))
                 }
                 sink.put(p)
                 n++

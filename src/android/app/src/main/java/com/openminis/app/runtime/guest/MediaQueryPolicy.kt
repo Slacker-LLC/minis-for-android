@@ -14,8 +14,12 @@ object MediaQueryPolicy {
     const val DEFAULT_LIMIT = 20
     const val MAX_LIMIT = 100
 
-    /** Media kinds the list query understands; `all` means photo + video + audio. */
-    val TYPES = listOf("photo", "video", "audio", "all")
+    /**
+     * Media kinds the list query understands. `all` covers photo + video + audio; documents
+     * stay out of it because mixing every non-media file into a listing helps nobody —
+     * `--type file` asks for them explicitly.
+     */
+    val TYPES = listOf("photo", "video", "audio", "file", "all")
 
     fun clampLimit(raw: Int?): Int = (raw ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
 
@@ -37,4 +41,23 @@ object MediaQueryPolicy {
 
     fun escapeLike(value: String): String =
         value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    /**
+     * Eta's recordings search is the audio query narrowed to a recording directory. The same
+     * clause is used here so "recordings" means the same thing in both apps.
+     */
+    const val RECORDINGS_PATH_CLAUSE = "relative_path LIKE '%Record%'"
+
+    /**
+     * A query matched against SEVERAL columns (Eta searches a document's name and its path).
+     * The escaped pattern is repeated once per column, because the caller binds one argument
+     * per placeholder.
+     */
+    fun anyColumnFilter(query: String?, columns: List<String>): Pair<String, List<String>>? {
+        val needle = query?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (columns.isEmpty()) return null
+        val pattern = "%${escapeLike(needle)}%"
+        val clause = columns.joinToString(" OR ") { column -> "$column LIKE ? ESCAPE '\\'" }
+        return "($clause)" to List(columns.size) { pattern }
+    }
 }

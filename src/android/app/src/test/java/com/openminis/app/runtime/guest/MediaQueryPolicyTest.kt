@@ -26,7 +26,8 @@ class MediaQueryPolicyTest {
         assertEquals("all", MediaQueryPolicy.type(null))
         assertEquals("all", MediaQueryPolicy.type(""))
         assertNull(MediaQueryPolicy.type("document"))
-        assertEquals(listOf("photo", "video", "audio", "all"), MediaQueryPolicy.TYPES)
+        assertEquals("file", MediaQueryPolicy.type("FILE"))
+        assertEquals(listOf("photo", "video", "audio", "file", "all"), MediaQueryPolicy.TYPES)
     }
 
     @Test
@@ -56,5 +57,34 @@ class MediaQueryPolicyTest {
             "bucket_display_name LIKE ? ESCAPE '\\'",
             MediaQueryPolicy.nameFilter("Camera", column = "bucket_display_name")!!.first,
         )
+    }
+
+    @Test
+    fun `a multi column filter repeats the argument once per column`() {
+        val filter = MediaQueryPolicy.anyColumnFilter(
+            "report",
+            listOf("_display_name", "relative_path"),
+        )!!
+
+        assertEquals(
+            "(_display_name LIKE ? ESCAPE '\\' OR relative_path LIKE ? ESCAPE '\\')",
+            filter.first,
+        )
+        assertEquals(listOf("%report%", "%report%"), filter.second)
+    }
+
+    @Test
+    fun `a multi column filter escapes and refuses the unusable cases`() {
+        assertEquals(
+            listOf("%50\\%%"),
+            MediaQueryPolicy.anyColumnFilter("50%", listOf("_display_name"))!!.second,
+        )
+        assertNull(MediaQueryPolicy.anyColumnFilter(null, listOf("_display_name")))
+        assertNull(MediaQueryPolicy.anyColumnFilter("x", emptyList()))
+    }
+
+    @Test
+    fun `the recordings clause is the documented path filter`() {
+        assertEquals("relative_path LIKE '%Record%'", MediaQueryPolicy.RECORDINGS_PATH_CLAUSE)
     }
 }
