@@ -669,6 +669,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2331 个用例 = 上一项后的 2321 + 10）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：已授权设备上的静默复探会不会真的不弹窗、su 弹窗与后台探测如何交互、以及没有 su 的设备上这一页的观感，都未验证。
 
+**MCP：参数声明为请求头（`x-mcp-header`）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 参数→请求头映射 | 现代 MCP schema 允许把某个工具参数标注为「以 HTTP 头传递」（`x-mcp-header`），这是服务器要求把密钥放在带外的方式。本仓库此前**完全不读这个扩展**，要求它的服务器永远收不到值。移植上游 `McpToolHeaders`：递归走 `properties`、只认 string/integer/boolean、头名必须匹配 token 字符集、整数要求精确且在 ±2^53-1 内（`1.5` 与超界值跳过而不是四舍五入）、类型不符跳过、缺参或 JSON null 跳过；值以 `Mcp-Param-` 前缀发出，非可打印 ASCII（或首尾带空白、或本身长得像包装）套 `=?base64?...?=` | `b3047921` | ✅ `McpToolHeadersTest`（12 例：前缀、未标注、布尔与精确整数、越界/分数、类型不符、缺参与 null、嵌套路径、非法头名与不支持类型、ASCII 直通、包装与再包装、解码回原文） |
+| 接线与优先级 | 会话在 `tools/list` 时按 schema 建一次绑定表，`tools/call` 前抽取后交给传输；HTTP 传输把参数头加在协议头与 `Authorization` **之前**（工具参数顶不掉会话凭据——上游同样的次序），stdio 传输忽略它们 | `b3047921` | ✅ `MCPHttpTransportParamHeaderTest`（2 例，MockWebServer 断言落点与优先级） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2343 个用例 = 上一项后的 2331 + 12）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：要求 `x-mcp-header` 的真实服务器如何对待包装形式、以及没有被要求时收到 `Mcp-Param-` 前缀头会不会拒绝，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
