@@ -168,6 +168,10 @@ object ToolSensitivePolicy {
         // aside for later is personal context, so the transcript keeps a placeholder.
         "android.alarm.list",
         "android.alarm.timers",
+        // [T-eta-xposed-groups] Clipboard history and the health summary carry the user's own
+        // clipboard content and body measurements.
+        "android.clipboard.history",
+        "android.health.summary",
         "search_clipboard_history",
         "get_health_summary",
         "read_sms_code",

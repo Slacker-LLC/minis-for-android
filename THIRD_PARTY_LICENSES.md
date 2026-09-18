@@ -105,6 +105,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/DeviceStatePolicy.kt` (the two commands as argv) and `tools/AndroidDeviceStateTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_device_state`) and its catalog entry |
 | `tools/AppStatePolicy.kt` (the three argv forms) and the `freeze`/`unfreeze` actions in `tools/android/AndroidPackageController.kt` / `tools/android/AndroidAgentTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`app_state_control`) and its catalog entry |
 | `tools/ClockDatabaseTools.kt` (the snapshot steps as separate privileged commands and the two queries) and `tools/PrivateDatabaseRules.kt` | `agent/tool/AgentPrivateDatabaseTools.kt` (`list_alarms` / `list_active_timers`) and their catalog entries |
+| `tools/PrivateDatabaseTools.kt` (clipboard history and the health summary), `tools/PrivateDatabaseSnapshot.kt`, `tools/DatabaseRows.kt`, `tools/HealthSummaryPolicy.kt` | `agent/tool/AgentPrivateDatabaseTools.kt` (`search_clipboard_history` / `get_health_summary`, and the snapshot and row reading shared with the clock queries) and their catalog entries |
 
 
 ## Active native/runtime components

@@ -629,6 +629,15 @@ class MinisApp : Application(), ImageLoaderFactory {
         // [T-eta-xposed-groups] Switching Wi-Fi/Bluetooth directly (Eta set_device_state), one argv
         // through the structured privileged path.
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidDeviceStateHandler(), listOf("set_device_state"))
+        // [T-eta-xposed-groups] Clipboard history and the health summary (Eta
+        // search_clipboard_history / get_health_summary), read through the private-database
+        // snapshot; the databases belong to the input method and to Health Connect.
+        com.openminis.app.tools.PrivateDatabaseTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.PrivateDatabaseTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothPairedHandler(), listOf("bluetooth_paired_devices"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothScanHandler(), listOf("bluetooth_scan"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTtsVoicesHandler(), listOf("list_tts_voices"))
