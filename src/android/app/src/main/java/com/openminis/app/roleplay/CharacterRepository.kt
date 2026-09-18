@@ -103,6 +103,9 @@ object CharacterRepository {
         dao().character(id) ?: throw IllegalArgumentException("character no longer exists")
         dao().deleteCharacter(id)
         runCatching { avatarFile(id).delete() }
+        // Eta deletes the story memory with the character; a conversation keeps its own card
+        // snapshot, but there is nobody left for the memory to belong to.
+        CharacterMemoryRepository.discard(appContext(), id)
         Unit
     }
 

@@ -80,6 +80,12 @@ object ToolPermissionManager {
         // caller may not read somebody else's chat history.
         "conversation.history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "conversation_history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        // [T-eta-character-cards] Story memory is the user's own fiction; a remote caller may not
+        // read or rewrite it.
+        "roleplay.memory_read" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "roleplay.memory_write" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "character_memory_get" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "character_memory_write" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         // [T-eta-alarm-tools] Scheduling device alarms is a real-world side effect; a remote
         // MCP caller may trigger it only through the confirmation gate.
         "android.alarm.set" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),

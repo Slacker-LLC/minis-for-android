@@ -2,6 +2,7 @@ package com.openminis.app.roleplay
 
 import com.openminis.app.data.model.AgentContentPart
 import com.openminis.app.data.model.LLMMessage
+import com.openminis.app.data.repository.MemoryInjectionBudget
 
 /**
  * [T-eta-character-cards] Turning a card into the character block of a turn, and finding where a
@@ -29,6 +30,13 @@ object CharacterPrompt {
         userDescription: String,
         before: String = "",
         after: String = "",
+        /**
+         * The character's story memory, when it has any. The revision travels with it because a
+         * write is validated against the memory the model was actually shown, not against whatever
+         * the file says later.
+         */
+        memory: CharacterMemorySnapshot? = null,
+        contextWindow: Int? = null,
     ): String {
         val original = "Speak with $userName as ${card.name}."
         fun expand(text: String): String = expandMacros(text, card, userName, userDescription, original)
@@ -51,6 +59,20 @@ object CharacterPrompt {
             appendLine("The user's role in this story: $userName")
             if (userDescription.isNotBlank()) appendLine("User persona:\n$userDescription")
             if (after.isNotBlank()) appendLine("Additional world setting:\n${expand(after)}")
+            if (memory != null && memory.content.isNotBlank()) {
+                appendLine(
+                    "This character's story memory is enabled: it holds the fiction this character shares " +
+                        "with the user, never the user's real memory notes.",
+                )
+                appendLine(
+                    "Update it when the story moves; read it back before writing. The revision below is " +
+                        "the state you were shown, and a write that carries a stale one is refused.",
+                )
+                appendLine("character_memory_revision=${memory.revision}")
+                appendLine("<character_memory_core>")
+                appendLine(MemoryInjectionBudget.bound(memory.content, contextWindow))
+                appendLine("</character_memory_core>")
+            }
         }.trim()
     }
 

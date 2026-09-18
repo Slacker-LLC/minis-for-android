@@ -571,6 +571,14 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.AndroidMediaFilesHandler(),
             aliasNames = listOf("search_files"),
         )
+        // [T-eta-character-cards] The bound character's story memory: read it, update it. The
+        // character comes from the session binding, so the model cannot name another one.
+        com.openminis.app.tools.CharacterMemoryTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.CharacterMemoryTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here

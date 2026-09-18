@@ -8423,6 +8423,14 @@ class ChatViewModel(
                             userName = binding.userName,
                             userDescription = binding.userDescription,
                             contextWindow = effectiveContextWindowTokens(),
+                            // The story memory is stored per character, so it is read here rather
+                            // than inside the (pure) projection.
+                            memory = runCatching {
+                                com.openminis.app.roleplay.CharacterMemoryRepository.snapshot(
+                                    context,
+                                    binding.characterId,
+                                )
+                            }.getOrNull(),
                         )
                     }
                     currentProvider.streamMessage(

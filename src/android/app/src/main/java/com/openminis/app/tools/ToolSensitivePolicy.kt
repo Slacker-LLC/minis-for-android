@@ -255,6 +255,13 @@ object ToolSensitivePolicy {
         "notification.search",
         "search_notification_history",
 
+        // [T-eta-character-cards] Story memory is private fiction; the transcript keeps a
+        // placeholder while the live turn sees the real text.
+        "roleplay.memory_read",
+        "roleplay.memory_write",
+        "character_memory_get",
+        "character_memory_write",
+
         // Minis catalog — canonical twin of read_image above.
         "linux.file.image.read",
     )

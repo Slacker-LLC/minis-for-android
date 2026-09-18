@@ -40,6 +40,8 @@ object RoleplayTurnProjection {
         userDescription: String,
         contextWindow: Int? = null,
         toolsText: String = "",
+        /** The character's story memory, read once by the caller that owns the device storage. */
+        memory: CharacterMemorySnapshot? = null,
     ): RoleplayProjection {
         val dialogue = messages.filter { CharacterPrompt.isDialogue(it) }
             .map { CharacterPrompt.dialogueText(it) }
@@ -61,6 +63,8 @@ object RoleplayTurnProjection {
             userDescription = userDescription,
             before = worldbook.beforeCharacter,
             after = worldbook.afterCharacter,
+            memory = memory,
+            contextWindow = contextWindow,
         )
 
         val projected = messages.toMutableList()

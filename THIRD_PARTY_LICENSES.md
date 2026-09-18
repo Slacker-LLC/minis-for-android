@@ -82,6 +82,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `ui/settings/CharacterPickerDialog.kt` and the session-menu entry in `ui/sessions/SessionListScreen.kt` | Eta's conversation binding UI |
 | `roleplay/CharacterWorldbookDraft.kt` (world book draft read/write) | `agent/roleplay/CharacterWorldbookDraft.kt` |
 | `ui/settings/CharacterDetailScreen.kt` (character detail and world-book editor) | Eta's character detail and world-book editor screens |
+| `roleplay/CharacterMemoryDocument.kt`, `roleplay/CharacterMemoryRepository.kt`, `tools/CharacterMemoryTools.kt` and the memory lines in `roleplay/CharacterPrompt.kt` | `data/repository/CharacterMemoryRepository.kt`, `agent/roleplay/CharacterMemoryTools.kt` and the memory half of `RoleplayRunContext.kt` |
 
 
 ## Active native/runtime components
