@@ -209,7 +209,17 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2006 个用例 = 上一项后的 2003 + 3，0 失败）。**未做**：`search_downloads`——Eta 读的是 `content://downloads/my_downloads`（仅本应用自己的下载记录，对本 App 近乎恒空）与 `all_downloads`（需要系统权限），两个都不值得做成工具，留待确认；`search_coloros_*`（笔记/录音）与 QQ/微信聊天图片缓存属于厂商私有目录，跨 ROM 不可复现，且会给 Root 增加新的第三方数据读取面，属于要先拍板的范围变更。真机未验证：文档列表在各 ROM 上的可见范围（Android 11+ 可见性、SAF 与 MediaStore.Files 的差别）、录音目录命名差异、大文件量下的查询耗时。
 
-## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
+## 三、Phase 5（角色系统）起步 — 分支 `codex/eta-phase5-roleplay`，基于 `f1bb9454`
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 角色卡模型 | Eta 的角色系统从「卡」开始：一份 Tavern V2/V3 JSON，通常以 Base64 藏在 PNG 的 `tEXt` 块里。本仓库此前没有任何角色系统，所以先落基础。`CharacterCard` 保留解析出来的整棵树（本版未实现的字段在导入导出间原样存活），并暴露提示词需要的那些字段：名称、描述、性格、场景、开场白与备选开场白、示例对话、系统提示与历史后指令、标签、extensions、character_book、深度备注 | `a5926cf9` | ✅ `CharacterCardCodecTest`（10 例） |
+| 编解码与校验 | `CharacterCardCodec`：16 MiB 上限、严格 UTF-8、只承认 `chara_card_v2`/`chara_card_v3`，旧版 V1 归一化成 V2 形状且顶层镜像字段同步；世界书在落库前校验（scan_depth/token_budget 为非负整数、recursive_scanning 为布尔、条目必须是对象且 keys/content/开关/顺序类型正确）。**与 Eta 的唯一差异**：显式 JSON null 视为缺席——真实卡片常把空字段写成 null | `a5926cf9` | ✅ 含旧版归一化、null 容忍、规范拒绝、世界书拒绝用例 |
+| PNG 承载 | `CharacterCardPng`：读之前逐块校验（长度、CRC、IHDR 几何、颜色类型与位深、必须有 IDAT、IEND 必须为空），`ccv3` 优先于 `chara`，V3 损坏时报错而**不**静默回退到旧副本；写入时先剔除旧卡块，再在 IEND 前插入新的 V2 与 V3 两份，32 MiB 上限 | `a5926cf9` | ✅ `CharacterCardPngTest`（9 例，自建分块 PNG） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2025 个用例 = Phase 4 分支的 2006 + 19，0 失败）。**未做**：世界书触发/递归注入与草稿编辑、宏展开（`{{char}}`/`{{user}}`）、兼容性警告（未支持宏/HTML/正则扩展）、角色存储与界面、导入导出入口。真机未验证：真实酒馆角色卡（含 V3 与 character_book）的往返、大体量卡片的解码耗时、PNG 写出后在各图片查看器中的正常显示。
+
+## 四、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
@@ -219,7 +229,7 @@
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
-## 四、明确排除
+## 五、明确排除
 
 | 项 | 理由 |
 |---|---|
@@ -229,7 +239,7 @@
 | 第二套跨进程 runtime 协议 / 终态 outbox | 单进程应用以 Room + ViewModel 为真源，重复实现会造成两套状态源 |
 | 在线商店类分发面 | 产品定位与服务端依赖不在本仓库范围 |
 
-## 五、未验证清单（不得据此声称设备结论）
+## 六、未验证清单（不得据此声称设备结论）
 
 - 技能事务在真机上的 `rename`/`fsync` 行为、进程被杀后的 journal 回滚、跨进程锁竞争。
 - 无障碍窗口集合、截图包含关系、主线程门在系统繁忙时的真实时序、滚动事件在各 ROM/WebView 的一致性。
