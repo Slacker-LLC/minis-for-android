@@ -602,4 +602,118 @@ internal object BrowserDomScripts {
         };
         """.trimIndent(),
     )
+
+    /**
+     * Upstream's `scroll` plus this app's fallback: scroll the named element, or the
+     * window, and when the window does not move, hunt for the largest inner
+     * scrollable container — app-like pages scroll a div, and a window-only scroll
+     * silently does nothing there. The named element must be visible (upstream's
+     * check), and the result reports where the scroll started and where it ended, so
+     * "did it move at all" is answerable without remembering the previous reading.
+     */
+    fun scroll(selector: String?, direction: String, amount: Int): String {
+        val selectorLiteral = selector?.let { org.json.JSONObject.quote(it) } ?: "null"
+        val directionLiteral = org.json.JSONObject.quote(direction)
+        return wrap("""
+        var targetSelector = $selectorLiteral;
+        var delta = ${if (direction == "up") -amount else amount};
+        var target = null;
+        var element = 'window';
+        var selectorUsed = targetSelector || 'window';
+        if (targetSelector) {
+          target = document.querySelector(targetSelector);
+          if (!target || !visible(target)) throw new Error('TARGET_NOT_VISIBLE: ' + targetSelector);
+          selectorUsed = targetSelector;
+        } else {
+          var beforeWindow = window.scrollY;
+          window.scrollBy(0, delta);
+          if (window.scrollY !== beforeWindow) {
+            var pageHeight = document.documentElement.scrollHeight ||
+              (document.body ? document.body.scrollHeight : 0);
+            return {
+              scrolled: true, element: 'window', selector_used: 'window',
+              direction: $directionLiteral, amount: $amount,
+              before: beforeWindow, after: window.scrollY, scrollY: window.scrollY,
+              scrollHeight: pageHeight, viewportHeight: window.innerHeight
+            };
+          }
+          var best = null;
+          var bestArea = 0;
+          function walk(el, depth) {
+            if (depth > 10) return;
+            var children = el.children;
+            for (var index = 0; index < children.length; index++) {
+              var child = children[index];
+              var style = window.getComputedStyle(child);
+              var overflowY = style.overflowY;
+              if ((overflowY === 'auto' || overflowY === 'scroll') &&
+                  child.scrollHeight > child.clientHeight + 5) {
+                var area = child.clientWidth * child.clientHeight;
+                if (area > bestArea) { best = child; bestArea = area; }
+              }
+              walk(child, depth + 1);
+            }
+          }
+          walk(document.body, 0);
+          if (best) {
+            target = best;
+            element = best.tagName.toLowerCase();
+            selectorUsed = selectorFor(best);
+          } else {
+            var beforeDocument = document.documentElement.scrollTop;
+            document.documentElement.scrollTop += delta;
+            return {
+              scrolled: true, element: 'document.documentElement',
+              selector_used: 'document.documentElement',
+              direction: $directionLiteral, amount: $amount,
+              before: beforeDocument, after: document.documentElement.scrollTop,
+              scrollY: document.documentElement.scrollTop
+            };
+          }
+        }
+        var before = target.scrollTop;
+        target.scrollBy(0, delta);
+        return {
+          scrolled: true, element: element, selector_used: selectorUsed,
+          direction: $directionLiteral, amount: $amount,
+          before: before, after: target.scrollTop,
+          scrollTop: target.scrollTop, scrollHeight: target.scrollHeight,
+          clientHeight: target.clientHeight
+        };
+        """.trimIndent())
+    }
+
+    /**
+     * Upstream's `pageInfo` plus this app's extras: the page's language and its
+     * canonical URL (both new here — a reader that knows the language picks a
+     * different reading strategy, and the canonical URL is what to cite), alongside
+     * the url / title / ready state / form / link / image counts this app already
+     * reported. Upstream caps the content size at 200000 px; ours reports the real
+     * number, because a capped size is a lie the caller cannot detect.
+     */
+    fun pageInfo(): String = wrap("""
+        var canonical = document.querySelector('link[rel="canonical"]');
+        return {
+          url: window.location.href,
+          title: document.title,
+          viewport_width: window.innerWidth,
+          viewport_height: window.innerHeight,
+          content_width: Math.max(
+            document.body ? document.body.scrollWidth : 0,
+            document.documentElement.scrollWidth
+          ),
+          content_height: Math.max(
+            document.body ? document.body.scrollHeight : 0,
+            document.documentElement.scrollHeight
+          ),
+          scroll_x: window.scrollX || 0,
+          scroll_y: window.scrollY || 0,
+          language: cleanInline(document.documentElement.lang, 32) || null,
+          canonical_url: canonical ? absoluteUrl(canonical.getAttribute('href')) : null,
+          ready_state: document.readyState,
+          forms: document.forms.length,
+          links: document.links.length,
+          images: document.images.length
+        };
+    """.trimIndent())
 }

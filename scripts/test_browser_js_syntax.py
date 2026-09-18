@@ -39,8 +39,34 @@ KNOWN_TEMPLATES = {
     "${BrowserTextWindowPolicy.MAX_DOCUMENT_CHARS}": "200000",
 }
 
-BRACED_TEMPLATE = re.compile(r"\$\{[^}]*\}")
 NAMED_TEMPLATE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*")
+
+
+def replace_templates(text: str, replacement: str) -> str:
+    """Replace `${ ... }` templates, counting braces: a template may contain a
+    lambda, and a non-greedy match would stop at its closing brace and leave the
+    rest of the expression behind as bogus JavaScript."""
+    out: list[str] = []
+    index = 0
+    while True:
+        start = text.find("${", index)
+        if start < 0:
+            out.append(text[index:])
+            return "".join(out)
+        out.append(text[index:start])
+        depth = 0
+        cursor = start + 1
+        while cursor < len(text):
+            character = text[cursor]
+            if character == "{":
+                depth += 1
+            elif character == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            cursor += 1
+        out.append(replacement)
+        index = cursor + 1
 
 
 def raw_strings(source: str) -> list[str]:
@@ -51,7 +77,7 @@ def raw_strings(source: str) -> list[str]:
 def resolve_templates(script: str) -> str:
     for template, value in KNOWN_TEMPLATES.items():
         script = script.replace(template, value)
-    script = BRACED_TEMPLATE.sub("0", script)
+    script = replace_templates(script, "0")
     script = NAMED_TEMPLATE.sub("0", script)
     return script.replace(DOLLAR_MARKER, "$")
 

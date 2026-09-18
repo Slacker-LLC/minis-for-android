@@ -955,14 +955,13 @@ class BrowserUseManager(
     private suspend fun scroll(selector: String?, direction: ScrollDirection?, amount: Int?): BrowserActionResult {
         val dir = direction ?: ScrollDirection.DOWN
         val px = amount ?: 500
-        val js = BrowserUseJS.scroll(dir, px, selector)
-        return evaluateJSAndParse(js)
+        return evaluateJSAndParse(BrowserDomScripts.scroll(selector, dir.value, px))
     }
 
     // -- Get Page Info --
 
     private suspend fun getPageInfo(): BrowserActionResult {
-        return evaluateAndReturn(BrowserUseJS.getPageInfo())
+        return evaluateAndReturn(BrowserDomScripts.pageInfo())
     }
 
     // -- Execute JS --
@@ -1455,8 +1454,19 @@ class BrowserUseManager(
             json.optBoolean("scrolled") -> {
                 val dir = json.optString("direction", "?")
                 val amt = json.optInt("amount", 0)
-                appendLine("Scrolled $dir ${amt}px")
-                if (json.has("scrollY")) appendLine("  Scroll Y: ${json.optInt("scrollY")}")
+                append("Scrolled ").append(dir).append(' ').append(amt).append("px")
+                // [T-browser-scroll-evidence-android] Upstream reports where the
+                // scroll started and where it ended; without the pair, "did it move"
+                // is unanswerable from a single reading.
+                if (json.has("before") && json.has("after")) {
+                    append(" (position ")
+                    append(json.optInt("before")).append(" -> ").append(json.optInt("after"))
+                    append(')')
+                }
+                appendLine()
+                if (!json.has("before") && json.has("scrollY")) {
+                    appendLine("  Scroll Y: ${json.optInt("scrollY")}")
+                }
                 if (json.has("scrollHeight")) appendLine("  Page height: ${json.optInt("scrollHeight")}")
                 if (json.has("viewportHeight")) append("  Viewport height: ${json.optInt("viewportHeight")}")
             }

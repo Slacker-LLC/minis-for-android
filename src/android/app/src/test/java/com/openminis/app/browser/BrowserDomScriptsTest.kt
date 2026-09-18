@@ -195,4 +195,37 @@ class BrowserDomScriptsTest {
         assertTrue(script.contains("target.scrollIntoView({ block: 'center', inline: 'center' });"))
         assertTrue(script.contains("matched_element: describe(target)"))
     }
+
+    @Test
+    fun `scroll refuses a target the page cannot show and reports the movement`() {
+        val script = BrowserDomScripts.scroll(".feed", "down", 500)
+
+        assertTrue(script.contains("var targetSelector = \".feed\";"))
+        assertTrue(script.contains("if (!target || !visible(target)) throw new Error('TARGET_NOT_VISIBLE: ' + targetSelector);"))
+        assertTrue(script.contains("var before = target.scrollTop;"))
+        assertTrue(script.contains("before: before, after: target.scrollTop"))
+        assertTrue(script.contains("direction: \"down\", amount: 500"))
+    }
+
+    @Test
+    fun `scroll still hunts an inner container when the window does not move`() {
+        val script = BrowserDomScripts.scroll(null, "up", 300)
+
+        assertTrue(script.contains("var delta = -300;"))
+        assertTrue(script.contains("var beforeWindow = window.scrollY;"))
+        assertTrue(script.contains("before: beforeWindow, after: window.scrollY"))
+        assertTrue(script.contains("overflowY === 'auto' || overflowY === 'scroll'"))
+        assertTrue(script.contains("selectorUsed = selectorFor(best)"))
+    }
+
+    @Test
+    fun `page info reports the language and the canonical url alongside the sizes`() {
+        val script = BrowserDomScripts.pageInfo()
+
+        assertTrue(script.contains("language: cleanInline(document.documentElement.lang, 32) || null"))
+        assertTrue(script.contains("canonical_url: canonical ? absoluteUrl(canonical.getAttribute('href')) : null"))
+        assertTrue(script.contains("scroll_x: window.scrollX || 0"))
+        assertTrue(script.contains("content_height: Math.max("))
+        assertTrue(script.contains("ready_state: document.readyState"))
+    }
 }
