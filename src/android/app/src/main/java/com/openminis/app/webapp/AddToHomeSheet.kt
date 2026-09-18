@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import com.openminis.app.util.BoundedStreams
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,6 +107,13 @@ sealed class WebAppSource {
     ) : WebAppSource()
 }
 
+/**
+ * The budget a picked web-app source file is copied under. The file is read into the cache and then
+ * written into the session workspace; a page or a small asset fits easily, and anything larger is
+ * refused rather than copied (BoundedStreams.TooLargeException carries the reason).
+ */
+private const val MAX_WEBAPP_SOURCE_BYTES = 8L * 1024 * 1024
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 /**
  * Bottom-sheet for "Add to Home Screen". T-pwa-2 launched it from the
@@ -154,8 +162,13 @@ fun AddToHomeSheet(
                     )
                     target.parentFile?.mkdirs()
                     runCatching {
+                        // [T-eta-bounded-copy] A picked document counts what actually arrives, not
+                        // what it declares (Eta's BoundedFileCopy rule): the source is copied under
+                        // a budget, so a mis-picked archive cannot fill the cache directory.
                         context.contentResolver.openInputStream(source.uri)?.use { input ->
-                            target.outputStream().use { out -> input.copyTo(out) }
+                            target.outputStream().use { out ->
+                                BoundedStreams.copy(input, out, MAX_WEBAPP_SOURCE_BYTES)
+                            }
                         } ?: error("openInputStream returned null")
                         target.inputStream().use { input ->
                             WorkspaceFileClient.writeStream(

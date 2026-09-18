@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.InterruptedIOException
 
 /**
  * The callers of these helpers are handed documents, share targets and archive
@@ -42,6 +43,40 @@ class BoundedStreamsTest {
 
         assertEquals(5_000L, copied)
         assertArrayEquals(payload, out.toByteArray())
+    }
+
+    @Test
+    fun `a source past the budget is refused with the type that says so`() {
+        val out = ByteArrayOutputStream()
+
+        val failure = runCatching {
+            BoundedStreams.copy(ByteArrayInputStream(ByteArray(4_096)), out, 1_024)
+        }.exceptionOrNull()
+
+        assertTrue(
+            "the caller can tell too large from a broken stream",
+            failure is BoundedStreams.TooLargeException,
+        )
+        assertTrue("and it is still an IOException", failure is IOException)
+    }
+
+    @Test
+    fun `a cancelled copy stops between chunks`() {
+        val payload = ByteArray(64 * 1_024)
+        val out = ByteArrayOutputStream()
+        Thread.currentThread().interrupt()
+        try {
+            val failure = runCatching {
+                BoundedStreams.copy(ByteArrayInputStream(payload), out, 1_024L * 1_024L)
+            }.exceptionOrNull()
+
+            assertTrue(
+                "a copy must not run to the end of somebody's file after the work was cancelled",
+                failure is InterruptedIOException,
+            )
+        } finally {
+            Thread.interrupted()
+        }
     }
 
     @Test
