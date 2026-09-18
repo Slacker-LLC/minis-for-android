@@ -59,13 +59,15 @@ object AndroidAgentTools {
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
-                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. wait_for_package waits for a package to become (or stop being) the foreground app and reports an unreadable foreground as unknown rather than as a miss. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
+                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. wait_for_package waits for a package to become (or stop being) the foreground app and reports an unreadable foreground as unknown rather than as a miss. " +
+                "set_text writes the whole value; input_text types into what is already there, at the field's own selection, and refuses (TEXT_CONTENT_UNAVAILABLE/TEXT_SELECTION_UNAVAILABLE) when the field does not hand over enough to reconstruct it - then send the full value with set_text. Actions: observe, screenshot, click, long_press, set_text, input_text, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam(
                     "string",
                     "UI action. back/home/recents/notifications/quick_settings are system panels driven through the same evidence path as gestures",
                     listOf(
-                        "observe", "screenshot", "click", "long_press", "set_text", "scroll", "wait",
+                        "observe", "screenshot", "click", "long_press", "set_text", "input_text",
+                        "scroll", "wait",
                         "wait_for_package",
                         UiGlobalAction.BACK.wireName, UiGlobalAction.HOME.wireName,
                         UiGlobalAction.RECENTS.wireName, UiGlobalAction.NOTIFICATIONS.wireName,

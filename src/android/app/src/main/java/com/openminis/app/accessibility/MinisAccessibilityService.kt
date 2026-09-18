@@ -509,10 +509,35 @@ class MinisAccessibilityService : AccessibilityService() {
     }
 
     fun setNodeText(node: AccessibilityNodeInfo, text: String): Boolean {
+        return setNodeText(node, text, text.length)
+    }
+
+    /**
+     * [T-eta-text-insert] Writes [text] and puts the cursor at [cursor]. Ported from Eta
+     * `setNodeText(node, text, cursor)` (agent/accessibility/AgentAccessibilityService.kt @
+     * c15de97): the write is the answer, and the cursor is placed afterwards so a field that
+     * refuses the selection still keeps the text.
+     */
+    fun setNodeText(node: AccessibilityNodeInfo, text: String, cursor: Int): Boolean {
         val args = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }
-        return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
+        placeCursor(node, cursor.coerceIn(0, text.length))
+        return true
+    }
+
+    /**
+     * True when the cursor really moved. The node is refreshed first: a stale node would take the
+     * selection of the text it no longer carries.
+     */
+    fun placeCursor(node: AccessibilityNodeInfo, cursor: Int): Boolean {
+        val selection = Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
+        }
+        return runCatching { node.refresh() }.getOrDefault(false) &&
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
     }
 
     /**

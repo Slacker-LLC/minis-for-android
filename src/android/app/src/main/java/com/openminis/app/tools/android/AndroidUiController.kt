@@ -13,6 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.accessibility.GatedCallOutcome
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.accessibility.PackageWindowVisibility
+import com.openminis.app.accessibility.TextEditPlanner
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.offload.OffloadPermissionManager
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +79,7 @@ object AndroidUiController {
                 "click" -> click(service, args, longPress = false)
                 "long_press" -> click(service, args, longPress = true)
                 "set_text" -> setText(context, service, args)
+                "input_text" -> inputText(service, args)
                 "scroll" -> scroll(service, args)
                 // [T-eta-ui-system-panel] back/home plus the system panels the guest
                 // android-a11y-cli already drives and Eta exposes as open_system_panel.
@@ -330,6 +332,60 @@ object AndroidUiController {
             .put("generation", resolved.locator.generation).put("ref", resolved.locator.ref)
             .put("success", ok).put("verified", verified ?: JSONObject.NULL).put("inputMethod", method)
             .put("unicode", "ACTION_SET_TEXT/clipboard supports Unicode; shell input is not used")), ok)
+    }
+
+    /**
+     * [T-eta-text-insert] Type into the field as it stands: the value written is the current text
+     * with the insertion applied at the field's own selection, which is what "type here" means and
+     * what set_text cannot express. Ported from Eta `inputTextFocused`
+     * (agent/accessibility/AgentAccessibilityService.kt @ c15de97).
+     *
+     * Upstream's gate is kept: a field that does not hand over its own text, or that reports no
+     * usable cursor, is refused with the reason and the caller is told to send the full value with
+     * set_text. Reconstructing a value we cannot read would silently overwrite what the user typed.
+     */
+    private fun inputText(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+        val resolved = resolveRef(args)
+        if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
+        resolved as UiRefResolution.Found
+        if (!resolved.node.isEditable || !resolved.node.isEnabled) {
+            return error("UI_NODE_NOT_EDITABLE", "the observed ref is not an enabled editable node")
+        }
+        val current = resolved.node.text
+        if (resolved.node.isPassword || current == null) {
+            return error(
+                "TEXT_CONTENT_UNAVAILABLE",
+                "the field does not hand over its current text; send the full value with set_text",
+            )
+        }
+        val inserted = args.optString("text", "")
+        val plan = TextEditPlanner.insertAtSelection(
+            currentText = current.toString(),
+            insertedText = inserted,
+            selectionStart = resolved.node.textSelectionStart,
+            selectionEnd = resolved.node.textSelectionEnd,
+        ) ?: return error(
+            "TEXT_SELECTION_UNAVAILABLE",
+            "the field reports no usable cursor or selection; send the full value with set_text",
+        )
+        val ok = service.setNodeText(resolved.node, plan.text, plan.cursor)
+        val verified = if (ok) service.verifyNodeText(resolved.node, plan.text) else null
+        val report = AndroidUiActionEvidence.ofTextInput(ok, verified)
+        val selectionPlaced = ok && service.placeCursor(resolved.node, plan.cursor)
+        return UiToolResult(
+            report.into(
+                JSONObject().put("action", "input_text")
+                    .put("generation", resolved.locator.generation).put("ref", resolved.locator.ref)
+                    .put("success", ok).put("verified", verified ?: JSONObject.NULL)
+                    .put("insertedAt", plan.cursor - inserted.length)
+                    .put("resultingLength", plan.text.length)
+                    .put(
+                        "inputMethod",
+                        if (selectionPlaced) "ACTION_SET_TEXT_AND_SELECTION" else "ACTION_SET_TEXT",
+                    ),
+            ),
+            ok,
+        )
     }
 
     private suspend fun scroll(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
