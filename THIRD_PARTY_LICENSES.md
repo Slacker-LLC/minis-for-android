@@ -102,6 +102,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/hyperos/HyperOsLauncherHooks.kt`, `xposed/hyperos/HyperOsSearchTrigger.kt`, `xposed/hyperos/HyperOsLongPressGesture.kt`, `xposed/hyperos/HyperOsLegacyGesture.kt`, `xposed/hyperos/HyperOsGesturePolicy.kt` (the takeover answer as a value) | `hook/hyperos/HyperOsLauncherHooks.kt`, `hook/hyperos/HyperOsSearchTrigger.kt`, `hook/hyperos/HyperOsLongPressGesture.kt`, `hook/hyperos/HyperOsLegacyGesture.kt` |
 | `xposed/system/SystemUiHooks.kt`, `xposed/system/SystemUiOcrPolicy.kt` (the haptic id and the context lookup order as values) | `hook/system/SystemUiHooks.kt` |
 | `tools/SmsCodeExtractionPolicy.kt` (the extraction rule) and `android.sms.code` in `tools/AndroidTelephonyTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`read_sms_code`) and its catalog entry |
+| `tools/DeviceStatePolicy.kt` (the two commands as argv) and `tools/AndroidDeviceStateTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_device_state`) and its catalog entry |
 
 
 ## Active native/runtime components

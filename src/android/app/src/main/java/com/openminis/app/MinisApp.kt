@@ -626,6 +626,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWifiInfoHandler(), listOf("wifi_info"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWifiScanHandler(), listOf("list_wifi_networks"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothStatusHandler(), listOf("bluetooth_status"))
+        // [T-eta-xposed-groups] Switching Wi-Fi/Bluetooth directly (Eta set_device_state), one argv
+        // through the structured privileged path.
+        com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidDeviceStateHandler(), listOf("set_device_state"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothPairedHandler(), listOf("bluetooth_paired_devices"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidBluetoothScanHandler(), listOf("bluetooth_scan"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidTtsVoicesHandler(), listOf("list_tts_voices"))
