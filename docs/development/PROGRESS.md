@@ -447,6 +447,14 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2192 个用例 = 上一项后的 2191 + 1，0 失败）。**没有任何设备结论**：授权被抹掉时后端接收器是否已注册、有序广播能否到达 system_server，均未验证——失败只是回落到原有提示路径，不会卡住工具调用。真机判据：force-stop 之后首次 a11y 工具调用是否不再弹 Shizuku 提示（开关打开时）。
 
+**Phase 4 补片：只回验证码的短信工具** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `read_sms_code` | 登录流程要的是六个数字，不是那条短信。规则照上游且比「找个数字」严得多：正文里必须出现**点明这是验证码的词**（中文几种说法 + `verification code`/`one-time password`/`otp`），取**离该词最近**的 4–8 位数字串（真实短信里第一个数字往往是金额、百分比或电话号码）；只返回 code/sender/timestamp，正文不出这个函数。读取走本仓库自己的短信路径（本应用已持有 READ_SMS，`android.sms.read` 查的就是同一个 provider），窗口 1–1440 分钟默认 10、最多回 10 条。工具注册名 `android.sms.code`、别名 `read_sms_code`，并进敏感表（一次性验证码不该留在 transcript 里） | `d0548894` | ✅ `SmsCodeExtractionPolicyTest`（5 例：中英文、就近取值、无上下文词拒绝、非 4–8 位拒绝、窗口钳制） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2197 个用例 = 上一项后的 2192 + 5，0 失败）。**没有任何设备结论**：某些 ROM 仅凭 READ_SMS 读不到 provider（还需要默认短信应用角色），未验证；被拒时工具返回 provider 自己的拒绝信息而不是空列表。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -454,7 +462,7 @@
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
-| Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
+| Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
