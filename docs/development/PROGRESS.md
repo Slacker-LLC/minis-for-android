@@ -978,6 +978,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 另一处自我纠错 | 第一轮把 `linux_file_copy/move` 判成「绝对路径被拒」，实际是我参数名猜错（应为 `source`/`destination`，现已在 `inputSchema` 里公布）；改用正确名字后 write → copy → move → read → delete → list 全绿 |
 | 验证口径 | `:app:testDebugUnitTest` **2410 例 0 失败** + `:app:lintDebug` 0 error + `:app:assembleDebug`；设备复原：MCP 已停、token prefs 还原 `<map />`、转发撤销、工作区临时文件（`sweep-probe.*`、`sweep-shot.png`）已删、调试截图环已清 |
 
+### 仪器化测试首次真跑：模拟器 50/50 与真机 50/50（2026-09-19，无代码改动）
+
+| 项 | 结果 |
+|---|---|
+| 背景 | 仓库自带 **10 个 `androidTest` 类、50 个用例**（Room 迁移、`SecureFileAccess` 符号链接逃逸拒绝、TerminalSanitizer、TextSegmenter、语音纠错、位图上限、前台服务清单、Bot 回合执行、并发追加事务），但**此前从未在本仓库真正跑过**——旧文档写的是「本仓库无 Robolectric/instrumentation」 |
+| 模拟器（AVD API 36 x86_64） | `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest` → **50 用例 0 失败 0 跳过**，50 秒 |
+| 真机（小米 24129PN74C，HyperOS / Android 37） | 先 `adb install -r -t app-debug-androidTest.apk`（**这次没有被 OEM 拒绝**，与旧文档记载相反），再 `am instrument -w llc.slacker.eta.test/androidx.test.runner.AndroidJUnitRunner` → **OK (50 tests)**，325 秒 |
+| 真机取证价值 | 迁移三件套（`BotMigrationTest` 5、`MessageAttributionMigrationTest` 2、`ChatAppendTransactionTest` 3）在这台「身份哈希事故」的机器上真的跑过一遍；`SecureFileAccessInstrumentedTest` 的符号链接逃逸拒绝也在真机成立 |
+| 一条设备观察（测试方法论） | 真机跑套件时会因 HyperOS 的空闲冷冻（进程处于 `do_freezer_trap`）中途停住，整个套件挂在原地；把 App 拉回前台即解冻、套件继续并正常结束。以后再跑别让它在后台空转等 |
+| 验证口径 | 本轮**无代码改动**；`:app:testDebugUnitTest` 2410 例 0 失败、`:app:lintDebug` 0 error、`assembleDebug` 与两个产物校验沿用上一轮结果；真机上的测试包已卸载 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
