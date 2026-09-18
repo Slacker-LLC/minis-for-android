@@ -420,6 +420,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2186 个用例 = 上一项后的 2180 + 6，0 失败）。**没有任何设备结论**：某一版 ColorOS 是否暴露这些 provider、root 调用能否到达、列返回什么，全部未验证；失败时工具给出带原因的错误码而不是空列表。真机判据：三个工具调用返回的 JSON 是数据还是某个带原因的 `PERSONAL_DATA_*` 错误码。
 
+**Phase 6 第十三组：HyperOS 桌面导航条长按 → Circle to Search** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 三个入口只装一个 | HyperOS 把同一个手势发布在多个桌面辅助类里，某一版 ROM 只带其中若干；这组按上游顺序找第一个匹配的入口装上，其余不动——装两个会在嵌套调用里把同一次搜索触发两遍（`NavStubGestureEventManager.handleLongPressEvent` → `CircleToSearchHelper.invokeOmni` → `NavBarEventHelper.onLongPress`）。三者都走同一个 `HyperOsSearchTrigger`（沿用 `gesture_bar_circle_to_search` 开关、缺 context 或系统搜索入口不可用就回落原生行为），并按返回类型给回答：void 给 null、boolean 给 true | `b5a325af` | ✅ `HyperOsGesturePolicyTest`（3 例） |
+| 旧版导航视图 | 对「长按检测在自己手里」的那一版桌面，改看 `NavStubView.onTouchEvent`：每个视图一个检测器（一次只持一个手势、只弱引用视图、不在延迟任务里持有 hook chain），只有真正被接管的那次手势会把事件改成 CANCEL 结束桌面自己的手势流，并在手势 pending 时压掉 recents 预启动；若该视图已经带有来历不明的长按检测（`mCheckLongPress`）就让给 ROM，不与之竞争 | `b5a325af` | ✅ 上述用例（void/boolean/其它返回类型的接管回答） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2189 个用例 = 上一项后的 2186 + 3，0 失败）。**没有任何设备结论**：某一版桌面是否有这些类与这条手势路径、系统搜索入口是否可解析、CANCEL 是否真的结束桌面自己的事件流，全部未验证——没有目标时台账记 MISSING/SKIPPED 并保留原手势。真机判据：logcat 里 `HyperOsLauncher` 前缀的台账行 + 长按导航条是否出现系统一圈即搜（开关打开时）。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -428,7 +437,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、SystemUI 的 OPlus OCR 长按（下一片）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
