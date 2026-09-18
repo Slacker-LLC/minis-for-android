@@ -86,20 +86,45 @@ internal class FadeController {
     /** True when at least one range is still under α=1. Drives the frame loop. */
     val hasActiveRanges: Boolean get() = rangesState.isNotEmpty()
 
+    /**
+     * [T-android-reveal-monotonic] Owner of the monotonic reveal clock for the
+     * text this controller animates: grapheme-indexed progress that may only
+     * move forward. A shrink clamps it instead of rewinding, which is what stops
+     * already-revealed characters from disappearing and fading back in.
+     */
+    private val reveal = RevealProgress()
+
+    /** Monotonic reveal progress in graphemes (tests / diagnostics). */
+    val revealedGraphemes: Int get() = reveal.revealedGraphemes
+
+    private var lastTickNanos: Long = System.nanoTime()
+
     fun ingest(newPlainText: String) {
         if (newPlainText == lastPlainText) return
-        // On a hard reset (text shrank or diverged from prefix), drop all
-        // in-flight ranges — the caller is rendering a brand-new block.
-        if (!newPlainText.startsWith(lastPlainText)) {
-            rangesState.clear()
-            rangeStartNanos.clear()
-            alphas.clear()
-            lastPlainText = newPlainText
-            return
-        }
-        val base = lastPlainText.length
-        val suffix = newPlainText.substring(base)
+        val previousText = lastPlainText
+        val update = reveal.ingest(newPlainText)
         lastPlainText = newPlainText
+        when (update.kind) {
+            RevealIngestKind.UNCHANGED -> return
+            RevealIngestKind.APPENDED -> Unit
+            RevealIngestKind.SHRANK, RevealIngestKind.REBUILT -> {
+                // [T-android-reveal-monotonic] This used to drop EVERY in-flight
+                // range, so characters that had already faded in flashed back to
+                // full opacity and then faded again as the same text was
+                // re-revealed. Progress only clamps now: keep the ranges whose
+                // text still exists, drop the ones the rewrite invalidated.
+                pruneRangesBefore(update.survivingPrefixEnd)
+                if (update.kind == RevealIngestKind.SHRANK) {
+                    // Shorter text has no new characters to reveal — the visible
+                    // content either stayed in place (prefix) or changed shape;
+                    // it renders opaque instead of replaying the fade.
+                    reveal.snapToTarget()
+                }
+                return
+            }
+        }
+        val base = previousText.length
+        val suffix = newPlainText.substring(base)
         if (suffix.isEmpty()) return
 
         // Split suffix into word-like runs separated by whitespace. Punctuation
@@ -150,6 +175,12 @@ internal class FadeController {
      * false when no ranges remain animating (caller can suspend the loop).
      */
     fun tick(nowNanos: Long): Boolean {
+        // [T-android-reveal-monotonic] Drive the reveal clock alongside the fade
+        // so progress tracks what has actually been shown. The per-step budget
+        // is clamped inside RevealProgress.advance.
+        val elapsedSeconds = ((nowNanos - lastTickNanos) / 1_000_000_000.0).toFloat()
+        lastTickNanos = nowNanos
+        reveal.advance(elapsedSeconds)
         if (rangesState.isEmpty()) return false
         val finished = mutableListOf<Int>()
         for (i in rangesState.indices) {
@@ -174,6 +205,29 @@ internal class FadeController {
             alphas.remove(r.start)
         }
         return rangesState.isNotEmpty()
+    }
+
+    /**
+     * Drop the in-flight ranges that no longer fit [keepEnd], keeping every
+     * range whose text survived the update and rebuilding both parallel lists
+     * plus the alpha map in one pass. A partially-invalidated range is dropped
+     * whole: its characters stay on screen at full opacity (a forward-only
+     * change) rather than animating against stale offsets.
+     */
+    private fun pruneRangesBefore(keepEnd: Int) {
+        if (rangesState.isEmpty()) return
+        val survivorIndices = rangesState.indices.filter { rangesState[it].end <= keepEnd }
+        if (survivorIndices.size == rangesState.size) return
+        val survivors = survivorIndices.map { rangesState[it] }
+        val survivorStartNanos = survivorIndices.map { rangeStartNanos.elementAt(it) }
+        val survivorAlphaKeys = survivors.mapTo(HashSet()) { it.start }
+        rangesState.clear()
+        rangesState.addAll(survivors)
+        rangeStartNanos.clear()
+        rangeStartNanos.addAll(survivorStartNanos)
+        alphas.keys.toList().forEach { start ->
+            if (start !in survivorAlphaKeys) alphas.remove(start)
+        }
     }
 
     /**

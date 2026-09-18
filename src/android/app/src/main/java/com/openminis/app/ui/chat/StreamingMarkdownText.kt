@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.R
+import com.openminis.app.ui.markdown.StreamingMarkdownProjectionSession
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -579,17 +580,40 @@ private fun StreamingMarkdownTextBody(
     }
     // [T-android-inline-parse-offmain] Theme snapshot for off-main prewarm.
     val mdColors = currentMdColors()
+    // [T-android-streaming-projection] Parse a virtual-EOF projection while the
+    // stream is open so an unclosed fence / inline marker / table candidate
+    // keeps ONE node type instead of rendering as literal text and flipping to
+    // rich text when the closing characters land. Render-only: the projection
+    // is never written back to the message, and a finished stream bypasses it
+    // entirely (StreamingMarkdownProjectionResult.verifiedTerminalSource).
+    val projectionSession = remember { StreamingMarkdownProjectionSession() }
+    // [T-android-streaming-state] Parses go through Eta's conflated-target
+    // pipeline so an appended chunk never throws away the parse that is already
+    // running (see StreamingMarkdownTargets).
+    val parseTargets = remember { StreamingMarkdownTargets() }
     var blocks by remember { mutableStateOf<List<MdBlock>>(emptyList()) }
-    LaunchedEffect(displayContent) {
-        val computed = withContext(Dispatchers.Default) {
-            parseMarkdownBlocks(displayContent).also {
-                MarkdownParseCaches.prewarm(it, mdColors)
-            }
-        }
-        // If the LE was cancelled while parseMarkdownBlocks was still running
-        // (a newer chunk arrived), don't publish stale blocks.
-        coroutineContext.ensureActive()
-        blocks = computed
+    LaunchedEffect(parseTargets) {
+        consumeStreamingMarkdownTargets(
+            targets = parseTargets.receiveChannel,
+            parse = { target ->
+                withContext(Dispatchers.Default) {
+                    val projection = projectionSession
+                        .project(target.content, isComplete = !target.isStreaming)
+                    val parsed = parseMarkdownBlocks(projection.renderedSource)
+                    MarkdownParseCaches.prewarm(parsed, mdColors)
+                    StreamingMarkdownSnapshot(
+                        originalSource = projection.originalSource,
+                        renderedSource = projection.renderedSource,
+                        isComplete = projection.isComplete,
+                        payload = parsed,
+                    )
+                }
+            },
+            publish = { snapshot -> blocks = snapshot.payload },
+        )
+    }
+    LaunchedEffect(displayContent, isStreaming) {
+        parseTargets.submit(displayContent, isStreaming)
     }
 
     ShardSubIndexScope {
@@ -974,44 +998,66 @@ private fun MarkdownBlockBody(
     // caches with the exact keys RenderBlock will look up — main-thread
     // composition of the live block becomes a pure cache hit.
     val mdColors = currentMdColors()
+    // [T-android-streaming-projection] Virtual-EOF projection for the live tail
+    // (see StreamingMarkdownTextBody) — the frozen path above never uses it.
+    val projectionSession = remember { StreamingMarkdownProjectionSession() }
+    val parseTargets = remember { StreamingMarkdownTargets() }
     var blocks by remember { mutableStateOf<List<MdBlock>>(emptyList()) }
+    // [T-android-streaming-state] One consumer owns the parses; appended chunks
+    // are never dropped just because a newer target arrived.
+    LaunchedEffect(parseTargets) {
+        consumeStreamingMarkdownTargets(
+            targets = parseTargets.receiveChannel,
+            parse = { target ->
+                // [T-android-stream-render-profile] Time the whole off-main tick
+                // (block split + prewarm/incremental inline+math) — this is what
+                // the incremental optimization shrinks.
+                val parseStartNs = System.nanoTime()
+                val snapshot = withContext(Dispatchers.Default) {
+                    val projection = projectionSession.project(target.content, isComplete = false)
+                    val parsed = parseMarkdownBlocks(projection.renderedSource)
+                    // [T-android-streaming-incremental-inline] Prewarm the frozen
+                    // blocks (all but the last) normally. The last block is the
+                    // growing live tail: when it's a Paragraph, warm it
+                    // incrementally (closed prefix reused + tiny fresh suffix) so
+                    // the main-thread RenderBlock resolves to an exact HIT without
+                    // re-scanning the whole accumulated paragraph; when it's a
+                    // table/list/etc. (which RenderBlock parses non-incrementally)
+                    // fall back to the normal per-block prewarm for it.
+                    if (parsed.size > 1) MarkdownParseCaches.prewarm(parsed.dropLast(1), mdColors)
+                    if (parsed.lastOrNull() is MdBlock.Paragraph) {
+                        MarkdownParseCaches.prewarmLiveTail(parsed, mdColors)
+                    } else {
+                        parsed.lastOrNull()?.let { last -> MarkdownParseCaches.prewarm(listOf(last), mdColors) }
+                    }
+                    // [T-android-review-p1-fixes] F2(a): deposit the live parse
+                    // into the blocks cache so the freeze edge (isStreaming →
+                    // false recomposes into the frozen branch with this exact
+                    // text) HITs synchronously — no plain-text preview flash, no
+                    // off-main re-parse. Only for segments big enough to take
+                    // the off-main MISS path at freeze; small ones parse sub-ms
+                    // synchronously anyway, and skipping them keeps live ticks
+                    // from churning the LRU. [T-android-streaming-projection] And
+                    // only when the projection added nothing virtual: the frozen
+                    // branch looks this entry up by the RAW fragment text.
+                    if (projection.isIdentity && target.content.length > COLD_PARSE_OFFMAIN_THRESHOLD_CHARS) {
+                        MarkdownParseCaches.putBlocks(target.content, parsed)
+                    }
+                    StreamingMarkdownSnapshot(
+                        originalSource = projection.originalSource,
+                        renderedSource = projection.renderedSource,
+                        isComplete = projection.isComplete,
+                        payload = parsed,
+                    )
+                }
+                StreamRenderProfiler.recordParse(target.content.length, (System.nanoTime() - parseStartNs) / 1_000_000.0)
+                snapshot
+            },
+            publish = { snapshot -> blocks = snapshot.payload },
+        )
+    }
     LaunchedEffect(displayContent) {
-        // [T-android-stream-render-profile] Time the whole off-main tick
-        // (block split + prewarm/incremental inline+math) — this is what the
-        // incremental optimization shrinks.
-        val parseStartNs = System.nanoTime()
-        val computed = withContext(Dispatchers.Default) {
-            parseMarkdownBlocks(displayContent).also {
-                // [T-android-streaming-incremental-inline] Prewarm the frozen
-                // blocks (all but the last) normally. The last block is the
-                // growing live tail: when it's a Paragraph, warm it
-                // incrementally (closed prefix reused + tiny fresh suffix) so
-                // the main-thread RenderBlock resolves to an exact HIT without
-                // re-scanning the whole accumulated paragraph; when it's a
-                // table/list/etc. (which RenderBlock parses non-incrementally)
-                // fall back to the normal per-block prewarm for it.
-                if (it.size > 1) MarkdownParseCaches.prewarm(it.dropLast(1), mdColors)
-                if (it.lastOrNull() is MdBlock.Paragraph) {
-                    MarkdownParseCaches.prewarmLiveTail(it, mdColors)
-                } else {
-                    it.lastOrNull()?.let { last -> MarkdownParseCaches.prewarm(listOf(last), mdColors) }
-                }
-                // [T-android-review-p1-fixes] F2(a): deposit the live parse
-                // into the blocks cache so the freeze edge (isStreaming →
-                // false recomposes into the frozen branch with this exact
-                // text) HITs synchronously — no plain-text preview flash, no
-                // off-main re-parse. Only for segments big enough to take
-                // the off-main MISS path at freeze; small ones parse sub-ms
-                // synchronously anyway, and skipping them keeps live ticks
-                // from churning the LRU.
-                if (displayContent.length > COLD_PARSE_OFFMAIN_THRESHOLD_CHARS) {
-                    MarkdownParseCaches.putBlocks(displayContent, it)
-                }
-            }
-        }
-        coroutineContext.ensureActive()
-        StreamRenderProfiler.recordParse(displayContent.length, (System.nanoTime() - parseStartNs) / 1_000_000.0)
-        blocks = computed
+        parseTargets.submit(displayContent, isStreaming = true)
     }
     // [T-android-stream-grow-anim] No height/scroll animation here. We tried
     // animateContentSize to ease the bottom-pinned item's exposed height into a
