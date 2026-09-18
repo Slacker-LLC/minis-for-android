@@ -763,7 +763,37 @@
 | 终端入口缺失（真机发现） | 手机上**没有任何办法打开终端**：设置页只声明了 `onTerminalClick` 而没渲染对应的行，会话菜单没有该项，`minis://terminal` 深链也没有任何流程会产生——于是能启动 Linux 运行时的只剩「agent 调用需要它的工具」，而没配 provider 的用户走不到。已在 `AGENT 运行时` 分区顶部补上「Minis Shell」一行（副标题 8 语言），装到手机后入口出现（`9e9c0d93`） |
 | 运行时实跑证据 | 点该行后终端打开并且 **guest 真的起来了**：提示符 `minis@localhost:/$`，在终端里执行 `id` → `uid=10186(minis) gid=10186(minis) groups=10186(minis)`（**App 真实 UID、supplementary groups 已清空**，与合同一致），`uname -a` → `Linux localhost 6.6.118-android15-… aarch64`（chroot 共享宿主内核），PTY 桥 `libpty_bridge.so` 装载 |
 | 一处诚实的边界 | 这次启动用的是设备上**已存在的共享 runtime state**：`/data/adb/minis/rootfs` 601 MB、时间戳 2026-09-09/13（另一款安装早先 provision 的），不是本次 APK 内 payload 现场解包的产物。按合同该目录就是 Root-owned、可替换的运行时状态，所以复用是设计行为；**本 APK 的 payload 解包路径尚未单独验证**（需要把该目录挪开再启动，会动到另一款应用的运行时状态，故留待你确认后做） |
-| 剩余待测 | 请求链路（新装实例还没有 provider 配置）；release 签名包（需要 `RELEASE_*`）；payload 解包路径（见上） |
+### 真机逐页扫描（2026-09-19，同一台手机）
+
+用 uiautomator 逐行点开设置里的每个入口，每次点击后重抓界面文本并检查 **crash 缓冲**：
+
+| 入口 | 打开后看到 | 崩溃 |
+|---|---|---|
+| 管理提供商 | 「未配置 AI 服务商」（诚实的空状态） | 无 |
+| 模型组 | 「暂无模型分组」 | 无 |
+| Token 用量 | 「总用量」 | 无 |
+| 桌面宠物 | 「还没有选择宠物」 | 无 |
+| 技能 | Search skills | 无 |
+| Characters | Characters | 无 |
+| 人格 | 「预览」 | 无 |
+| 系统提示词 | 「自定义系统提示词」 | 无 |
+| 记忆 | 「默认」 | 无 |
+| MCP 集成 | 「EXPOSE MINIS」 | 无 |
+| 子代理委派限制 | 自身页面 | 无 |
+| 模块设置 | 「手势」 | 无 |
+| 系统增强 | 「状态」 | 无 |
+| 日志 | 「权限」 | 无 |
+| 存储 | 自身页面 | 无 |
+| 共享文件夹 | 「共享」 | 无 |
+| 挂载外部文件夹 | 「未授予『所有文件访问权限』」——缺权限时如实说明，而不是装作能用 | 无 |
+| 关于 Minis | 「Minis for Android」 | 无 |
+| Minis Shell（本轮新增入口） | 终端 + guest 运行时（见上一节） | 无 |
+
+**crash 缓冲在整个扫描过程中保持为空**（每轮开始都单独清 `-b crash`，第一轮那批「CRASH」是清缓冲方式不对造成的误报，已修正后重跑）。本轮未点到的还剩「备份与恢复」「权限」两项（滚动预算用尽），下一轮补。
+
+**共享 rootfs 复用的结论（读代码得出，不是猜）**：`RootfsManager.checkHealth`/`evaluateProbeOutput`/`validateMetadata` 判定「健康」的条件是**布局完整 + 元数据兼容**（distro=ubuntu、24.04.x、arch=arm64、profile=base、`upstream_sha256` 是合法 64 位十六进制），并要求 `bin/sh` 或 `bin/bash` 可执行；它**不要求**该 rootfs 与当前 APK 的 payload 逐字节相同。也就是说：别的安装（或别的 App）早先 provision 出来的 rootfs 只要兼容就会被复用，这正符合合同里「`/data/adb/minis/rootfs` 是 Root-owned、可替换的 runtime state」。payload 解包路径因此不是「没生效」，而是「本轮没被触发」。
+
+| 剩余待测 | 请求链路（新装实例还没有 provider 配置）；release 签名包（需要 `RELEASE_*`）；payload 解包路径（需要把共享 rootfs 挪开，会动到另一款应用的运行时状态，等你确认）；设置里最后两页（备份与恢复 / 权限） |
 
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
