@@ -756,7 +756,14 @@
 | runtime payload | 此前 APK **没有** `assets/minis-runtime/…`（`dist/` 为空），Linux 运行时起不来。已跑 `scripts/build-runtime-payload.sh`：Ubuntu Base **24.04.3**（上游 sha256 与仓库 pin 双向校验）→ 叠加 minis 目录布局 → 确定性打包，产物 `dist/ubuntu-arm64-rootfs.tar.gz` **28 902 272 字节**，`verify-runtime-payload.sh dist` 通过；另跑 `scripts/build-root-network-proxy-android.sh` 补回代理 payload（NDK 28.2.13676358 / aarch64-linux-android / API 26） |
 | 完整 APK | `:app:assembleDebug` 后 `app-debug.apk` = **115 219 575 字节（109.9 MiB）**，内含 `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz`（内嵌 sha256 与 manifest 一致）、25 个 native 库全部 16 KB 对齐（`verify-android-16k.sh`）、`verify-runtime-payload.sh <apk>` 通过；真机 `adb install -r -t` **Success**、启动无崩溃 |
 | 模拟器对照 | API 36（x86_64）模拟器同一 APK 安装/启动/设置页/系统增强页均正常；**升级与全新安装两条路径现在都有证据** |
-| 尚未跑的核心流程 | **guest 运行时在设备上的首次启动**（解包 rootfs 到 `/data/adb/minis/rootfs` + 设备端 apt 安装 python3/git/curl/ping）——这是下一步要测的；另有请求链路需要在本应用里配置 provider（新装实例没有配置，手机上的另一款应用有） |
+### guest 运行时在真机上跑通（2026-09-19）
+
+| 项 | 结果 |
+|---|---|
+| 终端入口缺失（真机发现） | 手机上**没有任何办法打开终端**：设置页只声明了 `onTerminalClick` 而没渲染对应的行，会话菜单没有该项，`minis://terminal` 深链也没有任何流程会产生——于是能启动 Linux 运行时的只剩「agent 调用需要它的工具」，而没配 provider 的用户走不到。已在 `AGENT 运行时` 分区顶部补上「Minis Shell」一行（副标题 8 语言），装到手机后入口出现（`9e9c0d93`） |
+| 运行时实跑证据 | 点该行后终端打开并且 **guest 真的起来了**：提示符 `minis@localhost:/$`，在终端里执行 `id` → `uid=10186(minis) gid=10186(minis) groups=10186(minis)`（**App 真实 UID、supplementary groups 已清空**，与合同一致），`uname -a` → `Linux localhost 6.6.118-android15-… aarch64`（chroot 共享宿主内核），PTY 桥 `libpty_bridge.so` 装载 |
+| 一处诚实的边界 | 这次启动用的是设备上**已存在的共享 runtime state**：`/data/adb/minis/rootfs` 601 MB、时间戳 2026-09-09/13（另一款安装早先 provision 的），不是本次 APK 内 payload 现场解包的产物。按合同该目录就是 Root-owned、可替换的运行时状态，所以复用是设计行为；**本 APK 的 payload 解包路径尚未单独验证**（需要把该目录挪开再启动，会动到另一款应用的运行时状态，故留待你确认后做） |
+| 剩余待测 | 请求链路（新装实例还没有 provider 配置）；release 签名包（需要 `RELEASE_*`）；payload 解包路径（见上） |
 
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
