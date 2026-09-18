@@ -930,6 +930,18 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机 CRUD | create / list / disable / enable / delete / 未知 id（`no task with id=…`, rc=1）/ `run --id`（`{"ran":false,"error":"no_provider",…}`, rc=1）逐条走通；测完删掉测试任务，设备恢复原状 |
 | 验证口径 | `:app:testDebugUnitTest` **2400 例 0 失败**（新增 `ScheduledAlarmPrecisionTest` 2 例：exact 无提示、inexact 有提示——设备只能演示其中一种）+ `:app:lintDebug` 0 error + `:app:assembleDebug`；同一 APK 在 API 36 模拟器安装启动、焦点正常、crash 缓冲为空 |
 
+### 浏览器 `execute_js` 与 `pageInfo.viewport`：表达式取值 + 语法错误立刻报（2026-09-19，真机前后对照） — `312e6ca9`
+
+| 项 | 结果 |
+|---|---|
+| 现象（真机三连） | 旧版对着 example.com：`document.title` → `"undefined"`；`return document.title` → `"Example Domain"`；`var = ;` → 等满 **30 秒**才回 `JavaScript execution timed out (30s)`；`debug.browser.pageInfo.viewport` 永远是全零 + `readyState:""` |
+| 同一个根因 | 包装器把脚本当**函数体**执行：裸表达式是「没有 return 的语句」，值被丢掉；而**编译不过**的脚本根本到不了桥，于是只剩超时这一种说法。viewport 全零也是同一个根因——它的探针 `JSON.stringify({…})` 正是一个表达式 |
+| 修法 | `executeJS` 先跑**表达式形式**（`BrowserUseJS.bridgedExpression`），不编译再退回文档承诺的函数体形式（`bridgedBody`），两者都不编译就立刻报语法错误。**不会重复执行**：Chromium 对编译失败通过求值回调返回 `null`（编译成功的 async IIFE 返回它的 promise），`runBridged` 正是拿这个当编译信号 |
+| 顺带清掉的重复轮子 | `readViewport` 不再去解析给人看的动作文本（那正是永远解析失败的原因），改走 manager 新增的 `evaluateExpressionRaw` 直接拿页面自己的 JSON |
+| 真机复验（同一台、同一页） | `document.title` → `Example Domain`；`return document.title` → `Example Domain`；`await fetch(…) + return` → `200`；`var = ;` → **立即**返回 `execute_js script did not compile — check its syntax (the WebView refused it before running anything).`；`pageInfo.viewport` → `{pageWidth 412, pageHeight 914, viewportWidth 412, viewportHeight 914, readyState "complete"}` |
+| 验证口径 | `:app:testDebugUnitTest` **2403 例 0 失败**（新增 `BrowserUseJsWrapperTest` 3 例，把两种包装的形状钉住，防止表达式形式被悄悄改回函数体）+ `:app:lintDebug` 0 error + `:app:assembleDebug` + `verify-runtime-payload.sh` / `verify-android-16k.sh`；同一 APK 在 API 36 模拟器安装启动、`debug.browser.listTabs` 返回 `{"tabs":[]}`、crash 缓冲为空 |
+| 工具面同步 | `browser_use` 与 guest CLI 的 `script` 参数说明改为「单个表达式会返回其值；函数体支持 `await` 与顶层 `return`，没有 `return` 的函数体返回 `undefined`」，CLI 帮助加了一条表达式示例 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
