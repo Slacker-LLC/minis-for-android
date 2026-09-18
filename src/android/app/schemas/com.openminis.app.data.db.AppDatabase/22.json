@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 22,
-    "identityHash": "8ab8a11f432e9c3c3fe63e2b09177772",
+    "identityHash": "f827a661e72dcc535735beed70f6f416",
     "entities": [
       {
         "tableName": "sessions",
@@ -1195,14 +1195,24 @@
             "id"
           ]
         },
-        "indices": [],
+        "indices": [
+          {
+            "name": "index_characters_updated_at",
+            "unique": false,
+            "columnNames": [
+              "updated_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_characters_updated_at` ON `${TABLE_NAME}` (`updated_at`)"
+          }
+        ],
         "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8ab8a11f432e9c3c3fe63e2b09177772')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f827a661e72dcc535735beed70f6f416')"
     ]
   }
 }
