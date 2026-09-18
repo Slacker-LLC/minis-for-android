@@ -409,4 +409,39 @@ internal object BrowserDomScripts {
           })()
         };
         """.trimIndent())
+
+    /**
+     * [T-browser-element-rows-android] Upstream's `findElements`: every row is
+     * `describe()` of a live element, so it carries the selector that was verified
+     * to match exactly one node, the accessibility fields, and the box in viewport
+     * pixels — a follow-up click can name the element instead of guessing it from
+     * the text it happens to show.
+     *
+     * Omitting the selector is not an error: upstream's default list is the page's
+     * interactive elements, which is what "show me what I can touch here" means.
+     * The scan stops at 3000 matches, 16 rows or 500 ms, and says so.
+     */
+    fun findElements(selector: String?): String {
+        val selectorLiteral = org.json.JSONObject.quote(
+            selector ?: "a,button,input,textarea,select,[role=\"button\"],[role=\"link\"],[contenteditable=\"true\"],[tabindex]",
+        )
+        return wrap("""
+        var selector = $selectorLiteral;
+        var matches = document.querySelectorAll(selector);
+        var elements = [];
+        var scanned = 0;
+        var deadline = Date.now() + 500;
+        for (var index = 0; index < matches.length && index < 3000 && elements.length < 16 && Date.now() <= deadline; index++) {
+          scanned++;
+          elements.push(describe(matches[index], deadline));
+        }
+        return {
+          selector_used: selector,
+          element_count: elements.length,
+          scanned_elements: scanned,
+          truncated: scanned < matches.length,
+          elements: elements
+        };
+        """.trimIndent())
+    }
 }

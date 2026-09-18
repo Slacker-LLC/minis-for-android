@@ -101,4 +101,32 @@ class BrowserDomScriptsTest {
         assertTrue(wrapped.contains("return { marker: 1 };"))
         assertTrue(wrapped.indexOf("function visible(element)") < wrapped.indexOf("return { marker: 1 };"))
     }
+
+    @Test
+    fun `find_elements without a selector falls back to the interactive list`() {
+        val script = BrowserDomScripts.findElements(null)
+
+        assertTrue(script.contains("var selector = \"a,button,input,textarea,select,[role="))
+        assertTrue(script.contains("contenteditable="))
+        assertTrue(script.contains("[tabindex]"))
+    }
+
+    @Test
+    fun `find_elements quotes the caller's selector instead of pasting it`() {
+        val script = BrowserDomScripts.findElements("a[href=\"x\"]")
+
+        assertTrue(script.contains("var selector = \"a[href=\\\"x\\\"]\";"))
+        assertFalse(script.contains("document.querySelectorAll('a"))
+    }
+
+    @Test
+    fun `find_elements describes each row and admits when it stopped early`() {
+        val script = BrowserDomScripts.findElements("button")
+
+        assertTrue(script.contains("elements.push(describe(matches[index], deadline));"))
+        assertTrue(script.contains("index < 3000 && elements.length < 16 && Date.now() <= deadline"))
+        assertTrue(script.contains("deadline = Date.now() + 500"))
+        listOf("selector_used", "element_count", "scanned_elements", "truncated", "elements")
+            .forEach { key -> assertTrue("missing $key", script.contains("$key:")) }
+    }
 }

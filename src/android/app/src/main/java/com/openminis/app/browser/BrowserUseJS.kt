@@ -234,30 +234,6 @@ object BrowserUseJS {
         })()
     """.trimIndent()
 
-    // -- Find Elements --
-
-    fun findElements(selector: String): String = """
-        (function() {
-            var els = document.querySelectorAll('${jsQuote(selector)}');
-            var results = [];
-            var limit = Math.min(els.length, 20);
-            var scrollX = window.scrollX || window.pageXOffset || 0;
-            var scrollY = window.scrollY || window.pageYOffset || 0;
-            for (var i = 0; i < limit; i++) {
-                var el = els[i];
-                var rect = el.getBoundingClientRect();
-                results.push({
-                    index: i, tag: el.tagName, id: el.id || null,
-                    className: el.className || null,
-                    text: (el.innerText || '').substring(0, 80),
-                    href: el.href || null,
-                    rect: {x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height), pageX: Math.round(rect.x + scrollX), pageY: Math.round(rect.y + scrollY), visible: rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0}
-                });
-            }
-            return JSON.stringify({count: els.length, shown: limit, elements: results});
-        })()
-    """.trimIndent()
-
     // -- Get Page Info --
 
     fun getPageInfo(): String = """

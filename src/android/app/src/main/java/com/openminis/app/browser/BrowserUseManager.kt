@@ -1037,8 +1037,10 @@ class BrowserUseManager(
     // -- Find Elements --
 
     private suspend fun findElements(selector: String?): BrowserActionResult {
-        if (selector == null) return BrowserActionResult.error("find_elements requires 'selector'")
-        return evaluateAndReturn(BrowserUseJS.findElements(selector))
+        // [T-browser-element-rows-android] A missing selector stopped being an error:
+        // the ported script falls back to upstream's interactive-element list, which
+        // is what "show me what this page lets me touch" means.
+        return evaluateAndReturn(BrowserDomScripts.findElements(selector))
     }
 
     // -- Hover --
@@ -1444,29 +1446,11 @@ class BrowserUseManager(
                 }
                 append(text)
             }
-            json.has("count") && json.has("elements") -> {
-                val count = json.optInt("count")
-                val elements = json.optJSONArray("elements")
-                // The payload limiter drops trailing rows; print the rows that are
-                // actually here, not the page-side count the envelope started with.
-                appendLine("Found $count element(s) (showing ${elements?.length() ?: 0}):")
-                if (elements != null) {
-                    for (i in 0 until elements.length()) {
-                        val el = elements.getJSONObject(i)
-                        val idx = el.optInt("index")
-                        val tag = el.optString("tag", "?")
-                        val text = el.optString("text", "").take(80)
-                        val line = buildString {
-                            append("  [$idx] <$tag>")
-                            val id = el.optString("id", "")
-                            if (id.isNotEmpty()) append(" #$id")
-                            if (text.isNotEmpty()) append(" \"$text\"")
-                            val href = el.optString("href", "")
-                            if (href.isNotEmpty()) append(" -> $href")
-                        }
-                        appendLine(line)
-                    }
-                }
+            json.has("elements") -> {
+                // [T-browser-element-rows-android] One row per element plus its
+                // selector / accessibility fields / box; the payload limiter drops
+                // trailing rows, and the formatter prints what is actually here.
+                append(BrowserElementListFormatter.format(json))
             }
             else -> {
                 // Fallback: format each key-value pair

@@ -43,7 +43,7 @@ object BrowserUseTool {
 
         properties.put("selector", JSONObject().apply {
             put("type", "string")
-            put("description", "CSS selector for element interaction (click/type/hover/find_elements/get_text/scroll)")
+            put("description", "CSS selector for element interaction (click/type/hover/find_elements/get_text/scroll). Optional for find_elements: omit it to list the page's interactive elements. Each result row carries a verified unique selector, so a follow-up click can name the element instead of guessing from its text.")
         })
 
         properties.put("text", JSONObject().apply {
