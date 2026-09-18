@@ -2,17 +2,20 @@ package com.openminis.app.tools.android
 
 import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
+import android.os.PersistableBundle
 import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.accessibility.GatedCallOutcome
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.accessibility.PackageWindowVisibility
+import com.openminis.app.accessibility.ClipboardRestorePolicy
 import com.openminis.app.accessibility.TextEditPlanner
 import com.openminis.app.data.ContextOffload
 import com.openminis.app.offload.OffloadPermissionManager
@@ -79,7 +82,8 @@ object AndroidUiController {
                 "click" -> click(service, args, longPress = false)
                 "long_press" -> click(service, args, longPress = true)
                 "set_text" -> setText(context, service, args)
-                "input_text" -> inputText(service, args)
+                "input_text" -> insertText(context, service, args, allowClipboardFallback = false)
+                "paste_text" -> insertText(context, service, args, allowClipboardFallback = true)
                 "scroll" -> scroll(service, args)
                 // [T-eta-ui-system-panel] back/home plus the system panels the guest
                 // android-a11y-cli already drives and Eta exposes as open_system_panel.
@@ -306,21 +310,11 @@ object AndroidUiController {
         var method = "ACTION_SET_TEXT"
         var ok = service.setNodeText(resolved.node, text)
         if (!ok) {
-            // Safe Unicode fallback: focus + ACTION_PASTE, restoring the user's
-            // previous clipboard without exposing its content to the model.
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            if (clipboard != null) {
-                val previous = runCatching { clipboard.primaryClip }.getOrNull()
-                try {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Minis Android input", text))
-                    resolved.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                    ok = resolved.node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-                    method = "CLIPBOARD_ACTION_PASTE"
-                } finally {
-                    if (previous != null) clipboard.setPrimaryClip(previous)
-                    else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) clipboard.clearPrimaryClip()
-                    else clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                }
+            // Safe Unicode fallback: focus + ACTION_PASTE. pasteViaClipboard borrows the clipboard
+            // and hands it back, with the text marked sensitive while it is there.
+            if (pasteViaClipboard(context, resolved.node, text)) {
+                ok = true
+                method = "CLIPBOARD_ACTION_PASTE"
             }
         }
         // Ported from Eta `setNodeText` (agent/accessibility/AgentAccessibilityService.kt @
@@ -344,7 +338,12 @@ object AndroidUiController {
      * usable cursor, is refused with the reason and the caller is told to send the full value with
      * set_text. Reconstructing a value we cannot read would silently overwrite what the user typed.
      */
-    private fun inputText(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+    private fun insertText(
+        context: Context,
+        service: MinisAccessibilityService,
+        args: JSONObject,
+        allowClipboardFallback: Boolean,
+    ): UiToolResult {
         val resolved = resolveRef(args)
         if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
         resolved as UiRefResolution.Found
@@ -368,25 +367,75 @@ object AndroidUiController {
             "TEXT_SELECTION_UNAVAILABLE",
             "the field reports no usable cursor or selection; send the full value with set_text",
         )
-        val ok = service.setNodeText(resolved.node, plan.text, plan.cursor)
+        var ok = service.setNodeText(resolved.node, plan.text, plan.cursor)
+        var inputMethod = "ACTION_SET_TEXT_AND_SELECTION"
+        if (!ok && allowClipboardFallback) {
+            // Eta's paste_text: the selection-aware write first, and the clipboard only for an
+            // editor that refuses it outright - which is the only road into some input boxes.
+            ok = pasteViaClipboard(context, resolved.node, plan.text)
+            inputMethod = if (ok) "ACTION_PASTE" else "ACTION_PASTE_REFUSED"
+        }
         val verified = if (ok) service.verifyNodeText(resolved.node, plan.text) else null
         val report = AndroidUiActionEvidence.ofTextInput(ok, verified)
         val selectionPlaced = ok && service.placeCursor(resolved.node, plan.cursor)
         return UiToolResult(
             report.into(
-                JSONObject().put("action", "input_text")
+                JSONObject().put("action", if (allowClipboardFallback) "paste_text" else "input_text")
                     .put("generation", resolved.locator.generation).put("ref", resolved.locator.ref)
                     .put("success", ok).put("verified", verified ?: JSONObject.NULL)
                     .put("insertedAt", plan.cursor - inserted.length)
                     .put("resultingLength", plan.text.length)
-                    .put(
-                        "inputMethod",
-                        if (selectionPlaced) "ACTION_SET_TEXT_AND_SELECTION" else "ACTION_SET_TEXT",
-                    ),
+                    .put("inputMethod", if (selectionPlaced) inputMethod else "ACTION_SET_TEXT"),
             ),
             ok,
         )
     }
+
+    /**
+     * [T-eta-text-insert] Borrows the clipboard for one paste and hands it back. Ported from Eta
+     * `pasteText` / `restoreClipboardIfStillOwned` (agent/accessibility/AgentAccessibilityService.kt
+     * @ c15de97): the temporary clip is marked sensitive so the text is not shown in previews or
+     * read by anything else, and the previous clip is restored only while the clipboard still holds
+     * our own clip - a user who copied something else meanwhile must not have it overwritten.
+     */
+    private fun pasteViaClipboard(
+        context: Context,
+        node: AccessibilityNodeInfo,
+        text: String,
+    ): Boolean {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            ?: return false
+        val previous = runCatching { clipboard.primaryClip }.getOrNull()
+        val label = ClipboardRestorePolicy.temporaryLabel(pasteSequence.incrementAndGet())
+        val temporary = ClipData.newPlainText(label, text).apply {
+            description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        if (!runCatching { clipboard.setPrimaryClip(temporary) }.isSuccess) return false
+        return try {
+            node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        } finally {
+            val current = runCatching {
+                clipboard.primaryClip?.description?.label?.toString()
+            }.getOrNull()
+            if (ClipboardRestorePolicy.shouldRestore(current, label)) {
+                runCatching {
+                    if (previous != null) {
+                        clipboard.setPrimaryClip(previous)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        clipboard.clearPrimaryClip()
+                    } else {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                    }
+                }
+            }
+        }
+    }
+
+    /** One number per temporary clip, so a restore can tell its own clip from the user's. */
+    private val pasteSequence = java.util.concurrent.atomic.AtomicLong()
 
     private suspend fun scroll(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
         if (args.optString("ref", "").isNotBlank()) {

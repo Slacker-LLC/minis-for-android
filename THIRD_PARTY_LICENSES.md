@@ -113,6 +113,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `provider/HostedWebSearchPolicy.kt`, the `hostedWebSearch` field in `data/model/LLMModel.kt` / `data/model/ProviderConfig.kt` and its toggle in `ui/settings/ModelEntryDetailScreen.kt` | `agent/model/ResponsesRequestBuilder.kt` and the `hosted_web_search_enabled` column behind it |
 | `provider/HostedCallEventPolicy.kt`, `LLMStreamChunk.HostedToolActivity` and the row it appends in `ui/chat/ChatViewModel.kt` | `agent/model/OpenAiResponsesProvider.kt` (the hosted-call events, the `hostedTools` map and `ProviderEvent.HostedTool*`) |
 | `accessibility/TextEditPlanner.kt`, the cursor-aware `setNodeText` / `placeCursor` in `accessibility/MinisAccessibilityService.kt` and the `input_text` action in `tools/android/AndroidUiController.kt` | `agent/accessibility/TextEditPlanner.kt` and `inputTextFocused` / `setNodeText(node, text, cursor)` in `agent/accessibility/AgentAccessibilityService.kt` |
+| `accessibility/ClipboardRestorePolicy.kt`, the shared clipboard borrow and the `paste_text` action in `tools/android/AndroidUiController.kt` | `pasteText` / `restoreClipboardIfStillOwned` in `agent/accessibility/AgentAccessibilityService.kt` |
 
 
 ## Active native/runtime components
