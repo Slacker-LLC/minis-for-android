@@ -63,6 +63,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/ImageSourcePolicy.kt`, `tools/ReadImageTool.kt` (image source classification incl. gallery URIs) | `agent/model/AgentFileVisionToolCatalog.kt` |
 | `tools/skills/SkillToolPolicy.kt`, `tools/skills/SkillTools.kt` (skill listing, SKILL.md and resource reads), `tools/skills/SkillSourcePolicy.kt` and the GitHub inspect/install additions in `data/repository/SkillRepository.kt` | `agent/model/AgentSkillToolCatalog.kt` and the discovery/install path behind it |
 | `tools/android/UiGlobalActions.kt`, `tools/android/AndroidUiController.kt` (system panel actions) | `agent/device/RootShellDeviceController.kt` (`openSystemPanel`), `agent/model/AgentDeviceToolCatalog.kt` |
+| `tools/android/AppSearchPolicy.kt`, `tools/android/PackageWaitPolicy.kt`, the `search` action in `tools/android/AndroidPackageController.kt` and `wait_for_package` in `tools/android/AndroidUiController.kt` | `agent/model/AgentDeviceToolCatalog.kt` + `agent/tool/AgentLocalTools.kt` (`search_apps`, `wait_for_package`) |
 
 
 ## Active native/runtime components

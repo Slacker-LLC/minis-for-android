@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -18,6 +20,55 @@ object AndroidPackageController {
         require(packagePattern.matches(packageName)) { "invalid Android package name: $value" }
         return packageName
     }
+
+    /**
+     * [T-eta-app-search] Search the launcher activities Android lets this app see — the
+     * `search_apps` capability Eta ships (Mangi-11/Eta @ c15de97). Scope is honest: the
+     * manifest declares only the MAIN/LAUNCHER query, so non-launcher and hidden packages
+     * stay invisible here and need an authorized `pm` query instead.
+     */
+    suspend fun search(context: Context, query: String?, limitRaw: Int?): JSONObject =
+        withContext(Dispatchers.IO) {
+            val limit = AppSearchPolicy.clampLimit(limitRaw)
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            val resolved = runCatching {
+                context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            }.getOrDefault(emptyList())
+            val entries = resolved.map { info ->
+                val packageName = info.activityInfo.packageName
+                AppSearchPolicy.Entry(
+                    packageName = packageName,
+                    label = runCatching { info.loadLabel(context.packageManager).toString() }
+                        .getOrDefault("")
+                        .ifBlank { packageName },
+                    activity = info.activityInfo.name,
+                )
+            }.distinctBy { it.packageName to it.activity }
+            val ranked = AppSearchPolicy.rank(entries, query, limit)
+            JSONObject()
+                .put("query", query ?: JSONObject.NULL)
+                .put("visibleLaunchers", entries.size)
+                .put("returned", ranked.size)
+                .put("limit", limit)
+                .put(
+                    "apps",
+                    JSONArray().also { array ->
+                        ranked.forEach { entry ->
+                            array.put(
+                                JSONObject()
+                                    .put("package", entry.packageName)
+                                    .put("label", entry.label)
+                                    .put("activity", entry.activity),
+                            )
+                        }
+                    },
+                )
+                .put(
+                    "scope",
+                    "Android 11+ package visibility: only launcher activities visible to this app " +
+                        "are listed; other packages need an authorized Root/Shizuku pm query",
+                )
+        }
 
     suspend fun info(context: Context, sessionId: String, rawPackage: String): JSONObject {
         val packageName = requirePackageName(rawPackage)

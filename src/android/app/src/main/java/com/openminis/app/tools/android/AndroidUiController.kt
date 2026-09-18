@@ -39,6 +39,9 @@ object AndroidUiController {
 
     private const val SCROLL_GESTURE_DURATION_MS = 300L
 
+    /** [T-eta-wait-for-package] Poll cadence for a foreground-package wait. */
+    private const val PACKAGE_WAIT_POLL_MS = 150L
+
     private val legacyBackwardDirections = setOf("backward", "up", "left")
 
     private val verticalScrollActionIds = setOf(
@@ -84,6 +87,7 @@ object AndroidUiController {
                     global(service, platformGlobalAction(requested), requested.wireName)
                 }
                 "wait" -> waitFor(service, args)
+                "wait_for_package" -> waitForPackage(service, args)
                 else -> error("INVALID_ACTION", "unknown android_ui action: $action")
             }
         }
@@ -576,6 +580,54 @@ object AndroidUiController {
             node.contentDescription?.toString()?.contains(needle, true) == true) return true
         for (index in 0 until node.childCount) if (containsText(node.getChild(index), needle, depth + 1, maxDepth)) return true
         return false
+    }
+
+    /**
+     * [T-eta-wait-for-package] Wait until the foreground package is (or is no longer) the
+     * target — Eta's `wait_for_package` (Mangi-11/Eta @ c15de97) on this app's window
+     * semantics: an unreadable foreground never counts as a match, and a timeout reports
+     * that the visibility was unknown instead of claiming the target never appeared.
+     */
+    private suspend fun waitForPackage(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+        val target = args.optString("packageName", "").trim()
+        if (target.isEmpty()) return error("INVALID_ARGS", "wait_for_package requires packageName")
+        val mode = PackageWaitPolicy.Mode.parse(args.optString("mode", null))
+        val timeout = args.optLong("timeoutMs", 5_000L).coerceIn(0L, 60_000L)
+        val started = System.currentTimeMillis()
+        var observed: String? = null
+        var visibility = PackageWindowVisibility.UNKNOWN
+        do {
+            val window = service.foregroundWindow()
+            observed = window.packageName
+            visibility = window.visibility
+            val decision = PackageWaitPolicy.decide(
+                target = target,
+                mode = mode,
+                observation = PackageWaitPolicy.Observation(
+                    packageName = window.packageName,
+                    visible = window.visibility == PackageWindowVisibility.VISIBLE,
+                ),
+            )
+            if (decision == PackageWaitPolicy.Decision.MATCHED) {
+                return UiToolResult(
+                    JSONObject().put("action", "wait_for_package").put("packageName", target)
+                        .put("mode", mode.wire).put("matched", true)
+                        .put("observedPackage", window.packageName ?: JSONObject.NULL)
+                        .put("waitedMs", System.currentTimeMillis() - started),
+                    true,
+                )
+            }
+            delay(PACKAGE_WAIT_POLL_MS)
+        } while (System.currentTimeMillis() - started < timeout)
+        return UiToolResult(
+            JSONObject().put("action", "wait_for_package").put("packageName", target)
+                .put("mode", mode.wire).put("matched", false).put("timedOut", true)
+                .put("observedPackage", observed ?: JSONObject.NULL)
+                .put("observedVisibility", visibility.name)
+                .put("visibilityUnknown", visibility != PackageWindowVisibility.VISIBLE)
+                .put("waitedMs", System.currentTimeMillis() - started),
+            true,
+        )
     }
 
     private fun resolveRef(args: JSONObject): UiRefResolution {

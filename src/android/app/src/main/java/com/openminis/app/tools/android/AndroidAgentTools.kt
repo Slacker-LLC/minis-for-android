@@ -34,9 +34,15 @@ object AndroidAgentTools {
         AgentToolDefinition(
             name = APP,
             description = "Inspect and control an Android package with PackageManager/ActivityManager first and authorized Root or Shizuku only where shell privilege is required. " +
-                "Actions: info, launch, stop, restart, install, uninstall. Android 11 package visibility is reported honestly. Install/uninstall require one-time approval and never assume QUERY_ALL_PACKAGES.",
+                "Actions: search, info, launch, stop, restart, install, uninstall. search resolves a display name to a real package among the launcher apps this app can see. Android 11 package visibility is reported honestly. Install/uninstall require one-time approval and never assume QUERY_ALL_PACKAGES.",
             parameters = commonParams() + packageParams() + artifactParams() + mapOf(
-                "action" to AgentToolParam("string", "App action", listOf("info", "launch", "stop", "restart", "install", "uninstall")),
+                "action" to AgentToolParam(
+                    "string",
+                    "App action. search lists launcher apps by label or package (no packageName needed) so a display name can be resolved to a real package before any other action",
+                    listOf("search", "info", "launch", "stop", "restart", "install", "uninstall"),
+                ),
+                "query" to AgentToolParam("string", "search only: keyword matched against app label or package name"),
+                "limit" to AgentToolParam("integer", "search only: max rows (default 20, max 50)"),
                 "activity" to AgentToolParam("string", "Optional explicit launch Activity"),
                 "userId" to AgentToolParam("integer", "Optional Android user/profile id"),
                 "keepData" to AgentToolParam("boolean", "Keep package data when uninstalling"),
@@ -53,13 +59,14 @@ object AndroidAgentTools {
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
-                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, recents, notifications, quick_settings, wait.",
+                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. wait_for_package waits for a package to become (or stop being) the foreground app and reports an unreadable foreground as unknown rather than as a miss. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam(
                     "string",
                     "UI action. back/home/recents/notifications/quick_settings are system panels driven through the same evidence path as gestures",
                     listOf(
                         "observe", "screenshot", "click", "long_press", "set_text", "scroll", "wait",
+                        "wait_for_package",
                         UiGlobalAction.BACK.wireName, UiGlobalAction.HOME.wireName,
                         UiGlobalAction.RECENTS.wireName, UiGlobalAction.NOTIFICATIONS.wireName,
                         UiGlobalAction.QUICK_SETTINGS.wireName,
@@ -90,7 +97,8 @@ object AndroidAgentTools {
                 "direction" to AgentToolParam("string", "forward/backward/up/down/left/right"),
                 "durationMs" to AgentToolParam("integer", "Gesture or plain-wait duration"),
                 "timeoutMs" to AgentToolParam("integer", "Wait timeout (max 60000)"),
-                "mode" to AgentToolParam("string", "Wait for text to appear or disappear", listOf("appear", "disappear")),
+                "mode" to AgentToolParam("string", "Wait for the text or the foreground package to appear or disappear", listOf("appear", "disappear")),
+                "packageName" to AgentToolParam("string", "wait_for_package: package that must become (or stop being) the foreground app"),
                 "scale" to AgentToolParam("number", "Screenshot scale 0.1..1.0"),
             ),
             required = listOf("tool_title", "action"),
@@ -200,6 +208,11 @@ object AndroidAgentTools {
         val packageName = args.optString("packageName", "")
         val userId = args.optInt("userId", -1).takeIf { it >= 0 }
         val result = when (action) {
+            "search" -> AndroidPackageController.search(
+                context,
+                args.optString("query", "").ifBlank { null },
+                if (args.has("limit")) args.optInt("limit") else null,
+            )
             "info" -> AndroidPackageController.info(context, sid, packageName)
             "launch" -> AndroidPackageController.launch(context, sid, packageName, args.optString("activity", "").ifBlank { null })
             "stop" -> AndroidPackageController.stop(context, sid, packageName, userId)
@@ -212,6 +225,7 @@ object AndroidAgentTools {
             else -> throw IllegalArgumentException("unknown android_app action: $action")
         }
         val success = when (action) {
+            "search" -> true
             "info" -> true
             "launch" -> result.optBoolean("launched")
             "stop" -> result.optBoolean("stopped")
