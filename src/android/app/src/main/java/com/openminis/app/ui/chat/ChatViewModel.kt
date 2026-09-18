@@ -8205,6 +8205,11 @@ class ChatViewModel(
             val turnStartBlockIndex = allToolBlocks.size
             val pendingTurn = PendingAssistantTurn(assistantId, activeSessionId, turnStartBlockIndex)
             pendingAssistantTurn = pendingTurn
+            // [T-eta-responses-opaque-items] Opaque Responses output items (the
+            // reasoning items carrying encrypted_content) captured from THIS
+            // turn's stream, replayed verbatim by the next request of the run and
+            // never persisted. Ported from Eta `ResponsesEphemeralState`.
+            val turnProviderItems = mutableListOf<String>()
             // T307: per-delta StringBuilder for the running turn text + the
             // currently-open trailing text block. `turnText` snapshots are
             // taken (via .toString()) at flush boundaries only, never per
@@ -8371,6 +8376,8 @@ class ChatViewModel(
                 turnThinking.clear()
                 turnReasoningBlob = null
                 pendingTurn.reasoningContent = null
+                // The failed attempt's opaque items must not survive into the retry.
+                turnProviderItems.clear()
                 toolCalls.clear()
                 toolCallSignatures.clear()  // [T-android-gemini3-thoughtsig / #179]
                 // T94 fix 2 + T256: throttle bookkeeping is per-stream
@@ -8770,6 +8777,12 @@ class ChatViewModel(
                         turnReasoningBlob = chunk.content
                         pendingTurn.reasoningContent = chunk.content
                     }
+                    is LLMStreamChunk.ProviderOutputItem -> {
+                        // [T-eta-responses-opaque-items] Keep the item verbatim for the
+                        // next request of this run; the transcript rebuilds text and
+                        // function_call items on its own, but cannot rebuild this one.
+                        turnProviderItems += chunk.json
+                    }
                     is LLMStreamChunk.Started -> { /* no-op */ }
                     is LLMStreamChunk.Finished -> {
                         // T321: stash for empty-turn diagnostic logging below.
@@ -9126,6 +9139,7 @@ class ChatViewModel(
                 content = turnText,
                 contentParts = assistantParts,
                 reasoningContent = turnReasoningContent,
+                providerOutputItems = turnProviderItems.toList(),
             )
             pendingTurn.historyMessage = historyMessage
             agentHistory.add(historyMessage)

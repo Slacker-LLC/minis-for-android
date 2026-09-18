@@ -38,4 +38,18 @@ sealed class LLMStreamChunk {
      * one-shot, so this typically arrives once near the end of the stream.
      */
     data class MediaAttachment(val attachment: LLMMediaAttachment) : LLMStreamChunk()
+
+    /**
+     * [T-eta-responses-opaque-items] One COMPLETED Responses-API output item, kept
+     * verbatim because the app cannot rebuild it — a `reasoning` item carries the
+     * `encrypted_content` the ChatGPT backend needs to continue the same chain of
+     * thought on the next request of a `store:false` conversation.
+     *
+     * The agent loop attaches these to the in-memory assistant message so the next
+     * turn of the same run replays them; nothing persisted ever carries them (see
+     * [LLMMessage.providerOutputItems]). Ported from Eta
+     * `agent/model/ResponsesEphemeralState.kt` (Mangi-11/Eta @ c15de97);
+     * attribution in THIRD_PARTY_LICENSES.md.
+     */
+    data class ProviderOutputItem(val json: String) : LLMStreamChunk()
 }

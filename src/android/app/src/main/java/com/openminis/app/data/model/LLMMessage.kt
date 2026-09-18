@@ -29,6 +29,16 @@ data class LLMMessage(
      * reasoning_content once `thinking` is enabled.
      */
     val reasoningContent: String? = null,
+    /**
+     * [T-eta-responses-opaque-items] Raw Responses-API output items captured for
+     * this assistant turn (currently the `reasoning` items that carry
+     * `encrypted_content`), replayed verbatim by the next request of the same run.
+     *
+     * In-memory only: no Room mapping reads or writes this field, so a reloaded
+     * session falls back to the reconstructed items — the same lifetime Eta gives
+     * its `ResponsesEphemeralState`.
+     */
+    val providerOutputItems: List<String> = emptyList(),
 ) {
     enum class Role(val value: String) {
         USER("user"),

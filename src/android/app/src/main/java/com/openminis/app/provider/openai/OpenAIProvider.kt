@@ -1119,6 +1119,19 @@ class OpenAIProvider private constructor(
                         type == "response.output_item.done" -> {
                             val item = event.optJSONObject("item") ?: continue
                             val itemType = item.optString("type", "")
+                            // [T-eta-responses-opaque-items] A completed reasoning
+                            // item is the ONE output item the transcript cannot
+                            // rebuild — it carries the encrypted_content the
+                            // backend needs to continue the same chain of thought
+                            // with store:false. Hand it to the agent loop for
+                            // verbatim replay. Items without encrypted content are
+                            // not captured, so relays that never send it keep
+                            // exactly today's request shape.
+                            if (itemType == "reasoning" &&
+                                item.optString("encrypted_content").isNotEmpty()
+                            ) {
+                                send(LLMStreamChunk.ProviderOutputItem(item.toString()))
+                            }
                             if (itemType == "function_call") {
                                 val itemId = item.optString("id", "")
                                 val acc = responsesToolCalls.remove(itemId) ?: continue
@@ -3024,6 +3037,17 @@ class OpenAIProvider private constructor(
             if (msg.contentParts.isNotEmpty()) {
                 when (msg.role) {
                     LLMMessage.Role.ASSISTANT -> {
+                        // [T-eta-responses-opaque-items] Replay the items captured
+                        // from this turn's stream verbatim, in their original
+                        // position (a reasoning item precedes the message and the
+                        // function calls it belongs to). Only items the transcript
+                        // cannot rebuild are captured, so nothing is duplicated:
+                        // `function_call` items are rebuilt below with their exact
+                        // ids and the text follows as a message item.
+                        for (raw in msg.providerOutputItems) {
+                            val item = try { JSONObject(raw) } catch (_: Exception) { null }
+                            if (item != null) input.put(item)
+                        }
                         val textParts = msg.contentParts.filterIsInstance<AgentContentPart.Text>()
                         if (textParts.isNotEmpty()) {
                             val text = textParts.joinToString("") { it.text }
