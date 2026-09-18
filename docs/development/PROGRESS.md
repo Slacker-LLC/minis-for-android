@@ -429,6 +429,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2189 个用例 = 上一项后的 2186 + 3，0 失败）。**没有任何设备结论**：某一版桌面是否有这些类与这条手势路径、系统搜索入口是否可解析、CANCEL 是否真的结束桌面自己的事件流，全部未验证——没有目标时台账记 MISSING/SKIPPED 并保留原手势。真机判据：logcat 里 `HyperOsLauncher` 前缀的台账行 + 长按导航条是否出现系统一圈即搜（开关打开时）。
 
+**Phase 6 第十四组：ColorOS SystemUI 的 OCR 长按 → Circle to Search** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 导航条 OCR 长按 | ColorOS 的导航条长按是 SystemUI 里的屏幕 OCR；这组改挂 `OplusOcrScreenBusiness.onLongPressed()`，把这次手势交给系统 contextual search——但只在**开关为开、表面能给出 context、系统搜索入口真的可解析**时；任何一条不满足就跑 ROM 原来的 OCR。接管成功时用 SystemUI 自己的 `VibrationHelper.vibrateCustomized` 重放 ROM 原有的长按震动（效果 id 与查找顺序都是常量），拿不到助手只记节流警告、不吞手势 | `b6e94b65` | ✅ `SystemUiOcrPolicyTest`（2 例） |
+| 查找表作为值 | context 先按访问器 `getContext()` 找，再按 `context`/`mContext`/`mOcrContext` 三个成员依次找；顺序与震动效果 id 都被用例钉住——这类查找表一旦与目标改名不同步，表现是「接管从不触发」而不是报错 | `b6e94b65` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2191 个用例 = 上一项后的 2189 + 2，0 失败）。**没有任何设备结论**：某一版 ColorOS SystemUI 是否有这个 OCR 表面、它的 context 成员是否仍叫这些名字、VibrationHelper 是否存在，全部未验证——没有目标时台账记 MISSING 并保留原 OCR。**说明**：该目标类只存在于 OPlus/ColorOS 的 SystemUI，小米设备上会直接记 MISSING。真机判据：logcat 里 `SystemUI` 前缀的台账行 + 导航条长按是否出现系统一圈即搜（开关打开时）。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -437,7 +446,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、SystemUI 的 OPlus OCR 长按（下一片）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
