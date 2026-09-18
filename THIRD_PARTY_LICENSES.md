@@ -125,6 +125,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `browser/BrowserSelectorWaitPolicy.kt`, `selectorState` in `browser/BrowserDomScripts.kt` and the `wait_for_selector` action (budget clamps, poll interval, visible-match rule) | `agent/browser/AgentBrowserSession.kt` (`waitForSelector`) and `agent/browser/BrowserDomScripts.kt` (`selectorState`) |
 | `click` / `type` / `hover` in `browser/BrowserDomScripts.kt` (target resolution by selector or point, the `enabled` / `editable` guards and the `submit` half of type) | `agent/browser/BrowserDomScripts.kt` (`resolveTarget`, `click`, `type`, `enabled`, `editable`) |
 | `browser/BrowserHistoryPolicy.kt` and the `go_back` / `go_forward` / `reload` actions in `browser/BrowserUseManager.kt` | `agent/browser/AgentBrowserSession.kt` (`go_back` / `go_forward` / `reload`, `historyNavigation`) |
+| `scroll` and `pageInfo` in `browser/BrowserDomScripts.kt` (the before/after pair, the target-visibility check, the page language and canonical URL) | `agent/browser/BrowserDomScripts.kt` (`scroll`, `pageInfo`) |
 
 
 ## Active native/runtime components

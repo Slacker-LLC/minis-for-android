@@ -631,6 +631,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2311 个用例 = 上一项后的 2307 + 4）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：落在缓存页上的历史移动会不会在等待超时前报出 `onPageFinished`、以及被拦截的 `minis://` 页面 reload 的表现，都未验证。
 
+**scroll 的位置证据与 page_info 的语言** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `before` / `after` 与可见性检查 | 我们的滚动结果只报落点，「到底动没动」得靠模型记住上一次读数；上游报起始与结束两个位置。点名元素现在必须可见（选择器命中 `display:none` 的节点此前会「滚了个寂寞」还报成功）。**我们自己的内层滚动容器搜索保留**——app 型页面滚的是 div，只滚 window 会静默无效——并改为用 `selectorFor` 报出它选了哪个容器 | `ca3a78e9` | ✅ `BrowserDomScriptsTest` 增 3 例 |
+| 语言与 canonical | `get_page_info` 补上游的 `language` 与 `canonical_url`，并把 `scroll_x` 补齐；保留我们的 `ready_state` / `forms` / `links` / `images`，内容尺寸**取真实值**而不套上游的 200000 px 上限（被截断的数字调用方看不出来） | `ca3a78e9` | ✅ 上述用例 |
+| 守卫自身的缺陷 | 两个脚本搬进共享前导脚本时，守卫抓到了新 scroll 体里的**嵌套 Kotlin 模板**被自己的非贪婪正则替换成垃圾——这正是它存在的意义。守卫改为按花括号配平替换模板，并重新做了反向验证（注入语法错误仍然失败） | `ca3a78e9` | ✅ 13 个脚本解析通过 + 注入式反向验证 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2314 个用例 = 上一项后的 2311 + 3）与 `:app:lintDebug`（0 error），另有 `node --check`（13 脚本）、文档溯源与构建清理守卫全绿。**没有任何设备结论**：内层容器搜索在真实 app 型页面上是否挑到用户会滚的那个元素、以及页面平滑滚动时 `before/after` 是否仍然可读，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
