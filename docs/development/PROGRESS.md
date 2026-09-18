@@ -514,12 +514,22 @@
 
 **全量检查（本轮一次跑完）**：`:app:assembleDebug` 通过（产物 APK 内含 `META-INF/xposed/{module.init,module.prop,scope.list}` 三个声明文件）；`verify-android-16k.sh` 通过（24 个 native 库 16 KB 对齐）；`python3 scripts/test_pty_bridge.py` 通过；Rust 代理 `cargo fmt --check` / `clippy -D warnings` / `cargo test`（9 例）通过；`check-runtime-package-boundary.sh`、`check_build_cleanup.py`、`test_build_cleanup_guard.py`（14 例）、`test_docs_provenance.py`（18 例）全通过。**跑不了的两项（附原因）**：`:app:assembleRelease` 停在仓库自己的 `requireReleaseSigning`（要求生产签名环境变量，且明确禁止用 debug 签名——Release 编译与 R8 本身已跑过并通过）；`verify-runtime-payload.sh` 找不到 `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz`，因为本环境没有构建 rootfs dist（该 payload 在本仓库是可选的，只有 `MINIS_REQUIRE_RUNTIME_PAYLOAD=1` 时才强制）。
 
+**Phase 6 第十七组：ColorOS 电源键（OPlus 消息路径）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 复核对上游发现的缺口 | 上一轮把上游 `hook/system/PowerHooks.kt` 与 HyperOS 那条逐行比过之后确认：它是**ColorOS 自己的电源键路径**，不是 HyperOS 的另一个写法。这些 ROM 上长按电源键不是桌面发起的调用，而是**窗口管理器给自己的 speech handler 发的一条消息**；这组挂在 `PhoneWindowManagerExtImpl$OplusSpeechHandler.handleMessage` 上，只认领那条 assist 消息（`what=0x3F3`）并交给 `AssistantLaunch` 打开用户选的助手；其它消息、OEM 目标、解析不到窗口管理器、启动失败，一律回落 ROM | `bb655df0` | ✅ `PowerKeyPolicyTest`（2 例：消息 id、去重窗口） |
+| 两条让手感不变的上游规则 | ①接管成功时**重放 ROM 自己的长按震感**（`getWrapper().performHapticFeedback(0, "Speech - Long Press")`，拿不到只记节流警告）；②**1 秒去重窗口**内第二次按下直接吞掉，不会把助手开两次。消息 id、震感常量与窗口都收在 `PowerKeyPolicy` 里 | `bb655df0` | ✅ 上述用例 |
+| 刻意没搬的上游两半 | 上游先试 `AssistantManager.showAssistantSession`（自己的 voice-interaction 会话）再退回活动意图，并在成功后**后台修复默认助理配置**（`scheduleAssistantRecovery`）。这两半都属于 Eta 的助手选择/角色机制——正是本仓库不新建的那条通道，所以这里只保留活动意图那半（`AssistantLaunch`，已在上一轮补齐角色门与 action 解析），文件 KDoc 里写明 | `bb655df0` | — |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2222 个用例 = 上一项后的 2220 + 2），`:app:lintDebug` 0 error。**没有任何设备结论**：某一版 ColorOS 是否有这个 handler 与这个消息 id、能否从 handler 解析到窗口管理器、wrapper 是否暴露 `performHapticFeedback`，全部未验证——没有 handler 时台账记 SKIPPED 并保留原行为。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 就地展示/可停止/可接管已落地；Skills 暴露给模型、GUI 动作补齐、Markdown 导出同样已落地。**连续追问与面板内屏幕上下文未落地**：无头驱动 seam 其实**已经存在**（本仓库早有 `agent/AgentRunner`：prompt/cancel/waitForSettle/sessionEvents），卡的是面板设计——上游是一套 708 行的展开式面板（26 态状态模型 + `BasicTextField` 追问输入 + 手势/震动），直接搬会替换掉本仓库现有的胶囊浮层设计（当初的分析明确要保留 Minis 的工作台风格），属于要先拍板的产品改动；若要做，最自然的形态是在现有胶囊上加密实输入（需处理 overlay 窗口的 IME/焦点） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 清单已全部落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存、下载记录。其中 QQ/微信缓存与下载记录先被登记为「待拍板 / 不值得」，后来按上游补齐（限制写在各自工具描述里） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」 | Eta `hook/*`、`ModuleMain.kt` |
