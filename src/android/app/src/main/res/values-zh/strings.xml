@@ -1726,4 +1726,20 @@
     <string name="system_permissions_module_a11y_unavailable">Minis 模块未安装或未启用</string>
     <string name="system_permissions_module_a11y_footer">仅在已安装 LSPosed 模块并作用于 Minis 时可用；模块会在系统内保持无障碍服务开启，无需 Shizuku。</string>
 
+    <string name="module_settings_title">模块设置</string>
+    <string name="module_settings_row_subtitle">LSPosed 模块读取的开关</string>
+    <string name="module_settings_section_switches">手势</string>
+    <string name="module_settings_gesture_bar">手势条长按打开系统搜索</string>
+    <string name="module_settings_gesture_bar_sub">把导航条上的识屏交给系统自己的 contextual search。</string>
+    <string name="module_settings_double_finger">双指识屏打开系统搜索</string>
+    <string name="module_settings_double_finger_sub">把双指手势交给系统 contextual search，而不是厂商那一套。</string>
+    <string name="module_settings_hotword">熄屏后保持热词检测</string>
+    <string name="module_settings_hotword_sub">熄屏把助手的软件热词会话拆掉时，把它重新拉起来。</string>
+    <string name="module_settings_section_assistant">电源键助手</string>
+    <string name="module_settings_assistant_footer">只接管电源键长按；其它快捷方式保持各自的行为。</string>
+    <string name="module_settings_target_oem">设备自带的助手</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">这些开关由 Minis 的 LSPosed 模块读取：先安装模块，并在其作用域里勾选 Minis。改动在下一次拦截即生效，不需要重启。</string>
+
 </resources>

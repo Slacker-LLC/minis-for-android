@@ -1018,4 +1018,20 @@
     <string name="system_permissions_module_a11y_unavailable">Minis 模組未安裝或未啟用</string>
     <string name="system_permissions_module_a11y_footer">僅在已安裝 LSPosed 模組並作用於 Minis 時可用；模組會在系統內保持無障礙服務開啟，無需 Shizuku。</string>
 
+    <string name="module_settings_title">模組設定</string>
+    <string name="module_settings_row_subtitle">LSPosed 模組讀取的開關</string>
+    <string name="module_settings_section_switches">手勢</string>
+    <string name="module_settings_gesture_bar">手勢列長按開啟系統搜尋</string>
+    <string name="module_settings_gesture_bar_sub">把導覽列上的螢幕辨識交給系統自己的 contextual search。</string>
+    <string name="module_settings_double_finger">雙指螢幕辨識開啟系統搜尋</string>
+    <string name="module_settings_double_finger_sub">把雙指手勢交給系統 contextual search，而不是廠商那一套。</string>
+    <string name="module_settings_hotword">螢幕關閉後保持熱詞偵測</string>
+    <string name="module_settings_hotword_sub">螢幕關閉把助手的軟體熱詞工作階段拆掉時，把它重新拉起。</string>
+    <string name="module_settings_section_assistant">電源鍵助理</string>
+    <string name="module_settings_assistant_footer">只接管電源鍵長按；其他快捷方式維持各自的行為。</string>
+    <string name="module_settings_target_oem">裝置內建助理</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">這些開關由 Minis 的 LSPosed 模組讀取：先安裝模組，並在其作用範圍勾選 Minis。變更在下一次攔截即生效，不需要重新啟動。</string>
+
 </resources>

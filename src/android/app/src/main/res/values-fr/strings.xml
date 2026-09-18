@@ -1362,4 +1362,20 @@
     <string name="system_permissions_module_a11y_unavailable">Le module Minis n\'est pas installé ou n\'est pas actif</string>
     <string name="system_permissions_module_a11y_footer">Fonctionne uniquement avec le module LSPosed Minis installé et limité à Minis. Le module maintient alors le service d\'accessibilité activé dans le système, sans Shizuku.</string>
 
+    <string name="module_settings_title">Réglages du module</string>
+    <string name="module_settings_row_subtitle">Interrupteurs lus par le module LSPosed</string>
+    <string name="module_settings_section_switches">Gestes</string>
+    <string name="module_settings_gesture_bar">Un appui long sur la barre gestuelle ouvre la recherche système</string>
+    <string name="module_settings_gesture_bar_sub">Redirige la recherche d\'écran de la barre de navigation vers la recherche contextuelle du système.</string>
+    <string name="module_settings_double_finger">La reconnaissance à deux doigts ouvre la recherche système</string>
+    <string name="module_settings_double_finger_sub">Confie le geste à deux doigts à la recherche contextuelle du système plutôt qu\'à celle du fabricant.</string>
+    <string name="module_settings_hotword">Maintenir la détection du mot-clé après extinction de l\'écran</string>
+    <string name="module_settings_hotword_sub">Redémarre la session de mot-clé logicielle de l\'assistant lorsqu\'une extinction d\'écran l\'interrompt.</string>
+    <string name="module_settings_section_assistant">Assistant du bouton d\'alimentation</string>
+    <string name="module_settings_assistant_footer">Seul l\'appui long sur le bouton d\'alimentation est repris ; les autres raccourcis gardent leur comportement.</string>
+    <string name="module_settings_target_oem">L\'assistant du appareil</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">Ces interrupteurs sont lus par le module LSPosed Minis : installez-le et activez Minis dans sa portée. Un changement prend effet à la prochaine interception, sans redémarrage.</string>
+
 </resources>

@@ -54,6 +54,7 @@ import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
 import com.openminis.app.ui.settings.SettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
+import com.openminis.app.ui.settings.ModuleSettingsScreen
 import com.openminis.app.ui.settings.SessionStorageDetailScreen
 import com.openminis.app.ui.settings.SkillDetailScreen
 import com.openminis.app.ui.settings.StorageManagementScreen
@@ -185,6 +186,8 @@ object Routes {
     const val SHIZUKU = "shizuku"
     /** T323: System Permissions (Accessibility service status, etc.). */
     const val SYSTEM_PERMISSIONS = "system_permissions"
+    /** [T-eta-xposed-groups] The switches the LSPosed module reads. */
+    const val MODULE_SETTINGS = "module_settings"
     const val USAGE_STATS = "usage_stats"
     const val LOGS = "logs"
     const val LOG_DETAIL = "log_detail/{fileName}"
@@ -620,6 +623,7 @@ fun AppNavigation(
                 onSoulClick = { navController.safeNavigate(Routes.SOUL) },
                 onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
                 onPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
+                onModuleSettingsClick = { navController.safeNavigate(Routes.MODULE_SETTINGS) },
                 onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                 onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                 onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
@@ -1383,6 +1387,13 @@ fun AppNavigation(
 
         composable(Routes.SYSTEM_PERMISSIONS) {
             SystemPermissionsScreen(
+                onBack = { navController.safePopBackStack() },
+            )
+        }
+
+        // [T-eta-xposed-groups] Module settings: the switches the LSPosed module reads, written here.
+        composable(Routes.MODULE_SETTINGS) {
+            ModuleSettingsScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }

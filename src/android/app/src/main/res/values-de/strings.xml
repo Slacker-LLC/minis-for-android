@@ -1471,4 +1471,20 @@
     <string name="system_permissions_module_a11y_unavailable">Das Minis-Modul ist nicht installiert oder nicht aktiv</string>
     <string name="system_permissions_module_a11y_footer">Funktioniert nur mit installiertem Minis-LSPosed-Modul im Geltungsbereich von Minis. Das Modul hält den Bedienungshilfen-Dienst dann ohne Shizuku aktiv.</string>
 
+    <string name="module_settings_title">Moduleinstellungen</string>
+    <string name="module_settings_row_subtitle">Schalter, die das LSPosed-Modul liest</string>
+    <string name="module_settings_section_switches">Gesten</string>
+    <string name="module_settings_gesture_bar">Langes Drücken der Gestenleiste öffnet die Systemsuche</string>
+    <string name="module_settings_gesture_bar_sub">Leitet die Bildschirmsuche der Navigationsleiste an die Contextual Search des Systems weiter.</string>
+    <string name="module_settings_double_finger">Zwei-Finger-Bildschirmerkennung öffnet die Systemsuche</string>
+    <string name="module_settings_double_finger_sub">Übergibt die Zwei-Finger-Geste an die Contextual Search des Systems statt an die des Herstellers.</string>
+    <string name="module_settings_hotword">Hotword-Erkennung nach Bildschirm-aus am Leben halten</string>
+    <string name="module_settings_hotword_sub">Startet die Software-Hotword-Sitzung des Assistenten neu, wenn ein Bildschirm-aus sie beendet.</string>
+    <string name="module_settings_section_assistant">Assistent der Ein-/Aus-Taste</string>
+    <string name="module_settings_assistant_footer">Nur das lange Drücken der Ein-/Aus-Taste wird übernommen; alle anderen Kurzbefehle bleiben unverändert.</string>
+    <string name="module_settings_target_oem">Der eigene Assistent des Geräts</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">Diese Schalter liest das Minis-LSPosed-Modul: installieren und Minis im Geltungsbereich aktivieren. Änderungen greifen beim nächsten Abfangen, ohne Neustart.</string>
+
 </resources>

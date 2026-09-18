@@ -1468,4 +1468,20 @@
     <string name="system_permissions_module_a11y_unavailable">Minis 모듈이 설치되어 있지 않거나 활성 상태가 아닙니다</string>
     <string name="system_permissions_module_a11y_footer">Minis LSPosed 모듈을 설치하고 Minis 범위로 지정한 경우에만 동작합니다. 모듈은 Shizuku 없이 시스템에서 접근성 서비스를 활성 상태로 유지합니다.</string>
 
+    <string name="module_settings_title">모듈 설정</string>
+    <string name="module_settings_row_subtitle">LSPosed 모듈이 읽는 스위치</string>
+    <string name="module_settings_section_switches">제스처</string>
+    <string name="module_settings_gesture_bar">제스처 바 길게 누르면 시스템 검색 열기</string>
+    <string name="module_settings_gesture_bar_sub">내비게이션 바의 화면 검색을 시스템 자체 컨텍스트 검색으로 보냅니다.</string>
+    <string name="module_settings_double_finger">두 손가락 화면 인식으로 시스템 검색 열기</string>
+    <string name="module_settings_double_finger_sub">두 손가락 제스처를 OEM 대신 시스템 컨텍스트 검색에 넘깁니다.</string>
+    <string name="module_settings_hotword">화면 꺼짐 후에도 호출어 감지 유지</string>
+    <string name="module_settings_hotword_sub">화면이 꺼질 때 끊긴 어시스턴트의 소프트웨어 호출어 세션을 다시 시작합니다.</string>
+    <string name="module_settings_section_assistant">전원 키 어시스턴트</string>
+    <string name="module_settings_assistant_footer">전원 키 길게 누르기만 가져옵니다. 다른 단축키는 그대로 동작합니다.</string>
+    <string name="module_settings_target_oem">기기 자체 어시스턴트</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">이 스위치는 Minis LSPosed 모듈이 읽습니다. 모듈을 설치하고 범위에서 Minis를 활성화하세요. 변경은 다음 가로채기에서 적용되며 재시작은 필요 없습니다.</string>
+
 </resources>

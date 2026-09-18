@@ -1721,4 +1721,20 @@
     <string name="system_permissions_module_a11y_unavailable">Модуль Minis не установлен или неактивен</string>
     <string name="system_permissions_module_a11y_footer">Работает только с установленным модулем LSPosed Minis, включённым в область Minis. Модуль сам поддерживает службу доступности включённой, без Shizuku.</string>
 
+    <string name="module_settings_title">Настройки модуля</string>
+    <string name="module_settings_row_subtitle">Переключатели, которые читает модуль LSPosed</string>
+    <string name="module_settings_section_switches">Жесты</string>
+    <string name="module_settings_gesture_bar">Долгое нажатие на панель жестов открывает системный поиск</string>
+    <string name="module_settings_gesture_bar_sub">Направляет поиск по экрану с панели навигации в контекстный поиск системы.</string>
+    <string name="module_settings_double_finger">Распознавание двумя пальцами открывает системный поиск</string>
+    <string name="module_settings_double_finger_sub">Передаёт жест двумя пальцами в контекстный поиск системы, а не производителя.</string>
+    <string name="module_settings_hotword">Поддерживать распознавание слова после выключения экрана</string>
+    <string name="module_settings_hotword_sub">Перезапускает программный сеанс распознавания слова, который сбрасывается при выключении экрана.</string>
+    <string name="module_settings_section_assistant">Ассистент на кнопке питания</string>
+    <string name="module_settings_assistant_footer">Перехватывается только долгое нажатие кнопки питания; остальные ярлыки работают как прежде.</string>
+    <string name="module_settings_target_oem">Штатный ассистент устройства</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">Эти переключатели читает модуль Minis для LSPosed: установите его и включите Minis в его области. Изменение действует со следующего перехвата, перезапуск не нужен.</string>
+
 </resources>

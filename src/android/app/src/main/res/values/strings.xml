@@ -1873,4 +1873,20 @@
     <string name="system_permissions_module_a11y_unavailable">The Minis module is not installed or not active</string>
     <string name="system_permissions_module_a11y_footer">Works only with the Minis LSPosed module installed and scoped to Minis. The module then keeps the accessibility service enabled inside the system, without Shizuku.</string>
 
+    <string name="module_settings_title">Module settings</string>
+    <string name="module_settings_row_subtitle">Switches the LSPosed module reads</string>
+    <string name="module_settings_section_switches">Gestures</string>
+    <string name="module_settings_gesture_bar">Gesture-bar long press opens system search</string>
+    <string name="module_settings_gesture_bar_sub">Routes the navigation bar\'s screen search to the system\'s own contextual search.</string>
+    <string name="module_settings_double_finger">Two-finger screen recognition opens system search</string>
+    <string name="module_settings_double_finger_sub">Hands the two-finger gesture to the system\'s contextual search instead of the OEM one.</string>
+    <string name="module_settings_hotword">Keep hotword detection alive after screen-off</string>
+    <string name="module_settings_hotword_sub">Restarts the assistant\'s software hotword session when a screen-off tears it down.</string>
+    <string name="module_settings_section_assistant">Power-key assistant</string>
+    <string name="module_settings_assistant_footer">Only the long press of the power key is taken over; every other shortcut keeps its own behaviour.</string>
+    <string name="module_settings_target_oem">The device\'s own assistant</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">These switches are read by the Minis LSPosed module: install it and enable Minis in its scope. A change takes effect at the next interception, with no restart.</string>
+
 </resources>

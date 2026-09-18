@@ -129,6 +129,9 @@ fun SettingsScreen(
     // next to Soul so the two prompt-authoring surfaces sit together.
     onSystemPromptClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
+    // [T-eta-xposed-groups] The switches the LSPosed module reads, next to the platform
+    // permissions they sit beside.
+    onModuleSettingsClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
@@ -405,6 +408,18 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_section_permissions),
                     subtitle = stringResource(R.string.settings_permissions_subtitle),
                     onClick = onPermissionsClick,
+                    showDivider = false,
+                )
+            }
+
+            // [T-eta-xposed-groups] Module settings: the switches the LSPosed module reads.
+            SettingsSection() {
+                SettingsItem(
+                    icon = Icons.Outlined.Extension,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.module_settings_title),
+                    subtitle = stringResource(R.string.module_settings_row_subtitle),
+                    onClick = onModuleSettingsClick,
                     showDivider = false,
                 )
             }

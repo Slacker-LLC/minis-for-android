@@ -1476,4 +1476,20 @@
     <string name="system_permissions_module_a11y_unavailable">Minis モジュールがインストールされていないか、有効ではありません</string>
     <string name="system_permissions_module_a11y_footer">Minis の LSPosed モジュールをインストールし、Minis にスコープした場合のみ動作します。モジュールは Shizuku なしでシステム内でユーザー補助サービスを有効に保ちます。</string>
 
+    <string name="module_settings_title">モジュール設定</string>
+    <string name="module_settings_row_subtitle">LSPosed モジュールが読むスイッチ</string>
+    <string name="module_settings_section_switches">ジェスチャ</string>
+    <string name="module_settings_gesture_bar">ジェスチャバー長押しでシステム検索を開く</string>
+    <string name="module_settings_gesture_bar_sub">ナビゲーションバーの画面検索をシステムのコンテキスト検索に振り向けます。</string>
+    <string name="module_settings_double_finger">2 本指の画面認識でシステム検索を開く</string>
+    <string name="module_settings_double_finger_sub">2 本指ジェスチャを OEM ではなくシステムのコンテキスト検索に渡します。</string>
+    <string name="module_settings_hotword">画面オフ後もホットワード検出を維持する</string>
+    <string name="module_settings_hotword_sub">画面オフで切れたアシスタントのソフトウェア ホットワード セッションを再開します。</string>
+    <string name="module_settings_section_assistant">電源キーのアシスタント</string>
+    <string name="module_settings_assistant_footer">引き継ぐのは電源キーの長押しだけです。他のショートカットはそのまま動きます。</string>
+    <string name="module_settings_target_oem">端末本来のアシスタント</string>
+    <string name="module_settings_target_minis">Minis</string>
+    <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_footer">これらのスイッチは Minis LSPosed モジュールが読みます。モジュールをインストールし、スコープで Minis を有効にしてください。変更は次のインターセプトで有効になり、再起動は不要です。</string>
+
 </resources>

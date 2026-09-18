@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Parcelable
+import android.os.Build
 import android.os.SystemClock
 import com.openminis.app.xposed.HookInstallEntry
 import com.openminis.app.xposed.HookInstallReport
@@ -121,7 +122,11 @@ object ColorDirectHooks {
 
     private fun finishColorDirectActivity(activity: Activity) {
         activity.finishAndRemoveTask()
-        activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        // [T-eta-xposed-groups] Eta targets Android 37-era ROMs; the no-animation transition is
+        // only available from 34, and on anything older the card simply finishes as it always did.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        }
     }
 
     private fun resolveDirectExt(intent: Intent?, startInfoClass: Class<*>?): String? {
@@ -136,7 +141,9 @@ object ColorDirectHooks {
         if (startInfoClass != null && Parcelable::class.java.isAssignableFrom(startInfoClass)) {
             @Suppress("UNCHECKED_CAST")
             val typed = startInfoClass as Class<Parcelable>
-            intent.getParcelableExtra(EXTRA_START_INFO, typed)?.let { return it }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(EXTRA_START_INFO, typed)?.let { return it }
+            }
         }
         return runCatching { intent.extras?.get(EXTRA_START_INFO) }.getOrNull()
     }
