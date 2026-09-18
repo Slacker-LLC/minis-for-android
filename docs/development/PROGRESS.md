@@ -955,6 +955,18 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2407 例 0 失败**（新增 `SafeRemoteImportPolicyTest` 4 例：域名 fake-IP 放行 / 字面 fake-IP 拒绝 / 私有段两种形态都拒绝 / 公网两种形态都放行）+ `:app:lintDebug` 0 error + `verify-runtime-payload.sh` / `verify-android-16k.sh` |
 | 设备复原 | 测试用的技能（`sweep-probe`、导入的 `brand-guidelines`）已删除，磁盘只剩原有 12 个技能；MCP 测试 token 已从 `shared_prefs/minis_mcp_prefs.xml` 还原为 `<map />`，MCP 服务已停 |
 
+### MCP 工具面逐个过 + `tools/list` 发错字段名（2026-09-19，真机端到端） — `aedcd2ff`
+
+| 项 | 结果 |
+|---|---|
+| 逐个调用（真机，MCP） | `android_time`、`linux_shell`（`uid=10186(minis)` / Ubuntu 24.04.3 / 宿主内核）、`linux_python_run`（Python 3.12）、`android_settings_get`（`screen_brightness=2`，`source: android_api`）、`android_weather`（按文档的 `location` 参数 → 北京实时天气 2.0 s，**不需要定位权限**）、`android_tts_voices`、`linux_file_*` 全链路（write → read → info → head_tail → append → grep → copy → move → delete ×2 → list）逐条通过；需要审批的工具（shell / python / settings / weather / bluetooth / 文件写删等）走 `confirm_required` → 批准 → 重试，链路正常 |
+| **发现的真问题** | `tools/list` 里 **58 个工具全部只有 `input_schema`（蛇形）**，而 MCP 规范字段名是 **`inputSchema`**。原因是服务端直接复用了 **Anthropic Messages** 形状的序列化器（`toAnthropicJson()`）。规范客户端（Claude Desktop / Cursor / SDK）读不到任何参数：我自己就是靠猜参数名调用，`from_path`/`to_path` 猜错才把它翻出来。仓库里**自家的 MCP 客户端**反而写明了这一点（先读 `inputSchema`、兼容蛇形），说明错的是服务端这一侧 |
+| 修法 | 给 `AgentToolDefinition` 加 `toMcpJson()`（规范字段名），并把 schema 抽成共享的 `inputSchemaJson()`，两种形状共用同一份 schema、不会漂移；`MCPServer` 的 `tools/list` 改用它 |
+| 真机复验 | `tools/list` → **58 个工具全部带 `inputSchema`**、0 个蛇形、51 个含真实 `properties`（例：`linux_file_copy` → `[source, destination]`、`linux_file_list` → `[path, offset, limit]`、`android_weather` → `[location, forecast_days, units]`）；用**公布出来的名字**重跑文件工具：write → copy → move → read → delete → list 全部成功 |
+| 其余观察（非缺陷） | 相对路径（如 `workspace/...`）在文件工具里会被按会话工作区解析并给出 `NOT_FOUND: …`，绝对 `/workspace/...` 才是正解（工具的文档写的是 workspace 语义，行为一致，未改）；`android_weather` 的入参叫 `location`（不是 `city`），我第一次调用传错名字才落到「设备当前位置」分支并触发定位权限提示 |
+| 验证口径 | `:app:testDebugUnitTest` **2410 例 0 失败**（新增 `AgentToolDefinitionMcpShapeTest` 3 例：规范键在、Anthropic 键不在、两种形状 schema 一致）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
+| 设备复原 | MCP 服务已停、`shared_prefs/minis_mcp_prefs.xml` 已还原为 `<map />`、转发已撤、工作区临时文件已删；过程中出现的蓝牙权限提示已「拒绝」关闭（没有替你授权任何权限） |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
