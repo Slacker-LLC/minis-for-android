@@ -7,6 +7,59 @@ package com.openminis.app.browser
  */
 object BrowserUseJS {
 
+    // -- execute_js wrappers --
+
+    /**
+     * Wraps [script] as one **expression** and hands its value back through the
+     * `__minis__` bridge: `document.title`, `JSON.stringify(…)`, `await fetch(…)`.
+     *
+     * The body form below cannot do this — a bare expression is a statement with
+     * no `return`, so it answered a silent "undefined". Measured on the device:
+     * `document.title` → "undefined", `return document.title` → "Example Domain".
+     *
+     * A script that is not a single expression does not compile here, and a
+     * source that does not compile never runs, so the caller can safely fall back
+     * to [bridgedBody].
+     */
+    fun bridgedExpression(script: String): String = """
+        (async function(){
+            try {
+                var __v__ = await (async function(){ return ($script); })();
+                if (__v__ === undefined || __v__ === null) {
+                    __minis__.resolve(String(__v__));
+                } else if (typeof __v__ === 'object') {
+                    __minis__.resolve(JSON.stringify(__v__));
+                } else {
+                    __minis__.resolve(String(__v__));
+                }
+            } catch(e) {
+                __minis__.reject(e.message || String(e));
+            }
+        })();
+    """.trimIndent()
+
+    /**
+     * The documented body form: statements, top-level `await`, and anything the
+     * script `return`s (`var r = await fetch(url); return await r.json()`).
+     */
+    fun bridgedBody(script: String): String = """
+        (async function(){
+            try {
+                var __r__ = (async function(){ $script })();
+                var __v__ = await __r__;
+                if (__v__ === undefined || __v__ === null) {
+                    __minis__.resolve(String(__v__));
+                } else if (typeof __v__ === 'object') {
+                    __minis__.resolve(JSON.stringify(__v__));
+                } else {
+                    __minis__.resolve(String(__v__));
+                }
+            } catch(e) {
+                __minis__.reject(e.message || String(e));
+            }
+        })();
+    """.trimIndent()
+
     // -- Get Backbone --
 
     fun getBackbone(maxDepth: Int): String = """

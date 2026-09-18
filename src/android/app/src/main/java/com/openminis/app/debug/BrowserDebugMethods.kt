@@ -92,7 +92,6 @@ internal object BrowserDebugMethods {
             "vw:window.innerWidth||0,vh:window.innerHeight||0," +
             "rs:document.readyState||''" +
             "})"
-        val res = mgr.execute(BrowserActionInput(action = BrowserAction.EXECUTE_JS, script = js))
         val out = JSONObject().apply {
             put("scrollX", 0)
             put("scrollY", 0)
@@ -102,20 +101,22 @@ internal object BrowserDebugMethods {
             put("viewportHeight", 0)
             put("readyState", "")
         }
-        // The result text holds the JSON literal for EXECUTE_JS — strip wrapping
-        // quotes if any and parse.
-        val raw = res.text.trim().trim('"').replace("\\\"", "\"")
-        try {
-            val parsed = JSONObject(raw)
-            out.put("scrollX", parsed.optInt("sx"))
-            out.put("scrollY", parsed.optInt("sy"))
-            out.put("pageWidth", parsed.optInt("pw"))
-            out.put("pageHeight", parsed.optInt("ph"))
-            out.put("viewportWidth", parsed.optInt("vw"))
-            out.put("viewportHeight", parsed.optInt("vh"))
-            out.put("readyState", parsed.optString("rs"))
-        } catch (_: Exception) {
-            // Fall through with zeros — the page may be at about:blank.
+        // Ask for the page's own JSON: this used to re-parse the formatted action
+        // text, which never parsed and left every viewport reading zeros.
+        val raw = mgr.evaluateExpressionRaw(js)
+        if (raw != null) {
+            try {
+                val parsed = JSONObject(raw)
+                out.put("scrollX", parsed.optInt("sx"))
+                out.put("scrollY", parsed.optInt("sy"))
+                out.put("pageWidth", parsed.optInt("pw"))
+                out.put("pageHeight", parsed.optInt("ph"))
+                out.put("viewportWidth", parsed.optInt("vw"))
+                out.put("viewportHeight", parsed.optInt("vh"))
+                out.put("readyState", parsed.optString("rs"))
+            } catch (_: Exception) {
+                // Keep the zeros — the page may be at about:blank.
+            }
         }
         return out
     }

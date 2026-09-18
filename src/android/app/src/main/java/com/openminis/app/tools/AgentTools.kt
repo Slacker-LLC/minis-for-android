@@ -142,7 +142,7 @@ object AgentTools {
             "coordinate_y" to AgentToolParam("integer", "Y coordinate for click (alternative to selector)"),
             "direction" to AgentToolParam("string", "Scroll direction", enumValues = listOf("up", "down")),
             "amount" to AgentToolParam("integer", "Scroll amount in pixels (default: 500)"),
-            "script" to AgentToolParam("string", "JavaScript code to execute (for execute_js action). The script runs inside an async function wrapper — `await` and top-level `return` are both supported (e.g. `var r = await fetch(url); return await r.json()`)."),
+            "script" to AgentToolParam("string", "JavaScript code to execute (for execute_js action). Either a single expression, whose value comes back (e.g. `document.title`, `JSON.stringify([...document.links])`), or a script body with `await` and top-level `return` (e.g. `var r = await fetch(url); return await r.json()`). A body without `return` answers `undefined`."),
             "user_agent" to AgentToolParam("string", "User agent profile to switch to", enumValues = listOf("desktop_chrome", "mobile_chrome")),
             "max_depth" to AgentToolParam("integer", "Maximum tree depth for get_backbone (default: 5)"),
             "scroll_count" to AgentToolParam("integer", "Number of scroll steps for scroll_and_collect (default: 10, max: 20). Each step scrolls by 'amount' pixels and waits for new content."),

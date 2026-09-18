@@ -979,57 +979,102 @@ class BrowserUseManager(
 
     private suspend fun executeJS(script: String?): BrowserActionResult {
         if (script.isNullOrEmpty()) return BrowserActionResult.error("execute_js requires 'script'")
-        // Wrap in an async IIFE so `await` works in user scripts.
-        // Android WebView doesn't resolve Promises from evaluateJavascript,
-        // so we use a JS bridge callback (__minis__.resolve / __minis__.reject).
-        return try {
-            val deferred = CompletableDeferred<String>()
-            asyncJsDeferred = deferred
-            val wrapped = """
-                (async function(){
-                    try {
-                        var __r__ = (async function(){ $script })();
-                        var __v__ = await __r__;
-                        if (__v__ === undefined || __v__ === null) {
-                            __minis__.resolve(String(__v__));
-                        } else if (typeof __v__ === 'object') {
-                            __minis__.resolve(JSON.stringify(__v__));
-                        } else {
-                            __minis__.resolve(String(__v__));
-                        }
-                    } catch(e) {
-                        __minis__.reject(e.message || String(e));
-                    }
-                })();
-            """.trimIndent()
+        // Two shapes, each run at most once.
+        //
+        //  * Expression form first — `document.title`, `JSON.stringify(…)`,
+        //    `await fetch(…)` — because that is how agents write it, and the body
+        //    form answered a bare expression with a silent "undefined" (measured
+        //    on the device: `document.title` → "undefined", `return document.title`
+        //    → "Example Domain").
+        //  * Function-body form, the documented contract (`return`, statements,
+        //    top-level await).
+        //
+        // Chromium reports a source that failed to compile through the evaluation
+        // callback as null and never runs it, so the fallback cannot double-run
+        // side effects — and a script that compiles in neither form is answered as
+        // a syntax error instead of the old 30-second "timed out".
+        evaluateBridged(BrowserUseJS.bridgedExpression(script))?.let { return it }
+        evaluateBridged(BrowserUseJS.bridgedBody(script))?.let { return it }
+        return BrowserActionResult.error(
+            "execute_js script did not compile — check its syntax (the WebView refused it before running anything).",
+        )
+    }
+
+    /** What one bridged evaluation did. */
+    private sealed interface BridgedRun {
+        /** The WebView refused the source: nothing ran. */
+        object NotCompiled : BridgedRun
+
+        /** The bridge never answered inside the budget. */
+        object TimedOut : BridgedRun
+
+        /** The bridge answered: a value, or the {"error": …} envelope. */
+        data class Answer(val raw: String) : BridgedRun
+    }
+
+    /**
+     * Run [wrapped] (one of [BrowserUseJS]'s bridged wrappers). The evaluation
+     * callback is the compile signal: a source that does not compile comes back as
+     * `null`, while a compiled async IIFE comes back as its promise (`{}`); the
+     * value itself then arrives through the `__minis__` bridge.
+     */
+    private suspend fun runBridged(wrapped: String): BridgedRun {
+        val deferred = CompletableDeferred<String>()
+        val callback = CompletableDeferred<String?>()
+        asyncJsDeferred = deferred
+        try {
             withContext(Dispatchers.Main) {
-                webView.evaluateJavascript(wrapped, null)
+                webView.evaluateJavascript(wrapped) { raw -> callback.complete(raw) }
             }
-            val raw = withTimeoutOrNull(30_000L) { deferred.await() }
-                ?: run {
-                    asyncJsDeferred = null
-                    return BrowserActionResult.error("JavaScript execution timed out (30s)")
-                }
-            asyncJsDeferred = null
-            val json = try { JSONObject(raw) } catch (_: Exception) { null }
-            if (json != null) {
-                if (json.has("error")) {
-                    BrowserActionResult.error(json.getString("error"))
-                } else {
-                    BrowserActionResult(
-                        text = formatJSONResult(BrowserPayloadLimiter.bound(json)),
-                    )
-                }
-            } else {
-                // A raw script return is whatever the page decided to hand back —
-                // the payload budget is the only bound on it.
-                BrowserActionResult(text = BrowserPayloadLimiter.boundText(raw))
-            }
+            val compiled = callback.await()
+            if (compiled == null || compiled == "null") return BridgedRun.NotCompiled
+            val answer = withTimeoutOrNull(30_000L) { deferred.await() } ?: return BridgedRun.TimedOut
+            return BridgedRun.Answer(answer)
         } catch (e: Exception) {
+            return BridgedRun.Answer("""{\"error\":${JSONObject.quote(e.message ?: "JavaScript error")}}""")
+        } finally {
             asyncJsDeferred = null
-            BrowserActionResult.error("JavaScript error: ${e.message}")
         }
     }
+
+    private fun decodeBridged(raw: String): BrowserActionResult {
+        val json = try { JSONObject(raw) } catch (_: Exception) { null }
+        return if (json != null) {
+            if (json.has("error")) {
+                BrowserActionResult.error(json.getString("error"))
+            } else {
+                BrowserActionResult(text = formatJSONResult(BrowserPayloadLimiter.bound(json)))
+            }
+        } else {
+            // A raw script return is whatever the page decided to hand back — the
+            // payload budget is the only bound on it.
+            BrowserActionResult(text = BrowserPayloadLimiter.boundText(raw))
+        }
+    }
+
+    /** Null means "did not compile" — the caller picks the next shape. */
+    private suspend fun evaluateBridged(wrapped: String): BrowserActionResult? =
+        when (val run = runBridged(wrapped)) {
+            BridgedRun.NotCompiled -> null
+            BridgedRun.TimedOut -> BrowserActionResult.error("JavaScript execution timed out (30s)")
+            is BridgedRun.Answer -> decodeBridged(run.raw)
+        }
+
+    /**
+     * Raw value of one page expression, for callers that need the JSON the page
+     * produced rather than the human-readable text an action formats. The debug
+     * probes (`pageInfo.viewport`) are the callers: parsing the formatted text
+     * back into JSON is what silently produced all-zero viewports on the device.
+     *
+     * Null when the expression did not compile, timed out, or has no value — the
+     * caller keeps its own default.
+     */
+    internal suspend fun evaluateExpressionRaw(expression: String): String? =
+        when (val run = runBridged(BrowserUseJS.bridgedExpression(expression))) {
+            BridgedRun.NotCompiled -> null
+            BridgedRun.TimedOut -> null
+            is BridgedRun.Answer -> run.raw
+        }
 
     // -- Find Elements --
 

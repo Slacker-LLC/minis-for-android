@@ -100,7 +100,7 @@ object BrowserUseTool {
 
         properties.put("script", JSONObject().apply {
             put("type", "string")
-            put("description", "JavaScript code to execute (for execute_js). The script runs inside an async function wrapper — await and top-level return are both supported.")
+            put("description", "JavaScript code to execute (for execute_js). Either a single expression, whose value comes back (e.g. document.title), or a script body with await and top-level return (e.g. var r = await fetch(url); return await r.json()). A body without return answers undefined.")
         })
 
         properties.put("user_agent", JSONObject().apply {

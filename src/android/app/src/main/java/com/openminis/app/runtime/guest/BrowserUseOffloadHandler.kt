@@ -502,6 +502,7 @@ EXAMPLES:
   minis-browser-use click --selector '.btn-primary'
   minis-browser-use type --selector 'input[name=q]' --text 'hello'
   minis-browser-use execute_js --script 'return document.title'
+  minis-browser-use execute_js --script 'document.title'      (expression form: the value comes back)
   minis-browser-use --json '{"action":"navigate","url":"https://x.com"}'
 """.trimIndent() + "\n"
     }
