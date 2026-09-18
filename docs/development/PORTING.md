@@ -64,7 +64,7 @@ Device behaviour (Root/SELinux/OEM/LSPosed/a11y window set) unverified.
 - `rclone.aar` 被 gitignore：新工作树里不存在，构建前从 minis-for-android 复制，提交时忽略。
 - 行号会漂移：分析文档里的 `文件:行号` 只作线索，定位以符号名为准。
 - 既有编译警告（deprecation / opt-in / Java nullability）不属于本次改动，不要顺手改。
-- 单测全量约 1786 个用例，串行跑约 40–70 秒；新增用例保持同一节奏，避免引入需要真机的测试。
+- 单测全量约 1841 个用例（2026-09-18 Phase 1 落地后），串行跑约 40–70 秒；新增用例保持同一节奏，避免引入需要真机的测试。
 
 ## 阶段与验收边界
 
