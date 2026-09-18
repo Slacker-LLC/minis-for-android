@@ -1930,4 +1930,5 @@
     <string name="system_enhance_module_feature_accessibility">Accessibility keep-alive and hotword self-heal</string>
 
     <string name="system_enhance_root_hidden">su is not visible to this app; %1$s is installed - allow this app there (or turn off su hiding)</string>
+    <string name="settings_terminal_subtitle">Open the Ubuntu shell (starts the Linux runtime)</string>
 </resources>

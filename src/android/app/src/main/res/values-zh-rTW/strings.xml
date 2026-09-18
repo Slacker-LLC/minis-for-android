@@ -1075,4 +1075,5 @@
     <string name="system_enhance_module_feature_accessibility">無障礙保持運作與熱詞自癒</string>
 
     <string name="system_enhance_root_hidden">su 對本應用不可見；本機裝有 %1$s——請在它的應用清單裡允許本應用（或關閉 su 隱藏）</string>
+    <string name="settings_terminal_subtitle">開啟 Ubuntu Shell（會啟動 Linux 執行環境）</string>
 </resources>

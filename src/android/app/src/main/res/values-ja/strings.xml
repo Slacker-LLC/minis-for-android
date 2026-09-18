@@ -1533,4 +1533,5 @@
     <string name="system_enhance_module_feature_accessibility">アクセシビリティの維持とホットワードの自己修復</string>
 
     <string name="system_enhance_root_hidden">su がこのアプリから見えません。%1$s が入っています——そのアプリ一覧で本アプリを許可してください（su の隠蔽をオフにしても可）</string>
+    <string name="settings_terminal_subtitle">Ubuntu Shell を開く（Linux 実行環境を起動します）</string>
 </resources>

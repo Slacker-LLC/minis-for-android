@@ -277,6 +277,18 @@ fun SettingsScreen(
 
             // -- Agent Runtime --
             SettingsSection(title = stringResource(R.string.settings_section_agent_runtime)) {
+                // [T-android-terminal-entry] The terminal was reachable only from the wide
+                // layout and from a deep link that no phone flow produces, so on a phone
+                // the Ubuntu runtime had no user-facing entry at all - only the agent could
+                // start it by calling a tool. Found on the real device pass; the parameter
+                // below existed and was wired, the row was simply missing.
+                SettingsItem(
+                    icon = Icons.Outlined.Terminal,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.terminal_title),
+                    subtitle = stringResource(R.string.settings_terminal_subtitle),
+                    onClick = onTerminalClick,
+                )
                 SettingsItem(
                     icon = Icons.Outlined.Extension,
                     iconColor = Color(0xFF007AFF),
