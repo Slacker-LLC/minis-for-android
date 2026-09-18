@@ -745,7 +745,20 @@
 | 真机 | **未完成**：`adb devices` 只有模拟器，重启 adb server 与 `adb mdns services`（只发现模拟器自身的 10.0.2.16:5555）都没有物理设备。手机接上后可直接复用本节步骤：`adb install -r -t <apk>` → `am start` → logcat 崩溃扫描 → 逐页截图 | adb 输出 |
 | Release APK | **本环境做不出**：仓库自己的 `requireReleaseSigning` 要求 `RELEASE_*` 生产签名凭据且**明确禁止**回退 debug 签名；`scripts/verify-android-release.sh` 还会拒绝任何 CN=Android Debug 的产物。需要你提供签名环境变量（或密钥库）才能产出并验证 release 包；在此之前可安装可用产物是上面的 debug APK | `build.gradle.kts`、`verify-android-release.sh` |
 
-**下一步（收敛路径）**：① 等真机接入后按上表步骤补真机证据；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + 16k + 模拟器冒烟」这条链。
+### 真机一轮（2026-09-19，小米 24129PN74C / HyperOS / Android 37 / KernelSU Next）
+
+手机接上后按上表步骤跑，**抓到两个真问题并当场修掉**，另外补上了 runtime payload：
+
+| 项 | 结果 |
+|---|---|
+| 启动崩溃（升级安装） | 首次安装即 **ACRA 抓到 `IllegalStateException: Migration didn't properly handle: characters`**：`MIGRATION_20_21` 建了 `index_characters_updated_at`，而 `CharacterEntity` 没声明该索引 → Room 校验迁移后的库失败、应用起不来。**模拟器全新安装看不到**（走建表不跑迁移）。已在实体上声明该索引（并发导出的 `schemas/…/22.json`），重装后无 ACRA、无迁移错误、焦点回到本应用（`f40ec5ed` 前一片：`4d3eefde`） |
+| root 探测在真机上的误解 | 修复崩溃后，「系统增强」页仍显示「这台设备没有 su」——但手机装了 KernelSU Next。从**应用自己的 UID** 实测：`/system/bin/sh` 能执行、`/system/bin/su` 是 ENOENT（管理器对未授权应用隐藏 su），所以「没有 su」对本进程为真、对用户毫无帮助。新增 `RootManagerDetector`（KernelSU Next / KernelSU / APatch / Magisk，走清单 `<queries>` 按名查询），Root 行改为「su 对本应用不可见；本机装有 KernelSU Next——请在它的应用列表里允许本应用（或关闭 su 隐藏）」。你在管理器里授权后，同一台机器上 `run-as llc.slacker.eta /system/bin/su -c 'id -u'` 返回 **0**、页面即可检测到授权（`f40ec5ed`） |
+| runtime payload | 此前 APK **没有** `assets/minis-runtime/…`（`dist/` 为空），Linux 运行时起不来。已跑 `scripts/build-runtime-payload.sh`：Ubuntu Base **24.04.3**（上游 sha256 与仓库 pin 双向校验）→ 叠加 minis 目录布局 → 确定性打包，产物 `dist/ubuntu-arm64-rootfs.tar.gz` **28 902 272 字节**，`verify-runtime-payload.sh dist` 通过；另跑 `scripts/build-root-network-proxy-android.sh` 补回代理 payload（NDK 28.2.13676358 / aarch64-linux-android / API 26） |
+| 完整 APK | `:app:assembleDebug` 后 `app-debug.apk` = **115 219 575 字节（109.9 MiB）**，内含 `assets/minis-runtime/ubuntu-arm64-rootfs.tar.gz`（内嵌 sha256 与 manifest 一致）、25 个 native 库全部 16 KB 对齐（`verify-android-16k.sh`）、`verify-runtime-payload.sh <apk>` 通过；真机 `adb install -r -t` **Success**、启动无崩溃 |
+| 模拟器对照 | API 36（x86_64）模拟器同一 APK 安装/启动/设置页/系统增强页均正常；**升级与全新安装两条路径现在都有证据** |
+| 尚未跑的核心流程 | **guest 运行时在设备上的首次启动**（解包 rootfs 到 `/data/adb/minis/rootfs` + 设备端 apt 安装 python3/git/curl/ping）——这是下一步要测的；另有请求链路需要在本应用里配置 provider（新装实例没有配置，手机上的另一款应用有） |
+
+**下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
