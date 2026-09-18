@@ -145,12 +145,22 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1954 个用例 = 上一项后的 1945 + 9，0 失败）。至此 Eta GUI 动作清单在能力上齐了：启动应用=`android_app launch`、按名检索=`android_app search`、系统面板=`android_ui` 的 back/home/recents/notifications/quick_settings、open URI=`android.intent.send`、等待文本/等待包=`android_ui wait`/`wait_for_package`、定位变体=generation+ref 与 textFilter/resourceIdFilter。真机未验证：启动器可见范围在各 ROM 上的实际数量、`wait_for_package` 在系统繁忙/分屏下的读数、检索结果的排序观感。
 
+**Phase 3 会话级编辑：Markdown 导出** — 同一分支 `codex/eta-phase3-skills-tools`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| Markdown 导出 | 会话导出此前只有 JSON 与纯文本；纯文本把思考压进正文、把工具活动压成没有参数/结果/状态的一行。新增第三种格式：每轮一个标题、思考折进 `<details>`、工具活动逐行引用并带参数、结果与状态（ok/failed/unrecorded） | `d7a61891` | ✅ `ConversationMarkdownExporterTest`（11 例） |
+| 流式与有界 | 投影是纯逻辑（`share/ConversationMarkdownExporter.kt`），按块经既有 staging→zip 管线写出，长会话仍只占一个块的内存；参数与结果截到 400 字符并带显式截断标记；归档内文件名可读（`Minis-<title>-<yyyyMMdd-HHmm>.md`，剔除路径不安全字符、标题截断） | `d7a61891` | ✅ 截断/文件名/空块用例 |
+| 状态不猜 | 工具调用在**结果到达**（下一条 user 行）时才落笔，按 tool_use id 配对；没回来的调用标 `unrecorded`，不冒充成功 | `d7a61891` | 🟡 配对逻辑在 `ChatExporter` 内，宿主未覆盖（纯渲染部分已覆盖） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1965 个用例 = 上一项后的 1954 + 11，0 失败），`:app:lintDebug` 无新增问题（新增字符串已补齐 8 个 locale）。真机未验证：分享面板收到 `.md` 的行为、长会话导出的观感与耗时、`<details>` 在各 Markdown 阅读器里的折叠表现。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板、会话级编辑（Skills 暴露给模型与 GUI 动作补齐已在 `codex/eta-phase3-skills-tools` 落地） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板（Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出已在 `codex/eta-phase3-skills-tools` 落地；复制/编辑/删除/重新生成本仓库原本就有） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
