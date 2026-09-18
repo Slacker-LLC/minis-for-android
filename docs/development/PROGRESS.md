@@ -701,7 +701,7 @@
 | 项 | 内容 | 提交 | 验证 |
 |---|---|---|---|
 | 超限结果落盘、给指针 | MCP 工具结果此前直接进消息历史，头上只有传输层的「单回复 4 MiB」——那不是上下文预算，一个话多的服务器就能把几 MB 文本塞进下一个 provider 请求。现在超限结果经 `ContextOffload.spillIfOversized` 落到会话的 offloads 目录（与日志工具同一条路），模型拿到**头尾预览 + `/var/minis/offloads` 路径**，可以用 `file_read` 带 offset/limit 回去读全文，而不是拿到一截无法追回的正文 | `6dfb8046` | ✅ `MCPToolResultBoundsTest`（5 例：落盘结果用其预览、小结果原样、落盘失败时用带省略标记的裁剪预览、未落盘的 SpillResult 被忽略、内联预算远低于传输上限） |
-| 补上 `SpillPolicy` 缺失的接线 | `SpillPolicy`（上游 DeepSeek Harness 那套 dsh-spill-policy）早已移植，但**全仓只有一句工具描述提到它**，没有任何调用方——也就是说这条策略此前没人真正执行。本片把 MCP 这条路径接上；其余工具路径（shell/日志等）本来就有各自的有界输出 | `6dfb8046` | ✅ 上述用例 + 全量单测 |
+| 补上 `SpillPolicy` 缺失的接线 | `SpillPolicy`（随 Minis for Android 导入的 DeepSeek Harness `dsh-spill-policy` 契约，**不是 Eta**）早已在仓库里，但**全仓只有一句工具描述提到它**，没有任何调用方——也就是说这条策略此前没人真正执行。本片把 MCP 这条路径接上；其余工具路径（shell/日志等）本来就有各自的有界输出 | `6dfb8046` | ✅ 上述用例 + 全量单测 |
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2363 个用例 = 上一项后的 2358 + 5）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实远端服务器返回超大结果时，落盘路径（写入会话 offloads 目录）在设备上的表现未验证。
 
@@ -712,6 +712,15 @@
 | 64 KiB 从「事后检查」变成「过程上界」 | `MCPStdioTransport` 原来在 `BufferedReader.readLine()` **之后**才检查行长——可是 readLine 会先把整行读进内存，所以这个上限只是装饰：本地服务器（可能坏掉、也可能不可信）发一行就能让进程花掉几百 MB。现在读取走 `MCPBoundedLineReader`：边读边卡上限、保留 `readLine` 的 CRLF 与空行语义、连「一直没有换行的洪流」也会被拒；被灌爆的 stdout 帧直接关掉整条传输（杀进程）而不是试图在行中间重新同步；stderr 用同一个读取器配更小的上限，超限就跳到下一个换行（有界），既不放大日志也不让服务器卡在满管上 | `e737fb4e` | ✅ `MCPBoundedLineReaderTest`（8 例：逐行与 EOF、末行无换行、CRLF、空行、恰好到限、超限即拒且报来源与数值、无换行的 5 MB 洪流、跳过后仍能接着读） |
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2371 个用例 = 上一项后的 2363 + 8）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实 stdio MCP 服务器在帧被这样拒绝后的行为（传输已关闭，下次使用由 provider 的 reload 重连）未验证。
+
+**MCP 协议头与一条死路（自查）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 补上 `MCP-Protocol-Version` 等路由头 | 流式 HTTP 规范要求 `initialize` 之后**每个请求**都带 `MCP-Protocol-Version`，上游也确实每次都带；我们此前只发 `Mcp-Session-Id`，严格执行规范的服务器会直接拒掉 `tools/list`/`tools/call`。现在会话把协商到的版本交给传输，随请求发出，并一并带上 `Mcp-Method` 与 `Mcp-Name`（名字走 `x-mcp-header` 那套同一个头编码器，非 ASCII 工具名按规范的 base64 形式发出）；这些头**加在调用方头之后**，工具参数顶不掉协议路由——上游的次序也是这个道理 | `fd4f2198` | ✅ `MCPHttpTransportParamHeaderTest` 增 2 例（初始化前不带版本、设置后逐请求携带且 `Mcp-Method`/`Mcp-Name` 落位；非 ASCII 工具名被包装成 base64 并可解回） |
+| 删掉无人调用的第二套派发 | `MCPProvider.callRemoteTool` 与只为它存在的 `context` 字段/入参：全仓没有任何调用方（真正的派发走 `ToolRegistry` → `MCPToolHandler`），留着是一条没人维护的并行路径 | `fd4f2198` | ✅ 编译 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2373 个用例 = 上一项后的 2371 + 2）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：严格要求路由头的服务器，在我们多带了它自己客户端不会带的头时如何反应，未验证。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 

@@ -24,6 +24,16 @@
 | Eta | `https://github.com/Mangi-11/Eta`（PolyForm Noncommercial 1.0.0） |
 | Eta 历史 PR | `Slacker-LLC/minis-for-android#237`（模块化，已回退）、`#236`（Direct Ubuntu，已合并） |
 
+> **第三条血统：DeepSeek Harness（`dsh-*` 契约）** —— 代码里有一批文件在头注释里写着
+> 「Port of the DeepSeek Harness `dsh-…` contract」，例如 `tools/internal/SpillPolicy.kt`
+> （`dsh-spill-policy`）、`ToolResultPruner.kt`（`dsh-compaction-tool-result-pruner`）、
+> `OutputRetainer.kt`（`dsh-output-retention`）、`ContextPressure.kt`/`TokenMeter.kt`
+> （`dsh-token-meter`）、`ToolCheckpointStore.kt`（`dsh-session-checkpoint-policy`）、
+> `JobRegistry.kt`/`JobTools.kt`（`dsh-tool-jobs`）等。这些字样**随 Minis for Android
+> 导入一起进来**（提交 `b8a0d2a5`，同样的文本也存在于 `Slacker-LLC/minis-for-android`
+> 工作树），**与 Eta 无关**；本索引此前没有为它立条目，读文档时不要把 `dsh-*` 当成 Eta 的东西。
+> 上游链接与许可归属尚未在此登记（Eta 的许可与归属不受影响）。
+
 ## 内部分析资料
 
 | 文件 | 用途 |
