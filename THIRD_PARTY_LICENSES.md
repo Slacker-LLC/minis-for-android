@@ -73,6 +73,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `runtime/guest/MediaQueryPolicy.kt`, the list extensions in `runtime/guest/PhotosOffloadHandler.kt` and `tools/AndroidMediaStoreTools.kt` | `agent/tool/AgentPersonalDataTools.kt` (`search_media`, `search_audio`, `search_recordings`, `search_files`) and the media entries in `agent/model/AgentDeviceToolCatalog.kt` |
 | `roleplay/CharacterCard.kt`, `roleplay/CharacterCardCodec.kt`, `roleplay/CharacterCardPng.kt`, `roleplay/CharacterCardException.kt` | `agent/roleplay/CharacterCard.kt`, `CharacterCardCodec.kt`, `CharacterCardPng.kt`, `CharacterCardException.kt` |
 | `roleplay/CharacterWorldbook.kt`, `roleplay/CharacterWorldbookSupport.kt` | `agent/roleplay/CharacterWorldbook.kt`, `CharacterWorldbookSupport.kt` |
+| `roleplay/CharacterMacros.kt`, `roleplay/CharacterCardCompatibility.kt` | `agent/roleplay/CharacterMacros.kt`, `CharacterCardCompatibility.kt` |
 
 
 ## Active native/runtime components
