@@ -1,6 +1,5 @@
 package com.openminis.app.runtime.guest
 
-import android.app.ActivityManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -202,15 +201,9 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun isAppForeground(): Boolean {
-        return try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                ?: return true  // can't tell — assume OK, let the actual call surface errors
-            val procs = am.runningAppProcesses.orEmpty()
-            val pid = android.os.Process.myPid()
-            procs.any { it.pid == pid && it.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND }
-        } catch (_: Throwable) {
-            true
-        }
+        // One implementation for every handler — the alarm/open CLIs need the
+        // same answer to tell a blocked launch apart from a missing app.
+        return OffloadForeground.isAppForeground(context)
     }
 
     private fun backgroundError(args: OffloadArgs) = NativeOffloadResult(

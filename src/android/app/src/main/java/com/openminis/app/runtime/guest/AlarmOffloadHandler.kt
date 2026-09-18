@@ -98,6 +98,20 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
         // permission-stripped fork) is now a hard error — no silent fallback.
         val systemErr = scheduleViaSystemClock(label, hour, minute, mode)
         if (systemErr != null) {
+            // ActivityNotFoundException is ambiguous: Android blocks activity
+            // starts from a background app and reports the same exception a
+            // missing handler would. Find out which one this is before telling
+            // the user to install a Clock app they already have.
+            if (!OffloadForeground.isAppForeground(context)) {
+                AppLogger.warning(TAG, "set: refused while Minis was backgrounded — $systemErr")
+                return NativeOffloadResult(
+                    1,
+                    OffloadOutput.formatBody(
+                        OffloadForeground.backgroundLaunchBody("AlarmClock.ACTION_SET_ALARM").toString(),
+                        args,
+                    ) + "\n",
+                )
+            }
             val body = JSONObject().put("error", "system_clock_unavailable")
                 .put("message", systemErr)
                 .put("hint", "Re-enable or install a Clock app (e.g. Google Clock) and grant the SET_ALARM permission.")
@@ -201,6 +215,16 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
         // com.google.android.deskclock/.HandleSetApiCalls on Pixel 4a + 6.
         val systemErr = startSystemTimer(label, secs)
         if (systemErr != null) {
+            if (!OffloadForeground.isAppForeground(context)) {
+                AppLogger.warning(TAG, "timer: refused while Minis was backgrounded — $systemErr")
+                return NativeOffloadResult(
+                    1,
+                    OffloadOutput.formatBody(
+                        OffloadForeground.backgroundLaunchBody("AlarmClock.ACTION_SET_TIMER").toString(),
+                        args,
+                    ) + "\n",
+                )
+            }
             val body = JSONObject().put("error", "system_clock_unavailable")
                 .put("message", systemErr)
                 .put("hint", "Re-enable or install a Clock app (e.g. Google Clock) and grant the SET_ALARM permission.")
@@ -260,6 +284,16 @@ class AlarmOffloadHandler(private val context: Context) : NativeOffloadHandler {
                 .put("hint", "System Clock launched. Tell the user to view, edit, or cancel alarms in the Clock app's Alarms tab (or Timers tab for timers). Minis cannot enumerate or cancel alarms programmatically — Android's Clock API is fire-and-forget.")
             emitEnvelope("open", data, args)
         } catch (e: ActivityNotFoundException) {
+            if (!OffloadForeground.isAppForeground(context)) {
+                AppLogger.warning(TAG, "open: refused while Minis was backgrounded")
+                return NativeOffloadResult(
+                    1,
+                    OffloadOutput.formatBody(
+                        OffloadForeground.backgroundLaunchBody("AlarmClock.ACTION_SHOW_ALARMS").toString(),
+                        args,
+                    ) + "\n",
+                )
+            }
             val body = JSONObject().put("error", "no_clock_app")
                 .put("message", "No Clock app handles ACTION_SHOW_ALARMS. Install or re-enable a Clock app to manage alarms.")
                 .toString()

@@ -96,6 +96,19 @@ class OpenOffloadHandler(private val context: Context) : NativeOffloadHandler {
      * error message with a hint the model can relay to the user.
      */
     private fun maybeFallback(url: String, original: ActivityNotFoundException, args: OffloadArgs): NativeOffloadResult {
+        // Same ambiguity as the alarm CLI: a background app cannot start
+        // activities and the platform reports that as this exception. Say so
+        // rather than "install a compatible app" — it is already installed.
+        if (!OffloadForeground.isAppForeground(context)) {
+            Log.w(TAG, "refused while Minis was backgrounded: '$url'")
+            return NativeOffloadResult(
+                1,
+                OffloadOutput.formatBody(
+                    OffloadForeground.backgroundLaunchBody("ACTION_VIEW", url).toString(),
+                    args,
+                ) + "\n",
+            )
+        }
         // market: → Huawei AppGallery on HMS-only devices
         if (url.startsWith("market://") && OsCompat.isHuawei) {
             val pkg = Uri.parse(url).getQueryParameter("id")
