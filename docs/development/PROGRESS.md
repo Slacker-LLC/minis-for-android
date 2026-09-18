@@ -455,6 +455,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2197 个用例 = 上一项后的 2192 + 5，0 失败）。**没有任何设备结论**：某些 ROM 仅凭 READ_SMS 读不到 provider（还需要默认短信应用角色），未验证；被拒时工具返回 provider 自己的拒绝信息而不是空列表。
 
+**Phase 4 补片（二）：设备开关与 App 冻结** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `set_device_state` → `android.device.state` | 上游用一条 root 命令直接开关 Wi-Fi/蓝牙（`svc wifi enable|disable`、`cmd bluetooth_manager enable|disable`）；这里把同两条命令写成 **argv** 走结构化特权通道，目标先校验、未知目标直接拒绝（Wi-Fi 与蓝牙是两个系统服务，猜错就是静默切错无线电）；回答是共享的命令结果（backend/exitCode/stdout/stderr/timedOut）+ 请求内容，而不是一个光秃秃的布尔 | `83a0551e` | ✅ `DeviceStatePolicyTest`（4 例） |
+| `app_state_control` → `android_app` 的 `freeze`/`unfreeze` | 上游三个动作里 `force_stop` 本仓库早有（`android_app stop`），这次补上另外两个：`pm disable-user`（冻结，保留数据但不能再运行）与 `pm enable`（解冻）。三条命令统一收进一个纯策略 `AppStatePolicy`，`stop` 也改用它——同一命令只有一处实现；包名走既有的 `requirePackageName` 校验；风险级别定为 **DESTRUCTIVE**（需一次性审批）：冻结会改写别的包的启用状态，选错目标是系统应用就会一直用到解冻 | `bb350a4b` | ✅ `AppStatePolicyTest`（4 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2205 个用例 = 上一项后的 2197 + 4 + 4，0 失败）。**没有任何设备结论**：某些 ROM 是否允许 `pm disable-user` 经特权通道动系统包、`svc wifi`/`cmd bluetooth_manager` 是否被接受，均未验证；工具如实返回 exit code 与 stderr。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
