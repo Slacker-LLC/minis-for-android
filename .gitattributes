@@ -1,0 +1,35 @@
+# Keep repository text files on LF.
+#
+# Linux/WSL builds rely on shell shebangs and Gradle scripts being checked out
+# without CRLF conversion. This also avoids environment-specific diff noise.
+* text=auto eol=lf
+
+# Executable scripts must remain LF.
+*.sh    text eol=lf
+gradlew text eol=lf
+
+# Windows command files use CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files must not receive line-ending conversion.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.tar  binary
+*.jar  binary
+*.apk  binary
+*.aar  binary
+*.so   binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.keystore binary
+*.jks  binary

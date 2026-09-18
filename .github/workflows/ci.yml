@@ -1,0 +1,411 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-24.04
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      docs: ${{ steps.filter.outputs.docs }}
+      network_proxy: ${{ steps.filter.outputs.network_proxy }}
+      rootfs: ${{ steps.filter.outputs.rootfs }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]] || ! git cat-file -e "$BASE_SHA^{commit}"; then
+            BASE_SHA="$(git rev-list --max-parents=0 "$HEAD_SHA")"
+          fi
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            BASE_SHA="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          fi
+
+          android=false
+          docs=false
+          network_proxy=false
+          rootfs=false
+
+          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          printf 'Changed files:\n'
+          printf '  %s\n' "${changed_files[@]}"
+
+          for path in "${changed_files[@]}"; do
+            case "$path" in
+              deps/build_rclone_android.sh|deps/rclone-mobile/*|scripts/verify-android-16k.sh|scripts/verify-android-bundle.sh|scripts/test-android-16k.py)
+                android=true
+                ;;
+            esac
+            case "$path" in
+              *.md|AGENTS.md|LICENSE|scripts/check_docs_provenance.py|scripts/test_docs_provenance.py)
+                docs=true
+                ;;
+            esac
+            case "$path" in
+              src/native/root-network-proxy/*|scripts/build-root-network-proxy-android.sh|scripts/verify-root-network-proxy.sh)
+                network_proxy=true
+                android=true
+                ;;
+            esac
+            case "$path" in
+              scripts/build-ubuntu-rootfs.sh|scripts/build-runtime-payload.sh|scripts/test-build-ubuntu-rootfs-verification.sh|scripts/test-runtime-payload-verification.sh|scripts/verify-runtime-payload.sh|scripts/verify-android-release.sh|scripts/check-runtime-package-boundary.sh|src/android/*)
+                rootfs=true
+                ;;
+            esac
+            case "$path" in
+              src/android/*|src/shared/bashism/*|scripts/build-ubuntu-rootfs.sh|scripts/build-root-network-proxy-android.sh|scripts/build-runtime-payload.sh|scripts/gen_debug_skill_android.sh|scripts/verify-runtime-payload.sh|scripts/verify-root-network-proxy.sh|scripts/verify-android-release.sh)
+                android=true
+                ;;
+            esac
+            if [[ "$path" == ".github/workflows/ci.yml" ]]; then
+              android=true
+              docs=true
+              network_proxy=true
+              rootfs=true
+            fi
+          done
+
+          {
+            echo "android=$android"
+            echo "docs=$docs"
+            echo "network_proxy=$network_proxy"
+            echo "rootfs=$rootfs"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  build-cleanup:
+    name: Build cleanup guard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guard unit tests
+        run: python3 scripts/test_build_cleanup_guard.py
+      - name: Check canonical build paths and active tooling
+        run: python3 scripts/check_build_cleanup.py
+
+  docs-provenance:
+    name: Documentation provenance guard
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Guard unit tests
+        run: python3 scripts/test_docs_provenance.py
+      - name: Check current docs and provenance allowlist
+        run: python3 scripts/check_docs_provenance.py
+
+  root-network-proxy-quality:
+    name: Root network proxy quality
+    needs: changes
+    if: needs.changes.outputs.network_proxy == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust quality components
+        run: rustup component add rustfmt clippy
+      - name: Format
+        run: cargo fmt --manifest-path src/native/root-network-proxy/Cargo.toml --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path src/native/root-network-proxy/Cargo.toml --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --locked --manifest-path src/native/root-network-proxy/Cargo.toml
+      - name: Release build
+        run: cargo build --locked --release --manifest-path src/native/root-network-proxy/Cargo.toml
+
+  rootfs-verification:
+    name: Rootfs verification tests
+    needs: changes
+    if: needs.changes.outputs.rootfs == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Shell syntax
+        run: bash -n scripts/build-ubuntu-rootfs.sh scripts/build-root-network-proxy-android.sh scripts/build-runtime-payload.sh scripts/test-build-ubuntu-rootfs-verification.sh scripts/test-runtime-payload-verification.sh scripts/verify-runtime-payload.sh scripts/verify-root-network-proxy.sh scripts/verify-android-release.sh scripts/check-runtime-package-boundary.sh
+      - name: Fail-closed checksum tests
+        run: bash scripts/test-build-ubuntu-rootfs-verification.sh
+      - name: Runtime payload verification tests
+        run: bash scripts/test-runtime-payload-verification.sh
+      - name: Runtime package boundary contract
+        run: bash scripts/check-runtime-package-boundary.sh
+
+  runtime-payload:
+    name: Build verified Ubuntu rootfs payload
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and verify rootfs-only runtime payload
+        run: bash scripts/build-runtime-payload.sh
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-runtime-payload
+          path: |
+            dist/ubuntu-arm64-rootfs.tar.gz
+            dist/ubuntu-arm64-rootfs.tar.gz.sha256
+            dist/ubuntu-arm64-rootfs.manifest.json
+            dist/runtime-manifest.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  root-network-proxy-android:
+    name: Build Android Root network proxy
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned Android NDK and Rust target
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          test -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          rustup target add aarch64-linux-android
+      - name: Build and verify Root network proxy
+        run: |
+          bash scripts/build-root-network-proxy-android.sh
+          bash scripts/verify-root-network-proxy.sh dist
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-root-network-proxy
+          path: |
+            dist/minis-root-network-proxy-arm64-v8a
+            dist/minis-root-network-proxy-arm64-v8a.sha256
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  rclone-android:
+    name: Build rclone Android binding
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: deps/rclone-mobile/go.mod
+          cache: true
+          cache-dependency-path: deps/rclone-mobile/go.sum
+      - name: Install pinned Android NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          test -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+      - name: Build upstream rclone gomobile AAR
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@f98cc9b
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          gomobile init
+          bash deps/build_rclone_android.sh
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rclone-android-aar
+          path: deps/build/rclone/rclone.aar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  android-checks:
+    name: Android ${{ matrix.name }}
+    needs: [changes, rclone-android]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: unit tests
+            task: :app:testDebugUnitTest
+          - name: debug lint
+            task: :app:lintDebug
+          - name: release lint
+            task: :app:lintRelease
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: rclone-android-aar
+          path: src/android/app/libs
+      - name: Prepare Gradle wrapper
+        run: chmod +x src/android/gradlew
+      - name: Run ${{ matrix.name }}
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '0'
+        working-directory: src/android
+        run: ./gradlew ${{ matrix.task }} --max-workers=4 --stacktrace
+      - name: Verify PTY JNI lifecycle on Linux
+        if: matrix.name == 'unit tests'
+        run: python3 scripts/test_pty_bridge.py
+
+  android-debug-build:
+    name: Android debug build
+    needs: [changes, runtime-payload, root-network-proxy-android, rclone-android]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-runtime-payload
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-root-network-proxy
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: rclone-android-aar
+          path: src/android/app/libs
+      - name: Prepare Gradle wrapper
+        run: chmod +x src/android/gradlew
+      - name: Run debug build
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '1'
+        working-directory: src/android
+        run: ./gradlew :app:assembleDebug --max-workers=4 --stacktrace
+      - name: Verify debug APK runtime payload
+        run: |
+          bash scripts/verify-runtime-payload.sh src/android/app/build/outputs/apk/debug/app-debug.apk
+          bash scripts/verify-root-network-proxy.sh src/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify debug APK 16 KB native alignment
+        run: |
+          python3 scripts/test-android-16k.py
+          bash scripts/verify-android-16k.sh src/android/app/build/outputs/apk/debug/app-debug.apk
+
+  android-release:
+    name: Android release build and verification
+    needs: [changes, runtime-payload, root-network-proxy-android, rclone-android]
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_KEYSTORE: /tmp/ci-release.jks
+      RELEASE_STORE_PASSWORD: ci-release-pass
+      RELEASE_KEY_ALIAS: ci-release
+      RELEASE_KEY_PASSWORD: ci-release-pass
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-runtime-payload
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-root-network-proxy
+          path: dist
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: rclone-android-aar
+          path: src/android/app/libs
+      - name: Prepare Gradle wrapper
+        run: chmod +x src/android/gradlew
+      - name: Verify missing release credentials fail closed
+        working-directory: src/android
+        run: |
+          set +e
+          output="$(env -u RELEASE_KEYSTORE -u RELEASE_STORE_PASSWORD -u RELEASE_KEY_ALIAS -u RELEASE_KEY_PASSWORD \
+            ./gradlew :app:requireReleaseSigning --max-workers=4 --stacktrace 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "release signing gate unexpectedly succeeded without credentials" >&2
+            exit 1
+          fi
+          if ! grep -Fq "Production release signing is not configured." <<<"$output"; then
+            echo "release signing check failed for an unexpected reason" >&2
+            exit 1
+          fi
+      - name: Generate ephemeral CI release key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RELEASE_KEYSTORE" \
+            -storepass "$RELEASE_STORE_PASSWORD" \
+            -keypass "$RELEASE_KEY_PASSWORD" \
+            -alias "$RELEASE_KEY_ALIAS" \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Minis CI Release,O=Slacker LLC,C=US"
+      - name: Assemble release
+        env:
+          MINIS_REQUIRE_RUNTIME_PAYLOAD: '1'
+        working-directory: src/android
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --max-workers=4 --stacktrace
+      - name: Verify release APK
+        run: bash scripts/verify-android-release.sh src/android/app/build/outputs/apk/release/app-release.apk
+      - name: Verify bundle-generated APK
+        run: |
+          export BUNDLETOOL_JAR="$RUNNER_TEMP/bundletool-all-1.18.3.jar"
+          curl -fL --retry 3 https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar -o "$BUNDLETOOL_JAR"
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $BUNDLETOOL_JAR" | sha256sum -c -
+          bash scripts/verify-android-bundle.sh src/android/app/build/outputs/bundle/release/app-release.aab
+
+  android:
+    name: Android build, test and release checks
+    if: always()
+    needs: [changes, runtime-payload, root-network-proxy-android, android-checks, android-debug-build, android-release]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify Android check results
+        env:
+          ANDROID_CHANGED: ${{ needs.changes.outputs.android }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          PAYLOAD_RESULT: ${{ needs.runtime-payload.result }}
+          PROXY_RESULT: ${{ needs.root-network-proxy-android.result }}
+          CHECKS_RESULT: ${{ needs.android-checks.result }}
+          BUILD_RESULT: ${{ needs.android-debug-build.result }}
+          RELEASE_RESULT: ${{ needs.android-release.result }}
+        run: |
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Changed-path detection failed: $CHANGES_RESULT" >&2
+            exit 1
+          fi
+          if [[ "$ANDROID_CHANGED" != "true" ]]; then
+            echo "No Android-related files changed; Android checks were skipped."
+            exit 0
+          fi
+          if [[ "$PAYLOAD_RESULT" != "success" || "$PROXY_RESULT" != "success" || "$CHECKS_RESULT" != "success" || "$BUILD_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
+            echo "Android checks failed: payload=$PAYLOAD_RESULT proxy=$PROXY_RESULT checks=$CHECKS_RESULT build=$BUILD_RESULT release=$RELEASE_RESULT" >&2
+            exit 1
+          fi
+          echo "All Android checks passed."

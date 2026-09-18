@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- T33: Check Update — needed to launch the system installer for the
+         downloaded APK. The user must additionally grant "install unknown
+         apps" for this package the first time they upgrade. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Generic agent/shell execution uses a truthful specialUse FGS on API 34+.
+         It is neither media playback nor data synchronization. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Retained for genuine audio/media playback surfaces that may require a
+         dedicated mediaPlayback FGS. AgentForegroundService does not declare or
+         request this type. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- T50: PARTIAL_WAKE_LOCK held by AgentForegroundService while sessions
+         are streaming so Doze + OEM CPU throttling don't stall long shell
+         tools after screen-off. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- T-bg-overlay phase 2: floating tool-status capsule rendered via
+         WindowManager TYPE_APPLICATION_OVERLAY while Minis is backgrounded
+         and an agent task is in flight. The user must additionally grant
+         "Display over other apps" the first time they toggle the feature
+         on; the app silently falls back to the Phase 1 notification when
+         the permission is missing. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- T50: deep-link the user to the system battery-optimisation
+         exemption dialog when they tap the Background settings row. The
+         permission only governs whether ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+         can be issued without falling through to the broader settings list. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- [T-android-dynamic-island] Android 16 (Baklava) Live Updates: lets the
+         ongoing agent-status notification be promoted to the always-visible
+         status-chip / "dynamic island" surface. Non-runtime (install-time)
+         permission; ignored on pre-16 devices. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Special access: user grants this in Settings; never auto-escalated. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- Android 13+: nearby Wi-Fi is a runtime permission. Fine location stays
+         declared because scan results can reveal physical location. -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- Android 12+: paired-device metadata and scans are runtime-gated. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- T36: WRITE_CONTACTS — required by `android-contacts delete <id>`. -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- P10 Gate 3b: android.sms.read / android.call_log.read (runtime-gated). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Legacy WRITE grant needed on Android 10 base ROMs (e.g. HarmonyOS 2.x /
+         EMUI 11, Huawei Mate 40 ELS-AN00) so the Direct Root bind mount can
+         see the /mnt/runtime/write FUSE view. Capped at API 29 — ignored on
+         Android 11+. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- T219: Mount External Folders exposes SAF-picked tree URIs at
+         /var/minis/mounts/ through a Direct Root bind mount. The persisted
+         grant is still checked before each Android-side access and before each
+         launch; MANAGE_EXTERNAL_STORAGE is required on ROMs whose FUSE layer
+         filters other packages' files from the mounted tree. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <!-- "Take Photo" composer entry. We never use the camera background; the
+         permission is requested at the moment the user taps the menu item. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <!-- T262-1: required to dispatch AlarmClock.ACTION_SET_ALARM to
+         com.google.android.deskclock/.HandleSetApiCalls. The receiving
+         activity is permission-protected; without this normal-protection
+         permission the OS throws SecurityException at startActivity time
+         and android-alarm's dual-write silently degrades to the internal
+         AlarmManager copy only. T259 added <queries> + FLAG_ACTIVITY_NEW_TASK
+         which made resolveActivity report the target, but resolution alone
+         doesn't unblock the call — the permission does. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
+    <!-- [T-android-privileged-backend] AXManager only pushes its binder to
+         apps whose requestedPermissions list contains one of three sentinels
+         (see AxManager BinderSender#sendBinder). Without one of these
+         declared, AXManager skips us and Shizuku.pingBinder() stays false
+         even though AXManager's service is running. Shizuku itself does NOT
+         need this permission — it discovers clients via its ContentProvider
+         + INTERACT_ACROSS_USERS_FULL gating — but declaring it is the
+         standard Shizuku-client manifest practice (used by Magisk Manager,
+         Brevent, etc.) and unlocks the AXManager push path. The permission
+         is normal-protection and isn't actually granted; AXManager only
+         checks that we *requested* it. -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!-- Package visibility for speech recognition services + Custom Tabs
+         (Android 11+ scoped queries). -->
+    <queries>
+        <!-- Android debug tools may inspect user-visible launcher apps without
+             requesting QUERY_ALL_PACKAGES. Non-launcher/arbitrary packages
+             remain subject to Android 11 visibility and require an explicitly
+             authorized Root/Shizuku `pm` fallback. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- T234: needed for androidx.browser CustomTabsClient.bindCustomTabsService
+             to discover the user's Chrome (or any Custom Tabs provider) under
+             Android 11+ package-visibility rules. Without this the bind silently
+             returns false and Google login navigation falls back to the
+             ACTION_VIEW path. -->
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <!-- T259: surface the system Clock app for diagnostics so
+             android-alarm's dual-write resolveActivity returns non-null
+             on Android 11+. SET_ALARM is in the visibility allowlist
+             so startActivity already works without this, but the
+             pre-flight resolve gives us a cleaner log/fallback path. -->
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SHOW_ALARMS" />
+        </intent>
+        <!-- T266b: SET_TIMER for android-alarm timer — same Clock activity
+             handles it, but the queries entry keeps resolveActivity honest
+             on Android 11+. The com.android.alarm.permission.SET_ALARM perm
+             gates dispatch for both SET_ALARM and SET_TIMER. -->
+        <intent>
+            <action android:name="android.intent.action.SET_TIMER" />
+        </intent>
+        <!-- T322: Shizuku — package-visibility entry so we can detect whether the
+             user has the Shizuku Manager app installed and report accurate state
+             in Settings (NOT_INSTALLED vs NOT_RUNNING vs RUNNING_NEED_PERM …). -->
+        <package android:name="moe.shizuku.privileged.api" />
+        <!-- [T-android-privileged-backend] AXManager — same package-visibility
+             need so PrivilegedBackend can detect/launch it under Android 11+. -->
+        <package android:name="frb.axeron.manager" />
+        <!-- Crash-share dialog: ACTION_SENDTO mailto: needs explicit
+             visibility under Android 11+ before resolveActivity / startActivity
+             will return a real email-app candidate. Without it the
+             pre-flight resolveActivity always returns null and we fall
+             through to the generic share chooser. -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".MinisApp"
+        android:allowBackup="false"
+        android:largeHeap="true"
+        android:requestLegacyExternalStorage="true"
+        android:preserveLegacyExternalStorage="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
+        android:theme="@style/Theme.Minis">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.Minis"
+            android:windowSoftInputMode="adjustResize">
+            <!-- T-android-dynamic-app-icon: LAUNCHER intent-filter moved
+                 to the <activity-alias> entries below so the user can pick
+                 an alternate icon. Exactly one alias is enabled at a time
+                 (PackageManager.setComponentEnabledSetting); MainActivity
+                 itself never appears in the launcher directly, but all
+                 internal Intent(this, MainActivity::class.java) startActivity
+                 calls keep working because MainActivity is always enabled.
+                 The minis:// deep-link filter stays on MainActivity since
+                 deep-links never go through the LAUNCHER category. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="minis" />
+            </intent-filter>
+            <!-- A fallback contract for OEMs that invoke the assistant through
+                 ACTION_ASSIST instead of the VoiceInteractionService session. -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- [T-assist-voice-assist] HyperOS power-menu “语音助手” launches
+                 ACTION_VOICE_ASSIST (verified in MiuiSystemUI
+                 GlobalActionsDialogLite: startActivity(new
+                 Intent(ACTION_VOICE_ASSIST))). Registering the standard action
+                 lets the power menu open Minis directly — no OEM hack. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- T-android-dynamic-app-icon: launcher-icon aliases. Exactly
+             ONE of these three is enabled at any time; AppIconRepository
+             flips the enabled state in response to a Settings → App Icon
+             tap. All three target MainActivity, so the user-visible
+             launcher entry just swaps icon + label, no actual activity
+             change. Pre-install state: "auto" is enabled in the manifest
+             (android:enabled="true"), the other two are disabled. -->
+        <activity-alias
+            android:name=".MainActivityIconAuto"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- T-android-app-icon-shortcuts: app-icon long-press quick
+                 actions (mirrors iOS QuickActionRouter / UIApplicationShortcutItem).
+                 Three static shortcuts (new_chat / voice_chat / camera_chat)
+                 launch MainActivity via minis://action/<name> deep-link.
+                 The shortcuts meta-data must live on the alias that owns
+                 the LAUNCHER filter, not on MainActivity itself. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityIconLight"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_classic_light"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityIconDark"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_classic_dark"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+
+        <!-- Share receiver activity -->
+        <activity
+            android:name=".share.ShareReceiverActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Minis">
+            <!-- T157: widen mime to */* so Minis appears in the system share
+                 sheet for any file type (xml/pdf/zip/audio/video/…). The
+                 narrower text/plain + image/* + application/* set hid Minis
+                 from the chooser whenever the source app declared a more
+                 specific mime. ShareReceiverActivity already handles any
+                 incoming mime via the T185/T150 attachment path, so the
+                 wildcard is safe. Mirrors LocalSend's behaviour. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <!-- T142: ACTION_VIEW filters so Minis appears in the system
+                 "Open with" chooser triggered by other apps (Telegram tap-to-
+                 open, gallery long-press → Open with, file manager Open as…).
+                 Each mime is its own filter — using "*/*" would force Minis
+                 into every file chooser on the device and several OEM ROMs
+                 actively reject the registration. Mirror only mimes a chat
+                 composer can usefully prefill: images, PDFs, plain/structured
+                 text, audio/video files, common app archives. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="application/zip" />
+            </intent-filter>
+            <!-- T163: register for the system "Open with" chooser when the
+                 user taps a file in Files / Photos / any document viewer.
+                 The T142 filters above only fire for BROWSABLE intents
+                 (web links, deep-links) and never list Minis in the OEM
+                 file manager's chooser. Termux's working pattern is
+                 scheme=file + scheme=content + mimeType=*/* without
+                 BROWSABLE — file managers don't tag intents BROWSABLE.
+                 ShareReceiverActivity.handleView already routes the
+                 intent.data uri through the same T185/T150 attachment
+                 path, so any mime is safe. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- T-pwa-1 (renamed Pwa → WebApp): WebApp shortcut host.
+             Reachable only via explicit Intent from a pinned launcher
+             shortcut (ACTION_OPEN_WEBAPP + extras). Old ACTION_OPEN_PWA
+             intent-filter intentionally removed: per user direction,
+             home-screen icons pinned before the rename are not preserved
+             and will return "intent not found" on tap; the user has to
+             re-add them from inside the app. -->
+        <activity
+            android:name=".webapp.WebAppActivity"
+            android:label="@string/webapp_activity_label"
+            android:launchMode="singleInstance"
+            android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="false"
+            android:theme="@style/Theme.Minis">
+            <intent-filter>
+                <action android:name="com.openminis.app.action.OPEN_WEBAPP" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- OAuth callback handler: captures localhost redirects for all providers -->
+        <!-- Prevents "Choose activity" dialog when OAuth provider redirects to localhost -->
+        <activity
+            android:name=".auth.OAuthRedirectActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.NoDisplay">
+            <!-- Claude: http://localhost:54545/callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="54545"
+                    android:path="/callback" />
+            </intent-filter>
+            <!-- OpenAI: http://localhost:1455/auth/callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="1455"
+                    android:path="/auth/callback" />
+            </intent-filter>
+            <!-- Gemini: http://localhost:8085/oauth2callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="8085"
+                    android:path="/oauth2callback" />
+            </intent-filter>
+            <!-- OpenRouter: http://localhost:3000/callback (+fallback ports) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="3000"
+                    android:path="/callback" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="3001"
+                    android:path="/callback" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="localhost"
+                    android:port="3002"
+                    android:path="/callback" />
+            </intent-filter>
+        </activity>
+
+        <!-- Generic agent/shell execution foreground service. specialUse is
+             the narrow truthful type because interactive/headless agent turns do
+             not match mediaPlayback or dataSync. The subtype is required for
+             Android 14+ specialUse declarations. -->
+        <service
+            android:name=".service.AgentForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Active AI agent turn with model streaming and bounded tool execution" />
+        </service>
+
+        <!-- Alarm broadcast receiver (also handles BOOT_COMPLETED for re-scheduling).
+             exported=false: BOOT_COMPLETED is a protected broadcast that the
+             system still delivers to non-exported receivers, while exported=true
+             let ANY third-party app send an explicit ComponentName broadcast to
+             fake a "Minis Alarm" notification or delete persisted alarm entries. -->
+        <receiver
+            android:name=".offload.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- [T-android-mcp-server] Confirm-queue notification actions (批准/拒绝).
+             Explicit PendingIntent broadcasts only (exported=false); answers the
+             shared ConfirmQueue and cancels the notification. -->
+        <receiver
+            android:name=".notification.McpConfirmReceiver"
+            android:exported="false" />
+
+        <!-- Scheduled notification receiver — fires `android-notification schedule`
+             alarms so the deferred notification posts at the requested time. -->
+        <receiver
+            android:name=".offload.ScheduledNotificationReceiver"
+            android:exported="false" />
+
+        <!-- [T-android-scheduled-tasks-design] AlarmManager target for
+             user-defined scheduled tasks (Settings → home top-right
+             schedule icon). The receiver dispatches to ScheduledAgentRunner
+             which drives the agent loop headlessly. -->
+        <receiver
+            android:name=".scheduled.ScheduledTaskAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Notification listener — lets android-notification read active notifications.
+             User must enable this manually in Settings → Notifications → Device &
+             app notifications → Notification access. -->
+        <service
+            android:name=".offload.MinisNotificationListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- T322: Shizuku in-process content provider. Required by Shizuku
+             SDK >=12 to host the binder receiver inside our process. Marked
+             multiprocess=false so :acra reporter process doesn't try to host
+             a second copy. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- [T-android-privileged-backend] AXManager (Axeron) reuses this
+             same `<applicationId>.shizuku` ShizukuProvider — its
+             AxeronService#sendBinderToUserApp() resolves
+             "$packageName.shizuku" and calls Shizuku's "sendBinder" provider
+             method with extra "moe.shizuku.privileged.api.intent.extra.BINDER"
+             (verified in fahrez182/AxManager server/AxeronService.kt). The
+             only client-side requirement is the API_V23 uses-permission
+             above; no separate provider or AIDL surface is needed. -->
+
+        <!-- FileProvider for sharing exported JSON (provider config, etc.)
+             to other apps. Paths exposed are under app-scoped cache. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+        <provider
+            android:name=".providers.MinisDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <!-- T323: AccessibilityService backing `android-a11y-cli`. The user
+             must enable this manually under Settings → Accessibility; we
+             never start it programmatically (Android forbids that). -->
+        <service
+            android:name=".accessibility.MinisAccessibilityService"
+            android:exported="true"
+            android:label="@string/a11y_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/minis_accessibility_service" />
+        </service>
+
+        <service
+            android:name=".mcp.server.MCPKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MCP Server keep-alive across lock screen" />
+        </service>
+
+        <!-- OpenMinis Pet fork: universal pet package control surface. -->
+        <activity
+            android:name=".pet.PetControlActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Minis" />
+        <service
+            android:name=".pet.PetOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-enabled animated desktop pet overlay" />
+        </service>
+
+        <!-- Default digital assistant (RoleManager.ROLE_ASSISTANT) support:
+             long-press Home / voice invocation opens the app. -->
+        <service
+            android:name=".voice.AssistService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+        </service>
+        <service
+            android:name=".voice.AssistSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <!-- The voice-interaction metadata must point to a real recognition
+             service.  This bridge delegates to the user's existing system ASR
+             service and never recursively selects itself. -->
+        <service
+            android:name=".voice.AssistRecognitionService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/assist_recognition_service" />
+        </service>
+    </application>
+</manifest>

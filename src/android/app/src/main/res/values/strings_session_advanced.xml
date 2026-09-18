@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="session_advanced_settings_title">Session prompt</string>
+    <string name="session_advanced_settings_menu">Session prompt</string>
+    <string name="session_advanced_settings_inherit_help">Overrides apply only to this session. Turn off Custom to inherit the current global or model default.</string>
+    <string name="session_advanced_custom">Custom</string>
+    <string name="session_advanced_runtime_section">Session behavior</string>
+    <string name="session_advanced_runtime_help">Memory and thinking reuse the existing per-session controls, so changes take effect immediately and are not duplicated inside the override JSON.</string>
+    <string name="session_advanced_memory">Memory</string>
+    <string name="session_advanced_memory_help">Allow this session to inject and use persistent memory.</string>
+    <string name="session_advanced_thinking">Thinking level</string>
+    <string name="session_advanced_thinking_not_supported">Not supported by the current model</string>
+    <string name="session_advanced_instructions_section">Session prompt</string>
+    <string name="session_advanced_system_prompt">Session prompt</string>
+    <string name="session_advanced_system_prompt_hint">Role, prompt instructions, tone, and behavior for this conversation.</string>
+    <string name="session_advanced_soul_help">Global prompt is used by default. If you set a custom prompt before the first message, it replaces the global prompt for this conversation. The choice locks when chat starts.</string>
+    <string name="session_advanced_soul_locked_help">This conversation has already started. Its prompt choice is locked and cannot be changed, even after clearing chat history.</string>
+    <string name="session_advanced_soul_locked_custom">Custom prompt · locked</string>
+    <string name="session_advanced_soul_locked_global">Global prompt · locked</string>
+    <string name="session_advanced_model_section">Model parameters</string>
+    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature_hint">0.0–2.0</string>
+    <string name="session_advanced_max_tokens">Max output tokens</string>
+    <string name="session_advanced_max_tokens_hint">Positive integer</string>
+    <string name="session_advanced_tools_section">Tools</string>
+    <string name="session_advanced_tools">Custom tool allow-list</string>
+    <string name="session_advanced_tools_help">Limits the tools otherwise available to this session. Model, memory, preset, and runtime capability checks can still remove tools.</string>
+    <string name="session_advanced_save">Save</string>
+    <string name="session_advanced_reset_all">Reset overrides</string>
+    <string name="session_advanced_loading">Preparing session settings…</string>
+    <string name="session_advanced_missing_session">Could not prepare this session.</string>
+    <string name="session_advanced_invalid_prompt">Enter session prompt instructions or turn off Custom.</string>
+    <string name="session_advanced_invalid_temperature">Temperature must be between 0.0 and 2.0.</string>
+    <string name="session_advanced_invalid_max_tokens">Max output tokens must be a positive integer.</string>
+    <string name="session_advanced_save_failed">Could not save session settings.</string>
+    <string name="session_advanced_reset_failed">Could not reset session settings.</string>
+</resources>

@@ -1,0 +1,55 @@
+# Gradle / Android build files
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+output-metadata.json
+
+# Android distributable artifacts — never commit binaries
+*.apk
+*.aab
+dist/
+
+# Logs / profiling / OS files
+*.log
+*.hprof
+__pycache__/
+.DS_Store
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Signing material
+*.jks
+*.keystore
+
+# Google/Firebase local configuration
+google-services.json
+
+# Secrets / local environment
+.env
+.env.*
+src/android/app/provider-customization.properties
+
+# Local AI/developer tooling and generated debug assets
+.claude/
+src/android/app/src/debug/assets/debug-skill/
+
+# Generated Android/shared assets
+src/android/app/src/main/assets/bashism/
+src/android/app/src/main/assets/minis-runtime/*.tar.gz
+src/android/app/libs/rclone.aar
+
+# Native build products
+src/android/app/src/main/jniLibs/**/*.so
+src/native/**/target/
+
+# Local scratch / backups
+src-bak/

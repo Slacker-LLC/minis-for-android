@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Android's network-security-config cannot enumerate user-entered
+         runtime LAN hosts, so platform cleartext capability stays enabled.
+         This is transport plumbing, NOT the trust policy: ProviderTransportPolicy
+         permits HTTP only for an explicitly configured API-key provider origin,
+         blocks OAuth/update cleartext, and prevents insecure redirects. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <!-- Pre-T354 entry kept for explicitness; the base-config above already
+         covers localhost/127.0.0.1 (OAuth callback server). -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

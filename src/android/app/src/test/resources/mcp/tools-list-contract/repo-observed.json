@@ -1,0 +1,56 @@
+{
+  "toolsList": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "tools": [
+        {
+          "name": "planner_2",
+          "description": "Build a plan; do not execute it.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "request": {
+                "type": "string",
+                "description": "Task to plan"
+              },
+              "mode": {
+                "type": "string",
+                "description": "Planning mode",
+                "enum": ["fast", "deep"]
+              }
+            },
+            "required": ["request"]
+          }
+        },
+        {
+          "name": "lax_tool"
+        },
+        {
+          "name": "camel_only",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ignored": {"type": "string"}
+            }
+          }
+        },
+        {
+          "name": "",
+          "description": "must be skipped"
+        }
+      ]
+    }
+  },
+  "missingTools": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {}
+  },
+  "nameCases": {
+    "serverInput": "planner/service 2",
+    "serverSanitized": "planner_service_2",
+    "canonicalToolName": "mcp.planner-service.remote/tool 2",
+    "providerWireName": "mcp_planner-service_remote_tool_2"
+  }
+}

@@ -1,0 +1,86 @@
+package com.openminis.app.tools
+
+import android.content.Context
+
+/**
+ * Per-session agent execution permission preset (DSH `/permission`).
+ *
+ * This is deliberately separate from the MCP confirmation/surface gates:
+ * it gates what the *Agent runtime* may do inside one chat
+ * session and is consumed directly by the tool execution gate
+ * (see [FileWriteTool]/[FileEditTool]).
+ *
+ * Presets (DSH enum the bundled web client can express):
+ *  - `workspace-write`: file writes allowed only under `/workspace`,
+ *    `/var/minis/workspace`, and the per-session virtual attachments/offloads/
+ *    browser directories; global memory/skills/shared and external mounts are
+ *    refused.
+ *  - `danger-full-access`: no extra restriction from this store; existing T219
+ *    read-only mount guards and the OS sandbox still apply.
+ *
+ * `null` (never set) keeps the legacy unrestricted behaviour and is reported as
+ * `custom` on the DSH projection until the user switches a preset.
+ *
+ * The DSH web client (rc.8) hard-codes exactly two preset enum values
+ * (`workspace-write`, `danger-full-access`) in its permissions projection, so a
+ * third "read-only" mode cannot be expressed through the stock UI; it is
+ * therefore not advertised here rather than faking a menu entry.
+ */
+object SessionPermissionStore {
+
+    const val WORKSPACE_WRITE = "workspace-write"
+    const val DANGER_FULL_ACCESS = "danger-full-access"
+
+    private const val PREFS = "minis_session_permissions"
+    private fun key(sessionId: String) = "preset_$sessionId"
+
+    fun preset(context: Context, sessionId: String): String? {
+        if (sessionId.isBlank()) return null
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(key(sessionId), null)
+            ?.takeIf { it == WORKSPACE_WRITE || it == DANGER_FULL_ACCESS }
+    }
+
+    fun setPreset(context: Context, sessionId: String, preset: String?) {
+        if (sessionId.isBlank()) return
+        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        if (preset == null) editor.remove(key(sessionId)) else editor.putString(key(sessionId), preset)
+        editor.apply()
+    }
+
+    fun isKnownPreset(preset: String): Boolean =
+        preset == WORKSPACE_WRITE || preset == DANGER_FULL_ACCESS
+
+    /**
+     * Whether a file write to [linuxPath] is permitted under the session's
+     * current preset. `null` preset (never set) behaves like the legacy
+     * unrestricted runtime.
+     */
+    fun allowsFileWrite(context: Context, sessionId: String, linuxPath: String): Boolean {
+        val preset = preset(context, sessionId) ?: return true
+        if (preset == DANGER_FULL_ACCESS) return true
+        return isWorkspaceWritePath(linuxPath)
+    }
+
+    /** Pure path gate used by `workspace-write`; kept testable without Android state. */
+    internal fun isWorkspaceWritePath(linuxPath: String): Boolean {
+        if (linuxPath.isBlank() || linuxPath.contains('\u0000') || linuxPath.split('/').any { it == ".." }) {
+            return false
+        }
+        val normalized = if (linuxPath.startsWith('/')) {
+            linuxPath
+        } else {
+            "/var/minis/workspace/${linuxPath.trimStart('/')}"
+        }
+        return normalized == "/workspace" ||
+            normalized.startsWith("/workspace/") ||
+            normalized == "/var/minis/workspace" ||
+            normalized.startsWith("/var/minis/workspace/") ||
+            normalized == "/var/minis/attachments" ||
+            normalized.startsWith("/var/minis/attachments/") ||
+            normalized == "/var/minis/offloads" ||
+            normalized.startsWith("/var/minis/offloads/") ||
+            normalized == "/var/minis/browser" ||
+            normalized.startsWith("/var/minis/browser/")
+    }
+}

@@ -1,0 +1,504 @@
+package com.openminis.app.data
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.storage.StorageManager
+import android.provider.DocumentsContract
+import com.openminis.app.logging.AppLogger
+import com.openminis.app.runtime.RuntimePathRegistry
+import com.openminis.app.runtime.files.SecureFileAccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.UUID
+
+/**
+ * Store for user-mounted external folders (SAF-picked trees). Mirrors iOS
+ * `MountedFoldersManager` with the following deliberate differences:
+ *
+ *   - iOS uses `URL.bookmarkData` + `startAccessingSecurityScopedResource`;
+ *     Android uses tree URIs + `takePersistableUriPermission`. The URI
+ *     survives process death and reboots once persisted, so there's no
+ *     "activation" step — access is always available while the permission
+ *     grant is held.
+ *   - The direct Ubuntu runtime re-derives each active tree URI to a host path
+ *     when preparing a session mount namespace. This store persists only the
+ *     SAF identity and user-visible access policy; it never persists a host
+ *     path as an authorization capability.
+ *
+ * Persistence: `filesDir/minis-config/mounted-folders.json`. The path is
+ * intentionally outside `minis-global/` so it can't leak into the
+ * DocumentsProvider-exposed tree.
+ */
+class MountedFoldersStore(private val context: Context) {
+
+    data class MountIdentity(
+        val volume: String,
+        val pathSegments: List<String>,
+    )
+
+    @Serializable
+    data class Entry(
+        val id: String = UUID.randomUUID().toString(),
+        var name: String,
+        val sourceDisplayName: String,
+        val treeUri: String,
+        val createdAt: Long = System.currentTimeMillis(),
+        var isWritable: Boolean = true,
+        var userAllowWrite: Boolean = true,
+        /** URI-derived identity retained for diagnostics and migration compatibility. */
+        val volume: String? = null,
+        val pathSegments: List<String> = emptyList(),
+        var isActive: Boolean = true,
+    ) {
+        /** Final effective writable = OS-level `isWritable` AND user intent. */
+        val effectiveWritable: Boolean get() = isWritable && userAllowWrite
+    }
+
+    private val storeFile: File by lazy {
+        File(context.filesDir, "minis-config/mounted-folders.json").apply {
+            parentFile?.mkdirs()
+        }
+    }
+
+    private val mutex = Mutex()
+    private val _entries = MutableStateFlow<List<Entry>>(emptyList())
+    val entries: StateFlow<List<Entry>> = _entries.asStateFlow()
+
+    /**
+     * Candidate mount sets are offered to the runtime before they are persisted.
+     * Returning false keeps the old set, so delete/rename and permission changes
+     * fail closed when the replacement mount layout cannot be validated.
+     */
+    var onSnapshotChange: (suspend (List<Entry>) -> Boolean)? = null
+
+    init {
+        loadFromDisk()
+    }
+
+    /**
+     * Persist a new tree URI as a mount. Caller is responsible for having
+     * already called `contentResolver.takePersistableUriPermission(uri, …)`
+     * — typically via the SAF picker result in [SafMountHelper.handlePickerResult].
+     *
+     * Resolves the SAF tree URI transiently to a real POSIX path under
+     * `/storage/emulated/0/...`. Returns null when:
+     *   - the URI came from a non-externalstorage provider (Drive, Dropbox,
+     *     etc. have no POSIX path the direct runtime can bind-mount);
+     *   - the resolved path doesn't exist or isn't readable by us;
+     *   - the name is invalid / duplicate / cap reached.
+     */
+    suspend fun add(
+        treeUri: Uri,
+        customName: String,
+        userAllowWrite: Boolean = true,
+    ): Entry? = mutex.withLock {
+        val name = sanitizeName(customName).takeIf { it.isNotEmpty() } ?: return@withLock null
+        if (_entries.value.any { it.name.equals(name, ignoreCase = true) }) return@withLock null
+        if (_entries.value.size >= MAX_MOUNTS) return@withLock null
+        if (!hasPersistedRead(treeUri) || !hasRawReadCapability()) {
+            AppLogger.warning(TAG, "add: rejected URI without read grant or raw read capability $treeUri")
+            return@withLock null
+        }
+
+        val identity = mountIdentity(treeUri) ?: run {
+            AppLogger.warning(TAG, "add: rejected invalid external-storage URI $treeUri")
+            return@withLock null
+        }
+        val resolvedHostPath = resolvePosixPath(treeUri, context) ?: run {
+            AppLogger.warning(TAG, "add: rejected non-resolvable URI $treeUri")
+            return@withLock null
+        }
+
+        val sourceDisplayName = DocumentsContract.getTreeDocumentId(treeUri)
+            .substringAfterLast(':', treeUri.lastPathSegment.orEmpty())
+            .ifEmpty { name }
+        // OS-level writability is driven by the real filesystem used by the
+        // direct bind mount, but SAF write permission remains part of the user
+        // authorization contract. Missing either side degrades the mount to RO.
+        val probedWritable = hasPersistedWrite(treeUri) &&
+            hasRawWriteCapability() &&
+            probeWritable(resolvedHostPath)
+        val entry = Entry(
+            name = name,
+            sourceDisplayName = sourceDisplayName,
+            treeUri = treeUri.toString(),
+            isWritable = probedWritable,
+            userAllowWrite = userAllowWrite,
+            volume = identity.volume,
+            pathSegments = identity.pathSegments,
+        )
+        if (!commitSnapshot(_entries.value + entry)) return@withLock null
+        AppLogger.info(
+            TAG,
+            "add: name=$name volume=${identity.volume} segments=${identity.pathSegments} " +
+                "writable=$probedWritable ${storageDiag(context)}",
+        )
+        entry
+    }
+
+    /**
+     * One-line storage-access diagnostic for the mount log. Distinguishes the
+     * two reasons a folder can read but not write: on Android 11+ it's All Files
+     * Access; on Android 10 it's whether WRITE_EXTERNAL_STORAGE was actually
+     * granted at runtime (legacy opt-in alone is not enough) and whether the
+     * process still holds the legacy storage view.
+     */
+    private fun storageDiag(context: Context): String {
+        val sdk = Build.VERSION.SDK_INT
+        return if (sdk >= Build.VERSION_CODES.R) {
+            "sdk=$sdk allFilesAccess=${Environment.isExternalStorageManager()}"
+        } else {
+            val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            // Issue #118: Environment.isExternalStorageLegacy() is API 29, but this
+            // branch covers everything below R (30) — i.e. our whole 26..28 floor.
+            // Same defect as RuntimePathRegistry.storageAccessDiag; both are reachable from
+            // the boot path, so an unguarded call is a NoSuchMethodError that kills
+            // the process in Application.onCreate. Below 29 scoped storage doesn't
+            // exist, so the legacy view is unconditionally in effect.
+            val legacyView = if (sdk >= Build.VERSION_CODES.Q) {
+                Environment.isExternalStorageLegacy().toString()
+            } else {
+                "n/a(pre-Q)"
+            }
+            "sdk=$sdk readGranted=$read writeGranted=$write legacyView=$legacyView"
+        }
+    }
+
+    suspend fun remove(id: String): Boolean = mutex.withLock {
+        val before = _entries.value
+        val after = before.filterNot { it.id == id }
+        if (after.size == before.size) return@withLock false
+        // Reconcile first. Only after the replacement is live do we remove
+        // the persisted record and release the URI grant.
+        if (!commitSnapshot(after)) return@withLock false
+        before.firstOrNull { it.id == id }?.let { e ->
+            runCatching {
+                context.contentResolver.releasePersistableUriPermission(
+                    Uri.parse(e.treeUri),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+        }
+        true
+    }
+
+    suspend fun rename(id: String, newName: String): Boolean = mutex.withLock {
+        val trimmed = sanitizeName(newName).takeIf { it.isNotEmpty() } ?: return@withLock false
+        if (_entries.value.any { it.id != id && it.name.equals(trimmed, ignoreCase = true) }) {
+            return@withLock false
+        }
+        val after = _entries.value.map { e ->
+            if (e.id == id) e.copy(name = trimmed) else e
+        }
+        commitSnapshot(after)
+    }
+
+    suspend fun setUserAllowWrite(id: String, allow: Boolean): Boolean = mutex.withLock {
+        var changed = false
+        val after = _entries.value.map { e ->
+            if (e.id == id && e.userAllowWrite != allow) {
+                changed = true
+                e.copy(userAllowWrite = allow)
+            } else e
+        }
+        if (!changed) return@withLock false
+        commitSnapshot(after)
+    }
+
+    /**
+     * Re-prove the URI grant, storage capability and source directory on
+     * foreground resume. Invalid entries are marked inactive and the same
+     * complete mount set is reconciled immediately.
+     */
+    suspend fun refreshWritability() = mutex.withLock {
+        val before = _entries.value
+        val after = before.map { e ->
+            val uri = Uri.parse(e.treeUri)
+            val identity = mountIdentity(uri)
+            val readable = identity != null && hasPersistedRead(uri) && hasRawReadCapability()
+            val host = if (readable) resolvePosixPath(uri, context) else null
+            val active = host != null
+            val writable = active &&
+                hasPersistedWrite(uri) &&
+                hasRawWriteCapability() &&
+                probeWritable(host!!)
+            if (writable != e.isWritable || active != e.isActive) {
+                e.copy(isWritable = writable, isActive = active)
+            } else e
+        }
+        if (after != before) {
+            commitSnapshot(after)
+        }
+    }
+
+    /**
+     * Validate the active entries that the direct runtime is about to bind.
+     * Inactive entries stay persisted but are deliberately absent from the
+     * live mount set. Active entries fail closed if their SAF identity, read
+     * grant, raw-storage capability or source directory can no longer be
+     * re-derived.
+     */
+    suspend fun validateMountEntries(entries: List<Entry> = _entries.value) =
+        withContext(Dispatchers.IO) {
+            entries.forEach { entry ->
+                if (!entry.isActive) return@forEach
+                check(isSafeMountName(entry.name)) {
+                    "active mount ${entry.id} has invalid mount name"
+                }
+                val uri = Uri.parse(entry.treeUri)
+                check(mountIdentity(uri) != null) {
+                    "active mount ${entry.id} has invalid storage identity"
+                }
+                check(hasPersistedRead(uri)) {
+                    "active mount ${entry.id} has no persisted read grant"
+                }
+                check(hasRawReadCapability()) {
+                    "active mount ${entry.id} has no raw read capability"
+                }
+                check(resolvePosixPath(uri, context) != null) {
+                    "active mount ${entry.id} source is unavailable"
+                }
+            }
+        }
+
+    /**
+     * Decode a SAF tree URI into a transient POSIX validation path. The
+     * returned path is never persisted or sent across a runtime boundary.
+     *
+     * Only accepts `com.android.externalstorage.documents` URIs — those
+     * encode a `volume:relPath` document id where `volume` is either
+     * `primary` (the device's internal shared storage) or a removable
+     * storage UUID. Cloud providers (Drive, Dropbox, …) that return tree
+     * URIs without a real filesystem mapping are rejected with a null
+     * return so [add] can surface the "only on-device folders" error.
+     *
+     * Returns null on:
+     *   - non-externalstorage authority,
+     *   - unknown removable volume uuid,
+     *   - resolved File doesn't exist / isn't a directory / unreadable.
+     */
+    suspend fun resolvePosixPath(treeUri: Uri, context: Context): String? =
+        withContext(Dispatchers.IO) {
+            val authority = treeUri.authority
+            if (authority != EXTERNALSTORAGE_AUTHORITY) {
+                AppLogger.warning(TAG, "resolvePosixPath: rejecting non-externalstorage authority=$authority")
+                return@withContext null
+            }
+            val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+                ?: return@withContext null
+            val identity = mountIdentity(treeUri) ?: return@withContext null
+            val volume = identity.volume
+
+            val volumeRoot = resolveVolumeRoot(context, volume) ?: run {
+                AppLogger.warning(TAG, "resolvePosixPath: unknown volume=$volume in docId=$docId")
+                return@withContext null
+            }
+            // Canonicalize only the system-provided volume root. Every
+            // user-selected component is then checked with NOFOLLOW so a SAF
+            // tree containing a symlink cannot redirect the bind source.
+            val canonicalRoot = runCatching { File(volumeRoot).canonicalFile }.getOrNull()
+                ?: return@withContext null
+            var fullPath = canonicalRoot.toPath()
+            if (!java.nio.file.Files.isDirectory(fullPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                return@withContext null
+            }
+            for (segment in identity.pathSegments) {
+                fullPath = fullPath.resolve(segment)
+                if (java.nio.file.Files.isSymbolicLink(fullPath) ||
+                    !java.nio.file.Files.isDirectory(fullPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ) {
+                    AppLogger.warning(TAG, "resolvePosixPath: symlink/non-directory component in ${fullPath}")
+                    return@withContext null
+                }
+            }
+            val full = fullPath.toFile()
+            if (!full.exists() || !full.isDirectory) {
+                AppLogger.warning(TAG, "resolvePosixPath: path missing or not dir: ${full.absolutePath}")
+                return@withContext null
+            }
+            // Read probe: a resolvable dir the app can't actually readdir will
+            // mount but show empty. Surface it now so the log explains the
+            // eventual empty-folder report instead of leaving it silent.
+            val children = full.list()
+            if (children == null) {
+                AppLogger.warning(
+                    TAG,
+                    "resolvePosixPath: ${full.absolutePath} canRead=${full.canRead()} but list()=null " +
+                    "(readdir blocked by scoped storage) — mount is inactive until access is restored",
+                )
+                return@withContext null
+            } else {
+                AppLogger.info(TAG, "resolvePosixPath: ${full.absolutePath} ok childCount=${children.size}")
+            }
+            full.absolutePath
+        }
+
+    fun mountIdentity(treeUri: Uri): MountIdentity? {
+        if (treeUri.authority != EXTERNALSTORAGE_AUTHORITY) return null
+        val docId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return null
+        val parts = docId.split(':', limit = 2)
+        val volume = parts.firstOrNull().orEmpty()
+        if (volume != "primary" && !isSafeStorageVolumeId(volume)) return null
+        val relative = parts.getOrNull(1).orEmpty()
+        val segments = if (relative.isEmpty()) emptyList() else relative.split('/')
+        if (segments.any { !isSafeSegment(it) }) return null
+        return MountIdentity(volume = volume, pathSegments = segments)
+    }
+
+    private fun isSafeSegment(value: String): Boolean =
+        value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
+            !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
+
+    private fun isSafeMountName(value: String): Boolean =
+        value.isNotEmpty() && value.length <= 64 && value != "." && value != ".." &&
+            !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
+
+    private fun hasPersistedRead(uri: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+
+    private fun hasPersistedWrite(uri: Uri): Boolean =
+        context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission }
+
+    private fun hasRawReadCapability(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+            context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+
+    private fun hasRawWriteCapability(): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+            context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        else -> true
+    }
+
+    private suspend fun commitSnapshot(after: List<Entry>): Boolean {
+        // Hold the same gate used by UbuntuRuntime.prepareLaunch. The
+        // callback stops current shells before the candidate becomes the
+        // authoritative Store snapshot; keeping the gate through publication
+        // closes the old-snapshot relaunch window.
+        return RuntimePathRegistry.withMountMutationLock {
+            if (onSnapshotChange?.invoke(after) == false) return@withMountMutationLock false
+            _entries.value = after
+            saveToDisk(after)
+            true
+        }
+    }
+
+    /**
+     * Try to create + delete a hidden probe file under [hostPath]. Captures
+     * the same reality the App-UID process inside the direct chroot will see,
+     * so scoped-storage restrictions or freshly revoked permissions reflect
+     * honestly in the badge.
+     */
+    fun probeWritable(hostPath: String): Boolean {
+        val dir = File(hostPath)
+        if (!dir.isDirectory) return false
+        val writable = SecureFileAccess.probeWritable(dir)
+        if (!writable) AppLogger.warning(TAG, "probeWritable: $hostPath is not securely writable")
+        return writable
+    }
+
+    private fun resolveVolumeRoot(context: Context, volume: String): String? {
+        if (volume.equals("primary", ignoreCase = true)) {
+            return Environment.getExternalStorageDirectory()?.absolutePath
+        }
+        // Removable storage — match by uuid via StorageManager (API 24+ for
+        // storageVolumes, but `directory` is API 30+. Fall back gracefully
+        // on older devices by walking /storage/<uuid>).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+            sm?.storageVolumes?.firstOrNull { it.uuid?.equals(volume, ignoreCase = true) == true }
+                ?.directory?.absolutePath?.let { return it }
+        }
+        val fallback = File("/storage/$volume")
+        return if (fallback.isDirectory) fallback.absolutePath else null
+    }
+
+    private fun loadFromDisk() {
+        if (!storeFile.isFile) return
+        runCatching {
+            val text = storeFile.readText()
+            val parsed = JSON.decodeFromString<List<Entry>>(text)
+            _entries.value = parsed
+        }
+    }
+
+    private suspend fun saveToDisk(list: List<Entry>) = withContext(Dispatchers.IO) {
+        runCatching {
+            storeFile.writeText(JSON.encodeToString(list))
+        }
+    }
+
+    private fun sanitizeName(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed == "." || trimmed == "..") return ""
+        if (trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains('\u0000') ||
+            trimmed.any(Char::isISOControl)
+        ) return ""
+        return trimmed.take(64)
+    }
+
+    companion object {
+        const val MAX_MOUNTS = 10
+        private const val TAG = "MountedFolders"
+        private const val EXTERNALSTORAGE_AUTHORITY = "com.android.externalstorage.documents"
+        private val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    }
+}
+
+/** Accept an opaque StorageVolume UUID string while keeping the /storage fallback path safe. */
+internal fun isSafeStorageVolumeId(value: String): Boolean =
+    value.isNotEmpty() && value.length <= 128 && value != "." && value != ".." &&
+        !value.contains('/') && !value.contains('\\') && !value.any(Char::isISOControl)
+
+/**
+ * SAF helper — call [buildPickerIntent] from an `ActivityResultContract`,
+ * then pipe the resulting Uri back through [handlePickerResult] to persist
+ * the permission grant before adding it to [MountedFoldersStore].
+ */
+object SafMountHelper {
+    fun buildPickerIntent(): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+        addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+        )
+    }
+
+    /**
+     * Take a persistable permission on the picked tree URI so subsequent
+     * app launches can still access it without another picker round-trip.
+     * Returns true on success.
+     */
+    fun handlePickerResult(context: Context, treeUri: Uri): Boolean = runCatching {
+        context.contentResolver.takePersistableUriPermission(
+            treeUri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        )
+        true
+    }.getOrDefault(false)
+
+    /** Sugar over [DocumentsContract.getTreeDocumentId] for display purposes. */
+    fun treeDisplayPath(uri: Uri): String =
+        DocumentsContract.getTreeDocumentId(uri)
+}

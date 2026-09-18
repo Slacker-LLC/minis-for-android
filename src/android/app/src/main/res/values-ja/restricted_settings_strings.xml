@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="system_permissions_a11y_restricted_header">スイッチがグレーアウトしていますか？（「制限された設定」）</string>
+    <string name="system_permissions_a11y_restricted_footer">Android は、ダウンロードした APK ファイルからインストールしたアプリについて、ユーザー補助のスイッチを操作できないようにします。これは OS のセキュリティポリシーであり、Minis の不具合ではありません。インストール自体に問題はありません。制限された設定を許可してもスイッチが操作できるようになるだけで、それ自体が何かの権限を与えるわけではなく、サービスを有効にするかどうかは引き続きご自身で選べます。</string>
+    <string name="system_permissions_a11y_restricted_manual">制限された設定を許可</string>
+    <string name="system_permissions_a11y_restricted_manual_sub">アプリ情報 → ⋮ メニュー（右上）→ 制限された設定を許可</string>
+    <string name="system_permissions_a11y_restricted_shizuku">Shizuku で制限された設定を許可</string>
+    <string name="system_permissions_a11y_restricted_shizuku_sub">ワンタップ — Minis から離れずにフラグを解除します</string>
+    <string name="system_permissions_a11y_restricted_working">許可しています…</string>
+    <string name="system_permissions_a11y_restricted_failed">失敗しました — 下記の手順で手動で設定してください</string>
+</resources>
