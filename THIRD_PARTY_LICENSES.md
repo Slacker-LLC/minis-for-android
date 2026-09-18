@@ -71,6 +71,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/alarm/AlarmToolPolicy.kt`, `tools/AlarmTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_alarm`, `set_timer`) and the alarm table in `agent/model/AgentDeviceToolCatalog.kt` |
 | `tools/context/DeviceContextPolicy.kt`, `tools/DeviceContextTool.kt` | `agent/tool/DeviceContextTool.kt` (`get_current_context`) |
 | `runtime/guest/MediaQueryPolicy.kt`, the list extensions in `runtime/guest/PhotosOffloadHandler.kt` and `tools/AndroidMediaStoreTools.kt` | `agent/tool/AgentPersonalDataTools.kt` (`search_media`, `search_audio`, `search_recordings`, `search_files`) and the media entries in `agent/model/AgentDeviceToolCatalog.kt` |
+| `roleplay/CharacterCard.kt`, `roleplay/CharacterCardCodec.kt`, `roleplay/CharacterCardPng.kt`, `roleplay/CharacterCardException.kt` | `agent/roleplay/CharacterCard.kt`, `CharacterCardCodec.kt`, `CharacterCardPng.kt`, `CharacterCardException.kt` |
 
 
 ## Active native/runtime components
