@@ -687,6 +687,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2350 个用例 = 上一项后的 2343 + 7）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**设备结论**：无（这是命名算术，wire 名本来就被 provider 接受）。
 
+**MCP 工具 schema 的上界（自查出来的缺口）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 单工具与整次列表两道闸 | 远端 `inputSchema` 是**不可信输入**，而本仓库会把它打进**每一次** provider 请求：此前只有「单个回复 4 MiB」这一道闸，一次回复就能塞进近 4 MiB 的 schema，再乘上最多 50 页的分页——坏掉或恶意的服务器于是能让我们在内存与下一个请求里扛着几 MB 的 JSON。现在每个 schema 有单件上限（64 KiB），一次 `tools/list` 保留的 schema 总量另有上限（1 MiB）；**放不下的工具保留但不带 schema**（仍可调用，只是无类型——这是 MCP 服务器接受的状态），既不硬扛也不从列表里消失 | `753dcecc` | ✅ `McpToolSchemaBoundsTest`（8 例：单件放行/超限丢弃/空与缺失、解析时保留工具丢 schema、总量预算放行到满、超额不消耗预算、零长度不占额、默认值与既有 4 MiB/256 工具的刻度相容） |
+| 与上游的差异 | 上游同样上界了回复（1 MiB）、页数（8）与工具数（128），但 **schema 本体没有上界**——这一半是本仓库自己的缺口，不属移植；数值按本仓库既有刻度（4 MiB 回复、256 工具）取 | `753dcecc` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2358 个用例 = 上一项后的 2350 + 8）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实 schema 就有那么大的服务器，面对「被以无类型形式提供」会如何反应，未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
