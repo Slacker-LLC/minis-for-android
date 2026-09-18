@@ -3,6 +3,12 @@ package com.openminis.app.data.model
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** The widest wire name OpenAI-compatible endpoints accept for `tools[].name`. */
+private const val WIRE_NAME_MAX_CHARS = 64
+
+/** Characters in the digest a cut (or unreadable) wire name ends with. */
+private const val DIGEST_CHARS = 8
+
 /**
  * Provider-agnostic tool definition. Each tool registers with this structure,
  * and providers convert it to their native format (Anthropic input_schema,
@@ -30,12 +36,31 @@ data class AgentToolDefinition(
      * `mcp.<server>.<tool>` naming scheme (dots) is rejected with
      * `400 Invalid 'tools[N].name'`. Local dispatch keeps the canonical dotted
      * name; only the serialized wire form is sanitized.
+     *
+     * [WIRE_NAME_MAX_CHARS] is a hard cap, so a name longer than that is cut — and a
+     * cut alone would let two different tools end up with the SAME wire name (their
+     * first 64 characters agreeing, e.g. two long remote tool names on one server).
+     * The local registry maps wire names to canonical ones, so the collision would
+     * silently dispatch the model's call to the wrong tool. Long names therefore end
+     * in a short digest of the canonical name, which is the scheme Eta uses for the
+     * same reason (`agent/mcp/McpRunContext.kt`, Mangi-11/Eta @ c15de97).
      */
     val apiName: String
-        get() = name
-            .replace(Regex("[^a-zA-Z0-9_-]"), "_")
-            .take(64)
-            .ifEmpty { "tool" }
+        get() {
+            val sanitized = name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+            if (sanitized.none { it.isLetterOrDigit() }) return "tool_" + nameDigest()
+            if (sanitized.length <= WIRE_NAME_MAX_CHARS) return sanitized
+            return sanitized.take(WIRE_NAME_MAX_CHARS - DIGEST_CHARS - 1) + "_" + nameDigest()
+        }
+
+    /**
+     * Names that sanitize to punctuation only (`。。。` → `___`) are legal but carry
+     * nothing to tell two tools apart, so they get the digest instead of the underscores.
+     */
+    private fun nameDigest(): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(name.toByteArray(Charsets.UTF_8))
+        .take(4)
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     /** True when [candidate] matches canonical name, wire apiName, or normalized alphanumeric name. */
     fun matchesName(candidate: String): Boolean {
