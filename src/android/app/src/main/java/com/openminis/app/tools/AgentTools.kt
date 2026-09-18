@@ -154,6 +154,7 @@ object AgentTools {
             "timeout" to AgentToolParam("integer", "Milliseconds for wait_for_dom_stable (default 10000, clamped to 1000–60000). The action polls every 0.2s and resolves when DOM mutation rate stabilizes."),
             "timeout_ms" to AgentToolParam("integer", "Milliseconds for wait_for_selector (default 5000, clamped to 500–30000); polled every 0.25s until the selector matches a visible element."),
             "submit" to AgentToolParam("boolean", "type: after the text lands, submit the field's form (or press Enter in the field when it has none). Default false."),
+            "read_image" to AgentToolParam("boolean", "Whether a captured screenshot is attached for the model to look at (default true). False keeps the metadata for the model and the image on disk for the user."),
             "viewport_width" to AgentToolParam("integer", "Viewport width in CSS pixels for set_viewport (e.g. 1920). Required together with viewport_height unless reset=true."),
             "viewport_height" to AgentToolParam("integer", "Viewport height in CSS pixels for set_viewport (e.g. 1080). Required together with viewport_width unless reset=true."),
             "reset" to AgentToolParam("boolean", "For set_viewport: when true, clear the session-level viewport override and fall back to the global browser setting."),

@@ -581,7 +581,8 @@ class BrowserUseManager(
         val prevUrl = withContext(Dispatchers.Main) { webView.url }
         var result: BrowserActionResult = when (input.action) {
             BrowserAction.NAVIGATE -> navigate(input.url)
-            BrowserAction.SCREENSHOT -> return screenshot(fullPage = input.fullPage)
+            BrowserAction.SCREENSHOT ->
+                return screenshot(fullPage = input.fullPage, readImage = input.readImage)
             BrowserAction.CLICK -> click(input.selector, input.coordinateX, input.coordinateY)
             BrowserAction.TYPE -> type(input.selector, input.coordinateX, input.coordinateY, input.text, input.submit)
             BrowserAction.GET_TEXT -> return getText(input.selector, input.offset, input.maxChars)
@@ -612,7 +613,7 @@ class BrowserUseManager(
 
         // Auto-capture screenshot after visual-change actions
         if (result.success && BrowserAction.visualChangeActions.contains(input.action)) {
-            result = attachSnapshot(result)
+            result = attachSnapshot(result, attachImage = input.readImage)
         }
 
         // Detect URL change after visual-change actions (ignore hash-only changes)
@@ -632,7 +633,10 @@ class BrowserUseManager(
         return result
     }
 
-    private suspend fun attachSnapshot(result: BrowserActionResult): BrowserActionResult {
+    private suspend fun attachSnapshot(
+        result: BrowserActionResult,
+        attachImage: Boolean = true,
+    ): BrowserActionResult {
         return try {
             delay(300) // Let page settle
             val bitmap = captureWebViewBitmap() ?: return result
@@ -642,6 +646,7 @@ class BrowserUseManager(
             result.copy(
                 base64Image = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP),
                 imageFilePath = null,
+                attachImage = attachImage,
             )
         } catch (e: Exception) {
             Log.w(TAG, "Auto-snapshot failed: ${e.message}")
@@ -714,7 +719,10 @@ class BrowserUseManager(
 
     // -- Screenshot --
 
-    private suspend fun screenshot(fullPage: Boolean = false): BrowserActionResult {
+    private suspend fun screenshot(
+        fullPage: Boolean = false,
+        readImage: Boolean = true,
+    ): BrowserActionResult {
         var truncated = false
         var originalHeightPx = 0
         var didStretch = false
@@ -794,7 +802,10 @@ class BrowserUseManager(
         )
 
         return BrowserActionResult(
-            text = meta, base64Image = base64, imageFilePath = file.absolutePath
+            text = meta,
+            base64Image = base64,
+            imageFilePath = file.absolutePath,
+            attachImage = readImage,
         )
     }
 

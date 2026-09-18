@@ -10076,6 +10076,11 @@ class ChatViewModel(
                 }
             }
 
+            // Upstream's read_image=false: the screenshot is still saved for the user
+            // (thumbnail, artifact, minis:// path) but is not attached to the model,
+            // which only asked for the page's metadata.
+            if (!result.attachImage) inferenceBytes = null
+
             // Persist fetched files (fetch action) and append minis_url
             val fetchData = result.fetchedFileData
             val fetchName = result.fetchedFileName
@@ -10809,32 +10814,6 @@ class ChatViewModel(
         )
         return result
     }
-
-    suspend fun executeBrowserUse(argsJson: String): BrowserToolResult {
-        val input = BrowserActionInput.parse(argsJson)
-            ?: return BrowserToolResult(text = "Error: Invalid browser_use input. Required: 'action' parameter.", success = false)
-
-        return try {
-            val result = browserTabPool.execute(input)
-            BrowserToolResult(
-                text = result.text,
-                success = result.success,
-                base64Image = result.base64Image,
-                imageFilePath = result.imageFilePath,
-                pageURL = result.pageURL,
-            )
-        } catch (e: Exception) {
-            BrowserToolResult(text = "Error: ${e.message}", success = false)
-        }
-    }
-
-    data class BrowserToolResult(
-        val text: String,
-        val success: Boolean,
-        val base64Image: String? = null,
-        val imageFilePath: String? = null,
-        val pageURL: String? = null,
-    )
 
     // ─── Misc Helpers ────────────────────────────────────────────────────
 

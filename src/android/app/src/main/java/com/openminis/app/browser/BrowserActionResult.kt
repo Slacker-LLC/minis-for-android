@@ -10,6 +10,14 @@ data class BrowserActionResult(
     val base64Image: String? = null,
     /** Local file path where the screenshot was saved to disk. */
     val imageFilePath: String? = null,
+    /**
+     * Ported from Eta's `read_image` argument (Mangi-11/Eta @ c15de97): whether the
+     * captured image is attached to the model's context. False keeps the screenshot
+     * on disk — the user still gets the thumbnail and the artifact — while the model
+     * gets only the metadata, which is what a caller who just wanted to know the page
+     * geometry asked for.
+     */
+    val attachImage: Boolean = true,
     /** Raw downloaded file data (for fetch action). */
     val fetchedFileData: ByteArray? = null,
     /** Determined filename for the fetched file. */

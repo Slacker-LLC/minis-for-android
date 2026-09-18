@@ -125,6 +125,12 @@ object BrowserUseTool {
             put("description", "When true on screenshot, capture the entire scrollable page by temporarily stretching the viewport to document.scrollHeight (height-capped at 32768 px). Default false captures only the current viewport.")
         })
 
+        properties.put("read_image", JSONObject().apply {
+            put("type", "boolean")
+            put("default", true)
+            put("description", "Whether the captured screenshot is attached for you to look at (default true). Set false when you only need the geometry/metadata: the image is still saved to disk for the user, and you get an image_bytes/size report instead of the picture.")
+        })
+
         val inputSchema = JSONObject()
         inputSchema.put("type", "object")
         inputSchema.put("properties", properties)

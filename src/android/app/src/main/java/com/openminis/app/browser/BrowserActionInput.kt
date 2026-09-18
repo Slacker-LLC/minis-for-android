@@ -53,6 +53,13 @@ data class BrowserActionInput(
      */
     val submit: Boolean = false,
     /**
+     * Whether a captured screenshot is attached to the model (upstream's
+     * `read_image`, default true). False keeps the artifact for the user and the
+     * metadata for the model, and applies to the screenshots this app auto-captures
+     * after visual-change actions as well.
+     */
+    val readImage: Boolean = true,
+    /**
      * Cookies to write (set_cookies). Each entry has keys name + value
      * (required) and optional domain, path, secure, http_only, expires
      * (Unix seconds). Values are loosely typed (String / Boolean / Number).
@@ -100,6 +107,7 @@ data class BrowserActionInput(
                     },
                     fullPage = obj.optBoolean("full_page", false),
                     submit = obj.optBoolean("submit", false),
+                    readImage = obj.optBoolean("read_image", true),
                     cookies = parseCookies(obj),
                 )
             } catch (_: Exception) {
