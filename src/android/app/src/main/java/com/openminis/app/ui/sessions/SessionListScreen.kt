@@ -517,6 +517,8 @@ fun SessionListScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    // [T-eta-character-cards] The session whose character is being chosen.
+    var characterTarget by remember { mutableStateOf<ChatSessionEntity?>(null) }
     // [T-android-session-grouping] Group management dialogs.
     var folderToRename by remember { mutableStateOf<FolderEntity?>(null) }
     var folderToDissolve by remember { mutableStateOf<FolderEntity?>(null) }
@@ -951,9 +953,10 @@ fun SessionListScreen(
                                     onEnterSelect = { viewModel.enterSelection(it) },
                                     onPinToggle = { viewModel.togglePin(it) },
                                     onEditRequest = { editSession = it },
-                                    onExportRequest = { s, fmt ->
-                                        exportSession(context, s, chatRepository, scope, fmt)
-                                    },
+                                   onExportRequest = { s, fmt ->
+                                       exportSession(context, s, chatRepository, scope, fmt)
+                                   },
+                                    onCharacterRequest = { characterTarget = it },
                                     onRegenerateTitle = { viewModel.regenerateTitle(it) },
                                     onDuplicate = { viewModel.duplicateSession(it) },
                                     onDeleteRequest = { id ->
@@ -1190,6 +1193,15 @@ fun SessionListScreen(
     }
 
     // Single delete confirmation
+    // [T-eta-character-cards] Binding a character to a session is a picker, not a new screen:
+    // the choice is one row of one session.
+    characterTarget?.let { target ->
+        com.openminis.app.ui.settings.CharacterPickerDialog(
+            sessionId = target.id,
+            onDismiss = { characterTarget = null },
+        )
+    }
+
     if (showDeleteDialog && deleteTargetId != null) {
         MinisAlertDialog(
             onDismissRequest = {
@@ -1751,6 +1763,8 @@ private fun SessionItemContent(
     onPinToggle: (String) -> Unit,
     onEditRequest: (ChatSessionEntity) -> Unit,
     onExportRequest: (ChatSessionEntity, String) -> Unit,
+    /** [T-eta-character-cards] Opens the character picker for this session. */
+    onCharacterRequest: (ChatSessionEntity) -> Unit,
     onRegenerateTitle: (String) -> Unit,
     onDuplicate: (String) -> Unit,
     onDeleteRequest: (String) -> Unit,
@@ -1877,6 +1891,16 @@ private fun SessionItemContent(
                             if (isPinned) Icons.Default.Close else Icons.Default.PushPin,
                             contentDescription = null,
                         )
+                    },
+                )
+                // [T-eta-character-cards] Roleplay binding: pick the character this conversation
+                // talks to, or clear it. The card snapshot the binding stores keeps the session
+                // working even if the character is later deleted.
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.characters_pick_title)) },
+                    onClick = {
+                        showContextMenu = false
+                        onCharacterRequest(session)
                     },
                 )
                 // Export submenu (JSON / Plain Text)

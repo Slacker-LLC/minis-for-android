@@ -79,6 +79,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `roleplay/CharacterBinding.kt`, the session-binding additions in `roleplay/CharacterRepository.kt`, `data/db/ChatDao.kt`, `data/db/ChatSessionEntity.kt` and the `roleplay_json` column in `data/db/AppDatabase.kt` | `agent/roleplay/CharacterCard.kt` (`RoleplayBinding`) and the conversation binding in `RoleplayRunContext.kt` |
 | `roleplay/RoleplayTurnProjection.kt` (per-request lore, depth note and character block) | `agent/roleplay/RoleplayRunContext.kt` (`projectMessages`) |
 | `ui/settings/CharactersScreen.kt` (character library: import, share, delete) | Eta's character screens and its file-picker import path |
+| `ui/settings/CharacterPickerDialog.kt` and the session-menu entry in `ui/sessions/SessionListScreen.kt` | Eta's conversation binding UI |
 
 
 ## Active native/runtime components

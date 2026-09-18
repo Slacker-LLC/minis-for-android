@@ -586,6 +586,9 @@
     <string name="characters_export">Export or share this character</string>
     <string name="characters_delete">Delete this character</string>
     <string name="characters_delete_confirm">Delete "%1$s"? Sessions already bound to this character keep working from the card snapshot they stored.</string>
+    <string name="characters_pick_title">Character for this session</string>
+    <string name="characters_pick_none">No character (keep this session an ordinary chat)</string>
+    <string name="characters_pick_empty">No characters yet. Import one under Settings -> Characters.</string>
     <string name="characters_import_failed">The card could not be imported.</string>
     <string name="characters_export_failed">The character could not be exported.</string>
     <string name="sessionlist_edit_title_category">제목 및 카테고리 편집</string>
