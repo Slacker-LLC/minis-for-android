@@ -1527,4 +1527,5 @@
     <string name="system_enhance_module_feature_google">Google-Berechtigung (Gemini-Einstieg, Geräte-Tarnung)</string>
     <string name="system_enhance_module_feature_accessibility">Barrierefreiheit am Leben halten und Hotword-Selbstheilung</string>
 
+    <string name="system_enhance_root_hidden">su ist für diese App nicht sichtbar; %1$s ist installiert – erlaube diese App dort (oder schalte das Verstecken von su ab)</string>
 </resources>

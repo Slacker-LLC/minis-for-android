@@ -1782,4 +1782,5 @@
     <string name="system_enhance_module_feature_google">Google 资格（Gemini 入口、机型伪装）</string>
     <string name="system_enhance_module_feature_accessibility">无障碍保活与热词自愈</string>
 
+    <string name="system_enhance_root_hidden">su 对本应用不可见；本机装有 %1$s——请在它的应用列表里允许本应用（或关闭 su 隐藏）</string>
 </resources>

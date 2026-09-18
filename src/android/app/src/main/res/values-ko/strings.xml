@@ -1524,4 +1524,5 @@
     <string name="system_enhance_module_feature_google">Google 자격(Gemini 입구, 기기 위장)</string>
     <string name="system_enhance_module_feature_accessibility">접근성 유지와 핫워드 자가 복구</string>
 
+    <string name="system_enhance_root_hidden">su 가 이 앱에 보이지 않습니다. %1$s 이(가) 설치되어 있습니다 — 해당 앱 목록에서 이 앱을 허용하세요(su 숨김 해제도 가능).</string>
 </resources>

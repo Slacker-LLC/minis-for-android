@@ -89,7 +89,7 @@ fun SystemEnhanceScreen(
                     icon = Icons.Outlined.Key,
                     iconColor = Color(0xFFFF9F0A),
                     title = stringResource(R.string.system_enhance_root),
-                    subtitle = stringResource(rootState.subtitleRes()),
+                    subtitle = rootStateSubtitle(rootState),
                     trailing = {
                         MinisTextButton(
                             onClick = { RootAccess.request(context) },
@@ -178,12 +178,22 @@ private val HOOK_SWITCH_KEYS = listOf(
 private fun enabledHookSwitchCount(context: android.content.Context): Int =
     HOOK_SWITCH_KEYS.count { ModuleSettingsStore.isEnabled(context, it) }
 
-private fun RootAccessState.subtitleRes(): Int = when {
-    isChecking -> R.string.system_enhance_root_checking
-    status == RootAccessStatus.GRANTED -> R.string.system_enhance_root_granted
-    status == RootAccessStatus.NOT_GRANTED -> R.string.system_enhance_root_not_confirmed
-    status == RootAccessStatus.DENIED -> R.string.system_enhance_root_denied
-    status == RootAccessStatus.UNAVAILABLE -> R.string.system_enhance_root_absent
-    status == RootAccessStatus.TIMED_OUT -> R.string.system_enhance_root_timeout
-    else -> R.string.system_enhance_root_unknown
+/**
+ * [T-root-manager-detection-android] "su is absent" and "su is hidden from this app" are
+ * different dead ends: the real device that produced this distinction runs KernelSU Next,
+ * which keeps su invisible to apps that are not on its allowlist while the manager itself
+ * stays listed. Only the second case can be fixed by the user, so it says how.
+ */
+@Composable
+private fun rootStateSubtitle(state: RootAccessState): String = when {
+    state.isChecking -> stringResource(R.string.system_enhance_root_checking)
+    state.status == RootAccessStatus.GRANTED -> stringResource(R.string.system_enhance_root_granted)
+    state.status == RootAccessStatus.NOT_GRANTED ->
+        stringResource(R.string.system_enhance_root_not_confirmed)
+    state.status == RootAccessStatus.DENIED -> stringResource(R.string.system_enhance_root_denied)
+    state.status == RootAccessStatus.TIMED_OUT -> stringResource(R.string.system_enhance_root_timeout)
+    state.status == RootAccessStatus.UNAVAILABLE && state.rootManager != null ->
+        stringResource(R.string.system_enhance_root_hidden, state.rootManager)
+    state.status == RootAccessStatus.UNAVAILABLE -> stringResource(R.string.system_enhance_root_absent)
+    else -> stringResource(R.string.system_enhance_root_unknown)
 }

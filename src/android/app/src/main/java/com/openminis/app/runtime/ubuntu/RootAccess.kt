@@ -34,6 +34,12 @@ internal data class RootAccessState(
     val status: RootAccessStatus = RootAccessStatus.UNKNOWN,
     val suPresent: Boolean = false,
     val isChecking: Boolean = false,
+    /**
+     * [T-root-manager-detection-android] Label of the installed root manager, when su is
+     * not reachable from this process. Null when su is present or no known manager is
+     * installed, so the two dead ends can be told apart in the UI.
+     */
+    val rootManager: String? = null,
 ) {
     val isGranted: Boolean get() = status == RootAccessStatus.GRANTED
 }
@@ -63,6 +69,7 @@ internal object RootAccess {
         mutableState.value = RootAccessState(
             status = if (present) RootAccessStatus.NOT_GRANTED else RootAccessStatus.UNAVAILABLE,
             suPresent = present,
+            rootManager = if (present) null else RootManagerDetector.detect(context)?.label,
         )
         if (present && prefs.getBoolean(LAST_GRANTED, false)) {
             refresh(context)
@@ -89,7 +96,10 @@ internal object RootAccess {
             try {
                 val present = DirectRootRunner.findSu() != null
                 if (!present) {
-                    mutableState.value = RootAccessState(RootAccessStatus.UNAVAILABLE)
+                    mutableState.value = RootAccessState(
+                        status = RootAccessStatus.UNAVAILABLE,
+                        rootManager = RootManagerDetector.detect(context)?.label,
+                    )
                     return@launch
                 }
                 val attempted = prefs.getBoolean(AUTOMATIC_REQUEST_ATTEMPTED, false)

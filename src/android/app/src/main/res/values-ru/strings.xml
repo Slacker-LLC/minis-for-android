@@ -1777,4 +1777,5 @@
     <string name="system_enhance_module_feature_google">Право Google (вход Gemini, маскировка устройства)</string>
     <string name="system_enhance_module_feature_accessibility">Поддержка службы доступности и самовосстановление горячего слова</string>
 
+    <string name="system_enhance_root_hidden">su не виден этому приложению; установлен %1$s — разрешите это приложение в нём (или отключите скрытие su)</string>
 </resources>
