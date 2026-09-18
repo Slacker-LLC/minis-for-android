@@ -186,7 +186,7 @@
 | 闹钟与计时器 | `android-alarm` 早已能通过系统时钟应用排程，但只有 shell 能碰到它——模型没有可发现的工具 schema，被要求「设个 7 点闹钟」只能靠 `shell_execute` 猜 CLI 参数。新增 `android.alarm.set`（别名 `set_alarm`：本地时间 hour/minute、可选 label 与 repeat_days）、`android.alarm.timer`（别名 `set_timer`：秒数、上限 24 小时）、`android.alarm.open`（别名 `show_alarms`：把时钟应用拉到前台） | `0dbd53f4` | ✅ `AlarmToolPolicyTest`（8 例） |
 | 拒绝而非改写 | 校验集中在 `AlarmToolPolicy`：小时不在 0–23、分钟不在 0–59、计时器为 0/负数/超 24 小时、重复规则既不是整周（daily）也不是周一到周五（weekdays）、星期拼写不被 CLI 接受——一律带原因拒绝。自定义星期组合明确拒绝并说明只能去时钟应用设置，因为在这里排程会静默落到错误的日子 | `0dbd53f4` | ✅ 上述用例 |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1992 个用例 = 上一项后的 1984 + 8，0 失败）。**与 Eta 的刻意差异**：不提供 `list_alarms` / `list_active_timers`——Android 的 Clock API 是「发完即忘」，本仓库又刻意不再保留自己的闹钟记录（T266），做出来的「列表」只可能是打开时钟应用却自称列表；改为 `android.alarm.open`，结果里如实写明它做了什么。真机未验证：各 OEM 时钟应用对 `EXTRA_SKIP_UI` 的实际处理（是否弹确认）、Android 14+ 的精确闹钟授权路径、计时器与闹钟在真实设备上的创建结果。
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1992 个用例 = 上一项后的 1984 + 8，0 失败）。**与 Eta 的刻意差异**：不提供 `list_alarms` / `list_active_timers`——Android 的 Clock API 是「发完即忘」，本仓库又刻意不再保留自己的闹钟记录（T266），做出来的「列表」只可能是打开时钟应用却自称列表；改为 `android.alarm.open`，结果里如实写明它做了什么。**（更正，2026-09-18：上游其实是读时钟应用自己的数据库来列的，本仓库随后按上游落地了 `android.alarm.list`/`android.alarm.timers`，见「Phase 4 补片（三）」；上面这段「不提供列表」的结论作废。）** 真机未验证：各 OEM 时钟应用对 `EXTRA_SKIP_UI` 的实际处理（是否弹确认）、Android 14+ 的精确闹钟授权路径、计时器与闹钟在真实设备上的创建结果。
 
 | 项 | 内容 | 提交 | 验证 |
 |---|---|---|---|
@@ -463,6 +463,16 @@
 | `app_state_control` → `android_app` 的 `freeze`/`unfreeze` | 上游三个动作里 `force_stop` 本仓库早有（`android_app stop`），这次补上另外两个：`pm disable-user`（冻结，保留数据但不能再运行）与 `pm enable`（解冻）。三条命令统一收进一个纯策略 `AppStatePolicy`，`stop` 也改用它——同一命令只有一处实现；包名走既有的 `requirePackageName` 校验；风险级别定为 **DESTRUCTIVE**（需一次性审批）：冻结会改写别的包的启用状态，选错目标是系统应用就会一直用到解冻 | `bb350a4b` | ✅ `AppStatePolicyTest`（4 例） |
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2205 个用例 = 上一项后的 2197 + 4 + 4，0 失败）。**没有任何设备结论**：某些 ROM 是否允许 `pm disable-user` 经特权通道动系统包、`svc wifi`/`cmd bluetooth_manager` 是否被接受，均未验证；工具如实返回 exit code 与 stderr。
+
+**Phase 4 补片（三）：闹钟与计时器列表** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `list_alarms` / `list_active_timers` | 早前那片闹钟工具把这两个列成「刻意差异」，理由是「Clock API 发完即忘、列表只可能是打开应用自称列表」。上游其实有真的列表：**读时钟应用自己的数据库**（`/data/user_de/{user}/com.coloros.alarmclock/databases/alarms.db`），因为「现在设了什么」只存在于那个应用里。本片按上游落地：工具名 `android.alarm.list` / `android.alarm.timers`，别名沿用上游拼写，挂进 `AlarmTools` 家族 | `c839a6a6` | ✅ `PrivateDatabaseRulesTest`（5 例） |
+| 快照按 argv 拆成多步 | 必需的区别：上游把整个拷贝写成一段复合 shell 脚本，本仓库的特权面是 argv，所以同样的步骤拆成独立命令——`stat -c %s` 量大小、`readlink` 拒绝「读到的不是刚量过的那个文件」的软链、`cp` 复制；数据库与每个 SQLite 边车（`-wal`/`-shm`/`-journal`）各来一遍。边车不存在是正常的，**被拒绝的边车会让整次快照失败**（与上游 exit 25/26 同义）；快照用完即删，路径/表/列全部写死在代码里，调用方输入到不了那里 | `c839a6a6` | ✅ 上述用例（大小上限、软链判定、列要求、行数钳制、LIKE 转义） |
+| 查询与 schema 容忍 | 照上游：`alarms` 表要求 `_id/hour/minutes/enabled`，`timer_schedule` 表要求 `_id/duration/state`；结构不符答 `CLOCK_SCHEMA_UNSUPPORTED` 而不是猜；只查询表里真实存在的列（列少一版就少返回一列，不整条失败）；字段长度有界，行数 1–50 默认 20 | `c839a6a6` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2210 个用例 = 上一项后的 2205 + 5，0 失败）。**没有任何设备结论**：某一版 ROM 是否允许 root 把这个数据库拷进应用缓存、应用随后能否读那个 root 建的文件（SELinux 标签），全部未验证；每条失败路径都给出带错误码的答复而不是空列表。**文档更正**：闹钟那片「刻意差异」的说明已在本节作废，并在工具 KDoc 里改成现在的行为。真机判据：两个列表工具返回数据，还是 `CLOCK_DATA_UNAVAILABLE`/`CLOCK_SCHEMA_UNSUPPORTED`。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
