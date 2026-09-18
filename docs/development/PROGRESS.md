@@ -524,11 +524,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2222 个用例 = 上一项后的 2220 + 2），`:app:lintDebug` 0 error。**没有任何设备结论**：某一版 ColorOS 是否有这个 handler 与这个消息 id、能否从 handler 解析到窗口管理器、wrapper 是否暴露 `performHapticFeedback`，全部未验证——没有 handler 时台账记 SKIPPED 并保留原行为。
 
+**Phase 2 收尾：服务端联网搜索开关** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 按模型条目开启服务端搜索 | Phase 2 的最后一项遗留（当年结论是「调用方可用 `extra_body` 自带 tools，是否需要专门开关待定」）。上游的形态是**按模型条目**存开关，请求里加一条 `{"type":"web_search"}`。本仓库条目本来就把用户决策放在 `overrides_json`，而该字段注释就写明「加可选字段对旧 JSON 反序列化安全」，所以这一项**不需要数据库迁移**：`ModelOverrides.hostedWebSearch`（可选）+ `LLMModel.hostedWebSearch`（默认关）+ `ModelEntry.model` 折叠；界面在「模型条目 → 能力」区加一行开关，按既有约定「与基模型不同才落盘」；导出给 Linux 运行时的 overrides 镜像同步补字段 | `e9b9a827` | ✅ `HostedWebSearchPolicyTest`（5 例） |
+| 只进 Responses、不重复、不动默认 | 上游只在 Responses 请求里加这条（Chat Completions 没有该工具）。合并规则抽成 `HostedWebSearchPolicy.apply`：**关 = 原样返回同一个数组**（所有现有条目的请求逐字节不变）、开 = 已存在则不重复、否则在副本上追加——绝不原地改动调用方数组。请求侧把原来的 `if (tools.isNotEmpty())` 改成「托管工具 + 服务端搜索合并后再判断」，于是没有任何托管工具时也能只带这一条 | `e9b9a827` | ✅ 上述用例（关/开/空数组/已存在/不改原数组） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2227 个用例 = 上一项后的 2222 + 5），`:app:lintDebug` 0 error（字符串补齐 8 个 locale）。**没有任何设备结论**：某个 relay 是否真的接受这条 hosted tool、以及不支持该工具的 provider 上开关的表现，均未验证。**未做**：上游还会把 `response.web_search_call.{in_progress,searching,completed,failed}` 四个事件渲染成一条「网页搜索」工具行；来源本身已经通过引用格式化渲染出来，这一步留作后续。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
+| Phase 2 底层 AI | 已落地：请求头过滤与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册、服务端联网搜索开关（按条目）。未落地：`web_search_call` 流事件渲染成工具行；屏幕观察的其余合同 Minis 侧本就更强，未再移植。工具能力投影与终态门在本仓库由既有 schema/证据机制覆盖 | Eta `agent/model/*` |
 | Phase 3 数字助手 | 就地展示/可停止/可接管已落地；Skills 暴露给模型、GUI 动作补齐、Markdown 导出同样已落地。**连续追问与面板内屏幕上下文未落地**：无头驱动 seam 其实**已经存在**（本仓库早有 `agent/AgentRunner`：prompt/cancel/waitForSettle/sessionEvents），卡的是面板设计——上游是一套 708 行的展开式面板（26 态状态模型 + `BasicTextField` 追问输入 + 手势/震动），直接搬会替换掉本仓库现有的胶囊浮层设计（当初的分析明确要保留 Minis 的工作台风格），属于要先拍板的产品改动；若要做，最自然的形态是在现有胶囊上加密实输入（需处理 overlay 窗口的 IME/焦点） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 清单已全部落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存、下载记录。其中 QQ/微信缓存与下载记录先被登记为「待拍板 / 不值得」，后来按上游补齐（限制写在各自工具描述里） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
