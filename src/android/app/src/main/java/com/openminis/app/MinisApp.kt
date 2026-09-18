@@ -530,6 +530,16 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileGrepHandler(), listOf("file_grep"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileHeadTailHandler(), listOf("file_head_tail"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileInfoHandler(), listOf("file_info"))
+        // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
+        // SKILL.md reads and bounded resource reads through SkillRepository (same
+        // mutation lock and path guards as the rest of the skill code). Nothing here
+        // installs, writes or executes; Eta's spellings are kept as aliases.
+        com.openminis.app.tools.skills.SkillTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.skills.SkillTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // P10: android.* system tools (standard APIs, no root)
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidWebSearchHandler(), listOf("web_search"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.AndroidUrlFetchHandler(), listOf("url_fetch"))
