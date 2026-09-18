@@ -677,7 +677,7 @@
 | Phase 3 数字助手 | 就地展示/可停止/可接管已落地；Skills 暴露给模型、GUI 动作补齐、Markdown 导出同样已落地。**连续追问与面板内屏幕上下文未落地**：无头驱动 seam 其实**已经存在**（本仓库早有 `agent/AgentRunner`：prompt/cancel/waitForSettle/sessionEvents），卡的是面板设计——上游是一套 708 行的展开式面板（26 态状态模型 + `BasicTextField` 追问输入 + 手势/震动），直接搬会替换掉本仓库现有的胶囊浮层设计（当初的分析明确要保留 Minis 的工作台风格），属于要先拍板的产品改动；若要做，最自然的形态是在现有胶囊上加密实输入（需处理 overlay 窗口的 IME/焦点） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 清单已全部落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存、下载记录。其中 QQ/微信缓存与下载记录先被登记为「待拍板 / 不值得」，后来按上游补齐（限制写在各自工具描述里） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板） | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索、增强设置页（root 状态 + 模块开关聚合）。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板） | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
