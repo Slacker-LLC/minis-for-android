@@ -6,7 +6,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeNoException
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 
@@ -94,6 +97,30 @@ class SecureFileAccessTest {
             UbuntuPaths.resetLayoutForTest()
             root.deleteRecursively()
             outside.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a missing session directory names the path, not just its first component`() = runBlocking {
+        val root = Files.createTempDirectory("minis-secure-").toFile()
+        try {
+            UbuntuPaths.useLayoutForTest(root)
+            // The sessions root itself exists; what is missing is this session's directory.
+            Files.createDirectories(File(root, "sessions").toPath())
+            val path = UbuntuPaths.resolveSecureForFileAccess("no-such-session", "/workspace")!!
+            val error = assertThrows(WorkspaceFileClient.Failure::class.java) {
+                SecureFileAccess.list(path, 10, 0)
+            }
+            assertEquals("NOT_FOUND", error.code)
+            val message = error.message.orEmpty()
+            assertTrue(message, message.contains("no-such-session"))
+            assertTrue(message, message.contains("guest namespace"))
+            // A raw NoSuchFileException would print exactly the component name; that is
+            // what made a real device answer a tool call with "list failed: mcp".
+            assertNotEquals("no-such-session", error.message)
+        } finally {
+            UbuntuPaths.resetLayoutForTest()
+            root.deleteRecursively()
         }
     }
 

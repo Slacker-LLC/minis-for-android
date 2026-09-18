@@ -445,8 +445,27 @@ internal object SecureFileAccess {
             var current = openRoot(path.root)
             opened += current
             if (path.components.isEmpty()) return block(Parent(current, null, opened))
+            val walked = ArrayList<String>(path.components.size)
             path.components.dropLast(1).forEach { component ->
-                current = current.newDirectoryStream(Paths.get(component), *NOFOLLOW)
+                walked += component
+                // [T-android-secure-path-not-found] A missing directory used to escape as a
+                // raw NoSuchFileException, whose getMessage() is only the component name - a
+                // device test saw a tool answer "list failed: mcp" for a session that had no
+                // workspace yet, which tells the caller nothing. Name the path that is
+                // missing instead, the way deleteEntryIfPresent already names its entry.
+                current = try {
+                    current.newDirectoryStream(Paths.get(component), *NOFOLLOW)
+                } catch (error: NoSuchFileException) {
+                    throw WorkspaceFileClient.Failure(
+                        "NOT_FOUND",
+                        "path is not available in the guest namespace: " + walked.joinToString("/"),
+                    )
+                } catch (error: java.nio.file.NotDirectoryException) {
+                    throw WorkspaceFileClient.Failure(
+                        "NOT_DIR",
+                        "path component is not a directory: " + walked.joinToString("/"),
+                    )
+                }
                 opened += current
             }
             return block(Parent(current, Paths.get(path.components.last()), opened))
