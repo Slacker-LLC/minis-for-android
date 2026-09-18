@@ -164,6 +164,10 @@ object ToolSensitivePolicy {
         "get_device_environment",
         "list_alarms",
         "list_active_timers",
+        // [T-eta-xposed-groups] The same two tools under this catalog's names: what the user set
+        // aside for later is personal context, so the transcript keeps a placeholder.
+        "android.alarm.list",
+        "android.alarm.timers",
         "search_clipboard_history",
         "get_health_summary",
         "read_sms_code",

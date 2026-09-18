@@ -19,23 +19,33 @@ import org.json.JSONObject
  * private bookkeeping (T266) — so these tools add validation, an argv, and a documented
  * surface instead of a second scheduling path.
  *
- * Deliberate deviation from Eta: there is no `list_alarms` / `list_active_timers` tool here.
- * Android's Clock API is fire-and-forget, this app stopped keeping its own alarm records on
- * purpose, and a "list" that opened the Clock app would be a lie; the model gets
- * `android.alarm.open` instead, whose result says exactly what it did.
+ * The listing half (Eta's `list_alarms` / `list_active_timers`) reads the clock app's own
+ * database through the snapshot in [ClockDatabaseTools]: Android's Clock API is fire-and-forget, so
+ * what is set right now exists only inside that app. `android.alarm.open` stays for everything the
+ * database cannot answer honestly - editing, pausing and cancelling belong to the user.
  */
 object AlarmTools {
     const val SET = "android.alarm.set"
     const val TIMER = "android.alarm.timer"
     const val OPEN = "android.alarm.open"
+    const val LIST_ALARMS = "android.alarm.list"
+    const val LIST_TIMERS = "android.alarm.timers"
 
     val aliases: Map<String, List<String>> = mapOf(
         SET to listOf("set_alarm", "create_alarm"),
         TIMER to listOf("set_timer", "create_timer"),
         OPEN to listOf("show_alarms", "open_alarm_ui"),
+        LIST_ALARMS to listOf("list_alarms"),
+        LIST_TIMERS to listOf("list_active_timers"),
     )
 
-    fun handlers(): List<ToolHandler> = listOf(AlarmSetHandler(), AlarmTimerHandler(), AlarmOpenHandler())
+    fun handlers(): List<ToolHandler> = listOf(
+        AlarmSetHandler(),
+        AlarmTimerHandler(),
+        AlarmOpenHandler(),
+        AlarmListHandler(),
+        AlarmTimersHandler(),
+    )
 
     internal suspend fun dispatch(
         argv: List<String>,
@@ -130,13 +140,53 @@ class AlarmTimerHandler : ToolHandler {
 class AlarmOpenHandler : ToolHandler {
     override val definition = AgentToolDefinition(
         name = AlarmTools.OPEN,
-        description = "Open the system Clock app so the user can view, edit, pause or cancel alarms and " +
-            "timers. Android's Clock API cannot enumerate or cancel them from an app, so this is the " +
-            "only honest way to hand those operations to the user.",
+        description = "Open the system Clock app so the user can edit, pause or cancel alarms and " +
+            "timers. The list tools report what is set; changing or cancelling it belongs to the " +
+            "Clock app, and this is how the user gets there.",
         parameters = emptyMap(),
         required = emptyList(),
     )
 
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
         AlarmTools.open(sessionId, context)
+}
+
+class AlarmListHandler : ToolHandler {
+    override val definition = AgentToolDefinition(
+        name = AlarmTools.LIST_ALARMS,
+        description = "List the alarms the device Clock app actually holds, read from its own " +
+            "database. Requires an authorized privileged path; a build whose clock database has a " +
+            "different schema is reported as unsupported instead of guessed.",
+        parameters = mapOf(
+            "limit" to AgentToolParam(
+                "integer",
+                "Max rows (default ${PrivateDatabaseRules.DEFAULT_LIMIT}, " +
+                    "max ${PrivateDatabaseRules.MAX_LIMIT})",
+            ),
+            "enabled_only" to AgentToolParam("boolean", "Only enabled alarms (default true)"),
+        ),
+        required = emptyList(),
+    )
+
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
+        ClockDatabaseTools.listAlarms(context, sessionId, argsJson)
+}
+
+class AlarmTimersHandler : ToolHandler {
+    override val definition = AgentToolDefinition(
+        name = AlarmTools.LIST_TIMERS,
+        description = "List the countdown timers the device Clock app still holds (running or " +
+            "paused), read from its own database. Requires an authorized privileged path.",
+        parameters = mapOf(
+            "limit" to AgentToolParam(
+                "integer",
+                "Max rows (default ${PrivateDatabaseRules.DEFAULT_LIMIT}, " +
+                    "max ${PrivateDatabaseRules.MAX_LIMIT})",
+            ),
+        ),
+        required = emptyList(),
+    )
+
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String) =
+        ClockDatabaseTools.listTimers(context, sessionId, argsJson)
 }
