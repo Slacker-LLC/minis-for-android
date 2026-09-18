@@ -341,9 +341,19 @@
 |---|---|---|---|
 | 第三组真 hook：Gemini 浮窗补语音输入 | Google 的助手浮窗（`FloatyActivity`）在锁屏/亮屏路径回到前台时可能没带上本该开始收音的语音指令，用户看到浮层却还得再点一下麦克风。这组盯着该 Activity 的 `onResume`，把一条 `ACTION_VOICE_COMMAND` 补发回 Google 自己的应用。两个开关默认都关——锁屏与亮屏是两件独立的选择，「装了但没配」必须等价于没装。开关在 resume 时读一次、350 ms 后连同 Activity 是否还活着、锁屏状态是否仍是当初那个一起复查：为锁屏排队的那条指令绝不会在已解锁的会话上开麦。每个浮窗实例每个窗口只补一条（弱引用作键，不泄漏 Activity）；发送失败的尝试会清掉自己的标记而不是吃掉窗口 | `e818b8cf` | ✅ `GoogleVoiceCommandPolicyTest`（6 例） |
 | 目标与回落 | 优先 hook 浮窗自己的 `onResume`；该类没声明 `onResume` 时回落到 `Activity.onResume` 并用类名把自己限制在浮窗上——Google App 更新挪走方法后 hook 仍然有效；两者都没有则记 MISSING。指令带 `setPackage(Google 包)`，因为这条 hook 本来就跑在它的进程里 | `e818b8cf` | ✅ 上述用例覆盖开关默认、状态翻转拒绝、去重窗口与清标记 |
-| 刻意没移植的一半（待拍板） | Eta 同一文件的另一半是把 `Build.MANUFACTURER/BRAND/MODEL/PRODUCT/DEVICE` 改成 Samsung S24 Ultra，并让 `ro.opa.eligible_device` 与 `GOOGLE_BUILD`/`GOOGLE_EXPERIENCE` 两个 feature 一律为真——即在 Google 进程里伪装成另一台设备以「放开资格」。这不是能力补齐而是设备身份伪装：影响整机对 Google 的自我描述、跨版本易碎、是否接受属于产品决定，因此本仓库暂不落。要做请明说 | 未落 | — |
+| 同文件另一半 | Eta 同一文件的另一半是在 Google 进程里补齐机型档案与资格（`Build` 五个静态字段、`ro.opa.eligible_device`、`GOOGLE_BUILD`/`GOOGLE_EXPERIENCE` 两个 feature）。这一半当轮没落，下一组已按 Eta 原样补上 | 见下一组 | — |
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2148 个用例 = 上一项后的 2142 + 6，0 失败）。**没有任何设备结论**：这一版 Google App 是否暴露 `FloatyActivity`、它的 resume 路径是否真的缺语音指令、补发的指令是否会让浮窗开始收音，全部未验证——没有目标时台账记 MISSING 并保留原行为。真机判据：logcat 里 `GoogleVoiceCommand` 前缀的台账行。
+
+**Phase 6 第四组：Google 机型档案与资格** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第四组真 hook：让 Google App 认这台设备 | Google 的门禁是靠问平台问题来决定的——设备档案（`Build.MANUFACTURER/BRAND/MODEL/PRODUCT/DEVICE`）、`ro.opa.eligible_device` 属性、以及 `hasSystemFeature` 的 `GOOGLE_BUILD`/`GOOGLE_EXPERIENCE`；答案说「不是这台设备」时，它就把助手的那套屏幕能力（一圈即搜）拒掉。这组在模块进入的进程里把三处答案一起补齐：档案写进静态字段（先反射，平台拒绝时用 `putObjectVolatile` 就地写静态字段，因此已经读过该字段的代码看到的也是新值），属性与 feature 走 hook。Eta 的理由是这三件事同属「让 Google App 认为本机具备资格」，因此不做开关、进到哪个进程就在哪里生效——本仓库保持原样 | `49aa7ea3` | ✅ `GoogleSpoofProfileTest`（3 例） |
+| 档案集中一处 | 所有名字与取值集中在 `GoogleSpoofProfile`：属性键、两个 feature、五个静态字段（Samsung SM-S928B / e3s，Eta 用来过门禁的那套身份）。hook 只做一行读数，因为这类表最容易出的错是名字写错——反射找不到就悄悄留着真值还报成功，所以字段名、大小写与顺序都被用例钉住 | `49aa7ea3` | ✅ 上述用例（属性/feature 的精确匹配与五个字段名） |
+| 台账补「非 hook 变更」 | 前三组往台账里写的都是 hook；这组有一半是改静态字段，没有可拦截的调用。`HookRegistrar` 因此补 `applied()` 与 `failed()`：写得成就记一条 INSTALLED（带写入的值），写不成记 FAILED，字段在这版 ROM 上没有记 MISSING——「模块在这个进程里改过东西」不再只存在于日志行里 | `49aa7ea3` | ✅ `HookInstallJournalTest` 补 1 例（INSTALLED 行带 detail） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2152 个用例 = 上一项后的 2148 + 4，0 失败）。**没有任何设备结论**：这一版 Google App 是否真的拿这些答案当门禁、写入的档案是否在它读取之前生效、`sun.misc.Unsafe` 路径在目标 Android 版本上是否被允许，全部未验证——补齐失败时台账逐条记 MISSING/FAILED 并保留平台真值。真机判据：logcat 里 `GoogleEligibility` 前缀的台账行，以及 Google 进程内 `Build.MODEL` 是否变成 `SM-S928B`。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
@@ -353,7 +363,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿。未落地：小布、超级小爱、一圈即搜的系统侧、无障碍保活与热词自愈 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
