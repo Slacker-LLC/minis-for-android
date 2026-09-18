@@ -325,7 +325,11 @@ fun ScheduledTaskEditScreen(
                 AlertDialog(
                     onDismissRequest = { vm.clearRunNowState() },
                     title = { Text(stringResource(R.string.scheduled_task_run_now_failed)) },
-                    text = { Text(stringResource(R.string.scheduled_task_run_now_failed_body)) },
+                    text = {
+                        // The reason when we have one (no provider configured,
+                        // target chat gone) instead of a generic failure line.
+                        Text(state.message ?: stringResource(R.string.scheduled_task_run_now_failed_body))
+                    },
                     confirmButton = {
                         TextButton(onClick = { vm.clearRunNowState() }) {
                             Text(stringResource(R.string.ok))

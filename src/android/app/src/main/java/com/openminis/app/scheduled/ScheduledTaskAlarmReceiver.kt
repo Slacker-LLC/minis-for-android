@@ -79,7 +79,25 @@ class ScheduledTaskAlarmReceiver : BroadcastReceiver() {
                     // completion notification are finished off ScheduledAgent-
                     // Runner's app-scoped bgScope, which outlives this
                     // receiver.
-                    ScheduledAgentRunner.run(appContext, task, waitForCompletion = false)
+                    val outcome = ScheduledAgentRunner.run(
+                        appContext,
+                        task,
+                        waitForCompletion = false,
+                    )
+                    if (!outcome.started) {
+                        // The fire happened and nothing will run — the runner
+                        // only logs that, so the row kept no trace of it and the
+                        // run history showed a task that quietly stopped firing.
+                        // Record the reason, with a null session (nothing to open).
+                        manager.markFired(
+                            taskId = taskId,
+                            sessionId = null,
+                            resultPreview = outcome.message
+                                ?: outcome.errorCode
+                                ?: "run could not start",
+                            ok = false,
+                        )
+                    }
                 }
             } catch (t: Throwable) {
                 // Includes TimeoutCancellationException. The task stays

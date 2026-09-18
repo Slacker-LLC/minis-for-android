@@ -167,15 +167,16 @@ class ScheduledTasksViewModel(private val appContext: Context) : ViewModel() {
     fun runNow(task: ScheduledTask) {
         viewModelScope.launch(Dispatchers.IO) {
             _runNowState.value = RunNowState(taskId = task.id, status = RunStatus.RUNNING)
-            val sid = runCatching {
+            val outcome = runCatching {
                 com.openminis.app.scheduled.ScheduledAgentRunner.run(
                     appContext, task, waitForCompletion = false,
                 )
             }.getOrNull()
             _runNowState.value = RunNowState(
                 taskId = task.id,
-                status = if (sid != null) RunStatus.STARTED else RunStatus.FAILED,
-                sessionId = sid,
+                status = if (outcome?.started == true) RunStatus.STARTED else RunStatus.FAILED,
+                sessionId = outcome?.sessionId,
+                message = outcome?.message,
             )
         }
     }
@@ -187,6 +188,8 @@ class ScheduledTasksViewModel(private val appContext: Context) : ViewModel() {
         val taskId: String,
         val status: RunStatus,
         val sessionId: String? = null,
+        /** Why the run could not start, when [status] is FAILED. */
+        val message: String? = null,
     )
 
     companion object {

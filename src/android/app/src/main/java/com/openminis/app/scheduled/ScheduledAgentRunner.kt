@@ -33,6 +33,30 @@ object ScheduledAgentRunner {
     private const val RUN_TIMEOUT_MS = 10 * 60 * 1000L  // 10 min ceiling
 
     /**
+     * [T-android-scheduled-tasks-full] The result of asking a scheduled task to
+     * run: the session that received the prompt, or why none could.
+     *
+     * `null` used to stand for every failure at once. The CLI answered
+     * `{"ran": false}` and the editor's "Run now" dialog said only that the
+     * task could not start, so neither the agent nor the user could tell a
+     * missing provider (fixable in Settings) from a target chat that no longer
+     * exists. Measured on the Xiaomi 24129PN74C: `minis-scheduled run --id …`
+     * answered `{"ran": false}` on a device with no provider configured.
+     */
+    data class RunOutcome(
+        val sessionId: String? = null,
+        val errorCode: String? = null,
+        val message: String? = null,
+    ) {
+        val started: Boolean get() = sessionId != null
+    }
+
+    const val ERROR_APP_NOT_READY = "app_not_ready"
+    const val ERROR_SUBSYSTEMS_NOT_READY = "subsystems_not_ready"
+    const val ERROR_NO_PROVIDER = "no_provider"
+    const val ERROR_TARGET_SESSION_GONE = "target_session_gone"
+
+    /**
      * App-scoped scope for fire-and-forget completion work when a caller asks
      * NOT to wait (the "Run now" button). Outlives the editor screen so the
      * agent loop + completion notification finish even after the user leaves.
@@ -65,17 +89,23 @@ object ScheduledAgentRunner {
         context: Context,
         task: ScheduledTask,
         waitForCompletion: Boolean = true,
-    ): String? {
+    ): RunOutcome {
         val app = context.applicationContext as? MinisApp ?: run {
             AppLogger.error(TAG, "Application is not MinisApp — skipping task ${task.id}")
-            return null
+            return RunOutcome(
+                errorCode = ERROR_APP_NOT_READY,
+                message = "Minis is not initialized in this process.",
+            )
         }
         if (!app.subsystemsReady()) {
             AppLogger.error(
                 TAG,
                 "MinisApp subsystems not initialized (safe-mode or failed init) — skipping task ${task.id}",
             )
-            return null
+            return RunOutcome(
+                errorCode = ERROR_SUBSYSTEMS_NOT_READY,
+                message = "Minis is still starting, or it is running in safe mode.",
+            )
         }
 
         // Do not pre-start AgentForegroundService here. A scheduled task may
@@ -84,9 +114,8 @@ object ScheduledAgentRunner {
         // existing ChatViewModel execution path marks the session active only
         // when a real agent turn begins; that transition is the single owner of
         // the Agent FGS lifecycle.
-        val sessionId = withContext(Dispatchers.IO) {
-            resolveSessionId(app, task)
-        } ?: return null
+        val resolved = withContext(Dispatchers.IO) { resolveSessionId(app, task) }
+        val sessionId = resolved.sessionId ?: return resolved
 
         AppLogger.info(
             TAG,
@@ -100,7 +129,7 @@ object ScheduledAgentRunner {
             val ok = result.status != "Error" && result.status != "Timeout"
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
-            return sessionId
+            return RunOutcome(sessionId = sessionId)
         }
 
         // Fire-and-forget: the session is resolved and the prompt will claim
@@ -114,7 +143,7 @@ object ScheduledAgentRunner {
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
         }
-        return sessionId
+        return RunOutcome(sessionId = sessionId)
     }
 
     /**
@@ -162,22 +191,28 @@ object ScheduledAgentRunner {
         )
     }
 
-    private suspend fun resolveSessionId(app: MinisApp, task: ScheduledTask): String? {
+    private suspend fun resolveSessionId(app: MinisApp, task: ScheduledTask): RunOutcome {
         return when (val mode = task.targetMode) {
             is ScheduledTargetMode.AppendToSession -> {
                 if (app.chatRepository.getSession(mode.sessionId) == null) {
                     AppLogger.warning(TAG, "task ${task.id}: follow-up session ${mode.sessionId} gone — abort")
-                    null
+                    RunOutcome(
+                        errorCode = ERROR_TARGET_SESSION_GONE,
+                        message = "The chat this task follows up (${mode.sessionId}) no longer exists.",
+                    )
                 } else {
-                    mode.sessionId
+                    RunOutcome(sessionId = mode.sessionId)
                 }
             }
             is ScheduledTargetMode.RerunMessage -> {
                 if (app.chatRepository.getSession(mode.sessionId) == null) {
                     AppLogger.warning(TAG, "task ${task.id}: re-run session ${mode.sessionId} gone — abort")
-                    null
+                    RunOutcome(
+                        errorCode = ERROR_TARGET_SESSION_GONE,
+                        message = "The chat this task re-runs (${mode.sessionId}) no longer exists.",
+                    )
                 } else {
-                    mode.sessionId
+                    RunOutcome(sessionId = mode.sessionId)
                 }
             }
             ScheduledTargetMode.NewSession -> {
@@ -206,7 +241,11 @@ object ScheduledAgentRunner {
                     ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
                     ?: run {
                         AppLogger.warning(TAG, "task ${task.id}: no provider — abort")
-                        return null
+                        return RunOutcome(
+                            errorCode = ERROR_NO_PROVIDER,
+                            message = "No model provider is configured. Add one under Settings → " +
+                                "LLM Providers → Manage Providers, then run this task again.",
+                        )
                     }
                 val title = task.label.ifBlank { "Scheduled task" }
                 val memoryOn = com.openminis.app.data.MemoryGlobalPrefs.isGlobalEnabled(app)
@@ -222,7 +261,7 @@ object ScheduledAgentRunner {
                 if (bindingToWrite != null) {
                     app.chatRepository.updateSessionBinding(session.id, bindingToWrite, seedModelId)
                 }
-                session.id
+                RunOutcome(sessionId = session.id)
             }
         }
     }

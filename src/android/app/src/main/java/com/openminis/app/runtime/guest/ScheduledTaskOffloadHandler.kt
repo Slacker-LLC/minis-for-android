@@ -1,6 +1,8 @@
 package com.openminis.app.runtime.guest
 
 import android.content.Context
+import android.app.AlarmManager
+import android.os.Build
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
@@ -73,7 +75,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
     private fun handleList(): NativeOffloadResult {
         val arr = JSONArray()
         for (t in manager.list()) arr.put(taskJson(t))
-        val out = JSONObject().put("tasks", arr).put("count", arr.length())
+        val out = withPrecision(JSONObject().put("tasks", arr).put("count", arr.length()))
         return NativeOffloadResult(0, out.toString(2))
     }
 
@@ -104,7 +106,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
             endDateMs = args.get("end")?.let { parseDate(it) },
         )
         manager.create(task)
-        val out = JSONObject().put("created", taskJson(task))
+        val out = withPrecision(JSONObject().put("created", taskJson(task)))
         return NativeOffloadResult(0, out.toString(2))
     }
 
@@ -119,7 +121,10 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         val id = args.get("id") ?: throw IllegalArgumentException("--id required")
         if (manager.get(id) == null) return NativeOffloadResult(1, "minis-scheduled: no task with id=$id")
         manager.setEnabled(id, enabled)
-        return NativeOffloadResult(0, JSONObject().put("id", id).put("enabled", enabled).toString())
+        return NativeOffloadResult(
+            0,
+            withPrecision(JSONObject().put("id", id).put("enabled", enabled)).toString(),
+        )
     }
 
     private fun handleRun(args: OffloadArgs): NativeOffloadResult {
@@ -127,17 +132,49 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         val task = manager.get(id) ?: return NativeOffloadResult(1, "minis-scheduled: no task with id=$id")
         // Fire immediately, off-schedule. Blocks until the agent loop finishes
         // (ScheduledAgentRunner waits internally). Mirrors the editor "Run now".
-        val sessionId = runBlocking {
+        val outcome = runBlocking {
             com.openminis.app.scheduled.ScheduledAgentRunner.run(context, task)
         }
         val out = JSONObject()
             .put("id", id)
-            .put("ran", sessionId != null)
-            .apply { if (sessionId != null) put("sessionId", sessionId) }
-        return NativeOffloadResult(if (sessionId != null) 0 else 1, out.toString(2))
+            .put("ran", outcome.started)
+            .apply {
+                outcome.sessionId?.let { put("sessionId", it) }
+                // `ran: false` alone made every failure look alike; the code
+                // tells a missing provider (fixable in Settings) apart from a
+                // target chat that no longer exists.
+                outcome.errorCode?.let { put("error", it) }
+                outcome.message?.let { put("message", it) }
+            }
+        return NativeOffloadResult(if (outcome.started) 0 else 1, out.toString(2))
     }
 
     // ── parsing helpers ──
+
+    /**
+     * [T-android-scheduled-exact-alarm] Android 12+ lets the user withhold
+     * "Alarms & reminders" (`SCHEDULE_EXACT_ALARM` is denied by default for
+     * apps that target 13+). The manager then falls back to an inexact alarm,
+     * which is the right call — the task still fires, minutes late — but the
+     * CLI answered with a precise `nextTriggerMs` and said nothing about it, so
+     * a caller could not tell a punctual task from a drifting one. Measured on
+     * the Xiaomi 24129PN74C: every create logged `exact-alarm denied … falling
+     * back to inexact` while the JSON stayed silent.
+     */
+    private fun withPrecision(out: JSONObject): JSONObject {
+        val (precision, hint) = precisionNote(canScheduleExactAlarms())
+        out.put("alarm_precision", precision)
+        if (hint != null) out.put("hint", hint)
+        return out
+    }
+
+    private fun canScheduleExactAlarms(): Boolean = try {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager)
+                ?.canScheduleExactAlarms() == true
+    } catch (_: Throwable) {
+        true
+    }
 
     private fun parseTime(s: String): Pair<Int, Int> {
         val parts = s.split(":")
@@ -215,6 +252,19 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
 
     companion object {
         private const val TAG = "ScheduledTaskOffload"
+
+        /**
+         * Pure half of the precision note, so both branches are pinned by a
+         * unit test — a given device only ever shows the state it is in.
+         */
+        fun precisionNote(canScheduleExact: Boolean): Pair<String, String?> =
+            if (canScheduleExact) {
+                "exact" to null
+            } else {
+                "inexact" to "Android has not granted \"Alarms & reminders\" to Minis, so this " +
+                    "task may fire a few minutes late. Grant it in Settings → Apps → Minis → " +
+                    "Alarms & reminders."
+            }
         private val HELP = """
             minis-scheduled — manage timed AI tasks (mirrors the in-app Scheduled Tasks).
 
