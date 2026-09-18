@@ -132,6 +132,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `mcp/client/McpToolHeaders.kt` (the `x-mcp-header` schema walk, value rendering and base64 wrapper) and the per-call header plumbing in `mcp/client/MCPClientSession.kt` / `mcp/client/MCPHttpTransport.kt` | `agent/mcp/McpToolHeaders.kt` and the header handling in `agent/mcp/McpHttpClient.kt` |
 | `data/model/AgentToolDefinition.kt` (`apiName`: the wire-name sanitisation and its digest suffix) | `agent/mcp/McpRunContext.kt` (`modelToolName`) |
 | `mcp/client/MCPHttpTransport.kt` (the `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` headers and their order) | the request headers in `agent/mcp/McpHttpClient.kt` |
+| `tools/runtime/ToolResultBudget.kt` (the per-result cap at the dispatch boundary; the spill and prune policies it calls are already recorded above) | `agent/runtime/AgentRuntimeWire.kt` (`MAX_RESULT_CONTENT_CHARS`, the single per-result bound) |
 
 
 ## Active native/runtime components

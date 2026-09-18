@@ -722,6 +722,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2373 个用例 = 上一项后的 2371 + 2）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：严格要求路由头的服务器，在我们多带了它自己客户端不会带的头时如何反应，未验证。
 
+**工具结果的唯一上界（自查出来的缺口）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 派发收口处加一道闸 | 此前每个工具各自负责「别印太多」：浏览器有载荷闸门、MCP 处理器会落盘、shell 走自己的 retainer——但**一个只是印得多的工具**（数据库转储、日志读取、guest 里 `cat` 一个文件）会原样进 transcript、再原样进下一次 provider 请求。上游把这件事收在**一处**（runtime wire 上每条结果封 64 000 字符）；本仓库的等价收口是 registry 派发——结果正是在那里从「工具私事」变成「消息部件」。现在 `ToolResultBudget` 就在那里：50 KiB 以内原样通过，超了经 `ContextOffload` 落盘（与日志工具、MCP 处理器同一条路）给模型「预览 + `/var/minis/offloads` 路径」以便 `file_read` 回读，落盘失败退到 `ToolResultPruner` 的「头 + 省略标记 + 尾」。自己已经有界的工具远在预算之下，不会重复落盘 | `a17b51b5` | ✅ `ToolResultBudgetTest`（5 例：预算内同一对象返回、恰好到预算不落盘、超限用落盘预览且保留其它字段、落盘失败用带标记的裁剪预览、落盘报告未落盘时同样退到裁剪预览） |
+| 顺带修正的测试常识 | 预算是**UTF-8 字节**：第一版用例用 18 000 个 ASCII 字符当「超大」，离 50 KiB 还远，根本走不到落盘分支——测试当场把这个误解暴露出来（两例失败），改成按字节构造后才真正覆盖 | `a17b51b5` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2378 个用例 = 上一项后的 2373 + 5）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实超大工具结果走落盘路径（写入会话 offloads 目录）在设备上的表现未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
