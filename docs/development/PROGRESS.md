@@ -326,6 +326,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2132 个用例 = 上一项后的 2123 + 9，0 失败）。**没有任何设备结论**：特定 HyperOS 版本是否暴露这个 VoiceService、真机手势是否触发接管、binder 调用是否落地，全部未验证——ROM 上没有目标时台账会记 MISSING 并保留原行为。真机判据：logcat 里 `[HyperOsScreenSearch]` 的台账行 + `META-INF/xposed` 声明在 APK 内（已核对）。
 
+**Phase 6 第二组：HyperOS 电源键长按** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第二组真 hook：HyperOS 电源键长按 | 电源键长按在 HyperOS 上是一次快捷分发（`ShortCutActionsUtils.triggerFunction`），这组把它接到用户选定的助手。两个 arity 都 hook（ROM 在两个签名之间搬过），并且只认领「function **与** source 同时是助手长按」的那一次调用——同一个分发器还承载电源菜单、SOS 与其它所有快捷方式，只看 function 会把它们一起劫持。分发器的 context 从它自己的字段取；这一版 ROM 没有分发器记 SKIPPED 而不是 FAILED；任何解析不了的路径一律回落原逻辑 | `8474dd88` | ✅ `HyperOsPowerPolicyTest`（2 例） |
+| 助手启动桥与三态开关 | `AssistantLaunch` 是 Eta 用 `AssistantManager` 搭的桥，按本仓库已有的声明适配：助手 Activity 本来就响应 `ACTION_ASSIST`/`ACTION_VOICE_ASSIST`，VoiceInteractionService 也注册了助手角色，所以直接拉起这个已声明的入口，不再重建 Eta 的 voice-interaction 绑定与修复机制。「打开哪个助手」做成可测的值：OEM 目标映射为 null（＝不接管），调用方据此回落。`ModulePrefs` 增加字符串设置（三选一而不是开关），同样失败安全：读不到或值不认识保持 OEM 助手；目标包没装就记节流警告并回落——绝不为了换一次没发生的启动而吞掉手势 | `8474dd88` | ✅ `AssistantLaunchTest`（6 例）+ `ModulePrefsTest` 扩充（5→7 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2142 个用例 = 上一项后的 2132 + 10，0 失败）。**没有任何设备结论**：特定 HyperOS 版本是否暴露这个分发器、电源键快捷方式是否真的走到它、拉起的 intent 是否打开助手，全部未验证——ROM 上没有目标时台账记 MISSING/SKIPPED 并保留原行为。真机判据：logcat 里 `HyperOsPower` 前缀的台账行。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
