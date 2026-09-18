@@ -10,6 +10,7 @@ import com.openminis.app.xposed.system.AccessibilityProtectionHooks
 import com.openminis.app.xposed.system.ContextualSearchHooks
 import com.openminis.app.xposed.system.HotwordSelfHealHooks
 import com.openminis.app.xposed.system.SystemUiHooks
+import com.openminis.app.xposed.system.PowerKeyHooks
 
 /**
  * [T-eta-xposed-groups] The groups this module knows, wired to the targets they belong to.
@@ -48,6 +49,10 @@ object HookGroups {
         // And the assistant's hotword detection, which some builds drop when the screen goes off.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             HotwordSelfHealHooks.install(module, classLoader, log)
+        }
+        // The ColorOS power key: a message inside system_server rather than a launcher call.
+        HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
+            PowerKeyHooks.install(module, classLoader, log)
         }
         // The navigation bar itself: ColorOS SystemUI's OCR long press.
         HookGroupRegistry.register(ModuleTargets.SYSTEM_UI_PACKAGE) { module, classLoader, log ->

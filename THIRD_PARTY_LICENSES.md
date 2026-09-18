@@ -109,6 +109,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/ChatImagePolicy.kt` (the two caches and the row rule as values) and `tools/ChatImageTools.kt` | `agent/tool/AgentPersonalDataTools.kt` (`search_qq_chat_images` / `search_wechat_chat_images`) and their catalog entries |
 | `tools/PersonalDataQueryTools.kt` (the shared content-query read, extracted from the ColorOS tools) and `tools/DownloadsTools.kt` | `agent/tool/AgentPersonalDataTools.kt` (`search_downloads` and the `query` helper behind every provider read) and its catalog entry |
 | `xposed/ModuleSettingsStore.kt` and `ui/settings/ModuleSettingsScreen.kt` | `config/Prefs.kt` and the module settings screen behind it |
+| `xposed/system/PowerKeyHooks.kt`, `xposed/system/PowerKeyPolicy.kt` (the assist message id, the OEM haptic and the dedup window as values) | `hook/system/PowerHooks.kt` and the constants it reads in `core/ModuleConfig.kt` |
 
 
 ## Active native/runtime components
