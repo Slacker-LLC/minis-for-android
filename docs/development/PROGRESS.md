@@ -847,6 +847,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机复验 | 同一调用：修复前 `list failed: mcp` → 修复后 `list failed: NOT_FOUND: path is not available in the guest namespace: mcp`；`--limit/--offset` 等参数与边界用例不变 |
 | 验证口径 | `:app:compileDebugKotlin` + `:app:testDebugUnitTest`（**2390 例 0 失败**，含 `SecureFileAccessTest` 新增用例）+ `:app:assembleDebug` 后装机复跑；本片未动 UI/资源/清单，按验证矩阵未跑 lint |
 
+### 真机：guest 只读 CLI 与其余调试面（2026-09-19 续）
+
+| 调用 | 结果 |
+|---|---|
+| `android-device info / battery / storage` | 三项都 exit 0 并返回结构化 JSON：`info` 给出 android_version/board/brand/device/hardware/manufacturer/model/product/sdk_level 与内存；`battery` 给出 charging/health/level_percent/power_source/status/temperature_celsius；`storage` 给出 app_cache_mb/app_data_mb/internal_free|total|used_gb 与 note |
+| `android-clipboard` 往返 | `set --text <marker>` → `Copied 26 characters to clipboard.`；`get` 回读 26 字符且含 marker；**`get --json` 返回 `{"text":…,"chars":26,"truncated":false}`——正是本分支剪贴板有界那一片引入的形状**；最后 `clear` 把剪贴板恢复为空（设备状态复原） |
+| `minis-sessions-cli list` | `{ok:true, count:0, sessions:[]}`（新装实例，如实为空） |
+| `minis-config list` | 明确报错 + 用法：`invalid_args / Unknown subcommand 'list'. Use --help.`（不吞掉错误） |
+| `debug.logs.list` | 2 个文件：`launch-beacon.log`（384 B）与 **`crash-2026-09-19_03-41-14.log`（30 840 B）**——那是修复前的迁移崩溃，应用把它留档了 ✓；`debug.screenshot.list` → `{count:0}` |
+| 权限门控（观察，未改） | `android-notification list`、`android-calendar list --today`、`android-location current` 三项都因**设备上等待用户授权的对话框**而在 120 s 超时结束；其中日历是系统运行时权限弹窗、定位是应用自己的说明弹窗（“Minis needs location permission…，CANCEL / OPEN SETTINGS”）。**我没有替你批准任何个人数据授权**，而是点了「拒绝 / CANCEL」走失败关闭路径。可改进点（未做，属产品取舍）：调用方最终只看到 `command timed out after 120000ms`，没有任何线索说明「屏幕上有个权限弹窗在等你」——对交互式用户是正常等待，对无人看守的调用则容易变成盲目重试 |
+
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
