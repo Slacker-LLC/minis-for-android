@@ -90,6 +90,24 @@ class HookRegistrar(
         logger.warn(detail)
     }
 
+    /**
+     * A change a group makes that is not a hook: a field rewritten, a service started. Eta reports
+     * those in the log only; the ledger carries them here so "the module changed something in this
+     * process" is never only in a log line.
+     */
+    fun applied(id: String, description: String, detail: String? = null) {
+        require(STABLE_ID.matches(id)) { "hook id is invalid: $id" }
+        journal.installed(id, description, detail)
+        logger.debug { if (detail == null) "applied: $description" else "applied: $description ($detail)" }
+    }
+
+    /** A change that was attempted and did not take: the report says FAILED instead of guessing. */
+    fun failed(id: String, description: String, detail: String) {
+        require(STABLE_ID.matches(id)) { "hook id is invalid: $id" }
+        journal.failed(id, description, detail)
+        logger.error(detail)
+    }
+
     fun skipped(id: String, description: String, detail: String) {
         require(STABLE_ID.matches(id)) { "hook id is invalid: $id" }
         journal.skipped(id, description, detail)

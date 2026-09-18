@@ -28,8 +28,9 @@ import io.github.libxposed.api.XposedModule
  * is on (the lock screen and screen-on cases are separate choices, both off by default) and only
  * while the state that queued it still holds.
  *
- * Eta's other half of that file - rewriting the `Build` fields and the eligibility properties so
- * the device claims to be a different one - is deliberately not ported; PROGRESS.md records why.
+ * Eta's other half of that file - the device identity and the eligibility answers - is a separate
+ * group ([GoogleEligibilityHooks]): that half is about the Google app being willing to run the
+ * feature at all, while this one is about a single missing voice command.
  */
 object GoogleVoiceCommandHooks {
 

@@ -1,5 +1,6 @@
 package com.openminis.app.xposed
 
+import com.openminis.app.xposed.google.GoogleEligibilityHooks
 import com.openminis.app.xposed.google.GoogleVoiceCommandHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
@@ -31,6 +32,11 @@ object HookGroups {
         // Google's own floaty assistant surface, in the Google app's process.
         HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->
             GoogleVoiceCommandHooks.install(module, classLoader, log)
+        }
+        // The same process also answers Google's eligibility questions: without those answers its
+        // screen features stay refused no matter what the gestures do.
+        HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->
+            GoogleEligibilityHooks.install(module, classLoader, log)
         }
     }
 }

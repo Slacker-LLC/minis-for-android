@@ -57,7 +57,8 @@ class HookInstallJournal(private val group: String) {
         }
     }
 
-    fun installed(id: String, description: String) = record(id, description, HookInstallStatus.INSTALLED)
+    fun installed(id: String, description: String, detail: String? = null) =
+        record(id, description, HookInstallStatus.INSTALLED, detail)
 
     fun missing(id: String, description: String, detail: String) =
         record(id, description, HookInstallStatus.MISSING, detail)

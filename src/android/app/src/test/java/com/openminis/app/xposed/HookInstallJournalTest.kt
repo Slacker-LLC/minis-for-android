@@ -68,4 +68,15 @@ class HookInstallJournalTest {
         assertEquals(1, combined.installedCount)
         assertEquals(1, combined.skippedCount)
     }
+
+    @Test
+    fun `an applied change keeps its detail in the ledger`() {
+        val journal = HookInstallJournal("GoogleEligibility")
+
+        journal.installed("google.identity.model", "Build.MODEL", "SM-S928B")
+
+        val entry = journal.report().entries.single()
+        assertEquals(HookInstallStatus.INSTALLED, entry.status)
+        assertEquals("SM-S928B", entry.detail)
+    }
 }
