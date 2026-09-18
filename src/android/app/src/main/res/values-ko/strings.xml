@@ -1487,4 +1487,13 @@
     <string name="modeldetail_hosted_web_search">서버 측 웹 검색</string>
     <string name="modeldetail_hosted_web_search_sub">모델이 공급자 자체 검색을 호출하도록 허용합니다. 출처는 인용으로 돌아오고, 공급자 할당량을 사용하며, Responses API에서만 지원됩니다.</string>
 
+    <string name="hosted_tool_web_search">웹 검색</string>
+    <string name="hosted_tool_file_search">파일 검색</string>
+    <string name="hosted_tool_code_interpreter">코드 실행</string>
+    <string name="hosted_tool_computer">컴퓨터 사용</string>
+    <string name="hosted_tool_image_generation">이미지 생성</string>
+    <string name="hosted_tool_mcp">MCP 도구</string>
+    <string name="hosted_tool_unknown">공급자 도구</string>
+    <string name="hosted_tool_failed">실패</string>
+
 </resources>

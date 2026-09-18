@@ -1740,4 +1740,13 @@
     <string name="modeldetail_hosted_web_search">Веб-поиск на стороне провайдера</string>
     <string name="modeldetail_hosted_web_search_sub">Разрешает модели вызывать поиск провайдера. Источники возвращаются как цитаты; это расходует квоту провайдера, и поддерживает это только Responses API.</string>
 
+    <string name="hosted_tool_web_search">Веб-поиск</string>
+    <string name="hosted_tool_file_search">Поиск файлов</string>
+    <string name="hosted_tool_code_interpreter">Выполнение кода</string>
+    <string name="hosted_tool_computer">Управление компьютером</string>
+    <string name="hosted_tool_image_generation">Генерация изображений</string>
+    <string name="hosted_tool_mcp">Инструмент MCP</string>
+    <string name="hosted_tool_unknown">Инструмент провайдера</string>
+    <string name="hosted_tool_failed">ошибка</string>
+
 </resources>

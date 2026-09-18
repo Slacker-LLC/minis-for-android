@@ -1490,4 +1490,13 @@
     <string name="modeldetail_hosted_web_search">Serverseitige Websuche</string>
     <string name="modeldetail_hosted_web_search_sub">Erlaubt dem Modell die Suche des Anbieters selbst zu nutzen. Quellen kommen als Zitate zurück; das verbraucht das Kontingent des Anbieters, und nur die Responses-API kennt sie.</string>
 
+    <string name="hosted_tool_web_search">Websuche</string>
+    <string name="hosted_tool_file_search">Dateisuche</string>
+    <string name="hosted_tool_code_interpreter">Codeausführung</string>
+    <string name="hosted_tool_computer">Computersteuerung</string>
+    <string name="hosted_tool_image_generation">Bilderzeugung</string>
+    <string name="hosted_tool_mcp">MCP-Werkzeug</string>
+    <string name="hosted_tool_unknown">Anbieter-Werkzeug</string>
+    <string name="hosted_tool_failed">fehlgeschlagen</string>
+
 </resources>

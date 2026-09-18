@@ -1495,4 +1495,13 @@
     <string name="modeldetail_hosted_web_search">サーバー側ウェブ検索</string>
     <string name="modeldetail_hosted_web_search_sub">モデルがプロバイダー自身の検索を呼び出せるようにします。出典は引用として返り、プロバイダーの枠を消費します。対応するのは Responses API のみです。</string>
 
+    <string name="hosted_tool_web_search">ウェブ検索</string>
+    <string name="hosted_tool_file_search">ファイル検索</string>
+    <string name="hosted_tool_code_interpreter">コード実行</string>
+    <string name="hosted_tool_computer">コンピューター操作</string>
+    <string name="hosted_tool_image_generation">画像生成</string>
+    <string name="hosted_tool_mcp">MCP ツール</string>
+    <string name="hosted_tool_unknown">プロバイダーのツール</string>
+    <string name="hosted_tool_failed">失敗</string>
+
 </resources>

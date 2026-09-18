@@ -52,4 +52,20 @@ sealed class LLMStreamChunk {
      * attribution in THIRD_PARTY_LICENSES.md.
      */
     data class ProviderOutputItem(val json: String) : LLMStreamChunk()
+
+    /**
+     * [T-eta-hosted-web-search] A tool the **provider** ran on its own: the Responses API reports
+     * these as `<kind>_call.<phase>` events and this app never executes them. The kind is a token
+     * (`web_search`, `file_search`, …) rather than a sentence, because the row is labelled where the
+     * language is known.
+     *
+     * Ported from Eta `agent/model/OpenAiResponsesProvider.kt` and its `ProviderEvent.HostedTool*`
+     * (Mangi-11/Eta @ c15de97); attribution in THIRD_PARTY_LICENSES.md.
+     */
+    data class HostedToolActivity(
+        val id: String,
+        val kind: String,
+        val finished: Boolean,
+        val success: Boolean = true,
+    ) : LLMStreamChunk()
 }

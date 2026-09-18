@@ -111,6 +111,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/ModuleSettingsStore.kt` and `ui/settings/ModuleSettingsScreen.kt` | `config/Prefs.kt` and the module settings screen behind it |
 | `xposed/system/PowerKeyHooks.kt`, `xposed/system/PowerKeyPolicy.kt` (the assist message id, the OEM haptic and the dedup window as values) | `hook/system/PowerHooks.kt` and the constants it reads in `core/ModuleConfig.kt` |
 | `provider/HostedWebSearchPolicy.kt`, the `hostedWebSearch` field in `data/model/LLMModel.kt` / `data/model/ProviderConfig.kt` and its toggle in `ui/settings/ModelEntryDetailScreen.kt` | `agent/model/ResponsesRequestBuilder.kt` and the `hosted_web_search_enabled` column behind it |
+| `provider/HostedCallEventPolicy.kt`, `LLMStreamChunk.HostedToolActivity` and the row it appends in `ui/chat/ChatViewModel.kt` | `agent/model/OpenAiResponsesProvider.kt` (the hosted-call events, the `hostedTools` map and `ProviderEvent.HostedTool*`) |
 
 
 ## Active native/runtime components

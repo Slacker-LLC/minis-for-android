@@ -1037,4 +1037,13 @@
     <string name="modeldetail_hosted_web_search">伺服端聯網搜尋</string>
     <string name="modeldetail_hosted_web_search_sub">允許模型呼叫服務商自己的聯網搜尋。來源以引用形式回傳；會消耗服務商配額，且只有 Responses API 支援。</string>
 
+    <string name="hosted_tool_web_search">聯網搜尋</string>
+    <string name="hosted_tool_file_search">檔案搜尋</string>
+    <string name="hosted_tool_code_interpreter">程式碼執行</string>
+    <string name="hosted_tool_computer">電腦操作</string>
+    <string name="hosted_tool_image_generation">圖像生成</string>
+    <string name="hosted_tool_mcp">MCP 工具</string>
+    <string name="hosted_tool_unknown">服務商工具</string>
+    <string name="hosted_tool_failed">失敗</string>
+
 </resources>

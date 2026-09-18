@@ -17,6 +17,7 @@ import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
 import com.openminis.app.provider.CustomHeaderPolicy
 import com.openminis.app.provider.HostedWebSearchPolicy
+import com.openminis.app.provider.HostedCallEventPolicy
 import com.openminis.app.provider.RequestBodyMerge
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
@@ -927,6 +928,9 @@ class OpenAIProvider private constructor(
         // this turn; a citation that cannot be inlined is appended as a source
         // list when the turn ends.
         val responsesCitations = ResponsesCitationStream()
+        // [T-eta-hosted-web-search] Bookkeeping for the tools the provider runs itself, per stream:
+        // one call reports itself started once and finished once (upstream's own map).
+        val hostedCallLedger = HostedCallEventPolicy.Ledger()
 
         suspend fun flushResponsesCitations() {
             val block = responsesCitations.trailingSources() ?: return
@@ -1029,7 +1033,24 @@ class OpenAIProvider private constructor(
                 if (isResponsesAPI) {
                     // Responses API SSE parsing
                     val type = event.optString("type", "")
+                    val hostedActivity = HostedCallEventPolicy.parse(type)
                     when {
+                        // [T-eta-hosted-web-search] A tool the provider runs on its own reports
+                        // itself as <kind>_call.<phase>; the app never executes it, it only shows
+                        // the row (see LLMStreamChunk.HostedToolActivity).
+                        hostedActivity != null -> {
+                            val itemId = HostedCallEventPolicy.itemId(event, hostedActivity.kind)
+                            for (row in hostedCallLedger.accept(itemId, hostedActivity)) {
+                                send(
+                                    LLMStreamChunk.HostedToolActivity(
+                                        id = itemId,
+                                        kind = row.kind,
+                                        finished = row.finished,
+                                        success = row.success,
+                                    )
+                                )
+                            }
+                        }
                         // Reasoning text deltas — both event variants the API emits.
                         // For Codex OAuth the actual content is encrypted (echoed via
                         // include=reasoning.encrypted_content), so the .delta value

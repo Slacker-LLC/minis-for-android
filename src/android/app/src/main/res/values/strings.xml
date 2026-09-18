@@ -1892,4 +1892,13 @@
     <string name="modeldetail_hosted_web_search">Server-side web search</string>
     <string name="modeldetail_hosted_web_search_sub">Let the model call the search the provider runs itself. Sources come back as citations; this spends the provider\'s quota, and only the Responses API has it.</string>
 
+    <string name="hosted_tool_web_search">Web search</string>
+    <string name="hosted_tool_file_search">File search</string>
+    <string name="hosted_tool_code_interpreter">Code execution</string>
+    <string name="hosted_tool_computer">Computer use</string>
+    <string name="hosted_tool_image_generation">Image generation</string>
+    <string name="hosted_tool_mcp">MCP tool</string>
+    <string name="hosted_tool_unknown">Provider tool</string>
+    <string name="hosted_tool_failed">failed</string>
+
 </resources>

@@ -1745,4 +1745,13 @@
     <string name="modeldetail_hosted_web_search">服务端联网搜索</string>
     <string name="modeldetail_hosted_web_search_sub">允许模型调用服务商自己的联网搜索。来源以引用形式返回；会消耗服务商配额，且只有 Responses API 支持。</string>
 
+    <string name="hosted_tool_web_search">联网搜索</string>
+    <string name="hosted_tool_file_search">文件搜索</string>
+    <string name="hosted_tool_code_interpreter">代码执行</string>
+    <string name="hosted_tool_computer">计算机操作</string>
+    <string name="hosted_tool_image_generation">图像生成</string>
+    <string name="hosted_tool_mcp">MCP 工具</string>
+    <string name="hosted_tool_unknown">服务商工具</string>
+    <string name="hosted_tool_failed">失败</string>
+
 </resources>

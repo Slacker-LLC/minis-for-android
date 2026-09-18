@@ -8582,6 +8582,37 @@ class ChatViewModel(
                             }
                         }
                     }
+                    is LLMStreamChunk.HostedToolActivity -> {
+                        // [T-eta-hosted-web-search] A tool the provider ran itself: one info row
+                        // for the whole call, labelled here because the provider only names the
+                        // kind. It never becomes a tool_use block, so nothing tries to execute it.
+                        val label = context.getString(hostedToolLabelRes(chunk.kind))
+                        val text = when {
+                            !chunk.finished -> label + "…"
+                            chunk.success -> label
+                            else -> label + " · " + context.getString(R.string.hosted_tool_failed)
+                        }
+                        val row = AssistantBlock(
+                            id = "hosted_" + chunk.id,
+                            kind = "info",
+                            content = text,
+                            toolName = "hosted_tool",
+                        )
+                        val rowIndex = allToolBlocks.indexOfFirst { it.id == row.id }
+                        if (rowIndex >= 0) {
+                            allToolBlocks[rowIndex] = row
+                        } else {
+                            allToolBlocks.add(row)
+                        }
+                        withContext(Dispatchers.Main) {
+                            updateAssistantMessage(
+                                assistantId,
+                                accumulatedText + turnTextSb.toString(),
+                                true,
+                                allToolBlocks,
+                            )
+                        }
+                    }
                     is LLMStreamChunk.ToolUseStart -> {
                         // [T-dedupe-toolcallid] Rewrite duplicate id ASAP — the
                         // renamed value drives the AssistantBlock.id used by
@@ -12725,6 +12756,20 @@ class ChatViewModel(
      * while the model's own `tool_title` arg has not yet streamed in.
      * e.g. `file_write` → "Write File", `shell_execute` → "Execute Shell".
      */
+    /**
+     * [T-eta-hosted-web-search] The localized name of a tool the provider ran itself; the kind is
+     * the token the chunk carries, and anything this version does not know still gets a row.
+     */
+    private fun hostedToolLabelRes(kind: String): Int = when (kind) {
+        "web_search" -> R.string.hosted_tool_web_search
+        "file_search" -> R.string.hosted_tool_file_search
+        "code_interpreter" -> R.string.hosted_tool_code_interpreter
+        "computer" -> R.string.hosted_tool_computer
+        "image_generation" -> R.string.hosted_tool_image_generation
+        "mcp" -> R.string.hosted_tool_mcp
+        else -> R.string.hosted_tool_unknown
+    }
+
     private fun friendlyToolTitle(toolName: String): String = when (toolName) {
         "shell_execute" -> "Execute Shell"
         "file_read" -> "Read File"
