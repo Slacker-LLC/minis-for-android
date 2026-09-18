@@ -1,5 +1,6 @@
 package com.openminis.app.xposed
 
+import com.openminis.app.xposed.google.GoogleVoiceCommandHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
 
@@ -26,6 +27,10 @@ object HookGroups {
         // The power-key dispatcher lives in system_server.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             HyperOsPowerHooks.install(module, classLoader, log)
+        }
+        // Google's own floaty assistant surface, in the Google app's process.
+        HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->
+            GoogleVoiceCommandHooks.install(module, classLoader, log)
         }
     }
 }
