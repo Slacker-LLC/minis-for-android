@@ -335,6 +335,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2142 个用例 = 上一项后的 2132 + 10，0 失败）。**没有任何设备结论**：特定 HyperOS 版本是否暴露这个分发器、电源键快捷方式是否真的走到它、拉起的 intent 是否打开助手，全部未验证——ROM 上没有目标时台账记 MISSING/SKIPPED 并保留原行为。真机判据：logcat 里 `HyperOsPower` 前缀的台账行。
 
+**Phase 6 第三组：Gemini 浮窗语音补偿** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第三组真 hook：Gemini 浮窗补语音输入 | Google 的助手浮窗（`FloatyActivity`）在锁屏/亮屏路径回到前台时可能没带上本该开始收音的语音指令，用户看到浮层却还得再点一下麦克风。这组盯着该 Activity 的 `onResume`，把一条 `ACTION_VOICE_COMMAND` 补发回 Google 自己的应用。两个开关默认都关——锁屏与亮屏是两件独立的选择，「装了但没配」必须等价于没装。开关在 resume 时读一次、350 ms 后连同 Activity 是否还活着、锁屏状态是否仍是当初那个一起复查：为锁屏排队的那条指令绝不会在已解锁的会话上开麦。每个浮窗实例每个窗口只补一条（弱引用作键，不泄漏 Activity）；发送失败的尝试会清掉自己的标记而不是吃掉窗口 | `e818b8cf` | ✅ `GoogleVoiceCommandPolicyTest`（6 例） |
+| 目标与回落 | 优先 hook 浮窗自己的 `onResume`；该类没声明 `onResume` 时回落到 `Activity.onResume` 并用类名把自己限制在浮窗上——Google App 更新挪走方法后 hook 仍然有效；两者都没有则记 MISSING。指令带 `setPackage(Google 包)`，因为这条 hook 本来就跑在它的进程里 | `e818b8cf` | ✅ 上述用例覆盖开关默认、状态翻转拒绝、去重窗口与清标记 |
+| 刻意没移植的一半（待拍板） | Eta 同一文件的另一半是把 `Build.MANUFACTURER/BRAND/MODEL/PRODUCT/DEVICE` 改成 Samsung S24 Ultra，并让 `ro.opa.eligible_device` 与 `GOOGLE_BUILD`/`GOOGLE_EXPERIENCE` 两个 feature 一律为真——即在 Google 进程里伪装成另一台设备以「放开资格」。这不是能力补齐而是设备身份伪装：影响整机对 Google 的自我描述、跨版本易碎、是否接受属于产品决定，因此本仓库暂不落。要做请明说 | 未落 | — |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2148 个用例 = 上一项后的 2142 + 6，0 失败）。**没有任何设备结论**：这一版 Google App 是否暴露 `FloatyActivity`、它的 resume 路径是否真的缺语音指令、补发的指令是否会让浮窗开始收音，全部未验证——没有目标时台账记 MISSING 并保留原行为。真机判据：logcat 里 `GoogleVoiceCommand` 前缀的台账行。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
