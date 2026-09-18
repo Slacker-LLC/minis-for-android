@@ -162,6 +162,16 @@ object AndroidUiController {
         val width = bitmap.width
         val height = bitmap.height
         bitmap.recycle()
+        // [T-eta-ui-coordinate-space] This capture is the frame that later
+        // screenshot-space coordinates refer to.
+        ScreenshotFrameRegistry.record(
+            ScreenshotFrame(
+                width = width,
+                height = height,
+                originalWidth = originalWidth,
+                originalHeight = originalHeight,
+            ),
+        )
         val bytes = output.toByteArray()
         val linuxPath = ContextOffload.offloadImage(context, sessionId, bytes, toolId, "image/png")
         val json = JSONObject()
@@ -240,14 +250,37 @@ object AndroidUiController {
         if (!args.has("x") || !args.has("y")) {
             return error("INVALID_ARGS", "click requires generation+ref from observe, or explicit x+y coordinates")
         }
-        val x = args.optDouble("x", Double.NaN)
-        val y = args.optDouble("y", Double.NaN)
-        if (!x.isFinite() || !y.isFinite() || x < 0 || y < 0) return error("INVALID_ARGS", "x/y must be finite non-negative pixels")
+        val requestedX = args.optDouble("x", Double.NaN)
+        val requestedY = args.optDouble("y", Double.NaN)
+        if (!requestedX.isFinite() || !requestedY.isFinite() || requestedX < 0 || requestedY < 0) {
+            return error("INVALID_ARGS", "x/y must be finite non-negative pixels")
+        }
+        // [T-eta-ui-coordinate-space] x/y belong to the last screenshot unless the
+        // caller says otherwise: a coordinate read off a 50 % capture must not be
+        // dispatched as if it were a device pixel.
+        val space = UiCoordinateSpace.parse(
+            args.optString("coordinateSpace", UiCoordinateSpace.DEFAULT.wireName),
+        )
+        val display = service.resources.displayMetrics
+        val resolved = UiCoordinateSpacePolicy.resolvePoint(
+            x = requestedX,
+            y = requestedY,
+            space = space,
+            frame = ScreenshotFrameRegistry.latest(),
+            screenWidth = display.widthPixels,
+            screenHeight = display.heightPixels,
+        )
+        if (resolved is UiCoordinateResolution.Refused) return error(resolved.code, resolved.message)
+        resolved as UiCoordinateResolution.Resolved
+        val x = resolved.x
+        val y = resolved.y
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()); lineTo(x.toFloat() + 0.1f, y.toFloat() + 0.1f) }
         val report = service.dispatchGestureWithEvidence(path, 0L, if (longPress) 800L else 50L)
         val ok = report.evidence.acceptedBySystem
         return UiToolResult(report.into(JSONObject()
             .put("action", if (longPress) "long_press" else "click")
+            .put("coordinateSpace", space.wireName)
+            .put("requestedX", requestedX).put("requestedY", requestedY)
             .put("x", x).put("y", y).put("success", ok).put("coordinateFallback", true)), ok)
     }
 
@@ -304,12 +337,29 @@ object AndroidUiController {
         if (listOf(x, y, deltaX, deltaY).any { !it.isFinite() } || deltaX == 0.0 && deltaY == 0.0) {
             return error("INVALID_ARGS", "coordinate scroll requires finite x/y and a non-zero deltaX or deltaY")
         }
-        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()); lineTo((x + deltaX).toFloat(), (y + deltaY).toFloat()) }
+        // [T-eta-ui-coordinate-space] The anchor point AND the deltas belong to the
+        // same space, so both go through the one contract.
+        val space = UiCoordinateSpace.parse(
+            args.optString("coordinateSpace", UiCoordinateSpace.DEFAULT.wireName),
+        )
+        val display = service.resources.displayMetrics
+        val frame = ScreenshotFrameRegistry.latest()
+        val resolvedPoint = UiCoordinateSpacePolicy.resolvePoint(x, y, space, frame, display.widthPixels, display.heightPixels)
+        if (resolvedPoint is UiCoordinateResolution.Refused) return error(resolvedPoint.code, resolvedPoint.message)
+        resolvedPoint as UiCoordinateResolution.Resolved
+        val resolvedDelta = UiCoordinateSpacePolicy.resolveDelta(deltaX, deltaY, space, frame, display.widthPixels, display.heightPixels)
+        if (resolvedDelta is UiCoordinateResolution.Refused) return error(resolvedDelta.code, resolvedDelta.message)
+        resolvedDelta as UiCoordinateResolution.Resolved
+        val path = Path().apply {
+            moveTo(resolvedPoint.x.toFloat(), resolvedPoint.y.toFloat())
+            lineTo((resolvedPoint.x + resolvedDelta.x).toFloat(), (resolvedPoint.y + resolvedDelta.y).toFloat())
+        }
         val report = service.dispatchGestureWithEvidence(path, 0L, args.optLong("durationMs", 300L).coerceIn(50L, 5_000L))
         val ok = report.evidence.acceptedBySystem
         return UiToolResult(report.into(JSONObject().put("action", "scroll").put("success", ok)
-            .put("coordinateFallback", true).put("x", x).put("y", y)
-            .put("deltaX", deltaX).put("deltaY", deltaY)), ok)
+            .put("coordinateFallback", true).put("coordinateSpace", space.wireName)
+            .put("x", resolvedPoint.x).put("y", resolvedPoint.y)
+            .put("deltaX", resolvedDelta.x).put("deltaY", resolvedDelta.y)), ok)
     }
 
     /**

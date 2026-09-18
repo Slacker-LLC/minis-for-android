@@ -52,6 +52,7 @@ object AndroidAgentTools {
             description = "Observe and operate Android UI through the existing MinisAccessibilityService; no second Accessibility implementation. " +
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
+                "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
                 "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, wait.",
             parameters = commonParams() + mapOf(
                 "action" to AgentToolParam("string", "UI action", listOf("observe", "screenshot", "click", "long_press", "set_text", "scroll", "back", "home", "wait")),
@@ -66,6 +67,14 @@ object AndroidAgentTools {
                 "text" to AgentToolParam("string", "Text for set_text"),
                 "x" to AgentToolParam("number", "Explicit pixel X coordinate (last-resort fallback)"),
                 "y" to AgentToolParam("number", "Explicit pixel Y coordinate (last-resort fallback)"),
+                "coordinateSpace" to AgentToolParam(
+                    "string",
+                    "Pixel space of x/y and deltaX/deltaY. screenshot (default) = pixels of the most recent " +
+                        "android_ui screenshot image (that image is scaled, so this is what you actually see); " +
+                        "screen = real device pixels. A screenshot-space action fails closed when no screenshot " +
+                        "was taken yet, when the screen size changed since, or when the point is outside the image.",
+                    UiCoordinateSpace.wireValues,
+                ),
                 "deltaX" to AgentToolParam("number", "Coordinate-scroll horizontal delta"),
                 "deltaY" to AgentToolParam("number", "Coordinate-scroll vertical delta"),
                 "direction" to AgentToolParam("string", "forward/backward/up/down/left/right"),
