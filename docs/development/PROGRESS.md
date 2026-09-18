@@ -918,6 +918,18 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2398 例 0 失败**（新增 `OffloadForegroundTest` 2 例）+ `:app:assembleDebug` |
 | 顺带清点结果 | 可运行面（device info/battery/storage、alarm、notification settings、a11y service、shizuku service、scheduled list、model-use list、sessions list、debug）除上述一条外**全部 exit 0** |
 
+### 定时任务：起不来要说为什么，空触发要留记录（2026-09-19，真机端到端） — `de8a3b6c`
+
+| 项 | 结果 |
+|---|---|
+| 之前的问题（设备发现） | `minis-scheduled run --id …` 无论哪种失败都只回 `{"ran": false}`：`ScheduledAgentRunner.run()` 返回 `String?`，于是「没配 provider（去设置里加一个就好）」「目标会话已不存在」「应用没初始化」全都塌成 null，编辑器里的「Run now」也只显示一句通用失败文案 |
+| 改法 ①：结果带原因 | `run()` 改为返回 `RunOutcome(sessionId, errorCode, message)`（`no_provider` / `target_session_gone` / `app_not_ready` / `subsystems_not_ready`）：CLI 打印 `error`+`message`，失败弹窗显示具体原因 |
+| 改法 ②：exact/inexact 要说明 | 目标 13+ 的应用默认拿不到 `SCHEDULE_EXACT_ALARM`，`ScheduledTaskManager` 会退回 inexact——此前只写日志，CLI 却给出精确的 `nextTriggerMs`。现在 `list`/`create`/`enable` 都带 `alarm_precision`（exact/inexact）与一句处置提示 |
+| 改法 ③：空触发留痕 | 闹钟接收器此前丢掉 runner 的返回值：触发了但起不来的任务在记录里什么都没有，界面上像是「莫名其妙不再触发」。现在接住 `RunOutcome`，失败时 `markFired(ok=false, preview=原因, sessionId=null)`，运行历史屏直接显示 |
+| 真机端到端 | 建了一个 06:00 触发的任务：**06:01:01 触发**（晚 1 分钟，正是 inexact 预告的漂移）、handoff 2 ms、runner 报 no provider；随后 `minis-scheduled list` 回来带 `lastFiredAt=1789768861039`、`lastResultPreview="No model provider is configured. Add one under Settings → LLM Providers → Manage Providers, then run this task again."`、`alarm_precision:"inexact"` + 提示 |
+| 真机 CRUD | create / list / disable / enable / delete / 未知 id（`no task with id=…`, rc=1）/ `run --id`（`{"ran":false,"error":"no_provider",…}`, rc=1）逐条走通；测完删掉测试任务，设备恢复原状 |
+| 验证口径 | `:app:testDebugUnitTest` **2400 例 0 失败**（新增 `ScheduledAlarmPrecisionTest` 2 例：exact 无提示、inexact 有提示——设备只能演示其中一种）+ `:app:lintDebug` 0 error + `:app:assembleDebug`；同一 APK 在 API 36 模拟器安装启动、焦点正常、crash 缓冲为空 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
