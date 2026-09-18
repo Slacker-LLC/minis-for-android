@@ -31,7 +31,7 @@ internal object SafeRemoteImporter {
     private object PublicOnlyDns : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
             val addresses = Dns.SYSTEM.lookup(hostname)
-            if (addresses.isEmpty() || addresses.any(::isForbiddenAddress)) {
+            if (addresses.isEmpty() || addresses.any { isForbiddenAddress(it, fromHostname = true) }) {
                 throw UnknownHostException("URL host does not resolve to a public address")
             }
             return addresses
@@ -117,6 +117,13 @@ internal object SafeRemoteImporter {
         if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
             throw RPCException(-32602, "Local import hosts are not allowed")
         }
+        // A literal address in the URL is exactly the shape the guard exists
+        // for, so no hostname carve-outs apply to it.
+        parseLiteralAddress(host)?.let { literal ->
+            if (isForbiddenAddress(literal, fromHostname = false)) {
+                throw RPCException(-32602, "URL host does not resolve to a public address")
+            }
+        }
         // Resolve now for a fast, user-facing validation error. PublicOnlyDns
         // repeats the same policy at the actual connection boundary.
         try {
@@ -127,7 +134,26 @@ internal object SafeRemoteImporter {
         return url
     }
 
-    private fun isForbiddenAddress(address: InetAddress): Boolean {
+    /**
+     * A host that is written as an address rather than a name. Only the literal
+     * spelling can be trusted to mean "connect here": a name goes through
+     * whatever DNS resolver the device has, and on a fake-IP network (proxy
+     * routers, Clash/Surge-style VPNs — measured on the Xiaomi 24129PN74C,
+     * where every name resolves into 198.18/15) that answer is the proxy's own
+     * routing address, not the destination.
+     */
+    private fun parseLiteralAddress(host: String): InetAddress? {
+        val looksLikeIpv4 = host.isNotEmpty() && host.all { it.isDigit() || it == '.' }
+        val looksLikeIpv6 = host.contains(':')
+        if (!looksLikeIpv4 && !looksLikeIpv6) return null
+        return runCatching { InetAddress.getByName(host) }.getOrNull()
+    }
+
+    /**
+     * @param fromHostname true when the address is a DNS answer for a name, false
+     *   when the URL spelled the address itself.
+     */
+    internal fun isForbiddenAddress(address: InetAddress, fromHostname: Boolean): Boolean {
         // The API-34 Android emulator routes external DNS through its own
         // 198.18/15 benchmark-range NAT proxy. It is not reachable on a real
         // device, so permit it only for ranchu/goldfish AVDs; all production
@@ -145,7 +171,14 @@ internal object SafeRemoteImporter {
             // Carrier-grade NAT and benchmark ranges are not globally
             // reachable and can expose services in a device/VPN environment.
             if (a == 100 && b in 64..127) return true
-            if (a == 198 && b in 18..19) return true
+            // 198.18/15 is the classic fake-IP range: a proxy in front of the
+            // device (router or VPN) answers *every* name with an address here
+            // and routes the connection to the real host. Answering a name with
+            // it is therefore normal traffic, and refusing it broke every URL
+            // import and fetch on such a network. A literal address in the URL
+            // has no proxy behind it — that stays blocked, as do all genuinely
+            // private ranges below.
+            if (a == 198 && b in 18..19) return !fromHostname
             if (a == 0 || a >= 224) return true
         } else if (address is Inet6Address && bytes.isNotEmpty()) {
             // fc00::/7 unique-local addresses are not covered consistently by
@@ -156,8 +189,9 @@ internal object SafeRemoteImporter {
     }
 
     private fun isEmulatorNatProxy(address: InetAddress): Boolean {
-        if (!Build.HARDWARE.contains("ranchu", ignoreCase = true) &&
-            !Build.HARDWARE.contains("goldfish", ignoreCase = true)
+        val hardware = Build.HARDWARE ?: ""
+        if (!hardware.contains("ranchu", ignoreCase = true) &&
+            !hardware.contains("goldfish", ignoreCase = true)
         ) return false
         val bytes = address.address
         return bytes.size == 4 && (bytes[0].toInt() and 0xff) == 198 &&
