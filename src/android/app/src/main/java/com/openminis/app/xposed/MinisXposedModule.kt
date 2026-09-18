@@ -26,6 +26,8 @@ class MinisXposedModule : XposedModule() {
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         currentProcessName = param.processName
+        // Which groups exist is a product fact, so it lives in HookGroups rather than here.
+        HookGroups.registerDefaults()
         if (!param.isSystemServer && !ModuleTargets.shouldKeepLifecycleCallbacks(param.processName)) {
             detach()
             return

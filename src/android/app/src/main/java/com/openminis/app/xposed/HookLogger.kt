@@ -17,6 +17,8 @@ class HookLogger private constructor(
 ) {
     constructor(sink: (priority: Int, message: String) -> Unit) : this(sink, null)
 
+    private val throttle = LogThrottle()
+
     fun scoped(group: String): HookLogger =
         HookLogger(sink, scope?.let { "$it/$group" } ?: group)
 
@@ -27,6 +29,18 @@ class HookLogger private constructor(
     fun warn(message: String) = write(Log.WARN, message)
 
     fun error(message: String) = write(Log.ERROR, message)
+
+    /** For paths that run per touch or per frame: one line per key per window. */
+    fun warnThrottled(key: String, message: () -> String) {
+        if (throttle.shouldLog(throttleKey("warn", key))) warn(message())
+    }
+
+    fun errorThrottled(key: String, message: () -> String) {
+        if (throttle.shouldLog(throttleKey("error", key))) error(message())
+    }
+
+    private fun throttleKey(level: String, key: String): String =
+        listOfNotNull(scope, level, key).joinToString(":")
 
     private fun write(priority: Int, message: String) {
         val line = scope?.let { "[$it] $message" } ?: message

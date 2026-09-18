@@ -87,6 +87,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/MinisXposedModule.kt`, `xposed/HookGroupRegistry.kt`, `src/main/resources/META-INF/xposed/*` and the module declaration in `app/build.gradle.kts` | `ModuleMain.kt` and the libxposed module declaration |
 | `xposed/HookRegistrar.kt`, `xposed/HookSupport.kt`, `xposed/HookLogger.kt` | `core/HookRegistrar.kt`, `core/HookSupport.kt`, `core/ModuleLogger.kt` |
 | `xposed/ModulePrefs.kt` (module switches and their defaults) | `config/Prefs.kt` |
+| `xposed/LogThrottle.kt`, `xposed/HookGroups.kt`, `xposed/system/CircleToSearchInvoker.kt`, `xposed/hyperos/HyperOsScreenSearchHooks.kt`, `xposed/hyperos/HyperOsScreenSearchRequest.kt` | `core/LogThrottle.kt`, `hook/system/CircleToSearchInvoker.kt`, `hook/hyperos/HyperOsScreenSearch*.kt` |
 
 
 ## Active native/runtime components

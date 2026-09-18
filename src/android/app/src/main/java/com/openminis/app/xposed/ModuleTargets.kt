@@ -20,6 +20,11 @@ object ModuleTargets {
     const val SYSTEM_SERVER_PROCESS = "system"
     const val SYSTEM_UI_PACKAGE = "com.android.systemui"
     const val GOOGLE_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
+
+    /** The system's own contextual search ("circle to search") entry, used by gesture takeovers. */
+    const val CONTEXTUAL_SEARCH_ACTION = "android.app.contextualsearch.action.LAUNCH_CONTEXTUAL_SEARCH"
+    const val CONTEXTUAL_SEARCH_SERVICE = "contextual_search"
+    const val CIRCLE_TO_SEARCH_ENTRYPOINT = 1
     const val BREENO_PACKAGE = "com.heytap.speechassist"
     const val COLOROS_DIRECT_PACKAGE = "com.coloros.colordirectservice"
     const val COLOROS_MEMORY_PACKAGE = "com.oplus.aimemory"
