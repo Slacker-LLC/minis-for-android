@@ -440,6 +440,9 @@ class MinisApp : Application(), ImageLoaderFactory {
         // the comment there for why an exception at this point permanently
         // breaks the Application and produces the GH#147 crash loop.
         skillRepository = SkillRepository(this)
+        // [T-eta-character-cards] Stored character cards; the repository reads the database
+        // lazily, so nothing is loaded during startup.
+        com.openminis.app.roleplay.CharacterRepository.initialize(this)
         com.openminis.app.tools.BotDelegationCoordinator.install(
             context = this,
             botRepository = botRepository,

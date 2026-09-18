@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val APP_DATABASE_VERSION = 20
+const val APP_DATABASE_VERSION = 21
 
 @Database(
     entities = [
@@ -21,6 +21,7 @@ const val APP_DATABASE_VERSION = 20
         BotDelegationEntity::class,
         BotTaskEntity::class,
         BotInboxEventEntity::class,
+        CharacterEntity::class,
     ],
     version = APP_DATABASE_VERSION,
     // Keep the Room schema history committed so migration and downgrade
@@ -34,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun botDelegationDao(): BotDelegationDao
     abstract fun botTaskDao(): BotTaskDao
     abstract fun botInboxEventDao(): BotInboxEventDao
+    abstract fun characterDao(): CharacterDao
 
     companion object {
         @Volatile
@@ -352,6 +354,29 @@ abstract class AppDatabase : RoomDatabase() {
          * valid with a NULL root_task_id; new orchestration can opt into a
          * durable root without rewriting historical work.
          */
+        /**
+         * [T-eta-character-cards] Imported character cards. The card travels as JSON text so
+         * fields this app does not model survive, and the avatar is a file path under the app's
+         * own storage rather than a blob in the database.
+         */
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS characters (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        card_json TEXT NOT NULL,
+                        avatar_path TEXT,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_characters_updated_at ON characters(updated_at)")
+            }
+        }
+
         val MIGRATION_19_20 = object : Migration(19, 20) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE bot_delegations ADD COLUMN root_task_id TEXT")
@@ -487,6 +512,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_17_18,
                         MIGRATION_18_19,
                         MIGRATION_19_20,
+                        MIGRATION_20_21,
                         MIGRATION_14_13,
                     )
                     .build()
