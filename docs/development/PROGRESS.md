@@ -554,7 +554,9 @@
 | `ime_enter` 与写入上限 | 上游 `press_key` 的 ENTER 支路：在**持有输入焦点**的输入框上按字段自己的 IME 动作（搜索/完成/发送），提交搜索框或消息不用去猜哪个按钮——需要 Android 11，更老的平台带原因拒绝而不是静默无操作。写入上限一并搬：插入 ≤1000 字符且不得为空，整值 ≤4000 且**可以**为空（清空字段就是写空值），上游是在碰设备之前就拒绝 | `9964e554` | ✅ `TextInputBoundsPolicyTest`（2 例） |
 | 刻意没搬的其余部分 | 上游 `press_key` 还把 BACK/HOME/RECENTS/PASTE/NOTIFICATIONS/QUICK_SETTINGS 统一成一个动作并带 root `input keyevent` 回退；本仓库这些面板/按键本来就是各自的动作、且宁可拒绝也不接第二套实现（第二实现＝两条真相），所以只取 ENTER 那支。`clear_text` 是上游的 `replace_text("")`，本仓库 `set_text` 传空值即等价，不再加重复动作 | `9964e554` | — |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2241 个用例 = 上一项后的 2239 + 2）。**没有任何设备结论**：某个编辑器是否真的响应 `ACTION_IME_ENTER` 未验证，被拒时如实记为拒绝。**说明**：本片只改代码与工具 schema，未动资源/清单，按验证矩阵未复跑 lint。
+| 剪贴板读取/写入上限 | 上游两端都有界，我们两端都没有：**读**会把用户刚复制的任何东西（可能是一整份文档）原样倒进模型上下文；**写**不限长度。数值照搬：读最多交 8000 字符**并明说被截断**，写最多 20000 且**在改动剪贴板之前就拒绝**（截断写入等于对「用户让我复制的东西」撒谎）。规则收在 `ClipboardBoundsPolicy` 并有用例；处理器是唯一施加处——原样文本形态保持管道依赖的纯文本（有界），`--json` 形态给出 `text/chars/truncated`，且 `android.clipboard` 的读取改为走 JSON 形态，于是模型能被告知「你拿到的不是整条剪贴板」 | `a143104a` | ✅ `ClipboardBoundsPolicyTest`（3 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2244 个用例 = 上一项后的 2241 + 3）。**没有任何设备结论**：某台设备在自身限制生效前肯交出多大的剪贴板未验证；本应用承诺的是这个上限与这个标记。**说明**：本片只改代码与工具参数，未动资源/清单，按验证矩阵未复跑 lint。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
