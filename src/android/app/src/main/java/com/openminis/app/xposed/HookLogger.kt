@@ -30,13 +30,17 @@ class HookLogger private constructor(
 
     fun error(message: String) = write(Log.ERROR, message)
 
-    /** For paths that run per touch or per frame: one line per key per window. */
-    fun warnThrottled(key: String, message: () -> String) {
-        if (throttle.shouldLog(throttleKey("warn", key))) warn(message())
+    /**
+     * For paths that run per touch or per frame: one line per key per window. The window is a
+     * parameter because a caller that is deliberately noisy about a slow repair wants its own
+     * cadence rather than the hot-path default.
+     */
+    fun warnThrottled(key: String, windowMs: Long = DEFAULT_THROTTLE_WINDOW_MS, message: () -> String) {
+        if (throttle.shouldLog(throttleKey("warn", key), windowMs)) warn(message())
     }
 
-    fun errorThrottled(key: String, message: () -> String) {
-        if (throttle.shouldLog(throttleKey("error", key))) error(message())
+    fun errorThrottled(key: String, windowMs: Long = DEFAULT_THROTTLE_WINDOW_MS, message: () -> String) {
+        if (throttle.shouldLog(throttleKey("error", key), windowMs)) error(message())
     }
 
     private fun throttleKey(level: String, key: String): String =
@@ -45,5 +49,10 @@ class HookLogger private constructor(
     private fun write(priority: Int, message: String) {
         val line = scope?.let { "[$it] $message" } ?: message
         runCatching { sink(priority, line) }
+    }
+
+    companion object {
+        /** The window a throttled line uses when the caller does not ask for its own. */
+        const val DEFAULT_THROTTLE_WINDOW_MS = 60_000L
     }
 }
