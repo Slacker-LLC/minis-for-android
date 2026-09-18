@@ -696,6 +696,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2358 个用例 = 上一项后的 2350 + 8）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实 schema 就有那么大的服务器，面对「被以无类型形式提供」会如何反应，未验证。
 
+**MCP 工具结果不再能灌满上下文（自查出来的缺口）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 超限结果落盘、给指针 | MCP 工具结果此前直接进消息历史，头上只有传输层的「单回复 4 MiB」——那不是上下文预算，一个话多的服务器就能把几 MB 文本塞进下一个 provider 请求。现在超限结果经 `ContextOffload.spillIfOversized` 落到会话的 offloads 目录（与日志工具同一条路），模型拿到**头尾预览 + `/var/minis/offloads` 路径**，可以用 `file_read` 带 offset/limit 回去读全文，而不是拿到一截无法追回的正文 | `6dfb8046` | ✅ `MCPToolResultBoundsTest`（5 例：落盘结果用其预览、小结果原样、落盘失败时用带省略标记的裁剪预览、未落盘的 SpillResult 被忽略、内联预算远低于传输上限） |
+| 补上 `SpillPolicy` 缺失的接线 | `SpillPolicy`（上游 DeepSeek Harness 那套 dsh-spill-policy）早已移植，但**全仓只有一句工具描述提到它**，没有任何调用方——也就是说这条策略此前没人真正执行。本片把 MCP 这条路径接上；其余工具路径（shell/日志等）本来就有各自的有界输出 | `6dfb8046` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2363 个用例 = 上一项后的 2358 + 5）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实远端服务器返回超大结果时，落盘路径（写入会话 offloads 目录）在设备上的表现未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
