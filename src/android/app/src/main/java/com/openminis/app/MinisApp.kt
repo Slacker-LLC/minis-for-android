@@ -539,6 +539,12 @@ class MinisApp : Application(), ImageLoaderFactory {
                 aliasNames = com.openminis.app.tools.NotificationTools.aliases[handler.definition.name].orEmpty(),
             )
         }
+        // [T-eta-conversation-history] Re-reading the current session's transcript; the
+        // session id comes from the running turn, so the model can never name another one.
+        com.openminis.app.tools.runtime.ToolRegistry.register(
+            com.openminis.app.tools.history.ConversationHistoryHandler(),
+            aliasNames = com.openminis.app.tools.history.ConversationHistoryTool.aliases,
+        )
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here

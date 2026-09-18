@@ -76,6 +76,10 @@ object ToolPermissionManager {
         // agent may read it, a remote MCP caller may not.
         "notification.recent" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "notification.search" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        // [T-eta-conversation-history] The transcript stays on the device: a remote MCP
+        // caller may not read somebody else's chat history.
+        "conversation.history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "conversation_history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "android.media.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.control" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.weather" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),

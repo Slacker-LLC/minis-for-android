@@ -67,6 +67,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `share/ConversationMarkdownExporter.kt` and the markdown format in `share/ChatExporter.kt` | `ui/app/ConversationMarkdownExporter.kt` |
 | `service/OverlayRunActions.kt` and the stop control in `service/ToolOverlayController.kt` / `service/AgentForegroundService.kt` | assistant overlay panel in Eta `ui/app/*` (stop affordance and its rule) |
 | `notifications/NotificationHistoryPolicy.kt`, `notifications/MinisNotificationListenerService.kt`, `data/repository/NotificationHistoryRepository.kt`, `tools/NotificationTools.kt` | `agent/device/AgentNotificationHistoryService.kt`, `data/repository/NotificationHistoryRepository.kt`, and the `recent_notifications` / `search_notification_history` device tools |
+| `tools/history/ConversationHistoryPolicy.kt`, `tools/history/ConversationHistoryTool.kt` | `agent/model/AgentConversationToolCatalog.kt` and the runtime history seam that executes it |
 
 
 ## Active native/runtime components
