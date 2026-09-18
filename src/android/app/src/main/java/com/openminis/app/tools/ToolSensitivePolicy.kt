@@ -172,6 +172,10 @@ object ToolSensitivePolicy {
         // clipboard content and body measurements.
         "android.clipboard.history",
         "android.health.summary",
+        // [T-eta-xposed-groups] The chat image caches under this catalog's names: pictures from
+        // somebody's private conversations.
+        "android.chat_images.qq",
+        "android.chat_images.wechat",
         "search_clipboard_history",
         "get_health_summary",
         "read_sms_code",

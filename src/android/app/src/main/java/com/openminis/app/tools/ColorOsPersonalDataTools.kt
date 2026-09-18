@@ -55,7 +55,7 @@ object ColorOsPersonalDataTools {
         val keyword = args.optString("query").trim().takeIf { it.isNotEmpty() }
         if (PersonalDataQueryPolicy.isKeywordTooLong(keyword)) {
             return ToolExecutionResult(
-                failure(
+                PersonalDataQueryPolicy.failure(
                     "PERSONAL_DATA_QUERY_TOO_LONG",
                     "query is limited to ${PersonalDataQueryPolicy.MAX_KEYWORD_CHARS} characters",
                 ),
@@ -90,7 +90,7 @@ object ColorOsPersonalDataTools {
         )
         result.unavailableReason?.let { reason ->
             return ToolExecutionResult(
-                failure(
+                PersonalDataQueryPolicy.failure(
                     if (reason.contains("trusted Android Root tool")) {
                         "PERSONAL_DATA_TOOL_UNAVAILABLE"
                     } else {
@@ -103,7 +103,7 @@ object ColorOsPersonalDataTools {
         }
         if (result.timedOut) {
             return ToolExecutionResult(
-                failure("PERSONAL_DATA_QUERY_TIMEOUT", "the provider did not answer in time"),
+                PersonalDataQueryPolicy.failure("PERSONAL_DATA_QUERY_TIMEOUT", "the provider did not answer in time"),
                 false,
             )
         }
@@ -111,7 +111,7 @@ object ColorOsPersonalDataTools {
             PersonalDataContentParser.hasProviderFailure(result.stdout, result.stderr)
         ) {
             return ToolExecutionResult(
-                failure(
+                PersonalDataQueryPolicy.failure(
                     "PERSONAL_DATA_UNAVAILABLE",
                     "the provider is unavailable right now",
                     exitCode = result.exitCode,
@@ -132,13 +132,6 @@ object ColorOsPersonalDataTools {
             true,
         )
     }
-
-    private fun failure(code: String, message: String, exitCode: Int? = null): String = JSONObject()
-        .put("ok", false)
-        .put("code", code)
-        .put("message", message)
-        .apply { exitCode?.let { put("exit_code", it) } }
-        .toString(2)
 
     private const val QUERY_TIMEOUT_MS = 15_000L
 
@@ -271,6 +264,14 @@ object PersonalDataQueryPolicy {
     const val MAX_KEYWORD_CHARS = 200
 
     fun clampLimit(requested: Int?): Int = (requested ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
+
+    /** The error envelope every personal-data tool answers with. */
+    fun failure(code: String, message: String, exitCode: Int? = null): String = JSONObject()
+        .put("ok", false)
+        .put("code", code)
+        .put("message", message)
+        .apply { exitCode?.let { put("exit_code", it) } }
+        .toString(2)
 
     /** A longer keyword is a caller error, not something to silently cut. */
     fun isKeywordTooLong(keyword: String?): Boolean =

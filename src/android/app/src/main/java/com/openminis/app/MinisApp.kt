@@ -591,6 +591,15 @@ class MinisApp : Application(), ImageLoaderFactory {
                 aliasNames = com.openminis.app.tools.ColorOsPersonalDataTools.aliases[handler.definition.name].orEmpty(),
             )
         }
+        // [T-eta-xposed-groups] The chat apps' own image caches (Eta search_qq_chat_images /
+        // search_wechat_chat_images). The scan is one argv through the structured privileged path;
+        // only cache paths, kinds, times and sizes come back.
+        com.openminis.app.tools.ChatImageTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.ChatImageTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-character-cards] The bound character's story memory: read it, update it. The
         // character comes from the session binding, so the model cannot name another one.
         com.openminis.app.tools.CharacterMemoryTools.handlers().forEach { handler ->
