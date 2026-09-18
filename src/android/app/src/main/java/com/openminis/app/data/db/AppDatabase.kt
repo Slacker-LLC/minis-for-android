@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val APP_DATABASE_VERSION = 21
+const val APP_DATABASE_VERSION = 22
 
 @Database(
     entities = [
@@ -359,6 +359,16 @@ abstract class AppDatabase : RoomDatabase() {
          * fields this app does not model survive, and the avatar is a file path under the app's
          * own storage rather than a blob in the database.
          */
+        /**
+         * [T-eta-character-cards] The character bound to a session. Nullable, so existing
+         * sessions stay ordinary chats with no backfill.
+         */
+        val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions ADD COLUMN roleplay_json TEXT")
+            }
+        }
+
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -513,6 +523,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_18_19,
                         MIGRATION_19_20,
                         MIGRATION_20_21,
+                        MIGRATION_21_22,
                         MIGRATION_14_13,
                     )
                     .build()

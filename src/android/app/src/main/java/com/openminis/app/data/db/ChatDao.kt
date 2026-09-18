@@ -93,6 +93,16 @@ interface ChatDao {
     @Query("UPDATE sessions SET model_binding = :binding, model_id = :modelId, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionBinding(id: String, binding: String, modelId: String, updatedAt: Long = System.currentTimeMillis())
 
+    /**
+     * [T-eta-character-cards] The character bound to a session, or null for an ordinary chat. A
+     * binding is written as one JSON payload so the card snapshot and the persona travel together.
+     */
+    @Query("UPDATE sessions SET roleplay_json = :binding, updated_at = :updatedAt WHERE id = :id")
+    suspend fun setRoleplayBinding(id: String, binding: String?, updatedAt: Long)
+
+    @Query("SELECT roleplay_json FROM sessions WHERE id = :id")
+    suspend fun roleplayBinding(id: String): String?
+
     @Query("UPDATE sessions SET bot_id = :botId, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionBot(id: String, botId: String?, updatedAt: Long = System.currentTimeMillis())
 

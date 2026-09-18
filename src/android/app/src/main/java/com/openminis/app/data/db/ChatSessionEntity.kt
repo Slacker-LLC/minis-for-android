@@ -40,6 +40,12 @@ data class ChatSessionEntity(
     // choice that survives cold-start.
     @ColumnInfo(name = "thinking_override") val thinkingOverride: String? = null,
     /**
+     * [T-eta-character-cards] The character this session talks to, plus the card as it looked at
+     * bind time (see [com.openminis.app.roleplay.CharacterBinding]). Null means an ordinary chat;
+     * existing sessions keep working with no backfill because the column is nullable.
+     */
+    @ColumnInfo(name = "roleplay_json") val roleplayJson: String? = null,
+    /**
      * Sparse per-session configuration encoded by SessionOverrides.
      * null = inherit all current global/model defaults. Keeping the payload in
      * one nullable JSON column means adding future knobs does not require one

@@ -51,6 +51,8 @@ object CharacterRepository {
 
     private fun dao(): CharacterDao = database().characterDao()
 
+    private fun chatDao() = database().chatDao()
+
     fun avatarFile(id: String): File =
         File(appContext().filesDir, CharacterStoragePolicy.avatarRelativePath(id))
 
@@ -132,6 +134,44 @@ object CharacterRepository {
     /** A stored card is always one the codec accepts; anything else is refused before it is written. */
     internal fun validated(card: CharacterCard): CharacterCard =
         CharacterCardCodec.decodeJson(card.raw.toString())
+
+    /**
+     * Binds a character to a session. The card snapshot travels with the binding, so a session
+     * whose character is later edited or deleted keeps the words it was written with.
+     */
+    suspend fun bindToSession(
+        sessionId: String,
+        profile: CharacterProfile,
+        userName: String = CharacterBinding.DEFAULT_USER_NAME,
+        userDescription: String = "",
+    ): CharacterBinding = withContext(Dispatchers.IO) {
+        val binding = CharacterBinding.fromCard(profile.card, userName, userDescription).copy(
+            characterId = profile.id,
+        )
+        chatDao().setRoleplayBinding(sessionId, binding.toJson(), System.currentTimeMillis())
+        binding
+    }
+
+    suspend fun unbindSession(sessionId: String) = withContext(Dispatchers.IO) {
+        chatDao().setRoleplayBinding(sessionId, null, System.currentTimeMillis())
+        Unit
+    }
+
+    suspend fun bindingFor(sessionId: String): CharacterBinding? = withContext(Dispatchers.IO) {
+        CharacterBinding.fromJson(chatDao().roleplayBinding(sessionId))
+    }
+
+    /**
+     * What a turn should use: the live card while the character still exists, otherwise the
+     * snapshot the binding carries. Eta resolves it in that order, and so does this port.
+     */
+    suspend fun resolveForSession(sessionId: String): Pair<CharacterBinding, CharacterCard>? =
+        withContext(Dispatchers.IO) {
+            val binding = CharacterBinding.fromJson(chatDao().roleplayBinding(sessionId)) ?: return@withContext null
+            val live = dao().character(binding.characterId)?.toProfileOrNull()?.card
+            val card = live ?: runCatching { CharacterCardCodec.decodeJson(binding.cardSnapshotJson) }.getOrNull()
+            card?.let { binding to it }
+        }
 
     private fun writeAvatar(id: String, bytes: ByteArray): String {
         CharacterStoragePolicy.avatarRejection(bytes.size)?.let { reason ->
