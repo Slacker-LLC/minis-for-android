@@ -50,6 +50,11 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `agent/RunCheckpointStore.kt`, `agent/RunCheckpointRecorder.kt`, `agent/RunContextSnapshot.kt`, `agent/RunRecoveryCoordinator.kt` | `agent/runtime/AgentRunCheckpointStore.kt`, `agent/runtime/AgentRunCheckpointRecorder.kt`, `agent/runtime/AgentEventRecoveryProjection.kt`, `ui/app/AgentRunRecoveryCoordinator.kt` |
 | `data/repository/MemoryInjectionBudget.kt` (window budget, heading index, revision) | `agent/memory/AgentMemoryContext.kt` |
 | `provider/LLMFailureClassifier.kt` (failure classes and the retry gate) | `agent/model/AgentModelFailure.kt`, `agent/model/AgentModelRetry.kt` |
+| `ui/chat/WorkProcess.kt` (run grouping, running/failure summary) | `ui/app/AgentRunMessageProjector.kt`, `ui/components/ChatMessageItem.kt` (`AgentWorkProcess`) |
+| `ui/markdown/StreamingMarkdownProjection.kt` | `ui/markdown/StreamingGfmParser.kt` (`StreamingGfmProjection` and the parser session's terminal guard) |
+| `ui/chat/StreamingMarkdownTargets.kt` | `ui/components/StreamingMarkdownState.kt` (`consumeStreamingMarkdownTargets`) |
+| `ui/chat/StreamingMarkdownRestore.kt` | `ui/components/StreamingMarkdownRestoreState.kt` |
+| `ui/chat/RevealProgress.kt` (grapheme index, cadence and monotonic clamp) | `ui/components/SmoothTextReveal.kt` (algorithm half only; the draw/layout half is not ported) |
 
 
 ## Active native/runtime components
