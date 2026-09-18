@@ -731,6 +731,22 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2378 个用例 = 上一项后的 2373 + 5）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实超大工具结果走落盘路径（写入会话 offloads 目录）在设备上的表现未验证。
 
+## 四点五、收敛：可安装 APK 与模拟器验证（2026-09-19）
+
+目标改为「收敛成完整可用的 APK + 模拟器与真机测试」之后，本节的证据都是**构建产物与设备实测**，不是源码推断。
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| 构建 | `:app:assembleDebug` 通过，产物 `src/android/app/build/outputs/apk/debug/app-debug.apk`，**84 275 371 字节（80.4 MiB）**，包名 `llc.slacker.eta`（与正式 Minis 并存安装） | 构建日志 + `ls -la` |
+| 16 KB 对齐 | `scripts/verify-android-16k.sh` 通过：**24 个 native 库**全部 16 KB 对齐 | 脚本输出 |
+| 模拟器安装与启动 | Android **16（API 36, x86_64）** 模拟器 `openime-review-api36` 上 `adb install -r -t` **Success**；`am start MainActivity` 启动后 `dumpsys window` 焦点为本应用，**crash buffer 为空、无 FATAL、无本包名下的 E 级日志** | adb 输出 + logcat 扫描 |
+| 界面实测（截图留档在 /tmp，仓库不存二进制） | ① 聊天主界面：输入框占位「Message Minis (@ to mention files)」、模型选择器「选择模型」、麦克风/发送按钮、IME 正常唤起；输入框占位符轮播生效（截到第二句提示）——Phase 1 的轮播在真机上确实在转。② 设置页：`minis://settings/...` 深链直接打开设置。③ **新做的「系统增强」页**：Root 行显示「No su binary on this device」+ Check 按钮（模拟器无 su，初始化探测如实回报），无障碍保活行「Off — nothing re-binds the service」，模块开关行「1/3」（与 `ModulePrefs.BOOLEAN_DEFAULTS` 里手势条默认开启一致），下方「WHAT NEEDS ROOT」分区正常渲染。④ 点 Check：状态不变、无崩溃——无 su 时探测在 `findSu()` 处短路，符合设计 | `/tmp/emulator-minis-start.png`、`/tmp/emulator-enhance-2.png`、`/tmp/emulator-enhance-3.png`、`/tmp/emulator-enhance-4.png` |
+| 代码检查（同一提交上重跑） | `:app:testDebugUnitTest` **2385 例 0 失败**；`:app:lintDebug` **0 error**（145 warning / 5 hint，与改前一致） | 本轮输出 |
+| 真机 | **未完成**：`adb devices` 只有模拟器，重启 adb server 与 `adb mdns services`（只发现模拟器自身的 10.0.2.16:5555）都没有物理设备。手机接上后可直接复用本节步骤：`adb install -r -t <apk>` → `am start` → logcat 崩溃扫描 → 逐页截图 | adb 输出 |
+| Release APK | **本环境做不出**：仓库自己的 `requireReleaseSigning` 要求 `RELEASE_*` 生产签名凭据且**明确禁止**回退 debug 签名；`scripts/verify-android-release.sh` 还会拒绝任何 CN=Android Debug 的产物。需要你提供签名环境变量（或密钥库）才能产出并验证 release 包；在此之前可安装可用产物是上面的 debug APK | `build.gradle.kts`、`verify-android-release.sh` |
+
+**下一步（收敛路径）**：① 等真机接入后按上表步骤补真机证据；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + 16k + 模拟器冒烟」这条链。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
