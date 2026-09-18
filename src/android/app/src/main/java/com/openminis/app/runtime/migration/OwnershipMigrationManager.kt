@@ -1,11 +1,12 @@
 package com.openminis.app.runtime.migration
 
+import com.openminis.app.BuildConfig
 import org.json.JSONObject
 
 /**
  * Six-stage transactional FD-based ownership migration protocol.
  * Conforms to V4 audit specifications for migrating canonical user storage
- * from legacy package identity (dev.openminispet.android) to canonical identity (llc.slacker.minis).
+ * from legacy package identity (dev.openminispet.android) to canonical identity (llc.slacker.eta).
  *
  * Sequence:
  *   1. PREPARE: Dynamic UID & GID discovery via kernel stat (not pm list packages alone).
@@ -22,7 +23,9 @@ import org.json.JSONObject
 object OwnershipMigrationManager {
 
     const val LEGACY_PACKAGE = "dev.openminispet.android"
-    const val CANONICAL_PACKAGE = "llc.slacker.minis"
+    // The identity this app installs under; derived from the build so the
+    // migration target follows applicationId instead of a stale literal.
+    const val CANONICAL_PACKAGE = BuildConfig.APPLICATION_ID
 
     const val CANONICAL_BASE_DIR = "/data/adb/minis"
     const val LOCK_FILE_NAME = ".migration_in_progress"

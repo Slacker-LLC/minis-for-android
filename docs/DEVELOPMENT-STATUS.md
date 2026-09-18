@@ -9,7 +9,7 @@
 - PR #235：2026-09-10 已合入 `main`
 - 平台：已 Root 的 Android 设备
 - Linux runtime：Android App 自有协调 + Ubuntu 24.04 Direct chroot
-- `applicationId`：`llc.slacker.minis`
+- `applicationId`：`llc.slacker.eta`
 - Android/Kotlin namespace：`com.openminis.app`
 - 发布方式：源码优先
 

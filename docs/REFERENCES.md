@@ -63,6 +63,6 @@
 |---|---|---|
 | Gradle wrapper | 8.11.1 | `src/android/gradle/wrapper/gradle-wrapper.properties` |
 | compileSdk / targetSdk / minSdk | 36 / 35 / 26 | `src/android/app/build.gradle.kts` |
-| applicationId | `llc.slacker.minis` | 同上 |
+| applicationId | `llc.slacker.eta` | 同上 |
 | Kotlin / AGP | 见 `src/android/gradle/libs.versions.toml` | —— |
 | 单测基线 | 1786 个用例（`--no-daemon --max-workers=1`） | 本仓库当前 main |

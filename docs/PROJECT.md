@@ -43,7 +43,7 @@ Android app（:app）
 
 | 路径 | 内容 |
 |---|---|
-| `src/android/` | Android 应用（`applicationId=llc.slacker.minis`，namespace `com.openminis.app`） |
+| `src/android/` | Android 应用（`applicationId=llc.slacker.eta`，namespace `com.openminis.app`） |
 | `src/native/` | Root 原生组件（root network proxy） |
 | `src/shared/` | 跨环境辅助资产（bashism 等） |
 | `docs/contracts/` | 长期行为边界（中文合同，先读） |

@@ -16,7 +16,7 @@
 
 1. App 是数据库、工具权限、审批、session 和 guest 用户数据 backing 的权威；现役用户数据从 `Context.filesDir` 派生。
 2. `/data/adb/minis/rootfs` 是 Root-owned、可替换 Ubuntu rootfs；旧 `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` 只作为一次性迁移源。
-3. `applicationId = llc.slacker.minis`，namespace = `com.openminis.app`；不要把全库 namespace 重命名混入无关 PR。
+3. `applicationId = llc.slacker.eta`，namespace = `com.openminis.app`；不要把全库 namespace 重命名混入无关 PR。
 4. Guest UID/GID 使用当前安装实际 App identity；进入 chroot 后清空 supplementary groups/capabilities，禁止写死 `10000`。
 5. 新工具走现有 Tool Registry 与权限/结果模型。
 6. `DirectRootRunner` 只用于 App-owned **direct Ubuntu 24.04 chroot** 基础设施；本地 Agent 可按上游模式使用有界结构化 `root.shell`（tool basename + args）调用受信 Android system 工具，但不得把 raw command、host 文件 API 或通用 Root RPC 暴露给 Agent/MCP，也不得把 Provider 输出直接送入 `DirectRootRunner` / `su -c`。

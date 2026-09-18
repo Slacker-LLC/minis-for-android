@@ -35,7 +35,7 @@ Ubuntu 24.04 userspace
 
 | 项 | 当前值 |
 |---|---|
-| `applicationId` | `llc.slacker.minis` |
+| `applicationId` | `llc.slacker.eta` |
 | `namespace` / Kotlin 包根 | `com.openminis.app` |
 
 `applicationId` 与代码 namespace 可以不同；当前没有为了整洁而全库迁移 Kotlin package 的要求。

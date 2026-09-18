@@ -4,6 +4,20 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Application identity: llc.slacker.eta — 2026-09-18
+
+- `applicationId` moves from `llc.slacker.minis` to `llc.slacker.eta` so this fork
+  installs next to the upstream Minis package instead of replacing it. The Kotlin
+  namespace stays `com.openminis.app`; only the build identity changes.
+- The documents-provider authority and the ownership-migration target now derive from
+  `BuildConfig.APPLICATION_ID` instead of repeating the literal, so they cannot drift again.
+- Data does not migrate: a fresh install under the new id starts with its own private
+  data, and the previous package keeps its data untouched. Deep links (`minis://`) are
+  unchanged because they are scheme-based.
+- Current-state docs, debug tooling and the documentation-provenance guard follow the
+  new id; the device reports under `docs/` are left as historical records that describe
+  the old package.
+
 ### Custom system prompt box + editable prompt modules — 2026-09-18
 
 - Settings → System prompt is now a single free-text box for the device owner's own system prompt (Codex-style custom instructions). Whatever is saved there is injected at the top of the assembled agent prompt with an explicit precedence header, so it outranks the personality (SOUL.md), response style, presets, bot instructions and session Souls. An empty box injects nothing.

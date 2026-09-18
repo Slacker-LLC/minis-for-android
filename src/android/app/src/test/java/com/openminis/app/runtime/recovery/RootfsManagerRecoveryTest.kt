@@ -91,7 +91,7 @@ class RootfsManagerRecoveryTest {
     @Test
     fun `repair uses staged archive and swap only after validation`() {
         val stagedArchive =
-            "/data/user/0/llc.slacker.minis/cache/minis-runtime/ubuntu-arm64-rootfs.tar.gz"
+            "/data/user/0/llc.slacker.eta/cache/minis-runtime/ubuntu-arm64-rootfs.tar.gz"
         val command = RootfsManager.buildRepairCommand(
             "/data/adb/minis/rootfs",
             stagedArchive,

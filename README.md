@@ -33,7 +33,7 @@ If a device can provide correct guest networking without this compatibility path
 
 Direct Ubuntu audit changes were merged into `main` on 2026-09-12 (source baseline `422cc29f`). See the [Chinese documentation index](docs/README.md), [device report](docs/REAL-DEVICE-TEST-REPORT.md), and [remaining gaps](docs/contracts/06-CURRENT-GAPS.md). Guest `minis-mcp-cli` is still missing; native MCP support does not replace that CLI, and full device acceptance remains incomplete.
 
-- `applicationId`: `llc.slacker.minis`
+- `applicationId`: `llc.slacker.eta`
 - Android/Kotlin namespace: `com.openminis.app`
 
 The installed application identity and source namespace may differ; a repository-wide package rename is not implied.

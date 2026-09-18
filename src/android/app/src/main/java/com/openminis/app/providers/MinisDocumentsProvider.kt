@@ -12,6 +12,7 @@ import android.os.storage.StorageManager
 import android.provider.DocumentsContract.Document
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
+import com.openminis.app.BuildConfig
 import android.system.ErrnoException
 import android.system.OsConstants
 import android.util.Log
@@ -34,7 +35,9 @@ import java.io.RandomAccessFile
 class MinisDocumentsProvider : DocumentsProvider() {
 
     companion object {
-        const val AUTHORITY = "llc.slacker.minis.documents"
+        // Derived from the build so the authority can never drift from the
+        // installed applicationId (the manifest declares the same value).
+        const val AUTHORITY = BuildConfig.APPLICATION_ID + ".documents"
         private const val TAG = "MinisDocumentsProvider"
         private const val ROOT_ID = "minis-root"
         private const val ROOT_DOC_ID = ""

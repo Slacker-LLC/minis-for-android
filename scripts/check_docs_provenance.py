@@ -91,7 +91,7 @@ REQUIRED_PROVENANCE_TERMS = (
     "GPL-3.0",
     "https://github.com/OpenMinis/OpenMinis",
 )
-REQUIRED_IDENTITY_TERMS = ("llc.slacker.minis", "slacker.llc", "direct Ubuntu")
+REQUIRED_IDENTITY_TERMS = ("llc.slacker.eta", "slacker.llc", "direct Ubuntu")
 REQUIRED_STORAGE_CONTRACT_TERMS = (
     "Context.filesDir",
     "/data/adb/minis/rootfs",
@@ -100,7 +100,7 @@ REQUIRED_STORAGE_CONTRACT_TERMS = (
     ".root-data-migrated-v1",
 )
 REQUIRED_AGENTS_TERMS = (
-    "llc.slacker.minis",
+    "llc.slacker.eta",
     "docs/contracts/",
     "Context.filesDir",
     "DirectRootRunner",
