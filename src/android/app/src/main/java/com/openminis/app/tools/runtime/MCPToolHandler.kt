@@ -3,6 +3,7 @@ package com.openminis.app.tools.runtime
 import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
+import com.openminis.app.data.ContextOffload
 import com.openminis.app.mcp.client.MCPClientCodec
 import com.openminis.app.mcp.client.MCPClientSession
 import com.openminis.app.mcp.client.MCPTransportException
@@ -10,6 +11,7 @@ import com.openminis.app.mcp.client.MCPTransportFailureKind
 import com.openminis.app.tools.ToolExecutionResult
 import com.openminis.app.tools.ToolFailureKind
 import com.openminis.app.tools.ToolTimeoutPolicy
+import com.openminis.app.tools.internal.ToolResultPruner
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
@@ -61,10 +63,34 @@ class MCPToolHandler(
                 false,
             )
         }
-        return ToolExecutionResult(result.content, !result.isError)
+        // [T-mcp-result-bounds-android] A remote tool's result is untrusted text that
+        // goes straight into the transcript, and the HTTP reply cap (4 MiB) is far more
+        // than any context can afford. Oversized results spill to the session's
+        // offloads directory through the helper the log tools already use, so the model
+        // gets a head/tail preview plus a path it can re-read instead of megabytes of
+        // body; if the spill cannot be written, a pruned preview is used rather than the
+        // raw text.
+        val spill = runCatching {
+            ContextOffload.spillIfOversized(
+                sessionId = sessionId,
+                text = result.content,
+                baseName = "mcp_${serverId}_${remoteTool.name}",
+            )
+        }.getOrNull()
+        return ToolExecutionResult(boundedMcpResult(result.content, spill), !result.isError)
     }
 
     companion object {
+        /**
+         * The text handed to the model for one remote result: the spill's preview when
+         * the result was spilled, otherwise the result itself — pruned with an explicit
+         * omission marker when it is oversized and the spill failed.
+         */
+        internal fun boundedMcpResult(raw: String, spill: ContextOffload.SpillResult?): String =
+            spill?.takeIf { it.spilled }?.inline
+                ?: ToolResultPruner.prune(raw)
+                ?: raw
+
         fun schemaToParams(schema: JSONObject?): Map<String, AgentToolParam> {
             if (schema == null) return emptyMap()
             val props = schema.optJSONObject("properties") ?: return emptyMap()
