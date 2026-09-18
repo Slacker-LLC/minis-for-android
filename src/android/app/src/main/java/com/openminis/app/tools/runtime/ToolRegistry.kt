@@ -116,11 +116,15 @@ object ToolExecutor {
         }
         val handler = ToolRegistry.handler(canonical)
             ?: return ToolExecutionResult("Error: no handler for $canonical", false)
-        val provider = ProviderRouter.route(canonical)
-            ?: return handler.execute(argsJson, sessionId, context, toolId)
-        return provider.execute(canonical, argsJson, sessionId, context, toolId) {
-            handler.execute(argsJson, sessionId, context, toolId)
-        }
+        val raw = ProviderRouter.route(canonical)
+            ?.execute(canonical, argsJson, sessionId, context, toolId) {
+                handler.execute(argsJson, sessionId, context, toolId)
+            }
+            ?: handler.execute(argsJson, sessionId, context, toolId)
+        // [T-tool-result-budget-android] The dispatch is where a result stops being a
+        // tool's private business and becomes a message part, so it is where the bound
+        // lives; tools that already bound themselves stay well under it.
+        return ToolResultBudget.bounded(sessionId = sessionId, toolName = canonical, result = raw)
     }
 }
 
