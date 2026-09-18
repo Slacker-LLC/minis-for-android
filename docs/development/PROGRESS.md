@@ -621,6 +621,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2307 个用例 = 上一项后的 2302 + 5，另有一例在自查中删掉）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：带坐标的事件能否取悦真正依赖它们的框架、以及真实页面的提交处理器如何对待 `requestSubmit`，都未验证。
 
+**自己标签页的历史，三个动作** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `go_back` / `go_forward` / `reload` | 上游把三者当动作；我们的枚举里一个都没有——模型顺着链接点进去之后想回头，只能重新 navigate 一个凭记忆的 URL（记错就彻底走丢），而标签页自己的前进/后退状态只有浏览器面板能用。现在三个都是动作，并且**等落地的页面**再回话（navigate 与 reload 本来就在等） | `dafa3b58` | ✅ `BrowserHistoryPolicyTest`（4 例） |
+| 没有历史就拒绝 | 没有上一页时返回带原因的失败（`Cannot go back: this tab has no earlier page in its history.`），而不是我们自己 UI helper 那种静默 no-op——从工具结果看回来，no-op 和「页面变了」长得一模一样 | `dafa3b58` | ✅ 上述用例 |
+| 顺手收掉重复的等待 | `navigate`、`reloadAndWait`、`loadBlankPage` 各自带一份「建 deferred → 挂超时 → await → 清标志」，新动作会让它变成第四份。现在共用 `awaitNavigation(label, trigger)`；超时日志也统一（此前只有 navigate 会记下是哪个导航超时），`loadBlankPage` 不再要求调用方在主线程 | `dafa3b58` | ✅ 编译 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2311 个用例 = 上一项后的 2307 + 4）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：落在缓存页上的历史移动会不会在等待超时前报出 `onPageFinished`、以及被拦截的 `minis://` 页面 reload 的表现，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
