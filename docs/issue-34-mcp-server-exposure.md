@@ -44,3 +44,19 @@ The local MCP server is independent from the Direct Ubuntu Root/chroot path and 
 ## Verification
 
 Current source/tests and canonical CI are authoritative for token scope, loopback binding, tool filtering, rotation/revocation, Android compilation, lint, and packaging. A live external MCP client connection still requires device/integration evidence when claimed.
+
+### Device evidence (2026-09-19, Xiaomi 24129PN74C / HyperOS / Android 37)
+
+A live client connection was made through `adb forward tcp:18789` on a debug build, with the credential set through the debug RPC (`debug.mcp.settoken`, removed again afterwards by blanking `shared_prefs/minis_mcp_prefs.xml` via `run-as`). Observed contract, which a client has to follow exactly:
+
+| Step | Observed |
+|---|---|
+| Start | `debug.mcp.start` → `{started:true}`; `debug.mcp.status` → `{running:true, configured:true, port:18789}`. Without a credential the start is **refused** (`{started:false}`) — the fail-closed rule holds on the device, not only in tests |
+| Endpoint | `POST /mcp`; a request to `/` answers `404 {"error":"not found"}`. `Accept: application/json, text/event-stream` |
+| Auth | `Authorization: Bearer <token>`; without it `401 {"error":"unauthorized"}` |
+| `initialize` | `200`, `protocolVersion: 2025-06-18`, `capabilities.tools`, `serverInfo: {name: "minis", version: "0.1.0"}` |
+| `tools/list` | `200`, **58 tools**; wire names are the underscored `apiName` form (`android_context`, `linux_file_list`, `android_alarm_set`, …) |
+| Confirm gate | A tool that needs approval answers `error.code -32001`, `message "confirm_required"`, `data {confirm_id, expires_in_ms 120000}` |
+| Approval | `debug.mcp.confirm.answer {confirm_id, method}` where **`method` is the canonical dotted name** (`android.context` for the wire name `android_context`) → `{approved:true, result:"OK"}`; passing the wire name yields `WRONG_METHOD` |
+| Retry | The ticket must be sent as a **sibling of `name`/`arguments`** in the tool-call params (`{\"name\":…, \"arguments\":{}, \"confirm_id\":…}`) with **unchanged arguments** — the ticket is bound to caller + method + the canonical arguments digest — and then answers `200` with the tool result (verified: `isError:false`, keys `battery/foreground/location/network/ok/screen/time`) |
+| Boundary refusal | `linux_file_list` without a usable path answers `isError:true`, `BAD_PARAMS: path is outside the Minis guest namespace or unavailable` |

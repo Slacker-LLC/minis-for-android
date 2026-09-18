@@ -828,6 +828,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 
 **结论**：这一轮移植/对齐过的浏览器层（page_info 字段、`get_text` 分窗、`get_readable` Markdown + 链接、载荷/结果上界）在真机上是**端到端可复现**的，不是只在单测里成立。后续设备测试优先用这套 RPC 面，UI 点击仅用于验证界面本身。
 
+### 真机：guest CLI 清点、网络抓取、UI 树与 **MCP 服务端**（2026-09-19）
+
+| 调用 | 结果 |
+|---|---|
+| `ls /usr/local/bin` | 24 个 guest CLI：`android-a11y-cli / android-alarm / android-calendar / android-clipboard / android-contacts / android-device / android-location / android-notification / android-open / android-photos / android-player / android-shizuku-cli / android-speak / android-speech / android-weather / minis-browser-use / minis-config / minis-debug / minis-model-use / minis-open / minis-scheduled / minis-sessions-cli` 与 `xdg-open` 等价物 |
+| `debug.fetch {url, maxBytes}` | 通（两个后端各报一次状态：`httpurlconn_status 200`、`okhttp_status 200`，并回 DNS 与代理判定） |
+| `debug.viewTree {maxDepth:3}` | 返回实时视图树（DecorView 1200×2670 起） |
+| **MCP 服务端** | `debug.mcp.start` 无凭据 → `{started:false}`（失败关闭）；配 token 后 `{started:true}`、`running:true`；`POST 127.0.0.1:18789/mcp` 完成 `initialize`（`2025-06-18`、`minis 0.1.0`）与 `tools/list`：**58 个工具**；无 Bearer → `401`；需要审批的工具返回 `-32001 confirm_required`（票 + 120 s），用**规范名** `android.context` 批准后，带票原样重试 → `200、isError:false`，返回 `battery/foreground/location/network/ok/screen/time` 等字段。客户端契约（端点路径、票的位置、方法与参数绑定）已写进 `docs/issue-34-mcp-server-exposure.md` 的「Device evidence」一节 |
+| 凭据清理 | 测试用的 token 通过 `run-as` 把 `shared_prefs/minis_mcp_prefs.xml` 还原为 `<map />` 清掉（设备状态复原） |
+
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
