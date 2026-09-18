@@ -158,7 +158,47 @@ object MCPClientCodec {
      * accepted, with the specification spelling taking precedence.
      */
     internal fun readInputSchema(tool: JSONObject): JSONObject? =
-        tool.optJSONObject("inputSchema") ?: tool.optJSONObject("input_schema")
+        boundSchema(tool.optJSONObject("inputSchema") ?: tool.optJSONObject("input_schema"))
+
+    /**
+     * [T-android-mcp-schema-bounds] An `inputSchema` is untrusted JSON that this app
+     * echoes into every provider request for that tool, so it cannot be unbounded: the
+     * per-reply cap alone allows one nearly-4 MiB schema, and pagination multiplies it
+     * by the page count. A schema past [limit] is dropped (the tool stays callable and
+     * untyped, which MCP servers accept) instead of being carried around.
+     */
+    internal fun boundSchema(
+        schema: JSONObject?,
+        limit: Int = MAX_TOOL_SCHEMA_CHARS,
+    ): JSONObject? {
+        schema ?: return null
+        if (schema.length() == 0) return null
+        val size = schema.toString().length
+        return if (size <= limit) schema else null
+    }
+
+    /**
+     * How much schema text one `tools/list` may keep in total. Per-tool bounds do not
+     * bound the sum: 256 tools at the per-tool limit is still megabytes of JSON in
+     * memory and in the next request.
+     */
+    internal class SchemaBudget(private val limit: Int = MAX_TOTAL_SCHEMA_CHARS) {
+        private var used = 0
+
+        /** True when a schema of [chars] still fits; the budget then counts it. */
+        fun accept(chars: Int): Boolean {
+            if (chars <= 0) return false
+            if (used + chars > limit) return false
+            used += chars
+            return true
+        }
+    }
+
+    /** Largest schema one tool may carry. */
+    internal const val MAX_TOOL_SCHEMA_CHARS = 65_536
+
+    /** Largest amount of schema text one `tools/list` may keep across all tools. */
+    internal const val MAX_TOTAL_SCHEMA_CHARS = 1_048_576
 
     /**
      * Extracts call result content as concatenated text. Handles the three

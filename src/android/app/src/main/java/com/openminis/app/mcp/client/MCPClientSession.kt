@@ -86,6 +86,7 @@ class MCPClientSession(
     suspend fun listTools(): List<MCPClientCodec.RemoteTool> {
         val t = transport ?: throw MCPTransportException("session not connected")
         val out = mutableListOf<MCPClientCodec.RemoteTool>()
+        val schemaBudget = MCPClientCodec.SchemaBudget()
         var cursor: String? = null
         var guard = 0
         do {
@@ -95,7 +96,18 @@ class MCPClientSession(
             val reply = t.send(MCPClientCodec.buildToolsList(cursor))
             val page = MCPClientCodec.parseToolsList(reply)
                 ?: throw MCPTransportException("tools/list rejected: $reply")
-            out.addAll(page.tools)
+            // [T-android-mcp-schema-bounds] Per-tool bounds are in the codec; this one is
+            // the sum. A tool whose schema does not fit the budget is kept without it —
+            // callable, just untyped — rather than dropped from the list.
+            page.tools.forEach { tool ->
+                val schema = tool.inputSchema
+                val chars = schema?.toString()?.length ?: 0
+                out += if (schema == null || schemaBudget.accept(chars)) {
+                    tool
+                } else {
+                    tool.copy(inputSchema = null)
+                }
+            }
             // [T-mcp-param-headers-android] Derive the parameter-to-header bindings while
             // the schema is in hand; a tool whose schema declares none simply gets none.
             page.tools.forEach { tool ->
