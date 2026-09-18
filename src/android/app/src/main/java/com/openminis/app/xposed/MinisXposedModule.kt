@@ -30,6 +30,23 @@ class MinisXposedModule : XposedModule() {
             detach()
             return
         }
+        // [T-eta-xposed-entry] The framework hands every hooked process a read-only view of the
+        // module's settings. Keeping it means a toggle takes effect at the next interception
+        // instead of at the next reboot. When it is unavailable the hooks fall back to their
+        // own defaults (see ModulePrefs) rather than guessing - and the failure is logged, so
+        // "the switch does nothing" has a visible cause.
+        val remotePreferences = try {
+            getRemotePreferences(ModulePrefs.GROUP)
+        } catch (exception: Exception) {
+            log(
+                Log.WARN,
+                TAG,
+                "remote preferences unavailable, hooks use their defaults: " +
+                    "${exception.javaClass.simpleName}: ${exception.message}",
+            )
+            null
+        }
+        ModulePrefs.attachSharedPreferences(remotePreferences)
         log(
             Log.INFO,
             TAG,
