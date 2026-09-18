@@ -122,14 +122,17 @@
 | 技能正文与资源 | `skill.read`（别名 `skills_read`）按 id/名称/SKILL.md 路径读全文，512–64000 字符（默认 16000）并显式标注截断；`skill.read_resource`（别名 `skills_read_resource`）读技能内的有界 UTF-8 文本资源（如 `references/guide.md`） | `7741677c` | ✅ 上述用例 |
 | 复用而非新建通道 | 读路径全部走既有 `SkillRepository`，共用其跨进程变更锁与路径守卫；工具只加边界与 id/名称/路径解析，不写、不装、不执行；资源读失败时列出该技能实际包含的文件 | `7741677c` | ✅ 路径拒绝用例（空/绝对/反斜杠/控制字符/`..`/超长） |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1928 个用例 = Phase 2 分支的 1918 + 10，0 失败）。未做：`skills_list_curated` / `skills_inspect_github` / `skills_install_from_github`（安装面仍走既有事务，尚未暴露给模型）；真机未验证：模型在真实会话里发现并读取技能、禁用技能在列表里的可见性、大技能正文的截断观感。
+| GitHub 发现与安装 | `skill.inspect_github`（别名 `skills_inspect_github`）把 ref 解析成 commit，列出仓库里所有含 `SKILL.md` 的目录（仓库根目录的 SKILL.md 不算），可 `path` 收窄，上限 200 并如实报告截断，返回可供钉住的 commitSha；`skill.install_github`（别名 `skills_install_from_github`）在该 commit 上取 SKILL.md，走既有事务安装，再用**同一个 commit** 下载兄弟文件并二次提交，装出来的技能不会是两个版本的混合 | `45d222d0` | ✅ `SkillSourcePolicyTest`（12 例，纯解析/拒绝路径） |
+| 安装的失败关闭 | 安装永不覆盖：同名 id 返回 `SKILL_CONFLICT` 并说明是内置还是用户技能，指向 Settings → Skills 更新；不执行技能内脚本；私有仓库、未知 ref、API 限流、缺 SKILL.md、frontmatter 不可用、事务被拒各有独立原因；仓库解析拒绝非 github 主机、绝对路径与 `..` | `45d222d0` | ✅ 上述用例 + 🟡 三次网络调用（commits / git·trees / raw）宿主未覆盖 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1940 个用例 = 上一项后的 1928 + 12，0 失败）。未做：`skills_list_curated`（Eta 的 openai/skills 精选目录，需要额外约定目录清单）；安装的替换/更新流（本仓库已有 UI 侧 `updateFromURL`，模型侧只做新建）；真机未验证：模型在真实会话里发现并读取技能、真实 GitHub 仓库的发现/安装端到端、大技能正文的截断观感、限流下的报错文案。
 
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、会话级编辑（Skills 的只读面已在 `codex/eta-phase3-skills-tools` 落地；GitHub 发现/安装面待做） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、会话级编辑（Skills 暴露给模型已在 `codex/eta-phase3-skills-tools` 落地：列表/正文/资源只读 + GitHub 发现/安装） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
