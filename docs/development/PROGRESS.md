@@ -705,6 +705,14 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2363 个用例 = 上一项后的 2358 + 5）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实远端服务器返回超大结果时，落盘路径（写入会话 offloads 目录）在设备上的表现未验证。
 
+**MCP stdio 的行上限改成「读的时候就上界」（自查出来的缺口）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 64 KiB 从「事后检查」变成「过程上界」 | `MCPStdioTransport` 原来在 `BufferedReader.readLine()` **之后**才检查行长——可是 readLine 会先把整行读进内存，所以这个上限只是装饰：本地服务器（可能坏掉、也可能不可信）发一行就能让进程花掉几百 MB。现在读取走 `MCPBoundedLineReader`：边读边卡上限、保留 `readLine` 的 CRLF 与空行语义、连「一直没有换行的洪流」也会被拒；被灌爆的 stdout 帧直接关掉整条传输（杀进程）而不是试图在行中间重新同步；stderr 用同一个读取器配更小的上限，超限就跳到下一个换行（有界），既不放大日志也不让服务器卡在满管上 | `e737fb4e` | ✅ `MCPBoundedLineReaderTest`（8 例：逐行与 EOF、末行无换行、CRLF、空行、恰好到限、超限即拒且报来源与数值、无换行的 5 MB 洪流、跳过后仍能接着读） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2371 个用例 = 上一项后的 2363 + 8）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：真实 stdio MCP 服务器在帧被这样拒绝后的行为（传输已关闭，下次使用由 provider 的 reload 重连）未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
