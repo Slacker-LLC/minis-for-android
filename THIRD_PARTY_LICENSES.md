@@ -115,6 +115,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `accessibility/TextEditPlanner.kt`, the cursor-aware `setNodeText` / `placeCursor` in `accessibility/MinisAccessibilityService.kt` and the `input_text` action in `tools/android/AndroidUiController.kt` | `agent/accessibility/TextEditPlanner.kt` and `inputTextFocused` / `setNodeText(node, text, cursor)` in `agent/accessibility/AgentAccessibilityService.kt` |
 | `accessibility/ClipboardRestorePolicy.kt`, the shared clipboard borrow and the `paste_text` action in `tools/android/AndroidUiController.kt` | `pasteText` / `restoreClipboardIfStillOwned` in `agent/accessibility/AgentAccessibilityService.kt` |
 | `accessibility/TextInputBoundsPolicy.kt`, the write bounds in `tools/android/AndroidUiController.kt` and the `ime_enter` action | the `input_text` / `replace_text` bounds in `agent/device/RootShellDeviceController.kt` and `imeEnter` (the `press_key` ENTER path) in `agent/accessibility/AgentAccessibilityService.kt` |
+| `runtime/guest/ClipboardBoundsPolicy.kt` and the read/write bounds in `runtime/guest/ClipboardOffloadHandler.kt` | the clipboard bounds in `agent/device/RootShellDeviceController.kt` (`clipboardSet` / `clipboardGet`) |
 
 
 ## Active native/runtime components

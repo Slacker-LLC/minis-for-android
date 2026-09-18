@@ -260,7 +260,9 @@ object AndroidSystemOps {
 
     suspend fun clipboard(context: Context, sessionId: String, action: String, content: String?): ToolExecutionResult {
         val argv = when (action) {
-            "read" -> listOf("android-clipboard", "get")
+            // [T-eta-clipboard-bounds] The JSON form carries the truncation flag; the read is
+            // bounded, so a copied document does not become the model's context.
+            "read" -> listOf("android-clipboard", "get", "--json")
             "write" -> {
                 if (content.isNullOrEmpty()) return ToolExecutionResult("Error: content is required for write", false)
                 listOf("android-clipboard", "set", "--text", content)

@@ -93,8 +93,21 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
         // text (lots of pipe consumers depend on it). The iOS version emits
         // structured JSON; we only switch to JSON when --json is requested
         // so existing prompts (`text=$(android-clipboard get)`) keep working.
-        val text = try { clip.getItemAt(0).coerceToText(context).toString() } catch (_: Throwable) { "" }
-        val body = OffloadOutput.formatBody(text.trimEnd('\n'), args)
+        val raw = try { clip.getItemAt(0).coerceToText(context).toString() } catch (_: Throwable) { "" }
+        // [T-eta-clipboard-bounds] A clipboard holds whatever was last copied, which can be a whole
+        // document; the read is bounded (Eta's own bound) and the JSON form reports the truncation
+        // instead of pretending the text is complete.
+        val bounded = ClipboardBoundsPolicy.read(raw.trimEnd('\n'))
+        val payload = if (args.hasFlag("json")) {
+            JSONObject()
+                .put("text", bounded.text)
+                .put("chars", bounded.text.length)
+                .put("truncated", bounded.truncated)
+                .toString()
+        } else {
+            bounded.text
+        }
+        val body = OffloadOutput.formatBody(payload, args)
         return NativeOffloadResult(0, "$body\n")
     }
 
@@ -108,6 +121,11 @@ class ClipboardOffloadHandler(private val context: Context) : NativeOffloadHandl
                 2,
                 "android-clipboard set: missing <text> (use --text \"...\" or pass positional args)\n",
             )
+        }
+        // [T-eta-clipboard-bounds] Refused before the clipboard changes; a truncated write would be
+        // a silent lie about what the user asked to copy.
+        ClipboardBoundsPolicy.writeRefusal(text)?.let { refusal ->
+            return NativeOffloadResult(2, "android-clipboard set: $refusal\n")
         }
         if (!isAppForeground() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return backgroundError(args)
