@@ -128,6 +128,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `scroll` and `pageInfo` in `browser/BrowserDomScripts.kt` (the before/after pair, the target-visibility check, the page language and canonical URL) | `agent/browser/BrowserDomScripts.kt` (`scroll`, `pageInfo`) |
 | The `read_image` argument: `browser/BrowserActionInput.kt`, `attachImage` in `browser/BrowserActionResult.kt`, `screenshot` / `attachSnapshot` in `browser/BrowserUseManager.kt` and the attachment decision in `ui/chat/ChatViewModel.kt` | `agent/browser/AgentBrowserSession.kt` (the `read_image` argument of `screenshot`) |
 | `text` in `browser/BrowserDomScripts.kt` and the `get_text` wiring in `browser/BrowserUseManager.kt` (the visible-text collector path and its window) | `agent/browser/BrowserDomScripts.kt` (`text`) |
+| `runtime/ubuntu/RootAccess.kt` (the root state, the probe and the ask-once policy, on top of this repository's `DirectRootRunner`) and the enhancement summary in `ui/settings/SystemEnhanceScreen.kt` | `agent/device/RootAccess.kt` and `ui/screens/enhance/SystemEnhanceScreen.kt` |
 
 
 ## Active native/runtime components

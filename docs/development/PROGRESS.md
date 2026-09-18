@@ -659,6 +659,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2321 个用例 = 上一项后的 2319 + 2）与 `:app:lintDebug`（0 error），另有浏览器 JS 守卫（12 个脚本）。**没有任何设备结论**：采集器的输出与 `innerText` 在真实页面上差多少（相邻文本节点之间的空格是要盯的那一处），未验证。
 
+**增强设置页 + Root 状态** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| `RootAccess`（上游 `agent/device/RootAccess.kt` 移植） | 本仓库此前**知道**怎么找 `su`、怎么经由它执行，但没有任何地方**记住**结论——每个需要它的界面要么自己再探一次、要么假设。状态机（UNKNOWN/UNAVAILABLE/NOT_GRANTED/GRANTED/DENIED/TIMED_OUT）、「只问一次」策略（`explicit \|\| !attempted \|\| wasGranted`）与探测实现照搬，但探测走**本仓库自己的 `DirectRootRunner`**（同一条 root 路径，不做第二套）。一处刻意差异：`initialize` 只查 su 是否存在，除非上一次探测拿到过授权才静默复探——上游在首次启动就请求 root，本仓库让运行时启动（或用户在页面点「检测」）来触发弹窗 | `222f404c` | ✅ `RootAccessPolicyTest`（10 例：策略真值表、uid 0/非 0、超时、启动失败、静默成功不臆断、只有 GRANTED 算授权） |
+| 增强设置页 | Phase 6 路线图里一直未落地的那一页：状态区（Root 状态 + 检测按钮、无障碍保活、模块开关计数，各自链到拥有该开关的页面）+「需要 Root 的能力」「需要模块的能力」两节说明。**刻意不显示「模块已连接」**——模块跑在别的进程里、只读偏好，应用没有把手去问，猜一个状态就是编造 | `222f404c` | ✅ 编译 + `lintDebug`（0 error、未新增 warning）+ 8 个 locale 补齐 27 条字符串 |
+| 无障碍判定的唯一副本 | 权限页与新页面都要「无障碍服务是否开启」，此前是权限页里的私有函数；提到 `MinisAccessibilityService.isEnabled`，两页不可能给出不同答案 | `222f404c` | ✅ 上述验证 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2331 个用例 = 上一项后的 2321 + 10）与 `:app:lintDebug`（0 error，145 warning / 5 hint 与改前一致）。**没有任何设备结论**：已授权设备上的静默复探会不会真的不弹窗、su 弹窗与后台探测如何交互、以及没有 su 的设备上这一页的观感，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -667,7 +677,7 @@
 | Phase 3 数字助手 | 就地展示/可停止/可接管已落地；Skills 暴露给模型、GUI 动作补齐、Markdown 导出同样已落地。**连续追问与面板内屏幕上下文未落地**：无头驱动 seam 其实**已经存在**（本仓库早有 `agent/AgentRunner`：prompt/cancel/waitForSettle/sessionEvents），卡的是面板设计——上游是一套 708 行的展开式面板（26 态状态模型 + `BasicTextField` 追问输入 + 手势/震动），直接搬会替换掉本仓库现有的胶囊浮层设计（当初的分析明确要保留 Minis 的工作台风格），属于要先拍板的产品改动；若要做，最自然的形态是在现有胶囊上加密实输入（需处理 overlay 窗口的 IME/焦点） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 清单已全部落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存、下载记录。其中 QQ/微信缓存与下载记录先被登记为「待拍板 / 不值得」，后来按上游补齐（限制写在各自工具描述里） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板） | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
@@ -701,7 +711,7 @@
 - **provider 推理参数**：上游 `ProviderReasoning`/`ReasoningCapabilityResolver` 是按厂商源码类型硬编码的请求字段映射（bailian/siliconflow/deepseek/moonshot/mimo/minimax/openrouter/stepfun/openai/custom）。本仓库这条线是**数据 + 逐实例规则**驱动：`ThinkingLevelCatalog`（models.dev 的 `reasoning_options`）、`thinking/ThinkingRuleResolver` 与 `ThinkingWireFormat`（`reasoning_effort`/`reasoning_effort_nested`/`boolean_toggle` 等线格式，已含 DashScope 的 `enable_thinking`+`thinking_budget` 一类特例）。把上游的硬编码表搬过来只会多一份真相，故不搬。
 - **工具能力/需求声明**：上游 `AgentToolRequirements`/`AgentToolCapabilities`/`ToolCapabilityProjection` 是**给 UI 用的投影**（按 root/ColorOS 过滤工具卡、挑按钮动作）。本仓库没有工具卡列表，工具在调用时就带原因拒绝（例如桥不可用、参数越界），功能面等价，故不搬。
 
-**仍然未落地、且不依赖任何拍板的路线图项**：Phase 6 的「增强设置页」（上游 `SystemEnhanceScreen`：root 状态 + 模块连接状态 + 各接管说明）。本仓库已有「模块保护」开关与「模块设置页」，这一页是聚合与说明性质的入口，尚未开工。
+**曾经未落地、现已落地**：Phase 6 的「增强设置页」（上游 `SystemEnhanceScreen`：root 状态 + 模块状态 + 各接管说明）在 `222f404c` 落地（见 §四 最后一片）。
 
 ## 七、未验证清单（不得据此声称设备结论）
 
