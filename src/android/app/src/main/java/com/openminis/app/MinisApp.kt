@@ -571,6 +571,16 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.AndroidMediaFilesHandler(),
             aliasNames = listOf("search_files"),
         )
+        // [T-eta-xposed-groups] ColorOS system memories, read through the module inside the
+        // memory app's process (Eta search_coloros_memories / search_saved_places /
+        // search_personal_orders). Without the module the tools report which piece is missing
+        // rather than an empty result.
+        com.openminis.app.tools.ColorOsMemoryTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.ColorOsMemoryTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-character-cards] The bound character's story memory: read it, update it. The
         // character comes from the session binding, so the model cannot name another one.
         com.openminis.app.tools.CharacterMemoryTools.handlers().forEach { handler ->

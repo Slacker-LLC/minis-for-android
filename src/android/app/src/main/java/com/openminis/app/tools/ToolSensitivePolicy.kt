@@ -246,6 +246,14 @@ object ToolSensitivePolicy {
         "android.media.images",
         "list_media_images",
 
+        // [T-eta-xposed-groups] Minis catalog — ColorOS system memory (Eta
+        // search_coloros_memories, search_saved_places, search_personal_orders; those
+        // three spellings are already in the Eta list above). Memories and orders carry
+        // bills, pickup codes and addresses, so the transcript keeps a placeholder.
+        "android.coloros.memory",
+        "android.coloros.orders",
+        "android.coloros.places",
+
         // [T-eta-notification-history] Minis catalog — notification shade and history
         // (Eta recent_notifications, search_notification_history). Notification bodies
         // routinely carry one-time codes and private messages, so the transcript keeps
