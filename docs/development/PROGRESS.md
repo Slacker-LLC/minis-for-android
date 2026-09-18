@@ -719,6 +719,7 @@
 
 - **provider 推理参数**：上游 `ProviderReasoning`/`ReasoningCapabilityResolver` 是按厂商源码类型硬编码的请求字段映射（bailian/siliconflow/deepseek/moonshot/mimo/minimax/openrouter/stepfun/openai/custom）。本仓库这条线是**数据 + 逐实例规则**驱动：`ThinkingLevelCatalog`（models.dev 的 `reasoning_options`）、`thinking/ThinkingRuleResolver` 与 `ThinkingWireFormat`（`reasoning_effort`/`reasoning_effort_nested`/`boolean_toggle` 等线格式，已含 DashScope 的 `enable_thinking`+`thinking_budget` 一类特例）。把上游的硬编码表搬过来只会多一份真相，故不搬。
 - **工具能力/需求声明**：上游 `AgentToolRequirements`/`AgentToolCapabilities`/`ToolCapabilityProjection` 是**给 UI 用的投影**（按 root/ColorOS 过滤工具卡、挑按钮动作）。本仓库没有工具卡列表，工具在调用时就带原因拒绝（例如桥不可用、参数越界），功能面等价，故不搬。
+- **MCP 的运行期形态**：上游把 MCP 工具当一等模型工具，并给每次 run 冻结一份工具目录 + bearer token（`McpRunContext`/`McpRunSnapshot`），设置改动下一次 run 生效；工具目录还带 TTL 缓存（`McpServerManager.discover`）。本仓库这条线是 iOS 镜面的形态：服务在系统提示里披露 + guest `minis-mcp-cli` 发现/调用，另有一层把远端工具注册进 `ToolRegistry`（每次请求按当前注册表出 schema）。中途改设置会让后续请求看到新的工具表，最坏情况是模型调用一个刚消失的工具、拿到明确的报错，而不是状态损坏。**这一处按形态保留**；`x-mcp-header` 那一块（可独立成立的能力）已在 `b3047921` 搬过来。
 
 **曾经未落地、现已落地**：Phase 6 的「增强设置页」（上游 `SystemEnhanceScreen`：root 状态 + 模块状态 + 各接管说明）在 `222f404c` 落地（见 §四 最后一片）。
 
