@@ -591,6 +591,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2282 个用例 = 上一项后的 2273 + 9）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：真实页面上发射器产出的 Markdown 长什么样、重 DOM 上三重上界够不够、以及按字数打分会不会选错正文容器，都未验证。
 
+**find_elements 交出选择器而不是标签** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 每行都是一个 `describe()` | 我们此前每行只有 tag + 80 字符文本 + href、**必须**给选择器、最多 20 行：模型能看到写着「登录」的按钮，却没有名字可用，后续点击只能拿文本去猜选择器，而 20 行还会截掉控件密集页面的尾巴。上游的 `findElements` 对每个活元素跑共享的 `describe()`：**验证过唯一性**的选择器（唯一就直接给，否则退到有界的 `nth-of-type` 路径）、role / aria-label / placeholder / type、以及视口像素盒子。选择器现在**可以省略**——省略就是列页面上的可交互元素（上游默认表 `a,button,input,textarea,select,[role=button],[role=link],[contenteditable],[tabindex]`） | `11d40229` | ✅ `BrowserElementListFormatterTest`（10 例）+ `BrowserDomScriptsTest` 增 3 例 |
+| 边界照上游 | 扫描上限 3000 个匹配、16 行、500 ms 截止，`truncated` 时不装作列全了（行尾写明「页面匹配到的比这里多，扫描提前停了」）。行的排版收在纯函数 `BrowserElementListFormatter` 里并单独有用例：缺字段就当缺（不会印出字符串 `null`）、行内文本无法从自己的引号里逃出来、旧的 `{count, elements:[{rect}]}` 形状（`execute_js` 自建信封）仍然能排版 | `11d40229` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2295 个用例 = 上一项后的 2282 + 13）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：生成的选择器在页面跳转后是否仍然唯一、以及几千个匹配的页面上 500 ms 扫描预算的实际表现，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
