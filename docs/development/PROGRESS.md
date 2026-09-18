@@ -104,11 +104,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1906 个用例 = 上一项后的 1892 + 14，0 失败）。**这一项有唯一一处显式行为变化**：默认空间从「隐式的设备像素」变成「截图空间」。因此按 `observe` 的节点 bounds 或 `originalWidth/Height` 直接传 `x`/`y` 的调用方必须显式写 `coordinateSpace=screen`（若超出缩放后图像范围会被拒绝并提示，只有落在图像范围内的这种调用会被静默换算）。真机未验证：缩放截图下的实际点击落点、旋屏后的 frame 失效判断、系统繁忙时 `resources.displayMetrics` 与截图尺寸是否始终一致。
 
+**Phase 2-3 文件视觉（read_image 直读相册）** — 同一分支 `codex/eta-phase2-provider-passthrough`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 图片来源分类 | `android.media.images` 给的是 `content://media` URI，而 `read_image` 只认 guest 路径，看一张相册照片必须先 `android-photos export` 再读导出文件（不带 `--size` 还会导出缩放副本，模型可能分析的不是原图）。现在 `path` 由一处 `ImageSourcePolicy` 分类：guest 路径 / `minis://` / `file://` 照旧解析成工作区路径，`content://media` 直读 | `4e5f9df5` | ✅ `ImageSourcePolicyTest`（12 例） |
+| 直读实现 | MediaStore URI 走 App 自己的 resolver：按 API 级别检查 `READ_MEDIA_IMAGES` / `READ_EXTERNAL_STORAGE`（缺失时走既有应用内授权弹窗并复检）、`image/*` 类型校验、与 guest 路径同一个 50 MiB 上限和同一个缓存槽，后续解码/缩放/元数据仍是一条代码路径 | `4e5f9df5` | 🟡 编译通过（resolver 路径需真机或 instrumentation，宿主单测覆盖的是分类逻辑） |
+| 失败关闭 | 空路径、带 host 的 `file://`、其它 authority 的 `content://`（提示 `android-photos export`）、远程 URL 全部带原因拒绝；非图片类型与超限流各自报错；授权被拒/超时同时给出权限名与导出替代路径 | `4e5f9df5` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1918 个用例 = 上一项后的 1906 + 12，0 失败）。真机未验证：真实相册 URI（含 photopicker）的读取、授权弹窗与后台 service 场景下能否拿到结果、超大原图的读取上限行为。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门、文件视觉（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
+| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、Skills 暴露给模型、会话级编辑 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
