@@ -164,6 +164,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1969 个用例 = 上一项后的 1965 + 4，0 失败），`:app:lintDebug` 无新增问题（复用既有 `bg_service_stop_action` 文案，未新增资源）。**本项只覆盖 Eta 面板五项里的三项「就地展示/可停止/可接管」**：就地展示与点击接管（深链回会话）本仓库原本就有，本轮补的是停止。**未做**：连续追问（需要先把 agent 运行从前台 Activity 解耦成可无头驱动的 seam，目前 `runAgentLoop` 仍是 ChatViewModel 私有）与面板内的屏幕上下文。真机未验证：胶囊停止控件的点击热区与拖拽手势是否冲突、各 ROM 下停止后通知与胶囊的收起时序。
 
+**Phase 4 起步：通知栏与有界历史** — 分支 `codex/eta-phase4-notifications`，基于 `c3645c56`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 通知栏与有界历史 | 此前只能**发**通知（`android-notification`），读不到任何通知，于是「我错过了什么」「哪个 App 弹过我」在已授权通知访问的设备上也答不出来。新增 `notification.recent`（别名 `recent_notifications`，读当前通知栏，按时间倒序、可按包名过滤、上限 20 默认 10）与 `notification.search`（别名 `search_notification_history`，检索授权后记录的历史：7 天保留、最多 1000 条、单字段 4000 字符、关键词/包名过滤、回溯 1–168 小时默认 24、行数 1–50 默认 20） | `019d9e0c` | ✅ `NotificationHistoryPolicyTest`（6 例） |
+| 监听与保留策略 | 新增 `NotificationListenerService`（授权前系统根本不绑定该服务）记录投递，并在绑定时补录当前通知，历史不会从空开始；写入时先删过期行再按上限淘汰，任何一条边界都不会被越过；关键词里的 LIKE 通配符转义，`50%` 按字面匹配 | `019d9e0c` | ✅ 上限/转义/空通知用例 |
+| 隐私边界 | 通知正文按敏感工具分类（`ToolSensitivePolicy`）：实时回合看得到内容，落库的对话与恢复记录只留占位符；两个工具对 MCP 调用方 local-only；未授权时返回带设置入口的错误而不是空列表；API 26 回退到「已启用监听器」名单（那正是平台绑定依据） | `019d9e0c` | ✅ 分类与权限路径 + 🟡 服务/DB 路径需真机 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1975 个用例 = 上一项后的 1969 + 6，0 失败），`:app:lintDebug` 0 error（首轮因 `isNotificationListenerAccessGranted` 需 API 27 而失败，已按 API 级别回退修掉）。真机未验证：授权后监听器是否收到通知、通知栏实时读取、1000 条/7 天淘汰在真实投递量下的行为、各 ROM（MIUI/HyperOS 等）的通知访问授权路径。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
