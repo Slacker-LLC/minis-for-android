@@ -307,6 +307,12 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2112 个用例 = 上一项后的 2109 + 3，0 失败），`:app:assembleDebug` 通过并**在产出的 APK 里核对到 `META-INF/xposed/{module.prop,java_init.list,scope.list}`**（内容与预期一致，说明 `resources.merges` 规则有效、声明不会被 release 打包裁掉），libxposed 工件已从 Maven Central 解析成功（Gradle 缓存中可见）。`build.gradle` 用 `compileOnly`，因此 App 不会自带一份可能与已装管理器版本漂移的框架副本。**没有任何设备结论**：LSPosed 是否加载该模块、hook 是否生效均未验证——目前还没有注册任何 hook 组。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| Hook 安装骨架 | 模块能加载了，但还没有任何办法登记目标和汇报结果。本轮补上 Eta 的 `HookRegistrar`/`HookSupport`/`ModuleLogger`：注册器只管注册与记账（找目标仍是功能组的活），每条路径都写台账——installed、这版 ROM 没有（missing）、抛了（failed，带异常类名）、跳过（skipped）；重复注册被拒绝而不是把两个 hook 叠到同一个方法上；`install()` 会记下组级异常但**保留已注册的部分**（半个有用的组好过没有，且报告会说明缺哪块）；框架自身的失败以 Error 形式出现，刻意不吞。`HookSupport` 是各组共用的反射习惯：查找沿父类链、ROM 上不存在的类/方法返回 null（最终记进 MISSING）、`LinkageError` 当作「这里没有」、绝不把异常抛进别人的进程；另附各组需要的便利函数（字段读取、无参调用、组件→包名、包是否安装、Activity 是否可解析）。`HookLogger` 是日志缝：入口类持有 tag 与 sink，组只写行（自动带组名前缀），消息是 lambda 所以热路径不会构造没人打印的字符串 | `b1b7e86d` | ✅ `HookSupportTest`（6 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2118 个用例 = 上一项后的 2112 + 6，0 失败）。**没有任何设备结论**：真正跑这套骨架的是 hook 组，而目前还没有注册任何组。下一步就是第一组真 hook（按路线图：一圈即搜 / 无障碍保活 / 电源键 / 小布 / 超级小爱 / Google 解锁），每组都会把 installed/missing/failed/skipped 如实写进台账。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
