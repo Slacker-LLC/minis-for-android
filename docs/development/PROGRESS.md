@@ -989,6 +989,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 一条设备观察（测试方法论） | 真机跑套件时会因 HyperOS 的空闲冷冻（进程处于 `do_freezer_trap`）中途停住，整个套件挂在原地；把 App 拉回前台即解冻、套件继续并正常结束。以后再跑别让它在后台空转等 |
 | 验证口径 | 本轮**无代码改动**；`:app:testDebugUnitTest` 2410 例 0 失败、`:app:lintDebug` 0 error、`assembleDebug` 与两个产物校验沿用上一轮结果；真机上的测试包已卸载 |
 
+### `android.settings.set`：写入会改类型时拒绝、写后报回真实值（2026-09-19，真机复验） — `67c3de97`
+
+| 项 | 结果 |
+|---|---|
+| **发现（真机，我自己踩的）** | 测 root 写入通道时我故意传了一个非法值：`android_settings_set {system, screen_brightness, "not-a-number"}` 回 **`updated: true`**，随后设备真的把亮度读成字符串 `"not-a-number"`——平台的 `settings put` **不做类型检查**，工具自己也没有任何校验。我当场把它写回 `2`（用同一工具 + `settings get` 双向确认），设备状态已复原 |
+| 修法 ①：类型守卫 | 设置的「类型信号」只有它当前的值：**当前值是整数时，新值必须也是整数**，否则拒绝并在错误里同时给出当前值与新值。未设置的键仍接受任意值（没有任何类型证据），需要原始语义可以走 `linux_shell` |
+| 修法 ②：写后回执 | 写入结果不再只说 `updated: true`，而是带回 `valueAfter` 与 `verified`——平台可能归一化、截断或静默忽略，调用方应当看到设备真实保留了什么 |
+| 真机复验 | 非整数写入被拒、**没有落盘**（回读仍是 `2`）；整数写入 → `{updated:true, valueAfter:"2", verified:true}`；探针键（未设置）可写任意值、删除回 `{valueAfter:null, verified:true}`，测完已删；`settings get system screen_brightness` = `2` |
+| 验证口径 | `:app:testDebugUnitTest` **2412 例 0 失败**（新增 `AndroidSettingsTypeGuardTest` 2 例：带符号与空白的整数算整数，`not-a-number`/`2.5`/`0x10` 不算）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
