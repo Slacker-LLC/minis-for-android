@@ -20,6 +20,7 @@ import com.openminis.app.agent.RunCheckpointStore
 import com.openminis.app.agent.RunContextSnapshot
 import com.openminis.app.agent.RunRecoveryCoordinator
 import com.openminis.app.agent.InterruptedTailShape
+import com.openminis.app.agent.ToolBatchRepair
 import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserTabPool
@@ -7449,72 +7450,20 @@ class ChatViewModel(
      * - Assistant text after tool_use in the same message (Anthropic rejects this)
      */
     private fun sanitizeAgentHistory() {
-        // Walk through history sequentially, checking each assistant message.
-        // For each assistant message with tool_use blocks, verify the NEXT message
-        // is a user message with matching tool_result blocks. If not, inject them.
-        var i = 0
-        while (i < agentHistory.size) {
-            val msg = agentHistory[i]
-            if (msg.role != LLMMessage.Role.ASSISTANT) { i++; continue }
-
-            val toolUses = msg.contentParts.filterIsInstance<AgentContentPart.ToolUse>()
-            if (toolUses.isEmpty()) { i++; continue }
-
-            val toolUseIds = toolUses.map { it.id }.toSet()
-
-            // Check next message for matching tool_results
-            val next = agentHistory.getOrNull(i + 1)
-            val nextResultIds = next?.contentParts
-                ?.filterIsInstance<AgentContentPart.ToolResult>()
-                ?.map { it.id }?.toSet() ?: emptySet()
-
-            val missingIds = toolUseIds - nextResultIds
-            if (missingIds.isEmpty()) { i++; continue }
-
-            // Some tool_uses have no matching tool_result in the next message.
-            // If next message is a user message, add the missing results to it.
-            // Otherwise, inject a new user message with placeholder results.
-            val placeholders = toolUses.filter { it.id in missingIds }.map { use ->
-                AgentContentPart.ToolResult(
-                    id = use.id, name = use.name,
-                    content = "Tool execution was interrupted by an unexpected error.",
-                    isError = true,
-                )
-            }
-            Log.w(TAG, "sanitize: injecting ${placeholders.size} placeholder tool_result(s) after history[$i]")
-
-            if (next != null && next.role == LLMMessage.Role.USER &&
-                next.contentParts.any { it is AgentContentPart.ToolResult }) {
-                // Append missing results to the existing user message
-                agentHistory[i + 1] = next.copy(
-                    contentParts = next.contentParts + placeholders
-                )
-            } else {
-                // Insert a new user message with just the placeholder results
-                agentHistory.add(i + 1, LLMMessage(
-                    role = LLMMessage.Role.USER, content = "",
-                    contentParts = placeholders,
-                ))
-            }
-            i++
-        }
-
-        // Remove orphaned tool_results (result IDs not found in any tool_use)
-        val allToolUseIds = agentHistory.flatMap { it.contentParts }
-            .filterIsInstance<AgentContentPart.ToolUse>().map { it.id }.toSet()
-        val iter = agentHistory.listIterator()
-        while (iter.hasNext()) {
-            val msg = iter.next()
-            if (msg.role != LLMMessage.Role.USER) continue
-            val cleaned = msg.contentParts.filter { part ->
-                part !is AgentContentPart.ToolResult || part.id in allToolUseIds
-            }
-            if (cleaned.isEmpty() && msg.content.isBlank()) {
-                iter.remove()
-            } else if (cleaned.size < msg.contentParts.size) {
-                iter.set(msg.copy(contentParts = cleaned))
-            }
-        }
+        // [T-tool-batch-repair-android] The pairing rule itself lives in ToolBatchRepair
+        // so it can be tested directly. This call site is unchanged: it runs before every
+        // API call, which is what makes a batch interrupted by a process death safe on
+        // the next turn as well.
+        val repaired = ToolBatchRepair.repair(agentHistory)
+        if (!repaired.changed) return
+        Log.w(
+            TAG,
+            "sanitize: injected " + repaired.injected + " placeholder tool_result(s), " +
+                "dropped " + repaired.droppedResults + " orphan result(s) and " +
+                repaired.droppedMessages + " empty message(s)",
+        )
+        agentHistory.clear()
+        agentHistory.addAll(repaired.messages)
     }
 
     private fun unwrapFlowException(e: Throwable): Throwable {
