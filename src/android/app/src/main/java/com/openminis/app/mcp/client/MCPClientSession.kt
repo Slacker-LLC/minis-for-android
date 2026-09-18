@@ -37,17 +37,23 @@ class MCPClientSession(
         private set
 
     interface Transport {
-        suspend fun send(frame: JSONObject): JSONObject
+        /**
+         * [extraHeaders] carries the tool parameters the server asked to receive as
+         * headers (`x-mcp-header`); transports that have no headers ignore them.
+         */
+        suspend fun send(frame: JSONObject, extraHeaders: Map<String, String> = emptyMap()): JSONObject
         fun close()
     }
 
     private class HttpAdapter(private val http: MCPHttpTransport) : Transport {
-        override suspend fun send(frame: JSONObject): JSONObject = http.send(frame)
+        override suspend fun send(frame: JSONObject, extraHeaders: Map<String, String>): JSONObject =
+            http.send(frame, extraHeaders)
         override fun close() = http.close()
     }
 
     private class StdioAdapter(private val stdio: MCPStdioTransport) : Transport {
-        override suspend fun send(frame: JSONObject): JSONObject = stdio.send(frame)
+        override suspend fun send(frame: JSONObject, extraHeaders: Map<String, String>): JSONObject =
+            stdio.send(frame)
         override fun close() = stdio.close()
     }
 
@@ -90,6 +96,12 @@ class MCPClientSession(
             val page = MCPClientCodec.parseToolsList(reply)
                 ?: throw MCPTransportException("tools/list rejected: $reply")
             out.addAll(page.tools)
+            // [T-mcp-param-headers-android] Derive the parameter-to-header bindings while
+            // the schema is in hand; a tool whose schema declares none simply gets none.
+            page.tools.forEach { tool ->
+                val schema = tool.inputSchema ?: return@forEach
+                toolHeaders[tool.name] = McpToolHeaders.fromSchema(schema)
+            }
             if (page.skippedTools > 0) {
                 Log.w(TAG, "${config.id}: skipped ${page.skippedTools} unusable tool entries")
             }
@@ -106,10 +118,19 @@ class MCPClientSession(
 
     suspend fun callTool(name: String, arguments: JSONObject): MCPClientCodec.CallResult {
         val t = transport ?: throw MCPTransportException("session not connected")
-        val reply = t.send(MCPClientCodec.buildToolsCall(name, arguments, nextId++))
+        val extraHeaders = toolHeaders[name]?.extract(arguments).orEmpty()
+        val reply = t.send(MCPClientCodec.buildToolsCall(name, arguments, nextId++), extraHeaders)
         return MCPClientCodec.parseCallResult(reply)
             ?: throw MCPTransportException("tools/call rejected: $reply")
     }
+
+    /**
+     * [T-mcp-param-headers-android] The parameter-to-header bindings of every tool this
+     * session lists, derived from the schema's `x-mcp-header` annotations. Ported from Eta
+     * `agent/mcp/McpHttpClient.kt` (Mangi-11/Eta @ c15de97), which caches the same map per
+     * tool name.
+     */
+    private val toolHeaders = mutableMapOf<String, McpToolHeaders>()
 
     fun close() {
         transport?.close()

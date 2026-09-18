@@ -45,7 +45,13 @@ class MCPHttpTransport(
     private var sessionId: String? = null
     private val activeCalls = ConcurrentHashMap.newKeySet<Call>()
 
-    suspend fun send(frame: JSONObject): JSONObject {
+    /**
+     * [extraHeaders] are the tool parameters the server asked to receive as headers
+     * (`x-mcp-header`). They are applied before the protocol and authorization headers, so
+     * a tool argument can never displace the session's own credentials — the same
+     * precedence Eta's client uses.
+     */
+    suspend fun send(frame: JSONObject, extraHeaders: Map<String, String> = emptyMap()): JSONObject {
         val body = MCPClientCodec.encodeFrame(frame).toRequestBody(JSON)
         val reqBuilder = Request.Builder()
             .url(url)
@@ -53,6 +59,7 @@ class MCPHttpTransport(
             .header("Content-Type", "application/json")
             .post(body)
         headers.forEach { (k, v) -> reqBuilder.header(k, v) }
+        extraHeaders.forEach { (k, v) -> reqBuilder.header(k, v) }
         if (!bearerToken.isNullOrBlank()) {
             reqBuilder.header("Authorization", "Bearer $bearerToken")
         }
