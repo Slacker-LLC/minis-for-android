@@ -195,13 +195,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1997 个用例 = 上一项后的 1992 + 5，0 失败），`:app:lintDebug` 0 error（`getLastKnownLocation` 的权限判定通过了 lint 的 MissingPermission 检查路径）。真机未验证：各 ROM 上最近已知位置的可得性、前台应用在无无障碍时的报错路径、电量/网络在飞行模式与省电模式下的读数。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 媒体检索 | Eta 的个人上下文工具能按名称搜照片、视频与音频；本仓库的 MediaStore 表面只列照片（视频其实在底层 handler 里支持，但没有工具能触达），也没有任何按名称找文件的办法。新增 `android.media.audio`（别名 `search_audio`）：列出音频并带 content URI、时长与艺术家/专辑，不播放、不读音频字节；`android.media.images` 增加 `media_type`（photo/video）与 `query` 关键词，因此可以先把名字解析成 content URI 再交给 `read_image` | `d70477a2` | ✅ `MediaQueryPolicyTest`（6 例） |
+| 过滤与列单位 | 列表查询新增 `--type audio` 与 `--query`：过滤条件三种类型共用 `name LIKE ?`，通配符转义（搜 `50%` 按字面匹配）。音频的 `DATE_ADDED` 是秒、照片/视频的 `DATE_TAKEN` 是毫秒，这个差异留在 handler 内部，不泄漏到工具层 | `d70477a2` | ✅ 上限/转义/类型校验用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2003 个用例 = 上一项后的 1997 + 6，0 失败）。本项无资源/清单改动，未跑 lint。**未做**：Eta 的 `search_recordings`（ColorOS 录音）与 `search_files`/`search_downloads`（文档与下载记录）——前者是厂商私有目录、后者需要另一套 MediaStore.Files 查询与 MIME 归类，留待确认是否要做。真机未验证：各 ROM 上 MediaStore 音频的可检索范围（部分 ROM 只索引系统媒体库）、`--query` 在中文文件名上的行为、视频列表与 `read_image` 的配合。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 健康摘要、媒体/录音/文件检索、聊天图片（通知历史检索、会话历史检索、闹钟与计时器、设备环境已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 健康摘要、录音/文档/下载检索、聊天图片（通知历史检索、会话历史检索、闹钟与计时器、设备环境、音视频与照片检索已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
