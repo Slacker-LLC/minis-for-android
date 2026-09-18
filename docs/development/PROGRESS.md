@@ -136,12 +136,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1945 个用例 = 上一项后的 1940 + 5，0 失败）。未做（Eta GUI 动作清单里本仓库确实还缺的）：按名称搜索已安装应用（`search_apps`）、`wait_for_package`；其余（启动应用、open URI、等待文本、元素定位变体）本仓库分别由 `android_app launch`、`android.intent.send`、`android_ui wait` 与 generation+ref 覆盖。真机未验证：通知栏/快捷设置在各类 ROM 上的实际展开与证据读数。
 
+**Phase 3 GUI 动作：应用检索与前台等待** — 同一分支 `codex/eta-phase3-skills-tools`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 应用检索 | `android_app` 此前无法把显示名换成包名，模型要打开「备忘录」只能猜 `com.example.notes`。新增 `action=search`：在 App 可见的启动器活动里按名称或包名匹配（大小写不敏感），按名称排序、包名做平局裁决，默认 20 行、上限 50；结果报告可见启动器数量并写明范围（非启动器/隐藏包在这里看不到，需要授权后的 `pm` 查询） | `ec532059` | ✅ `AppSearchPolicyTest`（5 例） |
+| 前台等待 | `android_ui` 只能等文本出现/消失，没法确认某个包真的到了前台——而启动应用之后要的正是这个。新增 `action=wait_for_package`：轮询前台窗口直到目标成为（`appear`）或不再是（`disappear`）前台应用；读不到前台时两个方向都不算命中，超时返回 `observedVisibility` 与 `visibilityUnknown`，而不是声称目标没出现 | `ec532059` | ✅ `PackageWaitPolicyTest`（4 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1954 个用例 = 上一项后的 1945 + 9，0 失败）。至此 Eta GUI 动作清单在能力上齐了：启动应用=`android_app launch`、按名检索=`android_app search`、系统面板=`android_ui` 的 back/home/recents/notifications/quick_settings、open URI=`android.intent.send`、等待文本/等待包=`android_ui wait`/`wait_for_package`、定位变体=generation+ref 与 textFilter/resourceIdFilter。真机未验证：启动器可见范围在各 ROM 上的实际数量、`wait_for_package` 在系统繁忙/分屏下的读数、检索结果的排序观感。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板、会话级编辑、GUI 动作补齐的剩余项（Skills 暴露给模型与系统面板动作已在 `codex/eta-phase3-skills-tools` 落地） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板、会话级编辑（Skills 暴露给模型与 GUI 动作补齐已在 `codex/eta-phase3-skills-tools` 落地） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
