@@ -838,6 +838,15 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | **MCP 服务端** | `debug.mcp.start` 无凭据 → `{started:false}`（失败关闭）；配 token 后 `{started:true}`、`running:true`；`POST 127.0.0.1:18789/mcp` 完成 `initialize`（`2025-06-18`、`minis 0.1.0`）与 `tools/list`：**58 个工具**；无 Bearer → `401`；需要审批的工具返回 `-32001 confirm_required`（票 + 120 s），用**规范名** `android.context` 批准后，带票原样重试 → `200、isError:false`，返回 `battery/foreground/location/network/ok/screen/time` 等字段。客户端契约（端点路径、票的位置、方法与参数绑定）已写进 `docs/issue-34-mcp-server-exposure.md` 的「Device evidence」一节 |
 | 凭据清理 | 测试用的 token 通过 `run-as` 把 `shared_prefs/minis_mcp_prefs.xml` 还原为 `<map />` 清掉（设备状态复原） |
 
+**设备测试带出的一处报错质量缺陷（已修 + 真机复验）** — `5cd19e1c`：
+
+| 项 | 内容 |
+|---|---|
+| 现象 | 经 MCP 调 `linux_file_list {"path": "/workspace"}` 得到 `Error: list failed: mcp`——「mcp」是 MCP 服务端给工具传的 **sessionId**，而该会话的目录还不存在；`SecureFileAccess.withParent` 抛出的 `java.nio.file.NoSuchFileException("mcp")` 的 `getMessage()` 恰好只有那个目录名，于是整句报错只有这个裸名，调用方（模型或脚本）无从判断发生了什么 |
+| 修法 | 目录遍历把「组件缺失」翻译成 `Failure("NOT_FOUND", "path is not available in the guest namespace: <走过的路径>")`、「组件不是目录」翻译成 `NOT_DIR`——与 `deleteEntryIfPresent` 已有的写法一致；有界路径的既有报错（`BAD_PARAMS: path is outside the Minis guest namespace or unavailable: .`）不受影响 |
+| 真机复验 | 同一调用：修复前 `list failed: mcp` → 修复后 `list failed: NOT_FOUND: path is not available in the guest namespace: mcp`；`--limit/--offset` 等参数与边界用例不变 |
+| 验证口径 | `:app:compileDebugKotlin` + `:app:testDebugUnitTest`（**2390 例 0 失败**，含 `SecureFileAccessTest` 新增用例）+ `:app:assembleDebug` 后装机复跑；本片未动 UI/资源/清单，按验证矩阵未跑 lint |
+
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
