@@ -293,7 +293,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2102 个用例 = 上一项后的 2085 + 17，0 失败）。失败路径：未绑定角色 → `NO_CHARACTER_BOUND`；缺 revision / 未知 mode / revision 过期 → 拒绝而不是合并；行号越界 → 拒绝；超上限 → 带原因拒绝。剧情记忆归入敏感工具（transcript 只留占位符），且对 MCP 调用方 local-only。**Phase 5（角色系统）至此功能完整**：卡模型/编解码/PNG、世界书选择与编辑、宏、能力说明、存储、会话绑定、每轮注入、剧情记忆。真机未验证：真实长对话下记忆的增长与裁剪、并发两段会话写同一角色记忆时的 revision 冲突、记忆注入后的实际观感。
 
-## 四、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
+## 四、Phase 6（厂商入口接管）起步 — 分支 `codex/eta-phase6-xposed`，基于 `8b9e0900`
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| Hook 台账与目标表 | Phase 6 先落不需要框架的那一半：模块怎么汇报自己的 hook，以及在哪些进程里才该存在。`HookInstallStatus/Entry/Report/Journal` 照 Eta 原样——每个 hook 四态（installed/missing/failed/skipped）、每组计数与一行摘要；`capture()` 会把安装期异常先记成 FAILED 再抛出，因此半装完的组不可能汇报成功，而厂商 ROM 集成只有在「装上了 / 这版 ROM 没这个目标 / 它抛了」三者可区分时才可诊断。`ModuleTargets` 是 Eta 的单一目标表（自身包 + system_server + SystemUI + 路线图点名的助手/桌面/厂商入口），外加模块在一切之前要跑的两个判定：只在自身包与声明目标里保留生命周期回调（否则设备每次启动应用都要为空进程付费），`isProcessOf` 匹配包的子进程但不误配同前缀的包 | `6ed1918c` | ✅ `HookInstallJournalTest`（4 例）+ `ModuleTargetsTest`（3 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2109 个用例 = Phase 5 分支的 2102 + 7，0 失败）。**本项刻意不含**：`compileOnly` 的 libxposed 依赖、`META-INF/xposed/` 模块声明与 `XposedModule` 入口类——这三样改变 APK 对 LSPosed 声明的身份，属于独立一步；工件已确认能从 Maven Central 取到（`io.github.libxposed:api:102.0.0` 返回 200），因此不存在阻塞。**没有任何设备结论**：入口类存在之前这些代码不会运行。
+
+## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
@@ -303,7 +311,7 @@
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
-## 五、明确排除
+## 六、明确排除
 
 | 项 | 理由 |
 |---|---|
@@ -313,7 +321,7 @@
 | 第二套跨进程 runtime 协议 / 终态 outbox | 单进程应用以 Room + ViewModel 为真源，重复实现会造成两套状态源 |
 | 在线商店类分发面 | 产品定位与服务端依赖不在本仓库范围 |
 
-## 六、未验证清单（不得据此声称设备结论）
+## 七、未验证清单（不得据此声称设备结论）
 
 - 技能事务在真机上的 `rename`/`fsync` 行为、进程被杀后的 journal 回滚、跨进程锁竞争。
 - 无障碍窗口集合、截图包含关系、主线程门在系统繁忙时的真实时序、滚动事件在各 ROM/WebView 的一致性。
