@@ -364,6 +364,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2157 个用例 = 上一项后的 2152 + 5，0 失败）。**没有任何设备结论**：某一版 ROM 是否有这个服务类、`startService(Class)` 是否真能把它拉起来、手势的调用方是否真的走到 `enforcePermission`、Google App 是否暴露搜索入口，全部未验证；没有目标时台账记 MISSING/SKIPPED，服务没起来只记警告并保留 ROM 原行为。真机判据：logcat 里 `ContextualSearch` 前缀的台账行 + 手势触发后服务是否从「未启动」变成可用。
 
+**Phase 6 第六组：无障碍保活后端** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第六组：system_server 里的无障碍保活 | Minis 的 GUI 工具全部走自己的无障碍服务，而 OEM ROM 随时可以把它禁用或丢掉。这组把 Eta 的整套答案搬过来：用户开启保护后，后端只维护**本应用自己的组件**与总开关——服务列表是读-改-写，别人的条目原样保留、顺序不变；服务掉线后重绑，重启次数受 `AccessibilityRepairLimiter` 限制、退避按 `AccessibilityRestoreBackoff` 逐级升到上限后按稳定窗口复位，掉线成环不会变成死循环 | `11370a7b` | ✅ `AccessibilityServiceEnforcerTest`（10 例，Eta 原测试移植） |
+| 接线与线程 | 后端在 `startOtherServices` 尾部接入（方法先 deopt），跑在 Android 自己的 `BackgroundThread` 上——不新建线程、不用定时器、不做周期轮询；system context 两级解析（对象字段/方法 → `ActivityThread.getSystemContext`）。拿不到上下文或 Handler 就只记警告、不装后端 | `11370a7b` | ✅ 上述用例覆盖组件匹配/短名去重/顺序保留/近似名不误配 |
+| 开关与控制契约 | 保护开关就是平台自己的设置（`minis_accessibility_protection_enabled`），**默认关**；App 只能通过带 signature 权限的广播请求（协议版本 + 发送者 UID + 有序广播三者同时校验）与只应答 system UID 的健康 provider 询问后端，协议本身不赋予 App 写设置的能力。`xposed/LogSafety.kt`（`safeLogType`/`toSafeLogToken`）随该组移植，异常消息与用户内容不进日志 | `11370a7b` | ✅ `LogSafetyTest`（3 例）+ 协议/健康检查用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2170 个用例 = 上一项后的 2157 + 13，0 失败）。**没有任何设备结论**：各 ROM 的设置布局、direct-boot 用户、包变化广播的真实时序、重绑是否足以把服务拉回来、App 侧控制请求是否被接受，全部未验证。**未做**：App 侧还没接控制通道（发广播的开关与「增强设置页」），所以这组目前是后端就位、默认关闭。真机判据：logcat 里 `AccessibilityProtection` 前缀的台账行 + 打开开关后服务列表里本应用的组件是否被恢复。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -372,7 +382,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单。未落地：小布、超级小爱、无障碍保活与热词自愈、ColorOS 记忆/直连 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单、无障碍保活后端。未落地：小布、超级小爱、热词自愈、ColorOS 记忆/直连，以及无障碍保护的 App 侧控制与增强设置页 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
