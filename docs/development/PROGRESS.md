@@ -317,7 +317,14 @@
 |---|---|---|---|
 | 模块开关缝 | Eta 的每一组 hook 都要问一个用户开关，而开关此前没有落脚处：hook 跑在 system_server 或厂商应用进程里，读不到 App 私有设置。`ModulePrefs`（源自 Eta `config/Prefs.kt`）：框架会把模块设置的只读视图交给每个被注入的进程，入口类在加载时接上，组在拦截时用开关——所以切换开关在下一次拦截就生效，不必重启。两条规则比管道更重要：**每个开关有自己的默认值**，且「会接管按键或助手」的开关一律默认关，于是「装了但没配」的模块行为等同没装；手势条搜索路由保持默认开（把该手势接到系统自己的搜索就是这个功能本身）。设置读取失败、或该进程根本没拿到设置时，回落到默认值而不是猜——并且有日志，所以「开关没反应」有可见原因 | `ad620d73` | ✅ `ModulePrefsTest`（5 例） |
 
-✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2123 个用例 = 上一项后的 2118 + 5，0 失败）。缝做成一方法的 reader（而不是直接吃 `SharedPreferences`），默认值与回落因此能在无 Android 运行时的情况下测到；`attachSharedPreferences` 把框架对象适配到它上面。**没有任何设备结论**：还没有任何代码读这些开关——读它的是第一组 hook。下一步：第一组真 hook（一圈即搜 / 无障碍保活 / 电源键 / 小布 / 超级小爱 / Google 解锁），每组把 installed/missing/failed/skipped 写进台账并按开关决定是否接管。
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2123 个用例 = 上一项后的 2118 + 5，0 失败）。缝做成一方法的 reader（而不是直接吃 `SharedPreferences`），默认值与回落因此能在无 Android 运行时的情况下测到；`attachSharedPreferences` 把框架对象适配到它上面。
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第一组真 hook：HyperOS 手势条识屏 | 骨架此前无组可装。本轮落 Eta 里最小且完整的一组：HyperOS 把手势条长按交给自家语音助手，这组把**那一个请求**改接到系统自己的 contextual search。`HyperOsScreenSearchHooks` 挂在小米 `VoiceService.onStartCommand` 上，保留 Eta 对目标的谨慎：校验签名（不只是名字）、请求必须是「导航长按的识屏」（四个 intent 字段全对——这些 ROM 上同一个 assist action 承载所有助手请求）、开关必须是开、系统 contextual search 入口必须真的可用；任何一条不满足就**回落原逻辑**而不是吞掉手势，收尾用 `stopSelfResult` 只在本轮仍是最新启动时才停服务，避免丢掉中途到达的请求 | `cff4a171` | ✅ 编译 + `ScreenSearchRequestTest`（5 例）+ `LogThrottleTest`（4 例） |
+| 触发与日志 | `CircleToSearchInvoker` 走 binder 直连系统服务（而不是重放 OEM 识别链），先查可用性（Google App 已装且暴露入口）、缓存每次反射结果、绝不把异常抛进别人的进程；`HookLogger` 补上节流变体给「每次手势都会走」的路径；`HookGroups` 持有「组→目标」接线，入口类只谈框架 | `cff4a171` | ✅ 节流窗口与逐键独立用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2132 个用例 = 上一项后的 2123 + 9，0 失败）。**没有任何设备结论**：特定 HyperOS 版本是否暴露这个 VoiceService、真机手势是否触发接管、binder 调用是否落地，全部未验证——ROM 上没有目标时台账会记 MISSING 并保留原行为。真机判据：logcat 里 `[HyperOsScreenSearch]` 的台账行 + `META-INF/xposed` 声明在 APK 内（已核对）。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
