@@ -484,13 +484,22 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2213 个用例 = 上一项后的 2210 + 3，0 失败）。**没有任何设备结论**：某一版 ROM 是否装着这个输入法并有那个库、Health Connect 是否把数据放在该路径、root 能否把两者拷进应用缓存，全部未验证；失败一律给错误码而不是空列表。真机判据：两个工具返回数据，还是 `CLIPBOARD_*`/`HEALTH_DATA_UNAVAILABLE` 之类的错误码。
 
+**Phase 4 补片（五）：QQ/微信聊天图片缓存** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 两个聊天图片工具 | `android.chat_images.qq` / `android.chat_images.wechat`（别名 `search_qq_chat_images` / `search_wechat_chat_images`）：扫两个应用**自己的缓存目录**（QQ 的 `chatimg`/`chatraw`/`chatthumb` 三棵树，微信的 `image/`），只列路径、类型、时间、大小——不读图片内容；大小上限沿用图片编码器的 12 MiB（超出的候选不进列表），行数 1–30 默认 10，关键词按路径小写包含匹配。之前挂在「待拍板」里，本轮按上游落地 | `4d8de6e5` | ✅ `ChatImagePolicyTest`（5 例） |
+| argv 化的扫描 | 上游是一条 shell 管道（`test -d && find … \| sort -rn \| head`）；这里把 `find` 连同路径过滤、`-size`、`-printf '%T@\|%s\|%p'` 作为**一个 argv** 发出去（分组括号也是 argv），排序与截断在 Kotlin 里做——等价于 `sort -rn`（mtime 是首个字段）；行解析只接受**确实在被扫目录之下**的路径（`dir-backup/` 这种同前缀目录不算），时间/大小解析不出的行直接丢 | `4d8de6e5` | ✅ 上述用例（argv 形状、行解析、越界路径拒绝、QQ 三种树命名） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2218 个用例 = 上一项后的 2213 + 5，0 失败）。**没有任何设备结论**：某一版 ROM 是否允许特权通道扫这些缓存目录、该版 toybox `find` 是否支持 `-printf`，均未验证——扫不动就返回带错误码的答复；工具描述里也写明「读取图片本身取决于运行时能否到达那条路径」。真机判据：两个工具返回缓存行，还是 `QQ_CHAT_IMAGES_UNAVAILABLE`/`WECHAT_CHAT_IMAGES_UNAVAILABLE`。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 已落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要。未落地：QQ/微信聊天图片与下载记录检索（读他人私有缓存/权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 已落地：通知历史、会话历史、闹钟/计时器（含列表）、设备环境、照片/视频/音频/文档检索、验证码读取、设备开关、App 冻结、剪贴板历史、健康摘要、QQ/微信聊天图片缓存。未落地：`search_downloads`（Eta 读的是本应用自己的下载记录，对第三方应用近乎恒空；`all_downloads` 又需要系统权限，当年判断不值得做成工具） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 本阶段清单已在 `codex/eta-phase5-roleplay` 落地：角色卡模型/编解码/PNG 承载、世界书（含草稿编辑与编辑界面）、宏展开与兼容说明、存储层与迁移、会话绑定、逐轮注入、剧情记忆与记忆工具、角色库/详情界面。Eta 侧仅剩 `RoleplayMessageState`（多候选回复修订状态，23 行），本仓库的重新生成是自己那套，未移植 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏/电源键/桌面导航条长按、ColorOS SystemUI 的 OCR 长按、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关 + 接入恢复流程）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）、ColorDirect 双指识屏、ColorOS 便签/录音/摘要检索。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、QQ/微信聊天图片（读他人私有缓存，待拍板）、路线图里的「增强设置页」 | Eta `hook/*`、`ModuleMain.kt` |
 
