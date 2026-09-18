@@ -188,13 +188,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1992 个用例 = 上一项后的 1984 + 8，0 失败）。**与 Eta 的刻意差异**：不提供 `list_alarms` / `list_active_timers`——Android 的 Clock API 是「发完即忘」，本仓库又刻意不再保留自己的闹钟记录（T266），做出来的「列表」只可能是打开时钟应用却自称列表；改为 `android.alarm.open`，结果里如实写明它做了什么。真机未验证：各 OEM 时钟应用对 `EXTRA_SKIP_UI` 的实际处理（是否弹确认）、Android 14+ 的精确闹钟授权路径、计时器与闹钟在真实设备上的创建结果。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 设备环境 | Eta 的 `get_current_context` 存在，是为了让模型把「明天 7 点」换算成时钟时间、并在动手前知道设备在哪。Minis 的能力散在几个工具里（`android.time` 只给格式化时间，`android.location.get` 会强制定位且可能弹权限），没有任何一个回答「现在是什么状况」，而且 `android.time` 连星期与 UTC 偏移都没有。新增 `android.context`（别名 `get_current_context`）：时间环境（带偏移的 ISO、时区、设备语言的星期 + 英文短名、语言标签、UTC 偏移分钟、DST 标志）、屏幕是否点亮、电量与充电、网络传输类型与是否已验证、无障碍连接时的前台应用、最近一次已知位置 | `491267db` | ✅ `DeviceContextPolicyTest`（5 例，固定时钟与时区） |
+| 不弹窗不强定位 | 位置块只读「已启用 provider 的最近已知位置」，且仅在 `ACCESS_FINE/COARSE` 已授权时读；否则返回 `permission_not_granted` 并指向 `android.location.get` 去取真实定位。前台应用读不到时如实报 `accessibility_not_connected` 或 `unknown`，不做猜测 | `491267db` | ✅ 时间环境确定性用例 + 🟡 设备读取需真机 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1997 个用例 = 上一项后的 1992 + 5，0 失败），`:app:lintDebug` 0 error（`getLastKnownLocation` 的权限判定通过了 lint 的 MissingPermission 检查路径）。真机未验证：各 ROM 上最近已知位置的可得性、前台应用在无无障碍时的报错路径、电量/网络在飞行模式与省电模式下的读数。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 健康摘要、媒体/录音/文件检索、聊天图片、设备环境（通知历史检索、会话历史检索、闹钟与计时器已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 健康摘要、媒体/录音/文件检索、聊天图片（通知历史检索、会话历史检索、闹钟与计时器、设备环境已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
