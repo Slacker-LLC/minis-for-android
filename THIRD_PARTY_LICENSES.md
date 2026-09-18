@@ -123,6 +123,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `browser/BrowserDomScripts.kt` (the shared DOM preamble: visibility rule, bounded field / URL / selector helpers, visible-text collector, and the Markdown emitter behind `get_readable`) | `agent/browser/BrowserDomScripts.kt` |
 | `browser/BrowserElementListFormatter.kt` and `findElements` in `browser/BrowserDomScripts.kt` (the per-element row: verified selector, accessibility fields, box) | `agent/browser/BrowserDomScripts.kt` (`findElements` and `describe`) |
 | `browser/BrowserSelectorWaitPolicy.kt`, `selectorState` in `browser/BrowserDomScripts.kt` and the `wait_for_selector` action (budget clamps, poll interval, visible-match rule) | `agent/browser/AgentBrowserSession.kt` (`waitForSelector`) and `agent/browser/BrowserDomScripts.kt` (`selectorState`) |
+| `click` / `type` / `hover` in `browser/BrowserDomScripts.kt` (target resolution by selector or point, the `enabled` / `editable` guards and the `submit` half of type) | `agent/browser/BrowserDomScripts.kt` (`resolveTarget`, `click`, `type`, `enabled`, `editable`) |
 
 
 ## Active native/runtime components

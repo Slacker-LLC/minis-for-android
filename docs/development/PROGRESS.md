@@ -610,6 +610,17 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2302 个用例 = 上一项后的 2295 + 7）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：页面正在导航时 250 ms 轮询的实际表现、以及「可见但尚未绘制」的元素在这台 WebView 上会不会被算作可见，都未验证。
 
+**click / type 点名目标，不能写就拒绝** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 目标解析收在一处 | 我们此前 click 与 type 各自 `document.querySelector`，坐标路径另写一份 `elementFromPoint`；上游的 `resolveTarget(selector, x, y)` 一个入口两种寻址，找不到就抛类型化错误。现在三个动作（含 hover）共用它，选择器按 JSON 转义后传入而不是拼进单引号字符串 | `7c99bef6` | ✅ `BrowserDomScriptsTest` 增 6 例 |
+| 事件带真实坐标、先滚进视口 | 我们的事件一直是 `clientX/clientY = 0`——读坐标的框架（画布、拖拽面、地图）会把这种点击当成噪声丢掉；而且目标在下折叠时直接在视口外派发事件。现在先 `scrollIntoView({block:'center'})` 再按元素中心派发（事件序列仍是我们那套，多点 mouseover/enter/leave/out） | `7c99bef6` | ✅ 上述用例 |
+| 不能点的拒绝，不能写的拒绝 | 禁用/惰性/隐藏的目标用上游的 `enabled()` 判据**拒绝**而不是报告「已点击」；type 补上上游的 `editable()`（readonly、disabled、inert、不收文本的 input 类型）——这正是「Typed 7 chars into #search」这句话成不成立的分界：老代码会往只读或禁用字段里写值、把事件发完、然后报告成功，而页面一个事件都没理 | `7c99bef6` | ✅ 上述用例 |
+| 命中报告与 submit | click / type / hover 的结果带上与 `find_elements` 同一形状的 `describe()` 对象（`detail()` 复用同一个排版函数），点错节点在对话记录里看得见；type 增加上游的 `submit`（有表单走 `form.requestSubmit()`，没有就在字段里敲 Enter）。原生 setter、逐键事件与 Angular/Vue 兼容层仍是我们那套 | `7c99bef6` | ✅ 上述用例 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2307 个用例 = 上一项后的 2302 + 5，另有一例在自查中删掉）与 `:app:lintDebug`（0 error）。**没有任何设备结论**：带坐标的事件能否取悦真正依赖它们的框架、以及真实页面的提交处理器如何对待 `requestSubmit`，都未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
