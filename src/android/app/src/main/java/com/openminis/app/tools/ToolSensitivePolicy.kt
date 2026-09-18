@@ -246,6 +246,15 @@ object ToolSensitivePolicy {
         "android.media.images",
         "list_media_images",
 
+        // [T-eta-notification-history] Minis catalog — notification shade and history
+        // (Eta recent_notifications, search_notification_history). Notification bodies
+        // routinely carry one-time codes and private messages, so the transcript keeps
+        // only a placeholder.
+        "notification.recent",
+        "recent_notifications",
+        "notification.search",
+        "search_notification_history",
+
         // Minis catalog — canonical twin of read_image above.
         "linux.file.image.read",
     )

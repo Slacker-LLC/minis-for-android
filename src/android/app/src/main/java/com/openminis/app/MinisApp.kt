@@ -530,6 +530,15 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileGrepHandler(), listOf("file_grep"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileHeadTailHandler(), listOf("file_head_tail"))
         com.openminis.app.tools.runtime.ToolRegistry.register(com.openminis.app.tools.LinuxFileInfoHandler(), listOf("file_info"))
+        // [T-eta-notification-history] Notification shade reads and the bounded history.
+        // Both are classified sensitive (ToolSensitivePolicy), so the persisted transcript
+        // keeps a placeholder while the live turn sees the rows.
+        com.openminis.app.tools.NotificationTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.NotificationTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here

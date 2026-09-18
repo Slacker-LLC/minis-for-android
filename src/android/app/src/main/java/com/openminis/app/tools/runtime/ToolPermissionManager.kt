@@ -72,6 +72,10 @@ object ToolPermissionManager {
         "android.tts.voice" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.tts.enabled" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.images" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        // [T-eta-notification-history] Notification content stays on the device: the local
+        // agent may read it, a remote MCP caller may not.
+        "notification.recent" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        "notification.search" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "android.media.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.control" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.weather" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),

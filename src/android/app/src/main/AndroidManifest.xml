@@ -638,5 +638,17 @@
                 android:name="android.speech"
                 android:resource="@xml/assist_recognition_service" />
         </service>
+        <!-- [T-eta-notification-history] Reads the notification shade only after the
+             device owner grants Notification Access in system settings; the platform
+             binds this service on that grant and never before it. -->
+        <service
+            android:name=".notifications.MinisNotificationListenerService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
