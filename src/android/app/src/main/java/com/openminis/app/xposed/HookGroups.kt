@@ -5,6 +5,7 @@ import com.openminis.app.xposed.colordirect.ColorDirectHooks
 import com.openminis.app.xposed.google.GoogleEligibilityHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
+import com.openminis.app.xposed.hyperos.HyperOsLauncherHooks
 import com.openminis.app.xposed.system.AccessibilityProtectionHooks
 import com.openminis.app.xposed.system.ContextualSearchHooks
 import com.openminis.app.xposed.system.HotwordSelfHealHooks
@@ -46,6 +47,12 @@ object HookGroups {
         // And the assistant's hotword detection, which some builds drop when the screen goes off.
         HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
             HotwordSelfHealHooks.install(module, classLoader, log)
+        }
+        // The launcher's own long press on the navigation bar, in both launcher packages.
+        ModuleTargets.LAUNCHER_PACKAGES.forEach { launcher ->
+            HookGroupRegistry.register(launcher) { module, classLoader, log ->
+                HyperOsLauncherHooks.install(module, classLoader, log)
+            }
         }
         // Google's own process answers the eligibility questions: without those answers its screen
         // features stay refused no matter what the gestures do.
