@@ -127,12 +127,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1940 个用例 = 上一项后的 1928 + 12，0 失败）。未做：`skills_list_curated`（Eta 的 openai/skills 精选目录，需要额外约定目录清单）；安装的替换/更新流（本仓库已有 UI 侧 `updateFromURL`，模型侧只做新建）；真机未验证：模型在真实会话里发现并读取技能、真实 GitHub 仓库的发现/安装端到端、大技能正文的截断观感、限流下的报错文案。
 
+**Phase 3 GUI 动作：系统面板** — 同一分支 `codex/eta-phase3-skills-tools`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 系统面板动作 | `android_ui` 此前只有 `back`/`home`，而 guest 的 `android-a11y-cli` 已支持 `RECENTS`/`NOTIFICATIONS`、Eta 也有等价的 `open_system_panel`——模型要拉通知栏只能退回坐标手势。现在 `recents`/`notifications`/`quick_settings` 与 back/home 走同一条全局动作路径（含既有证据语义） | `bd12dcdd` | ✅ `UiGlobalActionsTest`（5 例） |
+| 单一事实来源 | 线名、结果里的标签、以及每个动作对应的平台常量集中在一个枚举里，schema、执行器与轨迹都读它，广告出来的动作列表不会与真正派发的分支漂移；Eta 的拼写（`notification`/`quicksettings`/`settings`）作为别名解析，其它一律 `INVALID_ACTION` 拒绝 | `bd12dcdd` | ✅ 别名与拒绝用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1945 个用例 = 上一项后的 1940 + 5，0 失败）。未做（Eta GUI 动作清单里本仓库确实还缺的）：按名称搜索已安装应用（`search_apps`）、`wait_for_package`；其余（启动应用、open URI、等待文本、元素定位变体）本仓库分别由 `android_app launch`、`android.intent.send`、`android_ui wait` 与 generation+ref 覆盖。真机未验证：通知栏/快捷设置在各类 ROM 上的实际展开与证据读数。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
-| Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、会话级编辑（Skills 暴露给模型已在 `codex/eta-phase3-skills-tools` 落地：列表/正文/资源只读 + GitHub 发现/安装） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
+| Phase 3 数字助手 | 助手浮层面板、会话级编辑、GUI 动作补齐的剩余项（Skills 暴露给模型与系统面板动作已在 `codex/eta-phase3-skills-tools` 落地） | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
