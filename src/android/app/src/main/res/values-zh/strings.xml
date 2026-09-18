@@ -1754,4 +1754,32 @@
     <string name="hosted_tool_unknown">服务商工具</string>
     <string name="hosted_tool_failed">失败</string>
 
+    <string name="system_enhance_title">系统增强</string>
+    <string name="system_enhance_row_subtitle">Root、模块，以及各自解锁什么</string>
+    <string name="system_enhance_section_status">状态</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">检测中…</string>
+    <string name="system_enhance_root_granted">已授权</string>
+    <string name="system_enhance_root_not_confirmed">已找到 su，但尚未确认授权</string>
+    <string name="system_enhance_root_denied">被 su 管理器拒绝</string>
+    <string name="system_enhance_root_absent">这台设备没有 su</string>
+    <string name="system_enhance_root_timeout">su 授权弹窗超时</string>
+    <string name="system_enhance_root_unknown">su 没有答复身份</string>
+    <string name="system_enhance_root_action">检测</string>
+    <string name="system_enhance_protection">无障碍保活</string>
+    <string name="system_enhance_protection_on">已开启——模块会重新绑定服务</string>
+    <string name="system_enhance_protection_off">已关闭——没有东西会重新绑定服务</string>
+    <string name="system_enhance_hooks">模块开关</string>
+    <string name="system_enhance_hooks_subtitle">模块从本应用读取的接管开关</string>
+    <string name="system_enhance_root_section">需要 Root 的能力</string>
+    <string name="system_enhance_root_footer">Root 是 Linux 运行时需要的：Ubuntu 24.04 chroot、它的挂载命名空间与其中的 guest 进程。设备控制与私有数据读取走同一条受控路径；这里不会给 agent 一个通用 Root shell。</string>
+    <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 运行时（chroot、挂载命名空间）</string>
+    <string name="system_enhance_root_feature_device">设备控制（结构化、受控 argv）</string>
+    <string name="system_enhance_root_feature_data">私有数据读取（时钟、剪贴板、健康、便签）</string>
+    <string name="system_enhance_module_section">需要模块的能力</string>
+    <string name="system_enhance_module_footer">模块运行在其他进程里，负责本应用自己够不到的入口：厂商助手与识屏手势、Google 资格检查、无障碍保活与热词自愈。它只读取你在模块设置页设的开关。</string>
+    <string name="system_enhance_module_feature_entries">厂商入口（助手、识屏、手势）</string>
+    <string name="system_enhance_module_feature_google">Google 资格（Gemini 入口、机型伪装）</string>
+    <string name="system_enhance_module_feature_accessibility">无障碍保活与热词自愈</string>
+
 </resources>

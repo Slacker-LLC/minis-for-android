@@ -47,6 +47,20 @@ class MinisAccessibilityService : AccessibilityService() {
         private var _instance: MinisAccessibilityService? = null
 
         fun getInstance(): MinisAccessibilityService? = _instance
+
+        /**
+         * [T-system-enhance-android] Whether the user has this service switched on, read
+         * from the platform's own list — the one fact both the permissions screen and the
+         * enhancement summary need, kept in one place so the two cannot answer differently.
+         */
+        fun isEnabled(context: android.content.Context): Boolean {
+            val expected = "${context.packageName}/${MinisAccessibilityService::class.java.name}"
+            val enabled = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            ) ?: return false
+            return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+        }
     }
 
     data class RecordedEvent(

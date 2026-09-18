@@ -1499,4 +1499,32 @@
     <string name="hosted_tool_unknown">Anbieter-Werkzeug</string>
     <string name="hosted_tool_failed">fehlgeschlagen</string>
 
+    <string name="system_enhance_title">Systemerweiterungen</string>
+    <string name="system_enhance_row_subtitle">Root, Modul und was jedes davon freischaltet</string>
+    <string name="system_enhance_section_status">Status</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">Prüfe…</string>
+    <string name="system_enhance_root_granted">Erteilt</string>
+    <string name="system_enhance_root_not_confirmed">su ist vorhanden, die Freigabe ist noch nicht bestätigt</string>
+    <string name="system_enhance_root_denied">Vom su-Manager abgelehnt</string>
+    <string name="system_enhance_root_absent">Kein su auf diesem Gerät</string>
+    <string name="system_enhance_root_timeout">Die su-Abfrage ist abgelaufen</string>
+    <string name="system_enhance_root_unknown">su hat ohne Identität geantwortet</string>
+    <string name="system_enhance_root_action">Prüfen</string>
+    <string name="system_enhance_protection">Barrierefreiheits-Dienst am Leben halten</string>
+    <string name="system_enhance_protection_on">An — das Modul bindet den Dienst erneut</string>
+    <string name="system_enhance_protection_off">Aus — nichts bindet den Dienst erneut</string>
+    <string name="system_enhance_hooks">Modulschalter</string>
+    <string name="system_enhance_hooks_subtitle">Übernahmen, die das Modul aus dieser App liest</string>
+    <string name="system_enhance_root_section">Wofür Root nötig ist</string>
+    <string name="system_enhance_root_footer">Root braucht die Linux-Laufzeit: den Ubuntu-24.04-chroot, seinen Mount-Namespace und die Gastprozesse darin. Gerätesteuerung und die Lesezugriffe auf private Daten laufen über denselben kontrollierten Weg; hier bekommt der Agent keine allgemeine Root-Shell.</string>
+    <string name="system_enhance_root_feature_runtime">Ubuntu-24.04-Laufzeit (chroot, Mount-Namespace)</string>
+    <string name="system_enhance_root_feature_device">Gerätesteuerung (strukturiert, kontrollierte argv)</string>
+    <string name="system_enhance_root_feature_data">Private Daten lesen (Uhr, Zwischenablage, Gesundheit, Notizen)</string>
+    <string name="system_enhance_module_section">Wofür das Modul nötig ist</string>
+    <string name="system_enhance_module_footer">Das Modul läuft in anderen Prozessen und erreicht die Einstiege, die diese App nicht erreicht: die Assistenten- und Bildschirmsuch-Gesten der Hersteller, Googles Berechtigungsprüfungen, der Barrierefreiheits-Wächter und die Hotword-Selbstheilung. Es liest nur die Schalter, die du auf der Modul-Seite setzt.</string>
+    <string name="system_enhance_module_feature_entries">Hersteller-Einstiege (Assistent, Bildschirmsuche, Gesten)</string>
+    <string name="system_enhance_module_feature_google">Google-Berechtigung (Gemini-Einstieg, Geräte-Tarnung)</string>
+    <string name="system_enhance_module_feature_accessibility">Barrierefreiheit am Leben halten und Hotword-Selbstheilung</string>
+
 </resources>

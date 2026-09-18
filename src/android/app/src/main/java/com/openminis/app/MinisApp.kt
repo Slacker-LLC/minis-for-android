@@ -506,6 +506,10 @@ class MinisApp : Application(), ImageLoaderFactory {
 
         // Initialize sandbox singletons (does not trigger extraction)
         RootfsManager.getInstance(this)
+        // [T-root-access-android] Root presence + the last probe's outcome, for the
+        // screens that have to state one or the other. Looks for su only; it does not
+        // spawn it (a granted device is re-probed, a never-asked one is not).
+        com.openminis.app.runtime.ubuntu.RootAccess.initialize(this)
         ExecutionCoordinator.init(this)
         ExecutionCoordinator.envVarRepository = envVarRepository
         // P3: register Tool Runtime handlers (linux.* + old aliases).

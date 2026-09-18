@@ -1390,4 +1390,32 @@
     <string name="hosted_tool_unknown">Outil du fournisseur</string>
     <string name="hosted_tool_failed">échec</string>
 
+    <string name="system_enhance_title">Améliorations système</string>
+    <string name="system_enhance_row_subtitle">Root, module, et ce que chacun débloque</string>
+    <string name="system_enhance_section_status">État</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">Vérification…</string>
+    <string name="system_enhance_root_granted">Accordé</string>
+    <string name="system_enhance_root_not_confirmed">su est présent, l\'accès n\'est pas encore confirmé</string>
+    <string name="system_enhance_root_denied">Refusé par le gestionnaire su</string>
+    <string name="system_enhance_root_absent">Aucun binaire su sur cet appareil</string>
+    <string name="system_enhance_root_timeout">La demande su a expiré</string>
+    <string name="system_enhance_root_unknown">su a répondu sans identité</string>
+    <string name="system_enhance_root_action">Vérifier</string>
+    <string name="system_enhance_protection">Maintien du service d\'accessibilité</string>
+    <string name="system_enhance_protection_on">Activé — le module relie le service à nouveau</string>
+    <string name="system_enhance_protection_off">Désactivé — rien ne relie le service à nouveau</string>
+    <string name="system_enhance_hooks">Interrupteurs du module</string>
+    <string name="system_enhance_hooks_subtitle">Reprises que le module lit depuis cette application</string>
+    <string name="system_enhance_root_section">Ce qui exige Root</string>
+    <string name="system_enhance_root_footer">Root est nécessaire au runtime Linux : le chroot Ubuntu 24.04, son namespace de montage et les processus invités. Le contrôle de l\'appareil et la lecture des données privées passent par le même chemin contrôlé ; rien ici ne donne un shell root général à l\'agent.</string>
+    <string name="system_enhance_root_feature_runtime">Runtime Ubuntu 24.04 (chroot, namespace de montage)</string>
+    <string name="system_enhance_root_feature_device">Contrôle de l\'appareil (argv structuré et contrôlé)</string>
+    <string name="system_enhance_root_feature_data">Lecture des données privées (horloge, presse-papiers, santé, notes)</string>
+    <string name="system_enhance_module_section">Ce qui exige le module</string>
+    <string name="system_enhance_module_footer">Le module tourne dans d\'autres processus et atteint les entrées que cette application ne peut pas : les gestes assistant et recherche à l\'écran des fabricants, les contrôles d\'éligibilité Google, le maintien du service d\'accessibilité et la réparation des mots-clés. Il lit seulement les interrupteurs réglés sur la page du module.</string>
+    <string name="system_enhance_module_feature_entries">Entrées fabricants (assistant, recherche à l\'écran, gestes)</string>
+    <string name="system_enhance_module_feature_google">Éligibilité Google (entrée Gemini, masquage de l\'appareil)</string>
+    <string name="system_enhance_module_feature_accessibility">Maintien du service d\'accessibilité et réparation des mots-clés</string>
+
 </resources>

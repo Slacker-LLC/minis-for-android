@@ -1749,4 +1749,32 @@
     <string name="hosted_tool_unknown">Инструмент провайдера</string>
     <string name="hosted_tool_failed">ошибка</string>
 
+    <string name="system_enhance_title">Системные улучшения</string>
+    <string name="system_enhance_row_subtitle">Root, модуль и что каждый из них открывает</string>
+    <string name="system_enhance_section_status">Состояние</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">Проверка…</string>
+    <string name="system_enhance_root_granted">Предоставлен</string>
+    <string name="system_enhance_root_not_confirmed">su есть, доступ ещё не подтверждён</string>
+    <string name="system_enhance_root_denied">Менеджер su отказал</string>
+    <string name="system_enhance_root_absent">На этом устройстве нет su</string>
+    <string name="system_enhance_root_timeout">Запрос su истёк по времени</string>
+    <string name="system_enhance_root_unknown">su ответил без идентичности</string>
+    <string name="system_enhance_root_action">Проверить</string>
+    <string name="system_enhance_protection">Поддержка службы доступности</string>
+    <string name="system_enhance_protection_on">Включено — модуль заново привязывает службу</string>
+    <string name="system_enhance_protection_off">Выключено — служба не перепривязывается</string>
+    <string name="system_enhance_hooks">Переключатели модуля</string>
+    <string name="system_enhance_hooks_subtitle">Перехваты, которые модуль читает из этого приложения</string>
+    <string name="system_enhance_root_section">Что требует Root</string>
+    <string name="system_enhance_root_footer">Root нужен среде Linux: chroot Ubuntu 24.04, его пространство имён монтирования и гостевые процессы внутри. Управление устройством и чтение приватных данных идут тем же контролируемым путём; здесь агент не получает общий root-шелл.</string>
+    <string name="system_enhance_root_feature_runtime">Среда Ubuntu 24.04 (chroot, пространство имён монтирования)</string>
+    <string name="system_enhance_root_feature_device">Управление устройством (структурированный контролируемый argv)</string>
+    <string name="system_enhance_root_feature_data">Чтение приватных данных (часы, буфер обмена, здоровье, заметки)</string>
+    <string name="system_enhance_module_section">Что требует модуля</string>
+    <string name="system_enhance_module_footer">Модуль работает в других процессах и достаёт входы, недоступные этому приложению: жесты ассистентов и поиска по экрану, проверки права Google, поддержку службы доступности и самовосстановление горячего слова. Он читает только переключатели со страницы модуля.</string>
+    <string name="system_enhance_module_feature_entries">Входы производителей (ассистент, поиск по экрану, жесты)</string>
+    <string name="system_enhance_module_feature_google">Право Google (вход Gemini, маскировка устройства)</string>
+    <string name="system_enhance_module_feature_accessibility">Поддержка службы доступности и самовосстановление горячего слова</string>
+
 </resources>

@@ -1901,4 +1901,32 @@
     <string name="hosted_tool_unknown">Provider tool</string>
     <string name="hosted_tool_failed">failed</string>
 
+    <string name="system_enhance_title">System enhancements</string>
+    <string name="system_enhance_row_subtitle">Root, the module, and what each one unlocks</string>
+    <string name="system_enhance_section_status">Status</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">Checking…</string>
+    <string name="system_enhance_root_granted">Granted</string>
+    <string name="system_enhance_root_not_confirmed">su is present; access has not been confirmed yet</string>
+    <string name="system_enhance_root_denied">Refused by the su manager</string>
+    <string name="system_enhance_root_absent">No su binary on this device</string>
+    <string name="system_enhance_root_timeout">The su prompt timed out</string>
+    <string name="system_enhance_root_unknown">su answered without an identity</string>
+    <string name="system_enhance_root_action">Check</string>
+    <string name="system_enhance_protection">Accessibility keep-alive</string>
+    <string name="system_enhance_protection_on">On — the module re-binds the service</string>
+    <string name="system_enhance_protection_off">Off — nothing re-binds the service</string>
+    <string name="system_enhance_hooks">Module switches</string>
+    <string name="system_enhance_hooks_subtitle">Takeovers the module reads from this app</string>
+    <string name="system_enhance_root_section">What needs root</string>
+    <string name="system_enhance_root_footer">Root is what the Linux runtime needs: the Ubuntu 24.04 chroot, its mount namespace and the guest processes inside it. Device control and the private-data reads go through the same controlled path; nothing here hands the agent a general root shell.</string>
+    <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 runtime (chroot, mount namespace)</string>
+    <string name="system_enhance_root_feature_device">Device control (structured, controlled argv)</string>
+    <string name="system_enhance_root_feature_data">Private data reads (clock, clipboard, health, notes)</string>
+    <string name="system_enhance_module_section">What needs the module</string>
+    <string name="system_enhance_module_footer">The module runs inside other processes and reaches the entries this app cannot: the vendors\' assistant and screen-search gestures, Google\'s eligibility checks, the accessibility keep-alive and hotword self-heal. It only reads the switches you set on the module settings page.</string>
+    <string name="system_enhance_module_feature_entries">Vendor entries (assistant, screen search, gestures)</string>
+    <string name="system_enhance_module_feature_google">Google eligibility (Gemini entry, device spoofing)</string>
+    <string name="system_enhance_module_feature_accessibility">Accessibility keep-alive and hotword self-heal</string>
+
 </resources>

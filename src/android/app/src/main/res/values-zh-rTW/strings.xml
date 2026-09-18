@@ -1046,4 +1046,32 @@
     <string name="hosted_tool_unknown">服務商工具</string>
     <string name="hosted_tool_failed">失敗</string>
 
+    <string name="system_enhance_title">系統增強</string>
+    <string name="system_enhance_row_subtitle">Root、模組，以及各自解鎖什麼</string>
+    <string name="system_enhance_section_status">狀態</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">檢查中…</string>
+    <string name="system_enhance_root_granted">已授權</string>
+    <string name="system_enhance_root_not_confirmed">已找到 su，但尚未確認授權</string>
+    <string name="system_enhance_root_denied">被 su 管理器拒絕</string>
+    <string name="system_enhance_root_absent">這台裝置沒有 su</string>
+    <string name="system_enhance_root_timeout">su 授權視窗逾時</string>
+    <string name="system_enhance_root_unknown">su 沒有回報身分</string>
+    <string name="system_enhance_root_action">檢查</string>
+    <string name="system_enhance_protection">無障礙保持運作</string>
+    <string name="system_enhance_protection_on">已開啟——模組會重新綁定服務</string>
+    <string name="system_enhance_protection_off">已關閉——沒有東西會重新綁定服務</string>
+    <string name="system_enhance_hooks">模組開關</string>
+    <string name="system_enhance_hooks_subtitle">模組從本應用讀取的接管開關</string>
+    <string name="system_enhance_root_section">需要 Root 的能力</string>
+    <string name="system_enhance_root_footer">Root 是 Linux 執行環境需要的：Ubuntu 24.04 chroot、它的掛載命名空間與其中的 guest 行程。裝置控制與私有資料讀取走同一條受控路徑；這裡不會給 agent 一個通用 Root shell。</string>
+    <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 執行環境（chroot、掛載命名空間）</string>
+    <string name="system_enhance_root_feature_device">裝置控制（結構化、受控 argv）</string>
+    <string name="system_enhance_root_feature_data">私有資料讀取（時鐘、剪貼簿、健康、便箋）</string>
+    <string name="system_enhance_module_section">需要模組的能力</string>
+    <string name="system_enhance_module_footer">模組執行在其他行程裡，負責本應用自己到不了的入口：廠商助理與螢幕搜尋手勢、Google 資格檢查、無障礙保持運作與熱詞自癒。它只讀取你在模組設定頁設定的開關。</string>
+    <string name="system_enhance_module_feature_entries">廠商入口（助理、螢幕搜尋、手勢）</string>
+    <string name="system_enhance_module_feature_google">Google 資格（Gemini 入口、機型偽裝）</string>
+    <string name="system_enhance_module_feature_accessibility">無障礙保持運作與熱詞自癒</string>
+
 </resources>

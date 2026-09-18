@@ -1504,4 +1504,32 @@
     <string name="hosted_tool_unknown">プロバイダーのツール</string>
     <string name="hosted_tool_failed">失敗</string>
 
+    <string name="system_enhance_title">システム拡張</string>
+    <string name="system_enhance_row_subtitle">Root、モジュール、それぞれが何を可能にするか</string>
+    <string name="system_enhance_section_status">状態</string>
+    <string name="system_enhance_root">Root</string>
+    <string name="system_enhance_root_checking">確認中…</string>
+    <string name="system_enhance_root_granted">許可済み</string>
+    <string name="system_enhance_root_not_confirmed">su はありますが、まだ許可は確認できていません</string>
+    <string name="system_enhance_root_denied">su マネージャーに拒否されました</string>
+    <string name="system_enhance_root_absent">この端末に su がありません</string>
+    <string name="system_enhance_root_timeout">su の確認がタイムアウトしました</string>
+    <string name="system_enhance_root_unknown">su が身元を返しませんでした</string>
+    <string name="system_enhance_root_action">確認</string>
+    <string name="system_enhance_protection">アクセシビリティの維持</string>
+    <string name="system_enhance_protection_on">オン — モジュールがサービスを再バインドします</string>
+    <string name="system_enhance_protection_off">オフ — サービスを再バインドしません</string>
+    <string name="system_enhance_hooks">モジュールのスイッチ</string>
+    <string name="system_enhance_hooks_subtitle">モジュールが本アプリから読む引き継ぎ項目</string>
+    <string name="system_enhance_root_section">Root が必要な機能</string>
+    <string name="system_enhance_root_footer">Root は Linux 実行環境に必要です。Ubuntu 24.04 の chroot、マウント名前空間、その中のゲストプロセス。端末操作と非公開データの読み取りも同じ制御された経路を通ります。ここで agent に汎用の Root シェルは渡しません。</string>
+    <string name="system_enhance_root_feature_runtime">Ubuntu 24.04 実行環境（chroot、マウント名前空間）</string>
+    <string name="system_enhance_root_feature_device">端末操作（構造化された制御された argv）</string>
+    <string name="system_enhance_root_feature_data">非公開データの読み取り（時計、クリップボード、健康、メモ）</string>
+    <string name="system_enhance_module_section">モジュールが必要な機能</string>
+    <string name="system_enhance_module_footer">モジュールは他のプロセスで動き、本アプリだけでは届かない入口を担当します。メーカーのアシスタントと画面検索のジェスチャー、Google の資格確認、アクセシビリティの維持、ホットワードの自己修復。読み取るのはモジュール設定ページで設定したスイッチだけです。</string>
+    <string name="system_enhance_module_feature_entries">メーカーの入口（アシスタント、画面検索、ジェスチャー）</string>
+    <string name="system_enhance_module_feature_google">Google の資格（Gemini 入口、機種の偽装）</string>
+    <string name="system_enhance_module_feature_accessibility">アクセシビリティの維持とホットワードの自己修復</string>
+
 </resources>

@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BatteryFull
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Dashboard
@@ -132,6 +133,8 @@ fun SettingsScreen(
     // [T-eta-xposed-groups] The switches the LSPosed module reads, next to the platform
     // permissions they sit beside.
     onModuleSettingsClick: () -> Unit = {},
+    // [T-system-enhance-android] Root + module status and what each unlocks.
+    onSystemEnhanceClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
@@ -420,6 +423,15 @@ fun SettingsScreen(
                     title = stringResource(R.string.module_settings_title),
                     subtitle = stringResource(R.string.module_settings_row_subtitle),
                     onClick = onModuleSettingsClick,
+                )
+                // [T-system-enhance-android] The aggregate above the switches: what root
+                // and the module are for, and what the app can actually read about them.
+                SettingsItem(
+                    icon = Icons.Outlined.Build,
+                    iconColor = Color(0xFFFF9F0A),
+                    title = stringResource(R.string.system_enhance_title),
+                    subtitle = stringResource(R.string.system_enhance_row_subtitle),
+                    onClick = onSystemEnhanceClick,
                     showDivider = false,
                 )
             }
