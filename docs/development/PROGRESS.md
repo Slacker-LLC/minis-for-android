@@ -226,6 +226,13 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2036 个用例 = 上一项后的 2025 + 11，0 失败）。真机未验证：与真实角色卡的配合（含大量条目时的扫描耗时）、递归扫描在真实卡片上的层数、预算裁剪在长会话中的表现。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 宏展开 | `CharacterMacros`：`{{char}}`/`{{user}}`/`{{bot}}` 与 `<USER>`/`<CHAR>`/`<BOT>` 两种拼写、卡片自身字段、日期/时间/星期、`newline`/`noop`。只有已知宏会被展开——未知宏原样保留；`{{// …}}` 是注释并消失；自引用宏在第一次重复处停下而不是死循环；嵌套有深度上限；整段展开有 2 MiB 上限，病态卡片无法无限分配。时钟与 locale 作为参数传入，所以日期/时间/星期可测，且星期跟随设备语言 | `e44138c0` | ✅ `CharacterMacrosTest`（10 例） |
+| 兼容性说明 | `CharacterCardCompatibility` 列出「卡片要、本版不做」的事项：未实现宏、HTML/脚本标记、正则与脚本扩展、不可用的深度备注、使用未支持条件的世界书条目（带计数）、附带资源、群聊专用开场白。**数据在任何情况下都保留**——这些警告存在是为了把差异讲清楚，而不是静默执行或丢弃。Eta 为自家界面返回中文散文，本移植返回稳定 code + 英文 detail，便于界面后续本地化 | `e44138c0` | ✅ `CharacterCardCompatibilityTest`（7 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2053 个用例 = 上一项后的 2036 + 17，0 失败）。至此「角色卡 → 提示词」这条链的逻辑部分基本闭合：卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明都齐了。真机未验证：真实卡片上的宏组合（含未闭合写法）、大卡片展开耗时、警告在界面上的呈现（界面尚未做）。
+
 ## 四、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -233,7 +240,7 @@
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
-| Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
+| Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色存储与界面、导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 五、明确排除
