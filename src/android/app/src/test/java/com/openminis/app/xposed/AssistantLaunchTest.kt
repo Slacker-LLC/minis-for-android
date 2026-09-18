@@ -21,7 +21,15 @@ class AssistantLaunchTest {
         val target = AssistantLaunch.targetFor(PowerAssistantTarget.MINIS, ownPackage = "llc.slacker.minis")
 
         assertEquals("llc.slacker.minis", target?.packageName)
-        assertEquals(AssistantLaunch.ACTION_VOICE_ASSIST, target?.action)
+        assertEquals(
+            listOf(AssistantLaunch.ACTION_VOICE_ASSIST, AssistantLaunch.ACTION_ASSIST),
+            target?.actions,
+        )
+        assertEquals(
+            "upstream only opens its own assistant once the role points at it",
+            true,
+            target?.requiresAssistantRole,
+        )
     }
 
     @Test
@@ -29,7 +37,13 @@ class AssistantLaunchTest {
         val target = AssistantLaunch.targetFor(PowerAssistantTarget.GEMINI)
 
         assertEquals(AssistantLaunch.GEMINI_PACKAGE, target?.packageName)
-        assertEquals(AssistantLaunch.ACTION_ASSIST, target?.action)
+        assertEquals(
+            "upstream tries the voice command as well",
+            listOf(AssistantLaunch.ACTION_ASSIST, AssistantLaunch.ACTION_VOICE_COMMAND),
+            target?.actions,
+        )
+        assertEquals(AssistantLaunch.GEMINI_ASSIST_COMPONENT, target?.component)
+        assertEquals(false, target?.requiresAssistantRole)
     }
 
     @Test

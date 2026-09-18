@@ -37,6 +37,23 @@ object ModuleTargets {
 
     val LAUNCHER_PACKAGES = setOf(XIAOMI_LAUNCHER_PACKAGE, XIAOMI_GLOBAL_LAUNCHER_PACKAGE)
 
+    /**
+     * [T-eta-xposed-entry] Targets whose surface only exists in the package's own main process: the
+     * launchers, SystemUI and the memory app are hooked in `processName == packageName`, while the
+     * Google app, the ColorOS direct service, Breeno and XiaoAi are matched with their subprocesses
+     * as well - that is upstream's split (Mangi-11/Eta @ c15de97), and installing SystemUI's hooks in
+     * one of its subprocesses would patch a surface that is not there.
+     */
+    val MAIN_PROCESS_TARGETS: Set<String> =
+        LAUNCHER_PACKAGES + SYSTEM_UI_PACKAGE + COLOROS_MEMORY_PACKAGE
+
+    /** Whether a group declared for [target] belongs in the process named [processName]. */
+    fun installsInProcess(target: String, processName: String?): Boolean {
+        val process = processName?.trim().orEmpty()
+        if (process.isEmpty()) return false
+        return if (target in MAIN_PROCESS_TARGETS) process == target else isProcessOf(process, target)
+    }
+
     /** Every package the module is declared for, in the order the scope list states them. */
     val SCOPED_PACKAGES = listOf(
         SYSTEM_SERVER_PROCESS,
@@ -66,6 +83,6 @@ object ModuleTargets {
         val process = processName?.trim().orEmpty()
         if (process.isEmpty()) return false
         if (isProcessOf(process, ownPackage)) return true
-        return SCOPED_PACKAGES.any { target -> isProcessOf(process, target) }
+        return SCOPED_PACKAGES.any { target -> installsInProcess(target, process) }
     }
 }

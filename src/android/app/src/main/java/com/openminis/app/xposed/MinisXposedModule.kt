@@ -24,6 +24,9 @@ class MinisXposedModule : XposedModule() {
 
     private var currentProcessName: String? = null
 
+    /** Upstream installs a target once per process; a second pass would stack a second hook. */
+    private val installedTargets = mutableSetOf<String>()
+
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         currentProcessName = param.processName
         // Which groups exist is a product fact, so it lives in HookGroups rather than here.
@@ -64,11 +67,16 @@ class MinisXposedModule : XposedModule() {
     override fun onPackageReady(param: PackageReadyParam) {
         // A group installs only in the target's own process: patching another app's classes from
         // here would either do nothing or touch the wrong process's copy.
-        if (!ModuleTargets.isProcessOf(currentProcessName, param.packageName)) return
+        if (!ModuleTargets.installsInProcess(param.packageName, currentProcessName)) return
         installFor(param.packageName, param.classLoader)
     }
 
+    @Synchronized
     private fun installFor(target: String, classLoader: ClassLoader) {
+        if (!installedTargets.add(target)) {
+            log(Log.INFO, TAG, "target=$target is already installed in this process; skipping")
+            return
+        }
         val installers = HookGroupRegistry.forTarget(target)
         if (installers.isEmpty()) {
             log(Log.INFO, TAG, "target=$target has no hook group yet; nothing was installed")

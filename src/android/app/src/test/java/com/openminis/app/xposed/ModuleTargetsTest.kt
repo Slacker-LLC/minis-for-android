@@ -23,6 +23,77 @@ class ModuleTargetsTest {
     }
 
     @Test
+    fun `some targets are only hooked in their own main process`() {
+        // Upstream's split: the launchers, SystemUI and the memory app are exact, the rest accept
+        // their subprocesses too.
+        assertTrue(
+            ModuleTargets.installsInProcess(
+                ModuleTargets.XIAOMI_LAUNCHER_PACKAGE,
+                ModuleTargets.XIAOMI_LAUNCHER_PACKAGE,
+            ),
+        )
+        assertFalse(
+            "a launcher subprocess is a different surface",
+            ModuleTargets.installsInProcess(
+                ModuleTargets.XIAOMI_LAUNCHER_PACKAGE,
+                ModuleTargets.XIAOMI_LAUNCHER_PACKAGE + ":remote",
+            ),
+        )
+        assertTrue(
+            ModuleTargets.installsInProcess(
+                ModuleTargets.SYSTEM_UI_PACKAGE,
+                ModuleTargets.SYSTEM_UI_PACKAGE,
+            ),
+        )
+        assertFalse(
+            ModuleTargets.installsInProcess(
+                ModuleTargets.SYSTEM_UI_PACKAGE,
+                ModuleTargets.SYSTEM_UI_PACKAGE + ":screenshot",
+            ),
+        )
+        assertTrue(
+            ModuleTargets.installsInProcess(
+                ModuleTargets.GOOGLE_SEARCH_PACKAGE,
+                ModuleTargets.GOOGLE_SEARCH_PACKAGE,
+            ),
+        )
+        assertTrue(
+            "the Google app's helper processes are still the Google app",
+            ModuleTargets.installsInProcess(
+                ModuleTargets.GOOGLE_SEARCH_PACKAGE,
+                ModuleTargets.GOOGLE_SEARCH_PACKAGE + ":search",
+            ),
+        )
+        assertTrue(
+            ModuleTargets.installsInProcess(
+                ModuleTargets.XIAOAI_PACKAGE,
+                ModuleTargets.XIAOAI_PACKAGE + ":core",
+            ),
+        )
+        assertFalse(ModuleTargets.installsInProcess(ModuleTargets.XIAOAI_PACKAGE, null))
+    }
+
+    @Test
+    fun `lifecycle callbacks follow the same process rule`() {
+        assertTrue(
+            ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.SYSTEM_UI_PACKAGE),
+        )
+        assertFalse(
+            "a SystemUI subprocess is not a target",
+            ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.SYSTEM_UI_PACKAGE + ":screenshot"),
+        )
+        assertTrue(
+            ModuleTargets.shouldKeepLifecycleCallbacks(
+                ModuleTargets.GOOGLE_SEARCH_PACKAGE + ":search",
+            ),
+        )
+        assertTrue(
+            "the module's own subprocesses always stay",
+            ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.OWN_PACKAGE + ":remote"),
+        )
+    }
+
+    @Test
     fun `the module keeps its callbacks only in its own process and its targets`() {
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.OWN_PACKAGE))
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks("llc.slacker.minis:agent"))
