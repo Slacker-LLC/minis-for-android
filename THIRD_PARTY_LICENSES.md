@@ -62,6 +62,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `tools/android/UiCoordinateSpace.kt` (coordinate-space contract, frame conversion and refusals) | `agent/model/AgentToolSchema.kt` (`coordinateSpace`), `agent/model/AgentScreenObservationContract.kt` |
 | `tools/ImageSourcePolicy.kt`, `tools/ReadImageTool.kt` (image source classification incl. gallery URIs) | `agent/model/AgentFileVisionToolCatalog.kt` |
 | `tools/skills/SkillToolPolicy.kt`, `tools/skills/SkillTools.kt` (skill listing, SKILL.md and resource reads), `tools/skills/SkillSourcePolicy.kt` and the GitHub inspect/install additions in `data/repository/SkillRepository.kt` | `agent/model/AgentSkillToolCatalog.kt` and the discovery/install path behind it |
+| `tools/android/UiGlobalActions.kt`, `tools/android/AndroidUiController.kt` (system panel actions) | `agent/device/RootShellDeviceController.kt` (`openSystemPanel`), `agent/model/AgentDeviceToolCatalog.kt` |
 
 
 ## Active native/runtime components

@@ -76,8 +76,13 @@ object AndroidUiController {
                 "long_press" -> click(service, args, longPress = true)
                 "set_text" -> setText(context, service, args)
                 "scroll" -> scroll(service, args)
-                "back" -> global(service, AccessibilityService.GLOBAL_ACTION_BACK, "back")
-                "home" -> global(service, AccessibilityService.GLOBAL_ACTION_HOME, "home")
+                // [T-eta-ui-system-panel] back/home plus the system panels the guest
+                // android-a11y-cli already drives and Eta exposes as open_system_panel.
+                "back", "home", "recents", "notifications", "quick_settings" -> {
+                    val requested = UiGlobalAction.parse(action)
+                        ?: return@withContext error("INVALID_ACTION", "unknown android_ui action: $action")
+                    global(service, platformGlobalAction(requested), requested.wireName)
+                }
                 "wait" -> waitFor(service, args)
                 else -> error("INVALID_ACTION", "unknown android_ui action: $action")
             }
@@ -505,6 +510,15 @@ object AndroidUiController {
     private fun gesturePath(gesture: ScrollGesture): Path = Path().apply {
         moveTo(gesture.start.x.toFloat(), gesture.start.y.toFloat())
         lineTo(gesture.end.x.toFloat(), gesture.end.y.toFloat())
+    }
+
+    /** Platform constant for a [UiGlobalAction]; the enum owns the wire contract. */
+    private fun platformGlobalAction(action: UiGlobalAction): Int = when (action) {
+        UiGlobalAction.BACK -> AccessibilityService.GLOBAL_ACTION_BACK
+        UiGlobalAction.HOME -> AccessibilityService.GLOBAL_ACTION_HOME
+        UiGlobalAction.RECENTS -> AccessibilityService.GLOBAL_ACTION_RECENTS
+        UiGlobalAction.NOTIFICATIONS -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+        UiGlobalAction.QUICK_SETTINGS -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
     }
 
     /**

@@ -53,9 +53,18 @@ object AndroidAgentTools {
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
-                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, wait.",
+                "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. Actions: observe, screenshot, click, long_press, set_text, scroll, back, home, recents, notifications, quick_settings, wait.",
             parameters = commonParams() + mapOf(
-                "action" to AgentToolParam("string", "UI action", listOf("observe", "screenshot", "click", "long_press", "set_text", "scroll", "back", "home", "wait")),
+                "action" to AgentToolParam(
+                    "string",
+                    "UI action. back/home/recents/notifications/quick_settings are system panels driven through the same evidence path as gestures",
+                    listOf(
+                        "observe", "screenshot", "click", "long_press", "set_text", "scroll", "wait",
+                        UiGlobalAction.BACK.wireName, UiGlobalAction.HOME.wireName,
+                        UiGlobalAction.RECENTS.wireName, UiGlobalAction.NOTIFICATIONS.wireName,
+                        UiGlobalAction.QUICK_SETTINGS.wireName,
+                    ),
+                ),
                 "generation" to AgentToolParam("integer", "Observation generation required with ref"),
                 "ref" to AgentToolParam("string", "Short-lived uN ref from observe"),
                 "interactiveOnly" to AgentToolParam("boolean", "Return only actionable nodes (default true)"),
