@@ -282,6 +282,12 @@ android {
             // ApplicationInfo.nativeLibraryDir, so the ELF must be materialized.
             useLegacyPackaging = true
         }
+        resources {
+            // [T-eta-xposed-entry] Keep the module declaration through release packaging;
+            // LSPosed reads these files out of the APK and a shrunk/merged resource table
+            // would otherwise drop the entry point.
+            merges += "META-INF/xposed/*"
+        }
     }
 
     testOptions {
@@ -484,6 +490,10 @@ dependencies {
 
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
+    // [T-eta-xposed-entry] The module API is compile-only: the framework provides it at
+    // runtime, and shipping it would give the app a copy that can drift from the
+    // installed manager. Ported from Eta's libxposed pin (102.0.0).
+    compileOnly("io.github.libxposed:api:102.0.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     // ProcessLifecycleOwner is used by XAIOAuthManager to detect Custom Tab dismissal.
