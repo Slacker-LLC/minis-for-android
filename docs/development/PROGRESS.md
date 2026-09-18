@@ -798,6 +798,36 @@
 
 | 剩余待测 | 请求链路（新装实例还没有 provider 配置）；release 签名包（需要 `RELEASE_*`）；payload 解包路径（需要把共享 rootfs 挪开，会动到另一款应用的运行时状态，等你确认）；设置里最后两页（备份与恢复 / 权限） |
 
+### 真机上的调试 RPC 测试面（2026-09-19，本轮新增用法）
+
+App 自带调试 JSON-RPC（`DebugServer`，`127.0.0.1:5321`，仅 debug 构建启动），本轮把它当成**没有模型也能驱动工具层**的仪器用起来，方法：
+
+```
+TOKEN=$(adb shell run-as llc.slacker.eta cat files/debug_server_token)   # 只读，别回显
+adb forward tcp:5321 tcp:5321
+curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"debug.appInfo","params":{}}' http://127.0.0.1:5321/
+```
+
+（鉴权要求每个连接都带 token，loopback 也不例外——这是仓库自己的设计；token 每次安装生成，文档也写明用 `run-as` 读。）
+
+| 调用 | 结果 |
+|---|---|
+| `debug.appInfo` | `sdkVersion 37`、`androidVersion 17`、设备 24129PN74C、`filesDir` 341 MB |
+| `debug.permissions.list` | 工具权限表（calendar/location/clipboard… 的默认与当前级别） |
+| `debug.mcp.status` | `running:false, configured:false, port:18789` |
+| `debug.shellExecute`（`id; uname -m; head -1 /etc/os-release`） | **`uid=10186(minis) gid=10186(minis) groups=10186(minis)`、`aarch64`、`PRETTY_NAME="Ubuntu 24.04.3 LTS"`** —— guest 运行时经**工具路径**（不只是终端 UI）确认 |
+| `debug.shellExecute`（200 000 字符输出） | 回来的 JSON 只有 **50 097 字符**：这条原始路径上也有 ~50 KiB 上界，不会把大盘输出整个塞回调用方 |
+| `debug.shellExecute`（中文 + `uname -m`） | `你好\naarch64`：UTF-8 过桥无损 |
+| guest CLI `minis-browser-use navigate --url https://example.com`（`/usr/local/bin/`） | 导航成功、`tab_id: 0`、viewport 412x914、自动截图落到 `/var/minis/browser/` |
+| `debug.browser.listTabs` / `pageInfo` | tab 0 / url / title / selected；pageInfo 里是**本轮移植的新字段**：`language: en`、`canonical_url: null`、`ready_state: complete`、`content_width/height`、`scroll_x/y` |
+| `debug.browser.getText` | **分窗表头生效**：`Text (chars 0-127 of 127; end of document):` + 采集器文本（Example Domain/正文/Learn more），走的是共享可见文本采集器而不是 `innerText` |
+| `debug.browser.getReadable` | **Markdown 生效**：`# Example Domain` 标题 + 段落 + `[Learn more](https://iana.org/domains/example)` 链接 |
+| `debug.browser.executeJS`（`return document.title + ' | links=' + document.links.length;`） | `Example Domain | links=1`（脚本必须显式 `return`，这是该动作的既有契约） |
+| `debug.browser.screenshot` | 返回 base64 JPEG |
+
+**结论**：这一轮移植/对齐过的浏览器层（page_info 字段、`get_text` 分窗、`get_readable` Markdown + 链接、载荷/结果上界）在真机上是**端到端可复现**的，不是只在单测里成立。后续设备测试优先用这套 RPC 面，UI 点击仅用于验证界面本身。
+
 **下一步（收敛路径）**：① 在真机上启动 guest 运行时（终端/环境页）并观察 provision 结果；② 若你给出 `RELEASE_*` 凭据，则产出并验证 release APK；③ 每次改动后重复「单测 + lint + assembleDebug + verify-runtime-payload + 16k + 模拟器与真机冒烟」这条链。
 
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
