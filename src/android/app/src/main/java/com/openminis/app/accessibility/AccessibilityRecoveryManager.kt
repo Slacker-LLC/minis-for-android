@@ -4,12 +4,15 @@ import android.content.Context
 import android.provider.Settings
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.ShizukuManager
+import com.openminis.app.xposed.system.AccessibilityProtectionClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 
@@ -62,6 +65,15 @@ object AccessibilityRecoveryManager {
      * so tests can assert the contract without reaching into internals.
      */
     const val PROMPT_TIMEOUT_MS: Long = 60_000L
+
+    /**
+     * [T-eta-xposed-groups] Only an explicit confirmation from the module backend counts as a
+     * repair. Its other two answers - the backend was not reachable, and the backend refused this
+     * caller - both mean nothing was written, so the caller falls through to the prompt instead of
+     * reporting a grant that does not exist.
+     */
+    internal fun moduleRepairSucceeded(status: AccessibilityProtectionClient.ControlStatus): Boolean =
+        status == AccessibilityProtectionClient.ControlStatus.APPLIED
 
     /**
      * After a Shizuku write, how long to wait for the framework to actually
@@ -245,6 +257,39 @@ object AccessibilityRecoveryManager {
      *
      * @return true once the service has actually rebound.
      */
+    /**
+     * [T-eta-xposed-groups] Ask the module backend to put the grant back. It runs inside
+     * system_server, so this path needs neither Shizuku nor a decision from the user; it is only
+     * asked while the protection switch is on, and anything other than an explicit confirmation
+     * makes the caller fall through to the prompt.
+     *
+     * The client refuses to block the main thread, so the request is made on the IO dispatcher; the
+     * backend answers through the same ordered broadcast the switch uses.
+     */
+    private suspend fun repairWithModule(context: Context): Boolean {
+        val status = withContext(Dispatchers.IO) {
+            if (AccessibilityProtectionClient.isEnabled(context)) {
+                AccessibilityProtectionClient.requestRecoveryBlocking(context)
+            } else {
+                // The switch is off: the backend would refuse, and asking it would only cost a
+                // timeout on the tool path.
+                null
+            }
+        }
+        if (status == null || !moduleRepairSucceeded(status)) {
+            AppLogger.info(TAG, "module repair not applied: status=$status")
+            return false
+        }
+        val bound = withTimeoutOrNull(REBIND_TIMEOUT_MS) {
+            while (MinisAccessibilityService.getInstance() == null) delay(REBIND_POLL_MS)
+            true
+        } == true
+        invalidateCache()
+        _revoked.value = isGrantRevoked(context)
+        AppLogger.info(TAG, "repair via module backend; rebound=$bound")
+        return true
+    }
+
     suspend fun repairWithShizuku(context: Context): Boolean {
         if (!ShizukuManager.isReady()) {
             AppLogger.info(TAG, "repair skipped: Shizuku not ready")
@@ -340,6 +385,10 @@ object AccessibilityRecoveryManager {
      */
     suspend fun ensureGrantOrPrompt(context: Context): Boolean {
         if (!isGrantRevoked(context)) return true
+
+        // The module backend repairs from inside the system, with no prompt and no Shizuku; it is
+        // asked first and a refusal falls through to the prompt below.
+        if (repairWithModule(context)) return true
 
         val shizuku = ShizukuManager.isReady()
         AppLogger.info(TAG, "grant revoked — prompting (shizukuReady=$shizuku)")

@@ -1,6 +1,7 @@
 package com.openminis.app.accessibility
 
 import org.junit.Assert.assertEquals
+import com.openminis.app.xposed.system.AccessibilityProtectionClient
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -90,6 +91,29 @@ class AccessibilityRecoveryManagerTest {
     }
 
     // ── Timeout contract ─────────────────────────────────────────────────
+
+    // ── Which backend may claim a repair ─────────────────────────────────
+
+    @Test
+    fun `only an explicit confirmation from the module backend counts as a repair`() {
+        assertTrue(
+            AccessibilityRecoveryManager.moduleRepairSucceeded(
+                AccessibilityProtectionClient.ControlStatus.APPLIED,
+            ),
+        )
+        assertFalse(
+            "an unreachable backend repaired nothing",
+            AccessibilityRecoveryManager.moduleRepairSucceeded(
+                AccessibilityProtectionClient.ControlStatus.UNAVAILABLE,
+            ),
+        )
+        assertFalse(
+            "a refusal repaired nothing",
+            AccessibilityRecoveryManager.moduleRepairSucceeded(
+                AccessibilityProtectionClient.ControlStatus.REJECTED,
+            ),
+        )
+    }
 
     @Test
     fun `prompt timeout is 60 seconds`() {
