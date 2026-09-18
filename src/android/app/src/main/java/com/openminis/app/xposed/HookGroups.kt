@@ -1,5 +1,6 @@
 package com.openminis.app.xposed
 
+import com.openminis.app.xposed.aimemory.ColorOsMemoryHooks
 import com.openminis.app.xposed.google.GoogleEligibilityHooks
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
 import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
@@ -49,6 +50,10 @@ object HookGroups {
         // features stay refused no matter what the gestures do.
         HookGroupRegistry.register(ModuleTargets.GOOGLE_SEARCH_PACKAGE) { module, classLoader, log ->
             GoogleEligibilityHooks.install(module, classLoader, log)
+        }
+        // The ColorOS memory app is asked through its own provider, from inside its own process.
+        HookGroupRegistry.register(ModuleTargets.COLOROS_MEMORY_PACKAGE) { module, classLoader, log ->
+            ColorOsMemoryHooks.install(module, classLoader, log)
         }
     }
 }
