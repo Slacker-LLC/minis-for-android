@@ -942,6 +942,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2403 例 0 失败**（新增 `BrowserUseJsWrapperTest` 3 例，把两种包装的形状钉住，防止表达式形式被悄悄改回函数体）+ `:app:lintDebug` 0 error + `:app:assembleDebug` + `verify-runtime-payload.sh` / `verify-android-16k.sh`；同一 APK 在 API 36 模拟器安装启动、`debug.browser.listTabs` 返回 `{"tabs":[]}`、crash 缓冲为空 |
 | 工具面同步 | `browser_use` 与 guest CLI 的 `script` 参数说明改为「单个表达式会返回其值；函数体支持 `await` 与顶层 `return`，没有 `return` 的函数体返回 `undefined`」，CLI 帮助加了一条表达式示例 |
 
+### 技能导入全链路 + SSRF 守卫误杀修正（2026-09-19，真机端到端 + 模拟器对照） — `d0e7df90`
+
+| 项 | 结果 |
+|---|---|
+| 技能生命周期（真机） | `skills.create` → `get` → `update`（body 与 `updatedAt` 都变）→ `toggle` 关/开 → `list` → `delete` 逐条走通；全程看盘：`files/minis-global/skills/<id>/SKILL.md` 落盘正确，操作结束后 `.minis-skill-installer` 日志目录**是空的**、`files/.skill-install.lock` 正常存在——也就是说事务在真机上收尾干净（那条「技能事务在真机上的 rename/fsync」未验证项拿到了正向证据） |
+| GitHub 导入（真机） | `skills.importUrl https://github.com/anthropics/skills/tree/main/skills/brand-guidelines` → **1.8 s 装好**，`importSource:"url"`、`sourceURL` 记录正确、frontmatter 描述解析正确；`raw.githubusercontent.com` 的 SKILL.md 同样可装 |
+| **发现的真问题** | 非 GitHub 的 URL 导入**全部被误杀**：这台手机的网络（GL.iNet 路由器代理）把**任何域名**都解析成 `198.18.x.x`（fake-IP，Clash/Surge 系 VPN 同理），而 `PublicOnlyDns` 把整个 `198.18/15` 拉黑 → `skills.importUrl https://example.com/` 在 0 ms 内回「URL host does not resolve to a public address」，**根本没发请求**。同一个守卫还被 `android.web.fetch`、`android.web.search`（模型侧）与 MCP 配置导入共用，也就是说这三个功能在这种网络上一起废了 |
+| 修法 | `198.18/15` 只在**URL 里写死字面 IP** 时拉黑（那才是 SSRF 的形态——「连到这里」），由域名解析得来时放行（连接由前面的代理接管并转发到真实主机）；RFC1918/回环/链路本地/ULA/CGNAT/0/8/224+ 两类都照旧拉黑，`.local`/`localhost` 名字照旧拒绝，AVD 的 NAT 例外保持不变（顺带把 `Build.HARDWARE` 判空，使策略可单测） |
+| 真机复验 | `https://example.com/` → 现在真的去抓（1.1 s）并如实回「did not provide a valid SKILL.md」；`raw.githubusercontent.com` 照常装好；字面 `198.18.5.94`、`192.168.8.1`、`localhost` **仍然全部拒绝**；经 MCP 服务端调 `android_web_fetch https://example.com/` 拿到页面正文、`android_web_search` 拿到 DuckDuckGo 结果（这两个在修前也是被守卫挡掉的） |
+| 模拟器对照 | 同一 APK：`https://example.com/` 能抓（1.5 s）、字面 LAN 地址仍拒绝 |
+| 验证口径 | `:app:testDebugUnitTest` **2407 例 0 失败**（新增 `SafeRemoteImportPolicyTest` 4 例：域名 fake-IP 放行 / 字面 fake-IP 拒绝 / 私有段两种形态都拒绝 / 公网两种形态都放行）+ `:app:lintDebug` 0 error + `verify-runtime-payload.sh` / `verify-android-16k.sh` |
+| 设备复原 | 测试用的技能（`sweep-probe`、导入的 `brand-guidelines`）已删除，磁盘只剩原有 12 个技能；MCP 测试 token 已从 `shared_prefs/minis_mcp_prefs.xml` 还原为 `<map />`，MCP 服务已停 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
