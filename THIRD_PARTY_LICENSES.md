@@ -57,6 +57,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `ui/chat/RevealProgress.kt` (grapheme index, cadence and monotonic clamp) | `ui/components/SmoothTextReveal.kt` (algorithm half only; the draw/layout half is not ported) |
 | `provider/CustomHeaderPolicy.kt` (forbidden/sensitive header names, name and value validation, log redaction) | `agent/model/CustomHeaderFilter.kt` |
 | `provider/RequestBodyMerge.kt` (recursive custom-body merge rules) | `agent/model/RequestBodyMerge.kt` |
+| `provider/openai/ResponsesCitationFormatter.kt` (formatter plus `ResponsesCitationStream`) | `agent/model/ResponsesCitationFormatter.kt`, annotation handling in `agent/model/OpenAiResponsesProvider.kt` |
 
 
 ## Active native/runtime components

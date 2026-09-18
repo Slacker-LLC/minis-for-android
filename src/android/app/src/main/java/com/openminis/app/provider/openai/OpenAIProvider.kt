@@ -922,6 +922,15 @@ class OpenAIProvider private constructor(
         // a body containing only whitespace before deciding whether to finish
         // or surface a provider error.
         val responsesOutputText = StringBuilder()
+        // [T-eta-responses-citations] `url_citation` annotations for the text of
+        // this turn; a citation that cannot be inlined is appended as a source
+        // list when the turn ends.
+        val responsesCitations = ResponsesCitationStream()
+
+        suspend fun flushResponsesCitations() {
+            val block = responsesCitations.trailingSources() ?: return
+            send(LLMStreamChunk.Text(block))
+        }
 
         try {
             send(LLMStreamChunk.Started)
@@ -962,6 +971,10 @@ class OpenAIProvider private constructor(
                     if (sawReasoningField || reasoningAccum.isNotEmpty()) {
                         send(LLMStreamChunk.ReasoningContent(reasoningAccum.toString()))
                     }
+                    // [T-eta-responses-citations] The source list has to precede
+                    // the terminal chunk here too (no-op unless a citation was
+                    // deferred).
+                    flushResponsesCitations()
                     send(LLMStreamChunk.Finished(finishReason))
                     sentFinished = true
                     break
@@ -1041,6 +1054,25 @@ class OpenAIProvider private constructor(
                             if (delta.isNotEmpty()) {
                                 responsesOutputText.append(delta)
                                 send(LLMStreamChunk.Text(delta))
+                            }
+                        }
+                        // [T-eta-responses-citations] A source annotation for the
+                        // text that just streamed. It is inlined only when it ends
+                        // exactly at the stream head; everything else is held for
+                        // the trailing source list (Eta's own fallback shape).
+                        type == "response.output_text.annotation.added" -> {
+                            val annotation = event.optJSONObject("annotation") ?: continue
+                            val citation = ResponsesCitationFormatter.read(annotation) ?: continue
+                            val marker = responsesCitations.accept(citation, responsesOutputText.length)
+                            if (marker != null) {
+                                send(LLMStreamChunk.Text(marker))
+                            } else {
+                                com.openminis.app.logging.AppLogger.info(
+                                    "OpenAIProvider",
+                                    "Responses API: url_citation ${citation.start}..${citation.end} " +
+                                        "cannot be inlined at head ${responsesOutputText.length} — " +
+                                        "deferred to the trailing source list",
+                                )
                             }
                         }
                         // function_call item announced — capture call_id + name, start accumulator.
@@ -1143,6 +1175,8 @@ class OpenAIProvider private constructor(
                                     "OpenAIProvider",
                                     "Responses API response.incomplete — preserving partial text, reason=$reason"
                                 )
+                                // The partial answer is kept, so its sources are too.
+                                flushResponsesCitations()
                             } else {
                                 com.openminis.app.logging.AppLogger.error(
                                     "OpenAIProvider",
@@ -1199,6 +1233,11 @@ class OpenAIProvider private constructor(
                                 )
                                 send(LLMStreamChunk.Usage(parseResponsesAPIUsage(usage)))
                             }
+                            // [T-eta-responses-citations] The turn is over: every
+                            // citation that never found a home inline becomes the
+                            // trailing source list. One-shot, so the later flush
+                            // points are no-ops.
+                            flushResponsesCitations()
                         }
                         type == "response.output_text.done" -> {
                             // Text output complete, no action needed
@@ -1394,6 +1433,7 @@ class OpenAIProvider private constructor(
                 if (sawReasoningField || reasoningAccum.isNotEmpty()) {
                     send(LLMStreamChunk.ReasoningContent(reasoningAccum.toString()))
                 }
+                flushResponsesCitations()
                 send(LLMStreamChunk.Finished(finishReason))
                 sentFinished = true
                 com.openminis.app.logging.AppLogger.info(
