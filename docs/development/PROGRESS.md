@@ -392,6 +392,16 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2174 个用例 = 上一项后的 2170 + 4，0 失败）。**没有任何设备结论**：某一版 OPlus 记忆应用是否有这个 provider 与这套表结构、root 调用能否到达、数据库文件是否可读，全部未验证——没有目标时台账记 MISSING 并保留原行为。**未做**：App 侧工具（search/orders/places 与无模块时的快照回退）留到下一片，因此这组目前只有桥的后端半侧。真机判据：logcat 里 `ColorOsMemory` 前缀的台账行 + root 调 `content call` 是否拿到 JSON。
 
+**Phase 6 第十组：ColorOS 记忆工具（App 侧）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 三个工具接上桥 | `android.coloros.memory` / `android.coloros.orders` / `android.coloros.places`（别名沿用上游拼写 `search_coloros_memories` / `search_personal_orders` / `search_saved_places`）把上一组的桥接到模型：请求由协议编码后走本仓库结构化的特权通道——**一个 `content call` argv**（固定 URI、固定方法名、base64url 参数），解码信封后把 JSON 交给模型。三个规范名都进了 `ToolSensitivePolicy` 敏感表（Eta 原表里本来就有那三个别名），落库 transcript 只留占位符 | `0d9d3d19` | ✅ `ColorOsMemoryQueryPolicyTest`（3 例） |
+| 边界与失败关闭 | 关键词上限 200 字符（超长**拒绝**而不截断）、行数 1–30 默认 10（钳制）、编码失败即拒；root 不可用 → `COLOROS_MEMORY_ROOT_UNAVAILABLE`、`content` 不是受信工具 → `COLOROS_MEMORY_TOOL_UNAVAILABLE`、超时 → `COLOROS_MEMORY_TIMEOUT`、没有回答 → `COLOROS_MEMORY_BRIDGE_UNAVAILABLE`（带 exit_code）、回答不是本桥信封 → `COLOROS_MEMORY_BRIDGE_UNANSWERED`。每个错误都带原因，不返回空列表冒充「没查到」 | `0d9d3d19` | ✅ 上述用例 |
+| 刻意没移植的回落 | Eta 为「没装模块」的设备备了 root 快照回落：一段复合 shell 脚本把数据库（含 -wal/-shm/-journal）拷进缓存再直接查。本仓库的特权面是 argv 制（受信工具 basename + 参数，不接受 raw command），复合脚本正是它拒绝的东西，所以这条回落不落；没装模块时工具如实报「模块未安装/未生效」 | `0d9d3d19` | — |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2177 个用例 = 上一项后的 2174 + 3，0 失败）。**没有任何设备结论**：某一版 OPlus 记忆应用是否应答这个 method、root 调用能否到达 provider、它的表结构返回什么，全部未验证。真机判据：`android.coloros.memory` 调用返回的 JSON 是数据还是某个带原因的 `COLOROS_MEMORY_*` 错误码。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -400,7 +410,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆只读桥（后端；App 侧工具未落）。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、ColorDirect、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐、系统 contextual search 的启动门与放行名单、无障碍保活（后端 + App 侧开关）、热词自愈、ColorOS 记忆（只读桥 + 三个工具）。未落地：小布、超级小爱（两者都要先定「被注入进程如何驱动本 App 的 agent」这条通道，Eta 用的是它自己的跨进程 runtime 客户端，本仓库合同不做第二套 runtime 协议）、ColorDirect、ColorOS 便签/录音检索、路线图里的「增强设置页」与恢复路径接入 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
