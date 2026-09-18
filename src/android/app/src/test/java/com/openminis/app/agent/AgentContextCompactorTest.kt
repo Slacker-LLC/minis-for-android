@@ -112,7 +112,9 @@ class AgentContextCompactorTest {
         )
         val groups = AgentContextCompactor.completeGroups(messages)
         assertEquals(3, groups.size)
-        assertEquals(listOf("问题"), groups[0].map { it.content })
+        // A user turn cannot end a group on its own, so the first safe boundary is
+        // after the assistant reply that follows it.
+        assertEquals(listOf("问题", "回答"), groups[0].map { it.content })
         assertEquals(listOf("", ""), groups[1].map { it.content })
         assertEquals(listOf("继续"), groups[2].map { it.content })
     }
@@ -240,10 +242,13 @@ class AgentContextCompactorTest {
 
     @Test
     fun summaryCharCapFollowsTheWindowWithAFloor() {
-        assertEquals(256, AgentContextCompactor.summaryCharCap(1_000))
+        // 0.6 x window, floored at 256 and capped at 12_000; an unknown window
+        // falls back to the 32_000 token budget before the hard cap applies.
+        assertEquals(256, AgentContextCompactor.summaryCharCap(100))
+        assertEquals(600, AgentContextCompactor.summaryCharCap(1_000))
         assertEquals(1_200, AgentContextCompactor.summaryCharCap(2_000))
         assertEquals(12_000, AgentContextCompactor.summaryCharCap(1_000_000))
-        assertEquals(256, AgentContextCompactor.summaryCharCap(null))
+        assertEquals(12_000, AgentContextCompactor.summaryCharCap(null))
         assertEquals(32_000, AgentContextCompactor.summaryMaxInputTokens(null))
     }
 
@@ -261,7 +266,10 @@ class AgentContextCompactorTest {
     @Test
     fun chunkingPacksCompleteBatchesUntilTheBudgetIsReached() {
         val history = (1..4).flatMap { turn -> listOf(user("问题 " + turn), assistant("回答 " + turn)) }
-        val plan = AgentContextCompactor.chunkForSummary(history, maxInputTokens = 400)
+        // With this fixture one complete group costs 301 tokens (256 framing plus
+        // 45 for the pair) and two cost 330, so the budget has to sit in between
+        // for a split to happen at all.
+        val plan = AgentContextCompactor.chunkForSummary(history, maxInputTokens = 320)
         assertTrue(plan is AgentContextCompactor.ChunkPlan.Chunks)
         val chunks = (plan as AgentContextCompactor.ChunkPlan.Chunks).chunks
         assertTrue("expected more than one chunk, got " + chunks.size, chunks.size > 1)
