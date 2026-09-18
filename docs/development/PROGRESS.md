@@ -84,11 +84,21 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1887 个用例 = 上一项后的 1874 + 13，0 失败）。未做的部分：服务端 `web_search` 开关（默认关）本项没有新增——当前调用方仍可经 `extra_body` 自带 `tools`，是否需要专门开关待定；真机观感（来源列表排版、链接可点）未验证。
 
+**Phase 2-1 Responses output item 回放** — 同一分支 `codex/eta-phase2-provider-passthrough`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 不透明 output item 捕获 | `response.output_item.done` 里的 `reasoning` 项若带 `encrypted_content`，随 `LLMStreamChunk.ProviderOutputItem` 交给 agent loop；不带加密内容的不捕获，保证不发这类项的 relay 请求形状与改动前完全一致 | `69d7f2b4` | ✅ `ResponsesOpaqueItemReplayTest`（5 例） |
+| 回合内逐字回放 | 捕获项挂在内存里的 assistant 轮（`LLMMessage.providerOutputItems`），Responses 请求体在重建的正文与 `function_call` 之前按原位置逐字回放；`store:false` 下工具回合之间不再丢失模型的加密思维链 | `69d7f2b4` | ✅ 线上请求体断言：`message:user → reasoning → function_call → function_call_output` |
+| 生命周期与失败路径 | 字段只存在于内存（Room 映射不读不写，重载会话回退到重建形状，与 Eta `ResponsesEphemeralState` 一致）；流失败重试前清空捕获项，废弃的那次尝试不会被回放；非法 JSON 项跳过 | `69d7f2b4` | ✅ 用例覆盖无捕获项/非法 JSON/无加密内容三条路径 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1892 个用例 = 上一项后的 1887 + 5，0 失败）。未做：Eta 是把**全部** output items 逐字回放并跳过重建；这里只回放正文与 `function_call` 无法重建的那一项（reasoning/encrypted），其余仍按既有重建路径生成（`function_call` 的 `id`/`call_id` 本来就逐字保留）。Codex OAuth 真机链路（加密思维链是否真的被接受）未验证。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | Responses 完整支持（opaque output 回放、服务端 `web_search`、引用格式化）、工具能力投影、屏幕观察契约、文件视觉（请求头与请求体合并已在 `codex/eta-phase2-provider-passthrough` 落地） | Eta `agent/model/*` |
+| Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门、屏幕观察契约、文件视觉（请求头与请求体合并、引用格式化、Responses opaque output 回放已在 `codex/eta-phase2-provider-passthrough` 落地） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、Skills 暴露给模型、会话级编辑 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
