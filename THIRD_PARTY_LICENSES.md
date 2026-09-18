@@ -103,6 +103,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/system/SystemUiHooks.kt`, `xposed/system/SystemUiOcrPolicy.kt` (the haptic id and the context lookup order as values) | `hook/system/SystemUiHooks.kt` |
 | `tools/SmsCodeExtractionPolicy.kt` (the extraction rule) and `android.sms.code` in `tools/AndroidTelephonyTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`read_sms_code`) and its catalog entry |
 | `tools/DeviceStatePolicy.kt` (the two commands as argv) and `tools/AndroidDeviceStateTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_device_state`) and its catalog entry |
+| `tools/AppStatePolicy.kt` (the three argv forms) and the `freeze`/`unfreeze` actions in `tools/android/AndroidPackageController.kt` / `tools/android/AndroidAgentTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`app_state_control`) and its catalog entry |
 
 
 ## Active native/runtime components

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import com.openminis.app.tools.AppStatePolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -154,13 +155,45 @@ object AndroidPackageController {
 
     suspend fun stop(context: Context, sessionId: String, rawPackage: String, userId: Int? = null): JSONObject {
         val packageName = requirePackageName(rawPackage)
-        val argv = mutableListOf("am", "force-stop")
-        userId?.let { argv += listOf("--user", it.toString()) }
-        argv += packageName
+        val argv = requireNotNull(AppStatePolicy.argv(AppStatePolicy.FORCE_STOP, packageName, userId)) {
+            "unknown app state action: force_stop"
+        }
         val result = PrivilegedCommandRunner.run(
             context, sessionId, argv, "停止 Android App $packageName", CommandRisk.USER_VISIBLE, 30_000L,
         )
         return commandJson(result).put("packageName", packageName).put("stopped", result.success)
+    }
+
+    /**
+     * [T-eta-xposed-groups] Eta's `app_state_control` freeze/unfreeze (Mangi-11/Eta @ c15de97):
+     * `pm disable-user` stops a package from running while keeping its data, and `pm enable` puts
+     * it back. The package name goes through the same validation as every other action, and the
+     * answer is the shared command result - the caller sees the exit code instead of a bare boolean.
+     */
+    suspend fun setPackageEnabled(
+        context: Context,
+        sessionId: String,
+        rawPackage: String,
+        enabled: Boolean,
+        userId: Int? = null,
+    ): JSONObject {
+        val packageName = requirePackageName(rawPackage)
+        val action = if (enabled) AppStatePolicy.UNFREEZE else AppStatePolicy.FREEZE
+        val argv = requireNotNull(AppStatePolicy.argv(action, packageName, userId)) {
+            "unknown app state action: $action"
+        }
+        val result = PrivilegedCommandRunner.run(
+            context,
+            sessionId,
+            argv,
+            "${if (enabled) "启用" else "冻结"} Android App $packageName",
+            CommandRisk.MUTATING,
+            30_000L,
+        )
+        return commandJson(result)
+            .put("packageName", packageName)
+            .put("enabled", enabled)
+            .put(if (enabled) "unfrozen" else "frozen", result.success)
     }
 
     suspend fun restart(

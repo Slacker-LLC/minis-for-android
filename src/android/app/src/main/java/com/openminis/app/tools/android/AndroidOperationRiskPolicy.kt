@@ -9,6 +9,10 @@ object AndroidOperationRiskPolicy {
         AndroidAgentTools.CAPABILITIES to "probe_native_chroot" -> AndroidOperationRisk.ROOT_SETUP
         AndroidAgentTools.APP to "install",
         AndroidAgentTools.APP to "uninstall",
+        // [T-eta-xposed-groups] Freezing rewrites another package's enabled state, and an unlucky
+        // choice can leave a system app unusable until it is enabled again, so it asks first.
+        AndroidAgentTools.APP to "freeze",
+        AndroidAgentTools.APP to "unfreeze",
         AndroidAgentTools.DEPLOY to "install",
         AndroidAgentTools.DEPLOY to "install_and_launch",
         AndroidAgentTools.LOGS to "clear" -> AndroidOperationRisk.DESTRUCTIVE

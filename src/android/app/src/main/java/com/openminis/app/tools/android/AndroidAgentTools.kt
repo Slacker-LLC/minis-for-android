@@ -34,12 +34,12 @@ object AndroidAgentTools {
         AgentToolDefinition(
             name = APP,
             description = "Inspect and control an Android package with PackageManager/ActivityManager first and authorized Root or Shizuku only where shell privilege is required. " +
-                "Actions: search, info, launch, stop, restart, install, uninstall. search resolves a display name to a real package among the launcher apps this app can see. Android 11 package visibility is reported honestly. Install/uninstall require one-time approval and never assume QUERY_ALL_PACKAGES.",
+                "Actions: search, info, launch, stop, restart, freeze, unfreeze, install, uninstall. search resolves a display name to a real package among the launcher apps this app can see. freeze/unfreeze are pm disable-user/pm enable: the package keeps its data but cannot run until it is enabled again, and an unlucky target can be a system app, so they require one-time approval. Android 11 package visibility is reported honestly. Install/uninstall require one-time approval and never assume QUERY_ALL_PACKAGES.",
             parameters = commonParams() + packageParams() + artifactParams() + mapOf(
                 "action" to AgentToolParam(
                     "string",
                     "App action. search lists launcher apps by label or package (no packageName needed) so a display name can be resolved to a real package before any other action",
-                    listOf("search", "info", "launch", "stop", "restart", "install", "uninstall"),
+                    listOf("search", "info", "launch", "stop", "restart", "freeze", "unfreeze", "install", "uninstall"),
                 ),
                 "query" to AgentToolParam("string", "search only: keyword matched against app label or package name"),
                 "limit" to AgentToolParam("integer", "search only: max rows (default 20, max 50)"),
@@ -216,6 +216,12 @@ object AndroidAgentTools {
             "info" -> AndroidPackageController.info(context, sid, packageName)
             "launch" -> AndroidPackageController.launch(context, sid, packageName, args.optString("activity", "").ifBlank { null })
             "stop" -> AndroidPackageController.stop(context, sid, packageName, userId)
+            "freeze" -> AndroidPackageController.setPackageEnabled(
+                context, sid, packageName, enabled = false, userId = userId,
+            )
+            "unfreeze" -> AndroidPackageController.setPackageEnabled(
+                context, sid, packageName, enabled = true, userId = userId,
+            )
             "restart" -> AndroidPackageController.restart(context, sid, packageName, args.optString("activity", "").ifBlank { null }, userId)
             "install" -> {
                 val artifact = inspectArtifact(context, sid, args)
@@ -229,6 +235,8 @@ object AndroidAgentTools {
             "info" -> true
             "launch" -> result.optBoolean("launched")
             "stop" -> result.optBoolean("stopped")
+            "freeze" -> result.optBoolean("frozen")
+            "unfreeze" -> result.optBoolean("unfrozen")
             "restart" -> result.optBoolean("restarted")
             "install" -> result.optBoolean("installed")
             "uninstall" -> result.optBoolean("uninstalled")
