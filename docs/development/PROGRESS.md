@@ -233,6 +233,13 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2053 个用例 = 上一项后的 2036 + 17，0 失败）。至此「角色卡 → 提示词」这条链的逻辑部分基本闭合：卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明都齐了。真机未验证：真实卡片上的宏组合（含未闭合写法）、大卡片展开耗时、警告在界面上的呈现（界面尚未做）。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 角色存储 | 卡能读能写，但没有人保存它。新增 `characters` 表（数据库版本 20 → 21，迁移与导出的 schema 一并提交）、DAO 与 `CharacterRepository`：卡以 JSON 文本整棵存储（本版未实现的字段在列里会被悄悄丢掉），落库前一律先过编解码校验，读不出来的行只记日志并跳过而不是拖垮列表；头像存成 App 私有目录下的文件（按角色 id 命名，不是数据库 blob），上限 4 MiB | `fe0ae925` | ✅ `CharacterStoragePolicyTest`（4 例）+ 🟡 DB 路径仅编译验证（本仓库无 Robolectric/instrumentation） |
+| 导入导出 | 导入保留原始 PNG，因此之后导出可以在那张图里重写角色块，美术资产能往返；JSON 卡则导出为 JSON。删除角色会连同头像文件一起清掉 | `fe0ae925` | 🟡 需真机核对 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2057 个用例 = 上一项后的 2053 + 4，0 失败），Room 导出 `21.json`。**与 Eta 的刻意差异**：不移植它的一次性默认角色播种与剧情记忆目录——这两个功能在本仓库都还不存在。真机未验证：迁移在真实升级路径上的执行、PNG 卡导入后的头像往返、大卡片写入与删除行为。
+
 ## 四、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -240,7 +247,7 @@
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
-| Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色存储与界面、导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
+| Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 五、明确排除
