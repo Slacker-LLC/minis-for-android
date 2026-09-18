@@ -286,6 +286,13 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2085 个用例，0 失败），`:app:lintDebug` 0 error（新增 15 个字符串补齐 8 个 locale，无新增发现）。至此 Phase 5 只剩**剧情记忆**一项。真机未验证：详情页在长世界书（数百条）下的滚动与编辑手感、保存后已绑定会话下一轮是否按新世界书触发。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 剧情记忆 | 角色跨会话记住什么。按 Eta 的边界：按角色存、与现实 MEMORY.md 分离、用 SHA-256 revision 标识状态、revision 过期就拒绝写入而不是盲目合并。`CharacterMemoryDocument` 承载规则（与文件无关，因此可测）：带 query 的读返回命中行与行号、不带 query 则从某行分页并如实报告后面还有没有；追加、整段替换（用于就地修正过期事实）、清空、以及 64k 上限——超过就必须编辑而不是继续追加。`CharacterMemoryRepository` 是它外面的文件处理：每个角色一个 Markdown 文件放在 App 私有存储，经临时文件 + rename 写入，角色删除时一并删除 | `3bc1d2b3` | ✅ `CharacterMemoryDocumentTest`（12 例） |
+| 工具与注入 | 两个工具读写「本会话绑定的角色」的记忆，模型点不了别的角色；每次写入都带 revision。角色块里也带上记忆：revision、按 `MemoryInjectionBudget`（与真实记忆同一套预算，而不是为角色扮演再造一个阈值）裁剪后的核心文本、以及读取其余内容的入口 | `3bc1d2b3` | ✅ `CharacterMemoryPromptTest`（5 例） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2102 个用例 = 上一项后的 2085 + 17，0 失败）。失败路径：未绑定角色 → `NO_CHARACTER_BOUND`；缺 revision / 未知 mode / revision 过期 → 拒绝而不是合并；行号越界 → 拒绝；超上限 → 带原因拒绝。剧情记忆归入敏感工具（transcript 只留占位符），且对 MCP 调用方 local-only。**Phase 5（角色系统）至此功能完整**：卡模型/编解码/PNG、世界书选择与编辑、宏、能力说明、存储、会话绑定、每轮注入、剧情记忆。真机未验证：真实长对话下记忆的增长与裁剪、并发两段会话写同一角色记忆时的 revision 冲突、记忆注入后的实际观感。
+
 ## 四、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
