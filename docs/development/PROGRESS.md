@@ -885,6 +885,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机 root 授权复验 | KernelSU Next 里放行后，**新装的这一版**：`run-as llc.slacker.eta /system/bin/su -c 'id -u'` → **0**；同一版本经 `debug.shellExecute` 进 guest → `uid=10186(minis) gid=10186(minis) groups=10186(minis)`、`PRETTY_NAME="Ubuntu 24.04.3 LTS"`、内核 `6.6.118-android15` |
 | 产物校验 | 同一 APK：`verify-runtime-payload.sh`（rootfs `06dcdf94…`）与 `verify-android-16k.sh`（25 个 native 库）通过；`:app:lintDebug` **0 error**（145 warning / 7 hint，全部改前既有） |
 
+### 权限门控不再盲等：快速失败 + 指名道姓的错误（2026-09-19，真机与模拟器复验） — `2372ea47`
+
+| 项 | 结果 |
+|---|---|
+| 之前的问题（设备发现） | `android-notification list`、`android-calendar list --today`、`android-location current` 三条都在等屏幕上的授权提示，调用方 120 s 后只看到 `command timed out after 120000ms`——门控自身允许 120 s（系统弹窗）+ 5 s（补授轮询）+ 120 s（应用内设置门），所以**调用方的命令超时总是先到**，结构化结果根本没机会返回 |
+| 改法 ①：没有宿主就不问 | 弹窗只能由 MainActivity 承载：`onStart`/`onStop` 注册 `setPermissionHostAttached()`，并**删掉 ChatScreen 里那份重复的 `RequestMultiplePermissions` 启动器**（它只在聊天页被组合时存在，且用 `any` 判断「已授权」——对读写双权限的请求是错的）。没有宿主时门控立刻返回 `NO_UI` |
+| 改法 ②：一条预算 | 整条交互门控（系统弹窗 + 补授轮询 + 设置门）共用 90 s 预算，落在 guest CLI 自己的 120 s 命令超时之内，调用方一定拿得到结构化结果 |
+| 改法 ③：一处实现、一处文案 | `requestPermissionFlow()` + `permissionFailure()` 取代六个 handler 与两个工具各抄的一份；失败体带 `error`（`permission_required` / `permission_denied` / `permission_timeout`）、`tool`、`permissions` 和一句「用户要做什么」。没有运行时权限的能力（Notification access）保留自己的错误码，并在 `detail` 里写清它的设置入口 |
+| 真机复验（前台、有人应答） | `android-calendar list --today`：系统授权框 → 点「拒绝且不再询问」→ 补授轮询 → 应用内「Calendar permission needed / CANCEL / OPEN SETTINGS」→ 点 CANCEL → CLI 及时返回 `{"error":"permission_denied","tool":"android-calendar","permissions":["android.permission.READ_CALENDAR"],"message":"The user declined …"}`，exit 77 |
+| 真机复验（后台、无人应答） | 同一台机器按 HOME 后逐条调用：location / notification / calendar **各约 0.7 s** 返回 `permission_required` 并点名权限（改前是 120 s 的无信息超时） |
+| 验证口径 | `:app:testDebugUnitTest` **2396 例 0 失败**（新增 `OffloadPermissionFailureTest` 6 例：各结果的失败体、能力专用码、detail、无宿主 2 s 内返回）+ `:app:lintDebug` 0 error + `:app:assembleDebug` + `verify-runtime-payload.sh` / `verify-android-16k.sh`；同一 APK 在 API 36 模拟器安装启动、调试面可用、crash 缓冲为空 |
+| 设备状态变化（如实记录） | 复验时在系统弹窗上点的是「拒绝且不再询问」，所以这台小米上「日历」权限现为永久拒绝（可在系统设置里重新打开）。本轮没有替你批准任何个人数据授权 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
