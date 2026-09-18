@@ -17,9 +17,12 @@ import android.content.SharedPreferences
  * got the settings at all, falls back to that default instead of guessing: a hook that cannot tell
  * whether it is wanted leaves the system alone.
  */
-fun interface ModulePrefReader {
+interface ModulePrefReader {
     /** Null when the key is absent; the caller applies the default. */
     fun getBoolean(key: String): Boolean?
+
+    /** Null when the key is absent or not a string. */
+    fun getString(key: String): String?
 }
 
 object ModulePrefs {
@@ -28,6 +31,9 @@ object ModulePrefs {
     const val GROUP = "minis_prefs"
 
     object Keys {
+        /** Which assistant a power-key long press should open: oem, minis or gemini. */
+        const val POWER_KEY_ASSISTANT_TARGET = "power_key_assistant_target"
+
         const val GESTURE_BAR_CIRCLE_TO_SEARCH = "gesture_bar_circle_to_search"
         const val DOUBLE_FINGER_CIRCLE_TO_SEARCH = "double_finger_circle_to_search"
         const val POWER_KEY_TAKEOVER = "power_key_takeover"
@@ -66,7 +72,13 @@ object ModulePrefs {
             attach(null)
             return
         }
-        attach { key -> if (preferences.contains(key)) preferences.getBoolean(key, false) else null }
+        attach(object : ModulePrefReader {
+            override fun getBoolean(key: String): Boolean? =
+                if (preferences.contains(key)) preferences.getBoolean(key, false) else null
+
+            override fun getString(key: String): String? =
+                if (preferences.contains(key)) preferences.getString(key, null) else null
+        })
     }
 
     fun defaultOf(key: String): Boolean = BOOLEAN_DEFAULTS[key] ?: false
@@ -74,5 +86,11 @@ object ModulePrefs {
     fun isEnabled(key: String): Boolean {
         val value = runCatching { reader?.getBoolean(key) }.getOrNull()
         return value ?: defaultOf(key)
+    }
+
+    /** A free-form setting, with the caller's fallback when settings are absent or unreadable. */
+    fun string(key: String, fallback: String): String {
+        val value = runCatching { reader?.getString(key) }.getOrNull()
+        return value?.takeIf { it.isNotBlank() } ?: fallback
     }
 }

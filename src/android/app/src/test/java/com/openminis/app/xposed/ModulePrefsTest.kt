@@ -2,6 +2,7 @@ package com.openminis.app.xposed
 
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -11,6 +12,13 @@ import org.junit.Test
  * switch that would replace a button, and a settings read that fails leaves the system alone.
  */
 class ModulePrefsTest {
+
+    /** A settings view that only carries booleans, the way a hooked process sees it. */
+    private fun reader(booleans: Map<String, Boolean>) = object : ModulePrefReader {
+        override fun getBoolean(key: String): Boolean? = booleans[key]
+
+        override fun getString(key: String): String? = null
+    }
 
     @After
     fun tearDown() = ModulePrefs.attach(null)
@@ -33,13 +41,14 @@ class ModulePrefsTest {
 
     @Test
     fun `a settings value wins over the default`() {
-        ModulePrefs.attach { key ->
-            when (key) {
-                ModulePrefs.Keys.POWER_KEY_TAKEOVER -> true
-                ModulePrefs.Keys.GESTURE_BAR_CIRCLE_TO_SEARCH -> false
-                else -> null
-            }
-        }
+        ModulePrefs.attach(
+            reader(
+                mapOf(
+                    ModulePrefs.Keys.POWER_KEY_TAKEOVER to true,
+                    ModulePrefs.Keys.GESTURE_BAR_CIRCLE_TO_SEARCH to false,
+                ),
+            ),
+        )
 
         assertTrue(ModulePrefs.isEnabled(ModulePrefs.Keys.POWER_KEY_TAKEOVER))
         assertFalse(ModulePrefs.isEnabled(ModulePrefs.Keys.GESTURE_BAR_CIRCLE_TO_SEARCH))
@@ -51,7 +60,11 @@ class ModulePrefsTest {
 
     @Test
     fun `a settings read that throws leaves the default in place`() {
-        ModulePrefs.attach { error("settings backend is gone") }
+        ModulePrefs.attach(object : ModulePrefReader {
+            override fun getBoolean(key: String): Boolean = error("settings backend is gone")
+
+            override fun getString(key: String): String = error("settings backend is gone")
+        })
 
         assertFalse(ModulePrefs.isEnabled(ModulePrefs.Keys.POWER_KEY_TAKEOVER))
         assertTrue(ModulePrefs.isEnabled(ModulePrefs.Keys.GESTURE_BAR_CIRCLE_TO_SEARCH))
@@ -59,7 +72,11 @@ class ModulePrefsTest {
 
     @Test
     fun `detaching settings returns every switch to its default`() {
-        ModulePrefs.attach { true }
+        ModulePrefs.attach(object : ModulePrefReader {
+            override fun getBoolean(key: String): Boolean = true
+
+            override fun getString(key: String): String = "value"
+        })
         assertTrue(ModulePrefs.isEnabled(ModulePrefs.Keys.POWER_KEY_TAKEOVER))
 
         ModulePrefs.attach(null)
@@ -67,6 +84,40 @@ class ModulePrefsTest {
         assertFalse(
             "a process that never got settings must not keep a stale answer",
             ModulePrefs.isEnabled(ModulePrefs.Keys.POWER_KEY_TAKEOVER),
+        )
+    }
+
+    @Test
+    fun `a string setting falls back when settings are absent or blank`() {
+        assertEquals(
+            "oem",
+            ModulePrefs.string(ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET, "oem"),
+        )
+
+        ModulePrefs.attach(object : ModulePrefReader {
+            override fun getBoolean(key: String): Boolean? = null
+
+            override fun getString(key: String): String = "  "
+        })
+
+        assertEquals(
+            "a blank value is not a choice",
+            "oem",
+            ModulePrefs.string(ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET, "oem"),
+        )
+    }
+
+    @Test
+    fun `a string setting is returned when the settings view carries it`() {
+        ModulePrefs.attach(object : ModulePrefReader {
+            override fun getBoolean(key: String): Boolean? = null
+
+            override fun getString(key: String): String = "minis"
+        })
+
+        assertEquals(
+            "minis",
+            ModulePrefs.string(ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET, "oem"),
         )
     }
 }

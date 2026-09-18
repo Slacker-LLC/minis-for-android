@@ -88,6 +88,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `xposed/HookRegistrar.kt`, `xposed/HookSupport.kt`, `xposed/HookLogger.kt` | `core/HookRegistrar.kt`, `core/HookSupport.kt`, `core/ModuleLogger.kt` |
 | `xposed/ModulePrefs.kt` (module switches and their defaults) | `config/Prefs.kt` |
 | `xposed/LogThrottle.kt`, `xposed/HookGroups.kt`, `xposed/system/CircleToSearchInvoker.kt`, `xposed/hyperos/HyperOsScreenSearchHooks.kt`, `xposed/hyperos/HyperOsScreenSearchRequest.kt` | `core/LogThrottle.kt`, `hook/system/CircleToSearchInvoker.kt`, `hook/hyperos/HyperOsScreenSearch*.kt` |
+| `xposed/AssistantLaunch.kt`, `xposed/hyperos/HyperOsPowerHooks.kt`, `xposed/hyperos/HyperOsPowerPolicy.kt` | `hook/hyperos/HyperOsPower*.kt` and the launch half of `hook/system/PowerHooks.kt` / `AssistantManager.kt` |
 
 
 ## Active native/runtime components

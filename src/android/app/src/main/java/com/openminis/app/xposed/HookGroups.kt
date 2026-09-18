@@ -1,6 +1,7 @@
 package com.openminis.app.xposed
 
 import com.openminis.app.xposed.hyperos.HyperOsScreenSearchHooks
+import com.openminis.app.xposed.hyperos.HyperOsPowerHooks
 
 /**
  * [T-eta-xposed-groups] The groups this module knows, wired to the targets they belong to.
@@ -21,6 +22,10 @@ object HookGroups {
         registered = true
         HookGroupRegistry.register(ModuleTargets.XIAOAI_PACKAGE) { module, classLoader, log ->
             HyperOsScreenSearchHooks.install(module, classLoader, log)
+        }
+        // The power-key dispatcher lives in system_server.
+        HookGroupRegistry.register(HookGroupRegistry.SYSTEM_TARGET) { module, classLoader, log ->
+            HyperOsPowerHooks.install(module, classLoader, log)
         }
     }
 }
