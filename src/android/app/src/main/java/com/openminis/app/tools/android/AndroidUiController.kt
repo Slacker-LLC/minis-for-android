@@ -419,7 +419,9 @@ object AndroidUiController {
         val label = ClipboardRestorePolicy.temporaryLabel(pasteSequence.incrementAndGet())
         val temporary = ClipData.newPlainText(label, text).apply {
             description.extras = PersistableBundle().apply {
-                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                // The key itself, not the platform field: the field is API 33 while the marker has
+                // been read since 13, and ClipboardRestorePolicy is where its value is pinned.
+                putBoolean(ClipboardRestorePolicy.EXTRA_IS_SENSITIVE, true)
             }
         }
         if (!runCatching { clipboard.setPrimaryClip(temporary) }.isSuccess) return false
