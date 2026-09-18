@@ -127,6 +127,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `browser/BrowserHistoryPolicy.kt` and the `go_back` / `go_forward` / `reload` actions in `browser/BrowserUseManager.kt` | `agent/browser/AgentBrowserSession.kt` (`go_back` / `go_forward` / `reload`, `historyNavigation`) |
 | `scroll` and `pageInfo` in `browser/BrowserDomScripts.kt` (the before/after pair, the target-visibility check, the page language and canonical URL) | `agent/browser/BrowserDomScripts.kt` (`scroll`, `pageInfo`) |
 | The `read_image` argument: `browser/BrowserActionInput.kt`, `attachImage` in `browser/BrowserActionResult.kt`, `screenshot` / `attachSnapshot` in `browser/BrowserUseManager.kt` and the attachment decision in `ui/chat/ChatViewModel.kt` | `agent/browser/AgentBrowserSession.kt` (the `read_image` argument of `screenshot`) |
+| `text` in `browser/BrowserDomScripts.kt` and the `get_text` wiring in `browser/BrowserUseManager.kt` (the visible-text collector path and its window) | `agent/browser/BrowserDomScripts.kt` (`text`) |
 
 
 ## Active native/runtime components

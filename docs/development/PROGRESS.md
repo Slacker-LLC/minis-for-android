@@ -650,6 +650,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2319 个用例 = 上一项后的 2314 + 5）与 `:app:lintDebug`（0 error），另有浏览器 JS、构建清理与文档溯源守卫全绿。**没有任何设备结论**：`read_image=false` 时聊天气泡里的缩略图在真机上是否仍然可用，未验证。
 
+**get_text 与 get_readable 用同一个采集器** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 两条读路径合一 | `get_text` 此前读 `document.body.innerText`——「什么算可见文本」交给浏览器渲染器决定；而 `get_readable` 早已走移植过来的共享采集器（按可见性过滤文本节点、跳过 script/style/noscript/template/svg/canvas/iframe、12000 节点与截止时间）。同一个页面两次读法可能给出不同结果。现在 `get_text` 也走采集器，保留它已有的分窗契约（`offset`/`max_chars`、`text_length`、`returned_chars`、`next_offset`、`truncated`、`source_truncated`），并照上游报出 `visited_nodes` 与所用选择器；标题保留，因为我们的结果是散文而不是信封 | `6d852c42` | ✅ `BrowserDomScriptsTest` 增 2 例（并断言不再出现 `innerText`） |
+| 死代码 | `BrowserUseJS` 只剩它自己的脚本（`getBackbone`、`fetch`）：`getText` 移走后 `jsQuote` 失去最后一个调用方，一并删除；选择器字面量改由共享前导脚本 JSON 转义（上游的规则） | `6d852c42` | ✅ 编译 + 全量单测 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2321 个用例 = 上一项后的 2319 + 2）与 `:app:lintDebug`（0 error），另有浏览器 JS 守卫（12 个脚本）。**没有任何设备结论**：采集器的输出与 `innerText` 在真实页面上差多少（相邻文本节点之间的空格是要盯的那一处），未验证。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
