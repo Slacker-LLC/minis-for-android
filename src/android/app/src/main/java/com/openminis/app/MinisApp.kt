@@ -545,6 +545,14 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.tools.history.ConversationHistoryHandler(),
             aliasNames = com.openminis.app.tools.history.ConversationHistoryTool.aliases,
         )
+        // [T-eta-alarm-tools] Alarms and timers through the existing android-alarm handler:
+        // validation and a documented tool surface, not a second scheduling path.
+        com.openminis.app.tools.AlarmTools.handlers().forEach { handler ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                handler,
+                aliasNames = com.openminis.app.tools.AlarmTools.aliases[handler.definition.name].orEmpty(),
+            )
+        }
         // [T-eta-skill-tools] Read-only skill surface for the model: discovery,
         // SKILL.md reads and bounded resource reads through SkillRepository (same
         // mutation lock and path guards as the rest of the skill code). Nothing here

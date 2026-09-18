@@ -80,6 +80,11 @@ object ToolPermissionManager {
         // caller may not read somebody else's chat history.
         "conversation.history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
         "conversation_history" to ToolPolicy(Level.MCP_ALLOWED, Level.LOCAL_ONLY),
+        // [T-eta-alarm-tools] Scheduling device alarms is a real-world side effect; a remote
+        // MCP caller may trigger it only through the confirmation gate.
+        "android.alarm.set" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.alarm.timer" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.alarm.open" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.media.control" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.weather" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),

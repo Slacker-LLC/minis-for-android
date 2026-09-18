@@ -68,6 +68,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `service/OverlayRunActions.kt` and the stop control in `service/ToolOverlayController.kt` / `service/AgentForegroundService.kt` | assistant overlay panel in Eta `ui/app/*` (stop affordance and its rule) |
 | `notifications/NotificationHistoryPolicy.kt`, `notifications/MinisNotificationListenerService.kt`, `data/repository/NotificationHistoryRepository.kt`, `tools/NotificationTools.kt` | `agent/device/AgentNotificationHistoryService.kt`, `data/repository/NotificationHistoryRepository.kt`, and the `recent_notifications` / `search_notification_history` device tools |
 | `tools/history/ConversationHistoryPolicy.kt`, `tools/history/ConversationHistoryTool.kt` | `agent/model/AgentConversationToolCatalog.kt` and the runtime history seam that executes it |
+| `tools/alarm/AlarmToolPolicy.kt`, `tools/AlarmTools.kt` | `agent/tool/AgentStructuredDeviceTools.kt` (`set_alarm`, `set_timer`) and the alarm table in `agent/model/AgentDeviceToolCatalog.kt` |
 
 
 ## Active native/runtime components
