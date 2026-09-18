@@ -908,6 +908,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 复验 | 同一台机器重扫 28 个入口：**`--help` 全部 0**；五个入口**无参数时仍为 2** 并打印用法 |
 | 验证口径 | `:app:testDebugUnitTest` **2396 例 0 失败** + `:app:assembleDebug`；本轮顺带记下一条排障经验：往 guest 发命令时，**主机侧拼 shell 文本会让 `$VAR` 在主机上就被展开**（`JSON.stringify` 不是 shell 转义），曾经因此把一条命令打成语法错误并让持久 shell 卡在悬空引号里——正确做法是把 JSON-RPC 载荷写进文件再用 `curl --data-binary @file` |
 
+### 启动 Activity 类 CLI：把「后台被拦」和「真没装应用」分开（2026-09-19，真机复验） — `4509573e`
+
+| 项 | 结果 |
+|---|---|
+| 发现 | CLI 运行面清点时 `android-alarm list` 返回 `{"error":"no_clock_app","message":"…Install or re-enable a Clock app…"}`——可这台小米**装着** `com.android.deskclock`：把 Minis 切到前台后同一条命令 `opened=true, rc=0`，`am start -a SHOW_ALARMS` 也能到 `com.android.deskclock/.DeskClockTabActivity`。原因是 Android 从后台启动 Activity 会抛 `ActivityNotFoundException`——和「真的没有处理者」是同一个异常，于是文案把用户指去装一个他已经有的应用 |
+| 修法 | 新增 `OffloadForeground`（`isAppForeground()` + 纯函数 `backgroundLaunchBody(action, subject)`），并**替换掉 `ClipboardOffloadHandler` 里那份私有副本**；闹钟的三个派发点（SET_ALARM / SET_TIMER / SHOW_ALARMS）与 `android-open` 在捕获 ANFE 时先判断是不是后台被拦，是就报 `{"error":"background_launch_blocked","action":…,"message":"Minis is not on screen…open Minis and retry"}`；真正的「没有处理者」文案保持不变 |
+| 真机复验 | 后台状态：`android-open https://example.com` → `background_launch_blocked` / `ACTION_VIEW`（改前是「no browser installed」）；前台状态：`android-alarm list` → Clock 打开、`rc=0` |
+| 验证口径 | `:app:testDebugUnitTest` **2398 例 0 失败**（新增 `OffloadForegroundTest` 2 例）+ `:app:assembleDebug` |
+| 顺带清点结果 | 可运行面（device info/battery/storage、alarm、notification settings、a11y service、shizuku service、scheduled list、model-use list、sessions list、debug）除上述一条外**全部 exit 0** |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
