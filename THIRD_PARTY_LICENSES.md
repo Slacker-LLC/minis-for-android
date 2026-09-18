@@ -75,6 +75,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `roleplay/CharacterWorldbook.kt`, `roleplay/CharacterWorldbookSupport.kt` | `agent/roleplay/CharacterWorldbook.kt`, `CharacterWorldbookSupport.kt` |
 | `roleplay/CharacterMacros.kt`, `roleplay/CharacterCardCompatibility.kt` | `agent/roleplay/CharacterMacros.kt`, `CharacterCardCompatibility.kt` |
 | `roleplay/CharacterRepository.kt`, `roleplay/CharacterStoragePolicy.kt`, `data/db/CharacterEntity.kt`, `data/db/CharacterDao.kt` and the `characters` table in `data/db/AppDatabase.kt` | `data/repository/CharacterRepository.kt` and `data/db/CharacterEntity.kt` |
+| `roleplay/CharacterPrompt.kt` (character block and depth-note placement) | `agent/roleplay/RoleplayRunContext.kt` |
 
 
 ## Active native/runtime components
