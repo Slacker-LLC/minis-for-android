@@ -169,47 +169,6 @@ object BrowserUseJS {
         """.trimIndent()
     }
 
-    // -- Get Readable --
-
-    /** The readable-mode half of [getText]'s contract; the source is whitespace-collapsed first. */
-    fun getReadable(offset: Int, maxChars: Int): String {
-        val documentCap = BrowserTextWindowPolicy.MAX_DOCUMENT_CHARS
-        return """
-        (function() {
-            var candidateSelectors = [
-                'article', '[role="main"]', 'main', '.post-content',
-                '.article-body', '.entry-content', '#content', '.content'
-            ];
-            var el = null;
-            var matchedSelector = null;
-            for (var i = 0; i < candidateSelectors.length; i++) {
-                var found = document.querySelector(candidateSelectors[i]);
-                if (found && window.getComputedStyle(found).display !== 'none' && (found.innerText || '').length > 0) {
-                    el = found; matchedSelector = candidateSelectors[i]; break;
-                }
-            }
-            if (!el) { el = document.body; matchedSelector = 'document.body (fallback)'; }
-            var title = document.title || '';
-            var source = (el.innerText || '').replace(/\s+/g, ' ').trim();
-            var value = source.substring(0, $documentCap);
-            var total = value.length;
-            var start = Math.min($offset, total);
-            var end = Math.min(start + $maxChars, total);
-            return JSON.stringify({
-                title: title,
-                text: value.substring(start, end),
-                text_length: total,
-                returned_chars: end - start,
-                offset: start,
-                next_offset: end < total ? end : null,
-                truncated: end < total,
-                source_truncated: source.length > $documentCap,
-                source: matchedSelector
-            });
-        })()
-    """.trimIndent()
-    }
-
     // -- Scroll --
 
     fun scroll(direction: ScrollDirection, amount: Int, selector: String?): String {

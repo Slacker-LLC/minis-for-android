@@ -264,6 +264,9 @@ jobs:
       - name: Verify PTY JNI lifecycle on Linux
         if: matrix.name == 'unit tests'
         run: python3 scripts/test_pty_bridge.py
+      - name: Verify the browser scripts still parse as JavaScript
+        if: matrix.name == 'unit tests'
+        run: python3 scripts/test_browser_js_syntax.py
 
   android-debug-build:
     name: Android debug build

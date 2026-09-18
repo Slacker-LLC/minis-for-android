@@ -956,7 +956,7 @@ class BrowserUseManager(
 
     private suspend fun getReadable(offset: Int?, maxChars: Int?): BrowserActionResult {
         return evaluateJSAndParse(
-            BrowserUseJS.getReadable(
+            BrowserDomScripts.readable(
                 offset = BrowserTextWindowPolicy.offset(offset),
                 maxChars = BrowserTextWindowPolicy.maxChars(maxChars),
             ),
