@@ -702,30 +702,58 @@ object AndroidUiController {
         val timeout = args.optLong("timeoutMs", 5_000L).coerceIn(0L, 60_000L)
         val text = args.optString("textFilter", "").trim()
         val disappear = args.optString("mode", "appear") == "disappear"
+        // [T-eta-wait-match] Upstream's matching modes; an unknown one is refused instead of being
+        // silently treated as the default (see UiWaitPolicy).
+        val matchMode = UiWaitPolicy.parse(args.optString("match", UiWaitPolicy.MODE_CONTAINS))
+            ?: return error(
+                "INVALID_MATCH",
+                "match must be one of " + UiWaitPolicy.MODES.joinToString(", "),
+            )
+        val includeDesc = if (args.has("include_desc")) args.optBoolean("include_desc") else true
         val started = System.currentTimeMillis()
+        var attempts = 0
         if (text.isEmpty()) {
             delay(timeout.coerceAtMost(10_000L))
             return UiToolResult(JSONObject().put("action", "wait").put("waitedMs", System.currentTimeMillis() - started).put("matched", true), true)
         }
         do {
-            val present = service.rootNodes().any { containsText(it, text, 0, 30) }
+            attempts++
+            val present = service.rootNodes().any {
+                containsText(it, text, matchMode, includeDesc, 0, 30)
+            }
             if (present != disappear) {
                 return UiToolResult(JSONObject().put("action", "wait").put("textFilter", text)
                     .put("mode", if (disappear) "disappear" else "appear")
+                    .put("match", matchMode).put("attempts", attempts)
                     .put("matched", true).put("waitedMs", System.currentTimeMillis() - started), true)
             }
             delay(200L)
         } while (System.currentTimeMillis() - started < timeout)
         return UiToolResult(JSONObject().put("action", "wait").put("textFilter", text)
             .put("mode", if (disappear) "disappear" else "appear")
-            .put("matched", false).put("timedOut", true).put("waitedMs", System.currentTimeMillis() - started), true)
+            .put("match", matchMode).put("attempts", attempts)
+            .put("matched", false).put("timedOut", true)
+            .put("waitedMs", System.currentTimeMillis() - started), true)
     }
 
-    private fun containsText(node: AccessibilityNodeInfo?, needle: String, depth: Int, maxDepth: Int): Boolean {
+    private fun containsText(
+        node: AccessibilityNodeInfo?,
+        needle: String,
+        matchMode: String,
+        includeDesc: Boolean,
+        depth: Int,
+        maxDepth: Int,
+    ): Boolean {
         if (node == null || depth > maxDepth) return false
-        if (node.text?.toString()?.contains(needle, true) == true ||
-            node.contentDescription?.toString()?.contains(needle, true) == true) return true
-        for (index in 0 until node.childCount) if (containsText(node.getChild(index), needle, depth + 1, maxDepth)) return true
+        if (UiWaitPolicy.matches(node.text?.toString(), needle, matchMode)) return true
+        if (includeDesc && UiWaitPolicy.matches(node.contentDescription?.toString(), needle, matchMode)) {
+            return true
+        }
+        for (index in 0 until node.childCount) {
+            if (containsText(node.getChild(index), needle, matchMode, includeDesc, depth + 1, maxDepth)) {
+                return true
+            }
+        }
         return false
     }
 

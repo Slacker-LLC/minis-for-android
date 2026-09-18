@@ -81,6 +81,15 @@ object AndroidAgentTools {
                 "maxDepth" to AgentToolParam("integer", "Maximum observation depth (default 12, max 30)"),
                 "maxNodes" to AgentToolParam("integer", "Maximum returned nodes (default 120, max 500)"),
                 "textFilter" to AgentToolParam("string", "Text/content-description filter"),
+                "match" to AgentToolParam(
+                    "string",
+                    "wait: how textFilter is matched - contains (default, case-insensitive), exact, prefix or regex",
+                    listOf("contains", "exact", "prefix", "regex"),
+                ),
+                "include_desc" to AgentToolParam(
+                    "boolean",
+                    "wait: also match the content description (default true)",
+                ),
                 "resourceIdFilter" to AgentToolParam("string", "Resource-id filter"),
                 "packageFilter" to AgentToolParam("string", "Package filter"),
                 "text" to AgentToolParam("string", "Text for set_text"),

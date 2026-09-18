@@ -116,6 +116,7 @@ commit; the license terms are not repeated per file. New ports append a row here
 | `accessibility/ClipboardRestorePolicy.kt`, the shared clipboard borrow and the `paste_text` action in `tools/android/AndroidUiController.kt` | `pasteText` / `restoreClipboardIfStillOwned` in `agent/accessibility/AgentAccessibilityService.kt` |
 | `accessibility/TextInputBoundsPolicy.kt`, the write bounds in `tools/android/AndroidUiController.kt` and the `ime_enter` action | the `input_text` / `replace_text` bounds in `agent/device/RootShellDeviceController.kt` and `imeEnter` (the `press_key` ENTER path) in `agent/accessibility/AgentAccessibilityService.kt` |
 | `runtime/guest/ClipboardBoundsPolicy.kt` and the read/write bounds in `runtime/guest/ClipboardOffloadHandler.kt` | the clipboard bounds in `agent/device/RootShellDeviceController.kt` (`clipboardSet` / `clipboardGet`) |
+| `tools/android/UiWaitPolicy.kt` and the `match` / `include_desc` parameters of the `android_ui wait` action | `RootShellDeviceController.matches` and the `wait_for_text` parameters behind it |
 
 
 ## Active native/runtime components
