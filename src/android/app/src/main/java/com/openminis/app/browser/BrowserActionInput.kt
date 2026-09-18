@@ -43,7 +43,7 @@ data class BrowserActionInput(
      * Mirrors Eta's `max_chars` (256..12000, default 8000).
      */
     val maxChars: Int? = null,
-    /** Milliseconds to wait (wait_for_dom_stable). */
+    /** Milliseconds to wait (wait_for_dom_stable, wait_for_selector). */
     val timeoutMs: Int? = null,
     /** When true on screenshot, stretch viewport to full document.scrollHeight before capture. */
     val fullPage: Boolean = false,
@@ -86,7 +86,13 @@ data class BrowserActionInput(
                     scrollCount = if (obj.has("scroll_count")) obj.optInt("scroll_count") else null,
                     offset = if (obj.has("offset")) obj.optInt("offset") else null,
                     maxChars = if (obj.has("max_chars")) obj.optInt("max_chars") else null,
-                    timeoutMs = if (obj.has("timeout")) obj.optInt("timeout") else null,
+                    // Upstream spells it timeout_ms; this app's older schema only knew
+                    // the `timeout` spelling for wait_for_dom_stable. Accept both.
+                    timeoutMs = when {
+                        obj.has("timeout_ms") -> obj.optInt("timeout_ms")
+                        obj.has("timeout") -> obj.optInt("timeout")
+                        else -> null
+                    },
                     fullPage = obj.optBoolean("full_page", false),
                     cookies = parseCookies(obj),
                 )

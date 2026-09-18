@@ -602,6 +602,7 @@ class BrowserUseManager(
                 input.scrollCount, input.itemSelector, input.keywords,
             )
             BrowserAction.WAIT_FOR_DOM_STABLE -> return waitForDomStable(input.timeoutMs)
+            BrowserAction.WAIT_FOR_SELECTOR -> return waitForSelector(input.selector, input.timeoutMs)
             BrowserAction.NEW_TAB, BrowserAction.CLOSE_TAB, BrowserAction.LIST_TABS ->
                 return BrowserActionResult.error("Tab management actions must be routed through BrowserTabPool")
         }
@@ -1719,6 +1720,51 @@ class BrowserUseManager(
         }
 
     // -- Wait for DOM Stable --
+
+    /**
+     * [T-browser-wait-for-selector-android] Ported from Eta `waitForSelector`
+     * (Mangi-11/Eta @ c15de97): poll the page-side `selectorState` until the
+     * selector matches something the browser can render, up to the clamped budget.
+     * `wait_for_dom_stable` watches the document as a whole; this waits for the one
+     * element the next click needs — which is what an app that renders after a
+     * click actually requires, and what a mutation-stability heuristic guesses at.
+     *
+     * An invalid selector fails on the first poll instead of burning the budget:
+     * the page-side `querySelectorAll` throws and the wrapper hands back the error.
+     */
+    private suspend fun waitForSelector(selector: String?, timeoutMs: Int?): BrowserActionResult {
+        if (selector.isNullOrBlank()) {
+            return BrowserActionResult.error("wait_for_selector requires 'selector'")
+        }
+        val budget = BrowserSelectorWaitPolicy.timeout(timeoutMs)
+        val deadline = System.currentTimeMillis() + budget
+        while (true) {
+            val state = try {
+                JSONObject(evaluateJavascript(BrowserDomScripts.selectorState(selector)))
+            } catch (e: Exception) {
+                return BrowserActionResult.error("JavaScript error: ${e.message}")
+            }
+            if (state.has("error")) {
+                return BrowserActionResult.error(state.optString("error", "selector lookup failed"))
+            }
+            if (state.optBoolean("found")) {
+                val elapsed = budget - (deadline - System.currentTimeMillis())
+                return BrowserActionResult(
+                    text = BrowserSelectorWaitPolicy.found(
+                        selector = selector,
+                        elapsedMs = elapsed,
+                        enabled = state.optBoolean("enabled", false),
+                    ),
+                )
+            }
+            if (System.currentTimeMillis() >= deadline) break
+            delay(BrowserSelectorWaitPolicy.POLL_INTERVAL_MS)
+        }
+        return BrowserActionResult(
+            text = BrowserSelectorWaitPolicy.notFound(selector, budget),
+            success = false,
+        )
+    }
 
     /**
      * Poll the DOM for stability: repeatedly measures `document.body.innerHTML.length`

@@ -444,4 +444,24 @@ internal object BrowserDomScripts {
         };
         """.trimIndent())
     }
+
+    /**
+     * [T-browser-wait-for-selector-android] Upstream's `selectorState`: is there a
+     * match the browser can actually render? The first 2000 matches are inspected
+     * and only a visible one counts, so `found` is never "in the DOM but hidden
+     * behind a collapsed menu"; `enabled` carries the accessibility check the
+     * caller needs before clicking.
+     */
+    fun selectorState(selector: String): String = wrap("""
+        var matches = document.querySelectorAll(${org.json.JSONObject.quote(selector)});
+        var target = null;
+        for (var index = 0; index < matches.length && index < 2000; index++) {
+          if (visible(matches[index])) { target = matches[index]; break; }
+        }
+        return {
+          found: !!target,
+          visible: !!target,
+          enabled: target ? enabled(target) : false
+        };
+    """.trimIndent())
 }

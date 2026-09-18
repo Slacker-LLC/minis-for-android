@@ -129,4 +129,23 @@ class BrowserDomScriptsTest {
         listOf("selector_used", "element_count", "scanned_elements", "truncated", "elements")
             .forEach { key -> assertTrue("missing $key", script.contains("$key:")) }
     }
+
+    @Test
+    fun `selector_state only counts a match the browser can render`() {
+        val script = BrowserDomScripts.selectorState(".result-row")
+
+        assertTrue(script.contains("var matches = document.querySelectorAll(\".result-row\");"))
+        assertTrue(script.contains("index < 2000"))
+        assertTrue(script.contains("if (visible(matches[index])) { target = matches[index]; break; }"))
+        assertTrue(script.contains("enabled: target ? enabled(target) : false"))
+        assertTrue(script.contains("found: !!target"))
+    }
+
+    @Test
+    fun `selector_state quotes a hostile selector instead of pasting it`() {
+        val script = BrowserDomScripts.selectorState("a[title=\"]\"]")
+
+        assertTrue(script.contains("\\\"]\\\"]"))
+        assertFalse(script.contains("querySelectorAll(\"a[title=\"]\"]\")"))
+    }
 }

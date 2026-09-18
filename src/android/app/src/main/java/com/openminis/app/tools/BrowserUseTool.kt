@@ -12,7 +12,7 @@ object BrowserUseTool {
 
     const val NAME = "browser_use"
 
-    val description = """Control web browser with up to 3 tabs. Actions: navigate to URL, take screenshot, click elements, type text, get page text, scroll, get page info, execute JavaScript, find elements by selector, hover, get readable content, set user agent, get page backbone (DOM structure), fetch resource, manage tabs (new_tab, close_tab, list_tabs). get_text and get_readable read the page in windows (offset + max_chars) and report next_offset while more text remains — pass it back as offset to continue the same page.""".trimIndent()
+    val description = """Control web browser with up to 3 tabs. Actions: navigate to URL, take screenshot, click elements, type text, get page text, scroll, get page info, execute JavaScript, find elements by selector, hover, get readable content, set user agent, get page backbone (DOM structure), fetch resource, wait for an element to appear (wait_for_selector), manage tabs (new_tab, close_tab, list_tabs). get_text and get_readable read the page in windows (offset + max_chars) and report next_offset while more text remains — pass it back as offset to continue the same page. find_elements without a selector lists the page's interactive elements and gives each a verified selector to click.""".trimIndent()
 
     /**
      * Build the JSON tool definition for the Anthropic / OpenAI / Gemini API.
@@ -76,6 +76,13 @@ object BrowserUseTool {
             put("type", "integer")
             put("minimum", 0)
             put("description", "get_text / get_readable: character offset to start the window at (default 0). The result header prints next_offset when more text remains — pass it back to keep reading the same page.")
+        })
+
+        properties.put("timeout_ms", JSONObject().apply {
+            put("type", "integer")
+            put("minimum", 500)
+            put("maximum", 30000)
+            put("description", "wait_for_selector: how long to wait for the selector to appear, in milliseconds (default 5000, max 30000). wait_for_dom_stable also reads it.")
         })
 
         properties.put("max_chars", JSONObject().apply {

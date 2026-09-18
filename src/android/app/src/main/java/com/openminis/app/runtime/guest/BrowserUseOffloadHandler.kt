@@ -155,6 +155,7 @@ class BrowserUseOffloadHandler(private val app: MinisApp) : NativeOffloadHandler
         args.get("item-selector", "item_selector")?.let { obj.put("item_selector", it) }
         args.getInt("scroll-count", "scroll_count")?.let { obj.put("scroll_count", it) }
         args.getInt("timeout")?.let { obj.put("timeout", it) }
+        args.getInt("timeout-ms", "timeout_ms")?.let { obj.put("timeout_ms", it) }
         if (args.hasFlag("fuzzy")) obj.put("fuzzy", true)
         args.get("keywords")?.let { raw ->
             // Comma- or whitespace-separated list.
@@ -467,6 +468,7 @@ ACTIONS:
                   the shell intact — write the array to a temp file first.
   scroll_and_collect --scroll-count <n> --item-selector <css> [--keywords <list>]
   wait_for_dom_stable [--timeout <ms>]
+  wait_for_selector --selector <css> [--timeout-ms <ms>]
 
 COMMON OPTIONS:
   --tab-id <n>     Route the action to a specific tab (default: active tab)
