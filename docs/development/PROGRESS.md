@@ -181,13 +181,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1984 个用例 = 上一项后的 1975 + 9，0 失败）。本项无新资源/清单改动，未跑 lint（工程矩阵里 Android 代码只要 compile+test）。真机未验证：超大会话的翻页耗时、模型在真实压缩后是否真的用它找回旧指令、工具片段截断在长会话里的可读性。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 闹钟与计时器 | `android-alarm` 早已能通过系统时钟应用排程，但只有 shell 能碰到它——模型没有可发现的工具 schema，被要求「设个 7 点闹钟」只能靠 `shell_execute` 猜 CLI 参数。新增 `android.alarm.set`（别名 `set_alarm`：本地时间 hour/minute、可选 label 与 repeat_days）、`android.alarm.timer`（别名 `set_timer`：秒数、上限 24 小时）、`android.alarm.open`（别名 `show_alarms`：把时钟应用拉到前台） | `0dbd53f4` | ✅ `AlarmToolPolicyTest`（8 例） |
+| 拒绝而非改写 | 校验集中在 `AlarmToolPolicy`：小时不在 0–23、分钟不在 0–59、计时器为 0/负数/超 24 小时、重复规则既不是整周（daily）也不是周一到周五（weekdays）、星期拼写不被 CLI 接受——一律带原因拒绝。自定义星期组合明确拒绝并说明只能去时钟应用设置，因为在这里排程会静默落到错误的日子 | `0dbd53f4` | ✅ 上述用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1992 个用例 = 上一项后的 1984 + 8，0 失败）。**与 Eta 的刻意差异**：不提供 `list_alarms` / `list_active_timers`——Android 的 Clock API 是「发完即忘」，本仓库又刻意不再保留自己的闹钟记录（T266），做出来的「列表」只可能是打开时钟应用却自称列表；改为 `android.alarm.open`，结果里如实写明它做了什么。真机未验证：各 OEM 时钟应用对 `EXTRA_SKIP_UI` 的实际处理（是否弹确认）、Android 14+ 的精确闹钟授权路径、计时器与闹钟在真实设备上的创建结果。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境（通知历史检索与会话历史检索已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 健康摘要、媒体/录音/文件检索、聊天图片、设备环境（通知历史检索、会话历史检索、闹钟与计时器已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
