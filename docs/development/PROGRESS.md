@@ -355,6 +355,15 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2152 个用例 = 上一项后的 2148 + 4，0 失败）。**没有任何设备结论**：这一版 Google App 是否真的拿这些答案当门禁、写入的档案是否在它读取之前生效、`sun.misc.Unsafe` 路径在目标 Android 版本上是否被允许，全部未验证——补齐失败时台账逐条记 MISSING/FAILED 并保留平台真值。真机判据：logcat 里 `GoogleEligibility` 前缀的台账行，以及 Google 进程内 `Build.MODEL` 是否变成 `SM-S928B`。
 
+**Phase 6 第五组：系统 contextual search 的可用性（一圈即搜的系统侧）** — 同一分支 `codex/eta-phase6-xposed`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 第五组真 hook：把系统的 contextual search 叫起来 | 没带 contextual search 配置的 ROM 根本不启动这个系统服务，导航条也就永远调不动它——用户手里的手势最后什么也不做。这组在 system_server 里补三处：启动门（`SystemServer.deviceHasConfigString` 对 `config_defaultContextualSearchPackageName` 那个资源回答「有」）、兜底启动（`startOtherServices` 走完之后服务仍不在就自己 `startService(Class)` 拉起来；该方法先 deopt，否则被修的启动路径本身可能已经是编译好的副本，hook 根本到不了）、服务侧两个答案（`getContextualSearchPackageName()` 答 Google 包；`enforcePermission(String)` 只对 `startContextualSearch` 且调用方在名单内的一类放行）。框架的 invoker 是隐藏方法的首选路径，被拒时回落普通反射 | `6ff28d21` | ✅ `ContextualSearchCallerPolicyTest`（5 例） |
+| 放行名单必须窄 | `ContextualSearchCallerPolicy` 是纯逻辑：SystemUI（导航条）与 ColorOS 的手势服务直接放行；小米桌面/全球版桌面/超级小爱要**同时**满足「手势接管开关为开」与「该包确实是系统包」——只按包名匹配等于给同名的侧载应用开后门。其余调用方一律回落平台自己的权限检查。调用方按 UID 取整包组（oneway AIDL 拿不到 PID），共享 UID 就是真实的权限边界 | `6ff28d21` | ✅ 上述用例（侧载同名拒绝、开关关闭拒绝、第三方拒绝、空包组拒绝） |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2157 个用例 = 上一项后的 2152 + 5，0 失败）。**没有任何设备结论**：某一版 ROM 是否有这个服务类、`startService(Class)` 是否真能把它拉起来、手势的调用方是否真的走到 `enforcePermission`、Google App 是否暴露搜索入口，全部未验证；没有目标时台账记 MISSING/SKIPPED，服务没起来只记警告并保留 ROM 原行为。真机判据：logcat 里 `ContextualSearch` 前缀的台账行 + 手势触发后服务是否从「未启动」变成可用。
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
@@ -363,7 +372,7 @@
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 剧情记忆、角色草稿编辑、角色界面与导入导出入口（角色卡模型/编解码/PNG 承载、世界书触发、宏展开、能力说明、存储层已在 `codex/eta-phase5-roleplay` 落地） | Eta `agent/roleplay/*` |
-| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿。未落地：小布、超级小爱、一圈即搜的系统侧、无障碍保活与热词自愈 | Eta `hook/*`、`ModuleMain.kt` |
+| Phase 6 厂商入口接管 | 已落地：libxposed 接入、HyperOS 手势条识屏与电源键、Google 资格补齐与浮窗语音补偿、系统 contextual search 的启动门与放行名单。未落地：小布、超级小爱、无障碍保活与热词自愈、ColorOS 记忆/直连 | Eta `hook/*`、`ModuleMain.kt` |
 
 ## 六、明确排除
 
