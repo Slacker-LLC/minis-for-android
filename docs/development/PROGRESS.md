@@ -64,11 +64,22 @@
 
 本仓库相对来源的适配：保留本分支已在用的记忆预算调用（`loadGlobalMemoryFragmentAsync(effectiveContextWindowTokens())`）；新增 `values-zh-rTW` 译文（源仓库无此语言）；补齐 Phase 1 字符串在 de/fr/ja/ko/ru/zh-rTW 的翻译（清掉 43 个 lint MissingTranslation error）；修掉 2 个 AppNavigation 的 Compose lint error；`docs/contracts/06-CURRENT-GAPS.md` 里真机结论标注为「在来源仓库 `a113ad1e` 上完成，本仓库未复跑」。
 
+**Phase 2-5 Provider 自定义请求头与请求体** — 分支 `codex/eta-phase2-provider-passthrough`，基于 `fcccb587`：
+
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 自定义请求头统一过滤 | `extra_headers`（标准 chat）、图片 passthrough、`passthrough.headers` 三个入口共用 `provider/CustomHeaderPolicy.kt`：协议头（`Host`/`Content-Length`/`Connection`/`Transfer-Encoding`/`Content-Encoding`/`Accept-Encoding`/`Expect`/`Keep-Alive`/`Proxy-Connection`/`Upgrade`）与凭据头（`Authorization`/`x-api-key`/`anthropic-version`）一律丢弃并给出警告；名称按 RFC 7230 token 字符集校验，值限可打印 ASCII 或 tab，大小写不敏感重名后者胜（先前那个被移除而不是一起发出去） | `61e0f8fe` | ✅ `CustomHeaderPolicyTest`（10 例，含全部拒绝路径） |
+| 请求头值日志脱敏 | 原始 passthrough 的 `headerOverrides` 日志改为输出脱敏后的 `名=值`，`authorization`/`x-api-key`/`api-key` 记为 `***` | `61e0f8fe` | ✅ `CustomHeaderPolicyTest` |
+| 请求体递归合并 | chat/responses `extra_body`、`images/generations` passthrough、`passthrough.body`（merge 模式）统一走 `provider/RequestBodyMerge.kt`：两侧都是对象时逐字段递归，数组整体替换，标量与 null 覆盖；`model` 仍由 App 最后钉住，调用方改不了路由 | `61e0f8fe` | ✅ `RequestBodyMergeTest`（8 例，含深层递归、对象被标量替换、调用方后续改写不影响已合并对象） |
+| 归属登记 | `THIRD_PARTY_LICENSES.md` 的 ported-modules 表增补 `CustomHeaderPolicy.kt`、`RequestBodyMerge.kt` 两行 | `61e0f8fe` | 文档：`test_docs_provenance.py` + `check_docs_provenance.py` 通过 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（1874 个用例 = 分支既有 1856 + 新增 18，0 失败）。行为变化只有一处需要在真机复核：调用方此前可以用 `extra_headers` 顶掉 App 自己的凭据或协议头，现在失败关闭（头被丢弃 + 结果 JSON 的 `warnings` 里出现原因）；其余自定义头与既有请求体字段语义不变。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
-| Phase 2 底层 AI | Responses 完整支持（opaque output 回放、服务端 `web_search`、引用格式化）、工具能力投影、屏幕观察契约、文件视觉、请求头与请求体合并 | Eta `agent/model/*` |
+| Phase 2 底层 AI | Responses 完整支持（opaque output 回放、服务端 `web_search`、引用格式化）、工具能力投影、屏幕观察契约、文件视觉（请求头与请求体合并已在 `codex/eta-phase2-provider-passthrough` 落地） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板、GUI 动作补齐、Skills 暴露给模型、会话级编辑 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
 | Phase 4 个人上下文 | 通知历史检索、闹钟与计时器、健康摘要、媒体/录音/文件检索、聊天图片、设备环境、会话历史检索 | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
