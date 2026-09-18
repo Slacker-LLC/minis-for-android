@@ -15,6 +15,8 @@ import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.provider.thinking.ThinkingResolveContext
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.LLMProvider
+import com.openminis.app.provider.CustomHeaderPolicy
+import com.openminis.app.provider.RequestBodyMerge
 import com.openminis.app.provider.applyUserAgentOverride
 import com.openminis.app.provider.safeOptString
 import kotlinx.coroutines.CancellationException
@@ -1498,13 +1500,21 @@ class OpenAIProvider private constructor(
         builder.header("Content-Type", "application/json")
         // ctor extraHeaders, then user headers LAST — replace semantics.
         for ((k, v) in extraHeaders) builder.header(k, v)
-        for ((k, v) in headers) builder.header(k, v)
+        // [T-eta-provider-passthrough] Envelope headers are caller input: the
+        // protocol/credential names Eta filters out are dropped before they can
+        // replace the token applied by applyKeyAuth above.
+        val userHeaders = CustomHeaderPolicy.sanitize(headers)
+        for ((k, v) in userHeaders) builder.header(k, v)
+        // Values are echoed for diagnosis; credential names are masked first so
+        // a caller-supplied key can never land in the log.
+        val loggedHeaders = CustomHeaderPolicy.redactForLog(userHeaders)
+            .entries.joinToString(",") { "${it.key}=${it.value}" }
 
         com.openminis.app.logging.AppLogger.info(
             "OpenAIProvider",
             "[ModelUseRoute] route=raw-passthrough method=$verb url=$url " +
                 "bodyKeys=[${bodyObject?.keys()?.asSequence()?.sorted()?.joinToString(",") ?: ""}] " +
-                "headerOverrides=[${headers.keys.sorted().joinToString(",")}]",
+                "headerOverrides=[$loggedHeaders]",
         )
 
         val response = client.newCall(builder.build()).execute()
@@ -1582,7 +1592,9 @@ class OpenAIProvider private constructor(
             // override prompt/size or add Seedream's `image`/`watermark`), but
             // `model` is force-kept to the resolved id afterward so a stray
             // override can't misroute the request.
-            for ((k, v) in imageExtraBody) body.put(k, v ?: JSONObject.NULL)
+            // [T-eta-provider-passthrough] Recursive merge (Eta RequestBodyMerge
+            // rules) so nested overrides keep their siblings.
+            RequestBodyMerge.mergeInto(body, imageExtraBody)
             body.put("model", model.id)
 
             val bodyStr = body.toString()
@@ -2269,7 +2281,9 @@ class OpenAIProvider private constructor(
     private fun mergeChatExtraBody(body: JSONObject) {
         if (chatExtraBody.isEmpty()) return
         if (isOAuth && !forceChatCompletions) return  // Codex OAuth exemption
-        for ((k, v) in chatExtraBody) body.put(k, v ?: JSONObject.NULL)
+        // [T-eta-provider-passthrough] Recursive merge (Eta RequestBodyMerge
+        // rules): objects merge field-by-field, arrays and scalars replace.
+        RequestBodyMerge.mergeInto(body, chatExtraBody)
         body.put("model", model.id)
     }
 

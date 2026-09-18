@@ -7,7 +7,9 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.provider.CustomHeaderPolicy
 import com.openminis.app.provider.ProviderFactory
+import com.openminis.app.provider.RequestBodyMerge
 import com.openminis.app.provider.safeOptString
 import com.openminis.app.runtime.guest.NativeOffloadHandler
 import com.openminis.app.runtime.guest.NativeOffloadRequest
@@ -614,7 +616,9 @@ class ModelUseOffloadHandler(
             }
         }
         val path = obj.safeOptString("endpoint_path", "").trim().takeIf { it.isNotEmpty() }
-        return ImagePassthrough(body, headers, path)
+        val sanitized = CustomHeaderPolicy.sanitizeWithWarnings(headers)
+        warnings.addAll(sanitized.warnings)
+        return ImagePassthrough(body, sanitized.headers, path)
     }
 
     // MARK: - Call feedback [T-model-use-passthrough-warnings]
@@ -785,7 +789,17 @@ class ModelUseOffloadHandler(
                 warnings.add("body_mode value '$desc' is invalid (only merge/replace are supported) — treated as merge.")
             }
         }
-        return PassthroughSpec(true, endpoint, method, headers, bodyMode = bodyMode, body = body, warnings = warnings)
+        val sanitized = CustomHeaderPolicy.sanitizeWithWarnings(headers)
+        warnings.addAll(sanitized.warnings)
+        return PassthroughSpec(
+            true,
+            endpoint,
+            method,
+            sanitized.headers,
+            bodyMode = bodyMode,
+            body = body,
+            warnings = warnings,
+        )
     }
 
     /**
@@ -840,7 +854,13 @@ class ModelUseOffloadHandler(
                 )
             }
         }
-        return out
+        // [T-eta-provider-passthrough] Same Eta filter as the other two header
+        // surfaces: protocol-managed and credential-managed names never reach
+        // the wire, invalid names/values are dropped, case-insensitive
+        // duplicates collapse to the last one.
+        val sanitized = CustomHeaderPolicy.sanitizeWithWarnings(out)
+        warnings.addAll(sanitized.warnings)
+        return sanitized.headers
     }
 
     /**
@@ -911,7 +931,10 @@ class ModelUseOffloadHandler(
                 baseline.put("max_tokens", maxTokens)
                 baseline.put("stream", false)
             }
-            for ((k, v) in spec.body) baseline.put(k, v ?: JSONObject.NULL)
+            // [T-eta-provider-passthrough] Recursive merge (Eta rules): nested
+            // objects merge field-by-field so a caller adding `reasoning.effort`
+            // no longer erases the sibling fields the app already set.
+            RequestBodyMerge.mergeInto(baseline, spec.body)
             baseline.put("model", entry.model.id)   // merge mode locks model
             baseline
         }
