@@ -202,13 +202,20 @@
 
 ✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2003 个用例 = 上一项后的 1997 + 6，0 失败）。本项无资源/清单改动，未跑 lint。**未做**：Eta 的 `search_recordings`（ColorOS 录音）与 `search_files`/`search_downloads`（文档与下载记录）——前者是厂商私有目录、后者需要另一套 MediaStore.Files 查询与 MIME 归类，留待确认是否要做。真机未验证：各 ROM 上 MediaStore 音频的可检索范围（部分 ROM 只索引系统媒体库）、`--query` 在中文文件名上的行为、视频列表与 `read_image` 的配合。
 
+| 项 | 内容 | 提交 | 验证 |
+|---|---|---|---|
+| 文档与录音检索 | 又两项 Eta 的个人上下文检索，都走本仓库既有的 handler 而不是新查询通道：`android.media.files`（别名 `search_files`）列文档——文件名、mime、相对路径、大小与 content URI，关键词同时匹配**文件名或路径**（与 Eta 的可搜索列一致），`media_type=0` 把媒体行挡在文档列表之外；`android.media.audio` 增加 `recordings_only`，即 Eta 的 `search_recordings`：用同一个 relative_path 子句把音频收敛到录音目录 | `12881c5f` | ✅ `MediaQueryPolicyTest`（9 例） |
+| 多列过滤 | 多列过滤由 `MediaQueryPolicy.anyColumnFilter` 生成：转义通配符并把绑定参数按列重复——占位符数量必须与 SQLite 调用完全对应，用例把这一点钉住 | `12881c5f` | ✅ 占位符重复与转义用例 |
+
+✅ 的定义：该分支上 `:app:compileDebugKotlin` + `:app:testDebugUnitTest` 通过（2006 个用例 = 上一项后的 2003 + 3，0 失败）。**未做**：`search_downloads`——Eta 读的是 `content://downloads/my_downloads`（仅本应用自己的下载记录，对本 App 近乎恒空）与 `all_downloads`（需要系统权限），两个都不值得做成工具，留待确认；`search_coloros_*`（笔记/录音）与 QQ/微信聊天图片缓存属于厂商私有目录，跨 ROM 不可复现，且会给 Root 增加新的第三方数据读取面，属于要先拍板的范围变更。真机未验证：文档列表在各 ROM 上的可见范围（Android 11+ 可见性、SAF 与 MediaStore.Files 的差别）、录音目录命名差异、大文件量下的查询耗时。
+
 ## 三、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
 | Phase 2 底层 AI | 服务端 `web_search` 开关、工具能力投影与终态门（请求头与请求体合并、引用格式化、Responses opaque output 回放、UI 坐标空间契约、`read_image` 直读相册已在 `codex/eta-phase2-provider-passthrough` 落地；屏幕观察的其余合同 Minis 侧本就更强，未再移植） | Eta `agent/model/*` |
 | Phase 3 数字助手 | 助手浮层面板的剩余部分：连续追问与面板内屏幕上下文（需要先把 agent 运行解耦成可无头驱动的 seam）；就地展示/可停止/可接管已在 `codex/eta-phase3-skills-tools` 落地，Skills 暴露给模型、GUI 动作补齐、会话级编辑的 Markdown 导出同样已落地，复制/编辑/删除/重新生成本仓库原本就有 | Eta `agent/voice`、`agent/overlay`、`agent/tool` |
-| Phase 4 个人上下文 | 健康摘要、录音/文档/下载检索、聊天图片（通知历史检索、会话历史检索、闹钟与计时器、设备环境、音视频与照片检索已在 `codex/eta-phase4-notifications` 落地） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
+| Phase 4 个人上下文 | 健康摘要、QQ/微信聊天图片、下载记录检索（通知历史、会话历史、闹钟计时器、设备环境、照片/视频/音频/文档检索已在 `codex/eta-phase4-notifications` 落地；后两项涉及厂商私有目录与系统权限，待拍板） | Eta `agent/tool/AgentPersonal*Tools.kt`、`agent/device/*` |
 | Phase 5 角色系统 | 角色卡（酒馆 PNG/JSON）、世界书、剧情记忆、宏、角色界面与导入导出 | Eta `agent/roleplay/*` |
 | Phase 6 厂商入口接管 | libxposed 接入 + 电源键、小布、超级小爱、一圈即搜、Google 解锁 + 无障碍保活 | Eta `hook/*`、`ModuleMain.kt` |
 
