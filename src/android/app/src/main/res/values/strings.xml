@@ -1762,4 +1762,22 @@
     <string name="newer_db_exit">Close</string>
     <string name="compact_progress">Compacting… %1$d s elapsed</string>
     <string name="compact_progress_split">Compacting… %1$d s · summarizing in segments (%2$d/%3$d)</string>
+
+    <!-- [T-android-work-process] Collapsed work-process row (thinking + tool steps). -->
+    <string name="work_process_running_step">Running step %1$d · %2$s</string>
+    <string name="work_process_running_thinking">Thinking…</string>
+    <string name="work_process_failed_step">Step %1$d failed · %2$s</string>
+    <plurals name="work_process_completed_steps">
+        <item quantity="one">%d step completed</item>
+        <item quantity="other">%d steps completed</item>
+    </plurals>
+    <string name="work_process_completed_thinking">Thinking finished</string>
+    <string name="work_process_expand">Expand work process</string>
+    <string name="work_process_collapse">Collapse work process</string>
+    <string name="appearance_section_work_process">Work process</string>
+    <string name="appearance_steps_presentation_title">Collapse thinking and tool steps</string>
+    <string name="appearance_steps_presentation_on">Consecutive thinking blocks and tool calls collapse into one expandable row.</string>
+    <string name="appearance_steps_presentation_off">Every thinking block and tool call keeps its own row.</string>
+    <string name="appearance_steps_presentation_footer">A collapsed row auto-expands while steps are running and folds back when they finish; a failed step writes its reason on the collapsed row. Turn this off for one row per step with the unchanged long-press menu (re-run, copy, stop).</string>
+
 </resources>

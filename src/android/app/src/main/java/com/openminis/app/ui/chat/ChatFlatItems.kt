@@ -435,6 +435,63 @@ internal sealed class FlatChatItem {
         override val contentType = "tool"
     }
 
+    /**
+     * [T-android-work-process] One collapsed "work process" row: a maximal run
+     * of consecutive thinking / tool blocks taken from a single assistant
+     * message. The header carries the live/running or completed state (and the
+     * failure reason once a step failed); tapping it expands an inline panel
+     * that renders each collected step. Emitted only under
+     * [com.openminis.app.data.StepsPresentation.GROUPED]; the perTool mode
+     * keeps emitting [AssistantThinking] / [AssistantToolUse] rows.
+     *
+     * Equality follows the [AssistantText] rule — never walk a tool result
+     * body char-by-char. During streaming a tool result grows on every tick and
+     * LazyColumn calls equals per row to decide the stable-skip, so compare the
+     * stable keys, statuses and lengths and fall back to signalling a change
+     * (the length check) as soon as any body grew.
+     */
+    class WorkProcessRow(
+        val messageId: String,
+        val process: WorkProcess,
+        /** Every tool_use block of the parent message — the detail sheet's step index. */
+        val allToolBlocks: List<AssistantBlock>,
+    ) : FlatChatItem() {
+        override val key = "work:$messageId:${process.id}"
+        override val contentType = "work"
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is WorkProcessRow) return false
+            if (messageId != other.messageId) return false
+            if (process.id != other.process.id) return false
+            val mine = process.blocks
+            val theirs = other.process.blocks
+            if (mine.size != theirs.size) return false
+            for (index in mine.indices) {
+                val left = mine[index]
+                val right = theirs[index]
+                if (left.id != right.id) return false
+                if (left.kind != right.kind) return false
+                if (left.toolStatus != right.toolStatus) return false
+                if (left.content.length != right.content.length) return false
+                if (left.toolTitle.length != right.toolTitle.length) return false
+            }
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var hash = messageId.hashCode()
+            hash = hash * 31 + process.id.hashCode()
+            hash = hash * 31 + process.blocks.size
+            process.blocks.forEach { block ->
+                hash = hash * 31 + block.id.hashCode()
+                hash = hash * 31 + (block.toolStatus?.ordinal ?: -1)
+                hash = hash * 31 + block.content.length
+            }
+            return hash
+        }
+    }
+
     data class AssistantMedia(
         val messageId: String,
         val block: AssistantBlock,
@@ -542,6 +599,18 @@ internal fun buildFlatChatItems(
     // prefix so the defensive key-collision suffixing behaves exactly as a
     // single full build would.
     seedKeys: Set<String> = emptySet(),
+    // [T-android-work-process] Which presentation the rows are built for.
+    // GROUPED (default) folds each maximal run of consecutive thinking / tool
+    // blocks into one FlatChatItem.WorkProcessRow; PER_TOOL keeps the
+    // historical one-row-per-block layout (thinking card + tool pill each).
+    stepsPresentation: com.openminis.app.data.StepsPresentation =
+        com.openminis.app.data.StepsPresentation.GROUPED,
+    // [T-android-work-process] The chat's CURRENT Deep Thinking level, used
+    // only for messages whose thinkingLevel snapshot is null (legacy /
+    // DB-restored rows). Matches the T300 fallback ChatScreen applies when it
+    // decides whether a thinking block renders at all: a thinking block that
+    // renders nothing must not create or pad a work-process row either.
+    currentThinkingEnabled: Boolean = true,
 ): List<FlatChatItem> {
     val out = mutableListOf<FlatChatItem>()
     val usedKeys = if (seedKeys.isEmpty()) mutableSetOf() else seedKeys.toMutableSet()
@@ -571,6 +640,11 @@ internal fun buildFlatChatItems(
             )
             is FlatChatItem.AssistantThinking -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantToolUse -> item.copy(messageId = "${item.messageId}#$n")
+            is FlatChatItem.WorkProcessRow -> FlatChatItem.WorkProcessRow(
+                messageId = "${item.messageId}#$n",
+                process = item.process,
+                allToolBlocks = item.allToolBlocks,
+            )
             is FlatChatItem.AssistantMedia -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantInfo -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantTyping -> item.copy(messageId = "${item.messageId}#$n")
@@ -658,7 +732,21 @@ internal fun buildFlatChatItems(
         // retryLast() re-runs the whole turn, so one button is enough.
         val lastCancelledToolId = blocks.lastOrNull { it.kind == "tool_use" && it.toolStatus == ToolBlockStatus.CANCELLED }?.id
 
-        blocks.forEachIndexed { index, block ->
+        // [T-android-work-process] Fold the block list into render entries
+        // first. GROUPED collapses each maximal run of consecutive thinking /
+        // tool blocks into a single WorkProcessRow; any other block kind ends
+        // the run, and a hidden thinking block (Deep Thinking off) neither
+        // creates nor pads a run. PER_TOOL yields one Single per block, which
+        // keeps the historical row layout and its long-press menus unchanged.
+        val thinkingVisible = message.thinkingLevel?.isEnabled ?: currentThinkingEnabled
+        val turnEntries = buildAssistantTurnEntries(
+            messageId = message.id,
+            blocks = blocks,
+            presentation = stepsPresentation,
+            thinkingVisible = thinkingVisible,
+        )
+
+        fun emitBlock(index: Int, block: AssistantBlock) {
             when (block.kind) {
                 "text" -> {
                     if (block.content.isNotEmpty()) {
@@ -765,6 +853,17 @@ internal fun buildFlatChatItems(
                     block = block,
                     allToolBlocks = toolPillBlocks,
                     isLastCancelled = block.id == lastCancelledToolId,
+                )))
+            }
+        }
+
+        turnEntries.forEach { entry ->
+            when (entry) {
+                is AssistantTurnEntry.Single -> emitBlock(entry.blockIndex, entry.block)
+                is AssistantTurnEntry.Process -> out.add(dedupe(FlatChatItem.WorkProcessRow(
+                    messageId = message.id,
+                    process = entry.process,
+                    allToolBlocks = toolPillBlocks,
                 )))
             }
         }

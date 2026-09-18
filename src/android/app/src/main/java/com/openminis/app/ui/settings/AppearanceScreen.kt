@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrightnessAuto
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.DarkMode
@@ -52,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -200,6 +202,10 @@ fun AppearanceScreen(
     var appBaseLevel by remember { mutableIntStateOf(prefs.getInt(KEY_FONT_APP_BASE, 0)) }
     var selectedLanguage by remember { mutableStateOf(prefs.getString(KEY_LANGUAGE, "") ?: "") }
     var selectedAppIcon by remember { mutableStateOf(AppIconRepository.current(context)) }
+
+    // [T-android-work-process] Collected, not remembered: the value lives in a
+    // process-wide StateFlow so the toggle and ChatScreen stay in sync.
+    val stepsPresentation by com.openminis.app.data.StepsPresentationPrefs.value.collectAsState()
 
     val fontsModified = chatInputLevel != 0 || messageLevel != 0 || appBaseLevel != 0
 
@@ -414,6 +420,40 @@ fun AppearanceScreen(
                 onCheckedChange = {
                     autoExpandThinking = it
                     prefs.edit().putBoolean(KEY_AUTO_EXPAND_THINKING, it).apply()
+                },
+                showDivider = false,
+            )
+        }
+
+        // [T-android-work-process] -- Work Process --
+        // Whether a turn's consecutive thinking + tool steps collapse into one
+        // expandable row (default, mirrors Eta's AgentWorkProcess) or keep the
+        // historical one-row-per-step layout with its long-press menus.
+        SettingsSection(
+            header = stringResource(R.string.appearance_section_work_process),
+            footer = stringResource(R.string.appearance_steps_presentation_footer),
+        ) {
+            SettingsSwitchRow(
+                icon = Icons.Outlined.Build,
+                iconColor = tileOrange,
+                title = stringResource(R.string.appearance_steps_presentation_title),
+                subtitle = stringResource(
+                    if (stepsPresentation == com.openminis.app.data.StepsPresentation.GROUPED) {
+                        R.string.appearance_steps_presentation_on
+                    } else {
+                        R.string.appearance_steps_presentation_off
+                    },
+                ),
+                checked = stepsPresentation == com.openminis.app.data.StepsPresentation.GROUPED,
+                onCheckedChange = { grouped ->
+                    com.openminis.app.data.StepsPresentationPrefs.set(
+                        context,
+                        if (grouped) {
+                            com.openminis.app.data.StepsPresentation.GROUPED
+                        } else {
+                            com.openminis.app.data.StepsPresentation.PER_TOOL
+                        },
+                    )
                 },
                 showDivider = false,
             )

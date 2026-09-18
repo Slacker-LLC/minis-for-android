@@ -275,6 +275,12 @@ class MinisApp : Application(), ImageLoaderFactory {
         // Activity context.
         com.openminis.app.data.AutoCompactPrefs.prime(this)
 
+        // [T-android-work-process] Warm the chat transcript's step-presentation
+        // choice (grouped by default) so ChatScreen can collect the current
+        // value instead of re-reading SharedPreferences on every recomposition
+        // of the flatten path.
+        com.openminis.app.data.StepsPresentationPrefs.prime(this)
+
         // T283: install NDK signal handler for native crashes (SIGSEGV/
         // SIGABRT/SIGBUS/SIGFPE/SIGILL/SIGSYS). Writes a one-shot text
         // report to filesDir/logs/native-crash-<stamp>.log before re-raising

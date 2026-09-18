@@ -2755,6 +2755,16 @@ fun ChatScreen(
                 var lastColdPrewarmMs by remember(sessionId) { mutableStateOf(-1L) }
                 var coldOpenSummaryEmitted by remember(sessionId) { mutableStateOf(false) }
                 val screenMountAtMs = remember(sessionId) { System.currentTimeMillis() }
+                // [T-android-work-process] Presentation mode + the chat's
+                // Deep Thinking level. They decide whether the flatten folds
+                // each run of thinking / tool blocks into one WorkProcessRow,
+                // and whether a hidden thinking block exists at all. Collected
+                // rather than read once so flipping the setting in Appearance
+                // re-flattens instead of waiting for the next session.
+                val stepsPresentationState by
+                    com.openminis.app.data.StepsPresentationPrefs.value.collectAsState()
+                val flattenThinkingEnabled =
+                    viewModel.thinkingLevel.collectAsState().value.isEnabled
                 // T-streaming-side-channel: messages-level changes (new
                 // message, retry, etc.) AND streamingById deltas both feed
                 // buildFlatChatItems, but we subscribe to streamingById
@@ -2763,7 +2773,7 @@ fun ChatScreen(
                 // scope. The flatten still runs per token (cheap-ish; ran
                 // before too), but the rebuild stays off the main UI
                 // composable's invalidation list.
-                LaunchedEffect(messages, sessionId) {
+                LaunchedEffect(messages, sessionId, stepsPresentationState, flattenThinkingEnabled) {
                     // [T-android-stream-pipeline-incremental] Frozen/live split.
                     //
                     // `messages` is CONSTANT within this effect (the effect is
@@ -2851,7 +2861,12 @@ fun ChatScreen(
                                     // threw ConcurrentModificationException from
                                     // a later frame's SubList.equals. Copying
                                     // severs the view so it can't comodify.
-                                    buildFlatChatItems(msgs.take(splitIdx), sessionId)
+                                    buildFlatChatItems(
+                                        msgs.take(splitIdx),
+                                        sessionId,
+                                        stepsPresentation = stepsPresentationState,
+                                        currentThinkingEnabled = flattenThinkingEnabled,
+                                    )
                                 }
                                 val buildMs = (System.nanoTime() - tBuildStart) / 1_000_000
                                 frozenRows = rows
@@ -2927,7 +2942,14 @@ fun ChatScreen(
                             } else {
                                 withContext(Dispatchers.Default) {
                                     val merged = mergeStreamingOverlay(msgs, stream)
-                                    buildFlatChatItems(merged, null, fromIndex = splitIdx, seedKeys = frozenKeys)
+                                    buildFlatChatItems(
+                                        merged,
+                                        null,
+                                        fromIndex = splitIdx,
+                                        seedKeys = frozenKeys,
+                                        stepsPresentation = stepsPresentationState,
+                                        currentThinkingEnabled = flattenThinkingEnabled,
+                                    )
                                 }
                             }
                             flatItems = if (liveRows.isEmpty()) frozenRows else frozenRows + liveRows
@@ -3006,6 +3028,11 @@ fun ChatScreen(
                         newest is FlatChatItem.UserBubble && newest.message.isQueued
                     if (newest !is FlatChatItem.AssistantToolUse &&
                         newest !is FlatChatItem.AssistantTyping &&
+                        // [T-android-work-process] In grouped mode the trailing
+                        // row of a live run is the work-process row; it needs
+                        // the same follow-pin the tool pill gets, otherwise the
+                        // running step is left behind the floating bar.
+                        newest !is FlatChatItem.WorkProcessRow &&
                         !isQueuedBubble
                     ) return@LaunchedEffect
                     if (newest.key == lastTrailingPinKey) return@LaunchedEffect
@@ -3042,6 +3069,7 @@ fun ChatScreen(
                     is FlatChatItem.AssistantMarkdownBlock -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantThinking -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantToolUse -> grayedMap[originalMessageId(messageId)] == true
+                    is FlatChatItem.WorkProcessRow -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantMedia -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
                      is FlatChatItem.AssistantTyping -> false
@@ -3625,6 +3653,40 @@ fun ChatScreen(
                                         android.widget.Toast.LENGTH_SHORT,
                                     ).show()
                                 },
+                            )
+                            // [T-android-work-process] One collapsible row for a
+                            // whole run of thinking + tool steps. Header = state
+                            // line (running / failed reason / completed count);
+                            // the panel renders the same ThinkingBlock and
+                            // ToolCallPill the perTool layout uses, so the detail
+                            // sheet, stop button and copy menu stay identical.
+                            is FlatChatItem.WorkProcessRow -> WorkProcessRowView(
+                                process = item.process,
+                                allToolBlocks = item.allToolBlocks,
+                                onStop = { viewModel.cancelStream() },
+                                onOpenDetail = { viewModel.openToolDetail(it) },
+                                onOpenTerminalWithCommand = onOpenTerminalWithCommand,
+                                onCopyDetails = { block ->
+                                    val text = formatToolDetailsForClipboard(block)
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("tool", text))
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        context.getString(R.string.tool_longpress_copied_toast),
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                },
+                                // Same re-run gate as the per-tool pill: off while
+                                // a turn is in flight (truncating a live turn
+                                // corrupts agent state). The cut anchor is this
+                                // process's last tool call.
+                                onRerunFromHere = if (!isStreaming) ({
+                                    val anchor = item.process.toolBlocks.lastOrNull()?.id
+                                    if (anchor != null) {
+                                        coroutineScope.launch { tracedScrollToItem("RERUN-FROM-WORK", 0, 0) }
+                                        safeMutate { viewModel.rerunFromToolBlock(item.messageId, anchor) }
+                                    }
+                                }) else null,
                             )
                             is FlatChatItem.AssistantInfo -> FallbackInfoBlock(
                                 block = item.block,

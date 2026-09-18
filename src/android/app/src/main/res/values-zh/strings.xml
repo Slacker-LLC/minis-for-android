@@ -1616,4 +1616,21 @@
     <string name="newer_db_exit">关闭</string>
     <string name="compact_progress">正在压缩… 已进行 %1$d 秒</string>
     <string name="compact_progress_split">正在压缩… %1$d 秒 · 分段摘要中（%2$d/%3$d）</string>
+
+    <!-- [T-android-work-process] 工作过程收束行（思考 + 工具步骤）。 -->
+    <string name="work_process_running_step">正在执行第 %1$d 步 · %2$s</string>
+    <string name="work_process_running_thinking">正在思考…</string>
+    <string name="work_process_failed_step">第 %1$d 步失败 · %2$s</string>
+    <plurals name="work_process_completed_steps">
+        <item quantity="other">已完成 %d 个步骤</item>
+    </plurals>
+    <string name="work_process_completed_thinking">已完成思考</string>
+    <string name="work_process_expand">展开工作过程</string>
+    <string name="work_process_collapse">收起工作过程</string>
+    <string name="appearance_section_work_process">工作过程</string>
+    <string name="appearance_steps_presentation_title">思考与工具步骤收束</string>
+    <string name="appearance_steps_presentation_on">连续的思考块与工具调用合并为一条可展开行。</string>
+    <string name="appearance_steps_presentation_off">每个思考块与工具调用各自单独一行。</string>
+    <string name="appearance_steps_presentation_footer">收束行在步骤运行中自动展开、结束后自动折叠；失败的步骤会把原因写在折叠行上。关闭后保持每步一行，长按菜单（重跑 / 复制 / 停止）不变。</string>
+
 </resources>
