@@ -49,6 +49,8 @@ internal object ConfigBuiltins {
         registerProviderCollections(r, providerRepo, envVarRepo)
         registerDefaults(r, providerRepo)
         registerSoul(r, context)
+        registerSystemPrompt(r, context)
+        registerCustomSystemPrompt(r, context)
         registerMemory(r, context)
     }
 
@@ -1071,5 +1073,113 @@ internal object ConfigBuiltins {
                 },
             )
         )
+    }
+
+    // -- System prompt modules - authored wording for the built-in prompt --
+    //
+    // [T-system-prompt-modules] The static agent prompt used to be one Kotlin
+    // literal inside ChatViewModel; every section now ships as a file under
+    // assets/prompts/ and can be overridden. Registering the same
+    // PromptModuleStore the Settings screen writes keeps one source of truth:
+    // a write here behaves exactly like a write there (override file + cache
+    // refresh), so minis-config and Settings never disagree about the prompt.
+    //
+    // prompt.modules is the read-only index (ids, order, gate, override state)
+    // so a caller can discover ids before touching prompt.<id>.text.
+
+    private const val CUSTOM_PROMPT_MAX_CHARS = 64_000
+
+    private fun registerCustomSystemPrompt(r: ConfigRegistry, context: Context) {
+        r.register(
+            ClosureField(
+                path = "prompt.custom",
+                displayName = "Custom system prompt (device owner)",
+                description = "The free-text system prompt written by the device owner in Settings -> System prompt. It is injected ahead of every other authored section and is declared to outrank personality, style, preset, bot and session guidance. Empty means nothing is injected.",
+                valueSchema = ConfigSchema.Str(maxLength = CUSTOM_PROMPT_MAX_CHARS),
+                risk = ConfigRisk.NORMAL,
+                revertable = true,
+                reader = {
+                    ConfigValue.Str(com.openminis.app.prompt.CustomPromptStore.text(context).orEmpty())
+                },
+                writer = { value ->
+                    val text = (value as? ConfigValue.Str)?.value
+                        ?: throw ConfigError.TypeMismatch("string")
+                    com.openminis.app.prompt.CustomPromptStore.save(context, text)
+                },
+            )
+        )
+    }
+
+    private const val PROMPT_MODULE_MAX_CHARS = 20_000
+
+    private fun registerSystemPrompt(r: ConfigRegistry, context: Context) {
+        r.register(
+            ReadOnlyField(
+                path = "prompt.modules",
+                displayName = "System prompt modules",
+                description = "Editable system-prompt modules in assembly order with gate and override state. Read-only index - edit through prompt.<id>.text and prompt.<id>.enabled.",
+                valueSchema = ConfigSchema.Json,
+                reader = {
+                    val array = org.json.JSONArray()
+                    for (snapshot in com.openminis.app.prompt.PromptModuleStore.snapshots(context)) {
+                        array.put(
+                            org.json.JSONObject()
+                                .put("id", snapshot.module.id)
+                                .put("title", snapshot.module.title)
+                                .put("group", snapshot.module.group)
+                                .put("gate", snapshot.module.gate.name)
+                                .put("enabled", snapshot.isEnabled)
+                                .put("customized", snapshot.isCustomized)
+                                .put("chars", snapshot.text.length)
+                        )
+                    }
+                    ConfigValue.Str(array.toString())
+                },
+            )
+        )
+
+        for (module in com.openminis.app.prompt.PromptModuleRegistry.modules) {
+            r.register(
+                ClosureField(
+                    path = "prompt." + module.id + ".text",
+                    displayName = module.title + " - text",
+                    description = module.description + " Default wording ships in assets/prompts/" + module.assetName +
+                        ". A write stores a user override; writing the default text back (or Reset to default in Settings -> System prompt) clears it. An empty value removes this section from the prompt.",
+                    valueSchema = ConfigSchema.Str(maxLength = PROMPT_MODULE_MAX_CHARS),
+                    risk = ConfigRisk.NORMAL,
+                    revertable = true,
+                    reader = {
+                        val snapshot = com.openminis.app.prompt.PromptModuleStore.snapshots(context)
+                            .firstOrNull { it.module.id == module.id }
+                        ConfigValue.Str(snapshot?.text.orEmpty())
+                    },
+                    writer = { value ->
+                        val text = (value as? ConfigValue.Str)?.value
+                            ?: throw ConfigError.TypeMismatch("string")
+                        com.openminis.app.prompt.PromptModuleStore.saveOverride(context, module.id, text)
+                    },
+                )
+            )
+            r.register(
+                ClosureField(
+                    path = "prompt." + module.id + ".enabled",
+                    displayName = module.title + " - enabled",
+                    description = "When false this module is skipped entirely and its text is kept. Runtime gate: " + module.gate.name + ".",
+                    valueSchema = ConfigSchema.Bool,
+                    risk = ConfigRisk.NORMAL,
+                    revertable = true,
+                    reader = {
+                        val snapshot = com.openminis.app.prompt.PromptModuleStore.snapshots(context)
+                            .firstOrNull { it.module.id == module.id }
+                        ConfigValue.Bool(snapshot?.isEnabled ?: true)
+                    },
+                    writer = { value ->
+                        val enabled = (value as? ConfigValue.Bool)?.value
+                            ?: throw ConfigError.TypeMismatch("boolean")
+                        com.openminis.app.prompt.PromptModuleStore.setEnabled(context, module.id, enabled)
+                    },
+                )
+            )
+        }
     }
 }

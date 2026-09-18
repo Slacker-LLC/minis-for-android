@@ -162,6 +162,10 @@ object Routes {
     const val MCP = "mcp"
     /** [T-soul-md] SOUL.md editor. */
     const val SOUL = "soul"
+    /** [T-system-prompt-modules] Editor for the built-in system prompt modules. */
+    const val SYSTEM_PROMPT = "system_prompt"
+    /** [T-system-prompt-modules] Advanced editor for the shipped prompt sections. */
+    const val SYSTEM_PROMPT_MODULES = "system_prompt_modules"
     const val MEMORY_FILE_EDIT = "memory_file/{fileName}/{isGlobal}"
     const val PERMISSIONS = "permissions"
     /**
@@ -249,9 +253,15 @@ fun AppNavigation(
 
     // [T-android-assistant-home] The home page's persisted state has to be
     // accurate on the very first frame — the start destination below is chosen
-    // from it — so prime it here, once, before the graph is built. The flows are
-    // then read by the session-list entry and the home page itself.
-    remember(context) { com.openminis.app.data.AssistantHomePrefs.prime(context) }
+    // from it — so prime it once here, before the graph is built, and snapshot
+    // the flag into a plain Boolean. The snapshot is deliberate: the start
+    // destination is decided once per process, and reading a StateFlow during
+    // composition is what lint's StateFlowValueCalledInComposition forbids. The
+    // live flows are read by the session-list entry and the home page itself.
+    val assistantHomeStartsApp = remember(context) {
+        com.openminis.app.data.AssistantHomePrefs.prime(context)
+        com.openminis.app.data.AssistantHomePrefs.startPage.value
+    }
 
     // Handle initial deep link after composition
     LaunchedEffect(initialDeepLink) {
@@ -464,7 +474,7 @@ fun AppNavigation(
         // targets still win: launch mode 1/2/0 navigates after the graph mounts,
         // so only the "stay on the list" case (mode 3, or the hang/crash circuit
         // breaker) is replaced — which is exactly what the user asked for.
-        com.openminis.app.data.AssistantHomePrefs.startPage.value -> Routes.ASSISTANT_HOME
+        assistantHomeStartsApp -> Routes.ASSISTANT_HOME
         else -> Routes.SESSION_LIST
     }
     NavHost(
@@ -598,6 +608,7 @@ fun AppNavigation(
                 onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
                 onMcpClick = { navController.safeNavigate(Routes.MCP) },
                 onSoulClick = { navController.safeNavigate(Routes.SOUL) },
+                onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
                 onPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
                 onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                 onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
@@ -1292,6 +1303,21 @@ fun AppNavigation(
             )
         }
 
+        // [T-system-prompt-custom] The device owner's own system prompt (one box).
+        composable(Routes.SYSTEM_PROMPT) {
+            com.openminis.app.ui.settings.SystemPromptSettingsScreen(
+                onBack = { navController.safePopBackStack() },
+                onModulesClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT_MODULES) },
+            )
+        }
+
+        // [T-system-prompt-modules] Advanced: the shipped prompt sections.
+        composable(Routes.SYSTEM_PROMPT_MODULES) {
+            com.openminis.app.ui.settings.SystemPromptModulesScreen(
+                onBack = { navController.safePopBackStack() },
+            )
+        }
+
         composable(
             route = Routes.MEMORY_FILE_EDIT,
             arguments = listOf(
@@ -1337,9 +1363,15 @@ fun AppNavigation(
         }
 
         composable(Routes.USAGE_STATS) {
+            // Read the provider config through a collected state instead of
+            // StateFlow.value inside composition (lint:
+            // StateFlowValueCalledInComposition). The instance below predates
+            // this branch but lost its lint-baseline fingerprint when this file
+            // grew, so it is fixed here rather than re-baselined.
+            val providerConfigState by providerRepository.config.collectAsState()
             UsageStatsScreen(
                 chatDao = chatRepository.dao,
-                providerConfig = providerRepository.config.value,
+                providerConfig = providerConfigState,
                 onBack = { navController.safePopBackStack() },
             )
         }

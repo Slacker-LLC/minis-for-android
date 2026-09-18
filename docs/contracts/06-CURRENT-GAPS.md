@@ -81,6 +81,28 @@ CI/宿主测试不能替代以下证据：
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
+## 系统提示词：自定义输入框与提示词模块（2026-09-18）
+
+Settings → System prompt 的主入口现在是设备主人自己的系统提示词输入框（类似 Codex 的 custom instructions）：
+保存内容写入 `<filesDir>/system_prompt/custom.md`，注入到组装后提示词的最前面并带优先级声明，
+与人格（SOUL.md）、回复风格、预设、Bot 指令、会话级 Soul 冲突时以它为准；留空则不注入。同一份文本也通过
+config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置的工具/风格章节降为二级页
+（Settings → System prompt → 内置提示词模块），默认文案在 `assets/prompts/<id>.md` 一文件一节，
+覆盖写入 `<filesDir>/system_prompt/<id>.md`，索引与开关为 `prompt.modules`、
+`prompt.<id>.text`、`prompt.<id>.enabled`。
+
+已确认的边界与缺口：
+
+- **默认文案未变**：无覆盖且自定义框为空时，组装结果与抽取前提示词逐字节一致（记忆开/关两种状态），
+  由 `SystemPromptComposerTest` 的两个 legacy fixture 固定。
+- **真机验证在来源仓库完成（minis-for-android a113ad1e，小米 24129PN74C，Debug 包），本仓库未复跑**：
+  输入框渲染正常，9.1k 字符文本经剪贴板粘贴并保存成功，
+  `custom.md` 落盘 23955 字节；`prompt.custom` 经 config bridge 可读；
+  `debug.llmRequests` 抓到的真实请求里，自定义块位于内置模块之前（offset 1065 < 11187）；
+  模块的编辑/开关/恢复默认在真机往返验证，agent 侧写入会实时反映到已打开的设置页。
+- **覆盖与自定义文本不进入备份**：`<filesDir>/system_prompt/` 不在 backup/restore 类别中，换机恢复后自定义内容会丢失。
+- 运行时片段（skills / MCP / GLOBAL.md / 每日记忆 / Runtime context）仍由既有路径生成，不在这些模块内。
+
 ## 历史队列
 
 旧 Issue 编号和 2026-09-10 的状态快照移至[历史记录](../archive/RUNTIME-HISTORY.md)，不再混入当前缺口。是否仍开放、是否已修复，处理前查源码和远端状态。

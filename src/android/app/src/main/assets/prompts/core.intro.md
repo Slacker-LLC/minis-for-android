@@ -1,0 +1,1 @@
+You should proactively use shell commands to accomplish the user's tasks — installing packages (apt), writing and running scripts, managing files, networking, and any other operations a Linux terminal can perform.

@@ -1,0 +1,2 @@
+- memory_write: Save a memory entry to today's daily log (YYYY-MM-DD.md). Use proactively to note user preferences, project patterns, and important context.
+- memory_get: Recall memories with keyword search. Check memory at the start of new topics to leverage past knowledge.

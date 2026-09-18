@@ -143,6 +143,34 @@
     <string name="settings_memory">记忆</string>
     <string name="settings_memory_subtitle">跨会话保留的持久化知识</string>
     <!-- T-soul-md — SOUL.md 人格 / 身份配置 -->
+    <!-- T-system-prompt-modules - 系统提示词模块 -->
+    <string name="settings_system_prompt">系统提示词</string>
+    <string name="settings_system_prompt_subtitle">写入你自己的系统提示词（优先级最高）</string>
+    <string name="system_prompt_intro">Agent 提示词由三部分组成：SOUL 身份层（设置 - 人格）、下面这些模块，以及每轮注入的运行时数据（技能、MCP、记忆、日期与语言）。编辑模块会写入本地覆盖；“恢复默认”会还原随 App 发布的文案。</string>
+    <string name="system_prompt_badge_custom">已自定义</string>
+    <string name="system_prompt_badge_default">默认</string>
+    <string name="system_prompt_gate_memory_on">仅记忆开启时</string>
+    <string name="system_prompt_gate_memory_off">仅记忆关闭时</string>
+    <string name="system_prompt_disabled_note">已关闭</string>
+    <string name="system_prompt_editor_hint">模块内容（Markdown）</string>
+    <string name="system_prompt_char_count">%1$d 字符</string>
+    <string name="system_prompt_reset_module">恢复默认</string>
+    <string name="system_prompt_reset_all">全部恢复默认</string>
+    <string name="system_prompt_reset_all_confirm_title">恢复所有模块？</string>
+    <string name="system_prompt_reset_all_confirm_body">所有自定义文案与开关都会被清除，每个模块都还原为随 App 发布的默认内容。</string>
+    <string name="system_prompt_custom_section">自定义系统提示词</string>
+    <string name="system_prompt_custom_hint">在这里写下你的系统提示词……</string>
+    <string name="system_prompt_custom_footer">保存后的内容会注入到每次对话的最前面，并附带优先级声明：与人格（Soul）、回复风格、预设、Bot 指令或会话级 Soul 冲突时，以这段内容为准。留空则不注入。</string>
+    <string name="system_prompt_custom_clear">清空</string>
+    <string name="system_prompt_custom_clear_confirm_title">清空自定义系统提示词？</string>
+    <string name="system_prompt_custom_clear_confirm_body">输入框会被清空，这段内容不再注入；其它设置不受影响。</string>
+    <string name="system_prompt_custom_status_saved">已保存</string>
+    <string name="system_prompt_custom_status_unsaved">有未保存的修改</string>
+    <string name="system_prompt_advanced_section">高级</string>
+    <string name="system_prompt_modules_entry">内置提示词模块</string>
+    <string name="system_prompt_modules_entry_subtitle">查看或改写随 App 发布的工具与风格说明</string>
+    <string name="system_prompt_modules_entry_subtitle_custom">已自定义 %1$d 节</string>
+    <string name="system_prompt_modules_title">内置提示词模块</string>
     <string name="settings_soul">人格</string>
     <string name="settings_soul_subtitle">持久化人格与身份（SOUL.md）</string>
     <string name="soul_settings_title">人格</string>

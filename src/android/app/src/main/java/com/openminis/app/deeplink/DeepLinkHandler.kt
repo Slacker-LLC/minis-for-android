@@ -18,6 +18,7 @@ import com.openminis.app.ui.navigation.Routes
  *   minis://settings/model-groups/<groupId>     → Model Group detail
  *   minis://settings/usage                      → Token usage
  *   minis://settings/skills                     → Skills management
+ *   minis://settings/system-prompt               → System prompt modules
  *   minis://settings/memory                     → Memory management
  *   minis://settings/storage                    → Storage management
  *   minis://settings/mount-external             → Mount External Folders list
@@ -175,6 +176,8 @@ object DeepLinkHandler {
             "usage", "usage-stats", "usage_stats" ->
                 DeepLinkAction.OpenSettingsScreen(Routes.USAGE_STATS)
             "skills" -> DeepLinkAction.OpenSettingsScreen(Routes.SKILLS)
+            "system-prompt", "system_prompt", "prompt" ->
+                DeepLinkAction.OpenSettingsScreen(Routes.SYSTEM_PROMPT)
             "memory" -> DeepLinkAction.OpenSettingsScreen(Routes.MEMORY)
             "storage" -> DeepLinkAction.OpenSettingsScreen(Routes.STORAGE)
             "mount-external", "mount_external", "mounts", "mounted-folders", "mounted_folders" ->

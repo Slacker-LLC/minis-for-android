@@ -270,6 +270,34 @@
     <string name="mcp_delete_title">Delete %1$s?</string>
     <string name="mcp_delete_message">This removes the server from servers.json. This cannot be undone.</string>
     <!-- T-soul-md — SOUL.md personality / identity settings -->
+    <!-- T-system-prompt-modules - editable system prompt modules -->
+    <string name="settings_system_prompt">System prompt</string>
+    <string name="settings_system_prompt_subtitle">Write your own system prompt (highest priority)</string>
+    <string name="system_prompt_intro">The agent prompt has three parts: the SOUL identity layer (Settings - Soul), the modules below, and per-turn runtime data (skills, MCP, memory, date and language). Editing a module writes a local override; Reset to default restores the wording shipped with the app.</string>
+    <string name="system_prompt_badge_custom">customized</string>
+    <string name="system_prompt_badge_default">default</string>
+    <string name="system_prompt_gate_memory_on">memory on only</string>
+    <string name="system_prompt_gate_memory_off">memory off only</string>
+    <string name="system_prompt_disabled_note">switched off</string>
+    <string name="system_prompt_editor_hint">Module text (Markdown)</string>
+    <string name="system_prompt_char_count">%1$d characters</string>
+    <string name="system_prompt_reset_module">Reset to default</string>
+    <string name="system_prompt_reset_all">Reset all</string>
+    <string name="system_prompt_reset_all_confirm_title">Reset every module?</string>
+    <string name="system_prompt_reset_all_confirm_body">All custom text and switches are cleared; every module returns to the wording shipped with the app.</string>
+    <string name="system_prompt_custom_section">Custom system prompt</string>
+    <string name="system_prompt_custom_hint">Write your system prompt here ...</string>
+    <string name="system_prompt_custom_footer">Saved text is injected at the top of every conversation with an explicit precedence header: where it conflicts with the personality (Soul), response style, presets, bot instructions or a session Soul, this text wins. Leave it empty to inject nothing.</string>
+    <string name="system_prompt_custom_clear">Clear</string>
+    <string name="system_prompt_custom_clear_confirm_title">Clear the custom system prompt?</string>
+    <string name="system_prompt_custom_clear_confirm_body">The box is emptied and nothing is injected from it. Other settings are not affected.</string>
+    <string name="system_prompt_custom_status_saved">Saved</string>
+    <string name="system_prompt_custom_status_unsaved">Unsaved changes</string>
+    <string name="system_prompt_advanced_section">Advanced</string>
+    <string name="system_prompt_modules_entry">Built-in prompt modules</string>
+    <string name="system_prompt_modules_entry_subtitle">View or reword the shipped tool and style sections</string>
+    <string name="system_prompt_modules_entry_subtitle_custom">%1$d section(s) customized</string>
+    <string name="system_prompt_modules_title">Built-in prompt modules</string>
     <string name="settings_soul">Soul</string>
     <string name="settings_soul_subtitle">Persistent personality and identity (SOUL.md)</string>
     <string name="soul_settings_title">Soul</string>

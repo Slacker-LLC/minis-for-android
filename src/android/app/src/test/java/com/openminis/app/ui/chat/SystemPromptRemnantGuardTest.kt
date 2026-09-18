@@ -20,11 +20,14 @@ class SystemPromptRemnantGuardTest {
 
     @Test
     fun systemPromptPurgesObsoleteAlpineAndProotRemnants() {
-        val source = locateChatViewModelSource().readText(Charsets.UTF_8)
-        val promptStart = source.indexOf("val base = identitySection")
-        val promptEnd = source.indexOf("Scheduled tasks:", promptStart)
-        assertTrue(promptStart > 0 && promptEnd > promptStart)
-        val prompt = source.substring(promptStart, promptEnd)
+        // [T-system-prompt-modules] The static prompt is no longer a literal in
+        // ChatViewModel; the shipped wording lives in the module default files
+        // under assets/prompts. Scan every module file rather than a slice of one
+        // source file, so wording cannot dodge the check by moving modules.
+        val prompt = locatePromptModuleDir().listFiles().orEmpty()
+            .filter { it.isFile && it.name.endsWith(".md") }
+            .sortedBy { it.name }
+            .joinToString("\n") { it.readText(Charsets.UTF_8) }
 
         // Must NOT contain obsolete package manager references
         assertFalse("Prompt must not instruct model to use apk add", prompt.contains("apk add"))
@@ -46,6 +49,31 @@ class SystemPromptRemnantGuardTest {
         // Positive assertions: must reference Ubuntu and apt
         assertTrue("Prompt must guide to apt", prompt.contains("apt"))
         assertTrue("Prompt must frame shell as Ubuntu 24.04 / Bash", prompt.contains("Ubuntu 24.04"))
+    }
+
+    private fun locatePromptModuleDir(): File {
+        val cwd = File(System.getProperty("user.dir")).canonicalFile
+        val candidates = listOf(
+            File(cwd, "src/main/assets/prompts"),
+            File(cwd, "app/src/main/assets/prompts"),
+            File(cwd, "src/android/app/src/main/assets/prompts"),
+        )
+        return candidates.firstOrNull { it.isDirectory }
+            ?: error("cannot find assets/prompts from ${cwd.path}")
+    }
+
+    @Test
+    fun chatViewModelDelegatesTheStaticPromptToTheModuleComposer() {
+        val source = locateChatViewModelSource().readText(Charsets.UTF_8)
+
+        assertTrue(
+            "ChatViewModel must assemble the static prompt through AgentSystemPrompt",
+            source.contains("com.openminis.app.prompt.AgentSystemPrompt.base("),
+        )
+        assertFalse(
+            "ChatViewModel must not inline prompt wording again",
+            source.contains("Available tools:"),
+        )
     }
 
     @Test

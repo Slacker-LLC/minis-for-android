@@ -482,6 +482,12 @@ class MinisApp : Application(), ImageLoaderFactory {
         // startup ANR (the same failure mode fixed for SkillRepository/GH#129).
         com.openminis.app.agent.SoulStore.initializeAsync(this)
 
+        // [T-system-prompt-modules] Warm the prompt-module cache (shipped
+        // defaults + user overrides) so the first send assembles the prompt from
+        // memory instead of reading the asset tree on the send path.
+        com.openminis.app.prompt.PromptModuleStore.warm(this)
+        com.openminis.app.prompt.CustomPromptStore.warm(this)
+
         // T-config: minis-config CLI surface — registry / audit log /
         // master-switch store. Initialized eagerly here so
         // ConfigRegistry.get() is safe from any thread for the rest of

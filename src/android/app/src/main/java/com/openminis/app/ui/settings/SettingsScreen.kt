@@ -123,6 +123,9 @@ fun SettingsScreen(
     // Agent Runtime section; default no-op for callers that haven't wired
     // the route yet.
     onSoulClick: () -> Unit = {},
+    // [T-system-prompt-modules] Editable agent system prompt modules. Listed
+    // next to Soul so the two prompt-authoring surfaces sit together.
+    onSystemPromptClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
@@ -280,6 +283,15 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_soul),
                     subtitle = stringResource(R.string.settings_soul_subtitle),
                     onClick = onSoulClick,
+                )
+                // [T-system-prompt-modules] Built-in prompt modules the agent
+                // receives on every turn; editable without a rebuild.
+                SettingsItem(
+                    icon = Icons.Outlined.Description,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.settings_system_prompt),
+                    subtitle = stringResource(R.string.settings_system_prompt_subtitle),
+                    onClick = onSystemPromptClick,
                 )
                 SettingsItem(
                     icon = Icons.Outlined.Psychology,

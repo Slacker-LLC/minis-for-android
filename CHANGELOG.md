@@ -4,6 +4,16 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Custom system prompt box + editable prompt modules — 2026-09-18
+
+- Settings → System prompt is now a single free-text box for the device owner's own system prompt (Codex-style custom instructions). Whatever is saved there is injected at the top of the assembled agent prompt with an explicit precedence header, so it outranks the personality (SOUL.md), response style, presets, bot instructions and session Souls. An empty box injects nothing.
+- Stored at `<filesDir>/system_prompt/custom.md`; editable from the app, from `minis://settings/system-prompt`, and by the agent through the config registry (`prompt.custom`, confirmation sheet and audit/revert unchanged).
+- The static system prompt is no longer a Kotlin literal inside `ChatViewModel.buildSystemPrompt()`. The shipped wording is one file per section under `src/android/app/src/main/assets/prompts/<id>.md`; `com.openminis.app.prompt` owns the registry (assembly order, separators, runtime gates), the override store, the custom-prompt store and the composer. ChatViewModel only contributes the per-turn runtime fragments.
+- The shipped sections keep an advanced editor (Settings → System prompt → Built-in prompt modules): every module shows its id, gate (ALWAYS / memory-on / memory-off), override state and an enable switch. Editing writes an app-private override; Reset to default deletes it so the section tracks app updates again. `minis-config` reads and writes the same store (`prompt.modules`, `prompt.<id>.text`, `prompt.<id>.enabled`).
+- Defaults stay byte-identical: with no overrides and an empty custom box the assembled prompt equals the pre-extraction prompt for both memory states, pinned by checked-in fixtures in `SystemPromptComposerTest`. `SystemPromptRemnantGuardTest` scans every module default file and asserts ChatViewModel no longer inlines prompt wording.
+- Unchanged by design: the SOUL.md identity layer (Settings → Soul), per-bot instructions, per-session Soul overrides and the per-turn runtime fragments (skills, MCP disclosure, memory, runtime context).
+- Known limitation: the custom prompt and module overrides are app-private files and are not yet part of the backup/restore categories.
+
 ### Direct Ubuntu runtime finalization — 2026-09-10
 
 - Finalized the production Linux path as Android App-owned orchestration + Ubuntu 24.04 direct chroot.
