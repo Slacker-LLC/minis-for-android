@@ -4,6 +4,15 @@ This changelog tracks **Minis for Android** as an independently maintained Andro
 
 ## Unreleased
 
+### Canonical application identity and repository — 2026-09-20
+
+- The integrated product uses the canonical `llc.slacker.minis` application identity in Gradle,
+  Xposed targets, accessibility-control protocol addresses, debug tooling, tests and current docs.
+- The active repository and mainline are `Slacker-LLC/minis-for-android` / `main`; Eta capability
+  work is integrated into this independent product rather than presented as a separate fork line.
+- Kotlin sources remain under `com.openminis.app`; this identity change does not rename the source
+  namespace.
+
 ### Application identity: llc.slacker.eta — 2026-09-18
 
 - `applicationId` moves from `llc.slacker.minis` to `llc.slacker.eta` so this fork

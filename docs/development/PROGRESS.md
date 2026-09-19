@@ -1254,7 +1254,15 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 
 **曾经未落地、现已落地**：Phase 6 的「增强设置页」（上游 `SystemEnhanceScreen`：root 状态 + 模块状态 + 各接管说明）在 `222f404c` 落地（见 §四 最后一片）。
 
-## 七、未验证清单（不得据此声称设备结论）
+## 七、主仓库归并与正式身份（2026-09-20）
+
+| 项 | 结果 |
+|---|---|
+| 正式仓库 | 主线归入 `Slacker-LLC/minis-for-android` 的 `main`；项目说明继续按独立产品维护 |
+| Android 身份 | `applicationId`、Xposed 自引用、无障碍保护协议、调试脚本和现役文档统一为 `llc.slacker.minis`；Kotlin namespace 仍为 `com.openminis.app` |
+| 历史证据 | 早期真机记录中的 `llc.slacker.eta` 是当时独立安装包的真实结果，保留为历史，不作为当前包名 |
+
+## 八、未验证清单（不得据此声称设备结论）
 
 - 技能事务在真机上的 `rename`/`fsync` 行为、进程被杀后的 journal 回滚、跨进程锁竞争。
 - 无障碍窗口集合、截图包含关系、主线程门在系统繁忙时的真实时序、滚动事件在各 ROM/WebView 的一致性。

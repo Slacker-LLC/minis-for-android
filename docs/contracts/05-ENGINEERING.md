@@ -22,7 +22,7 @@ README / 专题 docs → 面向读者说明
 
 ## 当前 Android 身份
 
-- `applicationId = llc.slacker.eta`；
+- `applicationId = llc.slacker.minis`；
 - `namespace = com.openminis.app`；
 - 两者不同不是 bug；全库 package 重命名必须作为独立任务。
 

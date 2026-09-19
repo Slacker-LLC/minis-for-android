@@ -1,4 +1,4 @@
-# 开发移植规范（Eta → minis-eta）
+# Eta 能力集成与来源规范
 
 本文件是移植工作的操作手册：怎么复用 Eta 代码、怎么落地、怎么验证、怎么登记归属。
 目标与阶段顺序见 `docs/analysis/eta-port-program.md`；当前进度见 `PROGRESS.md`。

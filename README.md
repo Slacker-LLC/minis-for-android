@@ -25,10 +25,10 @@ Active guest user data is App-owned and derived from `Context.filesDir`. `/data/
 
 ## Status
 
-The mainline is `main` (remote `Slacker-LLC/minis-eta`); the `codex/eta-phase6-xposed` line is merged into it.
+The mainline is `main` in `Slacker-LLC/minis-for-android`. The integrated Eta capability line is part of this independent product.
 
 Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failures**; `:app:lintDebug`
-**0 errors** (`186 warnings / 8 hints` are pre-existing); `app-debug.apk` ≈ **114 MB** with the runtime
+**0 errors** (`186 warnings / 6 hints` are pre-existing); `app-debug.apk` ≈ **114 MB** with the runtime
 payload. Interface text lives in resources with **eight locales** — English default plus Simplified Chinese,
 Traditional Chinese, Japanese, Korean, German, French and Russian; Simplified and Traditional Chinese are at
 full coverage, the other four still fall back to English for part of their strings ([docs/I18N.md](docs/I18N.md)).
@@ -43,7 +43,7 @@ If a device can provide correct guest networking without this compatibility path
 
 ## Android identity
 
-- `applicationId`: `llc.slacker.eta`
+- `applicationId`: `llc.slacker.minis`
 - Android/Kotlin namespace: `com.openminis.app`
 
 The installed application identity and source namespace may differ; a repository-wide package rename is not implied.

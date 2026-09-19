@@ -1,6 +1,6 @@
 # 文档索引
 
-本索引对应当前主线 **`main`**（远端 `Slacker-LLC/minis-eta`，2026-09-20 快照；`codex/eta-phase6-xposed` 已合入主线）。
+本索引对应 `Slacker-LLC/minis-for-android` 的当前主线 **`main`**（2026-09-20 快照）。
 中文为主要阅读入口；历史审计采样日期保留，不能把旧报告当作新一轮验收。
 
 当前事实与长期合同分开判断：

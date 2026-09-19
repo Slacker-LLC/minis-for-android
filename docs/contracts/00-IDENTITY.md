@@ -14,7 +14,7 @@
 
 | 项 | 当前值 |
 |---|---|
-| `applicationId` | `llc.slacker.eta` |
+| `applicationId` | `llc.slacker.minis` |
 | `namespace` | `com.openminis.app` |
 | Kotlin/Java 包根 | `com.openminis.app` |
 

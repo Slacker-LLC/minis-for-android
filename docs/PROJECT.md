@@ -33,8 +33,8 @@ Android app（:app）
 | 项 | 值 |
 |---|---|
 | 组织 / 域名 | Slacker-LLC / `slacker.llc` |
-| 仓库 / 主线 | `Slacker-LLC/minis-eta` / `main` |
-| `applicationId` | `llc.slacker.eta` |
+| 仓库 / 主线 | `Slacker-LLC/minis-for-android` / `main` |
+| `applicationId` | `llc.slacker.minis` |
 | Android/Kotlin namespace | `com.openminis.app` |
 | 版本 | `1.01-beta.2`（versionCode 39） |
 | 平台 | Android 8.0+（`minSdk 26`）、`targetSdk 35`、`compileSdk 36` |
@@ -92,7 +92,7 @@ bash scripts/verify-runtime-payload.sh  src/android/app/build/outputs/apk/debug/
 bash scripts/verify-android-16k.sh      src/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-当前基线（2026-09-20，Debug）：**2432 例 0 失败**；`:app:lintDebug` **0 error**（186 warning / 8 hint 为既有）；
+当前基线（2026-09-20，Debug）：**2432 例 0 失败**；`:app:lintDebug` **0 error**（186 warning / 6 hint 为既有）；
 `app-debug.apk` 约 **114 MB**（含 runtime payload）。
 
 构建需要 `src/android/app/libs/rclone.aar`（被 gitignore）：缺失时从任一既有构建树复制，**不要提交**；

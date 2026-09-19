@@ -1,4 +1,4 @@
-# 资料索引（minis-eta）
+# 资料索引（Minis for Android）
 
 本文件是**参考资料**索引：源码位置、上游链接、许可文本、工具链版本与关键源码速查。
 仓库自身的文档索引见 `docs/README.md`。
@@ -19,8 +19,8 @@
 
 | 项目 | 地址 |
 |---|---|
-| 本仓库 | `https://github.com/Slacker-LLC/minis-eta`（私有） |
-| Minis for Android | `https://github.com/Slacker-LLC/minis-for-android`（GPL-3.0） |
+| 本仓库 | `https://github.com/Slacker-LLC/minis-for-android`（GPL-3.0） |
+| 合并前的 Eta 能力开发仓库 | `Slacker-LLC/minis-eta`（已迁入本仓库主线） |
 | Eta | `https://github.com/Mangi-11/Eta`（PolyForm Noncommercial 1.0.0） |
 | Eta 历史 PR | `Slacker-LLC/minis-for-android#237`（模块化，已回退）、`#236`（Direct Ubuntu，已合并） |
 
@@ -73,6 +73,6 @@
 |---|---|---|
 | Gradle wrapper | 8.11.1 | `src/android/gradle/wrapper/gradle-wrapper.properties` |
 | compileSdk / targetSdk / minSdk | 36 / 35 / 26 | `src/android/app/build.gradle.kts` |
-| applicationId | `llc.slacker.eta` | 同上 |
+| applicationId | `llc.slacker.minis` | 同上 |
 | Kotlin / AGP | 见 `src/android/gradle/libs.versions.toml` | —— |
 | 单测基线 | 1786 个用例（`--no-daemon --max-workers=1`） | 本仓库当前 main |

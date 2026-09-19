@@ -11,7 +11,7 @@
 - 组织：Slacker-LLC
 - 域名：slacker.llc
 - 仓库：`Slacker-LLC/minis-for-android`
-- `applicationId`：`llc.slacker.eta`
+- `applicationId`：`llc.slacker.minis`
 - Android/Kotlin namespace：`com.openminis.app`
 - 许可证：GPL-3.0（法律来源只写在 `PROVENANCE.md`）
 
@@ -39,7 +39,7 @@
 4. 网络代理和 Root/chroot 是不同概念。HTTP/CONNECT 代理协议本身不要求 Root；当前 helper 仅因 Android 出站 UID/VPN/BPF 兼容需求可由特权身份启动。不得把它扩展成命令、文件或通用 RPC 服务。
 5. 产品运行时不恢复 PRoot/Alpine 双栈；不要为了兼容全局关闭 SELinux。
 6. Session 执行必须保持对应 session workspace 语义，不能用全局 `/workspace` 绕过隔离。
-7. `applicationId = llc.slacker.eta` 是当前事实；不要顺手迁移 `com.openminis.app` namespace。
+7. `applicationId = llc.slacker.minis` 是当前事实；不要顺手迁移 `com.openminis.app` namespace。
 8. 合同写长期边界，`06-CURRENT-GAPS.md` 写当前已确认差异；历史 Issue/PR/计划不能覆盖最终源码与测试。
 9. 安全改动必须有拒绝、越界或失败关闭等否定用例，不能只有成功路径。
 10. 不删除源文件版权头，不把 GPL 改成其它许可证；法律来源只维护在 `PROVENANCE.md`。

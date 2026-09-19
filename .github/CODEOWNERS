@@ -1,0 +1,9 @@
+# Repository-wide review ownership
+* @Slacker-LLC
+
+# Security and runtime boundaries
+/docs/contracts/ @Slacker-LLC
+/src/android/app/src/main/java/com/openminis/app/runtime/ @Slacker-LLC
+/src/android/app/src/main/java/com/openminis/app/tools/root/ @Slacker-LLC
+/src/native/root-network-proxy/ @Slacker-LLC
+/.github/workflows/ @Slacker-LLC

@@ -15,10 +15,10 @@
 
 ## 项目状态
 
-主线为 `main`（远端 `Slacker-LLC/minis-eta`）；`codex/eta-phase6-xposed` 已合入主线。
+主线为 `Slacker-LLC/minis-for-android` 的 `main`；Eta 能力线已经并入这个独立产品。
 
 当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**
-（186 warning / 8 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
+（186 warning / 6 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
 **8 个语言目录**：英文默认 + 简体 / 繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余四种仍有存量缺口
 （见 [docs/I18N.md](docs/I18N.md)）。
 
@@ -46,7 +46,7 @@ Ubuntu 24.04 userspace
 
 | 项 | 当前值 |
 |---|---|
-| `applicationId` | `llc.slacker.eta` |
+| `applicationId` | `llc.slacker.minis` |
 | `namespace` / Kotlin 包根 | `com.openminis.app` |
 
 `applicationId` 与代码 namespace 可以不同；当前没有为了整洁而全库迁移 Kotlin package 的要求。
