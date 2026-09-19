@@ -1198,6 +1198,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug` |
 | 现状 | zh 2245/2245、zh-rTW 2245/2245；两者「与英文相同」只剩 49 / 48 条品牌与协议名 |
 
+### 聊天外壳与会话面板的写死中文进资源（2026-09-19 续） — `90f20633`
+
+| 项 | 结果 |
+|---|---|
+| 问题 | 抽屉（搜索对话 / 新建聊天 / 终端 / 存储与沙箱 / 最近 / 重命名与删除会话）、会话配置与信息面板、目标与审批卡片、模型选择「全部模型与分组」、Agent 预设、slash 副标题、上下文压力提示、子代理限制页——这些界面把中文写死在 Kotlin 里，其它语言下会显示中文 |
+| 改法 | 52 个新 key 覆盖上述文案（8 语言同步）；已有 key 的直接复用（设置 / 取消 / 保存 / 删除 / 跳过 / 清除 / 恢复 / 退出 / 编辑 / Token 用量 / 自动压缩上下文 / 子代理委派限制等），不再造重复 key |
+| 明确不动 | 宠物人格提示词与系统提示词正文（面向模型）、`PetOverlayGeometry` 里按状态文本判断宠物动作的匹配逻辑（那是逻辑不是文案） |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug`（期间 lint 抓到 `chat_context_overflow_retry` 的格式串缺占位符 `StringFormatInvalid`，已补 `%1$d/%2$d` 修掉） |
+| 仍写死中文（未做） | 宠物控制页与浮窗（约 60 条）、内置提示词模块标题（16 条）、系统提示词模块页少量 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
