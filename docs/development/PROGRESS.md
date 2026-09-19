@@ -1075,7 +1075,7 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 电源键端到端结果 | 长按电源键 → 我们模块的 hook 接管，日志 `HyperOsPower: opened the MINIS assistant through android.intent.action.VOICE_ASSIST` + `MINIS opened for the power-key long press`；前台窗口变为 `llc.slacker.eta/com.openminis.app.MainActivityIconAuto`；小米语音助手**没有被拉起**（`voice_assist_start_from_key` 计数 0）。至此「设置成 minis 却不起作用」这条线全部闭合 |
 | 遗留 | 设置页仍有约 10 个自绘页面（角色库、挂载/共享文件夹、模型组、后台设置、存储详情、技能浏览、外观等）未走共享脚手架与行组件，按同一套 token 继续收口 |
 
-+## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
+## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
