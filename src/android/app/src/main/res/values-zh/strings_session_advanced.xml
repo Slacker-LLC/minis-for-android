@@ -18,7 +18,7 @@
     <string name="session_advanced_soul_locked_custom">自定义提示词 · 已锁定</string>
     <string name="session_advanced_soul_locked_global">全局提示词 · 已锁定</string>
     <string name="session_advanced_model_section">模型参数</string>
-    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature">温度</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
     <string name="session_advanced_max_tokens">最大输出 Token</string>
     <string name="session_advanced_max_tokens_hint">正整数</string>
