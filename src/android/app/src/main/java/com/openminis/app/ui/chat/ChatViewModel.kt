@@ -12479,6 +12479,8 @@ class ChatViewModel(
                 attachmentUris = restoredAttachmentUris,
                 toolBlocks = blocks,
                 sourceDbIds = listOf(entity.id),
+                createdAtMs = entity.createdAt,
+                updatedAtMs = entity.updatedAt,
                 // [T-error-persist-android] Restore the persisted terminal error
                 // so the inline error banner + Retry button survive a reload.
                 // Coalesce a blank value to null: the UI gate is `error?.let`, so

@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +82,19 @@ internal fun WorkProcessRowView(
     onRetry: (() -> Unit)? = null,
 ) {
     val summary = remember(process.blocks) { process.summary() }
+    // [T-android-turn-work] Wall-clock label while the turn runs; one tick a second is enough.
+    val startedAt = process.startedAtMs
+    var elapsedSec by remember(process.id, summary.isRunning, startedAt) { mutableStateOf(0L) }
+    LaunchedEffect(process.id, summary.isRunning, startedAt) {
+        if (!summary.isRunning || startedAt == null) {
+            elapsedSec = 0L
+        } else {
+            while (true) {
+                elapsedSec = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
+                delay(1_000L)
+            }
+        }
+    }
     var expanded by rememberSaveable(process.id) { mutableStateOf(summary.isRunning) }
     var userToggled by rememberSaveable(process.id) { mutableStateOf(false) }
 
@@ -98,7 +112,7 @@ internal fun WorkProcessRowView(
     }
     val runningTool = process.runningTool
     val headerIcon = runningTool?.let { toolIconFor(it.toolName) } ?: Icons.Default.Build
-    val headerText = workProcessHeaderText(summary)
+    val headerText = workProcessHeaderText(summary, elapsedSec.takeIf { summary.isRunning })
 
     Column(
         modifier = Modifier
@@ -200,6 +214,16 @@ internal fun WorkProcessRowView(
                             isStreaming = summary.isRunning && block.id == trailingBlockId,
                             isLast = block.id == trailingBlockId,
                         )
+                        // [T-android-turn-work] Text the model wrote between tool calls is part
+                        // of the turn's work, not its answer - it belongs in here with the steps.
+                        "text" -> if (block.content.isNotBlank()) {
+                            Text(
+                                text = block.content,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ChatColors.secondaryText,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
+                        }
                         else -> if (block.kind == TOOL_USE_KIND) {
                             Column {
                                 ToolCallPill(
@@ -265,7 +289,16 @@ internal fun WorkProcessRowView(
  * unit-testable — see `WorkProcessHeaderTextTest`.
  */
 @Composable
-internal fun workProcessHeaderText(summary: WorkProcessSummary): String = when {
+internal fun workProcessHeaderText(
+    summary: WorkProcessSummary,
+    runningElapsedSec: Long? = null,
+): String = when {
+    // [T-android-turn-work] A live turn counts up ("已处理 6分钟35秒"), a finished one reports the
+    // total ("用时 20分钟30秒") - the same single header, the way Codex's turn row reads.
+    summary.isRunning && runningElapsedSec != null -> stringResource(
+        R.string.work_process_elapsed,
+        formatStepDuration(runningElapsedSec, stillRunning = false),
+    )
     summary.isRunning && summary.runningStepNumber != null -> stringResource(
         R.string.work_process_running_step,
         summary.runningStepNumber,

@@ -123,6 +123,11 @@ data class ChatMessage(
     // suffix of `attachmentNames` (after the imageUris-many image entries).
     val attachmentUris: List<Uri> = emptyList(),
     val toolBlocks: List<AssistantBlock> = emptyList(),
+    // [T-android-turn-work] When this row was written and last updated (DB timestamps). A turn's
+    // duration is measured from them - the per-block timings are in-memory only, so a session
+    // reloaded from the database would otherwise lose its "用时 X" line entirely.
+    val createdAtMs: Long = 0L,
+    val updatedAtMs: Long? = null,
     // T300: thinking-level snapshot at the moment this assistant message
     // was created. Used by the chat UI to suppress the "Deep Thinking"
     // collapsible when the user's per-session toggle is OFF (forced-

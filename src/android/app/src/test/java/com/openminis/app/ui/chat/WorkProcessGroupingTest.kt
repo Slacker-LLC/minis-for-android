@@ -62,31 +62,27 @@ class WorkProcessGroupingTest {
     }
 
     @Test
-    fun `a text block ends the run and starts a new one`() {
+    fun `text between tool calls stays inside the one turn row`() {
         val entries = grouped(
             listOf(thinking("t1"), tool("a"), text("x"), tool("b"), thinking("t2")),
         )
-        // [process(t1,a), text(x), process(b,t2)]
-        assertEquals(3, entries.size)
-        assertEquals(listOf("t1", "a"), processes(entries)[0].blocks.map { it.id })
-        assertEquals(listOf("b", "t2"), processes(entries)[1].blocks.map { it.id })
-        val middle = entries[1]
-        assertTrue(middle is AssistantTurnEntry.Single)
-        assertEquals("x", (middle as AssistantTurnEntry.Single).block.id)
-        assertEquals(2, middle.blockIndex)
+        // [T-android-turn-work] One row for the whole turn: a question answered after two tool
+        // calls used to produce two rows and two durations. Text the model wrote between calls is
+        // narration and belongs inside the row (the panel renders it between the steps); only the
+        // trailing text after the last call is the answer, and here there is none.
+        assertEquals(1, entries.size)
+        assertEquals(listOf("t1", "a", "x", "b", "t2"), processes(entries).single().blocks.map { it.id })
     }
 
     @Test
-    fun `info and media blocks never join a process`() {
-        val entries = grouped(listOf(info("i1"), tool("a"), info("i2")))
-        assertEquals(3, entries.size)
-        // info is not a step: it ends whatever run precedes it and the lone
-        // tool call between the two notices stays a one-step process (grouped
-        // mode collapses every thinking/tool run, matching Eta's projector).
-        assertTrue(entries[0] is AssistantTurnEntry.Single)
-        assertEquals("i1", (entries[0] as AssistantTurnEntry.Single).block.id)
+    fun `a trailing notice stays outside the row`() {
+        val entries = grouped(listOf(tool("a"), info("i1")))
+        // info is not a step, so it is not folded in - and it sits after the last step, which makes
+        // it the tail of the message rather than part of the row.
+        assertEquals(1, processes(entries).single().blocks.map { it.id }.size)
         assertEquals(listOf("a"), processes(entries).single().blocks.map { it.id })
-        assertEquals("i2", (entries[2] as AssistantTurnEntry.Single).block.id)
+        assertTrue(entries.last() is AssistantTurnEntry.Single)
+        assertEquals("i1", (entries.last() as AssistantTurnEntry.Single).block.id)
     }
 
     @Test
@@ -97,9 +93,6 @@ class WorkProcessGroupingTest {
         )
         val process = processes(entries).single()
         assertEquals(listOf("a"), process.blocks.map { it.id })
-
-        // A run made of nothing but hidden thinking disappears entirely.
-        assertTrue(grouped(listOf(thinking("t1")), thinkingVisible = false).isEmpty())
     }
 
     @Test

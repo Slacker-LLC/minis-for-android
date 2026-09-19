@@ -79,6 +79,9 @@ internal val WORK_PROCESS_FAILED_STATUSES: Set<ToolBlockStatus> = setOf(
 internal data class WorkProcess(
     val id: String,
     val blocks: List<AssistantBlock>,
+    /** [T-android-turn-work] The turn's row timestamps, used when the steps carry none. */
+    val messageCreatedAtMs: Long = 0L,
+    val messageUpdatedAtMs: Long? = null,
 ) {
     init {
         require(blocks.isNotEmpty()) { "WorkProcess needs at least one block" }
@@ -118,14 +121,30 @@ internal data class WorkProcess(
      * end. Null while a step is still running (there is no end yet) and when the blocks carry no
      * timings at all - the header then keeps its step wording instead of inventing a duration.
      */
+    /**
+     * When the turn started: the first step's clock, or the row's own created-at when the steps
+     * carry no timings (a reloaded session has only the database timestamps).
+     */
+    val startedAtMs: Long?
+        get() = messageCreatedAtMs.takeIf { it > 0L }
+            ?: toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull()
+
     val durationMs: Long?
         get() {
             if (isRunning) return null
-            val started = toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull() ?: return null
+            // [T-android-turn-work] The turn's own clock wins: a turn starts when the user sent the
+            // message and ends when its last row was written, which is what Codex's duration_ms
+            // measures and what survives a reload. Summing the steps' own timings instead reported
+            // 1s for a turn whose single command slept for 20 (the per-block clocks are in-memory
+            // and only cover the calls that carried one).
+            val turnStart = messageCreatedAtMs.takeIf { it > 0L }
+            val turnEnd = messageUpdatedAtMs?.takeIf { it > 0L }
+            if (turnStart != null && turnEnd != null && turnEnd > turnStart) return turnEnd - turnStart
+            val started = toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull()
             val finished = toolBlocks
                 .filter { it.startTimeMs > 0L && it.durationMs > 0L }
-                .maxOfOrNull { it.startTimeMs + it.durationMs } ?: return null
-            return (finished - started).takeIf { it > 0L }
+                .maxOfOrNull { it.startTimeMs + it.durationMs }
+            return if (started != null && finished != null) (finished - started).takeIf { it > 0L } else null
         }
 
     /** [T-android-work-items] Steps per kind, in enum order. */
@@ -283,9 +302,16 @@ internal sealed interface AssistantTurnEntry {
  *
  * [StepsPresentation.PER_TOOL] is the historical layout: every block stays on
  * its own (thinking blocks are filtered later by the renderer, exactly as
- * before this change). [StepsPresentation.GROUPED] collapses each maximal run
- * of thinking / tool blocks into one [WorkProcess]; any other block kind
- * (text, media, info) ends the run, so a process never spans visible output.
+ * before this change).
+ *
+ * [StepsPresentation.GROUPED] collapses a whole turn into ONE [WorkProcess]:
+ * everything up to and including the last tool call, plus the narration the
+ * model wrote between calls. The trailing text after that last call is the
+ * turn's answer and stays outside the row. Codex splits a turn the same way
+ * (work items collapse into one header, the AgentMessage does not), and this
+ * app has to do it per message because the transcript already merges a turn's
+ * assistant rows into one. Folding each text-interrupted run instead produced a
+ * separate "用时 Ns" row per run - several durations for one question.
  *
  * [thinkingVisible] mirrors the T300 rule: when the user turned Deep Thinking
  * off, thinking blocks render nothing, so in grouped mode they must not create
@@ -296,45 +322,41 @@ internal fun buildAssistantTurnEntries(
     blocks: List<AssistantBlock>,
     presentation: StepsPresentation,
     thinkingVisible: Boolean,
+    messageCreatedAtMs: Long = 0L,
+    messageUpdatedAtMs: Long? = null,
 ): List<AssistantTurnEntry> {
     if (presentation == StepsPresentation.PER_TOOL) {
         return blocks.mapIndexed { index, block -> AssistantTurnEntry.Single(index, block) }
     }
 
+    // Everything up to the last work block belongs to the row; the text after it is the answer.
+    val lastWorkIndex = blocks.indexOfLast { block ->
+        isWorkProcessBlock(block) && (block.kind != THINKING_KIND || thinkingVisible)
+    }
+    if (lastWorkIndex < 0) {
+        // Nothing the agent did - every block is answer text.
+        return blocks.mapIndexed { index, block -> AssistantTurnEntry.Single(index, block) }
+    }
+    // Hidden thinking (Deep Thinking off) renders nothing, so it must not pad the row either.
+    val workBlocks = blocks.subList(0, lastWorkIndex + 1).filter { block ->
+        block.kind != THINKING_KIND || thinkingVisible
+    }
     val entries = mutableListOf<AssistantTurnEntry>()
-    var index = 0
-    while (index < blocks.size) {
-        val block = blocks[index]
-        val counts = isWorkProcessBlock(block) && (block.kind != THINKING_KIND || thinkingVisible)
-        if (!counts) {
-            if (block.kind != THINKING_KIND) {
-                entries.add(AssistantTurnEntry.Single(index, block))
-            }
-            index += 1
-            continue
-        }
-        val run = mutableListOf(block)
-        var next = index + 1
-        while (next < blocks.size) {
-            val candidate = blocks[next]
-            val candidateCounts =
-                isWorkProcessBlock(candidate) && (candidate.kind != THINKING_KIND || thinkingVisible)
-            if (!candidateCounts) break
-            run.add(candidate)
-            next += 1
-        }
-        entries.add(
-            AssistantTurnEntry.Process(
-                WorkProcess(
-                    // Anchored on the first block so the row keeps the same
-                    // LazyColumn key while the run grows, matching the
-                    // key-stability rule the streaming rows depend on.
-                    id = "$messageId:${run.first().id}",
-                    blocks = run.toList(),
-                ),
+    entries.add(
+        AssistantTurnEntry.Process(
+            WorkProcess(
+                // Anchored on the first block so the row keeps the same
+                // LazyColumn key while the run grows, matching the
+                // key-stability rule the streaming rows depend on.
+                id = "$messageId:" + workBlocks.first().id,
+                blocks = workBlocks.toList(),
+                messageCreatedAtMs = messageCreatedAtMs,
+                messageUpdatedAtMs = messageUpdatedAtMs,
             ),
-        )
-        index = next
+        ),
+    )
+    for (index in (lastWorkIndex + 1) until blocks.size) {
+        entries.add(AssistantTurnEntry.Single(index, blocks[index]))
     }
     return entries
 }

@@ -1594,4 +1594,5 @@
     </plurals>
     <string name="work_process_duration">%1$s 소요</string>
     <string name="work_process_duration_failed">%1$s 소요 · %2$d단계 실패</string>
+    <string name="work_process_elapsed">%1$s 처리 중</string>
 </resources>

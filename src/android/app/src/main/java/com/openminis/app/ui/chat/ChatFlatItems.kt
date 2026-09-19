@@ -658,6 +658,9 @@ internal fun buildFlatChatItems(
             is FlatChatItem.AssistantActions -> item.copy(messageId = "${item.messageId}#$n")
         }
     }
+    // [T-android-turn-work] Where the current turn began: the user message that opened it. The
+    // turn's duration is measured from here, not from the assistant row's own timestamps.
+    var turnStartedAtMs = 0L
     for (idx in fromIndex until messages.size) {
         val message = messages[idx]
         // [T-android-perf-logging] Per-100-message progress breadcrumb.
@@ -744,6 +747,8 @@ internal fun buildFlatChatItems(
             blocks = blocks,
             presentation = stepsPresentation,
             thinkingVisible = thinkingVisible,
+            messageCreatedAtMs = turnStartedAtMs.takeIf { it > 0L } ?: message.createdAtMs,
+            messageUpdatedAtMs = message.updatedAtMs,
         )
 
         fun emitBlock(index: Int, block: AssistantBlock) {

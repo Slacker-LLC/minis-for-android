@@ -1605,4 +1605,5 @@
     </plurals>
     <string name="work_process_duration">Dauer %1$s</string>
     <string name="work_process_duration_failed">Dauer %1$s · Schritt %2$d fehlgeschlagen</string>
+    <string name="work_process_elapsed">Läuft seit %1$s</string>
 </resources>
