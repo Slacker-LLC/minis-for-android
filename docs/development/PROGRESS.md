@@ -1087,7 +1087,7 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 踩到的坑 | ① Android 字符串资源里裸撇号必须在 8 个语言文件里统一转义（本次 ko 的「'권한'」导致 `Invalid unicode escape sequence`，而报错行号指向相邻资源，排查花了些时间）；② 上一轮被强杀的 Gradle 一直占着 `/tmp/minis-gradle.lock`，导致后续构建排队——已 kill 并确认锁释放 |
 | 仍未做 | ① `ShizukuPermissionScreen`（Shizuku 状态/安装/授权）与 `OffloadPermissionScreen`（工具权限）目前只能从各自的路由进入，未挂进「系统与权限」这一层，需要归位；② 权限页里的「语音纠错」更像 Agent 行为设置，可考虑移到「Agent 运行时」；③ 后台与通知的「后台任务悬浮窗」与权限页的「显示在其他应用上层」名字相近但含义不同，建议改名区分 |
 
-+## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
+## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
