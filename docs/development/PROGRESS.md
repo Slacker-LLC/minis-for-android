@@ -1075,7 +1075,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 电源键端到端结果 | 长按电源键 → 我们模块的 hook 接管，日志 `HyperOsPower: opened the MINIS assistant through android.intent.action.VOICE_ASSIST` + `MINIS opened for the power-key long press`；前台窗口变为 `llc.slacker.eta/com.openminis.app.MainActivityIconAuto`；小米语音助手**没有被拉起**（`voice_assist_start_from_key` 计数 0）。至此「设置成 minis 却不起作用」这条线全部闭合 |
 | 遗留 | 设置页仍有约 10 个自绘页面（角色库、挂载/共享文件夹、模型组、后台设置、存储详情、技能浏览、外观等）未走共享脚手架与行组件，按同一套 token 继续收口 |
 
-## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
+### 设置页三级化：一级分类 / 二级分类页 / 三级叶子页（2026-09-19，真机验证） — `f4d62d9c`
+
+| 项 | 结果 |
+|---|---|
+| 问题 | 用户反馈：设置页「逻辑不清楚、混乱得很」，尤其 系统增强 / 权限 / 后台与通知 三个页面互相重复（默认数字助手 出现两次，电池优化与自启动 也各出现两次） |
+| 全量清点 | 逐文件抽取每个设置页的 `header/title` 字符串并映射中文，得到 37 个设置页面的完整清单（见 PROGRESS 本节末的层级表），据此重排 |
+| 三级结构 | **一级**：设置 = 6 个分类（LLM 提供商 / Agent 运行时 / 外观 / 运行时与沙箱 / 系统与权限 / 诊断与关于），每行带一句副标题；**二级**：`SettingsCategoryScreen`（一个路由 `settings_category/{category}`，分类作参数）承载原先堆在一级页的那些行；**三级**：原有叶子页面不变 |
+| 去重 | ① 默认数字助手：只保留在「权限」（它是系统角色授权）；系统增强的电源键那一节改为页脚提示「要让 Minis 接管，先在权限里设为默认助手」；② 电池优化 / 自启动：只保留在「后台与通知」，权限页删掉那份重复的（原来以「无障碍保活」为由重复出现）；③ 二级「系统与权限」现在只有 3 行：系统增强 / 权限 / 后台与通知，并带一句说明 |
+| 验证口径 | `:app:testDebugUnitTest` **2423 例 0 失败**、`:app:compileDebugKotlin` 通过（`:app:lintDebug` 本轮仍在跑，结果见下一条提交说明）；真机：一级页 6 个分类，二级「系统与权限」3 行，三级「权限」首行是「默认数字助手（已是系统默认数字助手）」，且不再重复电池/自启动 |
+| 踩到的坑 | ① Android 字符串资源里裸撇号必须在 8 个语言文件里统一转义（本次 ko 的「'권한'」导致 `Invalid unicode escape sequence`，而报错行号指向相邻资源，排查花了些时间）；② 上一轮被强杀的 Gradle 一直占着 `/tmp/minis-gradle.lock`，导致后续构建排队——已 kill 并确认锁释放 |
+| 仍未做 | ① `ShizukuPermissionScreen`（Shizuku 状态/安装/授权）与 `OffloadPermissionScreen`（工具权限）目前只能从各自的路由进入，未挂进「系统与权限」这一层，需要归位；② 权限页里的「语音纠错」更像 Agent 行为设置，可考虑移到「Agent 运行时」；③ 后台与通知的「后台任务悬浮窗」与权限页的「显示在其他应用上层」名字相近但含义不同，建议改名区分 |
+
++## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
 |---|---|---|
