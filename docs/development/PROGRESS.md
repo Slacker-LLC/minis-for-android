@@ -1184,6 +1184,7 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 沙箱 | rootfs 说明、重置说明、「重置」按钮，以及安装 / 重置 / 恢复的全部状态与结果文案进资源；`RootfsManagementViewModel.observeInstallProgress` 增加 Context 参数 |
 | 新增 key | 18 条（权限弹窗），与本片其余 key 一样 8 语言同步 |
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug` |
+| 补漏 | 权限门控弹窗的按钮回退：`SettingsGateRequest` 的两个按钮原本是英文默认值（`Open Settings` / `Cancel`）并被 `MainActivity` 直接使用，负按钮因此一直是英文；现在默认空串，由对话框回退到 `check_update_open_install_settings` / `cancel` |
 | 未验证 | 真机截图仍未做：手机未接回 USB（`adb devices` 为空） |
 | 仍写死英文（未做） | guest CLI 的命令输出与帮助文本（模型侧）、roleplay 部分界面、备份远端类型目录描述 |
 
