@@ -1064,6 +1064,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 仍未做（下一步） | 约 10 个设置页仍自绘 Scaffold/行（角色库、挂载文件夹、共享文件夹、模型组、后台设置、存储详情、技能浏览、外观等），尺寸与上面这套不一致。这一轮先把「标准件 + 主路径」统一，剩余页面按同一套 token 收口 |
 | 验证口径 | `:app:testDebugUnitTest` **2423 例 0 失败** + `:app:lintDebug` 0 error（149 warning）+ `:app:assembleDebug`；手机上（小米 24129PN74C）按上述数值实测 |
 
+### 对话页一键新建会话 + 电源键接管真机打通（2026-09-19，真机验证） — `c8e52f93`
+
+| 项 | 结果 |
+|---|---|
+| 需求 | 对话页顶栏右侧是「⋯」，左侧只有抽屉按钮；要在左侧加一个圆形「+」快速新建会话（用侧边栏那支笔的图标也行） |
+| 做法 | 动作本来就有（`ChatScreen.onNewChat` → `newDraftSessionId()`，侧边栏「新建聊天」走的就是它），所以只补入口：单栏布局下在抽屉按钮右边放一个 34dp 实心圆（`colorScheme.primary`）+ 白色加号，语义标签 `chat_new_session`（8 语言）；双栏布局保留侧栏开关，不重复入口 |
+| 真机验证 | 打开一个有消息的会话（10 个文本节点）→ 点「+」→ 落到空白草稿（2 个文本节点）；按钮可被无障碍树识别（`content-desc="新建会话"`） |
+| 同批完成的设备决定（用户已同意） | ① **默认数字助手设为 Minis**：`cmd role add-role-holder --user 0 android.app.role.ASSISTANT llc.slacker.eta` → `secure assistant` = `llc.slacker.eta/com.openminis.app.voice.AssistService`（此前是 `com.miui.voiceassist`）；② **停用旧模块** `com.openminis.xposedshortcut`（Vector `modules disable`，新进程即刻生效，重启后彻底干净） |
+| 电源键端到端结果 | 长按电源键 → 我们模块的 hook 接管，日志 `HyperOsPower: opened the MINIS assistant through android.intent.action.VOICE_ASSIST` + `MINIS opened for the power-key long press`；前台窗口变为 `llc.slacker.eta/com.openminis.app.MainActivityIconAuto`；小米语音助手**没有被拉起**（`voice_assist_start_from_key` 计数 0）。至此「设置成 minis 却不起作用」这条线全部闭合 |
+| 遗留 | 设置页仍有约 10 个自绘页面（角色库、挂载/共享文件夹、模型组、后台设置、存储详情、技能浏览、外观等）未走共享脚手架与行组件，按同一套 token 继续收口 |
+
 +## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
