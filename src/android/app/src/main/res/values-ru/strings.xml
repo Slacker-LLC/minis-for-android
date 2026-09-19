@@ -1802,4 +1802,14 @@
     <string name="settings_assistant_role_missing_toast">На этом устройстве нет настройки ассистента</string>
     <string name="settings_system_enhance_footer">Root, переключатели модуля и то, что они открывают, — здесь.</string>
     <string name="chat_new_session">Новый чат</string>
+    <string name="settings_category_models_sub">Провайдеры, группы моделей, расход и автосжатие</string>
+    <string name="settings_category_agent_sub">Навыки, персонажи, персона, промпт, память и MCP</string>
+    <string name="settings_category_appearance_sub">Внешний вид и настольный питомец</string>
+    <string name="settings_category_runtime_sub">Терминал, окружение, хранилище и монтирования</string>
+    <string name="settings_category_system_sub">Root, модуль, разрешения и фон</string>
+    <string name="settings_category_about_sub">Журналы, информация и отзывы</string>
+    <string name="settings_permissions_category_sub">Специальные возможности, оверлей и доступ к уведомлениям</string>
+    <string name="settings_system_footer">Что этому приложению разрешено на устройстве и где меняется каждое разрешение.</string>
+    <string name="settings_assistant_role_footer">Жест ассистента (Home / кнопка питания) открывает приложение с этой ролью.</string>
+    <string name="module_settings_assistant_role_hint">Minis перехватит кнопку питания только после того, как станет ассистентом системы — задайте это в «Разрешениях».</string>
 </resources>

@@ -114,384 +114,33 @@ internal fun RoleManager.assistantRoleRequestIntent(): Intent = createRequestRol
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onProvidersClick: () -> Unit,
-    onModelGroupsClick: () -> Unit,
-    onRootfsClick: () -> Unit = {},
-    onEnvVarsClick: () -> Unit = {},
-   onSkillsClick: () -> Unit = {},
-    // [T-eta-character-cards] Character library entry, next to Skills.
-    onCharactersClick: () -> Unit = {},
-    onTerminalClick: () -> Unit = {},
-    onMemoryClick: () -> Unit = {},
-    // [T-mcp-integration-android] MCP Integrations page, listed directly below
-    // Memory. Default no-op for callers that haven't wired the route yet.
-    onMcpClick: () -> Unit = {},
-    // [T-soul-md] Soul settings page lives between Skills and Memory in the
-    // Agent Runtime section; default no-op for callers that haven't wired
-    // the route yet.
-    onSoulClick: () -> Unit = {},
-    // [T-system-prompt-modules] Editable agent system prompt modules. Listed
-    // next to Soul so the two prompt-authoring surfaces sit together.
-    onSystemPromptClick: () -> Unit = {},
-    onPermissionsClick: () -> Unit = {},
-    // [T-system-enhance-android] Root + module status, the switches the module reads, and what
-    // each of them unlocks - one page since the two used to say the same thing twice.
-    onSystemEnhanceClick: () -> Unit = {},
-    onUsageClick: () -> Unit = {},
-    onAppearanceClick: () -> Unit = {},
-    onLogsClick: () -> Unit = {},
-    // T219-2: Mount External Folders entry. Default no-op for any caller
-    // that hasn't wired the route yet.
-    onMountedFoldersClick: () -> Unit = {},
-    onBackupClick: () -> Unit = {},
-    // T235: Shared Folders entry (Shared / Skills / Memory). Default no-op
-    // for back-compat with callers wired before T235.
-    onSharedFoldersClick: () -> Unit = {},
-    // T50: Background & Notifications screen (battery optimisation +
-    // OEM autostart guidance). Default no-op so older callers/tests
-    // don't need to be retrofitted.
-    onBackgroundClick: () -> Unit = {},
-    // Hook accepted for forward-compat with AppNavigation's About route. The
-    // About row below still has a TODO onClick in HEAD; future settings-bucket
-    // work will wire this through.
-    onAboutClick: () -> Unit = {},
+    onOpenCategory: (SettingsCategory) -> Unit,
 ) {
-    val context = LocalContext.current
-    val roleManager = remember(context) { context.assistantRoleManagerOrNull() }
-    var showFeedbackSheet by remember { mutableStateOf(false) }
-    var showSubagentLimits by remember { mutableStateOf(false) }
-    var roleHeld by remember { mutableStateOf(false) }
-    var roleAvailable by remember { mutableStateOf(false) }
-
-    fun refreshAssistantRole() {
-        val manager = roleManager
-        if (manager == null) {
-            roleAvailable = false
-            roleHeld = false
-            return
-        }
-        roleAvailable = runCatching {
-            manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)
-        }.getOrDefault(false)
-        roleHeld = roleAvailable && runCatching {
-            manager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
-        }.getOrDefault(false)
-    }
-
-    // The role can also be changed from the OEM Settings app, so re-check it
-    // whenever this screen returns to foreground instead of retaining a stale row.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, roleManager) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) refreshAssistantRole()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        refreshAssistantRole()
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val assistLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        refreshAssistantRole()
-        Toast.makeText(context, if (roleHeld) "已设为默认数字助手" else "未设置为默认助手", Toast.LENGTH_SHORT).show()
-    }
     SettingsScaffold(
         title = stringResource(R.string.settings_title),
         onBack = onBack,
     ) {
-        // ── 模型与用量 ─────────────────────────────────────────────────────
-        SettingsSection(
-            header = stringResource(R.string.settings_section_llm_providers),
-            footer = stringResource(R.string.settings_section_llm_providers_footer),
-        ) {
-            SettingsRow(
-                icon = Icons.Outlined.Lock,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_manage_providers),
-                subtitle = stringResource(R.string.settings_manage_providers_subtitle),
-                onClick = onProvidersClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Settings,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_model_groups),
-                subtitle = stringResource(R.string.settings_model_groups_subtitle),
-                onClick = onModelGroupsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.BarChart,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_token_usage),
-                subtitle = stringResource(R.string.settings_token_usage_subtitle),
-                onClick = onUsageClick,
-            )
-            var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
-            SettingsSwitchRow(
-                icon = Icons.Outlined.AutoAwesome,
-                iconColor = Color(0xFF5856D6),
-                title = stringResource(R.string.settings_auto_compact),
-                subtitle = stringResource(R.string.settings_auto_compact_subtitle),
-                checked = autoCompactState,
-                onCheckedChange = { checked ->
-                    autoCompactState = checked
-                    com.openminis.app.data.AutoCompactPrefs.setEnabled(context, checked)
-                },
-                showDivider = false,
-            )
-        }
-
-        // ── 助手能力 ───────────────────────────────────────────────────────
-        SettingsSection(header = stringResource(R.string.settings_section_agent_runtime)) {
-            SettingsRow(
-                icon = Icons.Outlined.Extension,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_skills),
-                subtitle = stringResource(R.string.settings_skills_subtitle),
-                onClick = onSkillsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.RecordVoiceOver,
-                iconColor = Color(0xFFAF52DE),
-                title = stringResource(R.string.characters_title),
-                subtitle = stringResource(R.string.characters_subtitle),
-                onClick = onCharactersClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.AutoAwesome,
-                iconColor = Color(0xFFFF9500),
-                title = stringResource(R.string.settings_soul),
-                subtitle = stringResource(R.string.settings_soul_subtitle),
-                onClick = onSoulClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Description,
-                iconColor = Color(0xFF34C759),
-                title = stringResource(R.string.settings_system_prompt),
-                subtitle = stringResource(R.string.settings_system_prompt_subtitle),
-                onClick = onSystemPromptClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Psychology,
-                iconColor = Color(0xFF5856D6),
-                title = stringResource(R.string.settings_memory),
-                subtitle = stringResource(R.string.settings_memory_subtitle),
-                onClick = onMemoryClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Dashboard,
-                iconColor = Color(0xFF30B0C7),
-                title = stringResource(R.string.settings_mcp),
-                subtitle = stringResource(R.string.settings_mcp_subtitle),
-                onClick = onMcpClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.AccountTree,
-                iconColor = Color(0xFFAF52DE),
-                title = stringResource(R.string.settings_subagent_limits),
-                subtitle = stringResource(
-                    R.string.settings_subagent_limits_subtitle,
-                    SubagentLimits.maxDepth(context),
-                    SubagentLimits.timeoutMs(context) / 60_000L,
-                ),
-                onClick = { showSubagentLimits = true },
-                showDivider = false,
-            )
-        }
-
-        // ── 运行时与沙箱 ───────────────────────────────────────────────────
-        SettingsSection(header = stringResource(R.string.settings_section_runtime_storage)) {
-            SettingsRow(
-                icon = Icons.Outlined.Terminal,
-                iconColor = Color(0xFF34C759),
-                title = stringResource(R.string.terminal_title),
-                subtitle = stringResource(R.string.settings_terminal_subtitle),
-                onClick = onTerminalClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Key,
-                iconColor = Color(0xFF5856D6),
-                title = stringResource(R.string.settings_env_vars),
-                subtitle = stringResource(R.string.settings_env_vars_subtitle),
-                onClick = onEnvVarsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Inventory2,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_section_storage),
-                subtitle = stringResource(R.string.settings_storage_subtitle),
-                onClick = onRootfsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Folder,
-                iconColor = Color(0xFF34C759),
-                title = stringResource(R.string.settings_shared_folders),
-                subtitle = stringResource(R.string.settings_shared_folders_subtitle),
-                onClick = onSharedFoldersClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.FolderShared,
-                iconColor = Color(0xFFFF9500),
-                title = stringResource(R.string.settings_mount_external_folders),
-                subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
-                onClick = onMountedFoldersClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Backup,
-                iconColor = Color(0xFF34C759),
-                title = stringResource(R.string.settings_backup_restore),
-                subtitle = stringResource(R.string.settings_backup_restore_subtitle),
-                onClick = onBackupClick,
-                showDivider = false,
-            )
-        }
-
-        // ── 外观 ───────────────────────────────────────────────────────────
-        SettingsSection(header = stringResource(R.string.settings_section_appearance)) {
-            SettingsRow(
-                icon = Icons.Outlined.Palette,
-                iconColor = Color(0xFF5856D6),
-                title = stringResource(R.string.settings_section_appearance),
-                subtitle = stringResource(R.string.settings_appearance_subtitle),
-                onClick = onAppearanceClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Palette,
-                iconColor = Color(0xFF4D6BFE),
-                title = stringResource(R.string.settings_pet),
-                subtitle = stringResource(R.string.settings_pet_subtitle),
-                onClick = { context.startActivity(Intent(context, PetControlActivity::class.java)) },
-                showDivider = false,
-            )
-        }
-
-        // ── 系统与权限 ─────────────────────────────────────────────────────
-        SettingsSection(
-            header = stringResource(R.string.settings_section_system),
-            footer = stringResource(R.string.settings_system_enhance_footer),
-        ) {
-            SettingsRow(
-                icon = Icons.Outlined.Build,
-                iconColor = Color(0xFFFF9F0A),
-                title = stringResource(R.string.system_enhance_title),
-                subtitle = stringResource(R.string.system_enhance_row_subtitle),
-                onClick = onSystemEnhanceClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Shield,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_section_permissions),
-                subtitle = stringResource(R.string.settings_permissions_subtitle),
-                onClick = onPermissionsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.RecordVoiceOver,
-                iconColor = Color(0xFF30B0C7),
-                title = stringResource(R.string.settings_assistant_role),
-                subtitle = when {
-                    roleHeld -> stringResource(R.string.settings_assistant_role_held)
-                    roleManager == null -> stringResource(R.string.settings_assistant_role_unavailable)
-                    roleAvailable -> stringResource(R.string.settings_assistant_role_available)
-                    else -> stringResource(R.string.settings_assistant_role_unavailable)
-                },
-                onClick = {
-                    when {
-                        roleHeld -> Toast.makeText(
-                            context,
-                            context.getString(R.string.settings_assistant_role_held_toast),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                        roleManager != null && roleAvailable -> {
-                            assistLauncher.launch(
-                                roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),
-                            )
-                        }
-                        else -> runCatching {
-                            context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-                        }.onFailure {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.settings_assistant_role_missing_toast),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    }
-                },
-            )
-            SettingsRow(
-                icon = Icons.Outlined.BatteryFull,
-                iconColor = Color(0xFFFF9500),
-                title = stringResource(R.string.bg_section_header),
-                subtitle = stringResource(R.string.bg_section_subtitle),
-                onClick = onBackgroundClick,
-                showDivider = false,
-            )
-        }
-
-        // ── 诊断与关于 ─────────────────────────────────────────────────────
-        SettingsSection(header = stringResource(R.string.settings_section_diagnostics)) {
-            SettingsRow(
-                icon = Icons.Outlined.Description,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_section_logs),
-                subtitle = stringResource(R.string.settings_logs_subtitle),
-                onClick = onLogsClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Info,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_about_minis),
-                subtitle = stringResource(R.string.settings_about_subtitle),
-                onClick = onAboutClick,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.FrontHand,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_privacy_policy),
-                onClick = { openExternalUrl(context, "https://openminis.github.io/privacy-policy.html") },
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Feedback,
-                iconColor = Color(0xFF007AFF),
-                title = stringResource(R.string.settings_feedback),
-                onClick = { showFeedbackSheet = true },
-                showDivider = false,
-            )
-        }
-    }
-
-    if (showFeedbackSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showFeedbackSheet = false },
-            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
-        ) {
-            GlassSheetWindowBlur()
-            Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 24.dp)) {
-                FeedbackSheetItem(
-                    icon = Icons.Outlined.BugReport,
-                    title = stringResource(R.string.settings_submit_github_issues),
-                    onClick = {
-                        showFeedbackSheet = false
-                        openExternalUrl(context, buildBugReportUrl())
-                    },
+        // [T-android-settings-hierarchy] Level 1 lists subjects, not screens: one row per
+        // category, each opening the level-2 page that owns those settings. The leaf screens
+        // stay one tap further. Before this the page carried twenty-six rows under nine headers,
+        // and four unrelated things (root and module, permissions, the assistant role, background
+        // access) shared a single "system" card with no place to grow.
+        SettingsSection {
+            SettingsCategory.entries.forEachIndexed { index, category ->
+                SettingsRow(
+                    icon = category.icon(),
+                    iconColor = category.iconColor(),
+                    title = stringResource(category.titleRes),
+                    subtitle = stringResource(category.subtitleRes),
+                    onClick = { onOpenCategory(category) },
+                    showDivider = index != SettingsCategory.entries.lastIndex,
                 )
             }
         }
     }
-
-    if (showSubagentLimits) {
-        SubagentLimitsDialog(
-            initialDepth = SubagentLimits.maxDepth(context),
-            initialTimeoutMinutes = SubagentLimits.timeoutMs(context) / 60_000L,
-            onSave = { depth, timeoutMinutes ->
-                SubagentLimits.save(context, depth, timeoutMinutes)
-                showSubagentLimits = false
-            },
-            onDismiss = { showSubagentLimits = false },
-        )
-    }
 }
-
 @Composable
-private fun FeedbackSheetItem(
+internal fun FeedbackSheetItem(
     icon: ImageVector,
     title: String,
     onClick: () -> Unit,
@@ -519,7 +168,7 @@ private fun FeedbackSheetItem(
 }
 
 @Composable
-private fun SubagentLimitsDialog(
+internal fun SubagentLimitsDialog(
     initialDepth: Int,
     initialTimeoutMinutes: Long,
     onSave: (Int, Long) -> Unit,
@@ -603,7 +252,7 @@ private fun SubagentLimitsDialog(
  * Details (fenced code block), Expected Behavior, and Additional
  * Information.
  */
-private fun buildBugReportUrl(): String {
+internal fun buildBugReportUrl(): String {
     val osVersion = android.os.Build.VERSION.RELEASE
     val sdkInt = android.os.Build.VERSION.SDK_INT
     val versionName = BuildConfig.VERSION_NAME

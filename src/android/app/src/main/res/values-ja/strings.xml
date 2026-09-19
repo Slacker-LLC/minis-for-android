@@ -1557,4 +1557,14 @@
     <string name="settings_assistant_role_missing_toast">この端末には既定アシスタントの設定がありません</string>
     <string name="settings_system_enhance_footer">Root、モジュールのスイッチ、それぞれが可能にすることをここにまとめています。</string>
     <string name="chat_new_session">新しいチャット</string>
+    <string name="settings_category_models_sub">プロバイダー、モデルグループ、使用量、自動圧縮</string>
+    <string name="settings_category_agent_sub">スキル、キャラクター、人格、プロンプト、記憶、MCP</string>
+    <string name="settings_category_appearance_sub">外観とデスクトップペット</string>
+    <string name="settings_category_runtime_sub">ターミナル、環境変数、ストレージとマウント</string>
+    <string name="settings_category_system_sub">Root、モジュール、権限、バックグラウンド</string>
+    <string name="settings_category_about_sub">ログ、情報、フィードバック</string>
+    <string name="settings_permissions_category_sub">アクセシビリティ、オーバーレイ、通知アクセス</string>
+    <string name="settings_system_footer">この端末でこのアプリに許されること、および各許可の変更場所。</string>
+    <string name="settings_assistant_role_footer">Home / 電源キーのアシスタント ジェスチャは、この役割を持つアプリを開きます。</string>
+    <string name="module_settings_assistant_role_hint">Minis が電源キーを引き継ぐには、まず「権限」でシステム既定のアシスタントに設定してください。</string>
 </resources>

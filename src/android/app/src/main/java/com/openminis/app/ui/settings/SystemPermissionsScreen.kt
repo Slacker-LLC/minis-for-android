@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.Info
@@ -32,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +43,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.R
 import com.openminis.app.accessibility.AccessibilityRecoveryManager
 import com.openminis.app.accessibility.MinisAccessibilityService
@@ -58,6 +65,39 @@ import kotlinx.coroutines.launch
 fun SystemPermissionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var a11yEnabled by remember { mutableStateOf(isAccessibilityEnabled(context)) }
+
+    // [T-android-settings-hierarchy] The assistant role is a grant like the others on this page,
+    // and the module's power-key takeover depends on it, so it lives here rather than as a
+    // stand-alone row on the hub. The role can change from the OEM settings app too, so it is
+    // re-read whenever this screen returns to the foreground.
+    val roleManager = remember(context) { context.assistantRoleManagerOrNull() }
+    var roleHeld by remember { mutableStateOf(false) }
+    var roleAvailable by remember { mutableStateOf(false) }
+
+    fun refreshAssistantRole() {
+        val manager = roleManager
+        if (manager == null) {
+            roleAvailable = false
+            roleHeld = false
+            return
+        }
+        roleAvailable = runCatching { manager.assistantRoleAvailable() }.getOrDefault(false)
+        roleHeld = roleAvailable && runCatching { manager.assistantRoleHeld() }.getOrDefault(false)
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, roleManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshAssistantRole()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        refreshAssistantRole()
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val roleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { refreshAssistantRole() }
     var a11yDegraded by remember { mutableStateOf(false) }
     var a11yRevoked by remember { mutableStateOf(false) }
     var shizukuReady by remember { mutableStateOf(false) }
@@ -105,6 +145,51 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SettingsSection(
+                header = stringResource(R.string.settings_assistant_role),
+                footer = stringResource(R.string.settings_assistant_role_footer),
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.RecordVoiceOver,
+                    iconColor = Color(0xFF30B0C7),
+                    title = stringResource(R.string.settings_assistant_role),
+                    subtitle = when {
+                        roleHeld -> stringResource(R.string.settings_assistant_role_held)
+                        roleAvailable -> stringResource(R.string.settings_assistant_role_available)
+                        else -> stringResource(R.string.settings_assistant_role_unavailable)
+                    },
+                    trailing = {
+                        if (roleHeld) {
+                            Icon(
+                                Icons.Outlined.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
+                    onClick = {
+                        when {
+                            roleHeld -> Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_assistant_role_held_toast),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            roleManager != null && roleAvailable -> roleLauncher.launch(roleManager.assistantRoleRequestIntent())
+                            else -> runCatching {
+                                context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.settings_assistant_role_missing_toast),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    },
+                    showDivider = false,
+                )
+            }
+
             SettingsSection(
                 header = stringResource(R.string.system_permissions_section_a11y),
                 footer = stringResource(R.string.system_permissions_a11y_footer),
@@ -265,42 +350,10 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 }
             }
 
-            val activity = context as? Activity
-            if (
-                a11yDegraded &&
-                activity != null &&
-                PowerOptimizationManager.needsOemAutostartGuidance()
-            ) {
-                val vendor = PowerOptimizationManager.Vendor.current().displayName
-                SettingsSection(
-                    header = stringResource(R.string.system_permissions_a11y_oem_header),
-                    footer = stringResource(R.string.system_permissions_a11y_oem_footer, vendor),
-                ) {
-                    SettingsRow(
-                        icon = Icons.Outlined.RestartAlt,
-                        iconColor = Color(0xFFFF9500),
-                        title = stringResource(R.string.system_permissions_a11y_oem_autostart),
-                        subtitle = stringResource(R.string.system_permissions_a11y_oem_autostart_sub),
-                        onClick = {
-                            if (!PowerOptimizationManager.openOemAutostartSettings(activity)) {
-                                PowerOptimizationManager.openAppDetailsSettings(activity)
-                            }
-                        },
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.BatteryAlert,
-                        iconColor = Color(0xFFFF9500),
-                        title = stringResource(R.string.system_permissions_a11y_oem_battery),
-                        subtitle = stringResource(R.string.system_permissions_a11y_oem_battery_sub),
-                        onClick = {
-                            if (!PowerOptimizationManager.requestBatteryOptimizationExemption(activity)) {
-                                PowerOptimizationManager.openAppDetailsSettings(activity)
-                            }
-                        },
-                        showDivider = false,
-                    )
-                }
-            }
+            // [T-android-settings-hierarchy] Battery-optimisation and OEM-autostart guidance used
+            // to be repeated here and on "background & notifications" with different wording for
+            // the same two system screens. They live there now, one tap away in the same category;
+            // this page keeps only the grants that belong to accessibility itself.
 
             var correctionEnabled by remember {
                 mutableStateOf(

@@ -52,6 +52,8 @@ import com.openminis.app.ui.sandbox.FilePreviewScreen
 import com.openminis.app.ui.sandbox.RootfsManagementScreen
 import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
+import com.openminis.app.ui.settings.SettingsCategory
+import com.openminis.app.ui.settings.SettingsCategoryScreen
 import com.openminis.app.ui.settings.SettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
 import com.openminis.app.ui.settings.SystemEnhanceScreen
@@ -93,6 +95,9 @@ object Routes {
     const val ASSISTANT_HOME = "assistant_home"
     const val CHAT = "chat/{sessionId}"
     const val SETTINGS = "settings"
+    // [T-android-settings-hierarchy] Level 2: the settings of one category (see SettingsCategory).
+    const val SETTINGS_CATEGORY = "settings_category/{category}"
+    fun settingsCategory(category: String) = "settings_category/$category"
     const val BOTS = "bots"
     const val BOTS_ADD = "bots_add"
     const val BOTS_PROGRESS = "bots_progress"
@@ -612,28 +617,46 @@ fun AppNavigation(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.safePopBackStack() },
-                onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
-                onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
-                onRootfsClick = { navController.safeNavigate(Routes.STORAGE) },
-                onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
-               onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
-                onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
-                onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
-                onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
-                onMcpClick = { navController.safeNavigate(Routes.MCP) },
-                onSoulClick = { navController.safeNavigate(Routes.SOUL) },
-                onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
-                onPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
-                onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
-                onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
-                onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
-                onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
-                onLogsClick = { navController.safeNavigate(Routes.LOGS) },
-                onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
-                onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
-                onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
-                onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
+                onOpenCategory = { category ->
+                    navController.safeNavigate(Routes.settingsCategory(category.key))
+                },
             )
+        }
+
+        composable(
+            route = Routes.SETTINGS_CATEGORY,
+            arguments = listOf(navArgument("category") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val category = SettingsCategory.parse(backStackEntry.arguments?.getString("category"))
+            if (category == null) {
+                navController.safePopBackStack()
+            } else {
+                SettingsCategoryScreen(
+                    category = category,
+                    onBack = { navController.safePopBackStack() },
+                    onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
+                    onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
+                    onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
+                    onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
+                    onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
+                    onSoulClick = { navController.safeNavigate(Routes.SOUL) },
+                    onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
+                    onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
+                    onMcpClick = { navController.safeNavigate(Routes.MCP) },
+                    onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
+                    onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
+                    onRootfsClick = { navController.safeNavigate(Routes.STORAGE) },
+                    onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
+                    onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
+                    onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
+                    onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
+                    onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
+                    onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
+                    onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
+                    onLogsClick = { navController.safeNavigate(Routes.LOGS) },
+                    onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
+                )
+            }
         }
 
         listOf(Routes.BOTS, Routes.BOTS_ADD, Routes.BOTS_PROGRESS).forEach { botRoute ->

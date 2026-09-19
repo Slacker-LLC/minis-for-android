@@ -249,45 +249,18 @@ fun SystemEnhanceScreen(
 
         SettingsSection(
             header = stringResource(R.string.module_settings_section_assistant),
-            footer = stringResource(R.string.module_settings_assistant_footer),
+            // [T-android-settings-hierarchy] The assistant role itself is a grant and lives on the
+            // permissions page; repeating it here as a second row made the same switch appear
+            // twice with two different subtitles. What this page owns is the target choice, so the
+            // role only shows up as the sentence that explains when the choice can take effect.
+            footer = stringResource(
+                if (roleHeld) {
+                    R.string.module_settings_assistant_footer
+                } else {
+                    R.string.module_settings_assistant_role_hint
+                },
+            ),
         ) {
-            SettingsRow(
-                title = stringResource(R.string.module_settings_assistant_role),
-                subtitle = when {
-                    roleHeld -> stringResource(R.string.module_settings_assistant_role_held)
-                    roleAvailable -> stringResource(R.string.module_settings_assistant_role_needed)
-                    else -> stringResource(R.string.module_settings_assistant_role_unavailable)
-                },
-                trailing = {
-                    if (roleHeld) {
-                        Icon(
-                            Icons.Outlined.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
-                onClick = {
-                    val manager = roleManager
-                    when {
-                        roleHeld -> Toast.makeText(
-                            context,
-                            context.getString(R.string.module_settings_assistant_role_held),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                        manager != null && roleAvailable -> roleLauncher.launch(manager.assistantRoleRequestIntent())
-                        else -> runCatching {
-                            context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-                        }.onFailure {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.module_settings_assistant_role_unavailable),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    }
-                },
-            )
             PowerAssistantTarget.entries.forEachIndexed { index, target ->
                 SettingsRow(
                     title = stringResource(target.labelRes()),

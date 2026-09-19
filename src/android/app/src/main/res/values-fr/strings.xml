@@ -1443,4 +1443,14 @@
     <string name="settings_assistant_role_missing_toast">Cet appareil n\'a pas de réglage d\'assistant</string>
     <string name="settings_system_enhance_footer">Root, les interrupteurs du module et ce qu\'ils débloquent sont ici.</string>
     <string name="chat_new_session">Nouvelle conversation</string>
+    <string name="settings_category_models_sub">Fournisseurs, groupes de modèles, usage et compression auto</string>
+    <string name="settings_category_agent_sub">Compétences, personnages, persona, prompt, mémoire et MCP</string>
+    <string name="settings_category_appearance_sub">Apparence et compagnon de bureau</string>
+    <string name="settings_category_runtime_sub">Terminal, environnement, stockage et montages</string>
+    <string name="settings_category_system_sub">Root, module, autorisations et arrière-plan</string>
+    <string name="settings_category_about_sub">Journaux, à propos et retours</string>
+    <string name="settings_permissions_category_sub">Accessibilité, superposition et accès aux notifications</string>
+    <string name="settings_system_footer">Ce que cette app peut faire sur cet appareil, et où chaque autorisation se règle.</string>
+    <string name="settings_assistant_role_footer">Le geste d\'assistant (Home / bouton d\'alimentation) ouvre l\'app qui détient ce rôle.</string>
+    <string name="module_settings_assistant_role_hint">Minis ne reprend le bouton d\'alimentation qu\'une fois défini comme assistant système, dans « Autorisations ».</string>
 </resources>

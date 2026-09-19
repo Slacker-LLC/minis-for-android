@@ -1552,4 +1552,14 @@
     <string name="settings_assistant_role_missing_toast">Dieses Gerät hat keine Assistenten-Einstellung</string>
     <string name="settings_system_enhance_footer">Root, die Modul-Schalter und was sie jeweils freischalten, stehen hier.</string>
     <string name="chat_new_session">Neuer Chat</string>
+    <string name="settings_category_models_sub">Anbieter, Modellgruppen, Nutzung und Auto-Kompakt</string>
+    <string name="settings_category_agent_sub">Skills, Charaktere, Persona, Prompt, Gedächtnis und MCP</string>
+    <string name="settings_category_appearance_sub">Aussehen und Desktop-Haustier</string>
+    <string name="settings_category_runtime_sub">Terminal, Umgebung, Speicher und Einhängepunkte</string>
+    <string name="settings_category_system_sub">Root, Modul, Berechtigungen und Hintergrund</string>
+    <string name="settings_category_about_sub">Protokolle, Info und Feedback</string>
+    <string name="settings_permissions_category_sub">Bedienungshilfen, Overlay und Benachrichtigungszugriff</string>
+    <string name="settings_system_footer">Was diese App auf diesem Gerät darf und wo jede Freigabe geändert wird.</string>
+    <string name="settings_assistant_role_footer">Die Assistenten-Geste (Home / Ein-/Aus-Taste) öffnet die App mit dieser Rolle.</string>
+    <string name="module_settings_assistant_role_hint">Minis übernimmt die Ein-/Aus-Taste erst, wenn es unter „Berechtigungen“ als Standard-Assistent gesetzt ist.</string>
 </resources>

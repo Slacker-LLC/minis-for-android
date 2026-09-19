@@ -1099,4 +1099,14 @@
     <string name="settings_assistant_role_missing_toast">此裝置未提供預設助理設定</string>
     <string name="settings_system_enhance_footer">Root、模組開關以及它們各自解鎖的能力都在這裡。</string>
     <string name="chat_new_session">新增對話</string>
+    <string name="settings_category_models_sub">供應商、模型群組、用量與自動壓縮</string>
+    <string name="settings_category_agent_sub">技能、角色、人格、提示詞、記憶與 MCP</string>
+    <string name="settings_category_appearance_sub">外觀與桌面寵物</string>
+    <string name="settings_category_runtime_sub">終端、環境變數、儲存與掛載</string>
+    <string name="settings_category_system_sub">Root、模組、權限與背景</string>
+    <string name="settings_category_about_sub">日誌、關於與回饋</string>
+    <string name="settings_permissions_category_sub">無障礙、懸浮視窗與通知存取權</string>
+    <string name="settings_system_footer">本 App 在這台裝置上被允許做什麼，以及每項授權在哪裡改。</string>
+    <string name="settings_assistant_role_footer">長按 Home / 電源鍵的助理手勢會開啟目前持有該角色的 App。</string>
+    <string name="module_settings_assistant_role_hint">要讓 Minis 接管電源鍵，先在「權限」裡把它設為系統預設助理。</string>
 </resources>

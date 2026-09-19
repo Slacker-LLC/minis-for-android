@@ -1549,4 +1549,14 @@
     <string name="settings_assistant_role_missing_toast">이 기기에는 기본 어시스턴트 설정이 없습니다</string>
     <string name="settings_system_enhance_footer">Root, 모듈 스위치와 각각이 여는 기능이 여기에 모여 있습니다.</string>
     <string name="chat_new_session">새 대화</string>
+    <string name="settings_category_models_sub">공급자, 모델 그룹, 사용량, 자동 압축</string>
+    <string name="settings_category_agent_sub">스킬, 캐릭터, 페르소나, 프롬프트, 기억, MCP</string>
+    <string name="settings_category_appearance_sub">모양과 데스크톱 펫</string>
+    <string name="settings_category_runtime_sub">터미널, 환경 변수, 저장소와 마운트</string>
+    <string name="settings_category_system_sub">Root, 모듈, 권한, 백그라운드</string>
+    <string name="settings_category_about_sub">로그, 정보, 피드백</string>
+    <string name="settings_permissions_category_sub">접근성, 오버레이, 알림 접근</string>
+    <string name="settings_system_footer">이 기기에서 이 앱이 할 수 있는 일과 각 권한을 바꾸는 곳.</string>
+    <string name="settings_assistant_role_footer">Home / 전원 키 어시스턴트 제스처는 이 역할을 가진 앱을 엽니다.</string>
+    <string name="module_settings_assistant_role_hint">Minis가 전원 키를 가져오려면 먼저 \'권한\'에서 시스템 기본 어시스턴트로 설정하세요.</string>
 </resources>

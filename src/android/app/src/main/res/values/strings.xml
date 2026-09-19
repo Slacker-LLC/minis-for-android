@@ -1954,4 +1954,14 @@
     <string name="settings_assistant_role_missing_toast">This device has no default-assistant setting</string>
     <string name="settings_system_enhance_footer">Root, the LSPosed module and the switches it reads are all here.</string>
     <string name="chat_new_session">New chat</string>
+    <string name="settings_category_models_sub">Providers, model groups, usage and auto-compact</string>
+    <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
+    <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
+    <string name="settings_category_runtime_sub">Terminal, environment, storage and mounts</string>
+    <string name="settings_category_system_sub">Root, the module, permissions and background access</string>
+    <string name="settings_category_about_sub">Logs, about and feedback</string>
+    <string name="settings_permissions_category_sub">Accessibility, overlay and notification access</string>
+    <string name="settings_system_footer">What this app may do on this device, and where each grant is changed.</string>
+    <string name="settings_assistant_role_footer">The Home / power-key assistant gesture opens whichever app holds this role.</string>
+    <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
 </resources>
