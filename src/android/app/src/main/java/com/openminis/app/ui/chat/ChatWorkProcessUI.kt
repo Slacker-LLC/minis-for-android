@@ -166,6 +166,28 @@ internal fun WorkProcessRowView(
                     color = ChatColors.separator.copy(alpha = 0.45f),
                     thickness = 0.5.dp,
                 )
+                // [T-android-work-items] What the run consisted of, by type - the same idea as
+                // Codex's grouped work items, in one line above the individual steps.
+                // [T-android-work-items] What the run consisted of, by type - the same idea as
+                // Codex's grouped work items, in one line above the individual steps. The labels
+                // are resolved with a plain loop: a composable call inside joinToString's lambda
+                // is not a composable context.
+                val tallyGroups = tallyEntries(summary.tallies)
+                if (tallyGroups.isNotEmpty()) {
+                    val parts = ArrayList<String>(tallyGroups.size)
+                    for (index in tallyGroups.indices) {
+                        val (kind, count) = tallyGroups[index]
+                        parts.add(workItemTallyLabel(kind, count))
+                    }
+                    Text(
+                        text = parts.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChatColors.secondaryText,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
                 val trailingBlockId = process.blocks.lastOrNull()?.id
                 process.blocks.forEach { block ->
                     when (block.kind) {
@@ -215,10 +237,34 @@ internal fun workProcessHeaderText(summary: WorkProcessSummary): String = when {
         summary.failedStepNumber ?: 0,
         summary.failureReason,
     )
+    // [T-android-work-items] A finished run leads with how long it took, the way Codex's turn
+    // header does; the step count is what older rows (no timings) still fall back to.
+    summary.durationMs != null -> stringResource(
+        R.string.work_process_duration,
+        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
+    )
     summary.toolCount > 0 -> pluralStringResource(
         R.plurals.work_process_completed_steps,
         summary.toolCount,
         summary.toolCount,
     )
     else -> stringResource(R.string.work_process_completed_thinking)
+}
+
+/** [T-android-work-items] One group of the expanded summary line, e.g. "7 commands". */
+@Composable
+internal fun workItemTallyLabel(kind: WorkItemKind, count: Int): String {
+    val plural = when (kind) {
+        WorkItemKind.COMMAND -> R.plurals.work_item_command
+        WorkItemKind.FILE_READ -> R.plurals.work_item_file_read
+        WorkItemKind.FILE_EDIT -> R.plurals.work_item_file_edit
+        WorkItemKind.SEARCH -> R.plurals.work_item_search
+        WorkItemKind.BROWSER -> R.plurals.work_item_browser
+        WorkItemKind.MCP -> R.plurals.work_item_mcp
+        WorkItemKind.IMAGE -> R.plurals.work_item_image
+        WorkItemKind.DELEGATION -> R.plurals.work_item_delegation
+        // Filtered out by tallyEntries; kept exhaustive so a new kind is a compile error here.
+        WorkItemKind.REASONING, WorkItemKind.OTHER -> R.plurals.work_item_command
+    }
+    return pluralStringResource(plural, count, count)
 }

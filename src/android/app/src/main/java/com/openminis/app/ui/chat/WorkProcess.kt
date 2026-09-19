@@ -13,6 +13,51 @@ import com.openminis.app.data.StepsPresentation
 // what counts as a step, which failure text lands on the collapsed row) are
 // covered by JVM unit tests.
 
+/**
+ * [T-android-work-items] What a step *is*.
+ *
+ * Codex's turn model keeps a typed item per step (reasoning / command execution / file change /
+ * MCP call / web search) and builds both the live view and the finished summary from those types
+ * rather than from prose. This is the same idea at the granularity this app has: one enum per kind
+ * a finished run can be summarised by, decided purely from the tool name so it is testable and
+ * cannot drift between the live panel and the collapsed row.
+ */
+internal enum class WorkItemKind {
+    REASONING,
+    COMMAND,
+    FILE_READ,
+    FILE_EDIT,
+    SEARCH,
+    BROWSER,
+    MCP,
+    IMAGE,
+    DELEGATION,
+    OTHER,
+}
+
+/** Canonical tool names the classifier matches exactly; prefixes cover the rest. */
+private val WORK_ITEM_COMMANDS = setOf("shell_execute", "shell", "linux_shell", "linux.shell")
+private val WORK_ITEM_FILE_READS = setOf("file_read", "read", "linux.read")
+private val WORK_ITEM_FILE_EDITS = setOf("file_write", "file_edit", "write", "edit", "linux.write", "linux.edit")
+
+/** [T-android-work-items] The kind of one block: a thinking/text/info block is reasoning. */
+internal fun workItemKindOf(block: AssistantBlock): WorkItemKind {
+    if (block.kind != TOOL_USE_KIND) return WorkItemKind.REASONING
+    val name = block.toolName.trim().lowercase()
+    return when {
+        name.isEmpty() -> WorkItemKind.OTHER
+        name in WORK_ITEM_COMMANDS || name.contains("shell") || name.contains("terminal") -> WorkItemKind.COMMAND
+        name in WORK_ITEM_FILE_READS || name.contains("read_file") -> WorkItemKind.FILE_READ
+        name in WORK_ITEM_FILE_EDITS || name.contains("write_file") || name.contains("edit_file") -> WorkItemKind.FILE_EDIT
+        name.startsWith("mcp") || name.startsWith("mcp.") || name.contains(".") -> WorkItemKind.MCP
+        name.contains("search") || name.contains("web_") -> WorkItemKind.SEARCH
+        name.startsWith("browser") -> WorkItemKind.BROWSER
+        name.contains("image") || name.contains("photo") -> WorkItemKind.IMAGE
+        name == "subagent" || name.contains("delegate") || name.startsWith("bot_") -> WorkItemKind.DELEGATION
+        else -> WorkItemKind.OTHER
+    }
+}
+
 /** Tool statuses that mean "this step has not finished yet". */
 internal val WORK_PROCESS_RUNNING_STATUSES: Set<ToolBlockStatus> = setOf(
     ToolBlockStatus.STREAMING,
@@ -68,6 +113,25 @@ internal data class WorkProcess(
         return seen.takeIf { it > 0 }
     }
 
+    /**
+     * [T-android-work-items] How long the run took, from the first step's start to the last step's
+     * end. Null while a step is still running (there is no end yet) and when the blocks carry no
+     * timings at all - the header then keeps its step wording instead of inventing a duration.
+     */
+    val durationMs: Long?
+        get() {
+            if (isRunning) return null
+            val started = toolBlocks.mapNotNull { it.startTimeMs.takeIf { t -> t > 0L } }.minOrNull() ?: return null
+            val finished = toolBlocks
+                .filter { it.startTimeMs > 0L && it.durationMs > 0L }
+                .maxOfOrNull { it.startTimeMs + it.durationMs } ?: return null
+            return (finished - started).takeIf { it > 0L }
+        }
+
+    /** [T-android-work-items] Steps per kind, in enum order. */
+    val tallies: Map<WorkItemKind, Int>
+        get() = blocks.groupingBy(::workItemKindOf).eachCount()
+
     /** A snapshot of everything the collapsed row renders. */
     fun summary(maxFailureChars: Int = DEFAULT_FAILURE_CHARS): WorkProcessSummary {
         val running = runningTool
@@ -88,9 +152,24 @@ internal data class WorkProcess(
             // what is happening now, and the failure stays visible inside the
             // panel. Only a finished run reports its failure on the header.
             failureReason = if (running == null) failed?.let { failureSummary(it, maxFailureChars) } else null,
+            durationMs = durationMs,
+            tallies = tallies,
         )
     }
 }
+
+/**
+ * [T-android-work-items] The groups of the "what this run consisted of" summary, biggest first.
+ *
+ * Reasoning and unclassified steps are left out: the first is already visible as the panel's own
+ * thinking sections, and the second says "we could not name it" rather than telling the user
+ * anything. Null when nothing is left to report.
+ */
+internal fun tallyEntries(tallies: Map<WorkItemKind, Int>): List<Pair<WorkItemKind, Int>> =
+    tallies.entries
+        .filter { it.value > 0 && it.key != WorkItemKind.REASONING && it.key != WorkItemKind.OTHER }
+        .sortedWith(compareByDescending<Map.Entry<WorkItemKind, Int>> { it.value }.thenBy { it.key.ordinal })
+        .map { it.key to it.value }
 
 /** Everything the collapsed "work process" header needs, resolved once. */
 internal data class WorkProcessSummary(
@@ -102,6 +181,10 @@ internal data class WorkProcessSummary(
     val failedStepNumber: Int? = null,
     val failedToolName: String? = null,
     val failureReason: String? = null,
+    /** [T-android-work-items] Wall time of the finished run, when the steps carried timings. */
+    val durationMs: Long? = null,
+    /** [T-android-work-items] Steps per kind, for the expanded summary line. */
+    val tallies: Map<WorkItemKind, Int> = emptyMap(),
 ) {
     val hasFailure: Boolean get() = failureReason != null || failedStepNumber != null
 }
