@@ -1130,6 +1130,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机验证 | 开关写入 `tool_status_bar=false`；跑 `sleep 12` 的一轮时视图树里已无 CPU/MEM 节点，composer 直接贴消息列表 |
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:assembleDebug` |
 
+### 回答下方动作行左对齐（2026-09-19，真机验证） — `e962c97b`
+
+| 项 | 结果 |
+|---|---|
+| 用户反馈 | 对话里「复制 / 重新生成 / 播放 / 分支 / 更多」那排图标要左对齐 |
+| 根因 | `AssistantMessageActionBar` 的行用了 `Modifier.wrapContentWidth()`，而它的默认对齐参数是 **CenterHorizontally**，所以整组图标被摆在屏幕中间（其余内容都在消息自己的左列上） |
+| 改法 | 去掉 `wrapContentWidth()`（行本来就按内容收缩，item 宽度即屏幕宽），起始内边距设为 0，让整组贴住内容列；第一个图标字形因此只比文字多一个触摸框内缩（42dp 框 + 20dp 图标 = 11dp） |
+| 真机验证 | 「复制」字形 x 从屏幕中部移到 88px，消息文字在 52px（16dp 列）——差的 36px 正是触摸框内缩 |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
