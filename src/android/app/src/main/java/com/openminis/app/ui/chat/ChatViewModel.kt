@@ -12480,7 +12480,10 @@ class ChatViewModel(
                 toolBlocks = blocks,
                 sourceDbIds = listOf(entity.id),
                 createdAtMs = entity.createdAt,
-                updatedAtMs = entity.updatedAt,
+                // [T-android-turn-work] updated_at is a nullable column and a row that was written
+                // once never gets one; its created_at is then the best (and correct) end marker,
+                // because the answer row is created when the turn ends.
+                updatedAtMs = entity.updatedAt ?: entity.createdAt,
                 // [T-error-persist-android] Restore the persisted terminal error
                 // so the inline error banner + Retry button survive a reload.
                 // Coalesce a blank value to null: the UI gate is `error?.let`, so
@@ -12515,6 +12518,11 @@ class ChatViewModel(
                         id = msg.id,
                         content = combinedText,
                         toolBlocks = combinedBlocks,
+                        // [T-android-turn-work] The turn ends when its LAST row was written, so the
+                        // merged message keeps the later of the two end markers (the first row's
+                        // own clock is the start of the work, not its finish).
+                        updatedAtMs = maxOf(prev.updatedAtMs ?: 0L, msg.updatedAtMs ?: 0L)
+                            .takeIf { it > 0L },
                         // T126-marker: keep every source dbId so Phase 2.5
                         // can resolve markers that point at any of the
                         // pre-merge rows (lastCompactedMessageId is often

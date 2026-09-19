@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -114,18 +115,12 @@ internal fun WorkProcessRowView(
     val headerIcon = runningTool?.let { toolIconFor(it.toolName) } ?: Icons.Default.Build
     val headerText = workProcessHeaderText(summary, elapsedSec.takeIf { summary.isRunning })
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(ChatColors.secondaryBg.copy(alpha = 0.55f))
-            .border(
-                width = 0.5.dp,
-                color = ChatColors.separator.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(12.dp),
-            ),
-    ) {
+    // [T-android-turn-work] Codex's turn row, not a card: one line of text, a chevron that points
+    // right when the row is folded and down when it is open, and a hairline under it - spanning the
+    // same width as the answer text beside it. The rounded box this used to be was narrower than
+    // the message (the extra horizontal padding lived inside it) and read as a second, competing
+    // surface next to the reply.
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,16 +128,9 @@ internal fun WorkProcessRowView(
                     userToggled = true
                     expanded = !expanded
                 }
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = headerIcon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(8.dp))
             Text(
                 text = headerText,
                 style = MaterialTheme.typography.bodyMedium,
@@ -151,8 +139,9 @@ internal fun WorkProcessRowView(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            Spacer(Modifier.width(6.dp))
             Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
                 contentDescription = stringResource(
                     if (expanded) R.string.work_process_collapse else R.string.work_process_expand,
                 ),
@@ -160,6 +149,10 @@ internal fun WorkProcessRowView(
                 modifier = Modifier.size(16.dp),
             )
         }
+        HorizontalDivider(
+            color = ChatColors.separator.copy(alpha = 0.55f),
+            thickness = 0.5.dp,
+        )
 
         AnimatedVisibility(
             visible = expanded,
@@ -177,10 +170,6 @@ internal fun WorkProcessRowView(
             ),
         ) {
             Column {
-                HorizontalDivider(
-                    color = ChatColors.separator.copy(alpha = 0.45f),
-                    thickness = 0.5.dp,
-                )
                 // [T-android-work-items] What the run consisted of, by type - the same idea as
                 // Codex's grouped work items, in one line above the individual steps.
                 // [T-android-work-items] What the run consisted of, by type - the same idea as
