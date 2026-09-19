@@ -1937,4 +1937,20 @@
 
     <string name="system_enhance_root_hidden">su is not visible to this app; %1$s is installed - allow this app there (or turn off su hiding)</string>
     <string name="settings_terminal_subtitle">Open the Ubuntu shell (starts the Linux runtime)</string>
+    <string name="settings_section_runtime_storage">Runtime &amp; storage</string>
+    <string name="settings_section_system">System &amp; permissions</string>
+    <string name="settings_section_diagnostics">Diagnostics &amp; about</string>
+    <string name="settings_auto_compact">Auto-compact context</string>
+    <string name="settings_auto_compact_subtitle">Compact history when the token threshold is reached</string>
+    <string name="settings_pet">Desktop pet</string>
+    <string name="settings_pet_subtitle">Import a pet.json + spritesheet.webp pack</string>
+    <string name="settings_subagent_limits">Sub-agent delegation limits</string>
+    <string name="settings_subagent_limits_subtitle">Depth %1$d · %2$d min per task</string>
+    <string name="settings_assistant_role">Default digital assistant</string>
+    <string name="settings_assistant_role_held">Already the system\'s default assistant</string>
+    <string name="settings_assistant_role_available">Set as default to open this app from the assistant gesture</string>
+    <string name="settings_assistant_role_unavailable">Choose Minis in the system\'s default-assistant settings</string>
+    <string name="settings_assistant_role_held_toast">Already the default assistant</string>
+    <string name="settings_assistant_role_missing_toast">This device has no default-assistant setting</string>
+    <string name="settings_system_enhance_footer">Root, the LSPosed module and the switches it reads are all here.</string>
 </resources>

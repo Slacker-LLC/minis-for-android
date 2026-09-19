@@ -59,6 +59,51 @@ import com.openminis.app.i18n.uppercaseForDisplay
  *   }
  */
 
+/**
+ * [T-android-settings-metrics] Every measurement the settings surface uses, in one place.
+ *
+ * An audit of these screens found the same kind of row drawn with five horizontal insets
+ * (14/16/20/12/6dp), dividers indented by four different amounts (14/16/38/58dp), card corners in
+ * nine radii and screen-bottom padding in two sizes. The values below are what the shared
+ * primitives use; a screen that needs a different number should be adding a primitive here rather
+ * than a literal at the call site.
+ *
+ * The row inset is 16dp rather than the 14dp the row used to carry: the section card, the header
+ * and footer text, the choice rows and the hand-written rows all already sat at 16, so 14 was the
+ * single odd value making a row's text and the header above it differ by 2dp.
+ */
+object SettingsMetrics {
+    /** Distance from the screen edge to a section card. */
+    val CardMarginHorizontal = 16.dp
+
+    /** Inside the card: the row's own horizontal inset, which dividers also respect. */
+    val RowPaddingHorizontal = 16.dp
+    val RowPaddingVertical = 12.dp
+
+    /** MD3 single-line list item; a two-line caller passes [RowMinHeightTwoLine] instead. */
+    val RowMinHeight = 56.dp
+    val RowMinHeightTwoLine = 72.dp
+
+    /** Leading icon chip inside a row, and the gap between it and the title. */
+    val IconChipSize = 30.dp
+    val IconChipCorner = 8.dp
+    val IconGap = 14.dp
+
+    /** How far a divider is pulled in when the row it follows has a leading icon. */
+    val DividerInsetWithIcon = RowPaddingHorizontal + IconChipSize + IconGap
+
+    val SectionCorner = 14.dp
+
+    /** Gap between two sections, applied as top padding so the first one is spaced too. */
+    val SectionSpacing = 24.dp
+
+    /** Header and footer text align with the card's content: card margin + row inset. */
+    val SectionTextInset = CardMarginHorizontal + RowPaddingHorizontal
+
+    /** Bottom breathing room inside the scroll container, owned by [SettingsScaffold]. */
+    val ScreenBottomPadding = 24.dp
+}
+
 // ─── Scaffold ──────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,8 +181,13 @@ fun SettingsScaffold(
             .imePadding()
         Column(
             modifier = if (scrollable) baseMod.verticalScroll(rememberScrollState()) else baseMod,
-            content = content,
-        )
+        ) {
+            content()
+            // [T-android-settings-metrics] The scroll container owns the bottom breathing room;
+            // screens used to add 24 or 32dp of their own, and the ones that forgot ended flush
+            // against the navigation bar.
+            if (scrollable) Spacer(Modifier.height(SettingsMetrics.ScreenBottomPadding))
+        }
     }
 }
 
@@ -189,7 +239,7 @@ fun SettingsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 24.dp),
+            .padding(top = SettingsMetrics.SectionSpacing),
     ) {
         if (header != null) {
             Text(
@@ -201,7 +251,11 @@ fun SettingsSection(
                 // [T-android-settings-ui-md3] #5 header→card gap = 8dp (was 6dp,
                 // off-grid). Horizontal stays 32dp to align the header text with
                 // the inset card's content.
-                modifier = Modifier.padding(start = 32.dp, end = 32.dp, bottom = 8.dp),
+                modifier = Modifier.padding(
+                    start = SettingsMetrics.SectionTextInset,
+                    end = SettingsMetrics.SectionTextInset,
+                    bottom = 8.dp,
+                ),
             )
         }
         // [T-android-settings-section-symmetry] The card carries NO vertical
@@ -218,8 +272,8 @@ fun SettingsSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .padding(horizontal = SettingsMetrics.CardMarginHorizontal)
+                .clip(RoundedCornerShape(SettingsMetrics.SectionCorner))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
             content = content,
         )
@@ -232,7 +286,12 @@ fun SettingsSection(
                 // card, 4dp before the next section (the parent's 24dp top padding
                 // already provides separation, so keep the footer's own bottom
                 // tight at 4dp).
-                modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 8.dp, bottom = 4.dp),
+                modifier = Modifier.padding(
+                    start = SettingsMetrics.SectionTextInset,
+                    end = SettingsMetrics.SectionTextInset,
+                    top = 8.dp,
+                    bottom = 4.dp,
+                ),
                 lineHeight = 16.sp,
             )
         }
@@ -259,7 +318,7 @@ fun SettingsRow(
     // [T-android-settings-ui-md3] #8 single-line List Item is 56dp; a caller with
     // two-line content (e.g. the model list: name + id) passes 72dp for the MD3
     // double-line height. Default keeps every other row at the single-line 56dp.
-    minHeight: Dp = 56.dp,
+    minHeight: Dp = SettingsMetrics.RowMinHeight,
 ) {
     Column {
         Row(
@@ -273,7 +332,10 @@ fun SettingsRow(
                 // is what made a no-subtitle last row read ~50px shorter.
                 .heightIn(min = minHeight)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(
+                    horizontal = SettingsMetrics.RowPaddingHorizontal,
+                    vertical = SettingsMetrics.RowPaddingVertical,
+                ),
             // #10 keep the trailing control (Switch/value) vertically centered
             // against the title — already centered, kept explicit.
             verticalAlignment = Alignment.CenterVertically,
@@ -281,8 +343,8 @@ fun SettingsRow(
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(30.dp)
-                        .background(iconColor, RoundedCornerShape(8.dp)),
+                        .size(SettingsMetrics.IconChipSize)
+                        .background(iconColor, RoundedCornerShape(SettingsMetrics.IconChipCorner)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -292,7 +354,7 @@ fun SettingsRow(
                         modifier = Modifier.size(18.dp),
                     )
                 }
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(SettingsMetrics.IconGap))
             }
 
             Column(
@@ -334,16 +396,33 @@ fun SettingsRow(
         }
 
         if (showDivider) {
-            val insetStart = if (icon != null) 58.dp else 14.dp
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = insetStart, end = 14.dp)
-                    .height(0.5.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            SettingsDivider(
+                insetStart = if (icon != null) {
+                    SettingsMetrics.DividerInsetWithIcon
+                } else {
+                    SettingsMetrics.RowPaddingHorizontal
+                },
             )
         }
     }
+}
+
+/**
+ * [T-android-settings-metrics] The one divider every settings list uses.
+ *
+ * It used to be spelled out per primitive with four different start insets (14 for a plain row, 58
+ * with an icon, 16 in a choice row, 14/38 elsewhere) and an end inset that stopped 2dp short of the
+ * card's content edge, which is what made a list of mixed row types look misaligned.
+ */
+@Composable
+internal fun SettingsDivider(insetStart: Dp = SettingsMetrics.RowPaddingHorizontal) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = insetStart, end = SettingsMetrics.RowPaddingHorizontal)
+            .height(0.5.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+    )
 }
 
 /** Title + Switch row. */
@@ -424,9 +503,12 @@ fun SettingsChoiceRow(
                 .fillMaxWidth()
                 // [T-android-settings-ui-md3] #1 match SettingsRow's 56dp min so
                 // choice/radio rows line up with toggle/value rows in mixed lists.
-                .heightIn(min = 56.dp)
+                .heightIn(min = SettingsMetrics.RowMinHeight)
                 .clickable(onClick = onSelect)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(
+                    horizontal = SettingsMetrics.RowPaddingHorizontal,
+                    vertical = SettingsMetrics.RowPaddingVertical,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (leading != null) {
@@ -449,13 +531,7 @@ fun SettingsChoiceRow(
             }
         }
         if (showDivider) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 14.dp)
-                    .height(0.5.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            )
+            SettingsDivider()
         }
     }
 }
@@ -471,7 +547,10 @@ fun SettingsCardBlock(
 ) {
     Column(
         modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(
+                horizontal = SettingsMetrics.CardMarginHorizontal,
+                vertical = SettingsMetrics.RowPaddingVertical,
+            )
             .fillMaxWidth(),
         content = content,
     )

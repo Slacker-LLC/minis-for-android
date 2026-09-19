@@ -1330,8 +1330,8 @@
     <string name="assistant_memory_pressure_normal">La pression mémoire semble normale.</string>
     <string name="assistant_memory_close">Fermer</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">Cartes de personnage importées pour les sessions de rôle</string>
+    <string name="characters_title">Personnages</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1426,4 +1426,20 @@
 
     <string name="system_enhance_root_hidden">su n\'est pas visible pour cette application ; %1$s est installé – autorise cette application dans sa liste (ou désactive le masquage de su)</string>
     <string name="settings_terminal_subtitle">Ouvrir le shell Ubuntu (démarre l\'exécution Linux)</string>
+    <string name="settings_section_runtime_storage">Exécution et stockage</string>
+    <string name="settings_section_system">Système et autorisations</string>
+    <string name="settings_section_diagnostics">Diagnostic et à propos</string>
+    <string name="settings_auto_compact">Compresser le contexte automatiquement</string>
+    <string name="settings_auto_compact_subtitle">Compresser l\'historique au seuil de jetons</string>
+    <string name="settings_pet">Compagnon de bureau</string>
+    <string name="settings_pet_subtitle">Importer un pack pet.json + spritesheet.webp</string>
+    <string name="settings_subagent_limits">Limites de délégation des sous-agents</string>
+    <string name="settings_subagent_limits_subtitle">Profondeur %1$d · %2$d min par tâche</string>
+    <string name="settings_assistant_role">Assistant numérique par défaut</string>
+    <string name="settings_assistant_role_held">Déjà l\'assistant par défaut du système</string>
+    <string name="settings_assistant_role_available">Défini par défaut, le geste d\'assistant ouvre cette app</string>
+    <string name="settings_assistant_role_unavailable">Choisir Minis dans les réglages d\'assistant du système</string>
+    <string name="settings_assistant_role_held_toast">Déjà l\'assistant par défaut</string>
+    <string name="settings_assistant_role_missing_toast">Cet appareil n\'a pas de réglage d\'assistant</string>
+    <string name="settings_system_enhance_footer">Root, les interrupteurs du module et ce qu\'ils débloquent sont ici.</string>
 </resources>

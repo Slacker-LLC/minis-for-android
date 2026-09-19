@@ -579,8 +579,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">Klartext</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">Importierte Charakterkarten für Rollenspiel-Sitzungen</string>
+    <string name="characters_title">Charaktere</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1535,4 +1535,20 @@
 
     <string name="system_enhance_root_hidden">su ist für diese App nicht sichtbar; %1$s ist installiert – erlaube diese App dort (oder schalte das Verstecken von su ab)</string>
     <string name="settings_terminal_subtitle">Ubuntu-Shell öffnen (startet die Linux-Laufzeit)</string>
+    <string name="settings_section_runtime_storage">Laufzeit &amp; Speicher</string>
+    <string name="settings_section_system">System &amp; Berechtigungen</string>
+    <string name="settings_section_diagnostics">Diagnose &amp; Info</string>
+    <string name="settings_auto_compact">Kontext automatisch komprimieren</string>
+    <string name="settings_auto_compact_subtitle">Verlauf komprimieren, wenn der Token-Schwellwert erreicht ist</string>
+    <string name="settings_pet">Desktop-Haustier</string>
+    <string name="settings_pet_subtitle">Ein pet.json + spritesheet.webp-Paket importieren</string>
+    <string name="settings_subagent_limits">Grenzen der Unteragenten-Delegation</string>
+    <string name="settings_subagent_limits_subtitle">Tiefe %1$d · %2$d Min. pro Aufgabe</string>
+    <string name="settings_assistant_role">Standard-Assistent</string>
+    <string name="settings_assistant_role_held">Ist bereits der Standard-Assistent des Systems</string>
+    <string name="settings_assistant_role_available">Als Standard öffnet die Assistenten-Geste diese App</string>
+    <string name="settings_assistant_role_unavailable">Minis in den Assistenten-Einstellungen des Systems wählen</string>
+    <string name="settings_assistant_role_held_toast">Ist bereits der Standard-Assistent</string>
+    <string name="settings_assistant_role_missing_toast">Dieses Gerät hat keine Assistenten-Einstellung</string>
+    <string name="settings_system_enhance_footer">Root, die Modul-Schalter und was sie jeweils freischalten, stehen hier.</string>
 </resources>

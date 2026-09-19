@@ -141,8 +141,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">純文字</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">匯入的角色卡，用於角色扮演對話</string>
+    <string name="characters_title">角色</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1082,4 +1082,20 @@
 
     <string name="system_enhance_root_hidden">su 對本應用不可見；本機裝有 %1$s——請在它的應用清單裡允許本應用（或關閉 su 隱藏）</string>
     <string name="settings_terminal_subtitle">開啟 Ubuntu Shell（會啟動 Linux 執行環境）</string>
+    <string name="settings_section_runtime_storage">執行階段與沙箱</string>
+    <string name="settings_section_system">系統與權限</string>
+    <string name="settings_section_diagnostics">診斷與關於</string>
+    <string name="settings_auto_compact">自動壓縮上下文</string>
+    <string name="settings_auto_compact_subtitle">Token 達到閾值時自動壓縮歷史記錄</string>
+    <string name="settings_pet">桌面寵物</string>
+    <string name="settings_pet_subtitle">匯入通用 pet.json + spritesheet.webp 寵物包</string>
+    <string name="settings_subagent_limits">子代理委派限制</string>
+    <string name="settings_subagent_limits_subtitle">深度 %1$d 層 · 單任務逾時 %2$d 分鐘</string>
+    <string name="settings_assistant_role">預設數位助理</string>
+    <string name="settings_assistant_role_held">已是系統預設數位助理</string>
+    <string name="settings_assistant_role_available">設為預設後，長按 Home / 電源鍵助理手勢會開啟本 App</string>
+    <string name="settings_assistant_role_unavailable">在系統預設助理設定中選擇 Minis</string>
+    <string name="settings_assistant_role_held_toast">已是預設助理</string>
+    <string name="settings_assistant_role_missing_toast">此裝置未提供預設助理設定</string>
+    <string name="settings_system_enhance_footer">Root、模組開關以及它們各自解鎖的能力都在這裡。</string>
 </resources>

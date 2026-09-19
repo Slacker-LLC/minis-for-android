@@ -54,7 +54,6 @@ import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
 import com.openminis.app.ui.settings.SettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
-import com.openminis.app.ui.settings.ModuleSettingsScreen
 import com.openminis.app.ui.settings.SystemEnhanceScreen
 import com.openminis.app.ui.settings.SessionStorageDetailScreen
 import com.openminis.app.ui.settings.SkillDetailScreen
@@ -188,7 +187,6 @@ object Routes {
     /** T323: System Permissions (Accessibility service status, etc.). */
     const val SYSTEM_PERMISSIONS = "system_permissions"
     /** [T-eta-xposed-groups] The switches the LSPosed module reads. */
-    const val MODULE_SETTINGS = "module_settings"
     /** [T-system-enhance-android] Root + module status, and what each of them unlocks. */
     const val SYSTEM_ENHANCE = "system_enhance"
     const val USAGE_STATS = "usage_stats"
@@ -626,7 +624,6 @@ fun AppNavigation(
                 onSoulClick = { navController.safeNavigate(Routes.SOUL) },
                 onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
                 onPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
-                onModuleSettingsClick = { navController.safeNavigate(Routes.MODULE_SETTINGS) },
                 onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                 onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                 onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
@@ -1395,21 +1392,13 @@ fun AppNavigation(
             )
         }
 
-        // [T-eta-xposed-groups] Module settings: the switches the LSPosed module reads, written here.
-        composable(Routes.MODULE_SETTINGS) {
-            ModuleSettingsScreen(
-                onBack = { navController.safePopBackStack() },
-            )
-        }
-
-        // [T-system-enhance-android] Root + module status in one place: the page the
-        // roadmap's Phase 6 owed, with each row sending the user to the surface that
-        // owns its switch.
+        // [T-system-enhance-android] Root + module in one place: the status, the switches the
+        // LSPosed module reads, and what each of them unlocks. The former "module settings"
+        // screen is this page's switch section now.
         composable(Routes.SYSTEM_ENHANCE) {
             SystemEnhanceScreen(
                 onBack = { navController.safePopBackStack() },
                 onOpenSystemPermissions = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
-                onOpenModuleSettings = { navController.safeNavigate(Routes.MODULE_SETTINGS) },
             )
         }
 

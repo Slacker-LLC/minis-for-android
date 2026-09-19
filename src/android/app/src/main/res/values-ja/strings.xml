@@ -579,8 +579,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">プレーンテキスト</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">ロールプレイ用に読み込んだキャラクターカード</string>
+    <string name="characters_title">キャラクター</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1540,4 +1540,20 @@
 
     <string name="system_enhance_root_hidden">su がこのアプリから見えません。%1$s が入っています——そのアプリ一覧で本アプリを許可してください（su の隠蔽をオフにしても可）</string>
     <string name="settings_terminal_subtitle">Ubuntu Shell を開く（Linux 実行環境を起動します）</string>
+    <string name="settings_section_runtime_storage">ランタイムとストレージ</string>
+    <string name="settings_section_system">システムと権限</string>
+    <string name="settings_section_diagnostics">診断と情報</string>
+    <string name="settings_auto_compact">コンテキストの自動圧縮</string>
+    <string name="settings_auto_compact_subtitle">トークン閾値に達したら履歴を圧縮します</string>
+    <string name="settings_pet">デスクトップペット</string>
+    <string name="settings_pet_subtitle">汎用 pet.json + spritesheet.webp パックを読み込む</string>
+    <string name="settings_subagent_limits">サブエージェント委任の制限</string>
+    <string name="settings_subagent_limits_subtitle">深さ %1$d 層 · 1 タスク %2$d 分</string>
+    <string name="settings_assistant_role">既定のデジタルアシスタント</string>
+    <string name="settings_assistant_role_held">すでにシステムの既定アシスタントです</string>
+    <string name="settings_assistant_role_available">既定にするとアシスタント ジェスチャでこのアプリが開きます</string>
+    <string name="settings_assistant_role_unavailable">システムの既定アシスタント設定で Minis を選択</string>
+    <string name="settings_assistant_role_held_toast">すでに既定のアシスタントです</string>
+    <string name="settings_assistant_role_missing_toast">この端末には既定アシスタントの設定がありません</string>
+    <string name="settings_system_enhance_footer">Root、モジュールのスイッチ、それぞれが可能にすることをここにまとめています。</string>
 </resources>

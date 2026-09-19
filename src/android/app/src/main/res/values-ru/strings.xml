@@ -361,8 +361,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">Обычный текст</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">Импортированные карточки персонажей для ролевых сессий</string>
+    <string name="characters_title">Персонажи</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1785,4 +1785,20 @@
 
     <string name="system_enhance_root_hidden">su не виден этому приложению; установлен %1$s — разрешите это приложение в нём (или отключите скрытие su)</string>
     <string name="settings_terminal_subtitle">Открыть оболочку Ubuntu (запускает среду Linux)</string>
+    <string name="settings_section_runtime_storage">Среда и хранилище</string>
+    <string name="settings_section_system">Система и разрешения</string>
+    <string name="settings_section_diagnostics">Диагностика и информация</string>
+    <string name="settings_auto_compact">Автосжатие контекста</string>
+    <string name="settings_auto_compact_subtitle">Сжимать историю при достижении порога токенов</string>
+    <string name="settings_pet">Настольный питомец</string>
+    <string name="settings_pet_subtitle">Импорт пакета pet.json + spritesheet.webp</string>
+    <string name="settings_subagent_limits">Лимиты делегирования субагентам</string>
+    <string name="settings_subagent_limits_subtitle">Глубина %1$d · %2$d мин на задачу</string>
+    <string name="settings_assistant_role">Ассистент по умолчанию</string>
+    <string name="settings_assistant_role_held">Уже ассистент системы по умолчанию</string>
+    <string name="settings_assistant_role_available">Если выбрать по умолчанию, жест ассистента откроет это приложение</string>
+    <string name="settings_assistant_role_unavailable">Выберите Minis в настройках ассистента системы</string>
+    <string name="settings_assistant_role_held_toast">Уже ассистент по умолчанию</string>
+    <string name="settings_assistant_role_missing_toast">На этом устройстве нет настройки ассистента</string>
+    <string name="settings_system_enhance_footer">Root, переключатели модуля и то, что они открывают, — здесь.</string>
 </resources>

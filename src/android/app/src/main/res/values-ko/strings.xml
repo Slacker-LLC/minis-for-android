@@ -579,8 +579,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">일반 텍스트</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">역할극 세션용으로 가져온 캐릭터 카드</string>
+    <string name="characters_title">캐릭터</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1532,4 +1532,20 @@
 
     <string name="system_enhance_root_hidden">su 가 이 앱에 보이지 않습니다. %1$s 이(가) 설치되어 있습니다 — 해당 앱 목록에서 이 앱을 허용하세요(su 숨김 해제도 가능).</string>
     <string name="settings_terminal_subtitle">Ubuntu Shell 열기(Linux 런타임을 시작합니다)</string>
+    <string name="settings_section_runtime_storage">런타임 및 저장소</string>
+    <string name="settings_section_system">시스템 및 권한</string>
+    <string name="settings_section_diagnostics">진단 및 정보</string>
+    <string name="settings_auto_compact">컨텍스트 자동 압축</string>
+    <string name="settings_auto_compact_subtitle">토큰 임계값에 도달하면 기록을 압축합니다</string>
+    <string name="settings_pet">데스크톱 펫</string>
+    <string name="settings_pet_subtitle">범용 pet.json + spritesheet.webp 팩 가져오기</string>
+    <string name="settings_subagent_limits">하위 에이전트 위임 제한</string>
+    <string name="settings_subagent_limits_subtitle">깊이 %1$d단계 · 작업당 %2$d분</string>
+    <string name="settings_assistant_role">기본 디지털 어시스턴트</string>
+    <string name="settings_assistant_role_held">이미 시스템 기본 어시스턴트입니다</string>
+    <string name="settings_assistant_role_available">기본으로 설정하면 어시스턴트 제스처로 이 앱이 열립니다</string>
+    <string name="settings_assistant_role_unavailable">시스템 기본 어시스턴트 설정에서 Minis 선택</string>
+    <string name="settings_assistant_role_held_toast">이미 기본 어시스턴트입니다</string>
+    <string name="settings_assistant_role_missing_toast">이 기기에는 기본 어시스턴트 설정이 없습니다</string>
+    <string name="settings_system_enhance_footer">Root, 모듈 스위치와 각각이 여는 기능이 여기에 모여 있습니다.</string>
 </resources>

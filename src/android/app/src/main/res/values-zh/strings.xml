@@ -748,8 +748,8 @@
     <string name="sessionlist_export_json">JSON</string>
     <string name="sessionlist_export_plain">纯文本</string>
     <string name="sessionlist_export_markdown">Markdown</string>
-    <string name="characters_subtitle">Imported character cards for roleplay sessions</string>
-    <string name="characters_title">Characters</string>
+    <string name="characters_subtitle">导入的角色卡，用于角色扮演会话</string>
+    <string name="characters_title">角色</string>
     <string name="characters_import">Import a character card (PNG or JSON)</string>
     <string name="characters_empty">No characters yet. Import a card image (PNG with the card inside) or a JSON card to start.</string>
     <string name="characters_export">Export or share this character</string>
@@ -1790,4 +1790,20 @@
 
     <string name="system_enhance_root_hidden">su 对本应用不可见；本机装有 %1$s——请在它的应用列表里允许本应用（或关闭 su 隐藏）</string>
     <string name="settings_terminal_subtitle">打开 Ubuntu Shell（会启动 Linux 运行时）</string>
+    <string name="settings_section_runtime_storage">运行时与沙箱</string>
+    <string name="settings_section_system">系统与权限</string>
+    <string name="settings_section_diagnostics">诊断与关于</string>
+    <string name="settings_auto_compact">自动压缩上下文</string>
+    <string name="settings_auto_compact_subtitle">Token 达到阈值时自动压缩历史记录</string>
+    <string name="settings_pet">桌面宠物</string>
+    <string name="settings_pet_subtitle">导入通用 pet.json + spritesheet.webp 宠物包</string>
+    <string name="settings_subagent_limits">子代理委派限制</string>
+    <string name="settings_subagent_limits_subtitle">深度 %1$d 层 · 单任务超时 %2$d 分钟</string>
+    <string name="settings_assistant_role">默认数字助手</string>
+    <string name="settings_assistant_role_held">已是系统默认数字助手</string>
+    <string name="settings_assistant_role_available">设为默认后，长按 Home / 电源键助手手势会打开本 App</string>
+    <string name="settings_assistant_role_unavailable">在系统默认助手设置中选择 Minis</string>
+    <string name="settings_assistant_role_held_toast">已是默认数字助手</string>
+    <string name="settings_assistant_role_missing_toast">此设备未提供默认助手设置</string>
+    <string name="settings_system_enhance_footer">Root、模块开关以及它们各自解锁的能力都在这里。</string>
 </resources>

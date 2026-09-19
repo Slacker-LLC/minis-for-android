@@ -17,20 +17,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
@@ -46,6 +40,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderShared
 import androidx.compose.material.icons.outlined.FrontHand
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
@@ -57,13 +52,10 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -85,7 +77,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.openminis.app.tools.SubagentLimits
 import com.openminis.app.ui.components.MinisTextButton
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
@@ -95,7 +86,6 @@ import com.openminis.app.pet.PetControlActivity
 import com.openminis.app.ui.components.openExternalUrl
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.openminis.app.i18n.uppercaseForDisplay
 
 /** RoleManager was added in Android 10; older devices use voice-input Settings. */
 @Suppress("NewApi")
@@ -144,10 +134,8 @@ fun SettingsScreen(
     // next to Soul so the two prompt-authoring surfaces sit together.
     onSystemPromptClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
-    // [T-eta-xposed-groups] The switches the LSPosed module reads, next to the platform
-    // permissions they sit beside.
-    onModuleSettingsClick: () -> Unit = {},
-    // [T-system-enhance-android] Root + module status and what each unlocks.
+    // [T-system-enhance-android] Root + module status, the switches the module reads, and what
+    // each of them unlocks - one page since the two used to say the same thing twice.
     onSystemEnhanceClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
@@ -206,317 +194,267 @@ fun SettingsScreen(
         refreshAssistantRole()
         Toast.makeText(context, if (roleHeld) "已设为默认数字助手" else "未设置为默认助手", Toast.LENGTH_SHORT).show()
     }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.settings_back),
-                        )
+    SettingsScaffold(
+        title = stringResource(R.string.settings_title),
+        onBack = onBack,
+    ) {
+        // ── 模型与用量 ─────────────────────────────────────────────────────
+        SettingsSection(
+            header = stringResource(R.string.settings_section_llm_providers),
+            footer = stringResource(R.string.settings_section_llm_providers_footer),
+        ) {
+            SettingsRow(
+                icon = Icons.Outlined.Lock,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_manage_providers),
+                subtitle = stringResource(R.string.settings_manage_providers_subtitle),
+                onClick = onProvidersClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Settings,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_model_groups),
+                subtitle = stringResource(R.string.settings_model_groups_subtitle),
+                onClick = onModelGroupsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.BarChart,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_token_usage),
+                subtitle = stringResource(R.string.settings_token_usage_subtitle),
+                onClick = onUsageClick,
+            )
+            var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
+            SettingsSwitchRow(
+                icon = Icons.Outlined.AutoAwesome,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_auto_compact),
+                subtitle = stringResource(R.string.settings_auto_compact_subtitle),
+                checked = autoCompactState,
+                onCheckedChange = { checked ->
+                    autoCompactState = checked
+                    com.openminis.app.data.AutoCompactPrefs.setEnabled(context, checked)
+                },
+                showDivider = false,
+            )
+        }
+
+        // ── 助手能力 ───────────────────────────────────────────────────────
+        SettingsSection(header = stringResource(R.string.settings_section_agent_runtime)) {
+            SettingsRow(
+                icon = Icons.Outlined.Extension,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_skills),
+                subtitle = stringResource(R.string.settings_skills_subtitle),
+                onClick = onSkillsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.RecordVoiceOver,
+                iconColor = Color(0xFFAF52DE),
+                title = stringResource(R.string.characters_title),
+                subtitle = stringResource(R.string.characters_subtitle),
+                onClick = onCharactersClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.AutoAwesome,
+                iconColor = Color(0xFFFF9500),
+                title = stringResource(R.string.settings_soul),
+                subtitle = stringResource(R.string.settings_soul_subtitle),
+                onClick = onSoulClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Description,
+                iconColor = Color(0xFF34C759),
+                title = stringResource(R.string.settings_system_prompt),
+                subtitle = stringResource(R.string.settings_system_prompt_subtitle),
+                onClick = onSystemPromptClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Psychology,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_memory),
+                subtitle = stringResource(R.string.settings_memory_subtitle),
+                onClick = onMemoryClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Dashboard,
+                iconColor = Color(0xFF30B0C7),
+                title = stringResource(R.string.settings_mcp),
+                subtitle = stringResource(R.string.settings_mcp_subtitle),
+                onClick = onMcpClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.AccountTree,
+                iconColor = Color(0xFFAF52DE),
+                title = stringResource(R.string.settings_subagent_limits),
+                subtitle = stringResource(
+                    R.string.settings_subagent_limits_subtitle,
+                    SubagentLimits.maxDepth(context),
+                    SubagentLimits.timeoutMs(context) / 60_000L,
+                ),
+                onClick = { showSubagentLimits = true },
+                showDivider = false,
+            )
+        }
+
+        // ── 运行时与沙箱 ───────────────────────────────────────────────────
+        SettingsSection(header = stringResource(R.string.settings_section_runtime_storage)) {
+            SettingsRow(
+                icon = Icons.Outlined.Terminal,
+                iconColor = Color(0xFF34C759),
+                title = stringResource(R.string.terminal_title),
+                subtitle = stringResource(R.string.settings_terminal_subtitle),
+                onClick = onTerminalClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Key,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_env_vars),
+                subtitle = stringResource(R.string.settings_env_vars_subtitle),
+                onClick = onEnvVarsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Inventory2,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_section_storage),
+                subtitle = stringResource(R.string.settings_storage_subtitle),
+                onClick = onRootfsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Folder,
+                iconColor = Color(0xFF34C759),
+                title = stringResource(R.string.settings_shared_folders),
+                subtitle = stringResource(R.string.settings_shared_folders_subtitle),
+                onClick = onSharedFoldersClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.FolderShared,
+                iconColor = Color(0xFFFF9500),
+                title = stringResource(R.string.settings_mount_external_folders),
+                subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
+                onClick = onMountedFoldersClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Backup,
+                iconColor = Color(0xFF34C759),
+                title = stringResource(R.string.settings_backup_restore),
+                subtitle = stringResource(R.string.settings_backup_restore_subtitle),
+                onClick = onBackupClick,
+                showDivider = false,
+            )
+        }
+
+        // ── 外观 ───────────────────────────────────────────────────────────
+        SettingsSection(header = stringResource(R.string.settings_section_appearance)) {
+            SettingsRow(
+                icon = Icons.Outlined.Palette,
+                iconColor = Color(0xFF5856D6),
+                title = stringResource(R.string.settings_section_appearance),
+                subtitle = stringResource(R.string.settings_appearance_subtitle),
+                onClick = onAppearanceClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Palette,
+                iconColor = Color(0xFF4D6BFE),
+                title = stringResource(R.string.settings_pet),
+                subtitle = stringResource(R.string.settings_pet_subtitle),
+                onClick = { context.startActivity(Intent(context, PetControlActivity::class.java)) },
+                showDivider = false,
+            )
+        }
+
+        // ── 系统与权限 ─────────────────────────────────────────────────────
+        SettingsSection(
+            header = stringResource(R.string.settings_section_system),
+            footer = stringResource(R.string.settings_system_enhance_footer),
+        ) {
+            SettingsRow(
+                icon = Icons.Outlined.Build,
+                iconColor = Color(0xFFFF9F0A),
+                title = stringResource(R.string.system_enhance_title),
+                subtitle = stringResource(R.string.system_enhance_row_subtitle),
+                onClick = onSystemEnhanceClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Shield,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_section_permissions),
+                subtitle = stringResource(R.string.settings_permissions_subtitle),
+                onClick = onPermissionsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.RecordVoiceOver,
+                iconColor = Color(0xFF30B0C7),
+                title = stringResource(R.string.settings_assistant_role),
+                subtitle = when {
+                    roleHeld -> stringResource(R.string.settings_assistant_role_held)
+                    roleManager == null -> stringResource(R.string.settings_assistant_role_unavailable)
+                    roleAvailable -> stringResource(R.string.settings_assistant_role_available)
+                    else -> stringResource(R.string.settings_assistant_role_unavailable)
+                },
+                onClick = {
+                    when {
+                        roleHeld -> Toast.makeText(
+                            context,
+                            context.getString(R.string.settings_assistant_role_held_toast),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        roleManager != null && roleAvailable -> {
+                            assistLauncher.launch(
+                                roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),
+                            )
+                        }
+                        else -> runCatching {
+                            context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                        }.onFailure {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_assistant_role_missing_toast),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     }
                 },
             )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // -- LLM Providers --
-            SettingsSection(
-                title = stringResource(R.string.settings_section_llm_providers),
-                footer = stringResource(R.string.settings_section_llm_providers_footer),
-            ) {
-                SettingsItem(
-                    icon = Icons.Outlined.Lock,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_manage_providers),
-                    subtitle = stringResource(R.string.settings_manage_providers_subtitle),
-                    onClick = onProvidersClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Settings,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_model_groups),
-                    subtitle = stringResource(R.string.settings_model_groups_subtitle),
-                    onClick = onModelGroupsClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.BarChart,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_token_usage),
-                    subtitle = stringResource(R.string.settings_token_usage_subtitle),
-                    onClick = onUsageClick,
-                    showDivider = true,
-                )
-                var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
-                SettingsToggleItem(
-                    icon = Icons.Outlined.AutoAwesome,
-                    iconColor = Color(0xFF5856D6),
-                    title = "自动压缩上下文",
-                    subtitle = "Token 达到阈值时自动压缩历史记录",
-                    checked = autoCompactState,
-                    onCheckedChange = { checked ->
-                        autoCompactState = checked
-                        com.openminis.app.data.AutoCompactPrefs.setEnabled(context, checked)
-                    },
-                    showDivider = false,
-                )
-            }
-
-            // -- Appearance --
-            SettingsSection(title = stringResource(R.string.settings_section_appearance)) {
-                SettingsItem(
-                    icon = Icons.Outlined.Palette,
-                    iconColor = Color(0xFF4D6BFE),
-                    title = "桌面宠物",
-                    subtitle = "导入通用 pet.json + spritesheet.webp 宠物包",
-                    onClick = { context.startActivity(Intent(context, PetControlActivity::class.java)) },
-                )
-
-                SettingsItem(
-                    icon = Icons.Outlined.Palette,
-                    iconColor = Color(0xFF5856D6),
-                    title = stringResource(R.string.settings_section_appearance),
-                    subtitle = stringResource(R.string.settings_appearance_subtitle),
-                    onClick = onAppearanceClick,
-                    showDivider = false,
-                )
-            }
-
-            // -- Agent Runtime --
-            SettingsSection(title = stringResource(R.string.settings_section_agent_runtime)) {
-                // [T-android-terminal-entry] The terminal was reachable only from the wide
-                // layout and from a deep link that no phone flow produces, so on a phone
-                // the Ubuntu runtime had no user-facing entry at all - only the agent could
-                // start it by calling a tool. Found on the real device pass; the parameter
-                // below existed and was wired, the row was simply missing.
-                SettingsItem(
-                    icon = Icons.Outlined.Terminal,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.terminal_title),
-                    subtitle = stringResource(R.string.settings_terminal_subtitle),
-                    onClick = onTerminalClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Extension,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_skills),
-                    subtitle = stringResource(R.string.settings_skills_subtitle),
-                    onClick = onSkillsClick,
-                )
-                // [T-eta-character-cards] Imported cards and the library they live in.
-                SettingsItem(
-                    icon = Icons.Outlined.RecordVoiceOver,
-                    iconColor = Color(0xFFAF52DE),
-                    title = stringResource(R.string.characters_title),
-                    subtitle = stringResource(R.string.characters_subtitle),
-                    onClick = onCharactersClick,
-                )
-                // [T-soul-md] insertion between Skills and Memory per spec.
-                SettingsItem(
-                    icon = Icons.Outlined.AutoAwesome,
-                    iconColor = Color(0xFFFF9500),
-                    title = stringResource(R.string.settings_soul),
-                    subtitle = stringResource(R.string.settings_soul_subtitle),
-                    onClick = onSoulClick,
-                )
-                // [T-system-prompt-modules] Built-in prompt modules the agent
-                // receives on every turn; editable without a rebuild.
-                SettingsItem(
-                    icon = Icons.Outlined.Description,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_system_prompt),
-                    subtitle = stringResource(R.string.settings_system_prompt_subtitle),
-                    onClick = onSystemPromptClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Psychology,
-                    iconColor = Color(0xFF5856D6),
-                    title = stringResource(R.string.settings_memory),
-                    subtitle = stringResource(R.string.settings_memory_subtitle),
-                    onClick = onMemoryClick,
-                )
-                // [T-mcp-integration-android] MCP Integrations — directly below Memory.
-                // [T-android-mcp-icon-distinct] Dashboard (2x2 block grid) instead of
-                // Extension so MCP no longer shares the Skills row's puzzle-piece icon —
-                // the grid reads as "multiple composed blocks/servers". teal unchanged.
-                SettingsItem(
-                    icon = Icons.Outlined.Dashboard,
-                    iconColor = Color(0xFF30B0C7),
-                    title = stringResource(R.string.settings_mcp),
-                    subtitle = stringResource(R.string.settings_mcp_subtitle),
-                    onClick = onMcpClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.AccountTree,
-                    iconColor = Color(0xFFAF52DE),
-                    title = "子代理委派限制",
-                    subtitle = "深度 ${SubagentLimits.maxDepth(context)} 层 · 单任务超时 ${SubagentLimits.timeoutMs(context) / 60_000L} 分钟",
-                    onClick = { showSubagentLimits = true },
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.RecordVoiceOver,
-                    iconColor = Color(0xFF30B0C7),
-                    title = "默认数字助手",
-                    subtitle = when {
-                        roleHeld -> "已是系统默认数字助手"
-                        roleManager == null -> "在系统默认助手设置中选择 OpenMinis"
-                        roleAvailable -> "设为默认后，长按 Home / 电源键助手手势会打开 App"
-                        else -> "打开系统默认助手设置以选择 OpenMinis"
-                    },
-                    onClick = {
-                        when {
-                            roleHeld -> Toast.makeText(context, "已是默认数字助手", Toast.LENGTH_SHORT).show()
-                            roleManager != null && roleAvailable -> {
-                                assistLauncher.launch(
-                                    roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT),
-                                )
-                            }
-                            else -> runCatching {
-                                context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-                            }.onFailure {
-                                Toast.makeText(context, "此设备未提供默认助手设置", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Terminal,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_env_vars),
-                    subtitle = stringResource(R.string.settings_env_vars_subtitle),
-                    onClick = onEnvVarsClick,
-                )
-            }
-
-            // -- Storage --
-            SettingsSection(title = stringResource(R.string.settings_section_storage)) {
-                SettingsItem(
-                    icon = Icons.Outlined.Inventory2,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_section_storage),
-                    subtitle = stringResource(R.string.settings_storage_subtitle),
-                    onClick = onRootfsClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Folder,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_shared_folders),
-                    subtitle = stringResource(R.string.settings_shared_folders_subtitle),
-                    onClick = onSharedFoldersClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.FolderShared,
-                    iconColor = Color(0xFFFF9500),
-                    title = stringResource(R.string.settings_mount_external_folders),
-                    subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
-                    onClick = onMountedFoldersClick,
-                    showDivider = true,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Backup,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_backup_restore),
-                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
-                    onClick = onBackupClick,
-                    showDivider = false,
-                )
-            }
-
-            // -- Permissions --
-            SettingsSection(title = stringResource(R.string.settings_section_permissions)) {
-                SettingsItem(
-                    icon = Icons.Outlined.Shield,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_section_permissions),
-                    subtitle = stringResource(R.string.settings_permissions_subtitle),
-                    onClick = onPermissionsClick,
-                    showDivider = false,
-                )
-            }
-
-            // [T-eta-xposed-groups] Module settings: the switches the LSPosed module reads.
-            SettingsSection() {
-                SettingsItem(
-                    icon = Icons.Outlined.Extension,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.module_settings_title),
-                    subtitle = stringResource(R.string.module_settings_row_subtitle),
-                    onClick = onModuleSettingsClick,
-                )
-                // [T-system-enhance-android] The aggregate above the switches: what root
-                // and the module are for, and what the app can actually read about them.
-                SettingsItem(
-                    icon = Icons.Outlined.Build,
-                    iconColor = Color(0xFFFF9F0A),
-                    title = stringResource(R.string.system_enhance_title),
-                    subtitle = stringResource(R.string.system_enhance_row_subtitle),
-                    onClick = onSystemEnhanceClick,
-                    showDivider = false,
-                )
-            }
-
-            // -- Background & Notifications (T50) --
-            SettingsSection(
+            SettingsRow(
+                icon = Icons.Outlined.BatteryFull,
+                iconColor = Color(0xFFFF9500),
                 title = stringResource(R.string.bg_section_header),
-                footer = stringResource(R.string.bg_section_footer),
-            ) {
-                SettingsItem(
-                    icon = Icons.Outlined.BatteryFull,
-                    iconColor = Color(0xFFFF9500),
-                    title = stringResource(R.string.bg_section_header),
-                    subtitle = stringResource(R.string.bg_section_subtitle),
-                    onClick = onBackgroundClick,
-                    showDivider = false,
-                )
-            }
+                subtitle = stringResource(R.string.bg_section_subtitle),
+                onClick = onBackgroundClick,
+                showDivider = false,
+            )
+        }
 
-            // -- Logs --
-            SettingsSection(title = stringResource(R.string.settings_section_logs)) {
-                SettingsItem(
-                    icon = Icons.Outlined.Description,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_section_logs),
-                    subtitle = stringResource(R.string.settings_logs_subtitle),
-                    onClick = onLogsClick,
-                    showDivider = false,
-                )
-            }
-
-            // -- About --
-            SettingsSection(title = stringResource(R.string.settings_section_about)) {
-                SettingsItem(
-                    icon = Icons.Outlined.Info,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_about_minis),
-                    subtitle = stringResource(R.string.settings_about_subtitle),
-                    onClick = onAboutClick,
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.FrontHand,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_privacy_policy),
-                    subtitle = null,
-                    // iOS canonical URL — ContentView.swift / AddProviderView.swift
-                    onClick = { openExternalUrl(context, "https://openminis.github.io/privacy-policy.html") },
-                )
-                SettingsItem(
-                    icon = Icons.Outlined.Feedback,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_feedback),
-                    subtitle = null,
-                    onClick = { showFeedbackSheet = true },
-                    showDivider = false,
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
+        // ── 诊断与关于 ─────────────────────────────────────────────────────
+        SettingsSection(header = stringResource(R.string.settings_section_diagnostics)) {
+            SettingsRow(
+                icon = Icons.Outlined.Description,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_section_logs),
+                subtitle = stringResource(R.string.settings_logs_subtitle),
+                onClick = onLogsClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Info,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_about_minis),
+                subtitle = stringResource(R.string.settings_about_subtitle),
+                onClick = onAboutClick,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.FrontHand,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_privacy_policy),
+                onClick = { openExternalUrl(context, "https://openminis.github.io/privacy-policy.html") },
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Feedback,
+                iconColor = Color(0xFF007AFF),
+                title = stringResource(R.string.settings_feedback),
+                onClick = { showFeedbackSheet = true },
+                showDivider = false,
+            )
         }
     }
 
@@ -722,207 +660,4 @@ private fun buildBugReportUrl(): String {
         "?template=bug_report.md" +
         "&title=$title" +
         "&body=$encodedBody"
-}
-
-/**
- * A grouped settings section with header and optional footer, matching iOS grouped List sections.
- */
-@Composable
-private fun SettingsSection(
-    title: String,
-    footer: String? = null,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 20.dp),
-    ) {
-        // Section header
-        Text(
-            text = title.uppercaseForDisplay(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 0.5.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-        )
-
-        // Section card
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(color = MaterialTheme.colorScheme.surfaceContainerLow),
-        ) {
-            content()
-        }
-
-        // Section footer
-        if (footer != null) {
-            Text(
-                text = footer,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-                lineHeight = 16.sp,
-            )
-        }
-    }
-}
-
-/**
- * A single settings row item with colored icon, title, optional subtitle, and chevron.
- * Styled to match iOS settings rows with SF Symbol-like colored circle icons.
- */
-@Composable
-private fun SettingsItem(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    subtitle: String?,
-    onClick: () -> Unit,
-    showDivider: Boolean = true,
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Colored circle icon (matching iOS settings style)
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(
-                        color = iconColor,
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            // Title + subtitle
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            // Chevron
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        // Divider between items (inset to match icon alignment)
-        if (showDivider) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 58.dp, end = 14.dp)
-                    .height(0.5.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsToggleItem(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    showDivider: Boolean = true,
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(
-                        color = iconColor,
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            androidx.compose.material3.Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-            )
-        }
-
-        if (showDivider) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 58.dp, end = 14.dp)
-                    .height(0.5.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            )
-        }
-    }
 }
