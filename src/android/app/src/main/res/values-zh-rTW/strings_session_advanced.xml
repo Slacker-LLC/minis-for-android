@@ -18,7 +18,7 @@
     <string name="session_advanced_soul_locked_custom">自訂靈魂 · 已鎖定</string>
     <string name="session_advanced_soul_locked_global">全域靈魂 · 已鎖定</string>
     <string name="session_advanced_model_section">模型參數</string>
-    <string name="session_advanced_temperature">Temperature</string>
+    <string name="session_advanced_temperature">溫度</string>
     <string name="session_advanced_temperature_hint">0.0–2.0</string>
     <string name="session_advanced_max_tokens">最大輸出 Token</string>
     <string name="session_advanced_max_tokens_hint">正整數</string>
