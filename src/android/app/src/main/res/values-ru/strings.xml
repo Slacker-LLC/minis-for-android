@@ -1823,41 +1823,49 @@
     <plurals name="work_item_command">
         <item quantity="one">%1$d команда</item>
         <item quantity="few">%1$d команды</item>
+        <item quantity="many">%1$d команд</item>
         <item quantity="other">%1$d команд</item>
     </plurals>
     <plurals name="work_item_file_read">
         <item quantity="one">прочитан %1$d файл</item>
         <item quantity="few">прочитано %1$d файла</item>
+        <item quantity="many">прочитано %1$d файлов</item>
         <item quantity="other">прочитано %1$d файлов</item>
     </plurals>
     <plurals name="work_item_file_edit">
         <item quantity="one">изменён %1$d файл</item>
         <item quantity="few">изменено %1$d файла</item>
+        <item quantity="many">изменено %1$d файлов</item>
         <item quantity="other">изменено %1$d файлов</item>
     </plurals>
     <plurals name="work_item_search">
         <item quantity="one">%1$d поиск</item>
         <item quantity="few">%1$d поиска</item>
+        <item quantity="many">%1$d поисков</item>
         <item quantity="other">%1$d поисков</item>
     </plurals>
     <plurals name="work_item_browser">
         <item quantity="one">%1$d шаг браузера</item>
         <item quantity="few">%1$d шага браузера</item>
+        <item quantity="many">%1$d шагов браузера</item>
         <item quantity="other">%1$d шагов браузера</item>
     </plurals>
     <plurals name="work_item_mcp">
         <item quantity="one">%1$d вызов MCP</item>
         <item quantity="few">%1$d вызова MCP</item>
+        <item quantity="many">%1$d вызовов MCP</item>
         <item quantity="other">%1$d вызовов MCP</item>
     </plurals>
     <plurals name="work_item_image">
         <item quantity="one">%1$d изображение</item>
         <item quantity="few">%1$d изображения</item>
+        <item quantity="many">%1$d изображений</item>
         <item quantity="other">%1$d изображений</item>
     </plurals>
     <plurals name="work_item_delegation">
         <item quantity="one">%1$d делегирование</item>
         <item quantity="few">%1$d делегирования</item>
+        <item quantity="many">%1$d делегирований</item>
         <item quantity="other">%1$d делегирований</item>
     </plurals>
     <string name="work_process_duration">Заняло %1$s</string>
