@@ -1150,6 +1150,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机验证 | 点第 5 个色板 → `appearance_prefs.xml` 写入 `accent_color=4`（紫）；7 个色板正常渲染、选中态打勾 |
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败**（含主题来源守卫）+ `:app:assembleDebug` |
 
+### 挂载被拒的原因不再误报成「名称问题」（2026-09-19，真机日志定位） — `b3e07007`
+
+| 项 | 结果 |
+|---|---|
+| 用户反馈 | 挂载外部文件夹时弹「无法添加挂载，名称可能已被使用或无效」 |
+| 真机证据 | logcat：`W Minis.MountedFolders: add: rejected URI without read grant or raw read capability content://com.android.externalstorage.documents/tree/primary%3ADocuments%2F外部文件`；`appops get llc.slacker.eta MANAGE_EXTERNAL_STORAGE` = default（未授权）。即 **Android 11+ 的 All Files Access 门槛**（`Environment.isExternalStorageManager()`）拒绝了它，而弹窗把原因归到名字上 |
+| 改法 | `MountedFoldersStore.add` 从 `Entry?` 改为 `AddResult`：`Added(entry)` 或 `Rejected(AddFailure)`，失败枚举 8 种：名称不可用 / 重名 / 超上限 / **缺 All Files Access** / 缺读取授权 / 不支持的 URI / 路径无法解析 / 保存失败；界面按原因各给一句话，**缺权限那条直接给「去授权」按钮**（与页面横幅共用同一个打开函数） |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:assembleDebug`；那条日志就是被替换掉的旧拒绝路径 |
+| 待用户确认 | 新版弹窗要再走一次「选文件夹」流程才能看到（我没替你点系统选择器），重试时如果仍被拒，弹窗会直接说明是哪一条 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
