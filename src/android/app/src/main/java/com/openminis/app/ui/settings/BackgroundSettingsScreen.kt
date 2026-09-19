@@ -131,25 +131,13 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
     val vendor = remember { PowerOptimizationManager.Vendor.current() }
     val needsOemGuidance = remember { PowerOptimizationManager.needsOemAutostartGuidance() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.bg_section_header)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
+    // [T-android-settings-metrics] The shared scaffold, like every other settings page. The old
+    // 16dp horizontal padding it carried is dropped with it: every section already insets its card
+    // by that much, so this page's cards sat 16dp narrower than the same cards elsewhere.
+    SettingsScaffold(
+        title = stringResource(R.string.bg_section_header),
+        onBack = onBack,
+    ) {
             Spacer(Modifier.size(8.dp))
             // T180-bg-notif: Task Notifications toggle. Mirrors iOS
             // EnhancedBackgroundSettingsView's first section (the toggle
@@ -276,7 +264,6 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
             }
 
             Spacer(Modifier.size(16.dp))
-        }
     }
 }
 

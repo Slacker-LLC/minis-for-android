@@ -124,27 +124,12 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.system_permissions_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-        ) {
+    // [T-android-settings-metrics] The shared scaffold, like every other settings page: same top
+    // bar, same scroll container, and the bottom spacing this page used to leave out.
+    SettingsScaffold(
+        title = stringResource(R.string.system_permissions_title),
+        onBack = onBack,
+    ) {
             SettingsSection(
                 header = stringResource(R.string.settings_assistant_role),
                 footer = stringResource(R.string.settings_assistant_role_footer),
@@ -366,7 +351,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
 
             // [T-android-settings-hierarchy] Voice-correction learning moved to the assistant
             // category (it is an agent behaviour, not a system grant).
-        }
     }
 }
 
