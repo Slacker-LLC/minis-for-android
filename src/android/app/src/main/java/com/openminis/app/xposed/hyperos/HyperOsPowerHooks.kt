@@ -95,19 +95,36 @@ object HyperOsPowerHooks {
                     ) {
                         return@intercept chain.proceed()
                     }
-                    val target = PowerAssistantTarget.parse(
-                        ModulePrefs.string(
-                            ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET,
-                            PowerAssistantTarget.OEM.wire,
-                        ),
-                    )
+                    // An absent setting and a deliberate "device's own assistant" both mean the
+                    // gesture is left alone, so the raw value is kept to tell them apart in the
+                    // log: without that line a module that never received the app's switch is
+                    // indistinguishable from one whose user simply kept the OEM assistant.
+                    val setting = ModulePrefs.string(ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET, "")
+                    val target = PowerAssistantTarget.parse(setting)
+                    if (target == PowerAssistantTarget.OEM) {
+                        if (setting.isBlank()) {
+                            hooks.logger.infoThrottled("hyperos_power_target_unset") {
+                                "HyperOsPower: no power-key target reached this process; " +
+                                    "the system keeps the gesture"
+                            }
+                        }
+                        return@intercept chain.proceed()
+                    }
                     val context = contextField.get(chain.getThisObject()) as? Context
-                    if (context == null || AssistantLaunch.targetFor(target) == null) {
+                    if (context == null) {
+                        hooks.logger.warnThrottled("hyperos_power_no_context") {
+                            "HyperOsPower: the shortcut dispatcher carries no context; " +
+                                "keeping the system behaviour"
+                        }
                         return@intercept chain.proceed()
                     }
                     if (AssistantLaunch.launch(context, target, hooks.logger, "HyperOsPower")) {
+                        hooks.logger.info("HyperOsPower: $target opened for the power-key long press")
                         true
                     } else {
+                        hooks.logger.warnThrottled("hyperos_power_launch_failed") {
+                            "HyperOsPower: $target did not start; keeping the system behaviour"
+                        }
                         chain.proceed()
                     }
                 }

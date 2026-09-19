@@ -828,7 +828,8 @@ internal class AccessibilityServiceEnforcer(
     }
 
     private companion object {
-        const val APP_PACKAGE = "llc.slacker.minis"
+        /** The app this backend protects; one identity, owned by [ModuleTargets]. */
+        val APP_PACKAGE = com.openminis.app.xposed.ModuleTargets.OWN_PACKAGE
         const val SERVICE_CLASS =
             "com.openminis.app.accessibility.MinisAccessibilityService"
         const val DISABLED = 0

@@ -18,9 +18,9 @@ class AssistantLaunchTest {
 
     @Test
     fun `minis is reached through the assistant action this app declares`() {
-        val target = AssistantLaunch.targetFor(PowerAssistantTarget.MINIS, ownPackage = "llc.slacker.minis")
+        val target = AssistantLaunch.targetFor(PowerAssistantTarget.MINIS, ownPackage = "llc.slacker.eta")
 
-        assertEquals("llc.slacker.minis", target?.packageName)
+        assertEquals("llc.slacker.eta", target?.packageName)
         assertEquals(
             listOf(AssistantLaunch.ACTION_VOICE_ASSIST, AssistantLaunch.ACTION_ASSIST),
             target?.actions,

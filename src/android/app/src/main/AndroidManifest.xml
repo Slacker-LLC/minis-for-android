@@ -8,9 +8,9 @@
          signature permission. The permission is declared here so the app can hold it; the backend
          still validates the UID as well, because a permission alone would not say who asked. -->
     <permission
-        android:name="llc.slacker.minis.permission.CONTROL_ACCESSIBILITY_PROTECTION"
+        android:name="${applicationId}.permission.CONTROL_ACCESSIBILITY_PROTECTION"
         android:protectionLevel="signature" />
-    <uses-permission android:name="llc.slacker.minis.permission.CONTROL_ACCESSIBILITY_PROTECTION" />
+    <uses-permission android:name="${applicationId}.permission.CONTROL_ACCESSIBILITY_PROTECTION" />
     <!-- T33: Check Update — needed to launch the system installer for the
          downloaded APK. The user must additionally grant "install unknown
          apps" for this package the first time they upgrade. -->

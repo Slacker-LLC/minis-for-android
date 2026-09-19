@@ -264,6 +264,27 @@ class MinisApp : Application(), ImageLoaderFactory {
         // the exact launch where the user is trying to read the crash files.
         AppLogger.primeContext(this)
 
+        // [T-eta-xposed-groups] The framework binds the module's settings service into this
+        // process; the switches the hooks read are committed through it, and the values a user
+        // set before the framework was connected are migrated on that first bind. Registered
+        // here so every process that can host the UI has it, and guarded because a device
+        // without an Xposed framework simply never delivers the binder.
+        runCatching {
+            io.github.libxposed.service.XposedServiceHelper.registerListener(
+                object : io.github.libxposed.service.XposedServiceHelper.OnServiceListener {
+                    override fun onServiceBind(service: io.github.libxposed.service.XposedService) {
+                        com.openminis.app.xposed.ModuleSettingsStore.attachService(this@MinisApp, service)
+                    }
+
+                    override fun onServiceDied(service: io.github.libxposed.service.XposedService) {
+                        com.openminis.app.xposed.ModuleSettingsStore.detachService(service)
+                    }
+                },
+            )
+        }.onFailure {
+            Log.w("MinisApp", "Xposed settings service unavailable: ${it.javaClass.simpleName}: ${it.message}")
+        }
+
         // [T-codex-fast-mode] Capture the app context + warm the Fast Mode
         // flag cache so the provider layer (no Context) can read it at
         // request-build time — including offload / title-gen calls that

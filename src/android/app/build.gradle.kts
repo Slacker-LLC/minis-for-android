@@ -494,6 +494,12 @@ dependencies {
     // runtime, and shipping it would give the app a copy that can drift from the
     // installed manager. Ported from Eta's libxposed pin (102.0.0).
     compileOnly("io.github.libxposed:api:102.0.0")
+    // The module app's half of the same API: the framework binds an XposedService into this
+    // process and the settings the module reads are written through it (see ModuleSettingsStore).
+    // Pinned one line behind the hook API on purpose: service 102 declares minCompileSdk 37
+    // while this app compiles against 36, and the service API is version-negotiated by the
+    // framework, so a 101 client talks to a 102 framework.
+    implementation("io.github.libxposed:service:101.0.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     // ProcessLifecycleOwner is used by XAIOAuthManager to detect Custom Tab dismissal.

@@ -1490,6 +1490,12 @@
     <string name="module_settings_target_oem">端末本来のアシスタント</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Xposed フレームワーク未接続：このスイッチは書き込めません。フレームワークを導入し、スコープで Minis を有効にしてください。</string>
+    <string name="module_settings_write_failed">フレームワークが変更を確認しませんでした</string>
+    <string name="module_settings_assistant_role">システム既定のアシスタント</string>
+    <string name="module_settings_assistant_role_held">Minis はこの端末のアシスタントです</string>
+    <string name="module_settings_assistant_role_needed">電源キーを Minis が引き継ぐには既定のアシスタントが必要です</string>
+    <string name="module_settings_assistant_role_unavailable">この端末には既定のアシスタント設定がありません</string>
     <string name="module_settings_footer">これらのスイッチは Minis LSPosed モジュールが読みます。モジュールをインストールし、スコープで Minis を有効にしてください。変更は次のインターセプトで有効になり、再起動は不要です。</string>
 
     <string name="modeldetail_hosted_web_search">サーバー側ウェブ検索</string>

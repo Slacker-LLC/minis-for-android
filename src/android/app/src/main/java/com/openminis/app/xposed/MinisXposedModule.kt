@@ -58,6 +58,17 @@ class MinisXposedModule : XposedModule() {
             "module loaded process=${param.processName} systemServer=${param.isSystemServer} " +
                 "framework=$frameworkName($frameworkVersionCode) api=$apiVersion",
         )
+        // [T-eta-xposed-groups] Every switch in this module fails safe: an unreadable setting
+        // falls back to the default that keeps the system's own behaviour. That makes "the user
+        // turned the takeover on and it did nothing" and "the module never received the settings"
+        // look the same from outside, so what actually arrived is stated once per process here.
+        // Values only - no secret is read through this handle.
+        log(
+            Log.INFO,
+            TAG,
+            "settings reader=${if (remotePreferences == null) "absent" else "attached"} " +
+                "powerKeyTarget=${ModulePrefs.string(ModulePrefs.Keys.POWER_KEY_ASSISTANT_TARGET, UNSET_SETTING)}",
+        )
     }
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
@@ -105,5 +116,8 @@ class MinisXposedModule : XposedModule() {
     companion object {
         /** Tag the module logs under; short because it appears in every logcat line. */
         const val TAG = "Minis"
+
+        /** Logged in place of a setting the framework did not hand over. */
+        internal const val UNSET_SETTING = "<unset>"
     }
 }

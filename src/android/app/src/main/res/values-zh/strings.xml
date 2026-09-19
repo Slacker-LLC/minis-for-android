@@ -1740,6 +1740,12 @@
     <string name="module_settings_target_oem">设备自带的助手</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Xposed 框架未连接：这些开关暂时写不进去。请安装框架并在作用域中启用 Minis。</string>
+    <string name="module_settings_write_failed">框架没有确认这次写入</string>
+    <string name="module_settings_assistant_role">系统默认助手</string>
+    <string name="module_settings_assistant_role_held">Minis 已是本机的数字助手</string>
+    <string name="module_settings_assistant_role_needed">长按电源键由 Minis 接管前，必须先设为默认助手</string>
+    <string name="module_settings_assistant_role_unavailable">此设备没有默认助手设置</string>
     <string name="module_settings_footer">这些开关由 Minis 的 LSPosed 模块读取：先安装模块，并在其作用域里勾选 Minis。改动在下一次拦截即生效，不需要重启。</string>
 
     <string name="modeldetail_hosted_web_search">服务端联网搜索</string>

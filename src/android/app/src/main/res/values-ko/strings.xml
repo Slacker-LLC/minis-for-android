@@ -1482,6 +1482,12 @@
     <string name="module_settings_target_oem">기기 자체 어시스턴트</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Xposed 프레임워크에 연결되지 않았습니다: 이 스위치는 기록할 수 없습니다. 프레임워크를 설치하고 범위에서 Minis를 사용 설정하세요.</string>
+    <string name="module_settings_write_failed">프레임워크가 변경을 확인하지 않았습니다</string>
+    <string name="module_settings_assistant_role">시스템 기본 어시스턴트</string>
+    <string name="module_settings_assistant_role_held">Minis가 이 기기의 어시스턴트입니다</string>
+    <string name="module_settings_assistant_role_needed">전원 키를 Minis가 가져오려면 기본 어시스턴트여야 합니다</string>
+    <string name="module_settings_assistant_role_unavailable">이 기기에는 기본 어시스턴트 설정이 없습니다</string>
     <string name="module_settings_footer">이 스위치는 Minis LSPosed 모듈이 읽습니다. 모듈을 설치하고 범위에서 Minis를 활성화하세요. 변경은 다음 가로채기에서 적용되며 재시작은 필요 없습니다.</string>
 
     <string name="modeldetail_hosted_web_search">서버 측 웹 검색</string>

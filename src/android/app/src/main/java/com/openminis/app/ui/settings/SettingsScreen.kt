@@ -99,12 +99,26 @@ import com.openminis.app.i18n.uppercaseForDisplay
 
 /** RoleManager was added in Android 10; older devices use voice-input Settings. */
 @Suppress("NewApi")
-private fun Context.assistantRoleManagerOrNull(): RoleManager? =
+internal fun Context.assistantRoleManagerOrNull(): RoleManager? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         getSystemService(RoleManager::class.java)
     } else {
         null
     }
+
+/**
+ * The assistant role's three calls, each behind the one suppression above so no screen has to
+ * repeat it: with minSdk 26 every caller would otherwise need its own guard for an API the
+ * nullable manager already carries the version check for.
+ */
+@Suppress("NewApi")
+internal fun RoleManager.assistantRoleAvailable(): Boolean = isRoleAvailable(RoleManager.ROLE_ASSISTANT)
+
+@Suppress("NewApi")
+internal fun RoleManager.assistantRoleHeld(): Boolean = isRoleHeld(RoleManager.ROLE_ASSISTANT)
+
+@Suppress("NewApi")
+internal fun RoleManager.assistantRoleRequestIntent(): Intent = createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -96,7 +96,7 @@ class ModuleTargetsTest {
     @Test
     fun `the module keeps its callbacks only in its own process and its targets`() {
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.OWN_PACKAGE))
-        assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks("llc.slacker.minis:agent"))
+        assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.OWN_PACKAGE + ":agent"))
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.SYSTEM_SERVER_PROCESS))
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.SYSTEM_UI_PACKAGE))
         assertTrue(ModuleTargets.shouldKeepLifecycleCallbacks(ModuleTargets.XIAOAI_PACKAGE))

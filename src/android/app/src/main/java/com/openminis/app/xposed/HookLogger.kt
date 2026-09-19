@@ -39,6 +39,11 @@ class HookLogger private constructor(
         if (throttle.shouldLog(throttleKey("warn", key), windowMs)) warn(message())
     }
 
+    /** The info-level counterpart: state that repeats per gesture but is not a failure. */
+    fun infoThrottled(key: String, windowMs: Long = DEFAULT_THROTTLE_WINDOW_MS, message: () -> String) {
+        if (throttle.shouldLog(throttleKey("info", key), windowMs)) info(message())
+    }
+
     fun errorThrottled(key: String, windowMs: Long = DEFAULT_THROTTLE_WINDOW_MS, message: () -> String) {
         if (throttle.shouldLog(throttleKey("error", key), windowMs)) error(message())
     }

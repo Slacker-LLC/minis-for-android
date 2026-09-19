@@ -1376,6 +1376,12 @@
     <string name="module_settings_target_oem">L\'assistant du appareil</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Framework Xposed non connecté : ces interrupteurs ne peuvent pas être écrits. Installez le framework et activez Minis dans son périmètre.</string>
+    <string name="module_settings_write_failed">Le framework n\'a pas confirmé la modification</string>
+    <string name="module_settings_assistant_role">Assistant par défaut du système</string>
+    <string name="module_settings_assistant_role_held">Minis est l\'assistant de l\'appareil</string>
+    <string name="module_settings_assistant_role_needed">Nécessaire pour que Minis reprenne le bouton d\'alimentation</string>
+    <string name="module_settings_assistant_role_unavailable">Cet appareil n\'a pas de réglage d\'assistant par défaut</string>
     <string name="module_settings_footer">Ces interrupteurs sont lus par le module LSPosed Minis : installez-le et activez Minis dans sa portée. Un changement prend effet à la prochaine interception, sans redémarrage.</string>
 
     <string name="modeldetail_hosted_web_search">Recherche web côté serveur</string>

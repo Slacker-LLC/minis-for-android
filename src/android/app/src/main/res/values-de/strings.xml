@@ -1485,6 +1485,12 @@
     <string name="module_settings_target_oem">Der eigene Assistent des Geräts</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Xposed-Framework nicht verbunden: Diese Schalter lassen sich nicht schreiben. Installiere das Framework und aktiviere Minis im Scope.</string>
+    <string name="module_settings_write_failed">Das Framework hat die Änderung nicht bestätigt</string>
+    <string name="module_settings_assistant_role">System-Assistent</string>
+    <string name="module_settings_assistant_role_held">Minis ist der Assistent des Geräts</string>
+    <string name="module_settings_assistant_role_needed">Nötig, bevor Minis die Ein-/Aus-Taste übernimmt</string>
+    <string name="module_settings_assistant_role_unavailable">Dieses Gerät hat keine Assistenten-Einstellung</string>
     <string name="module_settings_footer">Diese Schalter liest das Minis-LSPosed-Modul: installieren und Minis im Geltungsbereich aktivieren. Änderungen greifen beim nächsten Abfangen, ohne Neustart.</string>
 
     <string name="modeldetail_hosted_web_search">Serverseitige Websuche</string>

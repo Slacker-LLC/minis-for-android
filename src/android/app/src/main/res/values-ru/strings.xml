@@ -1735,6 +1735,12 @@
     <string name="module_settings_target_oem">Штатный ассистент устройства</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Фреймворк Xposed не подключён: эти переключатели записать нельзя. Установите фреймворк и включите Minis в его области.</string>
+    <string name="module_settings_write_failed">Фреймворк не подтвердил изменение</string>
+    <string name="module_settings_assistant_role">Системный ассистент</string>
+    <string name="module_settings_assistant_role_held">Minis — ассистент этого устройства</string>
+    <string name="module_settings_assistant_role_needed">Нужно, чтобы Minis перехватил кнопку питания</string>
+    <string name="module_settings_assistant_role_unavailable">На этом устройстве нет настройки ассистента</string>
     <string name="module_settings_footer">Эти переключатели читает модуль Minis для LSPosed: установите его и включите Minis в его области. Изменение действует со следующего перехвата, перезапуск не нужен.</string>
 
     <string name="modeldetail_hosted_web_search">Веб-поиск на стороне провайдера</string>

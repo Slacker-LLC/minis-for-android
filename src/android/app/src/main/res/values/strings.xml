@@ -1887,6 +1887,12 @@
     <string name="module_settings_target_oem">The device\'s own assistant</string>
     <string name="module_settings_target_minis">Minis</string>
     <string name="module_settings_target_gemini">Google Gemini</string>
+    <string name="module_settings_not_connected">Xposed framework not connected: these switches cannot be written. Install the framework and enable Minis in its scope.</string>
+    <string name="module_settings_write_failed">The framework did not accept the change</string>
+    <string name="module_settings_assistant_role">System default assistant</string>
+    <string name="module_settings_assistant_role_held">Minis is this device\'s assistant</string>
+    <string name="module_settings_assistant_role_needed">Required before Minis can take over the power key</string>
+    <string name="module_settings_assistant_role_unavailable">This device has no default-assistant setting</string>
     <string name="module_settings_footer">These switches are read by the Minis LSPosed module: install it and enable Minis in its scope. A change takes effect at the next interception, with no restart.</string>
 
     <string name="modeldetail_hosted_web_search">Server-side web search</string>
