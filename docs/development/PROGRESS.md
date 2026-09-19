@@ -1146,7 +1146,7 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 |---|---|
 | 需求 | 用户提供 X 的强调色参考（蓝 #1D9BF0 / 黄 #FFD400 / 粉 #F91880 / 紫 #7856FF / 橙 #FF7A00 / 绿 #00BA7C），要求做强调色选择器 |
 | 改法 | `AccentColor` 枚举（7 项：**应用默认蓝**在前，保证老用户无感 + X 的 6 色），`MinisTheme(accent=…)` 经 `colorScheme.primary/primaryContainer/onPrimary/surfaceTint` 生效；外观页在主题下方新增「强调色」小节（7 个圆形色板，选中打勾），pref `accent_color`（int）；色板取色用 `ChatColors.isDark`（应用内主题）而非系统设置 |
-| 踩坑 | 第一版用了 `isSystemInDarkTheme()`，被仓库的 `InAppThemeSourceGuardTest` 拦住（UI 层不许读系统深色模式——应用内覆盖主题时会与系统不一致，OpenMinis#187 的老问题）；按守卫要求改用 `ChatColors.isDark` |
+| 踩坑 | 第一版用了 `isSystemInDarkTheme()`，被仓库的 `InAppThemeSourceGuardTest` 拦住（UI 层不许读系统深色模式——应用内覆盖主题时会与系统不一致，历史 #187 的老问题）；按守卫要求改用 `ChatColors.isDark` |
 | 真机验证 | 点第 5 个色板 → `appearance_prefs.xml` 写入 `accent_color=4`（紫）；7 个色板正常渲染、选中态打勾 |
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败**（含主题来源守卫）+ `:app:assembleDebug` |
 
