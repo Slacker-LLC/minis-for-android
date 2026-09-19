@@ -171,6 +171,69 @@ internal fun tallyEntries(tallies: Map<WorkItemKind, Int>): List<Pair<WorkItemKi
         .sortedWith(compareByDescending<Map.Entry<WorkItemKind, Int>> { it.value }.thenBy { it.key.ordinal })
         .map { it.key to it.value }
 
+/**
+ * [T-android-work-items] A file change as the work list shows it: which file, and how much moved.
+ *
+ * Codex keeps a file change as its own item type with the path and the diff on the item itself;
+ * here the full diff already lives in the tool detail sheet, so the work row only needs the part
+ * that answers "what did it touch, and how much" without opening anything.
+ */
+internal data class FileChangeSummary(
+    val fileName: String,
+    val addedLines: Int,
+    val removedLines: Int,
+    val isCreation: Boolean,
+)
+
+/** [T-android-work-items] The string value of one flat JSON field, without a JSON parser. */
+internal fun toolArgString(argsJson: String, key: String): String? {
+    val match = Regex("\"" + Regex.escape(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(argsJson)
+        ?: return null
+    return match.groupValues[1]
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+        .replace("\\\"", "\"")
+        .replace("\\\\", "\\")
+}
+
+private fun lineCount(text: String): Int = when {
+    text.isEmpty() -> 0
+    else -> text.lines().size
+}
+
+/**
+ * [T-android-work-items] The change [block] carries, or null when the block is not a file write/edit
+ * or its arguments do not name a file. A write is a creation when it has no previous content to
+ * compare against (the caller's only signal: the tool itself does not say).
+ */
+internal fun fileChangeSummary(block: AssistantBlock): FileChangeSummary? {
+    if (block.kind != TOOL_USE_KIND) return null
+    val name = block.toolName.lowercase()
+    val isWrite = name.contains("write")
+    val isEdit = name.contains("edit")
+    if (!isWrite && !isEdit) return null
+    val path = toolArgString(block.toolArgs, "path")
+        ?: toolArgString(block.toolArgs, "file_path")
+        ?: return null
+    val fileName = path.trimEnd('/').substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
+    val oldText = toolArgString(block.toolArgs, "old_string").orEmpty()
+    val newText = if (isWrite) {
+        toolArgString(block.toolArgs, "content").orEmpty()
+    } else {
+        toolArgString(block.toolArgs, "new_string").orEmpty()
+    }
+    val added = lineCount(newText)
+    val removed = lineCount(oldText)
+    if (added == 0 && removed == 0) return null
+    return FileChangeSummary(
+        fileName = fileName,
+        addedLines = added,
+        removedLines = removed,
+        isCreation = isWrite && oldText.isEmpty(),
+    )
+}
+
 /** Everything the collapsed "work process" header needs, resolved once. */
 internal data class WorkProcessSummary(
     val toolCount: Int,

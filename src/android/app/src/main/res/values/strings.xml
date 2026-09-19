@@ -2005,4 +2005,5 @@
         <item quantity="other">%1$d delegations</item>
     </plurals>
     <string name="work_process_duration">Took %1$s</string>
+    <string name="work_process_duration_failed">Took %1$s · step %2$d failed</string>
 </resources>

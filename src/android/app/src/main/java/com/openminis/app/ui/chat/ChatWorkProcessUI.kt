@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -200,16 +201,55 @@ internal fun WorkProcessRowView(
                             isLast = block.id == trailingBlockId,
                         )
                         else -> if (block.kind == TOOL_USE_KIND) {
-                            ToolCallPill(
-                                block = block,
-                                allToolBlocks = allToolBlocks,
-                                onRetry = onRetry,
-                                onStop = onStop,
-                                onOpenTerminalWithCommand = onOpenTerminalWithCommand,
-                                onOpenDetail = onOpenDetail,
-                                onRerunFromHere = onRerunFromHere,
-                                onCopyDetails = onCopyDetails?.let { copy -> { copy(block) } },
-                            )
+                            Column {
+                                ToolCallPill(
+                                    block = block,
+                                    allToolBlocks = allToolBlocks,
+                                    onRetry = onRetry,
+                                    onStop = onStop,
+                                    onOpenTerminalWithCommand = onOpenTerminalWithCommand,
+                                    onOpenDetail = onOpenDetail,
+                                    onRerunFromHere = onRerunFromHere,
+                                    onCopyDetails = onCopyDetails?.let { copy -> { copy(block) } },
+                                )
+                                // [T-android-work-items] Codex keeps a file change as its own item
+                                // with the path and the diff on the item itself. The full diff stays
+                                // in the detail sheet; this line answers "which file, how much"
+                                // without opening anything.
+                                fileChangeSummary(block)?.let { change ->
+                                    Row(
+                                        modifier = Modifier.padding(start = 34.dp, end = 12.dp, bottom = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = change.fileName,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = ChatColors.secondaryText,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        if (change.addedLines > 0) {
+                                            Text(
+                                                text = "+" + change.addedLines,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = Color(0xFF34C759),
+                                            )
+                                        }
+                                        if (change.addedLines > 0 && change.removedLines > 0) {
+                                            Spacer(Modifier.width(6.dp))
+                                        }
+                                        if (change.removedLines > 0) {
+                                            Text(
+                                                text = "−" + change.removedLines,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = ToolErrorColor,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -232,16 +272,22 @@ internal fun workProcessHeaderText(summary: WorkProcessSummary): String = when {
         summary.runningToolName.orEmpty(),
     )
     summary.isRunning -> stringResource(R.string.work_process_running_thinking)
+    // [T-android-work-items] A finished run leads with how long it took, the way Codex's turn
+    // header does; a failure is appended rather than replacing it, so the collapsed row still
+    // answers "how long" and the panel keeps the reason.
+    summary.durationMs != null && summary.failureReason != null -> stringResource(
+        R.string.work_process_duration_failed,
+        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
+        summary.failedStepNumber ?: 0,
+    )
+    summary.durationMs != null -> stringResource(
+        R.string.work_process_duration,
+        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
+    )
     summary.failureReason != null -> stringResource(
         R.string.work_process_failed_step,
         summary.failedStepNumber ?: 0,
         summary.failureReason,
-    )
-    // [T-android-work-items] A finished run leads with how long it took, the way Codex's turn
-    // header does; the step count is what older rows (no timings) still fall back to.
-    summary.durationMs != null -> stringResource(
-        R.string.work_process_duration,
-        formatStepDuration(summary.durationMs / 1000L, stillRunning = false),
     )
     summary.toolCount > 0 -> pluralStringResource(
         R.plurals.work_process_completed_steps,

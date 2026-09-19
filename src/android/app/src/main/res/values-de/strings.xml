@@ -1604,4 +1604,5 @@
         <item quantity="other">%1$d Delegationen</item>
     </plurals>
     <string name="work_process_duration">Dauer %1$s</string>
+    <string name="work_process_duration_failed">Dauer %1$s · Schritt %2$d fehlgeschlagen</string>
 </resources>

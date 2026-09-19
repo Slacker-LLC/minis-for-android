@@ -1850,4 +1850,5 @@
         <item quantity="other">%1$d 次委派</item>
     </plurals>
     <string name="work_process_duration">用时 %1$s</string>
+    <string name="work_process_duration_failed">用时 %1$s · 第 %2$d 步失败</string>
 </resources>

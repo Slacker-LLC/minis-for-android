@@ -1869,4 +1869,5 @@
         <item quantity="other">%1$d делегирований</item>
     </plurals>
     <string name="work_process_duration">Заняло %1$s</string>
+    <string name="work_process_duration_failed">Заняло %1$s · шаг %2$d не удался</string>
 </resources>

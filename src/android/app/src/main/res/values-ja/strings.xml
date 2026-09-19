@@ -1601,4 +1601,5 @@
         <item quantity="other">%1$d 回の委任</item>
     </plurals>
     <string name="work_process_duration">所要時間 %1$s</string>
+    <string name="work_process_duration_failed">所要時間 %1$s · ステップ %2$d 失敗</string>
 </resources>
