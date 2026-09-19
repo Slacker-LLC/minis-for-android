@@ -3691,7 +3691,7 @@ class ChatViewModel(
         val pressure = ContextPressure.compute(window, effectiveAgentHistory())
         if (pressure.needsCompact) {
             appendSystemInfo(
-                text = "[system] 当前上下文压力约 ${pressure.percent}%（模型窗口 $window）——如果继续可能超限，考虑 /compact",
+                text = context.getString(R.string.chat_context_pressure_note, pressure.percent, window),
                 iconKind = "compact",
             )
         }
@@ -8928,8 +8928,7 @@ class ChatViewModel(
                         )
                         rollbackFailedAttempt()
                         appendSystemInfo(
-                            text = "模型报告上下文超限，压缩后重试" +
-                                "（${decision.attempt}/${AgentContextBudget.MAX_OVERFLOW_ATTEMPTS}）。",
+                            text = context.getString(R.string.chat_context_overflow_retry, decision.attempt, AgentContextBudget.MAX_OVERFLOW_ATTEMPTS),
                             iconKind = "compact",
                         )
                         // compactAll() only answers through its callback on the real

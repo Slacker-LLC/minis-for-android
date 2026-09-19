@@ -1,5 +1,8 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +44,7 @@ fun SessionConfigSheet(
     onOpenMemory: () -> Unit,
 ) {
     StandardChatSheet(
-        title = "会话配置",
+        title = stringResource(R.string.session_config_title),
         onDismiss = onDismiss,
         heightFraction = 0.52f,
     ) {
@@ -52,8 +55,8 @@ fun SessionConfigSheet(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SessionConfigItem(
-                title = "会话提示词",
-                subtitle = "自定义当前会话的系统指令与偏好",
+                title = stringResource(R.string.session_advanced_settings_title),
+                subtitle = stringResource(R.string.session_config_prompt_footer),
                 icon = Icons.Default.EditNote,
                 onClick = {
                     onDismiss()
@@ -61,8 +64,8 @@ fun SessionConfigSheet(
                 },
             )
             SessionConfigItem(
-                title = "会话技能",
-                subtitle = "管理当前会话启用的技能扩展",
+                title = stringResource(R.string.session_config_skills),
+                subtitle = stringResource(R.string.session_config_skills_footer),
                 icon = Icons.Default.Build,
                 onClick = {
                     onDismiss()
@@ -70,8 +73,8 @@ fun SessionConfigSheet(
                 },
             )
             SessionConfigItem(
-                title = "会话中的 MCP",
-                subtitle = "管理当前会话连接的 MCP 工具服务",
+                title = stringResource(R.string.session_mcps_title),
+                subtitle = stringResource(R.string.session_config_mcps_footer),
                 icon = Icons.Default.Extension,
                 onClick = {
                     onDismiss()
@@ -79,8 +82,8 @@ fun SessionConfigSheet(
                 },
             )
             SessionConfigItem(
-                title = "会话中的记忆",
-                subtitle = "查看与管理当前会话沉淀的记忆",
+                title = stringResource(R.string.session_memory_title),
+                subtitle = stringResource(R.string.session_config_memory_footer),
                 icon = Icons.Default.Psychology,
                 onClick = {
                     onDismiss()

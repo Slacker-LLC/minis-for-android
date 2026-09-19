@@ -191,7 +191,7 @@ internal fun SubagentLimitsDialog(
                     .padding(24.dp),
             ) {
                 Text(
-                    text = "子代理委派限制",
+                    text = stringResource(R.string.settings_subagent_limits),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -199,7 +199,7 @@ internal fun SubagentLimitsDialog(
                 OutlinedTextField(
                     value = depth,
                     onValueChange = { depth = it.filter(Char::isDigit).take(1) },
-                    label = { Text("委派深度（1–5 层）") },
+                    label = { Text(stringResource(R.string.settings_subagent_depth)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
@@ -208,7 +208,7 @@ internal fun SubagentLimitsDialog(
                 OutlinedTextField(
                     value = timeout,
                     onValueChange = { timeout = it.filter(Char::isDigit).take(2) },
-                    label = { Text("单任务超时（1–30 分钟）") },
+                    label = { Text(stringResource(R.string.settings_subagent_timeout)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
@@ -218,7 +218,7 @@ internal fun SubagentLimitsDialog(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    MinisTextButton(onClick = onDismiss) { Text("取消") }
+                    MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                     MinisTextButton(
                         onClick = {
                             val d = depth.toIntOrNull() ?: SubagentLimits.DEFAULT_MAX_DEPTH
@@ -228,7 +228,7 @@ internal fun SubagentLimitsDialog(
                                 t.coerceIn(SubagentLimits.TIMEOUT_MINUTES_RANGE.first, SubagentLimits.TIMEOUT_MINUTES_RANGE.last),
                             )
                         },
-                    ) { Text("保存") }
+                    ) { Text(stringResource(R.string.save)) }
                 }
             }
         }

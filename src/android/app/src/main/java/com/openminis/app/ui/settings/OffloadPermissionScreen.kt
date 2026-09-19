@@ -179,8 +179,8 @@ fun OffloadPermissionScreen(
             SettingsRow(
                 icon = Icons.Outlined.Layers,
                 iconColor = Color(0xFF007AFF),
-                title = "系统特权详情",
-                subtitle = "悬浮窗、无障碍保活与语音纠错",
+                title = stringResource(R.string.offload_privilege_details),
+                subtitle = stringResource(R.string.offload_privilege_details_footer),
                 onClick = onOpenSystemPermissions,
                 showDivider = false,
             )

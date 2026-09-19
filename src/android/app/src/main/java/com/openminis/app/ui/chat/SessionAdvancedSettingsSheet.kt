@@ -144,7 +144,7 @@ fun SessionAdvancedSettingsSheet(
     }
 
     StandardChatSheet(
-        title = "会话提示词",
+        title = stringResource(R.string.session_advanced_settings_title),
         onDismiss = onDismiss,
     ) {
         if (isLoading) {

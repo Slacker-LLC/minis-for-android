@@ -145,7 +145,7 @@ fun SessionDrawerContent(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("搜索对话...", fontSize = 14.sp) },
+                placeholder = { Text(stringResource(R.string.drawer_search_chats), fontSize = 14.sp) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 4.dp),
@@ -175,12 +175,12 @@ fun SessionDrawerContent(
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
-                contentDescription = "新建聊天",
+                contentDescription = stringResource(R.string.scheduled_task_target_new),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp),
             )
             Text(
-                text = "新建聊天",
+                text = stringResource(R.string.scheduled_task_target_new),
                 fontSize = 14.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -200,17 +200,17 @@ fun SessionDrawerContent(
             )
             DrawerToolRow(
                 icon = Icons.Outlined.Schedule,
-                title = "定时任务",
+                title = stringResource(R.string.scheduled_tasks_title),
                 onClick = onOpenScheduledTasks,
             )
             DrawerToolRow(
                 icon = Icons.Default.Terminal,
-                title = "终端",
+                title = stringResource(R.string.drawer_terminal),
                 onClick = onOpenTerminal,
             )
             DrawerToolRow(
                 icon = Icons.Outlined.Folder,
-                title = "存储与沙箱",
+                title = stringResource(R.string.drawer_storage),
                 onClick = onOpenStorage,
             )
         }
@@ -219,7 +219,7 @@ fun SessionDrawerContent(
 
         // Section header: "最近"
         Text(
-            text = "最近",
+            text = stringResource(R.string.drawer_recent),
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Medium,
             color = ChatColors.secondaryText,
@@ -252,7 +252,7 @@ fun SessionDrawerContent(
             if (filteredSessions.isEmpty()) {
                 item {
                     Text(
-                        text = if (isSearching) "未找到相关对话" else "暂无历史对话",
+                        text = if (isSearching) stringResource(R.string.drawer_no_search_match) else stringResource(R.string.drawer_no_history),
                         fontSize = 13.5.sp,
                         color = ChatColors.tertiaryText,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
@@ -277,12 +277,12 @@ fun SessionDrawerContent(
         ) {
             Icon(
                 imageVector = Icons.Default.Settings,
-                contentDescription = "设置",
+                contentDescription = stringResource(R.string.settings),
                 tint = ChatColors.secondaryText,
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                text = "设置",
+                text = stringResource(R.string.settings),
                 fontSize = 14.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = ChatColors.primaryText,
@@ -294,7 +294,7 @@ fun SessionDrawerContent(
     sessionToRename?.let { session ->
         AlertDialog(
             onDismissRequest = { sessionToRename = null },
-            title = { Text("重命名会话", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.drawer_rename_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = renameText,
@@ -316,12 +316,12 @@ fun SessionDrawerContent(
                         sessionToRename = null
                     },
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { sessionToRename = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -331,8 +331,8 @@ fun SessionDrawerContent(
     sessionToDelete?.let { session ->
         AlertDialog(
             onDismissRequest = { sessionToDelete = null },
-            title = { Text("删除会话", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-            text = { Text("确定要删除此会话吗？此操作无法撤销。", fontSize = 14.sp) },
+            title = { Text(stringResource(R.string.drawer_delete_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.drawer_delete_session_confirm), fontSize = 14.sp) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -346,12 +346,12 @@ fun SessionDrawerContent(
                         sessionToDelete = null
                     },
                 ) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { sessionToDelete = null }) {
-                    Text("取消")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -398,7 +398,8 @@ private fun DrawerSessionItem(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val title = session.title?.ifBlank { "新会话" } ?: "新会话"
+    val newSessionLabel = stringResource(R.string.drawer_new_session)
+                    val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
     val bgColor = if (isSelected) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     } else {
@@ -440,7 +441,7 @@ private fun DrawerSessionItem(
             onDismissRequest = { showMenu = false },
         ) {
             DropdownMenuItem(
-                text = { Text("重命名") },
+                text = { Text(stringResource(R.string.drawer_rename)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -454,7 +455,7 @@ private fun DrawerSessionItem(
                 },
             )
             DropdownMenuItem(
-                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Delete,

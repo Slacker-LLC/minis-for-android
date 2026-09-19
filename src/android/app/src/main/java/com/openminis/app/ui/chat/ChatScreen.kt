@@ -2480,7 +2480,7 @@ fun ChatScreen(
                         ) {
                             // 会话配置 (提示词、技能、MCP、记忆)
                             DropdownMenuItem(
-                                text = { Text("会话配置") },
+                                text = { Text(stringResource(R.string.session_config_title)) },
                                 onClick = {
                                     showChatMenu = false
                                     showSessionConfigSheet = true
@@ -2491,7 +2491,7 @@ fun ChatScreen(
                             )
                             // Token 用量 (直达 Token 用量面板)
                             DropdownMenuItem(
-                                text = { Text("Token 用量") },
+                                text = { Text(stringResource(R.string.settings_token_usage)) },
                                 onClick = {
                                     showChatMenu = false
                                     showTokenUsageSheet = true
@@ -5782,7 +5782,7 @@ fun ChatScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = "全部模型与分组...",
+                                            text = stringResource(R.string.chat_models_all_groups),
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = ChatColors.primaryText,
@@ -6385,7 +6385,7 @@ fun ChatScreen(
                     .presetForSession(context, sessionId).id
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showAgentPresetSheet = false },
-                    title = { Text("Agent 预设") },
+                    title = { Text(stringResource(R.string.chat_agent_presets)) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
@@ -6411,7 +6411,7 @@ fun ChatScreen(
                                         if (preset.id == ActivePreset) {
                                             Icon(
                                                 Icons.Default.Check,
-                                                contentDescription = "当前使用",
+                                                contentDescription = stringResource(R.string.chat_agent_preset_current),
                                                 tint = MaterialTheme.colorScheme.primary,
                                             )
                                         }
@@ -6422,7 +6422,7 @@ fun ChatScreen(
                     },
                     confirmButton = {
                         TextButton(onClick = { showAgentPresetSheet = false }) {
-                            Text("关闭")
+                            Text(stringResource(R.string.overlay_dismiss))
                         }
                     },
                 )

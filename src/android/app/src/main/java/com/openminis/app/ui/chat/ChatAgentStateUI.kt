@@ -1,5 +1,8 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxSize
@@ -136,7 +139,7 @@ fun AskUserQuestionDialog(sessionId: String) {
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "模型在等你回答",
+                        text = stringResource(R.string.chat_waiting_answer),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 19.sp),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
@@ -182,7 +185,7 @@ fun AskUserQuestionDialog(sessionId: String) {
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = opt.label + if (opt.recommended) "（推荐）" else "",
+                                    text = opt.label + if (opt.recommended) stringResource(R.string.chat_recommended) else "",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
@@ -193,7 +196,7 @@ fun AskUserQuestionDialog(sessionId: String) {
                             OutlinedTextField(
                                 value = custom,
                                 onValueChange = { custom = it },
-                                placeholder = { Text("其他（输入你自己的答案）") },
+                                placeholder = { Text(stringResource(R.string.chat_other_answer)) },
                                 modifier = Modifier.fillMaxWidth(),
                                 maxLines = 3,
                             )
@@ -208,14 +211,14 @@ fun AskUserQuestionDialog(sessionId: String) {
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                     ) {
                         MinisTextButton(onClick = { submit(skip = true) }) {
-                            Text("跳过", color = ChatColors.secondaryText, fontSize = 14.sp)
+                            Text(stringResource(R.string.common_skip), color = ChatColors.secondaryText, fontSize = 14.sp)
                         }
                         Spacer(Modifier.width(6.dp))
                         MinisTextButton(
                             onClick = { submit(skip = false) },
                             enabled = q.multiple || selected.isNotEmpty() || custom.isNotBlank(),
                         ) {
-                            Text("提交", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(stringResource(R.string.chat_submit), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
                     }
                 }
@@ -283,13 +286,13 @@ fun DangerousOperationApprovalDialog(sessionId: String) {
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
                     Text(
-                        text = "需要你的批准",
+                        text = stringResource(R.string.chat_permission_needed_title),
                         style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Agent 想执行一项可能造成破坏的操作。请先核对以下内容：",
+                        text = stringResource(R.string.chat_permission_needed_body),
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
                         color = ChatColors.secondaryText,
                     )
@@ -320,11 +323,11 @@ fun DangerousOperationApprovalDialog(sessionId: String) {
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         MinisTextButton(onClick = { decide(allowed = false) }) {
-                            Text("拒绝", color = ChatColors.secondaryText, fontSize = 14.sp)
+                            Text(stringResource(R.string.chat_deny), color = ChatColors.secondaryText, fontSize = 14.sp)
                         }
                         Spacer(Modifier.width(6.dp))
                         MinisTextButton(onClick = { decide(allowed = true) }) {
-                            Text("仅此一次允许", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text(stringResource(R.string.chat_allow_once), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         }
                     }
                 }
@@ -360,6 +363,8 @@ fun AgentStateBars(
         plan.mode == "plan" || deliverables.isNotEmpty()
     if (!hasContent) return
 
+    val planFirstLabel = stringResource(R.string.chat_plan_first)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -375,14 +380,14 @@ fun AgentStateBars(
                 if (plan.mode == "plan") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Plan",
+                            text = stringResource(R.string.chat_plan_badge),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold,
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = plan.plan.ifBlank { "先计划，再执行。" },
+                            text = plan.plan.ifBlank { planFirstLabel },
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -391,7 +396,7 @@ fun AgentStateBars(
                         MinisTextButton(
                             onClick = { AgentStateStore.planSet(sessionId, "off") },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text("退出", style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(R.string.voice_panel_exit_edit), style = MaterialTheme.typography.labelMedium) }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                 }
@@ -412,15 +417,15 @@ fun AgentStateBars(
                                 editingGoal = true
                             },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text("编辑", style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(R.string.memory_action_edit), style = MaterialTheme.typography.labelMedium) }
                         MinisTextButton(
                             onClick = { AgentStateStore.goalSetActive(sessionId, !goal.active) },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text(if (goal.active) "暂停" else "恢复", style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(if (goal.active) R.string.common_pause else R.string.backup_tab_restore), style = MaterialTheme.typography.labelMedium) }
                         MinisTextButton(
                             onClick = { AgentStateStore.goalSet(sessionId, "") },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text("清除", style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(R.string.browser_settings_clear), style = MaterialTheme.typography.labelMedium) }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                 }
@@ -459,14 +464,14 @@ fun AgentStateBars(
                                         .clickable {
                                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             cm.setPrimaryClip(ClipData.newPlainText("deliverable", d.path))
-                                            Toast.makeText(context, "已复制路径：${d.path}", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.chat_copied_path, d.path), Toast.LENGTH_SHORT).show()
                                         }
                                         .padding(horizontal = 6.dp, vertical = 2.dp),
                                 )
                             }
                             if (deliverables.size > 4) {
                                 Text(
-                                    text = "…还有 ${deliverables.size - 4} 个",
+                                    text = stringResource(R.string.chat_more_deliverables, deliverables.size - 4),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = 6.dp),
@@ -479,7 +484,7 @@ fun AgentStateBars(
                                 deliverables = emptyList()
                             },
                             contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) { Text("清除", style = MaterialTheme.typography.labelMedium) }
+                        ) { Text(stringResource(R.string.browser_settings_clear), style = MaterialTheme.typography.labelMedium) }
                     }
                 }
             }
@@ -502,7 +507,7 @@ fun AgentStateBars(
                         .padding(24.dp),
                 ) {
                     Text(
-                        text = "编辑目标",
+                        text = stringResource(R.string.chat_edit_goal),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -510,7 +515,7 @@ fun AgentStateBars(
                     OutlinedTextField(
                         value = goalDraft,
                         onValueChange = { goalDraft = it.take(500) },
-                        label = { Text("目标") },
+                        label = { Text(stringResource(R.string.chat_goal_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3,
                     )
@@ -519,13 +524,13 @@ fun AgentStateBars(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        MinisTextButton(onClick = { editingGoal = false }) { Text("取消") }
+                        MinisTextButton(onClick = { editingGoal = false }) { Text(stringResource(R.string.cancel)) }
                         MinisTextButton(
                             onClick = {
                                 AgentStateStore.goalSet(sessionId, goalDraft)
                                 editingGoal = false
                             },
-                        ) { Text("保存") }
+                        ) { Text(stringResource(R.string.save)) }
                     }
                 }
             }
@@ -543,7 +548,7 @@ fun MessageFeedbackRow(messageId: String) {
         modifier = Modifier.padding(top = 6.dp),
     ) {
         Text(
-            text = if (kind == null) "这条回答有用吗？" else (if (kind == "up") "已标记有用 👍" else "已标记不满意 👎"),
+            text = if (kind == null) stringResource(R.string.chat_feedback_question) else (if (kind == "up") stringResource(R.string.chat_feedback_up) else stringResource(R.string.chat_feedback_down)),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

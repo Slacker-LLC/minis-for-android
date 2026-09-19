@@ -104,10 +104,10 @@ internal fun ChatViewModel.filteredSlashCommands(): List<SlashCommand> {
     val filter = _slashFilter.value.lowercase()
     val base = availableSlashCommands.map { cmd ->
         when (cmd.id) {
-            "model" -> cmd.copy(subtitle = "切换模型")
-            "permission" -> cmd.copy(subtitle = "权限管理")
-            "goal" -> cmd.copy(subtitle = "设定执行目标")
-            "plan" -> cmd.copy(subtitle = "执行计划模式")
+            "model" -> cmd.copy(subtitle = context.getString(R.string.slash_model_subtitle))
+            "permission" -> cmd.copy(subtitle = context.getString(R.string.slash_permission_subtitle))
+            "goal" -> cmd.copy(subtitle = context.getString(R.string.slash_goal_subtitle))
+            "plan" -> cmd.copy(subtitle = context.getString(R.string.slash_plan_subtitle))
             "compact" -> cmd.copy(
                 subtitle = context.getString(R.string.slash_compact_subtitle),
             )

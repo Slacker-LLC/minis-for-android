@@ -1,5 +1,8 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +47,7 @@ fun SessionInfoSheet(
     val fastModeOn by viewModel.fastModeEnabled.collectAsState()
 
     StandardChatSheet(
-        title = "会话信息",
+        title = stringResource(R.string.session_info_title),
         onDismiss = onDismiss,
         heightFraction = 0.45f,
     ) {
@@ -83,14 +86,14 @@ fun SessionInfoSheet(
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Token 用量",
+                        text = stringResource(R.string.settings_token_usage),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = ChatColors.primaryText,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "查看当前会话 Token 消耗详情",
+                        text = stringResource(R.string.session_info_token_usage_footer),
                         fontSize = 12.sp,
                         color = ChatColors.secondaryText,
                     )
@@ -129,14 +132,14 @@ fun SessionInfoSheet(
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "自动压缩上下文",
+                        text = stringResource(R.string.settings_auto_compact),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = ChatColors.primaryText,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "长对话接近上限时自动压缩精简",
+                        text = stringResource(R.string.session_info_auto_compact_footer),
                         fontSize = 12.sp,
                         color = ChatColors.secondaryText,
                     )
@@ -174,14 +177,14 @@ fun SessionInfoSheet(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "快速模式",
+                            text = stringResource(R.string.session_info_fast_mode),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = ChatColors.primaryText,
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "降低等待延迟，提升回复响应速度",
+                            text = stringResource(R.string.session_info_fast_mode_footer),
                             fontSize = 12.sp,
                             color = ChatColors.secondaryText,
                         )
