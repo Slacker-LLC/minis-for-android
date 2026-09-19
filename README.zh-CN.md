@@ -19,7 +19,7 @@
 
 当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**
 （186 warning / 6 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
-**8 个语言目录**：英文默认 + 简体 / 繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余四种仍有存量缺口
+**8 个语言目录**：英文默认 + 简体 / 繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余五种仍有存量缺口
 （见 [docs/I18N.md](docs/I18N.md)）。
 
 开发过程记录与未验证清单见 [docs/development/PROGRESS.md](docs/development/PROGRESS.md)。

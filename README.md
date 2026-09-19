@@ -31,7 +31,7 @@ Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failur
 **0 errors** (`186 warnings / 6 hints` are pre-existing); `app-debug.apk` ≈ **114 MB** with the runtime
 payload. Interface text lives in resources with **eight locales** — English default plus Simplified Chinese,
 Traditional Chinese, Japanese, Korean, German, French and Russian; Simplified and Traditional Chinese are at
-full coverage, the other four still fall back to English for part of their strings ([docs/I18N.md](docs/I18N.md)).
+full coverage, the other five still fall back to English for part of their strings ([docs/I18N.md](docs/I18N.md)).
 
 Development history and the unverified list: [docs/development/PROGRESS.md](docs/development/PROGRESS.md).
 
@@ -50,6 +50,6 @@ The installed application identity and source namespace may differ; a repository
 
 ## Remaining gaps
 
-Guest `minis-mcp-cli` is still missing; native MCP support does not replace that CLI, and full device acceptance remains incomplete. The other four locales still fall back to English for part of their strings. See [docs/contracts/06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md), the [Chinese documentation index](docs/README.md), the [device report](docs/REAL-DEVICE-TEST-REPORT.md), and `docs/development/PROGRESS.md` for the per-slice record and the unverified list.
+Guest `minis-mcp-cli` is still missing; native MCP support does not replace that CLI, and full device acceptance remains incomplete. The other five locales still fall back to English for part of their strings. See [docs/contracts/06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md), the [Chinese documentation index](docs/README.md), the [device report](docs/REAL-DEVICE-TEST-REPORT.md), and `docs/development/PROGRESS.md` for the per-slice record and the unverified list.
 
 Source-first. No production APK release is promised by the repository. Build instructions: [BUILDING.md](BUILDING.md). Runtime details: [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md). Security model: [docs/SECURITY.md](docs/SECURITY.md). Legal lineage: [PROVENANCE.md](PROVENANCE.md).
