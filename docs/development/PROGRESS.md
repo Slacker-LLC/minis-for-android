@@ -1033,6 +1033,23 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 诚信说明 | 只闭合了**提示词这条路径**；「guest 里没有 `minis-mcp-cli`」本身仍留在 06-CURRENT-GAPS 里（补 CLI 是另一件事，需要显式安装/依赖策略） |
 | 验证口径 | `:app:testDebugUnitTest` **2415 例 0 失败**（新增 `MCPPromptFragmentTest` 3 例：点名注册工具形式、绝不出现 `minis-mcp-cli`、仍列服务器/备注并保留 `$$VARNAME` 句）+ `:app:lintDebug` 0 error + `:app:assembleDebug` |
 
+### Phase 6 收口：模块开关此前根本没到 hook 进程（2026-09-19，真机定位 + 修复） — `46d4b215`
+
+| 项 | 结果 |
+|---|---|
+| 现象 | 用户在「设置 → 模块设置 → 电源键助手」选了 Minis，长按电源键却不是 Minis（实际打开小米语音助手，或什么都不发生） |
+| 真机定位链 | ① Vector 2.2 里模块**已启用**、作用域含 `system`，system_server 启动时 `[HyperOsPower] installed hook: ShortCutActionsUtils.triggerFunction/4,/5`、整组 `installed=10, missing=0, failed=0, skipped=1`；② 但长按电源键时模块**一行日志都没有**；③ 冷启动重抓 logcat 后模块自报 `settings reader=attached powerKeyTarget=<unset>`；④ 框架数据库 `configs` 表里本模块 **0 行** |
+| 原因 | 应用侧把开关写进自己的 `SharedPreferences("minis_prefs")`，而 hook 进程读的是框架 store（`XposedInterface.getRemotePreferences`），框架只发放「模块应用经 **service API**（`XposedService.getRemotePreferences`）提交过」的值。上游 Eta 的 UI 正是走 service API（`Prefs.remotePreferencesForUi` + `XposedServiceHelper`），本仓库移植时缺了应用侧这一半，于是框架 store 永远为空，所有开关都退回各自默认值——「用户打开了接管」与「什么都没写进去」在外部表现完全一致 |
+| 修复 | 加 `io.github.libxposed:service:101.0.0`（**比 hook API 低一行是有意的**：service 102 声明 minCompileSdk 37，本 App 编译在 36；service API 版本由框架协商）；`MinisApp` 注册 `XposedServiceHelper` 监听；`ModuleSettingsStore` 改为经 `XposedService.getRemotePreferences` **同步 commit** 写入，首次绑定把本地镜像里的旧值迁进框架（用户此前选的 minis 不丢），本地文件降级为「显示用镜像」，**框架没接受的写入绝不显示成已生效** |
+| 顺带修掉的自引用 | Xposed 层还写着改名前的包名 `llc.slacker.minis`（App 已是 `llc.slacker.eta`）：电源键接管会启动**另一个安装**、默认助手判断比对一个永远拿不到角色的包、无障碍保护会去保活旧 App 的服务、后端查询的健康 authority 根本不存在。现在全部跟随 `applicationId`，并由单测钉住 |
+| 界面 | 模块设置页把两个「会静默禁掉接管」的事实说清楚：框架未连接（开关禁用 + 文案）、本 App 不是系统默认助手（模块按设计保留系统行为），并在电源键那一节加了「设为系统默认助手」入口（复用 Settings 页已有的 RoleManager 请求流程） |
+| 可诊断性 | 模块每个进程启动时记录自己读到的设置（`settings reader=… powerKeyTarget=…`），电源键 hook 记录实际决策；fail-safe 路径不再静默——这次定位困难正是因为「按设计什么都没做」与「根本没跑」在日志里长得一样 |
+| 验证口径 | `:app:testDebugUnitTest` **2423 例 0 失败**（新增 `ModuleSettingsStoreTest` 7 例：远端优先、无框架时用镜像、无框架写入被拒绝且不落镜像、commit 被拒时两边都不动、首次绑定迁移；新增 `XposedIdentityTest` 1 例把自引用钉到 `BuildConfig.APPLICATION_ID`）+ `:app:lintDebug` 0 error（144 warning，比改前少 1）+ `:app:assembleDebug` + `scripts/verify-runtime-payload.sh`（rootfs SHA 一致）+ `scripts/verify-android-16k.sh`（25 个 native 库） |
+| 真机证据 | 框架 store 出现 `power_key_assistant_target=minis` / `double_finger_circle_to_search=true` / `hotword_self_heal=false`；SystemUI 里模块日志变成 `settings reader=attached powerKeyTarget=minis`；长按电源键**确实进到我们的 hook**，并如实报告拒绝原因：`HyperOsPower: llc.slacker.eta is not the device's assistant, keeping the system behaviour` |
+| 仍未闭合（等用户拍板） | ① 本机默认助手指向另一个安装（`io.github.mangi.eta` 的 VoiceInteractionService），所以模块按设计继续保留系统手势；是否把本 App 设为默认助手由用户决定（设置页已有入口）。② 真机上还启用着一个旧模块 `com.openminis.xposedshortcut`，它 hook 同一个 `triggerFunction` 并尝试启动已不存在的 `dev.openminispet.android`，每次长按打一行失败日志（它 proceed，不吞手势）；是否停用由用户决定 |
+| 设备复原 | 没有改用户的任何设置（电源键助手仍是 minis）、没有改防火墙、没有替用户设默认助手；期间为定位做过的临时改动（把设置文件临时改成 gemini 再改回）已还原 |
+| 一个自伤记录 | 本 worktree 缺 gitignore 的 `dist/` runtime payload 与 `rclone.aar`：第一次装到真机的 debug 包（86 MB）**不含 rootfs**。已从 eta2 worktree 补齐 `dist/`，重装完整包（115 MB，payload 校验通过） |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
