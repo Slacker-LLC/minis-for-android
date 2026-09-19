@@ -1120,6 +1120,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 真机证据 | 顶部一条「用时 10s · 第 3 步失败」纯文字行 + `>` 箭头 + 细线，下面是同一列内的回答文字；运行中此前已验证为 `已处理 10s`（同一条头部两种文案） |
 | 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:assembleDebug`；lint 结果见下一条 |
 
+### 外观新增「工具状态栏」开关（2026-09-19，真机验证） — `d88f21ba`
+
+| 项 | 结果 |
+|---|---|
+| 用户反馈 | 输入框上方那条「工具调用执行结果」横条关不掉；外观里的「工具预览窗口」只能关缩略图，关掉后横条照旧 |
+| 定位 | `FloatingToolStatusBar`（ChatScreen 挂在 composer 上方）由两部分组成：**缩略图预览**（受 `KEY_TOOL_PREVIEW` 控制）与**状态栏本身**（工具名/结果 + CPU/MEM HUD，此前无开关）。设备上读回 `appearance_prefs.xml` 也证实用户早已把 `tool_preview=false`，所以只剩横条 |
+| 改法 | 新增 `KEY_TOOL_STATUS_BAR = "tool_status_bar"`（默认 true）+ `LocalToolStatusBarEnabled`；ChatScreen 读取 pref、监听变更并 `provides`，挂载点改为 `if (lastToolBlocks.isNotEmpty() && toolStatusBarEnabled)`——关掉即整个条不挂载（缩略图、状态行、资源 HUD 一起消失）；外观页在「工具预览窗口」下面新增同名开关（8 语言字符串） |
+| 真机验证 | 开关写入 `tool_status_bar=false`；跑 `sleep 12` 的一轮时视图树里已无 CPU/MEM 节点，composer 直接贴消息列表 |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
