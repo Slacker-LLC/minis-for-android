@@ -363,7 +363,7 @@ class MainActivity : ComponentActivity() {
                         .setTitle(gate.title)
                         .setMessage(gate.message)
                         .setCancelable(false)
-                        .setPositiveButton(gate.positiveLabel) { d, _ ->
+                        .setPositiveButton(gate.positiveLabel.ifBlank { getString(R.string.check_update_open_install_settings) }) { d, _ ->
                             d.dismiss()
                             val intent = Intent(gate.settingsAction).apply {
                                 if (gate.requiresPackageUri) {
@@ -381,7 +381,7 @@ class MainActivity : ComponentActivity() {
                                 OffloadPermissionManager.SettingsGateDecision.OPEN
                             )
                         }
-                        .setNegativeButton(gate.negativeLabel) { d, _ ->
+                        .setNegativeButton(gate.negativeLabel.ifBlank { getString(R.string.cancel) }) { d, _ ->
                             d.dismiss()
                             OffloadPermissionManager.respondToSettingsGate(
                                 OffloadPermissionManager.SettingsGateDecision.CANCEL

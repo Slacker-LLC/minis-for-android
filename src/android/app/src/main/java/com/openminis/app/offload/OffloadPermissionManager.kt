@@ -252,10 +252,10 @@ object OffloadPermissionManager {
          * Intent must include a `package:<pkg>` data URI.
          */
         val requiresPackageUri: Boolean,
-        /** "Allow" button label for the in-app dialog. */
-        val positiveLabel: String = "Open Settings",
-        /** "Cancel" button label for the in-app dialog. */
-        val negativeLabel: String = "Cancel",
+        /** "Allow" button label for the in-app dialog; blank = localized default. */
+        val positiveLabel: String = "",
+        /** "Cancel" button label for the in-app dialog; blank = localized default. */
+        val negativeLabel: String = "",
     )
 
     /** What the UI actor decided after the dialog closed. */
