@@ -1174,6 +1174,19 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 未验证 | 改动后的真机逐屏截图未完成：手机在核对途中从 USB 掉线（`adb devices` 为空、`lsusb` 无设备）；掉线前已装过一次，中文 locale 下界面正常出中文 |
 | 已知剩余 | 繁體中文缺 1002 条、其它语言存量（ja 537 / ko 545 / de 545 / fr 653 / ru 255）；宠物、远端指令、Xposed 系统增强等仍写死中文；工具结果里的模型可见文案未纳入 |
 
+### MCP 暴露区块、权限弹窗与沙箱文案进资源（2026-09-19 续，用户点名 MCP） — `ebce7aa4`
+
+| 项 | 结果 |
+|---|---|
+| 用户反馈 | 「MCP 集成那一块还是英文」 |
+| MCP | `MCPServerExposureSection` 里 23 条写死英文全部进资源：Expose Minis 标题与说明、服务器状态行（运行中 / 已停止 / 需先建令牌）、Endpoint 与复制、Access token（生成 / 轮换 / 已配置 N 个授权工具）、Exposed tools 弹窗与「至少保留一个工具」说明、复制连接配置、撤销令牌（含「仅撤销此令牌」与「无令牌时自动停用」）。该页其余部分（MCPIntegrationsScreen / SessionMcpsSheet）扫描后确认早已走资源 |
+| 权限弹窗 | 6 个 guest handler 的 Settings 引导弹窗（日历 / 通讯录 / 位置 / 照片 / 照片位置 / 通知 / 通知使用权 / 麦克风）标题、正文与「打开设置」按钮进资源；正文里插值的 read/write 通过 `permission_action_read` / `permission_action_write` 本地化 |
+| 沙箱 | rootfs 说明、重置说明、「重置」按钮，以及安装 / 重置 / 恢复的全部状态与结果文案进资源；`RootfsManagementViewModel.observeInstallProgress` 增加 Context 参数 |
+| 新增 key | 18 条（权限弹窗），与本片其余 key 一样 8 语言同步 |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug` |
+| 未验证 | 真机截图仍未做：手机未接回 USB（`adb devices` 为空） |
+| 仍写死英文（未做） | guest CLI 的命令输出与帮助文本（模型侧）、roleplay 部分界面、备份远端类型目录描述 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
