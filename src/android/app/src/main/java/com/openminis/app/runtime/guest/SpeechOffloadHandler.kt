@@ -14,6 +14,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
+import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
@@ -272,11 +273,11 @@ class SpeechOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 satisfied = { hasMic() },
                 settingsGate = OffloadPermissionManager.SettingsGateRequest(
                     id = Manifest.permission.RECORD_AUDIO,
-                    title = "Microphone permission needed",
-                    message = "Minis needs microphone permission to transcribe speech. Open Settings to allow it.",
+                    title = context.getString(R.string.mic_permission_title),
+                    message = context.getString(R.string.speech_permission_message),
                     settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     requiresPackageUri = true,
-                    positiveLabel = "Open Settings",
+                    positiveLabel = context.getString(R.string.check_update_open_install_settings),
                 ),
             )
         }

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
+import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
@@ -108,15 +109,15 @@ class ContactsOffloadHandler(private val context: Context) : NativeOffloadHandle
                 satisfied = { hasPermission(needsWrite) },
                 settingsGate = OffloadPermissionManager.SettingsGateRequest(
                     id = if (needsWrite) "CONTACTS_RW" else Manifest.permission.READ_CONTACTS,
-                    title = "Contacts permission needed",
+                    title = context.getString(R.string.contacts_permission_title),
                     message = if (needsWrite) {
-                        "Minis needs read + write contacts permission to delete entries. Open Settings to allow it."
+                        context.getString(R.string.contacts_permission_message_write)
                     } else {
-                        "Minis needs contacts permission to read your address book. Open Settings to allow it."
+                        context.getString(R.string.contacts_permission_message_read)
                     },
                     settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     requiresPackageUri = true,
-                    positiveLabel = "Open Settings",
+                    positiveLabel = context.getString(R.string.check_update_open_install_settings),
                 ),
             )
         }

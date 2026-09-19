@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
@@ -124,11 +125,11 @@ class LocationOffloadHandler(private val context: Context) : NativeOffloadHandle
                     satisfied = { hasPermission() },
                     settingsGate = OffloadPermissionManager.SettingsGateRequest(
                         id = Manifest.permission.ACCESS_FINE_LOCATION,
-                        title = "Location permission needed",
-                        message = "Minis needs location permission to get your current location. Open Settings to allow it.",
+                        title = context.getString(R.string.location_permission_title),
+                        message = context.getString(R.string.location_permission_message),
                         settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         requiresPackageUri = true,
-                        positiveLabel = "Open Settings",
+                        positiveLabel = context.getString(R.string.check_update_open_install_settings),
                     ),
                 )
             }

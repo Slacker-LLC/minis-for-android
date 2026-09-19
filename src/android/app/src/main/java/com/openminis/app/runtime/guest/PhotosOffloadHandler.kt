@@ -11,6 +11,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
@@ -420,11 +421,11 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 satisfied = { hasMediaPermission() },
                 settingsGate = OffloadPermissionManager.SettingsGateRequest(
                     id = "photos_media",
-                    title = "Photos permission needed",
-                    message = "Minis needs media permission to read your photo library. Open Settings to allow it.",
+                    title = context.getString(R.string.photos_permission_title),
+                    message = context.getString(R.string.photos_permission_message),
                     settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     requiresPackageUri = true,
-                    positiveLabel = "Open Settings",
+                    positiveLabel = context.getString(R.string.check_update_open_install_settings),
                 ),
             )
         }
@@ -455,11 +456,11 @@ class PhotosOffloadHandler(private val context: Context) : NativeOffloadHandler 
                 satisfied = { hasMediaLocationPermission() },
                 settingsGate = OffloadPermissionManager.SettingsGateRequest(
                     id = "ACCESS_MEDIA_LOCATION",
-                    title = "Photo location needed",
-                    message = "Minis needs photo-location permission to read GPS EXIF for the `near` query. Open Settings to allow it.",
+                    title = context.getString(R.string.photo_location_permission_title),
+                    message = context.getString(R.string.photo_location_permission_message),
                     settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     requiresPackageUri = true,
-                    positiveLabel = "Open Settings",
+                    positiveLabel = context.getString(R.string.check_update_open_install_settings),
                 ),
             )
         }

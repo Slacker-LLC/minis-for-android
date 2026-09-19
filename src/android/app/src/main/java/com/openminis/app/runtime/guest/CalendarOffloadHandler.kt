@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.runtime.guest.NativeOffloadHandler
@@ -98,11 +99,21 @@ class CalendarOffloadHandler(private val context: Context) : NativeOffloadHandle
                 satisfied = satisfied,
                 settingsGate = OffloadPermissionManager.SettingsGateRequest(
                     id = settingsId,
-                    title = "Calendar permission needed",
-                    message = "Minis needs $humanLabel permission to $humanLabel your calendar. Open Settings to allow it.",
+                    title = context.getString(R.string.cal_permission_title),
+                    message = context.getString(
+                        R.string.cal_permission_message,
+                        context.getString(
+                            if (humanLabel == "read") R.string.permission_action_read
+                            else R.string.permission_action_write,
+                        ),
+                        context.getString(
+                            if (humanLabel == "read") R.string.permission_action_read
+                            else R.string.permission_action_write,
+                        ),
+                    ),
                     settingsAction = android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     requiresPackageUri = true,
-                    positiveLabel = "Open Settings",
+                    positiveLabel = context.getString(R.string.check_update_open_install_settings),
                 ),
             )
         }

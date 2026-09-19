@@ -300,16 +300,13 @@ fun RootfsManagementScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "The rootfs contains the Ubuntu 24.04 filesystem used by " +
-                            "the sandbox. Resetting deletes only the rootfs; App-owned " +
-                            "workspace, memory, skills, and shared files are preserved.",
+                        text = stringResource(R.string.rootfs_about_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Reset: Delete the Ubuntu rootfs\n" +
-                            "Backup/Restore: App-owned user data is managed separately",
+                        text = stringResource(R.string.rootfs_reset_summary_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -331,7 +328,7 @@ fun RootfsManagementScreen(
                     showResetDialog = false
                     viewModel.resetRootfs(context, keepUserData = false)
                 }) {
-                    Text("Reset", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_reset), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {

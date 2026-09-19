@@ -3,6 +3,7 @@ package com.openminis.app.ui.sandbox
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.openminis.app.R
 import com.openminis.app.sandbox.RootfsInstallState
 import com.openminis.app.sandbox.RootfsManager
 import com.openminis.app.runtime.ubuntu.RootfsHealth
@@ -49,7 +50,7 @@ class RootfsManagementViewModel : ViewModel() {
      * text into [_uiState]. Cancelled on completion so we don't leak a job
      * across multiple install() calls.
      */
-    private fun observeInstallProgress(manager: RootfsManager) {
+    private fun observeInstallProgress(manager: RootfsManager, context: Context) {
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
             manager.installState.collect { state ->
@@ -57,17 +58,17 @@ class RootfsManagementViewModel : ViewModel() {
                     is RootfsInstallState.Idle -> Unit
                     is RootfsInstallState.Preparing ->
                         _uiState.value = _uiState.value.copy(
-                            statusMessage = "Preparing rootfs…",
+                            statusMessage = context.getString(R.string.rootfs_status_preparing),
                             installProgress = 0f,
                         )
                     is RootfsInstallState.Extracting ->
                         _uiState.value = _uiState.value.copy(
-                            statusMessage = "Extracting rootfs… ${(state.progress * 100).toInt()}%",
+                            statusMessage = context.getString(R.string.rootfs_status_extracting, (state.progress * 100).toInt()),
                             installProgress = state.progress,
                         )
                     is RootfsInstallState.Finalizing ->
                         _uiState.value = _uiState.value.copy(
-                            statusMessage = "Finalizing…",
+                            statusMessage = context.getString(R.string.rootfs_status_finalizing),
                             installProgress = 1f,
                         )
                     is RootfsInstallState.Installed,
@@ -98,13 +99,13 @@ class RootfsManagementViewModel : ViewModel() {
     fun install(context: Context) {
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = "Installing rootfs...",
+            statusMessage = context.getString(R.string.rootfs_status_installing),
             resultMessage = null,
             installProgress = 0f,
         )
 
         val manager = RootfsManager.getInstance(context)
-        observeInstallProgress(manager)
+        observeInstallProgress(manager, context)
         viewModelScope.launch {
             try {
                 manager.installIfNeeded()
@@ -115,9 +116,9 @@ class RootfsManagementViewModel : ViewModel() {
                     isProcessing = false,
                     lastOperationSuccess = health.healthy,
                     resultMessage = if (health.healthy) {
-                        "Rootfs installed successfully"
+                        context.getString(R.string.rootfs_installed_successfully)
                     } else {
-                        "Installation failed: ${health.code} — ${health.detail}"
+                        context.getString(R.string.rootfs_install_failed_detail, health.code, health.detail)
                     },
                     rootfsHealthCode = health.code,
                     rootfsHealthDetail = health.detail,
@@ -128,7 +129,7 @@ class RootfsManagementViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = false,
-                    resultMessage = "Installation failed: ${e.message}",
+                    resultMessage = context.getString(R.string.rootfs_install_failed, e.message ?: ""),
                     installProgress = null,
                 )
             }
@@ -138,13 +139,13 @@ class RootfsManagementViewModel : ViewModel() {
     fun resetRootfs(context: Context, keepUserData: Boolean) {
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = if (keepUserData) "Backing up and resetting..." else "Resetting rootfs...",
+            statusMessage = context.getString(if (keepUserData) R.string.rootfs_status_backing_up else R.string.rootfs_status_resetting),
             resultMessage = null,
             installProgress = 0f,
         )
 
         val manager = RootfsManager.getInstance(context)
-        observeInstallProgress(manager)
+        observeInstallProgress(manager, context)
         viewModelScope.launch {
             try {
                 val backup = manager.reset(keepUserData)
@@ -155,9 +156,9 @@ class RootfsManagementViewModel : ViewModel() {
                     lastOperationSuccess = true,
                     hasBackup = backup != null && backup.exists(),
                     resultMessage = if (keepUserData) {
-                        "Rootfs reset with backup created"
+                        context.getString(R.string.rootfs_reset_with_backup)
                     } else {
-                        "Rootfs reset complete"
+                        context.getString(R.string.rootfs_reset_complete)
                     },
                     installProgress = null,
                 )
@@ -166,7 +167,7 @@ class RootfsManagementViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = false,
-                    resultMessage = "Reset failed: ${e.message}",
+                    resultMessage = context.getString(R.string.rootfs_reset_failed, e.message ?: ""),
                     installProgress = null,
                 )
             }
@@ -177,7 +178,7 @@ class RootfsManagementViewModel : ViewModel() {
         val backup = backupDir
         if (backup == null || !backup.exists()) {
             _uiState.value = _uiState.value.copy(
-                resultMessage = "No backup available",
+                resultMessage = context.getString(R.string.rootfs_no_backup),
                 lastOperationSuccess = false,
             )
             return
@@ -185,7 +186,7 @@ class RootfsManagementViewModel : ViewModel() {
 
         _uiState.value = _uiState.value.copy(
             isProcessing = true,
-            statusMessage = "Restoring user data...",
+            statusMessage = context.getString(R.string.rootfs_status_restoring),
             resultMessage = null,
         )
 
@@ -199,14 +200,14 @@ class RootfsManagementViewModel : ViewModel() {
                     isProcessing = false,
                     lastOperationSuccess = true,
                     hasBackup = false,
-                    resultMessage = "User data restored successfully",
+                    resultMessage = context.getString(R.string.rootfs_user_data_restored),
                 )
                 refresh(context)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isProcessing = false,
                     lastOperationSuccess = false,
-                    resultMessage = "Restore failed: ${e.message}",
+                    resultMessage = context.getString(R.string.rootfs_restore_failed, e.message ?: ""),
                 )
             }
         }

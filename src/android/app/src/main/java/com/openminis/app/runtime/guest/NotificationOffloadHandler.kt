@@ -128,11 +128,11 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
                     // tapped "Don't allow" — offer the in-app path to Settings.
                     settingsGate = OffloadPermissionManager.SettingsGateRequest(
                         id = Manifest.permission.POST_NOTIFICATIONS,
-                        title = "Notifications are off",
-                        message = "Minis needs notification permission to send notifications. Open Settings to allow it.",
+                        title = context.getString(R.string.notification_permission_title),
+                        message = context.getString(R.string.notification_permission_message),
                         settingsAction = Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         requiresPackageUri = true,
-                        positiveLabel = "Open Settings",
+                        positiveLabel = context.getString(R.string.check_update_open_install_settings),
                     ),
                 )
             }
@@ -421,11 +421,11 @@ class NotificationOffloadHandler(private val context: Context) : NativeOffloadHa
                 OffloadPermissionManager.requestSettingsGate(
                     OffloadPermissionManager.SettingsGateRequest(
                         id = "notification_access",
-                        title = "Notification access needed",
-                        message = "Minis needs Notification access to read the status-bar notifications. Open Settings and enable \"Minis\" under Notification access.",
+                        title = context.getString(R.string.notification_access_permission_title),
+                        message = context.getString(R.string.notification_access_permission_message),
                         settingsAction = MinisNotificationListenerService.SETTINGS_ACTION,
                         requiresPackageUri = false,
-                        positiveLabel = "Open Settings",
+                        positiveLabel = context.getString(R.string.check_update_open_install_settings),
                     ),
                     check = { MinisNotificationListenerService.isEnabled(context) },
                 )
