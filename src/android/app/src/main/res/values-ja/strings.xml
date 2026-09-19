@@ -1567,4 +1567,38 @@
     <string name="settings_system_footer">この端末でこのアプリに許されること、および各許可の変更場所。</string>
     <string name="settings_assistant_role_footer">Home / 電源キーのアシスタント ジェスチャは、この役割を持つアプリを開きます。</string>
     <string name="module_settings_assistant_role_hint">Minis が電源キーを引き継ぐには、まず「権限」でシステム既定のアシスタントに設定してください。</string>
+    <string name="settings_tool_permissions">ツールの権限</string>
+    <string name="settings_tool_permissions_sub">minis-config などのツールに設定の読み書きを許可します</string>
+    <string name="settings_shizuku_sub">Shizuku / AXManager のインストールと認可</string>
+    <string name="settings_bg_overlay">アプリ内タスク オーバーレイ</string>
+    <string name="system_permissions_overlay_section">オーバーレイ権限</string>
+    <string name="system_permissions_overlay_row">他のアプリの上に重ねて表示</string>
+    <string name="system_permissions_overlay_granted">許可済み</string>
+    <string name="system_permissions_overlay_missing">未許可 - タップしてシステム設定を開く</string>
+    <string name="system_permissions_overlay_footer">デスクトップペットが他のアプリの上に浮くために必要です。</string>
+    <plurals name="work_item_command">
+        <item quantity="other">%1$d 件のコマンド</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="other">%1$d 件のファイル読み取り</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="other">%1$d 件のファイル変更</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="other">%1$d 回の検索</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="other">%1$d 回のブラウザ操作</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="other">%1$d 回の MCP 呼び出し</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="other">%1$d 枚の画像</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="other">%1$d 回の委任</item>
+    </plurals>
+    <string name="work_process_duration">所要時間 %1$s</string>
 </resources>

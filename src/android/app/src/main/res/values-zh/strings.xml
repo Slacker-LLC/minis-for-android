@@ -1124,7 +1124,7 @@
     <string name="markdown_table_copied_toast">已复制表格</string>
     <string name="markdown_table_image_copied_toast">已复制表格图片</string>
     <string name="markdown_table_image_copy_failed_toast">复制表格图片失败</string>
-    <string name="settings_bg_overlay">后台任务悬浮窗</string>
+    <string name="settings_bg_overlay">应用内任务浮窗</string>
     <string name="settings_bg_overlay_footer">Minis 处于后台时，显示一个小型悬浮胶囊展示当前工具。需要"显示在其他应用上层"权限。点击悬浮窗回到 Minis；拖拽可移动位置。</string>
     <string name="settings_bg_overlay_permission_needed">需先授予"显示在其他应用上层"权限</string>
     <string name="settings_dynamic_island">灵动岛（实时更新）</string>
@@ -1817,4 +1817,37 @@
     <string name="settings_system_footer">本 App 在这台设备上被允许做什么，以及每项授权在哪里改。</string>
     <string name="settings_assistant_role_footer">长按 Home / 电源键的助手手势会打开当前持有该角色的 App。</string>
     <string name="module_settings_assistant_role_hint">要让 Minis 接管电源键，先在「权限」里把它设为系统默认助手。</string>
+    <string name="settings_tool_permissions">工具权限</string>
+    <string name="settings_tool_permissions_sub">允许 minis-config 等工具读写应用配置</string>
+    <string name="settings_shizuku_sub">Shizuku / AXManager 的安装与授权</string>
+    <string name="system_permissions_overlay_section">悬浮窗权限</string>
+    <string name="system_permissions_overlay_row">显示在其他应用上层</string>
+    <string name="system_permissions_overlay_granted">已授权</string>
+    <string name="system_permissions_overlay_missing">未授权，点击前往系统设置</string>
+    <string name="system_permissions_overlay_footer">桌面宠物需要这个权限才能浮在其他应用上面。</string>
+    <plurals name="work_item_command">
+        <item quantity="other">%1$d 条命令</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="other">读取 %1$d 个文件</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="other">修改 %1$d 个文件</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="other">%1$d 次搜索</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="other">%1$d 次浏览器操作</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="other">%1$d 次 MCP 调用</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="other">%1$d 张图片</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="other">%1$d 次委派</item>
+    </plurals>
+    <string name="work_process_duration">用时 %1$s</string>
 </resources>

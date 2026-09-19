@@ -289,14 +289,23 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
 
             // Fork-only system grant required by the floating desktop pet.
             SettingsSection(
-                header = "悬浮窗",
-                footer = "桌面宠物需要这个权限才能浮在其他应用上面。",
+                header = stringResource(R.string.system_permissions_overlay_section),
+                footer = stringResource(R.string.system_permissions_overlay_footer),
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Layers,
                     iconColor = if (overlayGranted) Color(0xFF34C759) else Color(0xFFFF2D55),
-                    title = "显示在其他应用上层",
-                    subtitle = if (overlayGranted) "已授权" else "未授权，点击前往系统设置",
+                    // [T-android-settings-hierarchy] Name says "permission": the app's own
+                    // in-app task overlay lives on "background & notifications", and the two
+                    // used to read as the same thing.
+                    title = stringResource(R.string.system_permissions_overlay_row),
+                    subtitle = stringResource(
+                        if (overlayGranted) {
+                            R.string.system_permissions_overlay_granted
+                        } else {
+                            R.string.system_permissions_overlay_missing
+                        },
+                    ),
                     onClick = {
                         runCatching {
                             context.startActivity(
@@ -355,66 +364,8 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             // the same two system screens. They live there now, one tap away in the same category;
             // this page keeps only the grants that belong to accessibility itself.
 
-            var correctionEnabled by remember {
-                mutableStateOf(
-                    com.openminis.app.speech.correction.VoiceCorrectionConsent.isEnabled(context),
-                )
-            }
-            var showClearCorrectionConfirm by remember { mutableStateOf(false) }
-
-            SettingsSection(
-                header = stringResource(R.string.voice_correction_section),
-                footer = stringResource(R.string.voice_correction_footer),
-            ) {
-                SettingsSwitchRow(
-                    icon = Icons.Outlined.RecordVoiceOver,
-                    title = stringResource(R.string.voice_correction_toggle),
-                    checked = correctionEnabled,
-                    onCheckedChange = { on ->
-                        correctionEnabled = on
-                        com.openminis.app.speech.correction.VoiceCorrectionConsent
-                            .setEnabled(context, on)
-                        com.openminis.app.speech.correction.VoiceCorrectionConsent
-                            .setPrompted(context, true)
-                    },
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.DeleteSweep,
-                    iconColor = MaterialTheme.colorScheme.error,
-                    title = stringResource(R.string.voice_correction_clear),
-                    titleColor = MaterialTheme.colorScheme.error,
-                    onClick = { showClearCorrectionConfirm = true },
-                    showDivider = false,
-                )
-            }
-
-            if (showClearCorrectionConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showClearCorrectionConfirm = false },
-                    title = { Text(stringResource(R.string.voice_correction_clear_title)) },
-                    confirmButton = {
-                        MinisTextButton(onClick = {
-                            showClearCorrectionConfirm = false
-                            com.openminis.app.speech.correction.VoiceCorrection.clearAllData(context)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.voice_correction_cleared),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }) {
-                            Text(
-                                stringResource(R.string.voice_correction_clear),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    },
-                    dismissButton = {
-                        MinisTextButton(onClick = { showClearCorrectionConfirm = false }) {
-                            Text(stringResource(R.string.voice_correction_consent_not_now))
-                        }
-                    },
-                )
-            }
+            // [T-android-settings-hierarchy] Voice-correction learning moved to the assistant
+            // category (it is an agent behaviour, not a system grant).
         }
     }
 }

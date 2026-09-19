@@ -652,6 +652,10 @@ fun AppNavigation(
                     onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
                     onPermissionsClick = { navController.safeNavigate(Routes.SYSTEM_PERMISSIONS) },
+                    // [T-android-settings-hierarchy] The tool-permission and Shizuku screens
+                    // were reachable only through each other; they belong to the same category.
+                    onToolPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
+                    onShizukuClick = { navController.safeNavigate(Routes.SHIZUKU) },
                     onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
                     onLogsClick = { navController.safeNavigate(Routes.LOGS) },
                     onAboutClick = { navController.safeNavigate(Routes.ABOUT) },

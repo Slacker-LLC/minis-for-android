@@ -1109,4 +1109,38 @@
     <string name="settings_system_footer">本 App 在這台裝置上被允許做什麼，以及每項授權在哪裡改。</string>
     <string name="settings_assistant_role_footer">長按 Home / 電源鍵的助理手勢會開啟目前持有該角色的 App。</string>
     <string name="module_settings_assistant_role_hint">要讓 Minis 接管電源鍵，先在「權限」裡把它設為系統預設助理。</string>
+    <string name="settings_tool_permissions">工具權限</string>
+    <string name="settings_tool_permissions_sub">允許 minis-config 等工具讀寫應用程式設定</string>
+    <string name="settings_shizuku_sub">Shizuku / AXManager 的安裝與授權</string>
+    <string name="settings_bg_overlay">應用程式內任務浮窗</string>
+    <string name="system_permissions_overlay_section">懸浮視窗權限</string>
+    <string name="system_permissions_overlay_row">顯示在其他應用程式上層</string>
+    <string name="system_permissions_overlay_granted">已授權</string>
+    <string name="system_permissions_overlay_missing">未授權，點擊前往系統設定</string>
+    <string name="system_permissions_overlay_footer">桌面寵物需要這個權限才能浮在其他應用程式上面。</string>
+    <plurals name="work_item_command">
+        <item quantity="other">%1$d 條命令</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="other">讀取 %1$d 個檔案</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="other">修改 %1$d 個檔案</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="other">%1$d 次搜尋</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="other">%1$d 次瀏覽器操作</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="other">%1$d 次 MCP 呼叫</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="other">%1$d 張圖片</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="other">%1$d 次委派</item>
+    </plurals>
+    <string name="work_process_duration">耗時 %1$s</string>
 </resources>

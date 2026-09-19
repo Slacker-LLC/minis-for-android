@@ -986,7 +986,7 @@
     <string name="selection_copied_toast">Скопировано: %1$s</string>
     <string name="selection_copied_as_markdown_toast">Скопировано как Markdown</string>
     <string name="selection_copied_as_rich_text_toast">Скопировано как форматированный текст</string>
-    <string name="settings_bg_overlay">Оверлей фоновых задач</string>
+    <string name="settings_bg_overlay">Оверлей задач внутри приложения</string>
     <string name="settings_bg_overlay_footer">Показывать небольшую плавающую капсулу с текущим инструментом, пока Minis в фоне. Требуется разрешение на отображение поверх других приложений. Нажмите капсулу, чтобы вывести Minis на передний план; перетащите, чтобы переместить её.</string>
     <string name="settings_bg_overlay_permission_needed">Разрешите отображение поверх других приложений для включения</string>
     <string name="settings_dynamic_island">Динамический остров (Live Updates)</string>
@@ -1812,4 +1812,53 @@
     <string name="settings_system_footer">Что этому приложению разрешено на устройстве и где меняется каждое разрешение.</string>
     <string name="settings_assistant_role_footer">Жест ассистента (Home / кнопка питания) открывает приложение с этой ролью.</string>
     <string name="module_settings_assistant_role_hint">Minis перехватит кнопку питания только после того, как станет ассистентом системы — задайте это в «Разрешениях».</string>
+    <string name="settings_tool_permissions">Разрешения инструментов</string>
+    <string name="settings_tool_permissions_sub">Разрешить таким инструментам, как minis-config, читать и менять конфигурацию</string>
+    <string name="settings_shizuku_sub">Установка и авторизация Shizuku или AXManager</string>
+    <string name="system_permissions_overlay_section">Разрешение на оверлей</string>
+    <string name="system_permissions_overlay_row">Поверх других приложений</string>
+    <string name="system_permissions_overlay_granted">Разрешено</string>
+    <string name="system_permissions_overlay_missing">Не разрешено — нажмите, чтобы открыть настройки</string>
+    <string name="system_permissions_overlay_footer">Настольному питомцу это нужно, чтобы парить поверх других приложений.</string>
+    <plurals name="work_item_command">
+        <item quantity="one">%1$d команда</item>
+        <item quantity="few">%1$d команды</item>
+        <item quantity="other">%1$d команд</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="one">прочитан %1$d файл</item>
+        <item quantity="few">прочитано %1$d файла</item>
+        <item quantity="other">прочитано %1$d файлов</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="one">изменён %1$d файл</item>
+        <item quantity="few">изменено %1$d файла</item>
+        <item quantity="other">изменено %1$d файлов</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="one">%1$d поиск</item>
+        <item quantity="few">%1$d поиска</item>
+        <item quantity="other">%1$d поисков</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="one">%1$d шаг браузера</item>
+        <item quantity="few">%1$d шага браузера</item>
+        <item quantity="other">%1$d шагов браузера</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="one">%1$d вызов MCP</item>
+        <item quantity="few">%1$d вызова MCP</item>
+        <item quantity="other">%1$d вызовов MCP</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="one">%1$d изображение</item>
+        <item quantity="few">%1$d изображения</item>
+        <item quantity="other">%1$d изображений</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="one">%1$d делегирование</item>
+        <item quantity="few">%1$d делегирования</item>
+        <item quantity="other">%1$d делегирований</item>
+    </plurals>
+    <string name="work_process_duration">Заняло %1$s</string>
 </resources>

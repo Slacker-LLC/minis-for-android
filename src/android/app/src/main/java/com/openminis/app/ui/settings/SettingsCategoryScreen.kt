@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.BarChart
@@ -30,6 +31,8 @@ import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,9 +44,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.openminis.app.R
 import com.openminis.app.pet.PetControlActivity
 import com.openminis.app.tools.SubagentLimits
+import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.openExternalUrl
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
@@ -114,6 +119,8 @@ fun SettingsCategoryScreen(
     onAppearanceClick: () -> Unit = {},
     onSystemEnhanceClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
+    onToolPermissionsClick: () -> Unit = {},
+    onShizukuClick: () -> Unit = {},
     onBackgroundClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
@@ -122,6 +129,10 @@ fun SettingsCategoryScreen(
     var showSubagentLimits by remember { mutableStateOf(false) }
     var showFeedbackSheet by remember { mutableStateOf(false) }
     var autoCompactState by remember { mutableStateOf(com.openminis.app.data.AutoCompactPrefs.isEnabled()) }
+    var correctionEnabled by remember {
+        mutableStateOf(com.openminis.app.speech.correction.VoiceCorrectionConsent.isEnabled(context))
+    }
+    var showClearCorrectionConfirm by remember { mutableStateOf(false) }
 
     SettingsScaffold(
         title = stringResource(category.titleRes),
@@ -167,9 +178,10 @@ fun SettingsCategoryScreen(
                 )
             }
 
-            SettingsCategory.ASSISTANT -> SettingsSection(
-                header = stringResource(R.string.settings_section_agent_runtime),
-            ) {
+            SettingsCategory.ASSISTANT -> {
+                SettingsSection(
+                    header = stringResource(R.string.settings_section_agent_runtime),
+                ) {
                 SettingsRow(
                     icon = Icons.Outlined.Extension,
                     iconColor = Color(0xFF007AFF),
@@ -224,6 +236,33 @@ fun SettingsCategoryScreen(
                     onClick = { showSubagentLimits = true },
                     showDivider = false,
                 )
+                }
+
+                // [T-android-settings-hierarchy] Voice-correction learning is an agent
+                // behaviour, not a system grant, so it sits with the other assistant rows.
+                SettingsSection(
+                    header = stringResource(R.string.voice_correction_section),
+                    footer = stringResource(R.string.voice_correction_footer),
+                ) {
+                    SettingsSwitchRow(
+                        icon = Icons.Outlined.RecordVoiceOver,
+                        title = stringResource(R.string.voice_correction_toggle),
+                        checked = correctionEnabled,
+                        onCheckedChange = { on ->
+                            correctionEnabled = on
+                            com.openminis.app.speech.correction.VoiceCorrectionConsent.setEnabled(context, on)
+                            com.openminis.app.speech.correction.VoiceCorrectionConsent.setPrompted(context, true)
+                        },
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.DeleteSweep,
+                        iconColor = MaterialTheme.colorScheme.error,
+                        title = stringResource(R.string.voice_correction_clear),
+                        titleColor = MaterialTheme.colorScheme.error,
+                        onClick = { showClearCorrectionConfirm = true },
+                        showDivider = false,
+                    )
+                }
             }
 
             SettingsCategory.APPEARANCE -> SettingsSection(
@@ -313,6 +352,20 @@ fun SettingsCategoryScreen(
                     onClick = onPermissionsClick,
                 )
                 SettingsRow(
+                    icon = Icons.Outlined.Build,
+                    iconColor = Color(0xFF5856D6),
+                    title = stringResource(R.string.settings_tool_permissions),
+                    subtitle = stringResource(R.string.settings_tool_permissions_sub),
+                    onClick = onToolPermissionsClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Terminal,
+                    iconColor = Color(0xFF30B0C7),
+                    title = stringResource(R.string.shizuku_title),
+                    subtitle = stringResource(R.string.settings_shizuku_sub),
+                    onClick = onShizukuClick,
+                )
+                SettingsRow(
                     icon = Icons.Outlined.BatteryFull,
                     iconColor = Color(0xFFFF9500),
                     title = stringResource(R.string.bg_section_header),
@@ -354,6 +407,34 @@ fun SettingsCategoryScreen(
                 )
             }
         }
+    }
+
+    if (showClearCorrectionConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCorrectionConfirm = false },
+            title = { Text(stringResource(R.string.voice_correction_clear_title)) },
+            confirmButton = {
+                MinisTextButton(onClick = {
+                    showClearCorrectionConfirm = false
+                    com.openminis.app.speech.correction.VoiceCorrection.clearAllData(context)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.voice_correction_cleared),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }) {
+                    Text(
+                        stringResource(R.string.voice_correction_clear),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                MinisTextButton(onClick = { showClearCorrectionConfirm = false }) {
+                    Text(stringResource(R.string.voice_correction_consent_not_now))
+                }
+            },
+        )
     }
 
     if (showFeedbackSheet) {

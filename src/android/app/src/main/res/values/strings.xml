@@ -1305,7 +1305,7 @@
     <string name="markdown_table_image_copy_failed_toast">Failed to copy table image</string>
 
     <!-- T-bg-overlay phase 2 — floating tool-status overlay toggle. -->
-    <string name="settings_bg_overlay">Background Task Overlay</string>
+    <string name="settings_bg_overlay">In-app task overlay</string>
     <string name="settings_bg_overlay_footer">Show a small floating capsule with the current tool while Minis is in the background. Requires permission to display over other apps. Tap the capsule to bring Minis to the foreground; drag to move it.</string>
     <string name="settings_bg_overlay_permission_needed">Allow drawing over other apps to enable</string>
     <!-- [T-android-dynamic-island] Android 16 Live Updates / dynamic-island toggle. -->
@@ -1964,4 +1964,45 @@
     <string name="settings_system_footer">What this app may do on this device, and where each grant is changed.</string>
     <string name="settings_assistant_role_footer">The Home / power-key assistant gesture opens whichever app holds this role.</string>
     <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
+    <string name="settings_tool_permissions">Tool permissions</string>
+    <string name="settings_tool_permissions_sub">Let tools such as minis-config read and write app configuration</string>
+    <string name="settings_shizuku_sub">Install and authorise Shizuku or AXManager</string>
+    <string name="system_permissions_overlay_section">Overlay permission</string>
+    <string name="system_permissions_overlay_row">Display over other apps</string>
+    <string name="system_permissions_overlay_granted">Granted</string>
+    <string name="system_permissions_overlay_missing">Not granted - tap to open system settings</string>
+    <string name="system_permissions_overlay_footer">The desktop pet needs this to float above other apps.</string>
+    <plurals name="work_item_command">
+        <item quantity="one">%1$d command</item>
+        <item quantity="other">%1$d commands</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="one">%1$d file read</item>
+        <item quantity="other">%1$d file reads</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="one">%1$d file change</item>
+        <item quantity="other">%1$d file changes</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="one">%1$d search</item>
+        <item quantity="other">%1$d searches</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="one">%1$d browser step</item>
+        <item quantity="other">%1$d browser steps</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="one">%1$d MCP call</item>
+        <item quantity="other">%1$d MCP calls</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="one">%1$d image</item>
+        <item quantity="other">%1$d images</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="one">%1$d delegation</item>
+        <item quantity="other">%1$d delegations</item>
+    </plurals>
+    <string name="work_process_duration">Took %1$s</string>
 </resources>

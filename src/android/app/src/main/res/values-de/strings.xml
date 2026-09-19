@@ -1562,4 +1562,46 @@
     <string name="settings_system_footer">Was diese App auf diesem Gerät darf und wo jede Freigabe geändert wird.</string>
     <string name="settings_assistant_role_footer">Die Assistenten-Geste (Home / Ein-/Aus-Taste) öffnet die App mit dieser Rolle.</string>
     <string name="module_settings_assistant_role_hint">Minis übernimmt die Ein-/Aus-Taste erst, wenn es unter „Berechtigungen“ als Standard-Assistent gesetzt ist.</string>
+    <string name="settings_tool_permissions">Werkzeug-Berechtigungen</string>
+    <string name="settings_tool_permissions_sub">Erlaubt Werkzeugen wie minis-config, die App-Konfiguration zu lesen und zu schreiben</string>
+    <string name="settings_shizuku_sub">Shizuku oder AXManager installieren und autorisieren</string>
+    <string name="settings_bg_overlay">Aufgaben-Overlay in der App</string>
+    <string name="system_permissions_overlay_section">Overlay-Berechtigung</string>
+    <string name="system_permissions_overlay_row">Über anderen Apps anzeigen</string>
+    <string name="system_permissions_overlay_granted">Erteilt</string>
+    <string name="system_permissions_overlay_missing">Nicht erteilt - tippen für die Systemeinstellungen</string>
+    <string name="system_permissions_overlay_footer">Das Desktop-Haustier braucht das, um über anderen Apps zu schweben.</string>
+    <plurals name="work_item_command">
+        <item quantity="one">%1$d Befehl</item>
+        <item quantity="other">%1$d Befehle</item>
+    </plurals>
+    <plurals name="work_item_file_read">
+        <item quantity="one">%1$d Datei gelesen</item>
+        <item quantity="other">%1$d Dateien gelesen</item>
+    </plurals>
+    <plurals name="work_item_file_edit">
+        <item quantity="one">%1$d Datei geändert</item>
+        <item quantity="other">%1$d Dateien geändert</item>
+    </plurals>
+    <plurals name="work_item_search">
+        <item quantity="one">%1$d Suche</item>
+        <item quantity="other">%1$d Suchen</item>
+    </plurals>
+    <plurals name="work_item_browser">
+        <item quantity="one">%1$d Browser-Schritt</item>
+        <item quantity="other">%1$d Browser-Schritte</item>
+    </plurals>
+    <plurals name="work_item_mcp">
+        <item quantity="one">%1$d MCP-Aufruf</item>
+        <item quantity="other">%1$d MCP-Aufrufe</item>
+    </plurals>
+    <plurals name="work_item_image">
+        <item quantity="one">%1$d Bild</item>
+        <item quantity="other">%1$d Bilder</item>
+    </plurals>
+    <plurals name="work_item_delegation">
+        <item quantity="one">%1$d Delegation</item>
+        <item quantity="other">%1$d Delegationen</item>
+    </plurals>
+    <string name="work_process_duration">Dauer %1$s</string>
 </resources>
