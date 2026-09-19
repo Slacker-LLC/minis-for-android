@@ -1,6 +1,8 @@
 # 文档索引
 
-本轮整理基于 2026-09-12 合并后的 `main`（源码基线 `422cc29f`）。中文为主要阅读入口；历史审计采样日期保留，不能把旧报告当作新一轮验收。
+本索引对应当前工作线 **`codex/eta-phase6-xposed`**（远端 `Slacker-LLC/minis-eta`，2026-09-20 快照
+HEAD `f58adf39`）。`main` 保留移植前的种子线。中文为主要阅读入口；历史审计采样日期保留，不能把旧报告
+当作新一轮验收。
 
 当前事实与长期合同分开判断：
 
@@ -9,20 +11,33 @@
 长期行为边界：AGENTS.md + docs/contracts/*
 当前缺口/设备验收边界：docs/contracts/06-CURRENT-GAPS.md
 产品入口：README.zh-CN.md / CONTRIBUTING.zh-CN.md
-历史记录：docs/issue-*.md、docs/archive/RUNTIME-HISTORY.md、Git 历史
+本地化规则与覆盖：docs/I18N.md
+历史记录：docs/issue-*.md、docs/archive/RUNTIME-HISTORY.md、docs/development/HANDOFF-*.md、Git 历史
 法律来源：PROVENANCE.md
 ```
 
-历史 PR、Issue 实施稿或阶段计划可以解释“当时为什么这样改”，但不能证明当前实现仍然如此。
+历史 PR、Issue 实施稿或阶段计划可以解释「当时为什么这样改」，但不能证明当前实现仍然如此。
 
 ## 项目与移植文档
 
 | 文件 | 用途 |
 |---|---|
-| [PROJECT.md](PROJECT.md) | 本仓库（minis-eta）的项目说明：来源、许可、结构、构建、文档地图 |
+| [PROJECT.md](PROJECT.md) | 项目说明：这是什么、来源与阶段分支、结构、构建、本地化、文档地图 |
 | [development/PORTING.md](development/PORTING.md) | 开发移植规范：复用规则、落地 SOP、验证矩阵、归属登记 |
-| [development/PROGRESS.md](development/PROGRESS.md) | 开发移植进度：已完成、进行中、待办阶段、排除项、未验证清单 |
+| [development/PROGRESS.md](development/PROGRESS.md) | 移植与收敛进度：逐片记录、已完成、待办阶段、排除项、未验证清单 |
+| [development/HANDOFF-2026-09-19.md](development/HANDOFF-2026-09-19.md) | 2026-09-19 的交接快照（过去/现在/将来）；查当前状态请回 PROGRESS.md |
+| [I18N.md](I18N.md) | 本地化：语言目录、硬规则、转义与复数坑、审计工具、当前覆盖与剩余 |
 | [REFERENCES.md](REFERENCES.md) | 资料索引：Eta 源码速查、上游链接、许可文本、工具链版本 |
+
+## Eta 对照分析
+
+| 文件 | 用途 |
+|---|---|
+| [analysis/eta-port-program.md](analysis/eta-port-program.md) | 移植阶段计划（阶段划分与顺序） |
+| [analysis/eta-integration-plan.md](analysis/eta-integration-plan.md) | 集成方案 |
+| [analysis/eta-agent-runtime.md](analysis/eta-agent-runtime.md) | Agent 运行时对照 |
+| [analysis/eta-ui-gui-root.md](analysis/eta-ui-gui-root.md) | UI / GUI / Root 能力对照 |
+| [analysis/eta-skills-mcp-backup.md](analysis/eta-skills-mcp-backup.md) | Skills / MCP / 备份对照 |
 
 ## 当前 runtime 结论
 
@@ -30,7 +45,7 @@
 - Android App 持有 session/shell/工具/数据真源；
 - `DirectRootRunner` 只用于建立 direct chroot 所需的最小基础设施；本地 Agent 另有上游兼容的结构化 `root.shell`，MCP 不可见且不接受 raw command；
 - 普通 guest 命令最终以真实 App UID/GID 且无 Linux capabilities 运行；
-- 旧特权 broker、PRoot、Alpine 不属于生产 runtime；
+- 旧特权 broker 与已淘汰的双栈兼容层不属于生产 runtime；
 - `127.0.0.1:18787` HTTP/CONNECT helper 是独立网络兼容组件，代理协议本身不依赖 Root；当前实现仅可为 Android UID/VPN/BPF 出站兼容以特权身份启动。
 
 ## 合同（先读这些）
@@ -53,7 +68,7 @@
 | 文件 | 用途 |
 |---|---|
 | [`../README.zh-CN.md`](../README.zh-CN.md) | 产品入口 |
-| [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | Direct Ubuntu 工程状态 |
+| [`DEVELOPMENT-STATUS.md`](DEVELOPMENT-STATUS.md) | 工程状态（结构与验证基线，随 HEAD 更新） |
 | [`EXECUTION-ENVIRONMENT.md`](EXECUTION-ENVIRONMENT.md) | 执行、UID/GID、mount 与网络关系 |
 | [`SECURITY.md`](SECURITY.md) | 安全模型 |
 | [`runtime-package-boundary.md`](runtime-package-boundary.md) | Android runtime 包职责边界 |
@@ -76,6 +91,9 @@
 
 ## 历史文档
 
-[`archive/RUNTIME-HISTORY.md`](archive/RUNTIME-HISTORY.md) 保留迁移背景；`docs/issue-*.md` 保留有独立解释价值的历史决策，文件头明确标记历史。备份 RFC 也属于设计参考，不是当前功能清单。
+[`archive/RUNTIME-HISTORY.md`](archive/RUNTIME-HISTORY.md) 保留迁移背景；`docs/issue-*.md` 保留有独立解释
+价值的历史决策，文件头明确标记历史；`development/HANDOFF-*.md` 是某一天的交接快照。备份 RFC 属于设计
+参考，不是当前功能清单。
 
-已删除被合同完全替代的七步计划，以及五份不参与构建的旧 PR patch 副本；它们仍可从 Git 历史恢复。保留法律文件、现役合同、实测报告和上游对账，不为了减少文件数删除验收缺口。
+已删除被合同完全替代的七步计划，以及五份不参与构建的旧 PR patch 副本；它们仍可从 Git 历史恢复。保留
+法律文件、现役合同、实测报告和上游对账，不为了减少文件数删除验收缺口。

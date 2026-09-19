@@ -1,9 +1,8 @@
 # Minis for Android
 
-> **This repository is minis-eta**: the home of Minis for Android merged with the Eta capability port line.
+> **This repository is minis-eta**: Minis for Android merged with the Eta capability-port line.
 > Project description: [docs/PROJECT.md](docs/PROJECT.md) · Porting rules and progress: [docs/development/PORTING.md](docs/development/PORTING.md) ·
-> Reference index: [docs/REFERENCES.md](docs/REFERENCES.md) · Roadmap: [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)
-
+> Localization: [docs/I18N.md](docs/I18N.md) · Reference index: [docs/REFERENCES.md](docs/REFERENCES.md) · Roadmap: [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)
 
 **Chinese contracts define intended behavior. Final branch source and tests define current implementation.** Start with [README.zh-CN.md](README.zh-CN.md), [AGENTS.md](AGENTS.md), and [docs/contracts/](docs/contracts/00-IDENTITY.md).
 
@@ -19,9 +18,25 @@ Android app → ExecutionCoordinator → RootPersistentShell → UbuntuKernel
             → setpriv(real App UID/GID, clear groups/caps) → bash
 ```
 
-The former privileged broker and the PRoot/Alpine runtime are not active production backends. Raw Agent/model/MCP-controlled Root shell or RPC execution is forbidden. The local Agent may use the upstream-compatible structured `root.shell` capability (`tool` basename plus `args`); it is local-only, bounded, and separate from the internal `DirectRootRunner` infrastructure.
+The former privileged broker and the retired compatibility runtimes are not active production backends. Raw Agent/model/MCP-controlled Root shell or RPC execution is forbidden. The local Agent may use the upstream-compatible structured `root.shell` capability (`tool` basename plus `args`); it is local-only, bounded, and separate from the internal `DirectRootRunner` infrastructure.
 
 Active guest user data is App-owned and derived from `Context.filesDir`. `/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are migration sources only.
+
+## Current line
+
+The working branch is `codex/eta-phase6-xposed` (remote `Slacker-LLC/minis-eta`); `main` keeps the seed that predates the port.
+
+| Phase branch | Theme |
+|---|---|
+| `codex/eta-phase1-ui` | work-process row, assistant home, streaming projection |
+| `codex/eta-phase2-provider-passthrough` | provider passthrough and reasoning parameters |
+| `codex/eta-phase3-skills-tools` | skill transactions, tools, MCP |
+| `codex/eta-phase4-notifications` | notifications and background work |
+| `codex/eta-phase5-roleplay` | character cards and world books |
+| `codex/system-prompt-modules` | system-prompt modularization |
+| **`codex/eta-phase6-xposed` (current)** | the phases landed on one line, plus the Xposed system-enhancement work, convergence, MCP device verification and the localization sweep |
+
+Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failures**; `:app:lintDebug` **0 errors**; `app-debug.apk` ≈ **114 MB** with the runtime payload. Interface text lives in resources with **eight locales** — English default plus Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French and Russian; Simplified and Traditional Chinese are at full coverage, the other four still have a backlog ([docs/I18N.md](docs/I18N.md)).
 
 ## Network compatibility
 
@@ -31,11 +46,13 @@ If a device can provide correct guest networking without this compatibility path
 
 ## Android identity
 
-Direct Ubuntu audit changes were merged into `main` on 2026-09-12 (source baseline `422cc29f`). See the [Chinese documentation index](docs/README.md), [device report](docs/REAL-DEVICE-TEST-REPORT.md), and [remaining gaps](docs/contracts/06-CURRENT-GAPS.md). Guest `minis-mcp-cli` is still missing; native MCP support does not replace that CLI, and full device acceptance remains incomplete.
-
 - `applicationId`: `llc.slacker.eta`
 - Android/Kotlin namespace: `com.openminis.app`
 
 The installed application identity and source namespace may differ; a repository-wide package rename is not implied.
+
+## Remaining gaps
+
+Guest `minis-mcp-cli` is still missing; native MCP support does not replace that CLI, and full device acceptance remains incomplete. The other four locales still fall back to English for part of their strings. See [docs/contracts/06-CURRENT-GAPS.md](docs/contracts/06-CURRENT-GAPS.md), the [Chinese documentation index](docs/README.md), the [device report](docs/REAL-DEVICE-TEST-REPORT.md), and `docs/development/PROGRESS.md` for the per-slice record and the unverified list.
 
 Source-first. No production APK release is promised by the repository. Build instructions: [BUILDING.md](BUILDING.md). Runtime details: [docs/EXECUTION-ENVIRONMENT.md](docs/EXECUTION-ENVIRONMENT.md). Security model: [docs/SECURITY.md](docs/SECURITY.md). Legal lineage: [PROVENANCE.md](PROVENANCE.md).

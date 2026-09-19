@@ -1,12 +1,12 @@
 # 开发状态
 
-> 更新：2026-09-12。Direct Ubuntu 审计提交 `53dada42` 已通过合并提交 `422cc29f` 进入 `main` 并推送 origin。本文以该源码基线为准；真机记录保留各自测试范围，不用合并后的宿主构建替代设备验收。
+> 更新：2026-09-20。当前工作线是 `codex/eta-phase6-xposed`（远端 `Slacker-LLC/minis-eta`，HEAD `f58adf39`）；Eta 能力移植没有改变本文的运行时结论（Direct Ubuntu 24.04 chroot、App-owned 数据、结构化 `root.shell`）。历史基线：Direct Ubuntu 审计提交 `53dada42` 经合并提交 `422cc29f` 进入 `main`（2026-09-12）；真机记录保留各自测试范围，不用宿主构建替代设备验收。逐片进度见 `development/PROGRESS.md`，项目全貌见 `PROJECT.md`。
 
 ## 项目状态
 
-- 仓库：`Slacker-LLC/minis-for-android`
-- 参考分支：`main`（Direct Ubuntu 已合入）
-- PR #235：2026-09-10 已合入 `main`
+- 仓库：`Slacker-LLC/minis-eta`
+- 当前工作线：`codex/eta-phase6-xposed`（`main` 保留移植前种子线；阶段分支见 `PROJECT.md`）
+- 基线快照：Direct Ubuntu 运行时结论沿用 `main` 上的 2026-09-12 审计；移植与收敛进度见 `development/PROGRESS.md`
 - 平台：已 Root 的 Android 设备
 - Linux runtime：Android App 自有协调 + Ubuntu 24.04 Direct chroot
 - `applicationId`：`llc.slacker.eta`
@@ -67,6 +67,8 @@ PR #235 合入前，Direct Ubuntu 迁移已经通过既有 CI，包括 rootfs/pa
 2026-09-12 的审计又补充了当前工作树和小米真机证据：设备 `24129PN74C`/HyperOS 已安装 Debug APK，进入 Direct Ubuntu Terminal，报告动态 App UID/GID，完成 workspace 文件读写，并在关闭时回收 Terminal shell；还执行了强停后的冷启动、MiMo v2.5 文本和 TTS 请求。详细记录见 [`REAL-DEVICE-TEST-REPORT.md`](REAL-DEVICE-TEST-REPORT.md)，上游/共享功能对账见 [`UPSTREAM-COMPARISON.md`](UPSTREAM-COMPARISON.md)。
 
 该设备的 HyperOS 拒绝安装 instrumentation APK，因此真机手测不能替代 instrumentation 执行证据。
+
+当前分支基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**（186 warning / 8 hint 为既有）；`:app:assembleDebug` 产出约 **114 MB** APK（含 runtime payload）。
 
 合并提交 `422cc29f` 的宿主 JVM 测试与 `assembleDebug` 已通过。合并后的 APK 没有额外完成一轮全功能真机验收；下列设备缺口不因合并而自动关闭。
 
