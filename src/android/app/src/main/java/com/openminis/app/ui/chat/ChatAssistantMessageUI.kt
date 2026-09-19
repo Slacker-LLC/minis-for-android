@@ -1219,8 +1219,13 @@ fun AssistantMessageActionBar(
 
     Row(
         modifier = modifier
-            .padding(start = 12.dp, top = 4.dp, bottom = 8.dp)
-            .wrapContentWidth(),
+            // [T-android-action-bar-left] `wrapContentWidth()`'s default alignment is CENTER, so
+            // the row of actions sat centred under the reply while every other line of the turn
+            // starts at the message's own left edge. The row wraps its children without that
+            // modifier and starts at the content column itself; the first glyph then sits one
+            // glyph-inset in (each action is a 42dp touch box around a 20dp icon), the same small
+            // inset Codex's own action row has under its text.
+            .padding(start = 0.dp, top = 4.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
