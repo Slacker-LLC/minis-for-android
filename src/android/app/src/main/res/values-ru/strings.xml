@@ -1871,4 +1871,6 @@
     <string name="work_process_duration">Заняло %1$s</string>
     <string name="work_process_duration_failed">Заняло %1$s · шаг %2$d не удался</string>
     <string name="work_process_elapsed">Обработка %1$s</string>
+    <string name="appearance_tool_status_bar_title">Строка состояния инструментов</string>
+    <string name="appearance_tool_status_bar_sub">Полоса над полем ввода: какой инструмент работает и с каким результатом.</string>
 </resources>

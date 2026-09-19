@@ -1603,4 +1603,6 @@
     <string name="work_process_duration">所要時間 %1$s</string>
     <string name="work_process_duration_failed">所要時間 %1$s · ステップ %2$d 失敗</string>
     <string name="work_process_elapsed">%1$s 処理中</string>
+    <string name="appearance_tool_status_bar_title">ツール ステータス バー</string>
+    <string name="appearance_tool_status_bar_sub">入力欄の上に実行中のツールと結果を表示する帯です。</string>
 </resources>

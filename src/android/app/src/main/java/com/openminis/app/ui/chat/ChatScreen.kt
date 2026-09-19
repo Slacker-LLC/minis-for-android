@@ -2142,6 +2142,9 @@ fun ChatScreen(
     var messageFontLevel by remember { mutableStateOf(appearancePrefs.getInt(com.openminis.app.ui.settings.KEY_FONT_MESSAGE, 0)) }
     var chatInputLevel by remember { mutableStateOf(appearancePrefs.getInt(com.openminis.app.ui.settings.KEY_FONT_CHAT_INPUT, 0)) }
     var toolPreviewEnabled by remember { mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_TOOL_PREVIEW, true)) }
+    var toolStatusBarEnabled by remember {
+        mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_TOOL_STATUS_BAR, true))
+    }
     // T-chat-title-pill: live-toggled by Settings → Appearance and by
     // `minis-config set appearance.show_chat_title …`. Default ON.
     var showChatTitlePill by remember { mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_SHOW_CHAT_TITLE, true)) }
@@ -2156,6 +2159,8 @@ fun ChatScreen(
                 com.openminis.app.ui.settings.KEY_FONT_MESSAGE -> messageFontLevel = sp.getInt(key, 0)
                 com.openminis.app.ui.settings.KEY_FONT_CHAT_INPUT -> chatInputLevel = sp.getInt(key, 0)
                 com.openminis.app.ui.settings.KEY_TOOL_PREVIEW -> toolPreviewEnabled = sp.getBoolean(key, true)
+                com.openminis.app.ui.settings.KEY_TOOL_STATUS_BAR ->
+                    toolStatusBarEnabled = sp.getBoolean(key, true)
                 com.openminis.app.ui.settings.KEY_SHOW_CHAT_TITLE -> showChatTitlePill = sp.getBoolean(key, true)
             }
         }
@@ -2387,6 +2392,7 @@ fun ChatScreen(
         LocalBrowserTabPool provides viewModel.browserTabPool,
         LocalMarkdownFontScale provides markdownFontScale,
         LocalToolPreviewEnabled provides toolPreviewEnabled,
+        LocalToolStatusBarEnabled provides toolStatusBarEnabled,
         LocalMarkdownUrlClickHandler provides urlClickHandler,
         LocalMarkdownImageTapHandler provides markdownImageTapHandler,
         // Route markdown media resolution through this chat's session so
@@ -3915,7 +3921,10 @@ fun ChatScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 92.dp),
                 )
-               if (lastToolBlocks.isNotEmpty()) {
+               // [T-android-tool-status-bar-toggle] The switch turns the whole strip off, not just
+               // its thumbnail: a user who does not want a running command pinned above the
+               // composer should not have to keep the row that reports it.
+               if (lastToolBlocks.isNotEmpty() && toolStatusBarEnabled) {
                    Box(
                        modifier = Modifier
                            .align(Alignment.BottomCenter)

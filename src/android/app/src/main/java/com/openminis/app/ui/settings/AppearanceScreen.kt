@@ -88,6 +88,10 @@ const val KEY_LAUNCH_SESSION = "launch_session"    // 0=Auto, 1=LastSession, 2=N
 const val KEY_RETURN_KEY_BEHAVIOR = "returnKeyBehavior"  // Int 0=Newline (default), 1=Send
 const val KEY_KEEP_SCREEN_AWAKE = "keepScreenAwakeDuringTasks"  // Boolean, default false
 const val KEY_TOOL_PREVIEW = "tool_preview"        // Boolean, default true
+// [T-android-tool-status-bar-toggle] The floating tool status bar above the composer (tool name,
+// result, CPU/MEM). KEY_TOOL_PREVIEW only governs its thumbnail, so a user who wants the strip
+// itself gone had no switch - this is that switch. Boolean, default true.
+const val KEY_TOOL_STATUS_BAR = "tool_status_bar"
 // [T-keyboard-auto-pop default flip] Default ON — most users want the
 // composer ready for a follow-up immediately after the model finishes.
 // Key name mirrors iOS `@AppStorage("chat.autoFocusAfterReply")` so a
@@ -193,6 +197,7 @@ fun AppearanceScreen(
     var returnKeyBehavior by remember { mutableIntStateOf(prefs.getInt(KEY_RETURN_KEY_BEHAVIOR, 0)) }
     var keepScreenAwake by remember { mutableStateOf(prefs.getBoolean(KEY_KEEP_SCREEN_AWAKE, false)) }
     var toolPreview by remember { mutableStateOf(prefs.getBoolean(KEY_TOOL_PREVIEW, true)) }
+    var toolStatusBar by remember { mutableStateOf(prefs.getBoolean(KEY_TOOL_STATUS_BAR, true)) }
     var autoFocusAfterReply by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_FOCUS_AFTER_REPLY, true)) }
     var autoExpandThinking by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_EXPAND_THINKING, true)) }
     var showChatTitle by remember { mutableStateOf(prefs.getBoolean(KEY_SHOW_CHAT_TITLE, true)) }
@@ -398,6 +403,17 @@ fun AppearanceScreen(
                 onCheckedChange = {
                     toolPreview = it
                     prefs.edit().putBoolean(KEY_TOOL_PREVIEW, it).apply()
+                },
+            )
+            SettingsSwitchRow(
+                icon = Icons.Outlined.Build,
+                iconColor = tileTeal,
+                title = stringResource(R.string.appearance_tool_status_bar_title),
+                subtitle = stringResource(R.string.appearance_tool_status_bar_sub),
+                checked = toolStatusBar,
+                onCheckedChange = {
+                    toolStatusBar = it
+                    prefs.edit().putBoolean(KEY_TOOL_STATUS_BAR, it).apply()
                 },
                 showDivider = false,
             )

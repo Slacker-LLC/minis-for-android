@@ -1497,4 +1497,6 @@
     <string name="work_process_duration">Durée %1$s</string>
     <string name="work_process_duration_failed">Durée %1$s · étape %2$d en échec</string>
     <string name="work_process_elapsed">En cours depuis %1$s</string>
+    <string name="appearance_tool_status_bar_title">Barre d\'état des outils</string>
+    <string name="appearance_tool_status_bar_sub">La bande au-dessus du champ de saisie qui indique l\'outil en cours et son résultat.</string>
 </resources>

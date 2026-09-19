@@ -2007,4 +2007,6 @@
     <string name="work_process_duration">Took %1$s</string>
     <string name="work_process_duration_failed">Took %1$s · step %2$d failed</string>
     <string name="work_process_elapsed">Working for %1$s</string>
+    <string name="appearance_tool_status_bar_title">Tool status bar</string>
+    <string name="appearance_tool_status_bar_sub">The strip above the composer that reports the running tool and its result.</string>
 </resources>

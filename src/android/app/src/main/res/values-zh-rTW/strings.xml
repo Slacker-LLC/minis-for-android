@@ -1145,4 +1145,6 @@
     <string name="work_process_duration">耗時 %1$s</string>
     <string name="work_process_duration_failed">耗時 %1$s · 第 %2$d 步失敗</string>
     <string name="work_process_elapsed">已處理 %1$s</string>
+    <string name="appearance_tool_status_bar_title">工具狀態列</string>
+    <string name="appearance_tool_status_bar_sub">輸入框上方那條顯示執行中工具與結果的橫條。</string>
 </resources>

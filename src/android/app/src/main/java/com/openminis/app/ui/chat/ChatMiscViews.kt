@@ -853,6 +853,10 @@ private fun parseInlineMarkdown(
 internal val LocalBrowserTabPool = compositionLocalOf<com.openminis.app.browser.BrowserTabPool?> { null }
 internal val LocalToolPreviewEnabled = compositionLocalOf { true }
 
+/** [T-android-tool-status-bar-toggle] Whether the floating tool status bar above the composer is
+ * mounted at all. The preview flag above only governs its thumbnail. */
+internal val LocalToolStatusBarEnabled = compositionLocalOf { true }
+
 @Composable
 internal fun rememberBrowserLiveSnapshot(
     block: AssistantBlock,

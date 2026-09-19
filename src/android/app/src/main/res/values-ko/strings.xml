@@ -1595,4 +1595,6 @@
     <string name="work_process_duration">%1$s 소요</string>
     <string name="work_process_duration_failed">%1$s 소요 · %2$d단계 실패</string>
     <string name="work_process_elapsed">%1$s 처리 중</string>
+    <string name="appearance_tool_status_bar_title">도구 상태 표시줄</string>
+    <string name="appearance_tool_status_bar_sub">입력창 위에 실행 중인 도구와 결과를 표시하는 띠입니다.</string>
 </resources>
