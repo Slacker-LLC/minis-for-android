@@ -2419,57 +2419,49 @@ fun ChatScreen(
                     }
                 },
                 navigationIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!isTwoPane) {
-                            if (onOpenDrawer != null) {
-                                IconButton(onClick = onOpenDrawer) {
-                                    Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                                }
-                            } else {
-                                IconButton(onClick = onBack) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                }
+                    if (!isTwoPane) {
+                        if (onOpenDrawer != null) {
+                            IconButton(onClick = onOpenDrawer) {
+                                Icon(Icons.Filled.Menu, contentDescription = "Menu")
                             }
-                            // [T-chat-new-session-button] One tap to a fresh conversation, on the
-                            // side the drawer's "new chat" lives. The action already existed
-                            // (onNewChat) but reaching it cost a swipe and a tap.
-                            Box(
-                                modifier = Modifier
-                                    .padding(start = 2.dp)
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .clickable(onClick = onNewChat),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = stringResource(R.string.chat_new_session),
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(20.dp),
-                                )
+                        } else {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
-                        } else if (onToggleSidebar != null) {
-                            IconButton(
-                                onClick = onToggleSidebar,
-                                modifier = Modifier.offset(y = (-2).dp),
-                            ) {
-                                Icon(
-                                    Icons.Filled.Menu,
-                                    contentDescription = stringResource(
-                                        if (sidebarCollapsed) {
-                                            R.string.chat_show_sidebar
-                                        } else {
-                                            R.string.chat_hide_sidebar
-                                        },
-                                    ),
-                                    modifier = Modifier.size(28.dp),
-                                )
-                            }
+                        }
+                    } else if (onToggleSidebar != null) {
+                        IconButton(
+                            onClick = onToggleSidebar,
+                            modifier = Modifier.offset(y = (-2).dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Menu,
+                                contentDescription = stringResource(
+                                    if (sidebarCollapsed) {
+                                        R.string.chat_show_sidebar
+                                    } else {
+                                        R.string.chat_hide_sidebar
+                                    },
+                                ),
+                                modifier = Modifier.size(28.dp),
+                            )
                         }
                     }
                 },
                 actions = {
+                    // [T-chat-new-session-button] One tap to a fresh conversation. The action
+                    // already existed (onNewChat, the drawer's "new chat"); this is its entry
+                    // point on the chat itself: the drawer's pencil, as a plain icon button next
+                    // to the overflow so all three top-bar controls are the same size and sit on
+                    // the same line.
+                    if (!isTwoPane) {
+                        IconButton(onClick = onNewChat) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.chat_new_session),
+                            )
+                        }
+                    }
                     // iOS: "..." circle button → dropdown menu
                     Box {
                         IconButton(onClick = { showChatMenu = true }) {
