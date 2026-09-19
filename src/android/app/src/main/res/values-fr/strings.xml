@@ -1499,4 +1499,13 @@
     <string name="work_process_elapsed">En cours depuis %1$s</string>
     <string name="appearance_tool_status_bar_title">Barre d\'état des outils</string>
     <string name="appearance_tool_status_bar_sub">La bande au-dessus du champ de saisie qui indique l\'outil en cours et son résultat.</string>
+    <string name="appearance_section_accent">Couleur d\'accent</string>
+    <string name="appearance_accent_footer">Utilisée pour les boutons, interrupteurs et liens de l\'app.</string>
+    <string name="appearance_accent_default">Par défaut</string>
+    <string name="appearance_accent_blue">Bleu</string>
+    <string name="appearance_accent_yellow">Jaune</string>
+    <string name="appearance_accent_pink">Rose</string>
+    <string name="appearance_accent_purple">Violet</string>
+    <string name="appearance_accent_orange">Orange</string>
+    <string name="appearance_accent_green">Vert</string>
 </resources>

@@ -1854,4 +1854,13 @@
     <string name="work_process_elapsed">已处理 %1$s</string>
     <string name="appearance_tool_status_bar_title">工具状态栏</string>
     <string name="appearance_tool_status_bar_sub">输入框上方那条显示正在运行的工具与结果的横条。</string>
+    <string name="appearance_section_accent">强调色</string>
+    <string name="appearance_accent_footer">应用内按钮、开关与链接使用的主色。</string>
+    <string name="appearance_accent_default">应用默认</string>
+    <string name="appearance_accent_blue">蓝色</string>
+    <string name="appearance_accent_yellow">黄色</string>
+    <string name="appearance_accent_pink">粉色</string>
+    <string name="appearance_accent_purple">紫色</string>
+    <string name="appearance_accent_orange">橙色</string>
+    <string name="appearance_accent_green">绿色</string>
 </resources>

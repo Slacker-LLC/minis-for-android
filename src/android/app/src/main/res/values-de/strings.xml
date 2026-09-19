@@ -1608,4 +1608,13 @@
     <string name="work_process_elapsed">Läuft seit %1$s</string>
     <string name="appearance_tool_status_bar_title">Werkzeug-Statusleiste</string>
     <string name="appearance_tool_status_bar_sub">Der Streifen über dem Eingabefeld, der das laufende Werkzeug und sein Ergebnis zeigt.</string>
+    <string name="appearance_section_accent">Akzentfarbe</string>
+    <string name="appearance_accent_footer">Wird für Schaltflächen, Schalter und Links in der App verwendet.</string>
+    <string name="appearance_accent_default">App-Standard</string>
+    <string name="appearance_accent_blue">Blau</string>
+    <string name="appearance_accent_yellow">Gelb</string>
+    <string name="appearance_accent_pink">Pink</string>
+    <string name="appearance_accent_purple">Violett</string>
+    <string name="appearance_accent_orange">Orange</string>
+    <string name="appearance_accent_green">Grün</string>
 </resources>

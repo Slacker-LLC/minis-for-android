@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -164,14 +166,52 @@ private val MinisShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp),   // Dialog, BottomSheet
 )
 
+/**
+ * [T-android-accent-color] The accent the user picked, applied through colorScheme.primary.
+ *
+ * Index 0 is the app's own accent (the desaturated iOS blue above) so an existing install looks
+ * unchanged; the other six are X's accent palette (blue / yellow / pink / purple / orange /
+ * green), which is what the picker offers. Each has a light and a dark value: the dark variants
+ * are lifted so they keep contrast on dark surfaces, and the yellow is darkened in light mode
+ * because the raw colour cannot carry white text on white surfaces.
+ */
+enum class AccentColor(val index: Int, val light: Color, val dark: Color) {
+    DEFAULT(0, Color(0xFF528AD2), Color(0xFF6A94CE)),
+    BLUE(1, Color(0xFF1D9BF0), Color(0xFF4FB3F0)),
+    YELLOW(2, Color(0xFFC9A200), Color(0xFFFFD400)),
+    PINK(3, Color(0xFFF91880), Color(0xFFF95C9F)),
+    PURPLE(4, Color(0xFF7856FF), Color(0xFF957CFF)),
+    ORANGE(5, Color(0xFFFF7A00), Color(0xFFFF9A40)),
+    GREEN(6, Color(0xFF00A76B), Color(0xFF00BA7C)),
+    ;
+
+    companion object {
+        fun fromIndex(value: Int): AccentColor = entries.firstOrNull { it.index == value } ?: DEFAULT
+    }
+}
+
+/** Re-colours the parts of the scheme an accent owns; the rest of the palette stays put. */
+private fun androidx.compose.material3.ColorScheme.withAccent(accent: AccentColor, dark: Boolean): androidx.compose.material3.ColorScheme {
+    val primary = if (dark) accent.dark else accent.light
+    return copy(
+        primary = primary,
+        onPrimary = if (primary.luminance() > 0.5f) Color(0xFF101010) else Color.White,
+        primaryContainer = primary.copy(alpha = 0.22f).compositeOver(surface),
+        onPrimaryContainer = if (dark) accent.light else accent.dark,
+        inversePrimary = if (dark) accent.light else accent.dark,
+        surfaceTint = primary,
+    )
+}
+
 @Composable
 fun MinisTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     fontScale: Float = 1f,
     uiStyle: UiStyle = UiStyle.CLASSIC,
+    accent: AccentColor = AccentColor.DEFAULT,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = (if (darkTheme) DarkColorScheme else LightColorScheme).withAccent(accent, darkTheme)
     val typography = scaledTypography(fontScale)
     val chatPalette = if (darkTheme) DarkChatPalette else LightChatPalette
 

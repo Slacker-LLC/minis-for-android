@@ -1,6 +1,7 @@
 package com.openminis.app.ui.settings
 
 import com.openminis.app.R
+import com.openminis.app.ui.theme.AccentColor
 import com.openminis.app.data.repository.AppIconRepository
 import com.openminis.app.ui.components.MinisTextButton
 
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.outlined.KeyboardReturn
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.CheckCircle
@@ -80,6 +82,8 @@ import kotlin.math.roundToInt
 // -- Preference Keys --
 const val PREF_APPEARANCE = "appearance_prefs"
 const val KEY_THEME_MODE = "theme_mode"            // 0=System, 1=Light, 2=Dark
+// [T-android-accent-color] Accent the user picked; index into AccentColor (0 = the app's own).
+const val KEY_ACCENT_COLOR = "accent_color"
 const val KEY_UI_STYLE = "ui_style"                // 0=Classic, 1=Glass (Liquid Glass)
 const val KEY_LAUNCH_SESSION = "launch_session"    // 0=Auto, 1=LastSession, 2=NewChat, 3=Home
 // iOS-aligned key names — match `@AppStorage("returnKeyBehavior")` and
@@ -184,6 +188,19 @@ fun fontScaleForLevel(level: Int): Float {
 }
 
 @Composable
+private fun AccentColor.label(): String = stringResource(
+    when (this) {
+        AccentColor.DEFAULT -> R.string.appearance_accent_default
+        AccentColor.BLUE -> R.string.appearance_accent_blue
+        AccentColor.YELLOW -> R.string.appearance_accent_yellow
+        AccentColor.PINK -> R.string.appearance_accent_pink
+        AccentColor.PURPLE -> R.string.appearance_accent_purple
+        AccentColor.ORANGE -> R.string.appearance_accent_orange
+        AccentColor.GREEN -> R.string.appearance_accent_green
+    },
+)
+
+@Composable
 fun AppearanceScreen(
     onBack: () -> Unit,
     onThemeChanged: (Int) -> Unit = {},
@@ -192,6 +209,7 @@ fun AppearanceScreen(
     val prefs = remember { getAppearancePrefs(context) }
 
     var themeMode by remember { mutableIntStateOf(prefs.getInt(KEY_THEME_MODE, 0)) }
+    var accentIndex by remember { mutableIntStateOf(prefs.getInt(KEY_ACCENT_COLOR, 0)) }
     var uiStyle by remember { mutableIntStateOf(prefs.getInt(KEY_UI_STYLE, 0)) }
     var launchSession by remember { mutableIntStateOf(prefs.getInt(KEY_LAUNCH_SESSION, 0)) }
     var returnKeyBehavior by remember { mutableIntStateOf(prefs.getInt(KEY_RETURN_KEY_BEHAVIOR, 0)) }
@@ -255,6 +273,48 @@ fun AppearanceScreen(
                     },
                     showDivider = idx < themeRows.size - 1,
                 )
+            }
+        }
+
+        // -- Accent colour --
+        // [T-android-accent-color] Sets colorScheme.primary for the whole app: buttons, switches,
+        // links, the running work-row label. Index 0 is the app's own blue so nothing changes for
+        // an install that never opens this row.
+        SettingsSection(
+            header = stringResource(R.string.appearance_section_accent),
+            footer = stringResource(R.string.appearance_accent_footer),
+        ) {
+            // The in-app palette, not the system setting: the two disagree whenever the user has
+            // overridden the theme here (guarded by InAppThemeSourceGuardTest).
+            val swatchDark = com.openminis.app.ui.theme.ChatColors.isDark
+            SettingsCardBlock {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccentColor.entries.forEach { accent ->
+                        val selected = accentIndex == accent.index
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (swatchDark) accent.dark else accent.light)
+                                .clickable(onClickLabel = accent.label()) {
+                                    accentIndex = accent.index
+                                    prefs.edit().putInt(KEY_ACCENT_COLOR, accent.index).apply()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Check,
+                                contentDescription = accent.label(),
+                                tint = if (selected) Color.White else Color.Transparent,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
 

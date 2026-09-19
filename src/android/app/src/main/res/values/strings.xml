@@ -2009,4 +2009,13 @@
     <string name="work_process_elapsed">Working for %1$s</string>
     <string name="appearance_tool_status_bar_title">Tool status bar</string>
     <string name="appearance_tool_status_bar_sub">The strip above the composer that reports the running tool and its result.</string>
+    <string name="appearance_section_accent">Accent colour</string>
+    <string name="appearance_accent_footer">Used for buttons, switches and links across the app.</string>
+    <string name="appearance_accent_default">App default</string>
+    <string name="appearance_accent_blue">Blue</string>
+    <string name="appearance_accent_yellow">Yellow</string>
+    <string name="appearance_accent_pink">Pink</string>
+    <string name="appearance_accent_purple">Purple</string>
+    <string name="appearance_accent_orange">Orange</string>
+    <string name="appearance_accent_green">Green</string>
 </resources>

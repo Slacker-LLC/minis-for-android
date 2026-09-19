@@ -41,6 +41,7 @@ import com.openminis.app.ui.navigation.AppNavigation
 import com.openminis.app.ui.navigation.Routes
 import com.openminis.app.ui.navigation.safeNavigate
 import com.openminis.app.ui.NewerDatabaseGuidanceScreen
+import com.openminis.app.ui.settings.KEY_ACCENT_COLOR
 import com.openminis.app.ui.settings.KEY_FONT_APP_BASE
 import com.openminis.app.ui.settings.KEY_KEEP_SCREEN_AWAKE
 import com.openminis.app.ui.settings.KEY_LANGUAGE
@@ -516,6 +517,7 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { getAppearancePrefs(this) }
             var themeMode by remember { mutableIntStateOf(prefs.getInt(KEY_THEME_MODE, 0)) }
             var uiStyle by remember { mutableIntStateOf(prefs.getInt(KEY_UI_STYLE, 0)) }
+            var accentIndex by remember { mutableIntStateOf(prefs.getInt(KEY_ACCENT_COLOR, 0)) }
             var appBaseLevel by remember { mutableIntStateOf(prefs.getInt(KEY_FONT_APP_BASE, 0)) }
 
             DisposableEffect(prefs) {
@@ -523,6 +525,7 @@ class MainActivity : ComponentActivity() {
                     when (key) {
                         KEY_THEME_MODE -> themeMode = sp.getInt(KEY_THEME_MODE, 0)
                         KEY_UI_STYLE -> uiStyle = sp.getInt(KEY_UI_STYLE, 0)
+                        KEY_ACCENT_COLOR -> accentIndex = sp.getInt(KEY_ACCENT_COLOR, 0)
                         KEY_FONT_APP_BASE -> appBaseLevel = sp.getInt(KEY_FONT_APP_BASE, 0)
                         KEY_KEEP_SCREEN_AWAKE -> applyKeepScreenAwakeFlag(
                             SessionActivityTracker.activeSessions.value.isNotEmpty()
@@ -564,6 +567,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = darkTheme,
                 fontScale = fontScale,
                 uiStyle = if (uiStyle == 1) UiStyle.GLASS else UiStyle.CLASSIC,
+                accent = com.openminis.app.ui.theme.AccentColor.fromIndex(accentIndex),
             ) {
                 GlassHost(backgroundColor = minisPageBackground(darkTheme)) {
                     val navController = rememberNavController().also { this.navController = it }

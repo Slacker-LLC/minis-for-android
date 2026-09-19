@@ -1597,4 +1597,13 @@
     <string name="work_process_elapsed">%1$s 처리 중</string>
     <string name="appearance_tool_status_bar_title">도구 상태 표시줄</string>
     <string name="appearance_tool_status_bar_sub">입력창 위에 실행 중인 도구와 결과를 표시하는 띠입니다.</string>
+    <string name="appearance_section_accent">강조 색</string>
+    <string name="appearance_accent_footer">앱의 버튼, 스위치, 링크에 사용되는 색입니다.</string>
+    <string name="appearance_accent_default">앱 기본값</string>
+    <string name="appearance_accent_blue">파랑</string>
+    <string name="appearance_accent_yellow">노랑</string>
+    <string name="appearance_accent_pink">분홍</string>
+    <string name="appearance_accent_purple">보라</string>
+    <string name="appearance_accent_orange">주황</string>
+    <string name="appearance_accent_green">초록</string>
 </resources>
