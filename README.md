@@ -1,8 +1,9 @@
 # Minis for Android
 
-> **This repository is minis-eta**: Minis for Android merged with the Eta capability-port line.
-> Project description: [docs/PROJECT.md](docs/PROJECT.md) · Porting rules and progress: [docs/development/PORTING.md](docs/development/PORTING.md) ·
-> Localization: [docs/I18N.md](docs/I18N.md) · Reference index: [docs/REFERENCES.md](docs/REFERENCES.md) · Roadmap: [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)
+> **Minis for Android** is an independent AI agent runtime for rooted Android devices: the agent loop, tools,
+> MCP, skills, memory, voice and an Ubuntu 24.04 chroot all run on the device, with no first-party backend.
+> Project description: [docs/PROJECT.md](docs/PROJECT.md) · Localization: [docs/I18N.md](docs/I18N.md) ·
+> Reference index: [docs/REFERENCES.md](docs/REFERENCES.md) · Document index: [docs/README.md](docs/README.md)
 
 **Chinese contracts define intended behavior. Final branch source and tests define current implementation.** Start with [README.zh-CN.md](README.zh-CN.md), [AGENTS.md](AGENTS.md), and [docs/contracts/](docs/contracts/00-IDENTITY.md).
 
@@ -22,21 +23,17 @@ The former privileged broker and the retired compatibility runtimes are not acti
 
 Active guest user data is App-owned and derived from `Context.filesDir`. `/data/adb/minis/rootfs` is Root-owned replaceable runtime state. Historical `/data/adb/minis/{workspace,sessions,memory,skills,shared,home,mcp-servers}` trees are migration sources only.
 
-## Current line
+## Status
 
-The working branch is `codex/eta-phase6-xposed` (remote `Slacker-LLC/minis-eta`); `main` keeps the seed that predates the port.
+The development mainline is `codex/eta-phase6-xposed` (remote `Slacker-LLC/minis-eta`).
 
-| Phase branch | Theme |
-|---|---|
-| `codex/eta-phase1-ui` | work-process row, assistant home, streaming projection |
-| `codex/eta-phase2-provider-passthrough` | provider passthrough and reasoning parameters |
-| `codex/eta-phase3-skills-tools` | skill transactions, tools, MCP |
-| `codex/eta-phase4-notifications` | notifications and background work |
-| `codex/eta-phase5-roleplay` | character cards and world books |
-| `codex/system-prompt-modules` | system-prompt modularization |
-| **`codex/eta-phase6-xposed` (current)** | the phases landed on one line, plus the Xposed system-enhancement work, convergence, MCP device verification and the localization sweep |
+Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failures**; `:app:lintDebug`
+**0 errors** (`186 warnings / 8 hints` are pre-existing); `app-debug.apk` ≈ **114 MB** with the runtime
+payload. Interface text lives in resources with **eight locales** — English default plus Simplified Chinese,
+Traditional Chinese, Japanese, Korean, German, French and Russian; Simplified and Traditional Chinese are at
+full coverage, the other four still fall back to English for part of their strings ([docs/I18N.md](docs/I18N.md)).
 
-Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failures**; `:app:lintDebug` **0 errors**; `app-debug.apk` ≈ **114 MB** with the runtime payload. Interface text lives in resources with **eight locales** — English default plus Simplified Chinese, Traditional Chinese, Japanese, Korean, German, French and Russian; Simplified and Traditional Chinese are at full coverage, the other four still have a backlog ([docs/I18N.md](docs/I18N.md)).
+Development history and the unverified list: [docs/development/PROGRESS.md](docs/development/PROGRESS.md).
 
 ## Network compatibility
 

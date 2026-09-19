@@ -1,8 +1,9 @@
 # Minis for Android
 
-> **本仓库是 minis-eta**：Minis for Android 与 Eta 能力移植线合并后的仓库。
-> 项目说明见 [docs/PROJECT.md](docs/PROJECT.md)，移植规范与进度见 [docs/development/PORTING.md](docs/development/PORTING.md)，
-> 本地化见 [docs/I18N.md](docs/I18N.md)，资料索引见 [docs/REFERENCES.md](docs/REFERENCES.md)，路线图见 [docs/analysis/eta-port-program.md](docs/analysis/eta-port-program.md)。
+> **Minis for Android** 是面向已 Root Android 设备的独立 AI Agent Runtime：Agent 循环、工具、MCP、技能、
+> 记忆、语音与 Ubuntu 24.04 chroot 都在设备本地运行，产品没有自建服务端。
+> 项目说明见 [docs/PROJECT.md](docs/PROJECT.md)，本地化见 [docs/I18N.md](docs/I18N.md)，资料索引见 [docs/REFERENCES.md](docs/REFERENCES.md)，
+> 文档索引见 [docs/README.md](docs/README.md)。
 
 面向 **已 Root Android 设备** 的 AI Agent Runtime。原生 Android App + Ubuntu 24.04 userspace，共用 Android 内核，不是虚拟机。
 
@@ -12,23 +13,16 @@
 [![ABI](https://img.shields.io/badge/ABI-arm64--v8a%20%7C%20x86__64-orange)](BUILDING.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-## 当前工作线
+## 项目状态
 
-现役分支是 **`codex/eta-phase6-xposed`**（远端 `Slacker-LLC/minis-eta`）；`main` 保留移植之前的种子线。能力移植按阶段交付：
+开发主线为 `codex/eta-phase6-xposed`（远端 `Slacker-LLC/minis-eta`）。
 
-| 阶段分支 | 主题 |
-|---|---|
-| `codex/eta-phase1-ui` | 工作过程行、助手首页、流式投影 |
-| `codex/eta-phase2-provider-passthrough` | Provider 透传与推理参数 |
-| `codex/eta-phase3-skills-tools` | Skills 事务、工具与 MCP |
-| `codex/eta-phase4-notifications` | 通知与后台 |
-| `codex/eta-phase5-roleplay` | 角色卡与世界书 |
-| `codex/system-prompt-modules` | 系统提示词模块化 |
-| **`codex/eta-phase6-xposed`（当前线）** | 阶段内容累计落地 + Xposed 系统增强 + 收敛、MCP 实测与本地化 |
+当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**
+（186 warning / 8 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
+**8 个语言目录**：英文默认 + 简体 / 繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余四种仍有存量缺口
+（见 [docs/I18N.md](docs/I18N.md)）。
 
-当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**；
-`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共 **8 个语言目录**：英文默认 + 简体 /
-繁體 / 日 / 韩 / 德 / 法 / 俄；简体与繁體已 100% 覆盖，其余四种仍有存量缺口（见 [docs/I18N.md](docs/I18N.md)）。
+开发过程记录与未验证清单见 [docs/development/PROGRESS.md](docs/development/PROGRESS.md)。
 
 ## 当前运行时
 
