@@ -1740,4 +1740,22 @@
     <string name="mcp_config_copied">接続設定をコピーしました</string>
     <string name="mcp_revoke_last_note">トークンが残っていないとサーバーは自動的に無効になります</string>
     <string name="mcp_scope_min_one">少なくとも 1 つのツールを残す必要があります。中央ポリシーで MCP_CONFIRM とされたツールは、選択しても承認が必要です。</string>
+    <string name="permission_action_read">読み取り</string>
+    <string name="permission_action_write">書き込み</string>
+    <string name="cal_permission_title">カレンダーの権限が必要です</string>
+    <string name="cal_permission_message">カレンダーの%1$s権限が必要です（%2$s）。設定で許可してください。</string>
+    <string name="contacts_permission_title">連絡先の権限が必要です</string>
+    <string name="contacts_permission_message_write">連絡先の読み書き権限がないと削除できません。設定で許可してください。</string>
+    <string name="contacts_permission_message_read">連絡先を読み取る権限が必要です。設定で許可してください。</string>
+    <string name="location_permission_title">位置情報の権限が必要です</string>
+    <string name="location_permission_message">現在地を取得するには位置情報の権限が必要です。設定で許可してください。</string>
+    <string name="photos_permission_title">写真の権限が必要です</string>
+    <string name="photos_permission_message">写真ライブラリを読み取るにはメディア権限が必要です。設定で許可してください。</string>
+    <string name="photo_location_permission_title">写真の位置情報が必要です</string>
+    <string name="photo_location_permission_message">`near` クエリで GPS EXIF を読むには写真の位置情報権限が必要です。設定で許可してください。</string>
+    <string name="notification_permission_title">通知がオフです</string>
+    <string name="notification_permission_message">通知を送るには通知権限が必要です。設定で許可してください。</string>
+    <string name="speech_permission_message">音声を文字起こしするにはマイク権限が必要です。設定で許可してください。</string>
+    <string name="notification_access_permission_title">通知へのアクセス権限が必要です</string>
+    <string name="notification_access_permission_message">ステータスバーの通知を読むには通知へのアクセス権限が必要です。設定の「通知へのアクセス」で「Minis」を有効にしてください。</string>
 </resources>

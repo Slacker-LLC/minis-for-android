@@ -1732,4 +1732,22 @@
     <string name="mcp_config_copied">연결 설정 복사됨</string>
     <string name="mcp_revoke_last_note">토큰이 남아 있지 않으면 서버가 자동으로 비활성화됩니다</string>
     <string name="mcp_scope_min_one">최소 하나의 도구를 남겨야 합니다. 중앙 정책에서 MCP_CONFIRM으로 표시된 도구는 선택해도 승인이 필요합니다.</string>
+    <string name="permission_action_read">읽기</string>
+    <string name="permission_action_write">쓰기</string>
+    <string name="cal_permission_title">캘린더 권한 필요</string>
+    <string name="cal_permission_message">캘린더 %1$s 권한이 필요합니다(%2$s). 설정에서 허용하세요.</string>
+    <string name="contacts_permission_title">연락처 권한 필요</string>
+    <string name="contacts_permission_message_write">연락처 읽기/쓰기 권한이 있어야 삭제할 수 있습니다. 설정에서 허용하세요.</string>
+    <string name="contacts_permission_message_read">연락처를 읽으려면 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="location_permission_title">위치 권한 필요</string>
+    <string name="location_permission_message">현재 위치를 가져오려면 위치 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="photos_permission_title">사진 권한 필요</string>
+    <string name="photos_permission_message">사진 보관함을 읽으려면 미디어 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="photo_location_permission_title">사진 위치 정보 필요</string>
+    <string name="photo_location_permission_message">`near` 쿼리에서 GPS EXIF를 읽으려면 사진 위치 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="notification_permission_title">알림이 꺼져 있음</string>
+    <string name="notification_permission_message">알림을 보내려면 알림 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="speech_permission_message">음성을 받아쓰려면 마이크 권한이 필요합니다. 설정에서 허용하세요.</string>
+    <string name="notification_access_permission_title">알림 접근 권한 필요</string>
+    <string name="notification_access_permission_message">상태 표시줄 알림을 읽으려면 알림 접근 권한이 필요합니다. 설정의 알림 접근에서 \"Minis\"를 활성화하세요.</string>
 </resources>

@@ -2008,4 +2008,22 @@
     <string name="mcp_config_copied">Конфигурация подключения скопирована</string>
     <string name="mcp_revoke_last_note">Сервер автоматически отключается, когда не остаётся ни одного токена</string>
     <string name="mcp_scope_min_one">Нужно оставить хотя бы один инструмент. Инструменты с пометкой MCP_CONFIRM всё равно требуют подтверждения.</string>
+    <string name="permission_action_read">чтение</string>
+    <string name="permission_action_write">запись</string>
+    <string name="cal_permission_title">Нужен доступ к календарю</string>
+    <string name="cal_permission_message">Minis нужен доступ «%1$s», чтобы %2$s календарь. Разрешите в настройках.</string>
+    <string name="contacts_permission_title">Нужен доступ к контактам</string>
+    <string name="contacts_permission_message_write">Minis нужен доступ на чтение и запись контактов, чтобы удалять записи. Разрешите в настройках.</string>
+    <string name="contacts_permission_message_read">Minis нужен доступ к контактам, чтобы прочитать адресную книгу. Разрешите в настройках.</string>
+    <string name="location_permission_title">Нужен доступ к геолокации</string>
+    <string name="location_permission_message">Minis нужен доступ к геолокации, чтобы определить ваше местоположение. Разрешите в настройках.</string>
+    <string name="photos_permission_title">Нужен доступ к фото</string>
+    <string name="photos_permission_message">Minis нужен доступ к медиафайлам, чтобы читать фотогалерею. Разрешите в настройках.</string>
+    <string name="photo_location_permission_title">Нужны геоданные фото</string>
+    <string name="photo_location_permission_message">Minis нужен доступ к геоданным фото, чтобы читать GPS EXIF для запроса `near`. Разрешите в настройках.</string>
+    <string name="notification_permission_title">Уведомления отключены</string>
+    <string name="notification_permission_message">Minis нужен доступ к уведомлениям, чтобы их отправлять. Разрешите в настройках.</string>
+    <string name="speech_permission_message">Minis нужен доступ к микрофону для распознавания речи. Разрешите в настройках.</string>
+    <string name="notification_access_permission_title">Нужен доступ к уведомлениям</string>
+    <string name="notification_access_permission_message">Minis нужен доступ к уведомлениям, чтобы читать их из строки состояния. Включите «Minis» в настройках в разделе доступа к уведомлениям.</string>
 </resources>

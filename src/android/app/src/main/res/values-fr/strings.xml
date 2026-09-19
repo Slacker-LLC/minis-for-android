@@ -1634,4 +1634,22 @@
     <string name="mcp_config_copied">Configuration de connexion copiée</string>
     <string name="mcp_revoke_last_note">Le serveur est désactivé automatiquement lorsqu\'il ne reste aucun jeton</string>
     <string name="mcp_scope_min_one">Au moins un outil doit rester sélectionné. Les outils marqués MCP_CONFIRM par la politique centrale nécessitent toujours une approbation.</string>
+    <string name="permission_action_read">lecture</string>
+    <string name="permission_action_write">écriture</string>
+    <string name="cal_permission_title">Autorisation Calendrier requise</string>
+    <string name="cal_permission_message">Minis a besoin de l\'autorisation %1$s pour %2$s votre calendrier. Autorisez-la dans les réglages.</string>
+    <string name="contacts_permission_title">Autorisation Contacts requise</string>
+    <string name="contacts_permission_message_write">Minis a besoin des autorisations de lecture et d\'écriture des contacts pour supprimer des entrées. Autorisez-les dans les réglages.</string>
+    <string name="contacts_permission_message_read">Minis a besoin de l\'autorisation Contacts pour lire votre carnet d\'adresses. Autorisez-la dans les réglages.</string>
+    <string name="location_permission_title">Autorisation Localisation requise</string>
+    <string name="location_permission_message">Minis a besoin de l\'autorisation Localisation pour obtenir votre position. Autorisez-la dans les réglages.</string>
+    <string name="photos_permission_title">Autorisation Photos requise</string>
+    <string name="photos_permission_message">Minis a besoin de l\'autorisation Médias pour lire votre photothèque. Autorisez-la dans les réglages.</string>
+    <string name="photo_location_permission_title">Localisation des photos requise</string>
+    <string name="photo_location_permission_message">Minis a besoin de l\'autorisation de localisation des photos pour lire les EXIF GPS de la requête `near`. Autorisez-la dans les réglages.</string>
+    <string name="notification_permission_title">Notifications désactivées</string>
+    <string name="notification_permission_message">Minis a besoin de l\'autorisation Notifications pour envoyer des notifications. Autorisez-la dans les réglages.</string>
+    <string name="speech_permission_message">Minis a besoin de l\'autorisation Microphone pour transcrire la parole. Autorisez-la dans les réglages.</string>
+    <string name="notification_access_permission_title">Accès aux notifications requis</string>
+    <string name="notification_access_permission_message">Minis a besoin de l\'accès aux notifications pour lire celles de la barre d\'état. Activez « Minis » dans les réglages, section Accès aux notifications.</string>
 </resources>

@@ -2144,4 +2144,22 @@
     <string name="mcp_config_copied">Connection config copied</string>
     <string name="mcp_revoke_last_note">Server is disabled automatically when no token remains</string>
     <string name="mcp_scope_min_one">At least one tool must remain selected. Tools marked MCP_CONFIRM by the central policy still require approval when selected.</string>
+    <string name="permission_action_read">read</string>
+    <string name="permission_action_write">write</string>
+    <string name="cal_permission_title">Calendar permission needed</string>
+    <string name="cal_permission_message">Minis needs %1$s permission to %2$s your calendar. Open Settings to allow it.</string>
+    <string name="contacts_permission_title">Contacts permission needed</string>
+    <string name="contacts_permission_message_write">Minis needs read + write contacts permission to delete entries. Open Settings to allow it.</string>
+    <string name="contacts_permission_message_read">Minis needs contacts permission to read your address book. Open Settings to allow it.</string>
+    <string name="location_permission_title">Location permission needed</string>
+    <string name="location_permission_message">Minis needs location permission to get your current location. Open Settings to allow it.</string>
+    <string name="photos_permission_title">Photos permission needed</string>
+    <string name="photos_permission_message">Minis needs media permission to read your photo library. Open Settings to allow it.</string>
+    <string name="photo_location_permission_title">Photo location needed</string>
+    <string name="photo_location_permission_message">Minis needs photo-location permission to read GPS EXIF for the `near` query. Open Settings to allow it.</string>
+    <string name="notification_permission_title">Notifications are off</string>
+    <string name="notification_permission_message">Minis needs notification permission to send notifications. Open Settings to allow it.</string>
+    <string name="speech_permission_message">Minis needs microphone permission to transcribe speech. Open Settings to allow it.</string>
+    <string name="notification_access_permission_title">Notification access needed</string>
+    <string name="notification_access_permission_message">Minis needs Notification access to read the status-bar notifications. Open Settings and enable \"Minis\" under Notification access.</string>
 </resources>

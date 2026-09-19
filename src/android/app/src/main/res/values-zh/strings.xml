@@ -2055,4 +2055,22 @@
     <string name="mcp_config_copied">连接配置已复制</string>
     <string name="mcp_revoke_last_note">令牌全部撤销后服务器会自动停用</string>
     <string name="mcp_scope_min_one">至少要保留一个工具。被中心策略标记为 MCP_CONFIRM 的工具即使选中，也仍然需要批准。</string>
+    <string name="permission_action_read">读取</string>
+    <string name="permission_action_write">写入</string>
+    <string name="cal_permission_title">需要日历权限</string>
+    <string name="cal_permission_message">Minis 需要日历%1$s权限才能%2$s你的日历。请打开设置允许。</string>
+    <string name="contacts_permission_title">需要通讯录权限</string>
+    <string name="contacts_permission_message_write">Minis 需要通讯录读写权限才能删除联系人。请打开设置允许。</string>
+    <string name="contacts_permission_message_read">Minis 需要通讯录权限才能读取你的通讯录。请打开设置允许。</string>
+    <string name="location_permission_title">需要位置权限</string>
+    <string name="location_permission_message">Minis 需要位置权限才能获取你的当前位置。请打开设置允许。</string>
+    <string name="photos_permission_title">需要照片权限</string>
+    <string name="photos_permission_message">Minis 需要媒体权限才能读取你的相册。请打开设置允许。</string>
+    <string name="photo_location_permission_title">需要照片位置信息</string>
+    <string name="photo_location_permission_message">Minis 需要照片位置权限，才能为 `near` 查询读取 GPS EXIF 信息。请打开设置允许。</string>
+    <string name="notification_permission_title">通知已关闭</string>
+    <string name="notification_permission_message">Minis 需要通知权限才能发送通知。请打开设置允许。</string>
+    <string name="speech_permission_message">Minis 需要麦克风权限才能转写语音。请打开设置允许。</string>
+    <string name="notification_access_permission_title">需要通知使用权</string>
+    <string name="notification_access_permission_message">Minis 需要通知使用权才能读取状态栏通知。请在设置的「通知使用权」中启用「Minis」。</string>
 </resources>

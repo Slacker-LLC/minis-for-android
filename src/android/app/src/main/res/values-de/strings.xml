@@ -1743,4 +1743,22 @@
     <string name="mcp_config_copied">Verbindungskonfiguration kopiert</string>
     <string name="mcp_revoke_last_note">Der Server wird automatisch deaktiviert, wenn kein Token mehr übrig ist</string>
     <string name="mcp_scope_min_one">Mindestens ein Tool muss ausgewählt bleiben. Tools, die von der zentralen Richtlinie als MCP_CONFIRM markiert sind, erfordern auch dann eine Freigabe.</string>
+    <string name="permission_action_read">Lesen</string>
+    <string name="permission_action_write">Schreiben</string>
+    <string name="cal_permission_title">Kalenderberechtigung erforderlich</string>
+    <string name="cal_permission_message">Minis benötigt %1$s-Rechte, um Ihren Kalender zu %2$s. Erlauben Sie es in den Einstellungen.</string>
+    <string name="contacts_permission_title">Kontaktberechtigung erforderlich</string>
+    <string name="contacts_permission_message_write">Minis benötigt Lese- und Schreibrechte für Kontakte, um Einträge zu löschen. Erlauben Sie es in den Einstellungen.</string>
+    <string name="contacts_permission_message_read">Minis benötigt Kontaktberechtigung, um Ihr Adressbuch zu lesen. Erlauben Sie es in den Einstellungen.</string>
+    <string name="location_permission_title">Standortberechtigung erforderlich</string>
+    <string name="location_permission_message">Minis benötigt Standortberechtigung, um Ihren aktuellen Standort zu ermitteln. Erlauben Sie es in den Einstellungen.</string>
+    <string name="photos_permission_title">Fotoberechtigung erforderlich</string>
+    <string name="photos_permission_message">Minis benötigt Medienberechtigung, um Ihre Fotobibliothek zu lesen. Erlauben Sie es in den Einstellungen.</string>
+    <string name="photo_location_permission_title">Foto-Standort erforderlich</string>
+    <string name="photo_location_permission_message">Minis benötigt die Foto-Standortberechtigung, um GPS-EXIF für die Abfrage `near` zu lesen. Erlauben Sie es in den Einstellungen.</string>
+    <string name="notification_permission_title">Benachrichtigungen sind aus</string>
+    <string name="notification_permission_message">Minis benötigt Benachrichtigungsrechte, um Benachrichtigungen zu senden. Erlauben Sie es in den Einstellungen.</string>
+    <string name="speech_permission_message">Minis benötigt Mikrofonrechte, um Sprache zu transkribieren. Erlauben Sie es in den Einstellungen.</string>
+    <string name="notification_access_permission_title">Zugriff auf Benachrichtigungen erforderlich</string>
+    <string name="notification_access_permission_message">Minis benötigt Zugriff auf Benachrichtigungen, um die Statusleisten-Benachrichtigungen zu lesen. Aktivieren Sie \"Minis\" in den Einstellungen unter Benachrichtigungszugriff.</string>
 </resources>
