@@ -1087,6 +1087,18 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 踩到的坑 | ① Android 字符串资源里裸撇号必须在 8 个语言文件里统一转义（本次 ko 的「'권한'」导致 `Invalid unicode escape sequence`，而报错行号指向相邻资源，排查花了些时间）；② 上一轮被强杀的 Gradle 一直占着 `/tmp/minis-gradle.lock`，导致后续构建排队——已 kill 并确认锁释放 |
 | 仍未做 | ① `ShizukuPermissionScreen`（Shizuku 状态/安装/授权）与 `OffloadPermissionScreen`（工具权限）目前只能从各自的路由进入，未挂进「系统与权限」这一层，需要归位；② 权限页里的「语音纠错」更像 Agent 行为设置，可考虑移到「Agent 运行时」；③ 后台与通知的「后台任务悬浮窗」与权限页的「显示在其他应用上层」名字相近但含义不同，建议改名区分 |
 
+### 设置页最后三处归位 + 工作过程「类型化工作项 / 轮次时长 / 分组小结」（2026-09-19） — `b7aae563` `c8e52f93`…`$(git log --oneline -1 | cut -d' ' -f1)`
+
+| 项 | 结果 |
+|---|---|
+| 归位 ① | `工具权限`（OffloadPermissionScreen）与 `Shizuku` 此前只能从对方页面进入——旧 hub 的「权限」行指向的其实是工具权限页，我把它改指系统权限页后就顺手把这两页变成孤儿；现在它们是「系统与权限」分类页里的两行，和权限放在一起 |
+| 归位 ② | `语音纠错学习` 从权限页移到「Agent 运行时」分类页：它是 agent 行为（有自己的同意开关），不是系统授权 |
+| 归位 ③ | 悬浮窗重名：权限页那行是系统权限，改名「悬浮窗权限 / 显示在其他应用上层」；后台页那行是应用内任务浮窗，改名「应用内任务浮窗」。该小节原本是硬编码中文，已进资源并补齐 8 语言 |
+| 工作过程（对齐 Codex 模型） | Codex 那一套的关键是**数据层**：每一步是带类型的 item（reasoning / command / file change / MCP / search），实时视图与完成后的收束都由类型驱动。本仓库缺的正是其中两样：① **轮次时长**（`WorkProcess.durationMs`：首个步骤 startTimeMs 到末个步骤 startTimeMs+durationMs；运行中为 null，旧数据无时间戳也为 null）；② **按类型统计**（`WorkItemKind` + 纯分类器 `workItemKindOf`，由工具名决定，实时面板与收束行不可能各说一套） |
+| 呈现 | 收束行在完成后以 `用时 56s` 开头（无时间戳的旧行回退到原来的「已完成 N 步」）；展开面板顶部多一行分组小结（按数量降序，如 `7 条命令 · 2 次文件修改`）；reasoning 与未识别步骤不计入小结（前者面板里已有思考小节，后者说了等于没说） |
+| 验证口径 | `:app:testDebugUnitTest` **2429 例 0 失败**（新增 `WorkProcessSummaryTest` 6 例：分类含规范 MCP 名、时长计算、运行中/无时间戳为 null、计数、分组排序与空集）+ `:app:assembleDebug`。**真机观感未验**：手机上两个会话都是纯问候，没有工具步骤，收束行的新文案要等一次真实工具回合才能看到 |
+| 踩坑 | Compose 不允许在 `joinToString`/`tallyLine` 这类普通 lambda 里调用 `@Composable`（`@Composable invocations can only happen from the context of a @Composable function`）——改成先用纯函数取出分组、再用普通 for 循环解析标签 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
