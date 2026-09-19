@@ -1801,4 +1801,5 @@
     <string name="settings_assistant_role_held_toast">Уже ассистент по умолчанию</string>
     <string name="settings_assistant_role_missing_toast">На этом устройстве нет настройки ассистента</string>
     <string name="settings_system_enhance_footer">Root, переключатели модуля и то, что они открывают, — здесь.</string>
+    <string name="chat_new_session">Новый чат</string>
 </resources>

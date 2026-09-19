@@ -1551,4 +1551,5 @@
     <string name="settings_assistant_role_held_toast">Ist bereits der Standard-Assistent</string>
     <string name="settings_assistant_role_missing_toast">Dieses Gerät hat keine Assistenten-Einstellung</string>
     <string name="settings_system_enhance_footer">Root, die Modul-Schalter und was sie jeweils freischalten, stehen hier.</string>
+    <string name="chat_new_session">Neuer Chat</string>
 </resources>

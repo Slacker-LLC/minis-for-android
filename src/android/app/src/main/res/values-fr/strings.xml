@@ -1442,4 +1442,5 @@
     <string name="settings_assistant_role_held_toast">Déjà l\'assistant par défaut</string>
     <string name="settings_assistant_role_missing_toast">Cet appareil n\'a pas de réglage d\'assistant</string>
     <string name="settings_system_enhance_footer">Root, les interrupteurs du module et ce qu\'ils débloquent sont ici.</string>
+    <string name="chat_new_session">Nouvelle conversation</string>
 </resources>

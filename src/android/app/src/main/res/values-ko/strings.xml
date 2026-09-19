@@ -1548,4 +1548,5 @@
     <string name="settings_assistant_role_held_toast">이미 기본 어시스턴트입니다</string>
     <string name="settings_assistant_role_missing_toast">이 기기에는 기본 어시스턴트 설정이 없습니다</string>
     <string name="settings_system_enhance_footer">Root, 모듈 스위치와 각각이 여는 기능이 여기에 모여 있습니다.</string>
+    <string name="chat_new_session">새 대화</string>
 </resources>
