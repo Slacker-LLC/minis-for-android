@@ -85,7 +85,7 @@ fun MemoryFileViewerBody(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 Text(
-                    text = initialContent.ifEmpty { "(empty)" },
+                    text = if (initialContent.isEmpty()) stringResource(R.string.memory_list_empty) else initialContent,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = ChatColors.primaryText,
@@ -294,7 +294,7 @@ fun MutationResultDialog(
         onDismissRequest = onDismiss,
         text = { Text(msg) },
         confirmButton = {
-            MinisTextButton(onClick = onDismiss) { Text("OK") }
+            MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.ok)) }
         },
     )
 }

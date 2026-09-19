@@ -162,7 +162,7 @@ fun StorageManagementScreen(
                 )
                 else -> sessions.forEachIndexed { index, session ->
                     SettingsValueRow(
-                        title = session.title ?: "Untitled",
+                        title = session.title ?: stringResource(R.string.chat_title_pill_session_default),
                         value = Formatter.formatFileSize(context, session.totalSize),
                         onClick = { onSessionClick(session.id) },
                         showDivider = index < sessions.size - 1,
@@ -215,7 +215,7 @@ fun SessionStorageDetailScreen(
     val totalSize = minisSize + mediaSize
     val hasFiles = totalSize > 0
 
-    SettingsScaffold(title = session?.title ?: "Session", onBack = onBack) {
+    SettingsScaffold(title = session?.title ?: stringResource(R.string.storage_session_fallback_title), onBack = onBack) {
         SettingsSection(header = stringResource(R.string.storage_section_minis_files)) {
             if (minisSize > 0) {
                 SettingsValueRow(
@@ -238,7 +238,7 @@ fun SessionStorageDetailScreen(
         SettingsSection(header = stringResource(R.string.storage_section_media)) {
             if (mediaSize > 0) {
                 SettingsValueRow(
-                    title = "Media",
+                    title = stringResource(R.string.permissions_category_media),
                     value = Formatter.formatFileSize(context, mediaSize),
                     showDivider = false,
                 )
@@ -297,7 +297,7 @@ fun SessionStorageDetailScreen(
             onDismissRequest = { showClearDialog = false },
             title = { Text(stringResource(R.string.storage_clear_confirm_title)) },
             text = {
-                Text("This will delete ${Formatter.formatFileSize(context, totalSize)} of files. This action cannot be undone.")
+                Text(stringResource(R.string.storage_clear_confirm_body, Formatter.formatFileSize(context, totalSize)))
             },
             confirmButton = {
                 MinisTextButton(onClick = {

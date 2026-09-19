@@ -54,6 +54,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -168,7 +170,7 @@ fun InlineAudioPlayer(
                     ) {
                         Icon(
                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            contentDescription = stringResource(if (isPlaying) R.string.common_pause else R.string.common_play),
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -209,7 +211,7 @@ fun InlineAudioPlayer(
                         ) {
                             Icon(
                                 Icons.Default.Stop,
-                                contentDescription = "Stop",
+                                contentDescription = stringResource(R.string.common_stop),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -494,7 +496,7 @@ private fun FullscreenVideoContent(file: File, onDismiss: () -> Unit) {
             ) {
                 CircleControlButton(
                     icon = Icons.Default.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.common_close),
                     onClick = {
                         try { videoView?.pause() } catch (_: Throwable) {}
                         onDismiss()
@@ -510,7 +512,7 @@ private fun FullscreenVideoContent(file: File, onDismiss: () -> Unit) {
                 )
                 CircleControlButton(
                     icon = Icons.Default.Share,
-                    contentDescription = "Share",
+                    contentDescription = stringResource(R.string.common_share),
                     onClick = { shareMediaFile(context, file, "video/*") },
                 )
             }
@@ -550,7 +552,7 @@ private fun FullscreenVideoContent(file: File, onDismiss: () -> Unit) {
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = stringResource(if (isPlaying) R.string.common_pause else R.string.common_play),
                         tint = Color.White,
                     )
                 }

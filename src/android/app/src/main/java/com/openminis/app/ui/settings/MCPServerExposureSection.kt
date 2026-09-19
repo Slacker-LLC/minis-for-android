@@ -22,8 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.openminis.app.R
 import com.openminis.app.mcp.server.MCPServerManager
 import com.openminis.app.ui.components.MinisTextButton
 
@@ -48,17 +50,16 @@ internal fun MCPServerExposureSection() {
     }
 
     SettingsSection(
-        header = "Expose Minis",
-        footer = "Streamable HTTP on 127.0.0.1 only. LAN/TLS exposure is not enabled here. " +
-            "New Settings tokens start with only MCP_ALLOWED tools; you can explicitly add or remove exposed tools below.",
+        header = stringResource(R.string.mcp_expose_header),
+        footer = stringResource(R.string.mcp_exposure_footer),
     ) {
         SettingsSwitchRow(
-            title = "Local MCP server",
+            title = stringResource(R.string.mcp_server_local_title),
             subtitle = when {
-                status.running -> "Running · ${status.endpoint}"
+                status.running -> stringResource(R.string.mcp_status_running, status.endpoint)
                 status.enabled && status.lastError != null -> status.lastError
-                status.configured -> "Stopped · ${status.endpoint}"
-                else -> "Create an access token before enabling"
+                status.configured -> stringResource(R.string.mcp_status_stopped, status.endpoint)
+                else -> stringResource(R.string.mcp_create_token_first)
             },
             checked = status.enabled,
             enabled = status.configured,
@@ -68,49 +69,49 @@ internal fun MCPServerExposureSection() {
                 if (!ok) {
                     Toast.makeText(
                         context,
-                        MCPServerManager.status().lastError ?: "MCP server could not start",
+                        MCPServerManager.status().lastError ?: context.getString(R.string.mcp_start_failed),
                         Toast.LENGTH_SHORT,
                     ).show()
                 }
             },
         )
         SettingsRow(
-            title = "Endpoint",
+            title = stringResource(R.string.voice_service_endpoint),
             subtitle = status.endpoint,
-            onClick = { copy(status.endpoint, "Endpoint copied") },
+            onClick = { copy(status.endpoint, context.getString(R.string.mcp_endpoint_copied)) },
             showChevron = false,
-            trailing = { Text("Copy", color = MaterialTheme.colorScheme.primary) },
+            trailing = { Text(stringResource(R.string.common_copy), color = MaterialTheme.colorScheme.primary) },
         )
         SettingsRow(
-            title = "Access token",
+            title = stringResource(R.string.mcp_access_token_label),
             subtitle = if (managedToken == null) {
-                "Not configured"
+                stringResource(R.string.mcp_not_configured)
             } else {
-                "Configured · ${managedToken!!.scope.size} scoped tools"
+                stringResource(R.string.mcp_configured_scoped, managedToken!!.scope.size)
             },
             onClick = {
                 val token = MCPServerManager.createOrRotateManagedToken()
                 refresh()
                 if (token != null) {
-                    copy(token.token, "New access token copied")
+                    copy(token.token, context.getString(R.string.mcp_new_token_copied))
                 } else {
-                    Toast.makeText(context, "Could not create MCP access token", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.mcp_token_create_failed), Toast.LENGTH_SHORT).show()
                 }
             },
             showChevron = false,
             trailing = {
                 Text(
-                    if (managedToken == null) "Generate" else "Rotate",
+                    if (managedToken == null) stringResource(R.string.mcp_generate) else stringResource(R.string.mcp_rotate),
                     color = MaterialTheme.colorScheme.primary,
                 )
             },
         )
         SettingsRow(
-            title = "Exposed tools",
+            title = stringResource(R.string.mcp_exposed_tools_title),
             subtitle = if (managedToken == null) {
-                "Generate a token first"
+                stringResource(R.string.mcp_generate_token_first)
             } else {
-                "${managedToken!!.scope.size} selected · tap to edit"
+                stringResource(R.string.mcp_tools_selected, managedToken!!.scope.size)
             },
             onClick = managedToken?.let { token ->
                 {
@@ -121,16 +122,16 @@ internal fun MCPServerExposureSection() {
             showChevron = managedToken != null,
         )
         SettingsRow(
-            title = "Copy connection config",
-            subtitle = "Claude Desktop / Cursor-compatible mcpServers JSON",
+            title = stringResource(R.string.mcp_copy_connection_config),
+            subtitle = stringResource(R.string.mcp_copy_config_subtitle),
             onClick = managedToken?.let { token ->
                 {
-                    copy(MCPServerManager.connectionConfig(token), "Connection config copied")
+                    copy(MCPServerManager.connectionConfig(token), context.getString(R.string.mcp_config_copied))
                 }
             },
             showChevron = false,
             trailing = if (managedToken != null) {
-                { Text("Copy", color = MaterialTheme.colorScheme.primary) }
+                { Text(stringResource(R.string.common_copy), color = MaterialTheme.colorScheme.primary) }
             } else {
                 null
             },
@@ -138,11 +139,11 @@ internal fun MCPServerExposureSection() {
         )
         if (managedToken != null) {
             SettingsRow(
-                title = "Revoke Settings token",
+                title = stringResource(R.string.mcp_revoke_settings_token),
                 subtitle = if (status.tokenCount > 1) {
-                    "Revokes this token only; ${status.tokenCount - 1} other token(s) remain"
+                    stringResource(R.string.mcp_revoke_others, status.tokenCount - 1)
                 } else {
-                    "Server is disabled automatically when no token remains"
+                    stringResource(R.string.mcp_revoke_last_note)
                 },
                 onClick = {
                     MCPServerManager.revokeManagedToken()
@@ -160,7 +161,7 @@ internal fun MCPServerExposureSection() {
         val available = remember(showScopeDialog) { MCPServerManager.availableToolsForManagedToken() }
         AlertDialog(
             onDismissRequest = { showScopeDialog = false },
-            title = { Text("Exposed tools") },
+            title = { Text(stringResource(R.string.mcp_exposed_tools_title)) },
             text = {
                 Column(
                     modifier = Modifier
@@ -170,7 +171,7 @@ internal fun MCPServerExposureSection() {
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        "At least one tool must remain selected. Tools marked MCP_CONFIRM by the central policy still require approval when selected.",
+                        stringResource(R.string.mcp_scope_min_one),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -200,10 +201,10 @@ internal fun MCPServerExposureSection() {
                             showScopeDialog = false
                         }
                     },
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                MinisTextButton(onClick = { showScopeDialog = false }) { Text("Cancel") }
+                MinisTextButton(onClick = { showScopeDialog = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

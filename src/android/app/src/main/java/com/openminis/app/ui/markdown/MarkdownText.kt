@@ -59,6 +59,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -233,7 +235,7 @@ private fun CodeBlockView(block: MarkdownParser.Block.CodeBlock) {
             ) {
                 Icon(
                     Icons.Default.ContentCopy,
-                    contentDescription = "Copy code",
+                    contentDescription = stringResource(R.string.common_copy_code),
                     modifier = Modifier.height(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -840,7 +842,7 @@ private fun MinisVideoBlock(block: MarkdownParser.Block.Video) {
             }
             Icon(
                 imageVector = Icons.Filled.PlayCircleFilled,
-                contentDescription = "Play video",
+                contentDescription = stringResource(R.string.md_play_video),
                 tint = Color.White.copy(alpha = 0.9f),
                 modifier = Modifier.width(56.dp).height(56.dp),
             )
@@ -972,7 +974,7 @@ private fun MinisAudioBlock(block: MarkdownParser.Block.Audio) {
         }
         Icon(
             imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            contentDescription = if (isPlaying) "Pause" else "Play",
+            contentDescription = stringResource(if (isPlaying) R.string.common_pause else R.string.common_play),
             tint = tint,
             modifier = Modifier.width(28.dp).height(28.dp),
         )

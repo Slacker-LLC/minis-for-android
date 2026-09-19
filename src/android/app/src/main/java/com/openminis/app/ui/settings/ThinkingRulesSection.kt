@@ -260,7 +260,7 @@ private fun ThinkingRuleRow(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title.ifEmpty { "(unnamed rule)" },
+                    text = if (title.isEmpty()) stringResource(R.string.thinking_rule_unnamed) else title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,

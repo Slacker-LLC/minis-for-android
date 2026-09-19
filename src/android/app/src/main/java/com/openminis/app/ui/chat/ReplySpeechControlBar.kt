@@ -89,14 +89,14 @@ fun ReplySpeechControlBar(
                             } else {
                                 Icons.Default.Pause
                             },
-                            contentDescription = if (state.status == ReplySpeechState.Status.PAUSED) "Resume" else "Pause",
+                            contentDescription = if (state.status == ReplySpeechState.Status.PAUSED) stringResource(R.string.resume_action) else stringResource(R.string.common_pause),
                             modifier = Modifier.size(20.dp),
                         )
                     }
                     IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
+                            contentDescription = stringResource(R.string.common_close),
                             modifier = Modifier.size(20.dp),
                         )
                     }

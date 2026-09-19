@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.openminis.app.R
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -159,7 +161,7 @@ fun KaTeXRenderView(
         // and the formula renders ~density× too large).
         Image(
             bitmap = cached.bitmap.asImageBitmap(),
-            contentDescription = "Math: $latex",
+            contentDescription = stringResource(R.string.md_math_label, latex),
             modifier = modifier.size(cached.cssWidth.dp, cached.cssHeight.dp),
         )
         return
@@ -176,7 +178,7 @@ fun KaTeXRenderView(
     if (renderedBitmap != null) {
         Image(
             bitmap = renderedBitmap!!.asImageBitmap(),
-            contentDescription = "Math: $latex",
+            contentDescription = stringResource(R.string.md_math_label, latex),
             modifier = modifier.size(renderedCssWidth.dp, renderedCssHeight.dp),
         )
     } else if (renderError != null) {

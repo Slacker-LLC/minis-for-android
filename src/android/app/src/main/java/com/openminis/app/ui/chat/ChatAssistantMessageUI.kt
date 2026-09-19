@@ -958,7 +958,7 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
                 Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
-                text = "Deep Thinking",
+                text = stringResource(R.string.appearance_section_deep_thinking),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = thinkingBlue,
@@ -987,7 +987,7 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
             } else {
                 Icon(
                     imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    contentDescription = stringResource(if (expanded) R.string.chat_collapse else R.string.chat_expand),
                     tint = thinkingBlue.copy(alpha = 0.5f),
                     modifier = Modifier.size(14.dp),
                 )
@@ -1120,7 +1120,7 @@ private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Deep Thinking",
+                        text = stringResource(R.string.appearance_section_deep_thinking),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF007AFF),

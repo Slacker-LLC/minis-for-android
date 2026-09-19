@@ -2428,11 +2428,11 @@ fun ChatScreen(
                     if (!isTwoPane) {
                         if (onOpenDrawer != null) {
                             IconButton(onClick = onOpenDrawer) {
-                                Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                                Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.common_menu))
                             }
                         } else {
                             IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                             }
                         }
                     } else if (onToggleSidebar != null) {
@@ -2471,7 +2471,7 @@ fun ChatScreen(
                     // iOS: "..." circle button → dropdown menu
                     Box {
                         IconButton(onClick = { showChatMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                         }
                         MinisMenu(
                             expanded = showChatMenu,
@@ -4083,7 +4083,7 @@ fun ChatScreen(
                             // anchor" for the turn-walk, and keeps this button visually
                             // distinct from the down button's plain chevron.
                             imageVector = Icons.Default.VerticalAlignTop,
-                            contentDescription = "Scroll to previous message",
+                            contentDescription = stringResource(R.string.chat_scroll_to_previous),
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -4139,7 +4139,7 @@ fun ChatScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Scroll to bottom",
+                            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -5423,7 +5423,7 @@ fun ChatScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Add,
-                                    contentDescription = "Attach",
+                                    contentDescription = stringResource(R.string.common_attach),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -6263,7 +6263,7 @@ fun ChatScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Stop,
-                                    contentDescription = "Stop",
+                                    contentDescription = stringResource(R.string.common_stop),
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -6298,7 +6298,7 @@ fun ChatScreen(
                             ) {
                                 Icon(
                                     Icons.Default.ArrowUpward,
-                                    contentDescription = "Send",
+                                    contentDescription = stringResource(R.string.send),
                                     tint = if (canActivate) ChatColors.background
                                     else ChatColors.primaryText.copy(alpha = 0.5f),
                                     modifier = Modifier.size(20.dp),

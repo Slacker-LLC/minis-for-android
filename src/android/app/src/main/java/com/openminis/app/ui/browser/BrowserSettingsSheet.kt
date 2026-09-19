@@ -515,7 +515,7 @@ private fun ViewportSection(
             onClick = onSelectDefault,
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text("Default (auto by UA)", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.browser_ua_default), style = MaterialTheme.typography.bodyMedium)
             val (uaW, uaH) = selectedProfile.viewportSize
             Text(
                 "${uaW} × $uaH",
@@ -537,9 +537,9 @@ private fun ViewportSection(
             onClick = onSelectCustom,
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text("Custom", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.browser_settings_ua_custom), style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Set your own width × height",
+                stringResource(R.string.browser_viewport_custom_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -556,7 +556,7 @@ private fun ViewportSection(
             OutlinedTextField(
                 value = widthText,
                 onValueChange = onWidthChange,
-                label = { Text("Width") },
+                label = { Text(stringResource(R.string.browser_viewport_width)) },
                 singleLine = true,
                 // [T-android-browser-settings-keyboard-overlap] focus →
                 // scroll-into-view so the soft keyboard doesn't cover
@@ -571,7 +571,7 @@ private fun ViewportSection(
             OutlinedTextField(
                 value = heightText,
                 onValueChange = onHeightChange,
-                label = { Text("Height") },
+                label = { Text(stringResource(R.string.browser_viewport_height)) },
                 singleLine = true,
                 // [T-android-browser-settings-keyboard-overlap] focus →
                 // scroll-into-view; mirrors the Width field.

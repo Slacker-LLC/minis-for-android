@@ -289,7 +289,7 @@ fun ProviderDetailScreen(
                         )
                     } else {
                         SettingsSwitchRow(
-                            title = "Allow insecure HTTP for this provider",
+                            title = stringResource(R.string.provider_allow_insecure_http),
                             checked = approvedCleartextOrigin == cleartextOrigin,
                             onCheckedChange = { allow ->
                                 approvedCleartextOrigin = if (allow) cleartextOrigin else null
@@ -501,7 +501,7 @@ fun ProviderDetailScreen(
                                 }
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                        ) { Text("Auto") }
+                        ) { Text(stringResource(R.string.soul_lang_auto)) }
                         SegmentedButton(
                             selected = mode == com.openminis.app.data.model.ImageEndpointMode.imagesGenerations,
                             onClick = {
@@ -516,7 +516,7 @@ fun ProviderDetailScreen(
                                 }
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                        ) { Text("Images API") }
+                        ) { Text(stringResource(R.string.provider_image_mode_images_api)) }
                         SegmentedButton(
                             selected = mode == com.openminis.app.data.model.ImageEndpointMode.chatCompletions,
                             onClick = {
@@ -530,7 +530,7 @@ fun ProviderDetailScreen(
                                 }
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                        ) { Text("Chat") }
+                        ) { Text(stringResource(R.string.chat_default_title)) }
                     }
                 }
             }
@@ -587,7 +587,7 @@ fun ProviderDetailScreen(
             // Refresh action sits as the first row, mirroring the iOS
             // tap-to-refresh affordance in the section header area.
             SettingsRow(
-                title = if (isRefreshing) "Refreshing…" else "Refresh model list",
+                title = stringResource(if (isRefreshing) R.string.provider_refreshing else R.string.provider_refresh_models),
                 onClick = if (isRefreshing) {
                     null
                 } else {
@@ -1014,7 +1014,7 @@ private fun ApiKeyCredentialBlock(
                 IconButton(onClick = onToggleVisibility) {
                     Icon(
                         if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (keyVisible) "Hide" else "Show",
+                        contentDescription = stringResource(if (keyVisible) R.string.common_hide else R.string.common_show),
                     )
                 }
             },
@@ -1049,7 +1049,7 @@ private fun ApiKeyCredentialBlock(
             IconButton(onClick = onToggleVisibility) {
                 Icon(
                     if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    contentDescription = if (keyVisible) "Hide" else "Show",
+                    contentDescription = stringResource(if (keyVisible) R.string.common_hide else R.string.common_show),
                 )
             }
             MinisSmallTextButton(onClick = onBeginEdit) {

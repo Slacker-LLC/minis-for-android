@@ -332,7 +332,7 @@ internal fun ToolDetailSheet(
                 ) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.common_close),
                         tint = ChatColors.primaryText,
                         modifier = Modifier.size(16.dp),
                     )
@@ -688,7 +688,7 @@ internal fun ToolDetailSheet(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = if (fileName.isNotEmpty()) fileName else "(file)",
+                                        text = if (fileName.isNotEmpty()) fileName else stringResource(R.string.tool_file_placeholder),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium,
                                         fontFamily = FontFamily.Monospace,
@@ -765,7 +765,7 @@ internal fun ToolDetailSheet(
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "Edited",
+                                                text = stringResource(R.string.tool_edited_label),
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = ChatColors.primaryText,
@@ -941,7 +941,7 @@ internal fun ToolDetailSheet(
                                     screenshotBitmap.height.coerceAtLeast(1)
                                 Image(
                                     bitmap = screenshotBitmap.asImageBitmap(),
-                                    contentDescription = "Browser screenshot",
+                                    contentDescription = stringResource(R.string.tool_browser_screenshot),
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -970,7 +970,7 @@ internal fun ToolDetailSheet(
                                             strokeWidth = 2.dp,
                                             color = ChatColors.link,
                                         )
-                                        Text("Loading...", fontSize = 12.sp, color = ChatColors.tertiaryText)
+                                        Text(stringResource(R.string.common_loading), fontSize = 12.sp, color = ChatColors.tertiaryText)
                                     }
                                 }
                             }
@@ -1000,7 +1000,7 @@ internal fun ToolDetailSheet(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Result",
+                                            text = stringResource(R.string.tool_result_label),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = ChatColors.secondaryText,
@@ -1145,7 +1145,7 @@ internal fun ToolDetailSheet(
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = if (isLive) "Running..." else "No output",
+                                        text = if (isLive) stringResource(R.string.tool_running_label) else stringResource(R.string.tool_no_output),
                                         color = ChatColors.tertiaryText,
                                         fontSize = 14.sp,
                                     )
@@ -1261,7 +1261,7 @@ internal fun ToolDetailSheet(
                     ) {
                         Icon(
                             Icons.Default.SkipPrevious,
-                            contentDescription = "Previous",
+                            contentDescription = stringResource(R.string.common_previous),
                             tint = if (currentIdx > 0) ChatColors.primaryText else ChatColors.disabledText,
                             modifier = Modifier.size(22.dp),
                         )
@@ -1307,7 +1307,7 @@ internal fun ToolDetailSheet(
                     ) {
                         Icon(
                             Icons.Default.SkipNext,
-                            contentDescription = "Next",
+                            contentDescription = stringResource(R.string.common_next_item),
                             tint = if (currentIdx < toolBlocks.lastIndex) ChatColors.primaryText else ChatColors.disabledText,
                             modifier = Modifier.size(22.dp),
                         )
@@ -1512,7 +1512,7 @@ private fun LazyRevealToolText(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Load more ($nextLines lines)",
+                    text = stringResource(R.string.tool_load_more_lines, nextLines),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = color.copy(alpha = 0.9f),
@@ -1521,7 +1521,7 @@ private fun LazyRevealToolText(
                     },
                 )
                 Text(
-                    text = "Load all (~$remainingLines)",
+                    text = stringResource(R.string.tool_load_all_lines, remainingLines),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = color.copy(alpha = 0.9f),
@@ -1601,7 +1601,7 @@ private fun EditorCard(
                 )
                 if (sizeLabel != null) {
                     Text(
-                        text = if (isStreaming) "($sizeLabel received)" else "($sizeLabel)",
+                        text = if (isStreaming) stringResource(R.string.tool_size_received, sizeLabel) else "($sizeLabel)",
                         fontSize = 11.sp,
                         color = if (isStreaming) Color(0xFFFF9500).copy(alpha = 0.8f) else sizeColor,
                     )

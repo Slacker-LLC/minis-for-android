@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.openminis.app.R
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.data.model.LLMMessage
@@ -1069,7 +1070,7 @@ class SessionListViewModel(
             val messages = chatRepository.loadMessages(id)
             val newSession = chatRepository.createSession(
                 modelId = session.modelId,
-                title = "${session.title ?: "Chat"} (Copy)",
+                title = context.getString(R.string.session_fork_copy_title, session.title ?: context.getString(R.string.chat_default_title)),
             )
             for (msg in messages) {
                 chatRepository.appendMessage(

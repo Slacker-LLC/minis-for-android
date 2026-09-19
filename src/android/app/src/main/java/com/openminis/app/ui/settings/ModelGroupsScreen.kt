@@ -293,7 +293,7 @@ fun ModelGroupsScreen(
                     Spacer(modifier = Modifier.height(SectionDesign.SectionTopGap))
                 }
                 item("defaults_section_header") {
-                    SectionHeader(text = "Defaults")
+                    SectionHeader(text = stringResource(R.string.model_groups_defaults))
                 }
                 item("defaults_section_card") {
                     SectionCard {

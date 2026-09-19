@@ -1481,7 +1481,7 @@ private fun DualFabRow(
                     FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                 },
             ) {
-                Icon(Icons.Outlined.Forum, contentDescription = "New Chat", tint = Color.White, modifier = Modifier.size(24.dp))
+                Icon(Icons.Outlined.Forum, contentDescription = stringResource(R.string.new_chat), tint = Color.White, modifier = Modifier.size(24.dp))
             }
             DropdownMenu(
                 expanded = showGroupMenu,
@@ -2654,7 +2654,7 @@ private fun SessionRow(
                 )
             } else {
                 Text(
-                    text = session.lastMessage ?: "No messages yet",
+                    text = session.lastMessage ?: stringResource(R.string.session_list_no_messages),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -3017,17 +3017,18 @@ internal fun SessionEditSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MinisTextButton(onClick = onDismiss) { Text("Cancel") }
+                MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "Edit Session",
+                    stringResource(R.string.session_edit_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
+                val defaultTitle = stringResource(R.string.new_chat)
                 MinisTextButton(
-                    onClick = { onSave(title.ifBlank { "New Chat" }, selectedCategory) },
-                ) { Text("Save") }
+                    onClick = { onSave(title.ifBlank { defaultTitle }, selectedCategory) },
+                ) { Text(stringResource(R.string.save)) }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -3036,7 +3037,7 @@ internal fun SessionEditSheet(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.webapp_sheet_title_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )

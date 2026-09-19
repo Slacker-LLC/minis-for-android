@@ -544,7 +544,7 @@ private fun ColumnScope.ApiKeyConfigSection(
                     IconButton(onClick = { showApiKeyPlaintext = !showApiKeyPlaintext }) {
                         Icon(
                             if (showApiKeyPlaintext) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (showApiKeyPlaintext) "Hide" else "Show",
+                            contentDescription = stringResource(if (showApiKeyPlaintext) R.string.common_hide else R.string.common_show),
                         )
                     }
                 },
@@ -598,7 +598,7 @@ private fun ColumnScope.ApiKeyConfigSection(
             if (isCleartextHttp) {
                 if (isAllowedCleartextEndpoint) {
                     SettingsSwitchRow(
-                        title = "Allow insecure HTTP for this provider",
+                        title = stringResource(R.string.provider_allow_insecure_http),
                         checked = approvedCleartextOrigin == cleartextOrigin,
                         onCheckedChange = { allow ->
                             approvedCleartextOrigin = if (allow) cleartextOrigin else null
@@ -606,14 +606,14 @@ private fun ColumnScope.ApiKeyConfigSection(
                         showDivider = false,
                     )
                     Text(
-                        text = "HTTP is not encrypted. API keys and prompts can be read or changed on the network. Use this only for an endpoint you trust.",
+                        text = stringResource(R.string.provider_insecure_http_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 } else {
                     Text(
-                        text = "Cleartext HTTP is allowed only for local/private provider endpoints. Use HTTPS for public hosts.",
+                        text = stringResource(R.string.provider_cleartext_local_only),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
