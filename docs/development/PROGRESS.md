@@ -1188,6 +1188,16 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 未验证 | 真机截图仍未做：手机未接回 USB（`adb devices` 为空） |
 | 仍写死英文（未做） | guest CLI 的命令输出与帮助文本（模型侧）、roleplay 部分界面、备份远端类型目录描述 |
 
+### 繁體中文补齐到 100%（2026-09-19） — `8d000438`
+
+| 项 | 结果 |
+|---|---|
+| 起点 | `values-zh-rTW` 只有 1108 key（英文默认 2245）：1137 条回退英文、61 条照抄英文，且 `bot_strings` / `strings_backup` / `restricted_settings_strings` 三个文件在繁體下不存在 |
+| 做法 | 简体目录此前已 100%，用 OpenCC `s2twp`（台湾正体 + 词汇转换）从简体译文生成：补 1137 条缺失 + 译 61 条照抄英文，并补建三个缺失文件；转换后逐条做 `s2t` 幂等复查，只剩 `群/羣`、`台/臺` 一类异体差异，采用台湾通用写法 |
+| 转义坑 | 简体原文里带 Android 转义（撇号、引号、\n）的条目，若按解析后的文本再转义会变成双重转义，AAPT2 报 `unescaped apostrophe`；改为从**原始资源文本**转换，修 17 条后 `aapt2 compile` 通过 |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败** + `:app:lintDebug` **0 error** + `:app:assembleDebug` |
+| 现状 | zh 2245/2245、zh-rTW 2245/2245；两者「与英文相同」只剩 49 / 48 条品牌与协议名 |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
