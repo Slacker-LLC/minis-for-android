@@ -1099,6 +1099,17 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 | 验证口径 | `:app:testDebugUnitTest` **2429 例 0 失败**（新增 `WorkProcessSummaryTest` 6 例：分类含规范 MCP 名、时长计算、运行中/无时间戳为 null、计数、分组排序与空集）+ `:app:assembleDebug`。**真机观感未验**：手机上两个会话都是纯问候，没有工具步骤，收束行的新文案要等一次真实工具回合才能看到 |
 | 踩坑 | Compose 不允许在 `joinToString`/`tallyLine` 这类普通 lambda 里调用 `@Composable`（`@Composable invocations can only happen from the context of a @Composable function`）——改成先用纯函数取出分组、再用普通 for 循环解析标签 |
 
+### 工作过程「一轮一条 · 已处理/用时」修正（2026-09-19，真机两态验证） — `fc72c181`
+
+| 项 | 结果 |
+|---|---|
+| 用户反馈 | 「用时只能显示一条」「运行中就是要显示已处理多久，跑完显示共用时」——对照 codex 的两张截图（运行中 `已处理 6分钟35秒`，跑完 `用时 20分钟30秒 >`） |
+| 三个错 | ① **时长口径错**：原来用工具体块的起止时间求和，只覆盖"带时间戳的那次调用"——真机上跑 `sleep 20` 的一轮报 **用时 1s**；② **运行中没有时长**：只有"正在执行第 N 步"文案，不符合 codex 的 `已处理 X`；③ **一轮多条**：分组在每个 text 块处切断，于是"叙述→工具→叙述→工具→回答"一条问题出现 2~3 条「用时 Ns」 |
+| 修法 | ① 时长改用**本轮自己的时钟**：从用户消息的 `created_at` 到本轮最后一条 assistant 行的 `updated_at`（这两个是持久化字段，重载不丢；快照里另存了 `ChatMessage.createdAtMs/updatedAtMs`）；② 运行中由 UI 每秒 tick 显示 `已处理 Xs`，结束后换成 `用时 Xs`——同一条头部，两种文案；③ 分组改成"**最后一次工具调用之前的一切**进这一条行（含中间叙述，面板里按顺序渲染）"，**其后的文字就是回答**，留在行外。之所以按消息而不用跨消息聚合：`toChatMessages` 早就把一轮的多条 assistant 行合并成一条了 |
+| 踩坑 | ① 我第一版把"列表末尾 flush"插进了循环体内，导致直播中的工作行永远不 flush——**命令跑完界面直接空白**（用户当场发现）；② 隐藏 thinking（深度思考关闭）不能垫进行里，否则行里多出看不见的块；③ Compose 不允许在 `joinToString` 之类的普通 lambda 里调用 `@Composable` |
+| 真机两态验证 | 跑 `sleep 30` 的一轮：第 10 秒截图显示 `已处理 10s`；跑完显示 `用时 31s`，回答在收束行下方；普通两条命令的一轮显示 `用时 3s`。三张截图已交 |
+| 验证口径 | `:app:testDebugUnitTest` **2432 例 0 失败**（`TurnWorkRowTest` 3 例：一轮一条、叙述在行内、回答在行外、时长跨整轮；`WorkProcessGroupingTest` 三例按新规则改写）+ `:app:assembleDebug` |
+
 ## 五、待办阶段（顺序与规格见 `docs/analysis/eta-port-program.md`）
 
 | 阶段 | 内容 | 来源 |
