@@ -1606,4 +1606,13 @@
     <string name="appearance_accent_purple">보라</string>
     <string name="appearance_accent_orange">주황</string>
     <string name="appearance_accent_green">초록</string>
+    <string name="mount_add_failed_name_unusable">사용할 수 없는 이름입니다. 슬래시나 제어 문자 없이 64자까지입니다.</string>
+    <string name="mount_add_failed_name_taken">같은 이름의 마운트가 이미 있습니다.</string>
+    <string name="mount_add_failed_at_capacity">한 번에 최대 10개까지 마운트할 수 있습니다.</string>
+    <string name="mount_add_failed_all_files_access">마운트에는 \'모든 파일 접근\' 권한이 필요합니다. 없으면 다른 앱이 쓴 파일을 볼 수 없습니다.</string>
+    <string name="mount_add_failed_read_grant">이 폴더의 읽기 권한이 유지되지 않았습니다. 다시 선택하고 허용하세요.</string>
+    <string name="mount_add_failed_unsupported_uri">이 위치는 마운트할 수 없습니다. 내부 저장소나 SD 카드의 폴더를 선택하세요.</string>
+    <string name="mount_add_failed_unresolvable_path">이 폴더의 실제 경로를 확인할 수 없습니다.</string>
+    <string name="mount_add_failed_commit">마운트를 저장하지 못했습니다. 다시 시도하세요.</string>
+    <string name="mount_add_grant_action">권한 허용</string>
 </resources>

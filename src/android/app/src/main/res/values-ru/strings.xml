@@ -1882,4 +1882,13 @@
     <string name="appearance_accent_purple">Фиолетовый</string>
     <string name="appearance_accent_orange">Оранжевый</string>
     <string name="appearance_accent_green">Зелёный</string>
+    <string name="mount_add_failed_name_unusable">Такое имя нельзя: без косых черт и управляющих символов, до 64 символов.</string>
+    <string name="mount_add_failed_name_taken">Точка монтирования с таким именем уже есть.</string>
+    <string name="mount_add_failed_at_capacity">Одновременно можно смонтировать не более 10 папок.</string>
+    <string name="mount_add_failed_all_files_access">Для монтирования нужен доступ ко всем файлам — без него приложение не видит файлы, записанные другими.</string>
+    <string name="mount_add_failed_read_grant">Разрешение на чтение этой папки не сохранилось. Выберите её снова и разрешите.</string>
+    <string name="mount_add_failed_unsupported_uri">Это место нельзя смонтировать. Выберите папку во внутреннем хранилище или на карте памяти.</string>
+    <string name="mount_add_failed_unresolvable_path">Не удалось определить реальный путь этой папки.</string>
+    <string name="mount_add_failed_commit">Не удалось сохранить точку монтирования. Попробуйте ещё раз.</string>
+    <string name="mount_add_grant_action">Разрешить</string>
 </resources>

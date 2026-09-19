@@ -1614,4 +1614,13 @@
     <string name="appearance_accent_purple">パープル</string>
     <string name="appearance_accent_orange">オレンジ</string>
     <string name="appearance_accent_green">グリーン</string>
+    <string name="mount_add_failed_name_unusable">その名前は使えません。スラッシュや制御文字は不可、64 文字までです。</string>
+    <string name="mount_add_failed_name_taken">同じ名前のマウントが既にあります。</string>
+    <string name="mount_add_failed_at_capacity">同時にマウントできるのは 10 個までです。</string>
+    <string name="mount_add_failed_all_files_access">マウントには「すべてのファイルへのアクセス」権限が必要です。ないと他アプリが書いたファイルが見えません。</string>
+    <string name="mount_add_failed_read_grant">このフォルダーの読み取り許可が保持されていません。もう一度選んで許可してください。</string>
+    <string name="mount_add_failed_unsupported_uri">この場所はマウントできません。「内部ストレージ」または SD カード内のフォルダーを選んでください。</string>
+    <string name="mount_add_failed_unresolvable_path">このフォルダーの実際のパスを解決できませんでした。</string>
+    <string name="mount_add_failed_commit">マウントを保存できませんでした。もう一度お試しください。</string>
+    <string name="mount_add_grant_action">許可する</string>
 </resources>

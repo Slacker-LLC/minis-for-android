@@ -1617,4 +1617,13 @@
     <string name="appearance_accent_purple">Violett</string>
     <string name="appearance_accent_orange">Orange</string>
     <string name="appearance_accent_green">Grün</string>
+    <string name="mount_add_failed_name_unusable">Dieser Name ist nicht möglich: keine Schrägstriche oder Steuerzeichen, bis 64 Zeichen.</string>
+    <string name="mount_add_failed_name_taken">Ein Einhängepunkt mit diesem Namen existiert bereits.</string>
+    <string name="mount_add_failed_at_capacity">Es lassen sich höchstens 10 Ordner einhängen.</string>
+    <string name="mount_add_failed_all_files_access">Einhängen braucht die Berechtigung „Zugriff auf alle Dateien“ - ohne sie sieht die App keine Dateien anderer Apps.</string>
+    <string name="mount_add_failed_read_grant">Die Leseberechtigung für diesen Ordner wurde nicht behalten. Bitte erneut wählen und erlauben.</string>
+    <string name="mount_add_failed_unsupported_uri">Dieser Ort lässt sich nicht einhängen. Bitte einen Ordner im internen Speicher oder auf der SD-Karte wählen.</string>
+    <string name="mount_add_failed_unresolvable_path">Der echte Pfad dieses Ordners ließ sich nicht ermitteln.</string>
+    <string name="mount_add_failed_commit">Der Einhängepunkt konnte nicht gespeichert werden. Bitte erneut versuchen.</string>
+    <string name="mount_add_grant_action">Zugriff erteilen</string>
 </resources>

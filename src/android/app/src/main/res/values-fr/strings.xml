@@ -1508,4 +1508,13 @@
     <string name="appearance_accent_purple">Violet</string>
     <string name="appearance_accent_orange">Orange</string>
     <string name="appearance_accent_green">Vert</string>
+    <string name="mount_add_failed_name_unusable">Ce nom est refusé : pas de barres obliques ni de caractères de contrôle, 64 caractères au plus.</string>
+    <string name="mount_add_failed_name_taken">Un montage portant ce nom existe déjà.</string>
+    <string name="mount_add_failed_at_capacity">Dix dossiers au maximum peuvent être montés.</string>
+    <string name="mount_add_failed_all_files_access">Le montage exige l\'autorisation « Accès à tous les fichiers » - sans elle, l\'app ne voit pas les fichiers des autres apps.</string>
+    <string name="mount_add_failed_read_grant">L\'autorisation de lecture de ce dossier n\'a pas été conservée. Sélectionnez-le à nouveau et autorisez.</string>
+    <string name="mount_add_failed_unsupported_uri">Cet emplacement ne peut pas être monté. Choisissez un dossier dans le stockage interne ou la carte SD.</string>
+    <string name="mount_add_failed_unresolvable_path">Le chemin réel de ce dossier n\'a pas pu être résolu.</string>
+    <string name="mount_add_failed_commit">Le montage n\'a pas pu être enregistré. Réessayez.</string>
+    <string name="mount_add_grant_action">Autoriser</string>
 </resources>

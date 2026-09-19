@@ -2018,4 +2018,13 @@
     <string name="appearance_accent_purple">Purple</string>
     <string name="appearance_accent_orange">Orange</string>
     <string name="appearance_accent_green">Green</string>
+    <string name="mount_add_failed_name_unusable">That name cannot be used: no slashes or control characters, up to 64 characters.</string>
+    <string name="mount_add_failed_name_taken">A mount with that name already exists.</string>
+    <string name="mount_add_failed_at_capacity">Up to 10 folders can be mounted at once.</string>
+    <string name="mount_add_failed_all_files_access">Mounting needs the All Files Access permission - without it this app cannot see files other apps wrote.</string>
+    <string name="mount_add_failed_read_grant">This folder\'s read permission was not kept. Pick it again and allow access.</string>
+    <string name="mount_add_failed_unsupported_uri">That location cannot be mounted. Pick a folder under Internal storage or the SD card.</string>
+    <string name="mount_add_failed_unresolvable_path">That folder\'s real path on this device could not be resolved.</string>
+    <string name="mount_add_failed_commit">The mount could not be saved. Try again.</string>
+    <string name="mount_add_grant_action">Grant access</string>
 </resources>

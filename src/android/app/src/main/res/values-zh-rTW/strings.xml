@@ -1156,4 +1156,13 @@
     <string name="appearance_accent_purple">紫色</string>
     <string name="appearance_accent_orange">橙色</string>
     <string name="appearance_accent_green">綠色</string>
+    <string name="mount_add_failed_name_unusable">名稱不能用：不能含斜線或控制字元，最長 64 個字元。</string>
+    <string name="mount_add_failed_name_taken">已經有同名的掛載了。</string>
+    <string name="mount_add_failed_at_capacity">最多同時掛載 10 個資料夾。</string>
+    <string name="mount_add_failed_all_files_access">掛載需要「所有檔案存取權」——沒有它，本應用程式看不到其他應用程式寫入的檔案。</string>
+    <string name="mount_add_failed_read_grant">沒有保留這個資料夾的讀取授權。請重新選擇並允許存取。</string>
+    <string name="mount_add_failed_unsupported_uri">這個位置不能掛載。請在「內部儲存空間」或記憶卡裡選一個資料夾。</string>
+    <string name="mount_add_failed_unresolvable_path">無法解析這個資料夾在本機的真實路徑。</string>
+    <string name="mount_add_failed_commit">掛載沒有儲存成功，請重試。</string>
+    <string name="mount_add_grant_action">去授權</string>
 </resources>

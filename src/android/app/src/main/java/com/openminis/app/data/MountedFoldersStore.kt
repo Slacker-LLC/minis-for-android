@@ -100,26 +100,59 @@ class MountedFoldersStore(private val context: Context) {
      *   - the resolved path doesn't exist or isn't readable by us;
      *   - the name is invalid / duplicate / cap reached.
      */
+    /**
+     * [T-android-mount-add-reasons] Why a mount could not be added.
+     *
+     * The store used to answer every refusal with null, and the screen turned that into one
+     * sentence - the name may already be used or is invalid - which is wrong for the case that
+     * rejects most attempts: on Android 11+ a mount needs All Files Access
+     * (Environment.isExternalStorageManager), and a user without it was told to check the name.
+     */
+    enum class AddFailure {
+        NAME_UNUSABLE,
+        NAME_TAKEN,
+        AT_CAPACITY,
+        MISSING_ALL_FILES_ACCESS,
+        MISSING_READ_GRANT,
+        UNSUPPORTED_URI,
+        UNRESOLVABLE_PATH,
+        COMMIT_FAILED,
+    }
+
+    sealed interface AddResult {
+        data class Added(val entry: Entry) : AddResult
+        data class Rejected(val failure: AddFailure) : AddResult
+    }
+
     suspend fun add(
         treeUri: Uri,
         customName: String,
         userAllowWrite: Boolean = true,
-    ): Entry? = mutex.withLock {
-        val name = sanitizeName(customName).takeIf { it.isNotEmpty() } ?: return@withLock null
-        if (_entries.value.any { it.name.equals(name, ignoreCase = true) }) return@withLock null
-        if (_entries.value.size >= MAX_MOUNTS) return@withLock null
-        if (!hasPersistedRead(treeUri) || !hasRawReadCapability()) {
-            AppLogger.warning(TAG, "add: rejected URI without read grant or raw read capability $treeUri")
-            return@withLock null
+    ): AddResult = mutex.withLock {
+        val name = sanitizeName(customName).takeIf { it.isNotEmpty() }
+            ?: return@withLock AddResult.Rejected(AddFailure.NAME_UNUSABLE)
+        if (_entries.value.any { it.name.equals(name, ignoreCase = true) }) {
+            return@withLock AddResult.Rejected(AddFailure.NAME_TAKEN)
+        }
+        if (_entries.value.size >= MAX_MOUNTS) {
+            return@withLock AddResult.Rejected(AddFailure.AT_CAPACITY)
+        }
+        if (!hasRawReadCapability()) {
+            AppLogger.warning(TAG, "add: rejected, no All Files Access for $treeUri")
+            return@withLock AddResult.Rejected(AddFailure.MISSING_ALL_FILES_ACCESS)
+        }
+        if (!hasPersistedRead(treeUri)) {
+            AppLogger.warning(TAG, "add: rejected URI without a persisted read grant $treeUri")
+            return@withLock AddResult.Rejected(AddFailure.MISSING_READ_GRANT)
         }
 
         val identity = mountIdentity(treeUri) ?: run {
             AppLogger.warning(TAG, "add: rejected invalid external-storage URI $treeUri")
-            return@withLock null
+            return@withLock AddResult.Rejected(AddFailure.UNSUPPORTED_URI)
         }
         val resolvedHostPath = resolvePosixPath(treeUri, context) ?: run {
             AppLogger.warning(TAG, "add: rejected non-resolvable URI $treeUri")
-            return@withLock null
+            return@withLock AddResult.Rejected(AddFailure.UNRESOLVABLE_PATH)
         }
 
         val sourceDisplayName = DocumentsContract.getTreeDocumentId(treeUri)
@@ -140,13 +173,15 @@ class MountedFoldersStore(private val context: Context) {
             volume = identity.volume,
             pathSegments = identity.pathSegments,
         )
-        if (!commitSnapshot(_entries.value + entry)) return@withLock null
+        if (!commitSnapshot(_entries.value + entry)) {
+            return@withLock AddResult.Rejected(AddFailure.COMMIT_FAILED)
+        }
         AppLogger.info(
             TAG,
             "add: name=$name volume=${identity.volume} segments=${identity.pathSegments} " +
                 "writable=$probedWritable ${storageDiag(context)}",
         )
-        entry
+        AddResult.Added(entry)
     }
 
     /**

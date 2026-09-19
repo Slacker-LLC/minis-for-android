@@ -1863,4 +1863,13 @@
     <string name="appearance_accent_purple">紫色</string>
     <string name="appearance_accent_orange">橙色</string>
     <string name="appearance_accent_green">绿色</string>
+    <string name="mount_add_failed_name_unusable">名称不能用：不能含斜杠或控制字符，最长 64 个字符。</string>
+    <string name="mount_add_failed_name_taken">已经有同名的挂载了。</string>
+    <string name="mount_add_failed_at_capacity">最多同时挂载 10 个文件夹。</string>
+    <string name="mount_add_failed_all_files_access">挂载需要「所有文件访问权限」——没有它，本应用看不到其他应用写入的文件。</string>
+    <string name="mount_add_failed_read_grant">没有保留这个文件夹的读取授权。请重新选择并允许访问。</string>
+    <string name="mount_add_failed_unsupported_uri">这个位置不能挂载。请在「内部存储」或存储卡里选一个文件夹。</string>
+    <string name="mount_add_failed_unresolvable_path">无法解析这个文件夹在本机的真实路径。</string>
+    <string name="mount_add_failed_commit">挂载没有保存成功，请重试。</string>
+    <string name="mount_add_grant_action">去授权</string>
 </resources>

@@ -104,6 +104,9 @@ fun MountedFoldersScreen(
     var pendingPickedUri by remember { mutableStateOf<Uri?>(null) }
     var pendingDefaultName by remember { mutableStateOf("") }
     var addError by remember { mutableStateOf<String?>(null) }
+    // [T-android-mount-add-reasons] The refusal that has a fix on this screen gets a button,
+    // not just an explanation.
+    var addErrorNeedsAllFilesAccess by remember { mutableStateOf(false) }
 
     // [T-android-mount-picker-landing] Shown once before handing off to the
     // system picker, explaining that Android forbids mounting the storage root.
@@ -135,10 +138,47 @@ fun MountedFoldersScreen(
     val legacyStorageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
+
         if (grants.values.any { it }) {
             hasAllFilesAccess = checkAllFilesAccess(context)
             scope.launch(Dispatchers.IO) { store.refreshWritability() }
         }
+    }
+
+    // [T-android-mount-add-reasons] The All Files Access page, shared by the banner and the
+    // refusal dialog that names it as the reason.
+    fun openAllFilesAccess() {
+    when {
+        // Android 11+: special All Files Access page.
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+        }.onFailure {
+            // Some OEMs (HarmonyOS/EMUI) don't host the per-app page —
+            // fall back to the app details screen.
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:${context.packageName}"),
+                    ),
+                )
+            }
+        }
+        // Android 10: request the legacy storage runtime permissions
+        // (READ for readdir, WRITE for the badge + agent writes).
+        Build.VERSION.SDK_INT == Build.VERSION_CODES.Q ->
+            legacyStorageLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ),
+            )
+    }
     }
 
     val pickerLauncher = rememberLauncherForActivityResult(
@@ -211,39 +251,7 @@ fun MountedFoldersScreen(
             InfoBanner()
 
             if (!hasAllFilesAccess) {
-                AllFilesAccessBanner(onClick = {
-                    when {
-                        // Android 11+: special All Files Access page.
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                    Uri.parse("package:${context.packageName}"),
-                                ),
-                            )
-                        }.onFailure {
-                            // Some OEMs (HarmonyOS/EMUI) don't host the per-app page —
-                            // fall back to the app details screen.
-                            runCatching {
-                                context.startActivity(
-                                    Intent(
-                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        Uri.parse("package:${context.packageName}"),
-                                    ),
-                                )
-                            }
-                        }
-                        // Android 10: request the legacy storage runtime permissions
-                        // (READ for readdir, WRITE for the badge + agent writes).
-                        Build.VERSION.SDK_INT == Build.VERSION_CODES.Q ->
-                            legacyStorageLauncher.launch(
-                                arrayOf(
-                                    android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                                ),
-                            )
-                    }
-                })
+                AllFilesAccessBanner(onClick = { openAllFilesAccess() })
             }
 
             if (entries.isEmpty()) {
@@ -312,12 +320,14 @@ fun MountedFoldersScreen(
             sourceUri = pickedUri,
             initialName = pendingDefaultName,
             onDismiss = { pendingPickedUri = null },
-            onConfirm = { name, allowWrite ->
+                            onConfirm = { name, allowWrite ->
                 scope.launch(Dispatchers.IO) {
-                    val added = store.add(pickedUri, name, allowWrite)
+                    val result = store.add(pickedUri, name, allowWrite)
                     withContext(Dispatchers.Main.immediate) {
-                        if (added == null) {
-                            addError = context.getString(R.string.mount_add_failed)
+                        if (result is MountedFoldersStore.AddResult.Rejected) {
+                            addError = context.getString(result.failure.messageRes())
+                            addErrorNeedsAllFilesAccess =
+                                result.failure == MountedFoldersStore.AddFailure.MISSING_ALL_FILES_ACCESS
                         }
                         pendingPickedUri = null
                     }
@@ -327,12 +337,38 @@ fun MountedFoldersScreen(
     }
 
     addError?.let { msg ->
+        val offersAccess = addErrorNeedsAllFilesAccess
+        fun dismiss() {
+            addError = null
+            addErrorNeedsAllFilesAccess = false
+        }
         AlertDialog(
-            onDismissRequest = { addError = null },
+            onDismissRequest = { dismiss() },
             confirmButton = {
-                MinisTextButton(onClick = { addError = null }) {
-                    Text(stringResource(android.R.string.ok))
+                if (offersAccess) {
+                    // [T-android-mount-add-reasons] The refusal names All Files Access as the
+                    // reason, so the fix is one tap from the dialog instead of a hunt through
+                    // system settings.
+                    MinisTextButton(onClick = {
+                        dismiss()
+                        openAllFilesAccess()
+                    }) {
+                        Text(stringResource(R.string.mount_add_grant_action))
+                    }
+                } else {
+                    MinisTextButton(onClick = { dismiss() }) {
+                        Text(stringResource(android.R.string.ok))
+                    }
                 }
+            },
+            dismissButton = if (offersAccess) {
+                {
+                    MinisTextButton(onClick = { dismiss() }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            } else {
+                null
             },
             text = { Text(msg) },
         )
@@ -731,4 +767,16 @@ internal fun defaultMountName(uri: Uri): String {
 private fun sanitize(raw: String): String {
     val cleaned = raw.trim().replace('/', '-').replace(' ', '_')
     return cleaned.ifEmpty { "mount" }
+}
+
+/** [T-android-mount-add-reasons] One sentence per refusal, instead of one sentence for all of them. */
+private fun MountedFoldersStore.AddFailure.messageRes(): Int = when (this) {
+    MountedFoldersStore.AddFailure.NAME_UNUSABLE -> R.string.mount_add_failed_name_unusable
+    MountedFoldersStore.AddFailure.NAME_TAKEN -> R.string.mount_add_failed_name_taken
+    MountedFoldersStore.AddFailure.AT_CAPACITY -> R.string.mount_add_failed_at_capacity
+    MountedFoldersStore.AddFailure.MISSING_ALL_FILES_ACCESS -> R.string.mount_add_failed_all_files_access
+    MountedFoldersStore.AddFailure.MISSING_READ_GRANT -> R.string.mount_add_failed_read_grant
+    MountedFoldersStore.AddFailure.UNSUPPORTED_URI -> R.string.mount_add_failed_unsupported_uri
+    MountedFoldersStore.AddFailure.UNRESOLVABLE_PATH -> R.string.mount_add_failed_unresolvable_path
+    MountedFoldersStore.AddFailure.COMMIT_FAILED -> R.string.mount_add_failed_commit
 }
