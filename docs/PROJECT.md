@@ -33,7 +33,7 @@ Android app（:app）
 | 项 | 值 |
 |---|---|
 | 组织 / 域名 | Slacker-LLC / `slacker.llc` |
-| 仓库 | `Slacker-LLC/minis-eta` |
+| 仓库 / 主线 | `Slacker-LLC/minis-eta` / `main` |
 | `applicationId` | `llc.slacker.eta` |
 | Android/Kotlin namespace | `com.openminis.app` |
 | 版本 | `1.01-beta.2`（versionCode 39） |

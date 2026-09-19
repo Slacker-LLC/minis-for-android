@@ -25,7 +25,7 @@ Active guest user data is App-owned and derived from `Context.filesDir`. `/data/
 
 ## Status
 
-The development mainline is `codex/eta-phase6-xposed` (remote `Slacker-LLC/minis-eta`).
+The mainline is `main` (remote `Slacker-LLC/minis-eta`); the `codex/eta-phase6-xposed` line is merged into it.
 
 Baseline on 2026-09-20 (Debug): `:app:testDebugUnitTest` **2432 tests / 0 failures**; `:app:lintDebug`
 **0 errors** (`186 warnings / 8 hints` are pre-existing); `app-debug.apk` ≈ **114 MB** with the runtime

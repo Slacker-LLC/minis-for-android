@@ -15,7 +15,7 @@
 
 ## 项目状态
 
-开发主线为 `codex/eta-phase6-xposed`（远端 `Slacker-LLC/minis-eta`）。
+主线为 `main`（远端 `Slacker-LLC/minis-eta`）；`codex/eta-phase6-xposed` 已合入主线。
 
 当前基线（2026-09-20，Debug）：`:app:testDebugUnitTest` **2432 例 0 失败**；`:app:lintDebug` **0 error**
 （186 warning / 8 hint 为既有）；`app-debug.apk` 约 **114 MB**（含 runtime payload）。界面文案走资源，共
