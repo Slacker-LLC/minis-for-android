@@ -7,7 +7,7 @@ import org.junit.Test
 class RecognitionDelegateSelectorTest {
 
     private val bridge = RecognitionDelegateSelector.Component(
-        "llc.slacker.eta",
+        "llc.slacker.minis",
         "com.openminis.app.voice.AssistRecognitionService",
     )
     private val deviceRecognizer = RecognitionDelegateSelector.Component(

@@ -16,7 +16,7 @@ import org.junit.Test
 class AccessibilityServiceEnforcerTest {
 
     private val component =
-        "llc.slacker.eta/com.openminis.app.accessibility.MinisAccessibilityService"
+        "llc.slacker.minis/com.openminis.app.accessibility.MinisAccessibilityService"
 
     @Test
     fun `adds the target while preserving other accessibility services`() {
@@ -48,9 +48,9 @@ class AccessibilityServiceEnforcerTest {
             appendAccessibilityServiceIfMissing(similar, component),
         )
         assertEquals(
-            "llc.slacker.eta/.accessibility.MinisAccessibilityService:$component",
+            "llc.slacker.minis/.accessibility.MinisAccessibilityService:$component",
             appendAccessibilityServiceIfMissing(
-                "llc.slacker.eta/.accessibility.MinisAccessibilityService",
+                "llc.slacker.minis/.accessibility.MinisAccessibilityService",
                 component,
             ),
         )

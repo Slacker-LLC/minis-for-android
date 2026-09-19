@@ -18,9 +18,9 @@ object AccessibilityProtectionProtocol {
 
     // Names follow the app's own package (see ModuleTargets.OWN_PACKAGE): a request addressed to
     // another install's permission or provider would be answered by that install instead.
-    const val ACTION_SET = "llc.slacker.eta.action.SET_ACCESSIBILITY_PROTECTION"
-    const val ACTION_RECOVER = "llc.slacker.eta.action.RECOVER_ACCESSIBILITY_SERVICE"
-    const val PERMISSION = "llc.slacker.eta.permission.CONTROL_ACCESSIBILITY_PROTECTION"
+    const val ACTION_SET = "llc.slacker.minis.action.SET_ACCESSIBILITY_PROTECTION"
+    const val ACTION_RECOVER = "llc.slacker.minis.action.RECOVER_ACCESSIBILITY_SERVICE"
+    const val PERMISSION = "llc.slacker.minis.permission.CONTROL_ACCESSIBILITY_PROTECTION"
     const val RECEIVER_PACKAGE = "android"
 
     const val EXTRA_PROTOCOL_VERSION = "protocol_version"
@@ -38,7 +38,7 @@ object AccessibilityProtectionProtocol {
      */
     const val DEFAULT_ENABLED = false
 
-    const val HEALTH_AUTHORITY = "llc.slacker.eta.accessibility.health"
+    const val HEALTH_AUTHORITY = "llc.slacker.minis.accessibility.health"
     const val HEALTH_METHOD = "accessibility_health"
     const val HEALTH_STATUS = "status"
     const val HEALTH_STATUS_CONNECTED = "connected"

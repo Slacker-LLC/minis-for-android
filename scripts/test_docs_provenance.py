@@ -201,7 +201,7 @@ class ProvenanceGuardTests(unittest.TestCase):
             valid_fixture(root)
             write(root, "docs/contracts/00-IDENTITY.md", "slacker.llc direct Ubuntu\n")
             errors = guard.check_tree(root)
-            self.assertTrue(any("llc.slacker.eta" in error for error in errors))
+            self.assertTrue(any("llc.slacker.minis" in error for error in errors))
 
 
 if __name__ == "__main__":

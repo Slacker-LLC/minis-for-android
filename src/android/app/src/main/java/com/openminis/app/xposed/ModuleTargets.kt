@@ -22,7 +22,7 @@ object ModuleTargets {
      * opened another install and the assistant-role check compared a package that could never
      * hold the role. Pinned to BuildConfig by a unit test rather than by memory.
      */
-    const val OWN_PACKAGE = "llc.slacker.eta"
+    const val OWN_PACKAGE = "llc.slacker.minis"
 
     const val SYSTEM_SERVER_PROCESS = "system"
     const val SYSTEM_UI_PACKAGE = "com.android.systemui"

@@ -6,7 +6,7 @@ import org.json.JSONObject
 /**
  * Six-stage transactional FD-based ownership migration protocol.
  * Conforms to V4 audit specifications for migrating canonical user storage
- * from legacy package identity (dev.openminispet.android) to canonical identity (llc.slacker.eta).
+ * from legacy package identity (dev.openminispet.android) to canonical identity (llc.slacker.minis).
  *
  * Sequence:
  *   1. PREPARE: Dynamic UID & GID discovery via kernel stat (not pm list packages alone).

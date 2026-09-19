@@ -11,10 +11,10 @@ import org.junit.Test
  *
  * Every one of these strings is an address: the package the power-key takeover opens, the
  * permission a control request is signed with, the authority the health check asks. On the Xiaomi
- * 24129PN74C the app had been renamed to `llc.slacker.eta` while the Xposed layer still said
- * `llc.slacker.minis`, so the takeover opened another install and the assistant-role check
- * compared a package that could never hold the role. BuildConfig carries the Gradle
- * applicationId, which is why pinning these to it is the guard that would have caught that.
+ * 24129PN74C previously exposed what happens when the app identity and Xposed constants drift:
+ * the takeover can open another install and the assistant-role check can compare a package that
+ * never holds the role. BuildConfig carries the Gradle applicationId, so pinning every address to
+ * it guards the canonical `llc.slacker.minis` identity.
  */
 class XposedIdentityTest {
 
