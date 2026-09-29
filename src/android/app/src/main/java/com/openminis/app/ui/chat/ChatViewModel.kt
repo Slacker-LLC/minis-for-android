@@ -4189,6 +4189,9 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.updateSessionTitleAndCategory(sid, title, category)
             _sessionTitle.value = title.ifBlank { "New Chat" }
+            com.openminis.app.tools.android.AndroidDebugSessionStore.update(sid) {
+                it.copy(sessionTitle = title.ifBlank { "New Chat" })
+            }
             _sessionCategory.value = category
         }
     }
@@ -4370,6 +4373,9 @@ class ChatViewModel(
             if (isDraft) {
                 // Draft session: just set up provider using Main slot or first entry
                 _sessionTitle.value = "New Chat"
+                com.openminis.app.tools.android.AndroidDebugSessionStore.update(sessionId) {
+                    it.copy(sessionTitle = "New Chat")
+                }
                 _sessionCategory.value = null
                 applyNewChatDefaultModel()
                 return@launch
@@ -4378,6 +4384,9 @@ class ChatViewModel(
             // Existing session: load from DB
             val session = chatRepository.getSession(sessionId) ?: return@launch
             _sessionTitle.value = session.title ?: "New Chat"
+            com.openminis.app.tools.android.AndroidDebugSessionStore.update(sessionId) {
+                it.copy(sessionTitle = session.title ?: "New Chat")
+            }
             _sessionCategory.value = session.category
             sessionBotId = session.botId
             sessionSource = session.source
@@ -5839,6 +5848,7 @@ class ChatViewModel(
                     // the stream has already flushed its last delta.
                     publishOverlayReplyExcerpt(activeSessionId)
                     SessionActivityTracker.setInactive(activeSessionId)
+                    com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                     SessionConcurrencyManager.releaseSlot(activeSessionId)
                         com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                     AppLogger.info(TAG_STREAM, "$label streamJob FINALLY exit")
@@ -6843,6 +6853,7 @@ class ChatViewModel(
                         // the stream has already flushed its last delta.
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
+                        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "send streamJob FINALLY exit")
@@ -7225,6 +7236,7 @@ class ChatViewModel(
                         // the stream has already flushed its last delta.
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
+                        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "retryLast streamJob FINALLY exit")
@@ -11176,6 +11188,9 @@ class ChatViewModel(
                     chatRepository.updateSessionTitleAndCategory(sid, title, category)
                     withContext(Dispatchers.Main) {
                         _sessionTitle.value = title
+                        com.openminis.app.tools.android.AndroidDebugSessionStore.update(sid) {
+                            it.copy(sessionTitle = title)
+                        }
                         _sessionCategory.value = category
                     }
                     AppLogger.info("TitleGen", "outcome=set title='$title' category='$category'")
@@ -11346,6 +11361,9 @@ class ChatViewModel(
         chatRepository.updateSessionTitle(sidForCheck, fallbackTitle)
         withContext(Dispatchers.Main) {
             _sessionTitle.value = fallbackTitle
+            com.openminis.app.tools.android.AndroidDebugSessionStore.update(sidForCheck) {
+                it.copy(sessionTitle = fallbackTitle)
+            }
         }
         // Length only — never the user's prompt text.
         AppLogger.info(
@@ -11478,8 +11496,10 @@ class ChatViewModel(
         publishOverlayReplyExcerpt(activeSessionId)
         SessionActivityTracker.clearToolRunning(com.openminis.app.service.ToolOutcome.Cancelled)
         SessionActivityTracker.setInactive(activeSessionId)
+        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
         if (isDraft && realSessionId.isNotEmpty() && activeSessionId != sessionId) {
             SessionActivityTracker.setInactive(sessionId)
+            com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(sessionId)
         }
         // Stop whichever shell the agent loop is actually dispatching against.
         // Before `ensureSession()` that is the draft id; after, the real id.
@@ -11635,6 +11655,7 @@ class ChatViewModel(
                         // the stream has already flushed its last delta.
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
+                        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel streamJob FINALLY exit")
@@ -11959,6 +11980,7 @@ class ChatViewModel(
                         // the stream has already flushed its last delta.
                         publishOverlayReplyExcerpt(activeSessionId)
                         SessionActivityTracker.setInactive(activeSessionId)
+                        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(activeSessionId)
                         SessionConcurrencyManager.releaseSlot(activeSessionId)
                         com.openminis.app.tools.BotDelegationCoordinator.current()?.onSourceTurnSettled(activeSessionId, botTurnSucceeded, sourceRunId)
                         AppLogger.info(TAG_STREAM, "resume streamJob FINALLY exit")

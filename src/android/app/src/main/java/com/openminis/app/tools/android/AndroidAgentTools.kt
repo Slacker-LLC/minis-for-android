@@ -4,6 +4,8 @@ import android.content.Context
 import com.openminis.app.data.model.AgentToolDefinition
 import com.openminis.app.data.model.AgentToolParam
 import com.openminis.app.tools.ToolExecutionResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
@@ -15,8 +17,12 @@ object AndroidAgentTools {
     const val LOGS = "android_logs"
     const val DIAGNOSE = "android_diagnose"
     const val DEPLOY = "android_deploy"
+    const val VSCREEN_OPEN = "android.vscreen.open"
+    const val VSCREEN_LAUNCH = "android.vscreen.launch"
+    const val VSCREEN_CLOSE = "android.vscreen.close"
+    const val VSCREEN_STATUS = "android.vscreen.status"
 
-    val names = setOf(CAPABILITIES, APP, UI, LOGS, DIAGNOSE, DEPLOY)
+    val names = setOf(CAPABILITIES, APP, UI, LOGS, DIAGNOSE, DEPLOY, VSCREEN_OPEN, VSCREEN_LAUNCH, VSCREEN_CLOSE, VSCREEN_STATUS)
 
     fun definitions(): List<AgentToolDefinition> = listOf(
         AgentToolDefinition(
@@ -55,7 +61,7 @@ object AndroidAgentTools {
         ),
         AgentToolDefinition(
             name = UI,
-            description = "Observe and operate Android UI through the existing MinisAccessibilityService; no second Accessibility implementation. " +
+            description = "Observe and operate Android UI through the existing MinisAccessibilityService on displayId=0, or the Shizuku VScreen UiAutomation backend on the exact active non-zero displayId; unknown ids fail closed and never fall back to the physical screen. No second Accessibility implementation is installed in the app process. " +
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
                 "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
@@ -77,6 +83,7 @@ object AndroidAgentTools {
                 ),
                 "generation" to AgentToolParam("integer", "Observation generation required with ref"),
                 "ref" to AgentToolParam("string", "Short-lived uN ref from observe"),
+                "displayId" to AgentToolParam("integer", "0 (default) selects the physical screen; only a current id returned by android.vscreen.open selects the isolated virtual display. Unknown ids fail closed."),
                 "interactiveOnly" to AgentToolParam("boolean", "Return only actionable nodes (default true)"),
                 "maxDepth" to AgentToolParam("integer", "Maximum observation depth (default 12, max 30)"),
                 "maxNodes" to AgentToolParam("integer", "Maximum returned nodes (default 120, max 500)"),
@@ -116,6 +123,27 @@ object AndroidAgentTools {
             required = listOf("tool_title", "action"),
             propertyOrdering = listOf("tool_title", "action", "generation", "ref", "interactiveOnly", "maxDepth", "maxNodes", "textFilter"),
             timeoutMs = 120_000L,
+        ),
+        AgentToolDefinition(
+            name = VSCREEN_OPEN,
+            description = "Open the single VScreen virtual display only after the user has enabled the feature and the current device self-check passed. Returns a non-physical displayId for android_ui.",
+            parameters = commonParams(), required = listOf("tool_title"), propertyOrdering = listOf("tool_title"), timeoutMs = 30_000L,
+        ),
+        AgentToolDefinition(
+            name = VSCREEN_LAUNCH,
+            description = "Launch an app only on the active VScreen display. Prefer an exact packageName; appName is resolved only if it exactly matches one visible launcher label/package, and ambiguity is reported rather than guessed.",
+            parameters = commonParams() + packageParams() + mapOf("appName" to AgentToolParam("string", "Exact visible launcher label if packageName is unknown"), "activity" to AgentToolParam("string", "Optional fully qualified activity within the exact package")),
+            required = listOf("tool_title"), propertyOrdering = listOf("tool_title", "packageName", "appName", "activity"), timeoutMs = 60_000L,
+        ),
+        AgentToolDefinition(
+            name = VSCREEN_CLOSE,
+            description = "Release the active VScreen virtual display and screen lease; it does not change the physical display or foreground app.",
+            parameters = commonParams(), required = listOf("tool_title"), propertyOrdering = listOf("tool_title"), timeoutMs = 30_000L,
+        ),
+        AgentToolDefinition(
+            name = VSCREEN_STATUS,
+            description = "Read cached self-check, current-device enablement, active virtual display id and screen-lease holder without rerunning the probe.",
+            parameters = commonParams(), required = listOf("tool_title"), propertyOrdering = listOf("tool_title"), timeoutMs = 20_000L,
         ),
         AgentToolDefinition(
             name = LOGS,
@@ -182,6 +210,7 @@ object AndroidAgentTools {
                 CAPABILITIES -> capabilityResult(context, sid, args, title)
                 APP -> appResult(context, sid, args, title)
                 UI -> uiResult(context, sid, args, title, toolId)
+                VSCREEN_OPEN, VSCREEN_LAUNCH, VSCREEN_CLOSE, VSCREEN_STATUS -> vscreenResult(context, sid, args, title, name)
                 LOGS -> logsResult(context, sid, args, title)
                 DIAGNOSE -> diagnoseResult(context, sid, args, title, toolId)
                 DEPLOY -> deployResult(context, sid, args, title)
@@ -269,11 +298,147 @@ object AndroidAgentTools {
             output = result.json.toString(2),
             success = result.success,
             imageData = result.imageData,
-            imageMimeType = result.imageData?.let { "image/png" },
+            imageMimeType = result.imageMimeType ?: result.imageData?.let { "image/png" },
             imageFilePath = result.imageHostPath,
             imageLinuxPath = result.imageLinuxPath,
             toolTitle = title,
         )
+    }
+
+    private suspend fun vscreenResult(
+        context: Context,
+        sid: String,
+        args: JSONObject,
+        title: String,
+        toolName: String,
+    ): ToolExecutionResult {
+        val sessionId = sid.ifBlank { com.openminis.app.offload.OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID }
+        val client = com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider.get(context)
+        com.openminis.app.tools.android.vscreen.VirtualScreenPolicy.disabledToolError(client.isEnabled())?.let { code ->
+            return jsonResult(
+                JSONObject().put("success", false).put("error", code)
+                    .put("message", "VScreen is disabled or the current device self-check has not passed"),
+                false,
+                title,
+            )
+        }
+        if (!com.openminis.app.offload.OffloadPermissionManager.checkPermission(toolName, title, sessionId)) {
+            return jsonResult(
+                JSONObject().put("success", false).put("error", "permission_denied")
+                    .put("message", "$toolName is disabled; allow it under Settings → Permissions → Integrations"),
+                false,
+                title,
+            )
+        }
+        val unattended = com.openminis.app.offload.OffloadPermissionManager.isUnattendedSession(sessionId)
+        val sessionTitle = AndroidDebugSessionStore.get(sessionId).sessionTitle ?: "Chat"
+
+        suspend fun leaseError(displayId: Int): JSONObject? = when (
+            val lease = DeviceScreenLease.shared.acquire(displayId, sessionId, sessionTitle, unattended)
+        ) {
+            is DeviceScreenLease.Acquisition.Granted -> null
+            is DeviceScreenLease.Acquisition.Busy -> JSONObject().put("success", false).put("error", "screen_busy")
+                .put("displayId", displayId).put("holderName", lease.holderName).put("message", "Another session owns this display")
+            DeviceScreenLease.Acquisition.Preempted -> JSONObject().put("success", false).put("error", "screen_preempted")
+                .put("displayId", displayId).put("message", "This unattended lease was preempted by an attended session")
+            DeviceScreenLease.Acquisition.InvalidSession -> JSONObject().put("success", false).put("error", "invalid_session")
+                .put("displayId", displayId)
+        }
+
+        return try {
+            when (toolName) {
+                VSCREEN_STATUS -> withContext(Dispatchers.IO) {
+                    val enabled = client.isEnabled()
+                    val displayId = if (enabled) runCatching { client.queryActiveDisplayId() }.getOrNull() else null
+                    val probe = client.lastProbe
+                    val fingerprint = com.openminis.app.tools.android.vscreen.VirtualScreenPreferences.currentDeviceFingerprint()
+                    val probeCurrent = probe != null && probe.fingerprint == fingerprint
+                    val result = JSONObject()
+                        .put("success", true)
+                        .put("enabled", enabled)
+                        .put("probeCurrent", probeCurrent)
+                        .put("probePassed", probe?.passed == true)
+                        .put("probe", probe?.let { JSONObject(it.json) } ?: JSONObject.NULL)
+                        .put("displayId", displayId ?: JSONObject.NULL)
+                    if (displayId != null) {
+                        val owner = DeviceScreenLease.shared.owner(displayId)
+                        result.put("screenLease", owner?.let {
+                            JSONObject().put("displayId", it.displayId).put("holderName", it.displayName)
+                                .put("unattended", it.unattended).put("lastActivityMs", it.lastActivityMs)
+                        } ?: JSONObject.NULL)
+                    }
+                    jsonResult(result, true, title)
+                }
+                VSCREEN_OPEN -> withContext(Dispatchers.IO) {
+                    val displayId = client.openDisplay()
+                    val failure = leaseError(displayId)
+                    if (failure != null) return@withContext jsonResult(failure, false, title)
+                    val size = client.displaySize()
+                    jsonResult(
+                        JSONObject().put("success", true).put("displayId", displayId)
+                            .put("width", size?.first ?: JSONObject.NULL).put("height", size?.second ?: JSONObject.NULL)
+                            .put("coordinateSpace", "display-local"),
+                        true,
+                        title,
+                    )
+                }
+                VSCREEN_LAUNCH -> {
+                    val packageName = resolveVScreenPackage(context, args)
+                    withContext(Dispatchers.IO) {
+                        val displayId = client.queryActiveDisplayId() ?: client.openDisplay()
+                        val failure = leaseError(displayId)
+                        if (failure != null) return@withContext jsonResult(failure, false, title)
+                        val activity = args.optString("activity").trim().ifBlank { null }
+                        val launched = client.launch(displayId, packageName, activity)
+                        DeviceScreenLease.shared.touch(displayId, sessionId)
+                        jsonResult(
+                            JSONObject().put("success", launched).put("launched", launched).put("displayId", displayId)
+                                .put("packageName", packageName).put("activity", activity ?: JSONObject.NULL),
+                            launched,
+                            title,
+                        )
+                    }
+                }
+                VSCREEN_CLOSE -> withContext(Dispatchers.IO) {
+                    val displayId = client.queryActiveDisplayId()
+                    if (displayId == null) return@withContext jsonResult(
+                        JSONObject().put("success", true).put("closed", false).put("reason", "no_active_display"), true, title,
+                    )
+                    val failure = leaseError(displayId)
+                    if (failure != null) return@withContext jsonResult(failure, false, title)
+                    client.releaseDisplay()
+                    DeviceScreenLease.shared.release(displayId, sessionId)
+                    VirtualScreenObservationRegistry.clearSession(sessionId)
+                    ScreenshotFrameRegistry.clear(sessionId, displayId)
+                    jsonResult(JSONObject().put("success", true).put("closed", true).put("displayId", displayId), true, title)
+                }
+                else -> jsonResult(JSONObject().put("success", false).put("error", "unknown_vscreen_tool"), false, title)
+            }
+        } catch (error: Throwable) {
+            jsonResult(
+                JSONObject().put("success", false)
+                    .put("error", (error as? com.openminis.app.tools.android.vscreen.VirtualScreenClient.VirtualScreenClientException)?.reasonCode ?: "vscreen_operation_failed")
+                    .put("message", (error.message ?: error.javaClass.simpleName).take(512)),
+                false,
+                title,
+            )
+        }
+    }
+
+    private suspend fun resolveVScreenPackage(context: Context, args: JSONObject): String {
+        val explicit = args.optString("packageName").trim()
+        if (explicit.isNotEmpty()) return AndroidPackageController.requirePackageName(explicit)
+        val appName = args.optString("appName").trim()
+        require(appName.isNotEmpty()) { "pass packageName or an exact appName" }
+        val search = AndroidPackageController.search(context, appName, 50)
+        val apps = search.optJSONArray("apps") ?: org.json.JSONArray()
+        val matches = (0 until apps.length()).mapNotNull { apps.optJSONObject(it) }
+            .filter { it.optString("label").equals(appName, ignoreCase = true) || it.optString("package").equals(appName, ignoreCase = true) }
+        require(matches.size == 1) {
+            if (matches.isEmpty()) "appName did not exactly match a visible launcher; use android.app search to identify its package"
+            else "appName is ambiguous; pass the exact packageName"
+        }
+        return AndroidPackageController.requirePackageName(matches.single().getString("package"))
     }
 
     private suspend fun logsResult(context: Context, sid: String, args: JSONObject, title: String): ToolExecutionResult {

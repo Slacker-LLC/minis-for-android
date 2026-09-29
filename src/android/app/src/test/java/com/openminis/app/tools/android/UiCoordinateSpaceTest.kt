@@ -209,6 +209,7 @@ class UiCoordinateSpaceTest {
 
     @Test
     fun `the registry keeps the most recent capture`() {
+        ScreenshotFrameRegistry.clearForTests()
         assertNull(ScreenshotFrameRegistry.latest())
 
         ScreenshotFrameRegistry.record(halfScale)
@@ -217,5 +218,20 @@ class UiCoordinateSpaceTest {
         val full = ScreenshotFrame(1080, 2400, 1080, 2400)
         ScreenshotFrameRegistry.record(full)
         assertEquals(full, ScreenshotFrameRegistry.latest())
+        ScreenshotFrameRegistry.clearForTests()
+    }
+
+    @Test
+    fun `capture geometry is isolated by session and display`() {
+        ScreenshotFrameRegistry.clearForTests()
+        val physical = ScreenshotFrame(540, 1200, 1080, 2400)
+        val virtual = ScreenshotFrame(360, 800, 720, 1600)
+        ScreenshotFrameRegistry.record(physical, sessionId = "chat-a", displayId = 0)
+        ScreenshotFrameRegistry.record(virtual, sessionId = "chat-a", displayId = 9)
+
+        assertEquals(physical, ScreenshotFrameRegistry.latest("chat-a", 0))
+        assertEquals(virtual, ScreenshotFrameRegistry.latest("chat-a", 9))
+        assertNull(ScreenshotFrameRegistry.latest("chat-b", 9))
+        ScreenshotFrameRegistry.clearForTests()
     }
 }

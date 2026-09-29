@@ -18,6 +18,10 @@ interface IVirtualScreenService {
     boolean back(int displayId) = 13;
     boolean home(int displayId) = 14;
     ParcelFileDescriptor screenshot(int displayId, int maxDim, int jpegQuality) = 15;
+    int getActiveDisplayId() = 16;
+    boolean hasPackageWindow(int displayId, String packageName) = 17;
+    boolean setTextTarget(int displayId, int targetIndex, @nullable String text) = 18;
+    boolean focusTarget(int displayId, int targetIndex) = 19;
 
     // Reserved by the Shizuku server. The server invokes transaction 16777115.
     void destroy() = 16777114;

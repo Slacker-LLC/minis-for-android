@@ -31,4 +31,38 @@ class UiGenerationFenceTest {
         assertEquals(UiGenerationFence.Verdict.STALE, fence.validate(second, "u1", "b"))
         assertEquals(UiGenerationFence.Verdict.VALID, fence.validate(third, "u1", "c"))
     }
+
+    @Test
+    fun `refs are scoped to both session and display`() {
+        val fence = UiGenerationFence()
+        val generation = fence.nextGeneration()
+        fence.install(generation, "same-screen", setOf("u1"), sessionId = "session-a", displayId = 7)
+
+        assertEquals(
+            UiGenerationFence.Verdict.VALID,
+            fence.validate(generation, "u1", "same-screen", sessionId = "session-a", displayId = 7),
+        )
+        assertEquals(
+            UiGenerationFence.Verdict.STALE,
+            fence.validate(generation, "u1", "same-screen", sessionId = "session-b", displayId = 7),
+        )
+        assertEquals(
+            UiGenerationFence.Verdict.STALE,
+            fence.validate(generation, "u1", "same-screen", sessionId = "session-a", displayId = 0),
+        )
+    }
+
+    @Test
+    fun `clearing one display invalidates only its observations`() {
+        val fence = UiGenerationFence()
+        val virtual = fence.nextGeneration()
+        fence.install(virtual, "vscreen", setOf("u1"), sessionId = "session-a", displayId = 7)
+        val physical = fence.nextGeneration()
+        fence.install(physical, "physical", setOf("u1"), sessionId = "session-a", displayId = 0)
+
+        fence.clearDisplay(7)
+
+        assertEquals(UiGenerationFence.Verdict.STALE, fence.validate(virtual, "u1", "vscreen", sessionId = "session-a", displayId = 7))
+        assertEquals(UiGenerationFence.Verdict.VALID, fence.validate(physical, "u1", "physical", sessionId = "session-a", displayId = 0))
+    }
 }

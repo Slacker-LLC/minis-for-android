@@ -140,18 +140,22 @@ object UiCoordinateSpacePolicy {
     }
 }
 
-/**
- * The frame of the most recent capture, process-wide: the accessibility dispatch gate
- * serialises UI actions, so there is exactly one image a model could be reading from —
- * the same lifetime Eta gives "the last observe_screen image".
- */
+/** The latest capture geometry, isolated so coordinate conversion cannot cross sessions/displays. */
 object ScreenshotFrameRegistry {
-    @Volatile
-    private var frame: ScreenshotFrame? = null
+    private data class Key(val sessionId: String, val displayId: Int)
+    private val frames = java.util.concurrent.ConcurrentHashMap<Key, ScreenshotFrame>()
 
-    fun record(frame: ScreenshotFrame) {
-        this.frame = frame
+    fun record(frame: ScreenshotFrame, sessionId: String = "", displayId: Int = 0) {
+        frames[Key(sessionId, displayId)] = frame
     }
 
-    fun latest(): ScreenshotFrame? = frame
+    fun latest(sessionId: String = "", displayId: Int = 0): ScreenshotFrame? = frames[Key(sessionId, displayId)]
+
+    fun clear(sessionId: String, displayId: Int) { frames.remove(Key(sessionId, displayId)) }
+
+    fun clearDisplay(displayId: Int) {
+        frames.keys.removeAll { it.displayId == displayId }
+    }
+
+    internal fun clearForTests() { frames.clear() }
 }

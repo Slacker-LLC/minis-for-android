@@ -9,7 +9,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 
-/** Clipboard access is process-local and is deliberately not exposed as a VScreen AIDL operation. */
+/**
+ * Clipboard state is shared device-wide. Any future UI tool that uses this bridge must keep the
+ * single-virtual-display screen lease; relaxing per-display serialization requires a fresh
+ * clipboard concurrency/privacy review. VScreen's default text path uses target-scoped UI actions.
+ */
 internal class ClipboardBridge {
     private val manager = ShellContext.get().getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         ?: throw IllegalStateException("clipboard_service_unavailable")
