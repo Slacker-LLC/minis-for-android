@@ -50,10 +50,11 @@ class BotInboxRepository(private val dao: BotInboxEventDao) {
         wakeBatch: String = UUID.randomUUID().toString(),
         leaseMs: Long = DEFAULT_LEASE_MS,
         limit: Int = DEFAULT_BATCH_SIZE,
+        rootTaskId: String? = null,
     ): List<BotInboxEventEntity> {
         val now = System.currentTimeMillis()
         dao.releaseExpired(now)
-        return dao.listPending(recipientBotId, limit.coerceIn(1, MAX_BATCH_SIZE)).mapNotNull { event ->
+        return dao.listPending(recipientBotId, rootTaskId, limit.coerceIn(1, MAX_BATCH_SIZE)).mapNotNull { event ->
             if (dao.claim(event.id, leaseOwner, now + leaseMs.coerceAtLeast(1_000L), wakeBatch, now) == 1) {
                 event.copy(
                     status = BotInboxEventEntity.STATUS_CLAIMED,
@@ -71,10 +72,19 @@ class BotInboxRepository(private val dao: BotInboxEventDao) {
 
     suspend fun markDead(id: String): Boolean = dao.markDead(id, System.currentTimeMillis()) == 1
 
+    suspend fun listPendingForRootTask(recipientBotId: String, rootTaskId: String): List<BotInboxEventEntity> =
+        dao.listPendingForRootTask(recipientBotId, rootTaskId)
+
+    suspend fun listPendingAll(limit: Int = MAX_SCAN_SIZE): List<BotInboxEventEntity> =
+        dao.listPendingAll(limit.coerceIn(1, MAX_SCAN_SIZE))
+
+    suspend fun earliestLeaseExpiration(): Long? = dao.earliestLeaseExpiration()
+
     companion object {
         const val DEFAULT_LEASE_MS = 60_000L
         const val DEFAULT_BATCH_SIZE = 16
         const val MAX_BATCH_SIZE = 100
+        const val MAX_SCAN_SIZE = 4_096
         const val KEY_MAX_CHARS = 512
         const val PAYLOAD_MAX_CHARS = 64_000
     }

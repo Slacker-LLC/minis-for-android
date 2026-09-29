@@ -2196,4 +2196,11 @@
         <item quantity="one">+%1$d backup model</item>
         <item quantity="other">+%1$d backup models</item>
     </plurals>
+    <string name="bots_task_budget_summary">Automatic reviews %1$d/%2$d · revisions %3$d/%4$d · delegations %5$d/%6$d</string>
+    <string name="bots_task_pause">Pause</string>
+    <string name="bots_task_cancel">Cancel</string>
+    <string name="bots_task_notification_title">Bot task: %1$s</string>
+    <string name="bots_task_notification_needs_user">The owner Bot needs your input.</string>
+    <string name="bots_task_notification_completed">The owner Bot finished reviewing the results.</string>
+    <string name="bots_task_notification_budget">The automatic review budget is exhausted.</string>
 </resources>

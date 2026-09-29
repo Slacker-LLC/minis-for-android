@@ -11,6 +11,7 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.data.repository.BotTaskRepository
 import com.openminis.app.agent.AgentRunner
+import com.openminis.app.offload.OffloadPermissionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,9 +38,15 @@ class BotDelegationCoordinator private constructor(
     private val receiptMutex = Mutex()
     private val targetDispatchLocks = ConcurrentHashMap<String, Mutex>()
     private val waitingTasks = ConcurrentHashMap.newKeySet<String>()
+    private val wakingTasks = WakeTaskRegistry()
+    private val wakeDispatcher = BotWakeDispatcher(
+        application, botRepository, chatRepository, providerRepository,
+        delegationRepository, taskRepository, inboxRepository, wakingTasks,
+    )
 
     fun recoverAfterProcessStart() {
         scope.launch {
+            inboxRepository.releaseExpired()
             delegationRepository.cancelUnsettledAfterProcessStart()
             delegationRepository.listRunning().forEach { delegation ->
                 delegationRepository.fail(
@@ -58,6 +65,7 @@ class BotDelegationCoordinator private constructor(
                 deliverReceipt(delegation)
             }
             dispatchAll()
+            wakeDispatcher.recoverAfterProcessStart()
         }
     }
 
@@ -151,15 +159,36 @@ class BotDelegationCoordinator private constructor(
             return ToolExecutionResult("Error: delegation_fanout_limit_reached", false)
         }
         val existingDelegation = delegationRepository.findBySourceTool(sourceSessionId, sourceToolId)
-        // A source run is the stable anchor for a user's goal in this first
-        // step. Replaying the same tool call reuses the same root task, while
-        // later work can move the anchor to the actual user message ID.
-        val rootTask = taskRepository.ensureRootTask(
-            originSessionId = sourceSessionId,
-            originMessageId = runId,
-            ownerBotId = sourceBotId,
-            goal = prompt,
-        )
+        val wakingRootTaskId = wakingTasks.rootForSession(sourceSessionId)
+        val rootTask = if (wakingRootTaskId != null) {
+            taskRepository.get(wakingRootTaskId)
+                ?: return ToolExecutionResult("Error: root_task_not_found", false)
+        } else {
+            // Ordinary user turns keep the existing run-based idempotency key.
+            taskRepository.ensureRootTask(
+                originSessionId = sourceSessionId,
+                originMessageId = runId,
+                ownerBotId = sourceBotId,
+                goal = prompt,
+            )
+        }
+        if (!BotWakePolicy.isWakeable(rootTask.status)) {
+            return ToolExecutionResult("Error: task_not_continuable", false)
+        }
+        if (existingDelegation == null) {
+            if (!BotWakePolicy.canDelegate(rootTask.delegationsUsed)) {
+                return ToolExecutionResult("Error: delegation_budget_exhausted", false)
+            }
+            val beginsRevision = wakingRootTaskId != null && wakingTasks.beginRevision(rootTask.id)
+            if (beginsRevision && !BotWakePolicy.canRequestRevision(rootTask.revisionRoundsUsed)) {
+                wakingTasks.rollbackRevision(rootTask.id)
+                return ToolExecutionResult("Error: revision_budget_exhausted", false)
+            }
+            if (beginsRevision && !taskRepository.requestRevision(rootTask.id, BotWakePolicy.MAX_REVISION_ROUNDS)) {
+                wakingTasks.rollbackRevision(rootTask.id)
+                return ToolExecutionResult("Error: revision_budget_exhausted", false)
+            }
+        }
         val delegation = existingDelegation ?: delegationRepository.enqueue(
             sourceBotId = sourceBotId,
             sourceSessionId = sourceSessionId,
@@ -171,7 +200,11 @@ class BotDelegationCoordinator private constructor(
             depth = 1,
         )
         if (existingDelegation == null) {
-            taskRepository.recordDelegation(rootTask.id)
+            if (!taskRepository.recordDelegation(rootTask.id, BotWakePolicy.MAX_DELEGATIONS_PER_TASK)) {
+                delegationRepository.cancel(delegation.id, "task delegation budget exhausted")
+                deliverReceipt(delegationRepository.get(delegation.id))
+                return ToolExecutionResult("Error: delegation_budget_exhausted", false)
+            }
             taskRepository.updateState(
                 id = rootTask.id,
                 status = com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE,
@@ -354,13 +387,15 @@ class BotDelegationCoordinator private constructor(
         }
         var releaseLockImmediately = true
         try {
-            val result = AgentRunner.prompt(
+            val result = OffloadPermissionManager.withUnattendedSession(targetSession.id) {
+                AgentRunner.prompt(
                     context = application,
                     sessionId = targetSession.id,
                     text = delegation.prompt,
                     wait = true,
                     timeoutMs = TARGET_TIMEOUT_MS,
                 )
+            }
             releaseLockImmediately = result.streamExited
             if (result.status.equals("Cancelled", ignoreCase = true)) {
                 delegationRepository.cancel(delegation.id, "target turn cancelled")
@@ -444,56 +479,56 @@ class BotDelegationCoordinator private constructor(
                 current.resultText?.takeIf { it.isNotBlank() }?.let { append("\n$it") }
                 current.errorText?.takeIf { it.isNotBlank() }?.let { append("\n错误：$it") }
             }
-            publishInboxEvent(current)
             val parts = JSONArray().put(JSONObject().put("type", "text").put("value", body)).toString()
             runCatching {
                 val message = chatRepository.appendMessage(current.sourceSessionId, "assistant", parts,
                     idempotencyKey = "bot-receipt:${current.id}")
                 AgentRunner.notifyExternalMessage(application, message)
+                val event = publishInboxEvent(current)
                 delegationRepository.markDelivered(current.id)
+                event?.let(wakeDispatcher::onInboxEventPublished)
             }
         }
     }
 
-    private suspend fun publishInboxEvent(delegation: BotDelegationEntity) {
+    private suspend fun publishInboxEvent(delegation: BotDelegationEntity): com.openminis.app.data.db.BotInboxEventEntity? {
         val type = when (delegation.status) {
             BotDelegationEntity.STATUS_COMPLETED -> com.openminis.app.data.db.BotInboxEventEntity.TYPE_DELEGATION_SUBMITTED
             BotDelegationEntity.STATUS_FAILED,
             BotDelegationEntity.STATUS_DENIED,
             BotDelegationEntity.STATUS_CANCELLED,
             BotDelegationEntity.STATUS_BUSY_GAVE_UP -> com.openminis.app.data.db.BotInboxEventEntity.TYPE_TASK_FAILED
-            else -> return
+            else -> return null
         }
-        runCatching {
-            inboxRepository.enqueue(
-                dedupeKey = "delegation-result:${delegation.id}",
-                rootTaskId = delegation.rootTaskId,
-                recipientBotId = delegation.sourceBotId,
-                recipientSessionId = delegation.sourceSessionId,
-                type = type,
-                producerDelegationId = delegation.id,
-                payloadJson = JSONObject().apply {
-                    put("delegation_id", delegation.id)
-                    put("root_task_id", delegation.rootTaskId ?: JSONObject.NULL)
-                    put("status", delegation.status)
-                    put("result", delegation.resultText ?: JSONObject.NULL)
-                    put("error", delegation.errorText ?: JSONObject.NULL)
-                    put("outcome_unknown", delegation.outcomeUnknown != 0)
-                }.toString(),
+        val event = inboxRepository.enqueue(
+            dedupeKey = "delegation-result:${delegation.id}",
+            rootTaskId = delegation.rootTaskId,
+            recipientBotId = delegation.sourceBotId,
+            recipientSessionId = delegation.sourceSessionId,
+            type = type,
+            producerDelegationId = delegation.id,
+            payloadJson = JSONObject().apply {
+                put("delegation_id", delegation.id)
+                put("root_task_id", delegation.rootTaskId ?: JSONObject.NULL)
+                put("status", delegation.status)
+                put("result", delegation.resultText ?: JSONObject.NULL)
+                put("error", delegation.errorText ?: JSONObject.NULL)
+                put("outcome_unknown", delegation.outcomeUnknown != 0)
+            }.toString(),
+        )
+        delegation.rootTaskId?.let { taskId ->
+            taskRepository.updateStateIfWakeable(
+                id = taskId,
+                status = if (delegation.status == BotDelegationEntity.STATUS_COMPLETED) {
+                    com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE
+                } else {
+                    com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER
+                },
+                phase = com.openminis.app.data.db.BotTaskEntity.PHASE_REVIEWING,
+                ownerSessionId = delegation.sourceSessionId,
             )
-            delegation.rootTaskId?.let { taskId ->
-                taskRepository.updateState(
-                    id = taskId,
-                    status = if (delegation.status == BotDelegationEntity.STATUS_COMPLETED) {
-                        com.openminis.app.data.db.BotTaskEntity.STATUS_ACTIVE
-                    } else {
-                        com.openminis.app.data.db.BotTaskEntity.STATUS_NEEDS_USER
-                    },
-                    phase = com.openminis.app.data.db.BotTaskEntity.PHASE_REVIEWING,
-                    ownerSessionId = delegation.sourceSessionId,
-                )
-            }
         }
+        return event
     }
 
     private fun sanitizeRosterText(value: String, maxChars: Int): String =

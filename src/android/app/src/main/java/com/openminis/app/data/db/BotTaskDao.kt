@@ -30,32 +30,52 @@ interface BotTaskDao {
     suspend fun updateState(id: String, status: String, phase: String, ownerSessionId: String?, now: Long): Int
 
     @Query(
-        "UPDATE bot_tasks SET revision = revision + 1, revision_rounds_used = revision_rounds_used + 1, " +
-            "status = :status, phase = 'REVISING', updated_at = :now WHERE id = :id AND status NOT IN ('COMPLETED', 'CANCELLED')",
+        "UPDATE bot_tasks SET status = :status, phase = :phase, " +
+            "current_owner_session_id = :ownerSessionId, updated_at = :now " +
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER')",
     )
-    suspend fun requestRevision(id: String, status: String, now: Long): Int
+    suspend fun updateStateIfWakeable(
+        id: String,
+        status: String,
+        phase: String,
+        ownerSessionId: String?,
+        now: Long,
+    ): Int
+
+    @Query(
+        "UPDATE bot_tasks SET revision = revision + 1, revision_rounds_used = revision_rounds_used + 1, " +
+            "status = :status, phase = 'REVISING', updated_at = :now " +
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER') AND revision_rounds_used < :maxRounds",
+    )
+    suspend fun requestRevision(id: String, status: String, now: Long, maxRounds: Int): Int
 
     @Query(
         "UPDATE bot_tasks SET stop_generation = stop_generation + 1, status = :status, " +
-            "updated_at = :now WHERE id = :id AND status NOT IN ('COMPLETED', 'CANCELLED')",
+            "updated_at = :now WHERE id = :id AND status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')",
     )
     suspend fun stop(id: String, status: String, now: Long): Int
 
     @Query(
         "UPDATE bot_tasks SET status = 'COMPLETED', phase = 'DELIVERING', completed_at = :now, updated_at = :now " +
-            "WHERE id = :id AND status NOT IN ('CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')",
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER')",
     )
     suspend fun complete(id: String, now: Long): Int
 
     @Query(
         "UPDATE bot_tasks SET auto_runs_used = auto_runs_used + 1, updated_at = :now " +
-            "WHERE id = :id AND status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')",
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER') AND auto_runs_used < :maxRuns",
     )
-    suspend fun recordAutoRun(id: String, now: Long): Int
+    suspend fun recordAutoRun(id: String, now: Long, maxRuns: Int): Int
 
     @Query(
         "UPDATE bot_tasks SET delegations_used = delegations_used + 1, updated_at = :now " +
-            "WHERE id = :id AND status NOT IN ('COMPLETED', 'CANCELLED', 'FAILED', 'BUDGET_EXHAUSTED')",
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER') AND delegations_used < :maxDelegations",
     )
-    suspend fun recordDelegation(id: String, now: Long): Int
+    suspend fun recordDelegation(id: String, now: Long, maxDelegations: Int): Int
+
+    @Query(
+        "UPDATE bot_tasks SET status = 'BUDGET_EXHAUSTED', phase = 'REVIEWING', updated_at = :now " +
+            "WHERE id = :id AND status IN ('ACTIVE', 'NEEDS_USER')",
+    )
+    suspend fun exhaustBudget(id: String, now: Long): Int
 }

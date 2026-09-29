@@ -2077,4 +2077,11 @@
     <plurals name="model_slot_backups_count">
         <item quantity="other">+%1$d 個備用模型</item>
     </plurals>
+    <string name="bots_task_budget_summary">自動複核 %1$d/%2$d · 修訂 %3$d/%4$d · 委派 %5$d/%6$d</string>
+    <string name="bots_task_pause">暫停</string>
+    <string name="bots_task_cancel">取消</string>
+    <string name="bots_task_notification_title">Bot 工作：%1$s</string>
+    <string name="bots_task_notification_needs_user">負責 Bot 需要你處理。</string>
+    <string name="bots_task_notification_completed">負責 Bot 已完成結果複核。</string>
+    <string name="bots_task_notification_budget">自動複核預算已用盡。</string>
 </resources>

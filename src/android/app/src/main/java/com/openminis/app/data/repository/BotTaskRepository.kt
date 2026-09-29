@@ -49,8 +49,15 @@ class BotTaskRepository(private val dao: BotTaskDao) {
         ownerSessionId: String? = null,
     ): Boolean = dao.updateState(id, status, phase, ownerSessionId, System.currentTimeMillis()) == 1
 
-    suspend fun requestRevision(id: String): Boolean =
-        dao.requestRevision(id, BotTaskEntity.STATUS_ACTIVE, System.currentTimeMillis()) == 1
+    suspend fun updateStateIfWakeable(
+        id: String,
+        status: String,
+        phase: String,
+        ownerSessionId: String? = null,
+    ): Boolean = dao.updateStateIfWakeable(id, status, phase, ownerSessionId, System.currentTimeMillis()) == 1
+
+    suspend fun requestRevision(id: String, maxRounds: Int): Boolean =
+        dao.requestRevision(id, BotTaskEntity.STATUS_ACTIVE, System.currentTimeMillis(), maxRounds) == 1
 
     suspend fun pause(id: String): Boolean =
         dao.stop(id, BotTaskEntity.STATUS_PAUSED, System.currentTimeMillis()) == 1
@@ -60,9 +67,14 @@ class BotTaskRepository(private val dao: BotTaskDao) {
 
     suspend fun complete(id: String): Boolean = dao.complete(id, System.currentTimeMillis()) == 1
 
-    suspend fun recordAutoRun(id: String): Boolean = dao.recordAutoRun(id, System.currentTimeMillis()) == 1
+    suspend fun recordAutoRun(id: String, maxRuns: Int): Boolean =
+        dao.recordAutoRun(id, System.currentTimeMillis(), maxRuns) == 1
 
-    suspend fun recordDelegation(id: String): Boolean = dao.recordDelegation(id, System.currentTimeMillis()) == 1
+    suspend fun recordDelegation(id: String, maxDelegations: Int): Boolean =
+        dao.recordDelegation(id, System.currentTimeMillis(), maxDelegations) == 1
+
+    suspend fun exhaustBudget(id: String): Boolean =
+        dao.exhaustBudget(id, System.currentTimeMillis()) == 1
 
     private fun normalize(value: String, limit: Int): String =
         value.replace("\r\n", "\n").replace('\r', '\n')

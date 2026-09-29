@@ -1709,4 +1709,11 @@
         <item quantity="one">+%1$d modèle de secours</item>
         <item quantity="other">+%1$d modèles de secours</item>
     </plurals>
+    <string name="bots_task_budget_summary">Révisions automatiques %1$d/%2$d · corrections %3$d/%4$d · délégations %5$d/%6$d</string>
+    <string name="bots_task_pause">Mettre en pause</string>
+    <string name="bots_task_cancel">Annuler</string>
+    <string name="bots_task_notification_title">Tâche Bot : %1$s</string>
+    <string name="bots_task_notification_needs_user">Le Bot responsable a besoin de votre intervention.</string>
+    <string name="bots_task_notification_completed">Le Bot responsable a terminé l’examen des résultats.</string>
+    <string name="bots_task_notification_budget">Le budget de révision automatique est épuisé.</string>
 </resources>

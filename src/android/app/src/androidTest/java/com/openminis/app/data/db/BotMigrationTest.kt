@@ -195,7 +195,9 @@ class BotMigrationTest {
                 goal = "A replay must not create a second root",
             )
             assertEquals(first.id, replay.id)
-            assertTrue(tasks.requestRevision(first.id))
+            assertTrue(
+                tasks.requestRevision(first.id, com.openminis.app.tools.BotWakePolicy.MAX_REVISION_ROUNDS),
+            )
             assertEquals(BotTaskEntity.PHASE_REVISING, tasks.get(first.id)?.phase)
 
             val inbox = com.openminis.app.data.repository.BotInboxRepository(db.botInboxEventDao())

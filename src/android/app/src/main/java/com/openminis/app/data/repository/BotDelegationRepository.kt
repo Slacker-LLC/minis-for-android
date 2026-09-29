@@ -55,6 +55,9 @@ class BotDelegationRepository(private val dao: BotDelegationDao) {
     suspend fun countForSourceRun(sessionId: String, runId: String): Int =
         dao.countForSourceRun(sessionId, runId)
 
+    suspend fun countNonTerminalForRootTask(rootTaskId: String): Int =
+        dao.countNonTerminalForRootTask(rootTaskId)
+
     suspend fun findBySourceTool(sessionId: String, sourceToolId: String): BotDelegationEntity? =
         dao.findBySourceTool(sessionId, sourceToolId)
 
