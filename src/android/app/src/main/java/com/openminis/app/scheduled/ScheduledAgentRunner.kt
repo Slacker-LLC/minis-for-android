@@ -218,26 +218,16 @@ object ScheduledAgentRunner {
             ScheduledTargetMode.NewSession -> {
                 val explicitBinding = task.modelBinding
                 val pinnedModelId = task.modelId
-                val defaultGroupId =
-                    if (explicitBinding == null && pinnedModelId == null) {
-                        app.providerRepository.defaultPrimaryGroupId
-                    } else null
-
+                val boundEntry = when {
+                    explicitBinding != null ->
+                        com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, explicitBinding)
+                            ?: com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)
+                    pinnedModelId == null ->
+                        com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)
+                    else -> null
+                }
                 val seedModelId: String = pinnedModelId
-                    ?: run {
-                        val groupIdForSeed: String? = explicitBinding
-                            ?.let { parseGroupIdFromBinding(it) }
-                            ?: defaultGroupId
-                        val entryIdForSeed: String? = explicitBinding
-                            ?.let { parseEntryIdFromBinding(it) }
-
-                        entryIdForSeed
-                            ?.let { eid -> app.providerRepository.config.value.modelEntries.firstOrNull { it.id == eid }?.model?.id }
-                            ?: groupIdForSeed
-                                ?.let { gid -> app.providerRepository.group(gid) }
-                                // Credential-aware: unattended runs skip members that cannot authenticate.
-                                ?.let { g -> app.providerRepository.availableMemberEntries(g).firstOrNull()?.model?.id }
-                    }
+                    ?: boundEntry?.model?.id
                     ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
                     ?: run {
                         AppLogger.warning(TAG, "task ${task.id}: no provider — abort")
@@ -256,8 +246,9 @@ object ScheduledAgentRunner {
                 )
                 app.chatRepository.dao.updateSource(session.id, "scheduled")
 
-                val bindingToWrite: String? = explicitBinding
-                    ?: defaultGroupId?.let { """{"type":"group","groupId":"$it"}""" }
+                val bindingToWrite: String? = boundEntry?.let {
+                    com.openminis.app.data.model.ModelBinding.encodeEntry(it.id)
+                }
                 if (bindingToWrite != null) {
                     app.chatRepository.updateSessionBinding(session.id, bindingToWrite, seedModelId)
                 }
@@ -265,20 +256,6 @@ object ScheduledAgentRunner {
             }
         }
     }
-
-    private fun parseGroupIdFromBinding(json: String): String? = runCatching {
-        val o = org.json.JSONObject(json)
-        if (o.optString("type") == "group") {
-            o.optString("groupId").takeIf { it.isNotEmpty() }
-        } else null
-    }.getOrNull()
-
-    private fun parseEntryIdFromBinding(json: String): String? = runCatching {
-        val o = org.json.JSONObject(json)
-        if (o.optString("type") == "entry") {
-            o.optString("entryId").takeIf { it.isNotEmpty() }
-        } else null
-    }.getOrNull()
 
     private fun postCompletionNotification(
         context: Context,

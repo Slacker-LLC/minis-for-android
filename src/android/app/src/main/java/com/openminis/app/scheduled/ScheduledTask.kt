@@ -110,10 +110,9 @@ data class ScheduledTask(
     val targetMode: ScheduledTargetMode = ScheduledTargetMode.NewSession,
     val modelId: String? = null,             // null → use app default (or fall back from modelBinding's resolved entry)
     // [T-android-scheduled-task-model-binding] Mirrors ChatSessionEntity.modelBinding.
-    // JSON: `{"type":"group","groupId":"..."}` or `{"type":"entry","entryId":"..."}`
-    // null → "use app default" (ScheduledAgentRunner resolves to defaultPrimaryGroupId).
-    // When non-null, ScheduledAgentRunner writes it onto the new session row so the
-    // chat picks up the same group/entry the user chose for the task.
+    // Runtime JSON is `{"type":"entry","entryId":"..."}`; legacy group
+    // payloads are migrated once. Null follows the main model slot.
+    // ScheduledAgentRunner writes a resolved entry binding onto the new session.
     val modelBinding: String? = null,
     val enabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),

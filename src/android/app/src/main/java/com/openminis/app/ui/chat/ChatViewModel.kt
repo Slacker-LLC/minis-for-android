@@ -1533,10 +1533,10 @@ class ChatViewModel(
             ?.let { id -> config.modelEntries.find { it.id == id }?.model }
             ?: currentModel
         val window = liveModel?.contextWindowTokens ?: return null
-        val groupLimit = _selectedGroupId.value
-            ?.let { gid -> config.modelGroups.find { it.id == gid }?.contextLimitTokens }
+        val entryLimit = _activeEntryId.value
+            ?.let { id -> config.modelEntries.find { it.id == id }?.overrides?.contextLimitTokens }
             ?.takeIf { it > 0 }
-        return if (groupLimit != null) minOf(window, groupLimit) else window
+        return if (entryLimit != null) minOf(window, entryLimit) else window
     }
 
     val currentModelMaxOutputTokens: Int?
@@ -4096,32 +4096,25 @@ class ChatViewModel(
                 // enabled, re-resolve the group to its next enabled member. Only
                 // for group bindings — a deliberate direct-entry pick is left
                 // untouched (it has no in-group alternative to fall back to).
-                val groupBound = _selectedGroupId.value
                 val activeEntry = _activeEntryId.value
-                if (currentProvider != null && groupBound != null && activeEntry != null &&
+                if (currentProvider != null && activeEntry != null &&
                     config.modelEntries.isNotEmpty() &&
                     !providerRepository.isEntryProviderEnabled(activeEntry)
                 ) {
                     val before = activeEntry
-                    if (resolveProviderFromGroup(groupBound)) {
+                    if (applyNewChatDefaultModel()) {
                         AppLogger.info(
                             TAG,
-                            "🔀RESOLVE group=$groupBound active entry=$before provider disabled — re-resolved to entry=${_activeEntryId.value} model=${currentModel?.id}",
+                            "🔀RESOLVE active entry=$before provider disabled — re-resolved to entry=${_activeEntryId.value} model=${currentModel?.id}",
                         )
-                        // Persist the re-resolved member so a reload doesn't snap
-                        // back to the disabled one. resolveProviderFromGroup set
-                        // _activeEntryId to the actually-resolved member.
+                        // Persist the slot result so a reload does not snap back.
                         _activeEntryId.value?.let {
-                            persistBinding("""{"type":"group","groupId":"$groupBound","lastEntryId":"$it"}""")
+                            persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(it))
                         }
                     } else {
-                        // Whole group is now unavailable (all members disabled /
-                        // credential-less) — fall through to the default group /
-                        // new-chat fallback chain by clearing the cached provider
-                        // so the guard below re-runs the standard resolution.
                         AppLogger.warning(
                             TAG,
-                            "🔀RESOLVE group=$groupBound active entry=$before provider disabled and group has no enabled member — falling back",
+                            "🔀RESOLVE active entry=$before provider disabled and no slot fallback is available",
                         )
                         currentProvider = null
                     }
@@ -4142,21 +4135,9 @@ class ChatViewModel(
                             return@collect
                         }
                     }
-                    val effectiveGroupId = initialGroupId ?: providerRepository.defaultPrimaryGroupId
-                    var resolved = false
-                    if (effectiveGroupId != null) {
-                        resolved = resolveProviderFromGroup(effectiveGroupId)
-                        if (resolved) {
-                            _selectedGroupId.value = effectiveGroupId
-                        }
-                    }
-                    if (!resolved) {
-                        // [T-newchat-default-model-fallback-android] Same
-                        // new-chat fallback chain as the draft branch in
-                        // loadSession: last-used → newest-provider/newest-text.
-                        // Was allVisibleEntries().firstOrNull().
-                        applyNewChatDefaultModel()
-                    }
+                    // Deep links are migrated to entry IDs in the slot UI phase;
+                    // a legacy group id is not a runtime binding.
+                    applyNewChatDefaultModel()
                 }
             }
         }
@@ -4291,14 +4272,8 @@ class ChatViewModel(
             _browserTabPoolRef?.setSession(session.id)
         }
         // Persist the current model binding so it survives re-entry
-        val groupId = _selectedGroupId.value
         val entryId = _activeEntryId.value
-        val binding = when {
-            groupId != null && entryId != null -> """{"type":"group","groupId":"$groupId","lastEntryId":"$entryId"}"""
-            groupId != null -> """{"type":"group","groupId":"$groupId"}"""
-            entryId != null -> """{"type":"entry","entryId":"$entryId"}"""
-            else -> null
-        }
+        val binding = entryId?.let { com.openminis.app.data.model.ModelBinding.encodeEntry(it) }
         if (binding != null) {
             chatRepository.updateSessionBinding(realSessionId, binding, modelId)
         }
@@ -4414,24 +4389,7 @@ class ChatViewModel(
                 // Draft session: just set up provider using default group or first entry
                 _sessionTitle.value = "New Chat"
                 _sessionCategory.value = null
-                val effectiveGroupId = initialGroupId ?: providerRepository.defaultPrimaryGroupId
-                var resolved = false
-                if (effectiveGroupId != null) {
-                    resolved = resolveProviderFromGroup(effectiveGroupId)
-                    if (resolved) {
-                        _selectedGroupId.value = effectiveGroupId
-                        // T312: pull group session defaults onto the new draft.
-                        // ensureSession will persist the override once the
-                        // first message is sent and the DB row materialises.
-                        applyGroupSessionDefaults(effectiveGroupId)
-                    }
-                }
-                if (!resolved) {
-                    // [T-newchat-default-model-fallback-android] No default
-                    // group (or it had no usable model) → last-used model, then
-                    // newest-provider/newest-text-model. Was firstOrNull().
-                    applyNewChatDefaultModel()
-                }
+                applyNewChatDefaultModel()
                 return@launch
             }
 
@@ -4468,32 +4426,15 @@ class ChatViewModel(
                             currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
                             _providerName.value = instance.label.ifEmpty { entry.model.provider }
                             resolved = true
-                            // No binding row (e.g. a synced session that only
-                            // carried model_id). If the entry belongs to the
-                            // default group, adopt that group so group fallback
-                            // works — otherwise buildFallbackProviders returns
-                            // empty and provider errors never fall back. NOT
-                            // applied to an explicit "entry" binding (user pin),
-                            // which restoreFromBinding handles above. Mirrors
-                            // the iOS runAgentLoop group-discovery fix.
-                            val defaultGroupId = providerRepository.defaultPrimaryGroupId
-                            if (defaultGroupId != null &&
-                                providerRepository.group(defaultGroupId)?.memberEntryIds?.contains(entry.id) == true
-                            ) {
-                                _selectedGroupId.value = defaultGroupId
-                            }
+                            _selectedGroupId.value = null
                         }
                     }
                 }
             }
 
-            // Priority 3: fall back to default group
+            // Priority 3: fall back to the main slot, then last-used/newest.
             if (!resolved) {
-                val defaultGroupId = providerRepository.defaultPrimaryGroupId
-                if (defaultGroupId != null) {
-                    resolved = resolveProviderFromGroup(defaultGroupId)
-                    if (resolved) _selectedGroupId.value = defaultGroupId
-                }
+                resolved = applyNewChatDefaultModel()
             }
 
             // [T-HANG-DIAG] measure DB load + transform separately so a long
@@ -5057,8 +4998,10 @@ class ChatViewModel(
         _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
         val resolved = resolveProviderFromGroup(groupId)
         if (resolved) {
-            persistBinding("""{"type":"group","groupId":"$groupId"}""")
-            applyGroupSessionDefaults(groupId)
+            _activeEntryId.value?.let { entryId ->
+                persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(entryId))
+                applyEntrySessionDefaults(entryId)
+            }
         }
     }
 
@@ -5068,8 +5011,10 @@ class ChatViewModel(
         _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
         val resolved = resolveProviderFromGroup(groupId, entryId)
         if (resolved) {
-            persistBinding("""{"type":"group","groupId":"$groupId","lastEntryId":"$entryId"}""")
-            applyGroupSessionDefaults(groupId)
+            _activeEntryId.value?.let { activeEntryId ->
+                persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(activeEntryId))
+                applyEntrySessionDefaults(activeEntryId)
+            }
             // [T-newchat-default-model-fallback-android] Record the actually-
             // resolved active entry as last-used (resolveProviderFromGroup may
             // fall back off a disabled member, so _activeEntryId is the truth).
@@ -5090,9 +5035,9 @@ class ChatViewModel(
      * pre-bound chat aren't clobbered by a later group re-select that
      * happens to land on the same default state.
      */
-    private fun applyGroupSessionDefaults(groupId: String) {
-        val group = providerRepository.group(groupId) ?: return
-        val level = group.defaultThinkingLevel ?: return
+    private fun applyEntrySessionDefaults(entryId: String) {
+        val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return
+        val level = entry.overrides.defaultThinkingLevel ?: return
         if (_thinkingLevel.value == level) return
         _thinkingLevel.value = level
         viewModelScope.launch {
@@ -5119,7 +5064,8 @@ class ChatViewModel(
      * which ignored both last-used and add-order — replaced by this chain.
      */
     private fun applyNewChatDefaultModel(): Boolean {
-        val entry = providerRepository.lastUsedVisibleEntry()
+        val entry = providerRepository.primaryEntry(com.openminis.app.data.model.ModelSlot.main)
+            ?: providerRepository.lastUsedVisibleEntry()
             ?: providerRepository.newestProviderNewestTextEntry()
             ?: return false
         val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
@@ -5127,10 +5073,13 @@ class ChatViewModel(
         _modelName.value = entry.model.displayName
         _activeEntryId.value = entry.id
         _providerName.value = instance.label.ifEmpty { entry.model.provider }
+        _selectedGroupId.value = null
+        _selectedGroupName.value = ""
         val apiKey = providerRepository.usableApiKey(instance)
         if (apiKey != null) {
             currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
         }
+        applyEntrySessionDefaults(entry.id)
         return true
     }
 
@@ -5148,7 +5097,8 @@ class ChatViewModel(
         _selectedGroupName.value = ""
         _activeEntryId.value = entry.id
         currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
-        persistBinding("""{"type":"entry","entryId":"$entryId"}""")
+        persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(entryId))
+        applyEntrySessionDefaults(entry.id)
         // [T-newchat-default-model-fallback-android] Remember this as the
         // global last-used model so the NEXT new chat (when no default group
         // is set) defaults back to it. Tier 2 of the new-chat fallback chain.
@@ -5191,25 +5141,16 @@ class ChatViewModel(
     )
 
     private fun buildFallbackProviders(primaryProvider: LLMProvider): List<FallbackCandidate> {
-        val groupId = _selectedGroupId.value ?: return emptyList()
         val config = providerRepository.config.value
-        val group = config.modelGroups.find { it.id == groupId } ?: return emptyList()
-        val members = group.memberEntryIds
-        // Find current provider's position in the group.
-        // [T-android-fallback-entry-identity] Prefer the ACTIVE ENTRY id — the
-        // model-id match below is ambiguous when two instances share a model id
-        // and would anchor the cycle at the wrong member.
-        val activeEntry = _activeEntryId.value
-        val currentIdx = members.indexOfFirst { it == activeEntry }.takeIf { it >= 0 }
-            ?: members.indexOfFirst { entryId ->
-                config.modelEntries.find { it.id == entryId }?.model?.id == primaryProvider.model.id
-            }
+        val members = providerRepository.availableEntries(com.openminis.app.data.model.ModelSlot.main).map { it.id }
+        val currentEntry = _activeEntryId.value
+            ?: providerRepository.availableEntries(com.openminis.app.data.model.ModelSlot.main)
+                .firstOrNull { it.model.id == primaryProvider.model.id }
+                ?.id
         val result = mutableListOf<FallbackCandidate>()
-        val currentEntryId = members.getOrNull(currentIdx)
-        for (entryId in fallbackEntryIdsInAttemptOrder(members, currentEntryId)) {
+        for (entryId in fallbackEntryIdsInAttemptOrder(members, currentEntry)) {
             val entry = config.modelEntries.find { it.id == entryId } ?: continue
             val instance = config.instances.find { it.id == entry.providerInstanceId } ?: continue
-            if (!instance.isEnabled) continue
             val apiKey = providerRepository.usableApiKey(instance) ?: continue
             val p = try {
                 ProviderFactory.create(instance, apiKey, entry.model, context)
@@ -5228,13 +5169,19 @@ class ChatViewModel(
      * silently filtered and fallback kept cycling OpenAI-only.
      */
     private fun unavailableGroupMembers(): List<String> {
-        val groupId = _selectedGroupId.value ?: return emptyList()
         val config = providerRepository.config.value
-        val group = config.modelGroups.find { it.id == groupId } ?: return emptyList()
         val result = mutableListOf<String>()
-        for (entryId in group.memberEntryIds) {
-            val entry = config.modelEntries.find { it.id == entryId } ?: continue
-            val instance = config.instances.find { it.id == entry.providerInstanceId } ?: continue
+        for (entryId in config.slots.main) {
+            val entry = config.modelEntries.find { it.id == entryId }
+            if (entry == null) {
+                result.add("⚠️ Model entry $entryId: Missing")
+                continue
+            }
+            val instance = config.instances.find { it.id == entry.providerInstanceId }
+            if (instance == null) {
+                result.add("⚠️ ${entry.model.displayName}: Provider missing")
+                continue
+            }
             val label = instance.label.ifEmpty { entry.model.provider }
             val reason = when {
                 entry.isHidden -> "Hidden"
@@ -5248,17 +5195,10 @@ class ChatViewModel(
     }
 
     private fun resolveNextFallbackProvider(): LLMProvider? {
-        val groupId = _selectedGroupId.value ?: return null
-        val group = providerRepository.group(groupId) ?: return null
         val currentEntryId = _activeEntryId.value ?: return null
-        val currentIdx = group.memberEntryIds.indexOf(currentEntryId)
-        if (currentIdx < 0) return null
-
         val config = providerRepository.config.value
-        // Try next entries in the group
-        for (i in 1 until group.memberEntryIds.size) {
-            val nextIdx = (currentIdx + i) % group.memberEntryIds.size
-            val entryId = group.memberEntryIds[nextIdx]
+        val memberIds = providerRepository.availableEntries(com.openminis.app.data.model.ModelSlot.main).map { it.id }
+        for (entryId in fallbackEntryIdsInAttemptOrder(memberIds, currentEntryId)) {
             val entry = config.modelEntries.find { it.id == entryId } ?: continue
             val instance = providerRepository.instance(entry.providerInstanceId) ?: continue
             // [T-disabled-provider-via-group-android] Skip disabled
@@ -5961,11 +5901,7 @@ class ChatViewModel(
                 SessionConcurrencyManager.acquireSlot(activeSessionId)
                 AppLogger.debug(TAG_STREAM, "$label streamJob slot acquired")
                 SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                val activeFallbackStrategy = run {
-                    val groupId = _selectedGroupId.value
-                    groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                        ?: com.openminis.app.data.model.FallbackStrategy.default
-                }
+                val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                 val fallbackProviders = buildFallbackProviders(launchedProvider)
                 var botTurnSucceeded = false
                 try {
@@ -6957,11 +6893,7 @@ class ChatViewModel(
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
 
                     // Resolve the active group's fallback strategy
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
+                    val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
 
                     // Build full fallback provider list upfront (mirrors iOS triedEntries approach)
                     val fallbackProviders = buildFallbackProviders(provider)
@@ -7354,11 +7286,7 @@ class ChatViewModel(
                     SessionConcurrencyManager.acquireSlot(activeSessionId)
                     AppLogger.debug(TAG_STREAM, "retryLast streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
+                    val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                     val fallbackProviders = buildFallbackProviders(provider)
                     var botTurnSucceeded = false
                     try {
@@ -9029,9 +8957,9 @@ class ChatViewModel(
                         // Persist the fallback model so re-entering the session starts from here
                         val groupId = _selectedGroupId.value
                         if (groupId != null && newEntry != null) {
-                            persistBinding("""{"type":"group","groupId":"$groupId","lastEntryId":"${newEntry.id}"}""")
+                            persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(newEntry.id))
                         } else if (newEntry != null) {
-                            persistBinding("""{"type":"entry","entryId":"${newEntry.id}"}""")
+                            persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(newEntry.id))
                         }
                         val infoText = fallbackReasons.joinToString("\n") + "\n🔄 Switched to ${currentProvider.model.displayName}"
                         discardAttemptBlocks()
@@ -11771,11 +11699,7 @@ class ChatViewModel(
                     AppLogger.debug(TAG_STREAM, "resumeQueueAfterCancel streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
 
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
+                    val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                     val fallbackProviders = buildFallbackProviders(provider)
                     var botTurnSucceeded = false
 
@@ -12097,12 +12021,7 @@ class ChatViewModel(
                     SessionConcurrencyManager.acquireSlot(activeSessionId)
                     AppLogger.debug(TAG_STREAM, "resume streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let {
-                            providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy
-                        } ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
+                    val activeFallbackStrategy = providerRepository.config.value.fallbackTrigger
                     val fallbackProviders = buildFallbackProviders(provider)
                     var botTurnSucceeded = false
                     try {

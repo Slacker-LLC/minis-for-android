@@ -1,167 +1,70 @@
 package com.openminis.app.data
 
+import com.openminis.app.data.repository.MemberAvailability
+import com.openminis.app.data.repository.availableMembersInDeclarationOrder
+import com.openminis.app.ui.chat.fallbackEntryIdsInAttemptOrder
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * [T-android-group-resolve-skip-uncredentialed] Pins the selection rule used by
- * `ChatViewModel.resolveProviderFromGroup` + `ProviderRepository.availableMemberEntries`
- * (mirrors iOS `ModelGroupRouter.resolve` / `availableEntryIds`).
- *
- * Same shape as ModelGroupReorderTest: the repository needs Context + Room +
- * EncryptedSharedPreferences, so this exercises the pure decision rule those
- * methods implement — filter the members down to the usable ones FIRST, then
- * apply the routing strategy. That ordering is the whole contract.
- *
- * The regression being pinned: selection used to take the first *enabled*
- * member and only then check its credential, abandoning the entire group when
- * that one member had none. A group of otherwise-usable models therefore
- * resolved to nothing, and the caller fell through to the new-chat default
- * chain — which picks by "most recently added provider" and so ran the session
- * on a model that was not in the group the user had selected.
- */
-class GroupResolveCredentialFilterTest {
-
-    /** Minimal stand-in for the (entry, instance) pair the real filter walks. */
-    private data class Member(
-        val entryId: String,
-        val hidden: Boolean = false,
-        val providerEnabled: Boolean = true,
-        /** hasAnyCredential: API key OR manual bearer OR stored OAuth token. */
-        val credentialed: Boolean = true,
+/** Regression coverage for ordered slot resolution and stable failover. */
+class SlotResolveCredentialFilterTest {
+    private fun available(
+        declared: List<String>,
+        vararg entries: MemberAvailability<String>,
+    ): List<String> = availableMembersInDeclarationOrder(
+        declared,
+        entries.associateBy { it.value },
     )
 
-    /** The exact filter implemented in ProviderRepository.availableMemberEntries. */
-    private fun available(members: List<Member>): List<String> =
-        members.filter { !it.hidden && it.providerEnabled && it.credentialed }
-            .map { it.entryId }
-
-    /** The exact selection implemented in ChatViewModel.resolveProviderFromGroup. */
-    private fun resolve(
-        members: List<Member>,
-        preferredEntryId: String? = null,
-        loadBalance: Boolean = false,
-        sessionId: String = "",
-    ): String? {
-        val avail = available(members)
-        if (avail.isEmpty()) return null
-        return avail.firstOrNull { it == preferredEntryId }
-            ?: if (loadBalance) avail[Math.floorMod(sessionId.hashCode(), avail.size)]
-            else avail.first()
-    }
+    private fun entry(
+        id: String,
+        hidden: Boolean = false,
+        providerEnabled: Boolean = true,
+        credentialed: Boolean = true,
+    ) = MemberAvailability(id, hidden, providerEnabled, credentialed)
 
     @Test
-    fun `uncredentialed head member is skipped, not fatal to the whole group`() {
-        val group = listOf(
-            Member("anthropic/claude-sonnet-5", credentialed = false),
-            Member("anthropic/claude-sonnet-4-6", credentialed = false),
-            Member("anthropic/claude-opus-5", credentialed = false),
-            Member("openai/gpt-5.6-terra"),
-            Member("openai/gpt-5.6-sol"),
+    fun `hidden disabled uncredentialed and missing slot entries are skipped in order`() {
+        assertEquals(
+            listOf("backup-a", "backup-b"),
+            available(
+                listOf("hidden", "disabled", "uncredentialed", "missing", "backup-a", "backup-b"),
+                entry("hidden", hidden = true),
+                entry("disabled", providerEnabled = false),
+                entry("uncredentialed", credentialed = false),
+                entry("backup-b"),
+                entry("backup-a"),
+            ),
         )
-        assertEquals("openai/gpt-5.6-terra", resolve(group))
     }
 
     @Test
-    fun `group resolves to null only when EVERY member is unusable`() {
-        val group = listOf(
-            Member("a/1", credentialed = false),
-            Member("b/2", providerEnabled = false),
-            Member("c/3", hidden = true),
+    fun `slot resolves to empty only when every declared entry is unavailable`() {
+        assertEquals(
+            emptyList<String>(),
+            available(
+                listOf("no-credential", "disabled", "hidden"),
+                entry("no-credential", credentialed = false),
+                entry("disabled", providerEnabled = false),
+                entry("hidden", hidden = true),
+            ),
         )
-        assertNull(resolve(group))
     }
 
     @Test
-    fun `hidden entries are filtered, matching iOS`() {
-        val group = listOf(Member("a/1", hidden = true), Member("b/2"))
-        assertEquals("b/2", resolve(group))
-    }
-
-    @Test
-    fun `disabled providers are still filtered`() {
-        val group = listOf(Member("a/1", providerEnabled = false), Member("b/2"))
-        assertEquals("b/2", resolve(group))
-    }
-
-    @Test
-    fun `filtering preserves declaration order so primary stays first member`() {
-        val group = listOf(
-            Member("a/1", credentialed = false),
-            Member("b/2"),
-            Member("c/3"),
+    fun `fallback candidates follow slot order after current entry and wrap`() {
+        val slot = available(
+            listOf("primary", "hidden", "backup-a", "disabled", "backup-b"),
+            entry("primary"),
+            entry("hidden", hidden = true),
+            entry("backup-a"),
+            entry("disabled", providerEnabled = false),
+            entry("backup-b"),
         )
-        assertEquals(listOf("b/2", "c/3"), available(group))
-        assertEquals("b/2", resolve(group))
-    }
-
-    @Test
-    fun `a fully usable group is unaffected`() {
-        val group = listOf(Member("a/1"), Member("b/2"))
-        assertEquals("a/1", resolve(group))
-    }
-
-    @Test
-    fun `preferred entry is honored when still available`() {
-        val group = listOf(Member("a/1"), Member("b/2"), Member("c/3"))
-        assertEquals("c/3", resolve(group, preferredEntryId = "c/3"))
-    }
-
-    @Test
-    fun `preferred entry that lost its credential falls back to first available`() {
-        val group = listOf(
-            Member("a/1", credentialed = false),
-            Member("b/2"),
-            Member("c/3", credentialed = false),
-        )
-        assertEquals("b/2", resolve(group, preferredEntryId = "c/3"))
-    }
-
-    @Test
-    fun `loadBalance picks within the FILTERED list, never an unusable member`() {
-        val group = listOf(
-            Member("dead/1", credentialed = false),
-            Member("ok/1"),
-            Member("ok/2"),
-        )
-        val usable = setOf("ok/1", "ok/2")
-        for (sid in listOf("", "s1", "s2", "session-abc", "😀")) {
-            val picked = resolve(group, loadBalance = true, sessionId = sid)
-            assert(picked in usable) { "loadBalance picked $picked for sid=$sid" }
-        }
-    }
-
-    @Test
-    fun `loadBalance is stable for a given session id`() {
-        val group = listOf(Member("a/1"), Member("b/2"), Member("c/3"))
-        val first = resolve(group, loadBalance = true, sessionId = "session-42")
+        assertEquals(listOf("backup-a", "backup-b"), fallbackEntryIdsInAttemptOrder(slot, "primary"))
+        assertEquals(listOf("primary", "backup-a"), fallbackEntryIdsInAttemptOrder(slot, "backup-b"))
         repeat(5) {
-            assertEquals(first, resolve(group, loadBalance = true, sessionId = "session-42"))
+            assertEquals(listOf("backup-a", "backup-b"), fallbackEntryIdsInAttemptOrder(slot, "primary"))
         }
-    }
-
-    @Test
-    fun `loadBalance spreads distinct sessions across members`() {
-        val group = listOf(Member("a/1"), Member("b/2"), Member("c/3"))
-        val picked = (0 until 60).map {
-            resolve(group, loadBalance = true, sessionId = "session-$it")
-        }.toSet()
-        assert(picked.size > 1) { "loadBalance collapsed to a single member: $picked" }
-    }
-
-    @Test
-    fun `fallback strategy always takes the first available member`() {
-        val group = listOf(Member("a/1", credentialed = false), Member("b/2"), Member("c/3"))
-        for (sid in listOf("", "s1", "session-xyz")) {
-            assertEquals("b/2", resolve(group, loadBalance = false, sessionId = sid))
-        }
-    }
-
-    @Test
-    fun `negative hash codes do not crash or index out of bounds`() {
-        val group = listOf(Member("a/1"), Member("b/2"))
-        val picked = resolve(group, loadBalance = true, sessionId = "polygenelubricants")
-        assert(picked == "a/1" || picked == "b/2") { "unexpected pick: $picked" }
     }
 }

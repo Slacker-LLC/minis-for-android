@@ -184,11 +184,7 @@ internal class PetChatEngine(private val context: Context) {
         repo: com.openminis.app.data.repository.ProviderRepository,
         config: com.openminis.app.data.model.ProviderConfig,
     ): com.openminis.app.data.model.ModelEntry? {
-        val fromGroup = config.defaultPrimaryGroupId
-            ?.let { repo.group(it) }
-            ?.memberEntryIds
-            ?.firstNotNullOfOrNull { id -> config.modelEntries.firstOrNull { it.id == id && !it.isHidden } }
-        if (fromGroup != null) return fromGroup
+        repo.primaryEntry(com.openminis.app.data.model.ModelSlot.main)?.let { return it }
 
         return config.modelEntries.firstOrNull { candidate ->
             !candidate.isHidden && repo.instance(candidate.providerInstanceId) != null

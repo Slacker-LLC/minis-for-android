@@ -202,13 +202,20 @@ class BotDelegationCoordinator private constructor(
             source.source == ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION) {
             return ToolExecutionResult("Error: bot_roster_requires_bot_session", false)
         }
+        providerRepository.awaitConfigLoaded()
         val bots = botRepository.listBots()
             .filter { it.enabled && it.id != sourceBot.id }
             .map { bot ->
+            val entryId = (com.openminis.app.data.model.ModelBinding.parse(bot.modelBinding)
+                as? com.openminis.app.data.model.ModelBinding.Entry)?.entryId
+            val modelName = entryId?.let { id ->
+                providerRepository.config.value.modelEntries.firstOrNull { it.id == id && it.model.isTextOutput }
+                    ?.model?.displayName
+            }
             JSONObject().apply {
                 put("bot_id", bot.id)
                 put("name", sanitizeRosterText(bot.name, ROSTER_NAME_MAX_CHARS))
-                put("model_binding", bot.modelBinding?.let { sanitizeRosterText(it, ROSTER_BINDING_MAX_CHARS) } ?: JSONObject.NULL)
+                put("model_binding", modelName?.let { sanitizeRosterText(it, ROSTER_MODEL_NAME_MAX_CHARS) } ?: JSONObject.NULL)
             }
         }
         return ToolExecutionResult(
@@ -498,7 +505,7 @@ class BotDelegationCoordinator private constructor(
         private const val TARGET_TIMEOUT_MS = 15 * 60 * 1000L
         private const val MAX_BUSY_RETRIES = 3
         private const val ROSTER_NAME_MAX_CHARS = 80
-        private const val ROSTER_BINDING_MAX_CHARS = 160
+        private const val ROSTER_MODEL_NAME_MAX_CHARS = 160
         @Volatile private var instance: BotDelegationCoordinator? = null
 
         fun install(
