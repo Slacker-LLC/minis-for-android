@@ -866,6 +866,9 @@ fun ChatSplitScaffoldRoute(
                         onMemberDetails = { navController.safeNavigate(Routes.botDetails(it)) },
                         onAddMember = { navController.safeNavigate(Routes.BOTS_ADD) },
                         onOpenProgress = { navController.safeNavigate(Routes.BOTS_PROGRESS) },
+                        onOpenRoutineEditor = { taskId, botId ->
+                            navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
+                        },
                     )
                 } else {
                 com.openminis.app.ui.sessions.SessionListScreen(

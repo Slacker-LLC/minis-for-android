@@ -1204,6 +1204,7 @@ object DebugMethodRegistry {
                 ParamSpec("customDays", "int[]", required = false, description = "Calendar day values 1..7 for CUSTOM."),
                 ParamSpec("prompt", "string", required = false, description = "Prompt for NEW_SESSION / APPEND_TO."),
                 ParamSpec("targetMode", "string", required = false, default = "NEW_SESSION", description = "NEW_SESSION | APPEND_TO:<sessionId> | RERUN:<sessionId>:<messageId>."),
+                ParamSpec("botId", "string", required = false, description = "Optional owning Bot id; omit for an ordinary routine."),
                 ParamSpec("enabled", "bool", required = false, default = true, description = "Whether AlarmManager registration is active."),
             ),
             returns = "{task,created:true}",
@@ -1212,7 +1213,10 @@ object DebugMethodRegistry {
         MethodSpec(
             name = "scheduled.update",
             description = "Patch and re-register an existing scheduled task.",
-            params = listOf(ParamSpec("taskId", "string", required = true, description = "Task id; all task fields are optional patches.")),
+            params = listOf(
+                ParamSpec("taskId", "string", required = true, description = "Task id; all task fields are optional patches."),
+                ParamSpec("botId", "string", required = false, description = "Change owning Bot id; null clears ownership."),
+            ),
             returns = "{task,updated:true}",
             example = ex("taskId" to "task-1", "hour" to 10),
         ),

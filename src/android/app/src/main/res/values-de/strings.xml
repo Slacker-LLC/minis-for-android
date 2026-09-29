@@ -1825,4 +1825,20 @@
     <string name="bots_task_notification_needs_user">Der zuständige Bot benötigt deine Eingabe.</string>
     <string name="bots_task_notification_completed">Der zuständige Bot hat die Ergebnisse geprüft.</string>
     <string name="bots_task_notification_budget">Das Budget für automatische Prüfungen ist ausgeschöpft.</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">Ausführung durch</string>
+    <string name="scheduled_task_executor_regular">Normaler Chat (ohne Bot)</string>
+    <string name="scheduled_task_executor_loading">Wird geladen…</string>
+    <string name="scheduled_task_model_bot_default">Standardmodell dieses Bots verwenden</string>
+    <string name="scheduled_task_bot_disabled">Bot ist deaktiviert</string>
+    <string name="scheduled_task_bot_label">Bot: %1$s</string>
+    <string name="bots_routines">Routinen</string>
+    <string name="bots_routines_disabled">Dieser Bot ist deaktiviert. Seine Routinen bleiben aktiviert, werden aber bis zur Reaktivierung übersprungen.</string>
+    <string name="bots_new_routine">Neue Routine</string>
+    <string name="bots_routine_no_next">Kein nächster Lauf geplant</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">Dieser Bot hat bereits %1$d Routinen. Lösche eine, bevor du eine weitere hinzufügst.</string>
+    <string name="scheduled_task_save_failed">Die geplante Aufgabe konnte nicht gespeichert werden.</string>
 </resources>

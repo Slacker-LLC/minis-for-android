@@ -36,6 +36,8 @@ import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.scheduled.ScheduledTask
+import com.openminis.app.scheduled.ScheduledTaskManager
 import com.openminis.app.service.SessionConcurrencyManager
 import com.openminis.app.tools.BotWakePolicy
 import com.openminis.app.ui.chat.ModelPickerSheet
@@ -50,8 +52,12 @@ import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun BotsScreen(
@@ -66,6 +72,7 @@ fun BotsScreen(
     onMemberDetails: ((String) -> Unit)? = null,
     onAddMember: (() -> Unit)? = null,
     onOpenProgress: (() -> Unit)? = null,
+    onOpenRoutineEditor: (taskId: String?, botId: String?) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val delegationRepository = remember(context) {
@@ -74,6 +81,10 @@ fun BotsScreen(
     val taskRepository = remember(context) {
         (context.applicationContext as MinisApp).botTaskRepository
     }
+    val scheduledTaskManager = remember(context) { ScheduledTaskManager(context.applicationContext) }
+    val scheduledTasks by remember(scheduledTaskManager) {
+        scheduledTaskManager.store().observe()
+    }.collectAsState(initial = emptyList())
     val loadedBots by remember(botRepository) {
         botRepository.observeBots().map<List<BotEntity>, List<BotEntity>?> { it }
     }.collectAsState(initial = null)
@@ -185,6 +196,7 @@ fun BotsScreen(
                 config.modelEntries.firstOrNull { it.id == entryId }?.model?.displayName
             },
             sessions = recent,
+            routines = scheduledTasks.filter { it.botId == selectedBot.id },
             work = delegations.filter { it.sourceBotId == selectedBot.id || it.targetBotId == selectedBot.id },
             bots = bots,
             opening = openingId != null,
@@ -195,7 +207,9 @@ fun BotsScreen(
             onToggle = {
                 scope.launch {
                     try {
-                        check(botRepository.setBotEnabled(selectedBot.id, !selectedBot.enabled)) { failureText }
+                        val enabling = !selectedBot.enabled
+                        check(botRepository.setBotEnabled(selectedBot.id, enabling)) { failureText }
+                        if (enabling) scheduledTaskManager.rescheduleBotTasks(selectedBot.id)
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (exception: Exception) { error = exception.message ?: failureText }
                 }
@@ -203,6 +217,10 @@ fun BotsScreen(
             onDelete = { deleting = selectedBot },
             onOpenSession = ::openSession,
             onOpenWork = { selectedTaskId = it },
+            onOpenRoutineEditor = onOpenRoutineEditor,
+            onToggleRoutine = { taskId, enabled ->
+                scope.launch(Dispatchers.IO) { scheduledTaskManager.setEnabled(taskId, enabled) }
+            },
         )
     } else if (selectedBotId != null && !showProgress) {
         SettingsScaffold(title = stringResource(R.string.bots_details), onBack = ::goBack, scrollable = false) {
@@ -343,6 +361,7 @@ fun BotsScreen(
                 scope.launch {
                     try {
                         check(botRepository.deleteBot(bot.id)) { failureText }
+                        scheduledTaskManager.deleteAllForBot(bot.id)
                         selectedBotId = null
                         if (initialBotId != null) onBack()
                     } catch (cancelled: CancellationException) { throw cancelled }
@@ -458,9 +477,12 @@ private fun ColumnScope.BotEmptyState(title: Int, body: Int, action: @Composable
 
 @Composable
 private fun BotDetails(
-    bot: BotEntity, modelName: String?, sessions: List<ChatSessionEntity>, work: List<BotDelegationEntity>, bots: List<BotEntity>,
+    bot: BotEntity, modelName: String?, sessions: List<ChatSessionEntity>, work: List<BotDelegationEntity>,
+    routines: List<ScheduledTask>, bots: List<BotEntity>,
     opening: Boolean, onBack: () -> Unit, onOpen: () -> Unit, onNewTopic: () -> Unit, onEdit: () -> Unit,
     onToggle: () -> Unit, onDelete: () -> Unit, onOpenSession: (String) -> Unit, onOpenWork: (String) -> Unit,
+    onOpenRoutineEditor: (taskId: String?, botId: String?) -> Unit,
+    onToggleRoutine: (taskId: String, enabled: Boolean) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     var expanded by rememberSaveable(bot.id) { mutableStateOf(false) }
@@ -507,6 +529,33 @@ private fun BotDetails(
         SettingsSection(header = stringResource(R.string.bots_model), footer = stringResource(R.string.bots_model_footer)) {
             SettingsRow(title = if (bot.modelBinding == null) stringResource(R.string.bots_follow_default)
                 else modelName ?: stringResource(R.string.bots_model_missing), onClick = onEdit, showDivider = false)
+        }
+        SettingsSection(
+            header = stringResource(R.string.bots_routines),
+            footer = if (!bot.enabled) stringResource(R.string.bots_routines_disabled) else null,
+        ) {
+            SettingsRow(
+                title = stringResource(R.string.bots_new_routine),
+                icon = Icons.Outlined.Add,
+                onClick = { onOpenRoutineEditor(null, bot.id) },
+                showDivider = routines.isNotEmpty(),
+            )
+            routines.forEachIndexed { index, task ->
+                val nextRun = task.nextTriggerMs()?.let {
+                    SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(it))
+                } ?: stringResource(R.string.bots_routine_no_next)
+                val recentResult = task.runHistory.firstOrNull()?.preview ?: task.lastResultPreview
+                val subtitle = listOfNotNull(nextRun, recentResult?.take(80)).joinToString(" · ")
+                SettingsRow(
+                    title = task.label.ifBlank { task.prompt.take(40) },
+                    subtitle = subtitle,
+                    onClick = { onOpenRoutineEditor(task.id, bot.id) },
+                    trailing = {
+                        Switch(checked = task.enabled, onCheckedChange = { onToggleRoutine(task.id, it) })
+                    },
+                    showDivider = index < routines.lastIndex,
+                )
+            }
         }
         if (work.isNotEmpty()) SettingsSection(header = stringResource(R.string.bots_recent_work)) {
             work.take(5).forEach { task -> DelegationRow(task, bots) { onOpenWork(task.id) } }

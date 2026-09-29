@@ -11,11 +11,10 @@ import org.junit.Test
  * standalone modules.
  *
  * The two fixture comparisons are the important ones: the checked-in
- * `legacy_modules_memory_on/off.txt` files are the prompt exactly as it was
- * hardcoded in ChatViewModel.buildSystemPrompt() before the extraction. If the
- * default modules (asset files + registry order + gaps + gates) stop
- * reproducing them byte for byte, this refactor changed what the model sees and
- * the test fails instead of shipping silently.
+ * `legacy_modules_memory_on/off.txt` files pin the shipped default prompt for
+ * each memory state. Intentional changes to prompt guidance update these
+ * fixtures alongside the assets; the module assembly (asset files + registry
+ * order + gaps + gates) must still reproduce them byte for byte.
  */
 class SystemPromptComposerTest {
 

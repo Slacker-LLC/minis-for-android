@@ -1822,4 +1822,20 @@
     <string name="bots_task_notification_needs_user">担当 Bot があなたの対応を必要としています。</string>
     <string name="bots_task_notification_completed">担当 Bot が結果のレビューを完了しました。</string>
     <string name="bots_task_notification_budget">自動レビューの予算を使い切りました。</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">実行者</string>
+    <string name="scheduled_task_executor_regular">通常のチャット（Botなし）</string>
+    <string name="scheduled_task_executor_loading">読み込み中…</string>
+    <string name="scheduled_task_model_bot_default">このBotのデフォルトモデルを使用</string>
+    <string name="scheduled_task_bot_disabled">Botは無効です</string>
+    <string name="scheduled_task_bot_label">Bot：%1$s</string>
+    <string name="bots_routines">ルーティン</string>
+    <string name="bots_routines_disabled">このBotは無効です。ルーティンは有効のままですが、Botが再有効化されるまで実行をスキップします。</string>
+    <string name="bots_new_routine">新しいルーティン</string>
+    <string name="bots_routine_no_next">次回の実行予定はありません</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">このBotにはすでに%1$d件のルーティンがあります。追加する前に1件削除してください。</string>
+    <string name="scheduled_task_save_failed">定期タスクを保存できませんでした。</string>
 </resources>

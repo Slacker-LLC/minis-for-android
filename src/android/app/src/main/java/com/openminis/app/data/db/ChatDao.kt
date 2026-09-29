@@ -79,7 +79,7 @@ interface ChatDao {
     @Query("SELECT * FROM sessions WHERE id = :id")
     fun observeSession(id: String): Flow<ChatSessionEntity?>
 
-    @Query("SELECT * FROM sessions WHERE bot_id = :botId AND (source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation')) ORDER BY updated_at DESC, created_at DESC LIMIT 1")
+    @Query("SELECT * FROM sessions WHERE bot_id = :botId AND (source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation', 'scheduled')) ORDER BY updated_at DESC, created_at DESC LIMIT 1")
     suspend fun latestBotConversation(botId: String): ChatSessionEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

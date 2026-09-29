@@ -2203,4 +2203,20 @@
     <string name="bots_task_notification_needs_user">The owner Bot needs your input.</string>
     <string name="bots_task_notification_completed">The owner Bot finished reviewing the results.</string>
     <string name="bots_task_notification_budget">The automatic review budget is exhausted.</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">Executor</string>
+    <string name="scheduled_task_executor_regular">Regular chat (no Bot)</string>
+    <string name="scheduled_task_executor_loading">Loading…</string>
+    <string name="scheduled_task_model_bot_default">Use this Bot’s default model</string>
+    <string name="scheduled_task_bot_disabled">Bot is disabled</string>
+    <string name="scheduled_task_bot_label">Bot: %1$s</string>
+    <string name="bots_routines">Routines</string>
+    <string name="bots_routines_disabled">This Bot is disabled. Its routines remain enabled but are skipped until the Bot is restored.</string>
+    <string name="bots_new_routine">New routine</string>
+    <string name="bots_routine_no_next">No next run scheduled</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">This Bot already has %1$d routines. Delete one before adding another.</string>
+    <string name="scheduled_task_save_failed">Could not save the scheduled task.</string>
 </resources>

@@ -34,16 +34,26 @@ class ScheduledTaskManager(private val context: Context) {
     fun get(taskId: String): ScheduledTask? = store.get(taskId)
 
     fun create(task: ScheduledTask): ScheduledTask {
-        store.upsert(task)
-        if (task.enabled) registerAlarm(task)
-        return task
+        return synchronized(MUTATION_LOCK) {
+            require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task)) {
+                "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
+            }
+            store.upsert(task)
+            if (task.enabled) registerAlarm(task)
+            task
+        }
     }
 
     fun update(task: ScheduledTask): ScheduledTask {
-        cancelAlarm(task.id)
-        store.upsert(task)
-        if (task.enabled) registerAlarm(task)
-        return task
+        return synchronized(MUTATION_LOCK) {
+            require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task, excludingTaskId = task.id)) {
+                "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
+            }
+            cancelAlarm(task.id)
+            store.upsert(task)
+            if (task.enabled) registerAlarm(task)
+            task
+        }
     }
 
     fun setEnabled(taskId: String, enabled: Boolean) {
@@ -54,8 +64,25 @@ class ScheduledTaskManager(private val context: Context) {
     }
 
     fun delete(taskId: String) {
-        cancelAlarm(taskId)
-        store.delete(taskId)
+        synchronized(MUTATION_LOCK) {
+            cancelAlarm(taskId)
+            store.delete(taskId)
+        }
+    }
+
+    /** Remove only the selected Bot's routines and cancel every associated alarm. */
+    fun deleteAllForBot(botId: String): Int = synchronized(MUTATION_LOCK) {
+        val owned = ScheduledTaskPolicy.tasksForBot(store.all(), botId)
+        owned.forEach { task ->
+            cancelAlarm(task.id)
+            store.delete(task.id)
+        }
+        owned.size
+    }
+
+    /** Re-arm enabled routines after a disabled Bot is restored. */
+    fun rescheduleBotTasks(botId: String) {
+        store.all().filter { it.botId == botId && it.enabled }.forEach(::registerAlarm)
     }
 
     /**
@@ -168,6 +195,7 @@ class ScheduledTaskManager(private val context: Context) {
 
     companion object {
         private const val TAG = "ScheduledTaskManager"
+        private val MUTATION_LOCK = Any()
         const val ACTION_FIRE = "com.openminis.app.scheduled.FIRE"
         const val EXTRA_TASK_ID = "task_id"
         const val CHANNEL_ID = "minis_scheduled_tasks"

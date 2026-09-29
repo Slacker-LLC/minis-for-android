@@ -132,6 +132,8 @@ data class ScheduledTask(
     // "Run records" menu opens a screen backed by this. Capped at
     // MAX_RUN_HISTORY by the manager when appending.
     val runHistory: List<ScheduledRun> = emptyList(),
+    /** Bot that owns this routine; null keeps legacy ordinary-chat behavior. */
+    val botId: String? = null,
 ) {
 
     /**
@@ -213,6 +215,7 @@ data class ScheduledTask(
         put("targetMode", targetMode.encode())
         if (modelId != null) put("modelId", modelId)
         if (modelBinding != null) put("modelBinding", modelBinding)
+        if (!botId.isNullOrBlank()) put("botId", botId)
         put("enabled", enabled)
         put("createdAt", createdAt)
         if (startDateMs != null) put("startDateMs", startDateMs)
@@ -228,6 +231,8 @@ data class ScheduledTask(
     companion object {
         /** Max recorded executions kept per task. */
         const val MAX_RUN_HISTORY = 50
+        /** Maximum number of routines owned by one Bot, including disabled routines. */
+        const val MAX_ROUTINES_PER_BOT = 20
 
         fun fromJson(o: JSONObject): ScheduledTask = ScheduledTask(
             id = o.getString("id"),
@@ -259,6 +264,7 @@ data class ScheduledTask(
                     }
                 }
             } ?: emptyList(),
+            botId = (o.opt("botId") as? String)?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 }

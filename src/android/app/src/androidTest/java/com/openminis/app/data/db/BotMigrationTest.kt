@@ -109,7 +109,7 @@ class BotMigrationTest {
     }
 
     @Test
-    fun directConversation_keepsBindingAndSkipsInternalExecution() = runBlocking {
+    fun scheduledConversation_keepsBotIdentityAndBindingWithoutHijackingLatest() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         try {
@@ -120,6 +120,11 @@ class BotMigrationTest {
             listOf("subagent", "bot_delegation", "bot-delegation").forEachIndexed { index, source ->
                 db.chatDao().insertSession(direct.copy(id = "internal-$index", source = source, updatedAt = 20))
             }
+            val scheduled = direct.copy(id = "scheduled-newer", source = "scheduled", updatedAt = 30)
+            db.chatDao().insertSession(scheduled)
+            val persistedScheduled = repository.getSession(scheduled.id)
+            assertEquals("reviewer", persistedScheduled?.botId)
+            assertEquals(binding, persistedScheduled?.modelBinding)
             assertEquals(direct.id, repository.latestBotConversation("reviewer")?.id)
             assertEquals(binding, repository.getSession(direct.id)?.modelBinding)
             assertEquals(null, repository.latestBotConversation("another-bot"))

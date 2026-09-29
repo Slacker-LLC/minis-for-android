@@ -56,6 +56,8 @@ object ScheduledAgentRunner {
     const val ERROR_SUBSYSTEMS_NOT_READY = "subsystems_not_ready"
     const val ERROR_NO_PROVIDER = "no_provider"
     const val ERROR_TARGET_SESSION_GONE = "target_session_gone"
+    const val ERROR_BOT_NOT_FOUND = "bot_not_found"
+    const val ERROR_BOT_DISABLED = "bot_disabled"
 
     /**
      * App-scoped scope for fire-and-forget completion work when a caller asks
@@ -109,13 +111,32 @@ object ScheduledAgentRunner {
             )
         }
 
+        val ownerBot = task.botId?.let { app.botRepository.getBot(it) }
+        when (ScheduledTaskPolicy.botOwnerState(task.botId, ownerBot)) {
+            BotOwnerState.MISSING -> {
+                val message = "Bot 已删除"
+                val manager = ScheduledTaskManager(app)
+                manager.markFired(task.id, null, message, ok = false)
+                manager.setEnabled(task.id, false)
+                postCompletionNotification(app, task, null, message)
+                return RunOutcome(errorCode = ERROR_BOT_NOT_FOUND, message = message)
+            }
+            BotOwnerState.DISABLED -> {
+                val message = "Bot 已停用"
+                ScheduledTaskManager(app).markFired(task.id, null, message, ok = false)
+                postCompletionNotification(app, task, null, message)
+                return RunOutcome(errorCode = ERROR_BOT_DISABLED, message = message)
+            }
+            BotOwnerState.UNOWNED, BotOwnerState.ENABLED -> Unit
+        }
+
         // Do not pre-start AgentForegroundService here. A scheduled task may
         // fail before it resolves a target session/provider, and Android FGS
         // background-start rules depend on the actual launch context. The
         // existing ChatViewModel execution path marks the session active only
         // when a real agent turn begins; that transition is the single owner of
         // the Agent FGS lifecycle.
-        val resolved = withContext(Dispatchers.IO) { resolveSessionId(app, task) }
+        val resolved = withContext(Dispatchers.IO) { resolveSessionId(app, task, ownerBot) }
         val sessionId = resolved.sessionId ?: return resolved
 
         AppLogger.info(
@@ -196,7 +217,11 @@ object ScheduledAgentRunner {
         )
     }
 
-    private suspend fun resolveSessionId(app: MinisApp, task: ScheduledTask): RunOutcome {
+    private suspend fun resolveSessionId(
+        app: MinisApp,
+        task: ScheduledTask,
+        ownerBot: com.openminis.app.data.db.BotEntity?,
+    ): RunOutcome {
         return when (val mode = task.targetMode) {
             is ScheduledTargetMode.AppendToSession -> {
                 if (app.chatRepository.getSession(mode.sessionId) == null) {
@@ -223,18 +248,28 @@ object ScheduledAgentRunner {
             ScheduledTargetMode.NewSession -> {
                 val explicitBinding = task.modelBinding
                 val pinnedModelId = task.modelId
-                val boundEntry = when {
-                    explicitBinding != null ->
-                        com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, explicitBinding)
-                            ?: com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)
-                    pinnedModelId == null ->
-                        com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)
-                    else -> null
+                val desiredBinding = ScheduledTaskPolicy.effectiveModelBinding(
+                    taskBinding = explicitBinding,
+                    legacyModelId = pinnedModelId,
+                    botBinding = ownerBot?.modelBinding,
+                )
+                val boundEntry = if (pinnedModelId == null || desiredBinding != null) {
+                    com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, desiredBinding)
+                } else null
+                if (desiredBinding != null && boundEntry == null) {
+                    val ownerName = ownerBot?.name?.let { "Bot '$it'" } ?: "This routine"
+                    return RunOutcome(
+                        errorCode = ERROR_NO_PROVIDER,
+                        message = "$ownerName's selected model is unavailable. Choose a usable model and try again.",
+                    )
                 }
-                val seedModelId: String = pinnedModelId
-                    ?: boundEntry?.model?.id
-                    ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
-                    ?: run {
+                val seedModelId: String = when {
+                    explicitBinding != null -> boundEntry?.model?.id
+                    pinnedModelId != null -> pinnedModelId
+                    ownerBot?.modelBinding != null -> boundEntry?.model?.id
+                    else -> boundEntry?.model?.id
+                        ?: app.providerRepository.allVisibleEntries().firstOrNull()?.baseModel?.id
+                } ?: run {
                         AppLogger.warning(TAG, "task ${task.id}: no provider — abort")
                         return RunOutcome(
                             errorCode = ERROR_NO_PROVIDER,
@@ -244,19 +279,17 @@ object ScheduledAgentRunner {
                     }
                 val title = task.label.ifBlank { "Scheduled task" }
                 val memoryOn = com.openminis.app.data.MemoryGlobalPrefs.isGlobalEnabled(app)
+                val bindingToWrite: String? = boundEntry?.let {
+                    com.openminis.app.data.model.ModelBinding.encodeEntry(it.id)
+                }
                 val session = app.chatRepository.createSession(
                     modelId = seedModelId,
                     title = title,
                     memoryEnabled = memoryOn,
+                    botId = ownerBot?.id,
+                    source = "scheduled",
+                    modelBinding = bindingToWrite,
                 )
-                app.chatRepository.dao.updateSource(session.id, "scheduled")
-
-                val bindingToWrite: String? = boundEntry?.let {
-                    com.openminis.app.data.model.ModelBinding.encodeEntry(it.id)
-                }
-                if (bindingToWrite != null) {
-                    app.chatRepository.updateSessionBinding(session.id, bindingToWrite, seedModelId)
-                }
                 RunOutcome(sessionId = session.id)
             }
         }
@@ -265,29 +298,32 @@ object ScheduledAgentRunner {
     private fun postCompletionNotification(
         context: Context,
         task: ScheduledTask,
-        sessionId: String,
+        sessionId: String?,
         preview: String,
     ) {
-        val deepLink = Uri.parse("minis://session/$sessionId")
-        val openIntent = Intent(Intent.ACTION_VIEW, deepLink).apply {
-            setPackage(context.packageName)
-        }
+        val openIntent = sessionId?.let { id ->
+            Intent(Intent.ACTION_VIEW, Uri.parse("minis://session/$id")).apply {
+                setPackage(context.packageName)
+            }
+        } ?: context.packageManager.getLaunchIntentForPackage(context.packageName)
         val notificationId = task.id.hashCode() and 0x7FFFFFFF
-        val contentPi = PendingIntent.getActivity(
-            context,
-            notificationId,
-            openIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val contentPi = openIntent?.let {
+            PendingIntent.getActivity(
+                context,
+                notificationId,
+                it,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
         val title = "Minis: ${task.label.ifBlank { "Scheduled task" }}"
         val notification = NotificationCompat.Builder(context, ScheduledTaskManager.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
             .setContentTitle(title)
             .setContentText(preview)
             .setStyle(NotificationCompat.BigTextStyle().bigText(preview))
-            .setContentIntent(contentPi)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .apply { contentPi?.let { setContentIntent(it) } }
             .build()
         try {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE)
