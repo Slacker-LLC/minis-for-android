@@ -2166,4 +2166,13 @@
     <string name="vscreen_step_unknown">Проверка совместимости</string>
     <string name="vscreen_title">Виртуальный экран</string>
     <string name="vscreen_width">Ширина (px)</string>
+<string name="scheduled_task_permission_tier">Права сценария</string>
+<string name="scheduled_task_tier_read_only">Только чтение</string>
+<string name="scheduled_task_tier_full">Полный доступ</string>
+<string name="scheduled_task_tier_read_only_detail">Разрешены одобренные команды shell только для чтения. Файловые инструменты и вывод shell могут записывать данные только во временную папку сеанса этого сценария; MCP и произвольное выполнение кода заблокированы. Остальные разрешения приложения продолжают действовать.</string>
+<string name="scheduled_task_tier_full_detail">Снимает ограничения READ_ONLY для shell, файлов и MCP в этом сценарии; существующие разрешения приложения и подтверждения для фонового запуска сохраняются. Этот уровень не ограничивает сетевой доступ.</string>
+<string name="scheduled_task_tier_full_confirmation_title">Подтвердить полный доступ?</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL позволяет этому сценарию без присмотра выполнять произвольные команды shell, записывать файлы за пределами временной папки и вызывать подключённые инструменты MCP с учётом существующих разрешений приложения. Выбирайте этот вариант, только если доверяете запросу и настроенным инструментам. Сетевой доступ остаётся неограниченным.</string>
+<string name="scheduled_task_tier_full_confirm">Подтвердить полный доступ</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY заблокировал %1$s: %2$s</string>
 </resources>

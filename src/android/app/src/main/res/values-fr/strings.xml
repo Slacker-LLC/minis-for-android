@@ -1803,4 +1803,13 @@
     <string name="vscreen_step_unknown">Vérification de compatibilité</string>
     <string name="vscreen_title">Écran virtuel</string>
     <string name="vscreen_width">Largeur (px)</string>
+<string name="scheduled_task_permission_tier">Autorisations de la routine</string>
+<string name="scheduled_task_tier_read_only">Lecture seule</string>
+<string name="scheduled_task_tier_full">Accès complet</string>
+<string name="scheduled_task_tier_read_only_detail">Autorise les commandes shell en lecture seule approuvées. Les outils fichier et les sorties shell ne peuvent écrire que dans le dossier temporaire de la session de cette routine ; les outils MCP et l’exécution de code arbitraire sont bloqués. Les autres autorisations de l’application restent applicables.</string>
+<string name="scheduled_task_tier_full_detail">Supprime les limites READ_ONLY de cette routine pour le shell, les fichiers et MCP ; les autorisations de l’application et confirmations d’exécution en arrière-plan restent applicables. Ce niveau ne restreint pas l’accès réseau.</string>
+<string name="scheduled_task_tier_full_confirmation_title">Confirmer l’accès complet ?</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL permet à cette routine sans surveillance d’exécuter des commandes shell arbitraires, d’écrire hors de son dossier temporaire et d’appeler les outils MCP connectés, sous réserve des autorisations existantes de l’application. Choisissez ce niveau uniquement si vous faites confiance au prompt et aux outils configurés. L’accès réseau reste sans restriction.</string>
+<string name="scheduled_task_tier_full_confirm">Confirmer l’accès complet</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY a bloqué %1$s : %2$s</string>
 </resources>

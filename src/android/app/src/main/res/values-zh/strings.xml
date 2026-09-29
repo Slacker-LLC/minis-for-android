@@ -2200,4 +2200,13 @@
     <string name="vscreen_step_unknown">兼容性检测</string>
     <string name="vscreen_title">虚拟屏幕</string>
     <string name="vscreen_width">宽度（px）</string>
+<string name="scheduled_task_permission_tier">例程权限</string>
+<string name="scheduled_task_tier_read_only">只读</string>
+<string name="scheduled_task_tier_full">完整权限</string>
+<string name="scheduled_task_tier_read_only_detail">允许已批准的只读 shell 命令。文件工具和 shell 输出只能写入本例程会话的临时目录；MCP 和任意代码执行会被阻止。其他应用权限仍然适用。</string>
+<string name="scheduled_task_tier_full_detail">移除此例程对 shell、文件和 MCP 的 READ_ONLY 限制；现有应用权限和无人值守确认策略仍然适用。此档位不会限制网络访问。</string>
+<string name="scheduled_task_tier_full_confirmation_title">确认完整权限？</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL 允许此无人值守例程在现有应用权限范围内执行任意 shell 命令、写入临时目录以外的文件并调用已连接的 MCP 工具。仅在信任提示词和已配置工具时选择。网络访问仍不受限制。</string>
+<string name="scheduled_task_tier_full_confirm">确认完整权限</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY 已阻止 %1$s：%2$s</string>
 </resources>

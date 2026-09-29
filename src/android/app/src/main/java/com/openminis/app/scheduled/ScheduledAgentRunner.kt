@@ -146,10 +146,15 @@ object ScheduledAgentRunner {
         )
 
         if (waitForCompletion) {
-            val result = OffloadPermissionManager.withUnattendedSession(sessionId) {
-                dispatch(app, task, sessionId, wait = true)
+            var tierDenials = emptyList<OffloadPermissionManager.ScheduledTierDenial>()
+            val result = OffloadPermissionManager.withUnattendedSession(sessionId, task.permissionTier) {
+                try {
+                    dispatch(app, task, sessionId, wait = true)
+                } finally {
+                    tierDenials = OffloadPermissionManager.consumeScheduledTierDenials(sessionId)
+                }
             }
-            val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
+            val preview = runPreview(app, result.responseText, tierDenials)
             val ok = result.status != "Error" && result.status != "Timeout"
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
@@ -161,15 +166,40 @@ object ScheduledAgentRunner {
         // dispatch + completion off the app scope and return the session id
         // immediately so the UI can show "task started" without blocking.
         bgScope.launch {
-            val result = OffloadPermissionManager.withUnattendedSession(sessionId) {
-                dispatch(app, task, sessionId, wait = true)
+            var tierDenials = emptyList<OffloadPermissionManager.ScheduledTierDenial>()
+            val result = OffloadPermissionManager.withUnattendedSession(sessionId, task.permissionTier) {
+                try {
+                    dispatch(app, task, sessionId, wait = true)
+                } finally {
+                    tierDenials = OffloadPermissionManager.consumeScheduledTierDenials(sessionId)
+                }
             }
-            val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
+            val preview = runPreview(app, result.responseText, tierDenials)
             val ok = result.status != "Error" && result.status != "Timeout"
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
             postCompletionNotification(app, task, sessionId, preview)
         }
         return RunOutcome(sessionId = sessionId)
+    }
+
+    private fun runPreview(
+        context: Context,
+        responseText: String?,
+        denials: List<OffloadPermissionManager.ScheduledTierDenial>,
+    ): String {
+        val response = (responseText ?: "").take(200).ifBlank { "(no response)" }
+        if (denials.isEmpty()) return response
+        return buildString {
+            append(response)
+            denials.take(5).forEach { denial ->
+                append("\n")
+                append(context.getString(
+                    com.openminis.app.R.string.scheduled_task_readonly_denied_preview,
+                    denial.toolName,
+                    denial.summary,
+                ))
+            }
+        }.take(1_200)
     }
 
     /**

@@ -35,6 +35,15 @@ README / 专题 docs → 面向读者说明
 - Session 相关入口保持 session workspace 语义；
 - Root launcher 的原始脚本入口只执行 App 构造的基础设施脚本；本地 Agent 的 Root 能力使用结构化 `root.shell`（tool basename + argv），通过可信路径、参数/超时/输出和进程清理边界，且保持 local-only、MCP 不可见。不得新增 raw command、Root RPC 或通用 broker。
 
+## VScreen 与例程权限档位
+
+- VScreen 仅在 Shizuku shell UID UserService 自检通过后启用；不得以 Root、KernelSU、LSPosed、视频/OCR 或未经认证的 socket 作为后备路径。
+- 物理屏与虚拟屏的 UI observation 均不得序列化 Android 标记为 password 节点的 text、content description 或 hint；仅可保留字段结构及 password 标记。
+- `ScheduledTask` 权限档位保存在现有 JSON 存储中，不新增或迁移 Room schema。新建例程默认为 `READ_ONLY`；旧 JSON 缺字段时保留既有 `FULL` 行为，未知/畸形档位按 `READ_ONLY` 处理。
+- 档位仅由 `ScheduledAgentRunner` 对正在运行的例程 session 建立；不同 session 的委派目标和唤醒回合不继承该档位，继续由 F3 既有无人值守策略保护；若共用同一 `sessionId`，所有回合共享最严格的活跃档位，denial preview 目前也按 session 收集而非按 turn 归属。
+- `READ_ONLY` 的 shell 采用纯函数 allowlist，MCP 与任意代码/包安装工具拒绝；文件写工具及 shell 输出仅可写入该 session 的 `/var/minis/offloads`（Guest `/tmp` 别名），并在运行时校验解析后的目标仍位于 session 目录内。
+- `FULL` 需在原生例程编辑器确认后才能新建或提权。档位不提供网络出口隔离；浏览器、网络工具及 `FULL` 命令仍受现有应用权限约束，但网络请求没有此处新增的系统级拦截。
+
 ## 网络边界
 
 - 网络代理和 Root/chroot 分开设计；HTTP/CONNECT 代理协议本身不依赖 Root。
@@ -91,6 +100,9 @@ cd src/android
 ./gradlew :app:lintDebug --no-daemon
 ./gradlew :app:lintRelease --no-daemon
 ```
+
+VScreen/V4 的 JVM 安全回归至少覆盖 `ScheduledReadOnlyPolicyTest`、`ScheduledTaskPermissionTierJsonTest`、
+`ScheduledTaskTierMutationPolicyTest` 与 `OffloadPermissionManagerScheduledTierTest`。这些宿主测试只证明解析/权限策略，不能替代 Shizuku UserService 和 OEM 显示行为的真机验收。
 
 Release/R8/JNI 敏感改动必须跑对应 Release 检查；Debug 不能替代。Root、mount、SELinux、VPN/DNS/BPF/Fake-IP、OEM 生命周期等设备行为，只有明确真机实测后才能声称通过。
 
