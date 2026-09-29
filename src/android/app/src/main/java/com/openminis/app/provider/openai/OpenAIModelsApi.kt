@@ -19,9 +19,9 @@ object OpenAIModelsApi {
     private val cache = ProviderModelsCache("openai")
 
     /**
-     * Static model list for Codex OAuth (tokens can't call /v1/models).
-     * Matches iOS `LLMModel.allOpenAICodexOAuth` (Providers/LLMTypes.swift).
-     * Order is preserved so the model picker shows the same default rank.
+     * Codex OAuth fallback catalog is loaded from model-rules.json because these
+     * tokens cannot call /v1/models. Order is preserved so the picker keeps its
+     * default rank.
      */
     // T119: every GPT-5.x model on Codex OAuth supports reasoning_effort
     // (`/v1/responses` requires the `reasoning` object on this auth path),
@@ -30,38 +30,14 @@ object OpenAIModelsApi {
     // Keep the current callable-id allow-list unchanged: unsupported ids can
     // return HTTP 400 and render as an empty assistant turn. Re-probe against a
     // live Codex token before adding any model back.
-    internal val codexOAuthStaticModels: List<LLMModel> = listOf(
-        LLMModel.gpt6Astra,
-        LLMModel("gpt-5.6-sol", "GPT-5.6 Sol", "OpenAI", supportsReasoning = true),
-        LLMModel("gpt-5.6-terra", "GPT-5.6 Terra", "OpenAI", supportsReasoning = true),
-        LLMModel("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", supportsReasoning = true),
-        LLMModel("gpt-5.5", "GPT-5.5", "OpenAI", supportsReasoning = true),
-        LLMModel("gpt-5.4", "GPT-5.4", "OpenAI", supportsReasoning = true),
-        LLMModel("gpt-5.4-mini", "GPT-5.4 Mini", "OpenAI", supportsReasoning = true),
-        // Kept after Codex enrichment: this special image route has capabilities
-        // that models.dev does not declare.
-        LLMModel(
-            id = "gpt-image-2",
-            displayName = "GPT Image 2",
-            provider = "OpenAI",
-            inputModalities = listOf("text", "image"),
-            outputModalities = listOf("image"),
-        ),
-    )
-
     fun fetchModelsOAuth(): List<LLMModel> {
-        val codexModels = codexOAuthStaticModels.dropLast(1)
-        AppLogger.info(TAG, "Codex OAuth model list (${codexModels.size} models): ${codexModels.joinToString { it.id }}")
-        return ModelsDevApi.enrichModels(codexModels) + codexOAuthStaticModels.last()
+        val catalog = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("codexOAuth")
+        val textModels = catalog.filter(LLMModel::isTextOutput)
+        val specialRoutes = catalog.filterNot(LLMModel::isTextOutput)
+        AppLogger.info(TAG, "Codex OAuth model list (${textModels.size} text models): ${textModels.joinToString { it.id }}")
+        return ModelsDevApi.enrichModels(textModels) + specialRoutes
     }
 
-    // Chat-capable model prefixes (matching iOS)
-    private val chatPrefixes = listOf("gpt-", "o1", "o3", "o4-", "codex-", "chatgpt-")
-
-    // Suffixes to exclude (matching iOS)
-    private val excludeSuffixes = listOf(
-        "-instruct", "-realtime", "-audio", "-transcribe", "-tts", "-embedding"
-    )
 
     suspend fun fetchModels(
         apiKey: String,
@@ -75,7 +51,7 @@ object OpenAIModelsApi {
         val isCustomBase = baseURL != null && !isOfficialOpenAI(baseURL)
         // For third-party endpoints (vLLM, Ollama, etc.), return empty on failure
         // so the caller preserves existing models instead of replacing with built-in GPT list.
-        val fallback = if (isCustomBase) emptyList() else LLMModel.allOpenAI
+        val fallback = if (isCustomBase) emptyList() else com.openminis.app.provider.rules.ModelRulesProvider.staticModels("openAI")
 
         val cacheKey = (baseURL ?: "") + "|" + apiKey
         if (context != null && !forceRefresh) {
@@ -109,13 +85,11 @@ object OpenAIModelsApi {
                 val obj = data.getJSONObject(i)
                 val id = obj.getString("id")
 
-                // Only filter by chat prefixes for official OpenAI endpoints;
+                // Only apply the official OpenAI picker policy to official endpoints;
                 // custom endpoints (vLLM, Ollama) may serve any model ID.
-                if (!isCustomBase) {
-                    if (!chatPrefixes.any { id.startsWith(it) }) continue
-                    if (excludeSuffixes.any { id.contains(it) }) continue
-                    if (id.contains(":ft-")) continue
-                }
+                if (!isCustomBase && com.openminis.app.provider.rules.ModelRulesProvider
+                        .pickerFilter("openAI")?.accepts(id) == false
+                ) continue
 
                 val displayName = obj.optString("name", id)
                 // Third-party gateways (vLLM, OpenRouter-compat proxies) often
@@ -130,28 +104,15 @@ object OpenAIModelsApi {
                 val inputModalities = arch?.optJSONArray("input_modalities")?.toStringList().normalizeModalities()
                 val outputModalities = arch?.optJSONArray("output_modalities")?.toStringList().normalizeModalities()
 
-                // T119: known reasoning families (GPT-5.x, o-series, Codex
-                // Mini) get supportsReasoning pre-set to true so the
-                // Thinking pill enables before models.dev enrichment lands
-                // — for brand-new ids (e.g. gpt-5.5) the catalog rarely has
-                // the `reasoning` flag yet, and without this the pill
-                // stays disabled.
-                val idLower = id.lowercase()
-                val knownReasoning = idLower == "gpt-6-astra" || idLower.startsWith("gpt-5") ||
-                    idLower.startsWith("o1") ||
-                    idLower.startsWith("o3") ||
-                    idLower.startsWith("o4") ||
-                    idLower.contains("codex")
 
                 parsed.add(
-                    LLMModel(
+                    com.openminis.app.provider.rules.ModelRulesProvider.applyCapabilities(LLMModel(
                         id = id,
                         displayName = displayName,
                         provider = if (isCustomBase) "Custom" else "OpenAI",
                         inputModalities = inputModalities,
                         outputModalities = outputModalities,
-                        supportsReasoning = if (knownReasoning) true else null,
-                    ).withKnownOpenAICapabilities()
+                    ))
                 )
             }
             if (parsed.isEmpty()) return@withContext fallback
@@ -173,18 +134,6 @@ object OpenAIModelsApi {
         return out
     }
 
-    private fun LLMModel.withKnownOpenAICapabilities(): LLMModel {
-        if (!isGpt6Astra) return this
-        val known = LLMModel.gpt6Astra
-        return copy(
-            contextWindow = contextWindow ?: known.contextWindow,
-            maxOutputTokens = maxOutputTokens ?: known.maxOutputTokens,
-            supportsReasoning = supportsReasoning ?: known.supportsReasoning,
-            reasoningEffortValues = reasoningEffortValues ?: known.reasoningEffortValues,
-            inputModalities = inputModalities ?: known.inputModalities,
-            outputModalities = outputModalities ?: known.outputModalities,
-        )
-    }
 
     /** Check if a base URL points to official OpenAI endpoints. */
     private fun isOfficialOpenAI(baseURL: String): Boolean {

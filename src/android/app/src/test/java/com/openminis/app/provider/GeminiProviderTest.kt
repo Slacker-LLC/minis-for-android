@@ -27,7 +27,7 @@ class GeminiProviderTest {
         server.start()
         provider = GeminiProvider(
             apiKey = "test-key",
-            model = LLMModel.gemini25Flash,
+            model = ModelRulesTestFixtures.staticModel("gemini", "gemini-2.5-flash"),
             basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }

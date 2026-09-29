@@ -126,7 +126,7 @@ object AnthropicModelsApi {
 
         // All candidate bases failed.
         android.util.Log.e("AnthropicModels", "All ${candidateBases.size} fallback levels failed; lastCode=$lastFailureCode")
-        return@withContext if (isCustomEndpoint) emptyList() else LLMModel.allAnthropic
+        return@withContext if (isCustomEndpoint) emptyList() else com.openminis.app.provider.rules.ModelRulesProvider.staticModels("anthropic")
     }
 
     private suspend fun parseAndCache(
@@ -135,7 +135,7 @@ object AnthropicModelsApi {
         context: Context?,
         cacheKey: String,
     ): List<LLMModel> {
-        val fallback: List<LLMModel> = if (isCustomEndpoint) emptyList() else LLMModel.allAnthropic
+        val fallback: List<LLMModel> = if (isCustomEndpoint) emptyList() else com.openminis.app.provider.rules.ModelRulesProvider.staticModels("anthropic")
         val models = try {
             val json = JSONObject(body)
             val data = json.optJSONArray("data") ?: return fallback

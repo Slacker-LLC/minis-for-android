@@ -13,8 +13,8 @@ import com.openminis.app.provider.ModelsDevApi
  * step doesn't depend on a network round-trip. Returned in the exact
  * priority order the UI should display.
  *
- * The same set is the [LLMModel.allXAI] companion list — keep them in
- * sync. Returned through [ModelsDevApi.enrichModels] so context window
+ * The set is maintained in the bundled model-rules.json. Returned through
+ * [ModelsDevApi.enrichModels] so context window
  * / modality metadata fills in from the shared catalog.
  */
 object XAIModelsApi {
@@ -22,7 +22,7 @@ object XAIModelsApi {
 
     /** Static fallback used when /v1/models is unreachable or untrusted. */
     fun fetchModelsOAuth(): List<LLMModel> {
-        val models = LLMModel.allXAI
+        val models = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("xAI")
         AppLogger.info(TAG, "xAI OAuth model list (${models.size} models): ${models.joinToString { it.id }}")
         return ModelsDevApi.enrichModels(models)
     }

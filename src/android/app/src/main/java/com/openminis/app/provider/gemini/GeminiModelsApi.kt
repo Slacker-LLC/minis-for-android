@@ -22,7 +22,7 @@ object GeminiModelsApi {
      *   - OAuth via `Authorization: Bearer <token>` (no key param)
      *   - Cloud Code Assist: no public list endpoint — caller passes
      *     `cloudCodeFallback=true` to short-circuit straight to the built-in
-     *     `LLMModel.allGemini` list.
+     *     `com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")` list.
      *
      * The spec also requires a **403 fallback** on OAuth: when the OAuth
      * token lacks the `generative-language` scope (common for Cloud Code
@@ -39,7 +39,7 @@ object GeminiModelsApi {
         context: Context? = null,
         forceRefresh: Boolean = false,
     ): List<LLMModel> = withContext(Dispatchers.IO) {
-        if (cloudCodeFallback) return@withContext LLMModel.allGemini
+        if (cloudCodeFallback) return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
 
         val cacheKey = (if (isOAuth) "oauth|" else "key|") + apiKey
         if (context != null && !forceRefresh) {
@@ -57,22 +57,22 @@ object GeminiModelsApi {
         // [T-android-default-ua] brand outbound /v1beta/models request.
         builder.applyUserAgentOverride(null)
         val response = client.newCall(builder.build()).execute()
-        val body = response.body?.string() ?: return@withContext LLMModel.allGemini
+        val body = response.body?.string() ?: return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
 
         if (!response.isSuccessful) {
             // 403 on OAuth almost always means the token lacks the
             // generative-language scope. Falling back to the built-in list
             // matches iOS and keeps Cloud Code Assist users functional.
-            if (isOAuth && response.code == 403) return@withContext LLMModel.allGemini
+            if (isOAuth && response.code == 403) return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
             if (context != null && (response.code == 401 || response.code == 403)) {
                 cache.invalidate(context, cacheKey)
             }
-            return@withContext LLMModel.allGemini
+            return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
         }
 
         val models = try {
             val json = JSONObject(body)
-            val arr = json.optJSONArray("models") ?: return@withContext LLMModel.allGemini
+            val arr = json.optJSONArray("models") ?: return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
             val result = mutableListOf<LLMModel>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
@@ -89,10 +89,10 @@ object GeminiModelsApi {
                     result.add(LLMModel(name, displayName, "Google"))
                 }
             }
-            if (result.isEmpty()) return@withContext LLMModel.allGemini
+            if (result.isEmpty()) return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
             ModelsDevApi.enrichModels(result)
         } catch (_: Exception) {
-            return@withContext LLMModel.allGemini
+            return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
         }
 
         if (context != null) cache.save(context, cacheKey, models)

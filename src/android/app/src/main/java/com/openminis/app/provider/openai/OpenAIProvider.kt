@@ -58,7 +58,7 @@ import com.openminis.app.provider.failOnSilentEmptyCompletion
 class OpenAIProvider private constructor(
     private val apiKey: String?,
     private val oauthTokenProvider: (suspend () -> String)?,
-    override var model: LLMModel = LLMModel.gpt4oMini,
+    override var model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "gpt-4o-mini", "GPT-4o Mini", "OpenAI"),
     private val basePath: String = "https://api.openai.com/v1",
     private val extraHeaders: Map<String, String> = emptyMap(),
     /** Codex account ID for OAuth mode (extracted from JWT). */
@@ -104,7 +104,7 @@ class OpenAIProvider private constructor(
      * Non-reasoning Responses relays do honor the per-session field.
      */
     override val supportsTemperatureOverride: Boolean
-        get() = !model.isGpt6Astra && model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
+        get() = com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).rejectsTemperature != true && model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
 
     /**
      * [T-android-thinking-rules-phase2] Owning provider-instance id, set by
@@ -129,7 +129,7 @@ class OpenAIProvider private constructor(
     /** API Key constructor (Chat Completions API by default; set useResponsesAPI=true for /v1/responses). */
     constructor(
         apiKey: String,
-        model: LLMModel = LLMModel.gpt4oMini,
+        model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "gpt-4o-mini", "GPT-4o Mini", "OpenAI"),
         basePath: String = "https://api.openai.com/v1",
         extraHeaders: Map<String, String> = emptyMap(),
         useResponsesAPI: Boolean = false,
@@ -151,7 +151,7 @@ class OpenAIProvider private constructor(
     /** OAuth constructor (Codex Responses API). */
     constructor(
         oauthTokenProvider: suspend () -> String,
-        model: LLMModel = LLMModel.codexMini,
+        model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "codex-mini-latest", "Codex Mini", "OpenAI"),
         codexAccountId: String? = null,
     ) : this(apiKey = null, oauthTokenProvider = oauthTokenProvider, model = model, codexAccountId = codexAccountId)
 

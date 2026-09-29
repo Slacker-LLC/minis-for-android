@@ -2,21 +2,27 @@ package com.openminis.app.provider
 
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ThinkingLevel
-import com.openminis.app.provider.openai.OpenAIModelsApi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 /** Baseline captured from the pre-rules Kotlin catalog on PR0. */
 class ThinkingLevelCatalogSnapshotTest {
     @Test
     fun `static and explicitly requested ids retain their catalog ceiling`() {
+        val document = ModelRulesTestFixtures.bundledDocument()
         val additionalIds = listOf(
             "mimo-v2.5", "mimo-v2.5-pro", "seed-2.0", "bytedance-seed/x",
             "claude-opus-4-8", "claude-opus-4.7", "gpt-5.6-sol", "gpt-5.6-luna",
         )
-        val allModels = LLMModel.allModels + OpenAIModelsApi.codexOAuthStaticModels +
-            additionalIds.map { LLMModel(it, it, "Snapshot") }
-        val observed = allModels.associate { it.id to it.catalogMaxThinkingLevel }
+        val allModels = document.staticModels.values.flatten() + additionalIds.map { LLMModel(it, it, "Snapshot") }
+        val observed = allModels.associate { model ->
+            val level = if (model.supportsReasoning == false) ThinkingLevel.OFF
+            else model.selectableThinkingLevels.lastOrNull()
+                ?: document.capabilitiesFor(model.id).maxThinkingLevel
+                ?: ThinkingLevel.HIGH
+            model.id to level
+        }
 
         val expected = buildMap<String, ThinkingLevel> {
             listOf(
@@ -39,5 +45,18 @@ class ThinkingLevelCatalogSnapshotTest {
         }
         assertEquals("snapshot includes every current static/requested id", expected.keys, observed.keys)
         assertEquals(expected, observed)
+        document.staticModels.values.flatten().forEach { model ->
+            if (model.supportsReasoning != false && model.selectableThinkingLevels.isEmpty()) {
+                assertNotNull("${model.id} must have an explicit catalog rule", document.capabilitiesFor(model.id).maxThinkingLevel)
+            }
+        }
+    }
+
+    @Test
+    fun `completely unknown model uses the explicitly changed HIGH fallback`() {
+        val document = ModelRulesTestFixtures.bundledDocument()
+        val unknown = LLMModel("vendor-new-reasoner-999", "Unknown", "Custom")
+        assertEquals(null, document.capabilitiesFor(unknown.id).maxThinkingLevel)
+        assertEquals(ThinkingLevel.HIGH, ThinkingLevelCatalog.declaredMaxLevel(unknown.id) ?: ThinkingLevel.HIGH)
     }
 }

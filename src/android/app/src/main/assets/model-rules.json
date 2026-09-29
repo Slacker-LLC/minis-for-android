@@ -1,0 +1,716 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "gpt-6-astra-capabilities",
+      "match": {
+        "idExact": [
+          "gpt-6-astra"
+        ],
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "MAX",
+        "supportsReasoning": true,
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000,
+        "reasoningEffortValues": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ],
+        "rejectsTemperature": true
+      }
+    },
+    {
+      "id": "gpt-5.6-sol-terra-family",
+      "match": {
+        "idPrefix": [
+          "gpt-5.6-sol",
+          "gpt-5.6-terra"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "MAX"
+      }
+    },
+    {
+      "id": "gpt-5.6-luna-family",
+      "match": {
+        "idPrefix": [
+          "gpt-5.6-luna"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "MAX"
+      }
+    },
+    {
+      "id": "gpt-5.5-family",
+      "match": {
+        "idPrefix": [
+          "gpt-5.5"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-openai-reasoning-family-ceiling",
+      "match": {
+        "idPrefix": [
+          "gpt-5",
+          "o1",
+          "o3",
+          "o4"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-codex-family-ceiling",
+      "match": {
+        "idContains": [
+          "codex"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-hermes-reasoning-ceiling",
+      "match": {
+        "idContains": [
+          "hermes"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-qwen-family-ceiling",
+      "match": {
+        "idContains": [
+          "qwen"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "claude-opus-4-family",
+      "match": {
+        "idPrefix": [
+          "claude-opus-4"
+        ],
+        "normalizeDots": true,
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "MAX"
+      }
+    },
+    {
+      "id": "known-anthropic-family-ceiling",
+      "match": {
+        "idPrefix": [
+          "claude-3-7",
+          "claude-opus-3-7",
+          "claude-sonnet-3-7",
+          "claude-haiku-3-7",
+          "claude-4",
+          "claude-opus-4",
+          "claude-sonnet-4",
+          "claude-haiku-4",
+          "claude-fable-5",
+          "claude-opus-5",
+          "claude-sonnet-5",
+          "claude-haiku-5",
+          "claude-5"
+        ],
+        "normalizeDots": true,
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-gemini-family-ceiling",
+      "match": {
+        "idPrefix": [
+          "gemini-"
+        ],
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "known-grok-family-ceiling",
+      "match": {
+        "idPrefix": [
+          "grok-"
+        ],
+        "stripPath": true
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    },
+    {
+      "id": "mimo-agnes-reasoning-ceiling",
+      "match": {
+        "idContains": [
+          "mimo",
+          "agnes"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "HIGH"
+      }
+    },
+    {
+      "id": "bytedance-seed-reasoning-ceiling",
+      "match": {
+        "idContains": [
+          "seed-",
+          "bytedance-seed"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "HIGH"
+      }
+    },
+    {
+      "id": "openai-reasoning-prefixes",
+      "match": {
+        "idPrefix": [
+          "gpt-5",
+          "o1",
+          "o3",
+          "o4"
+        ]
+      },
+      "set": {
+        "supportsReasoning": true
+      }
+    },
+    {
+      "id": "openai-codex-reasoning",
+      "match": {
+        "idContains": [
+          "codex"
+        ]
+      },
+      "set": {
+        "supportsReasoning": true
+      }
+    },
+    {
+      "id": "claude-extended-thinking",
+      "match": {
+        "idPrefix": [
+          "claude-3-7",
+          "claude-opus-3-7",
+          "claude-sonnet-3-7",
+          "claude-haiku-3-7",
+          "claude-4",
+          "claude-opus-4",
+          "claude-sonnet-4",
+          "claude-haiku-4",
+          "claude-fable-5",
+          "claude-opus-5",
+          "claude-sonnet-5",
+          "claude-haiku-5",
+          "claude-5"
+        ],
+        "normalizeDots": true,
+        "stripPath": true
+      },
+      "set": {
+        "supportsReasoning": true
+      }
+    },
+    {
+      "id": "claude-adaptive-thinking-and-temperature",
+      "match": {
+        "idPrefix": [
+          "claude-opus-4-6",
+          "claude-opus-4-7",
+          "claude-opus-4-8",
+          "claude-sonnet-4-6",
+          "claude-sonnet-4-7",
+          "claude-sonnet-4-8",
+          "claude-haiku-4-6",
+          "claude-haiku-4-7",
+          "claude-haiku-4-8",
+          "claude-4-6",
+          "claude-4-7",
+          "claude-4-8",
+          "claude-fable-5",
+          "claude-opus-5",
+          "claude-sonnet-5",
+          "claude-haiku-5",
+          "claude-5"
+        ],
+        "normalizeDots": true,
+        "stripPath": true
+      },
+      "set": {
+        "adaptiveThinking": true,
+        "rejectsTemperature": true
+      }
+    },
+    {
+      "id": "gemini-3-thought-signature",
+      "match": {
+        "idPrefix": [
+          "gemini-3"
+        ],
+        "stripPath": true
+      },
+      "set": {
+        "requiresThoughtSignature": true
+      }
+    },
+    {
+      "id": "known-static-model-thinking-ceilings",
+      "match": {
+        "idExact": [
+          "claude-fable-5",
+          "claude-sonnet-5",
+          "claude-sonnet-4-6",
+          "claude-haiku-4-5",
+          "gemini-3-pro-preview",
+          "gemini-3-flash-preview",
+          "gemini-2.5-pro",
+          "gemini-2.5-flash",
+          "gemini-2.5-flash-lite",
+          "gpt-5.3-codex",
+          "gpt-5.2-codex",
+          "gpt-5.1-codex-max",
+          "gpt-5.2",
+          "gpt-4o",
+          "gpt-4o-mini",
+          "o3",
+          "o4-mini",
+          "codex-mini-latest",
+          "anthropic/claude-sonnet-4",
+          "google/gemini-2.5-flash",
+          "openai/gpt-4o",
+          "meta-llama/llama-4-maverick",
+          "grok-4.6",
+          "grok-4.5",
+          "grok-4.3",
+          "grok-4.20-0309-reasoning",
+          "grok-4.20-0309-non-reasoning",
+          "grok-4.20-multi-agent-0309",
+          "grok-build-0.1",
+          "grok-3-mini",
+          "grok-3-mini-fast",
+          "grok-composer-2.5-fast",
+          "grok-4-fast",
+          "grok-4-fast-non-reasoning",
+          "grok-code-fast-1",
+          "kimi-k3",
+          "kimi-k2",
+          "gpt-5.4",
+          "gpt-5.4-mini",
+          "gpt-image-2"
+        ]
+      },
+      "set": {
+        "maxThinkingLevel": "XHIGH"
+      }
+    }
+  ],
+  "staticModels": {
+    "anthropic": [
+      {
+        "id": "claude-fable-5",
+        "displayName": "Claude Fable 5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-opus-4-8",
+        "displayName": "Claude Opus 4.8",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-opus-4-6",
+        "displayName": "Claude Opus 4.6",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-sonnet-5",
+        "displayName": "Claude Sonnet 5",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 64000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-sonnet-4-6",
+        "displayName": "Claude Sonnet 4.6",
+        "provider": "Anthropic",
+        "contextWindow": 1000000,
+        "maxOutputTokens": 64000,
+        "supportsReasoning": true
+      },
+      {
+        "id": "claude-haiku-4-5",
+        "displayName": "Claude Haiku 4.5",
+        "provider": "Anthropic",
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000,
+        "supportsReasoning": true
+      }
+    ],
+    "gemini": [
+      {
+        "id": "gemini-3-pro-preview",
+        "displayName": "Gemini 3 Pro (Preview)",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-3-flash-preview",
+        "displayName": "Gemini 3 Flash (Preview)",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-2.5-pro",
+        "displayName": "Gemini 2.5 Pro",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-2.5-flash",
+        "displayName": "Gemini 2.5 Flash",
+        "provider": "Google"
+      },
+      {
+        "id": "gemini-2.5-flash-lite",
+        "displayName": "Gemini 2.5 Flash Lite",
+        "provider": "Google"
+      }
+    ],
+    "openAI": [
+      {
+        "id": "gpt-6-astra",
+        "displayName": "GPT-6 Astra",
+        "provider": "OpenAI",
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true,
+        "reasoningEffortValues": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ]
+      },
+      {
+        "id": "gpt-5.5",
+        "displayName": "GPT-5.5",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.3-codex",
+        "displayName": "GPT-5.3 Codex",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.2-codex",
+        "displayName": "GPT-5.2 Codex",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.1-codex-max",
+        "displayName": "GPT-5.1 Codex Max",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.2",
+        "displayName": "GPT-5.2",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-4o",
+        "displayName": "GPT-4o",
+        "provider": "OpenAI"
+      },
+      {
+        "id": "gpt-4o-mini",
+        "displayName": "GPT-4o Mini",
+        "provider": "OpenAI"
+      },
+      {
+        "id": "o3",
+        "displayName": "o3",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "o4-mini",
+        "displayName": "o4 Mini",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "codex-mini-latest",
+        "displayName": "Codex Mini",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      }
+    ],
+    "openRouter": [
+      {
+        "id": "anthropic/claude-sonnet-4",
+        "displayName": "Claude Sonnet 4",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "google/gemini-2.5-flash",
+        "displayName": "Gemini 2.5 Flash",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "openai/gpt-4o",
+        "displayName": "GPT-4o",
+        "provider": "OpenRouter"
+      },
+      {
+        "id": "meta-llama/llama-4-maverick",
+        "displayName": "Llama 4 Maverick",
+        "provider": "OpenRouter"
+      }
+    ],
+    "xAI": [
+      {
+        "id": "grok-4.6",
+        "displayName": "Grok 4.6",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-4.5",
+        "displayName": "Grok 4.5",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-4.3",
+        "displayName": "Grok 4.3",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-4.20-0309-reasoning",
+        "displayName": "Grok 4.20 Reasoning",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-4.20-0309-non-reasoning",
+        "displayName": "Grok 4.20",
+        "provider": "xAI"
+      },
+      {
+        "id": "grok-4.20-multi-agent-0309",
+        "displayName": "Grok 4.20 Multi-Agent",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-build-0.1",
+        "displayName": "Grok Build 0.1",
+        "provider": "xAI"
+      },
+      {
+        "id": "grok-3-mini",
+        "displayName": "Grok 3 Mini",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-3-mini-fast",
+        "displayName": "Grok 3 Mini Fast",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-composer-2.5-fast",
+        "displayName": "Grok Composer 2.5 Fast",
+        "provider": "xAI"
+      },
+      {
+        "id": "grok-4-fast",
+        "displayName": "Grok 4 Fast",
+        "provider": "xAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "grok-4-fast-non-reasoning",
+        "displayName": "Grok 4 Fast (Non-Reasoning)",
+        "provider": "xAI"
+      },
+      {
+        "id": "grok-code-fast-1",
+        "displayName": "Grok Code Fast 1",
+        "provider": "xAI",
+        "supportsReasoning": true
+      }
+    ],
+    "kimi": [
+      {
+        "id": "kimi-k3",
+        "displayName": "Kimi K3",
+        "provider": "Kimi"
+      },
+      {
+        "id": "kimi-k2",
+        "displayName": "Kimi K2",
+        "provider": "Kimi"
+      }
+    ],
+    "codexOAuth": [
+      {
+        "id": "gpt-6-astra",
+        "displayName": "GPT-6 Astra",
+        "provider": "OpenAI",
+        "contextWindow": 1050000,
+        "maxOutputTokens": 128000,
+        "supportsReasoning": true,
+        "reasoningEffortValues": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "text"
+        ]
+      },
+      {
+        "id": "gpt-5.6-sol",
+        "displayName": "GPT-5.6 Sol",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.6-terra",
+        "displayName": "GPT-5.6 Terra",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.6-luna",
+        "displayName": "GPT-5.6 Luna",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.5",
+        "displayName": "GPT-5.5",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.4",
+        "displayName": "GPT-5.4",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "displayName": "GPT-5.4 Mini",
+        "provider": "OpenAI",
+        "supportsReasoning": true
+      },
+      {
+        "id": "gpt-image-2",
+        "displayName": "GPT Image 2",
+        "provider": "OpenAI",
+        "inputModalities": [
+          "text",
+          "image"
+        ],
+        "outputModalities": [
+          "image"
+        ]
+      }
+    ]
+  },
+  "pickerFilters": {
+    "openAI": {
+      "includePrefixes": [
+        "gpt-",
+        "o1",
+        "o3",
+        "o4-",
+        "codex-",
+        "chatgpt-"
+      ],
+      "excludeSuffixes": [
+        "-instruct",
+        "-realtime",
+        "-audio",
+        "-transcribe",
+        "-tts",
+        "-embedding"
+      ],
+      "excludeContains": [
+        "-instruct",
+        "-realtime",
+        "-audio",
+        "-transcribe",
+        "-tts",
+        "-embedding",
+        ":ft-"
+      ]
+    }
+  }
+}

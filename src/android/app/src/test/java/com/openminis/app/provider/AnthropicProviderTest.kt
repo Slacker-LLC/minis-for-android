@@ -30,7 +30,7 @@ class AnthropicProviderTest {
         server.start()
         provider = AnthropicProvider(
             apiKey = "test-key",
-            model = LLMModel.claudeHaiku45,
+            model = ModelRulesTestFixtures.staticModel("anthropic", "claude-haiku-4-5"),
             basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
@@ -197,7 +197,7 @@ class AnthropicProviderTest {
 
         val request = server.takeRequest()
         val body = JSONObject(request.body.readUtf8())
-        assertEquals(LLMModel.claudeHaiku45.id, body.getString("model"))
+        assertEquals(ModelRulesTestFixtures.staticModel("anthropic", "claude-haiku-4-5").id, body.getString("model"))
         assertEquals(2048, body.getInt("max_tokens"))
     }
 
@@ -384,8 +384,8 @@ class AnthropicProviderTest {
 
     @Test
     fun `provider model can be changed`() {
-        provider.model = LLMModel.claudeHaiku45
-        assertEquals(LLMModel.claudeHaiku45, provider.model)
+        provider.model = ModelRulesTestFixtures.staticModel("anthropic", "claude-haiku-4-5")
+        assertEquals(ModelRulesTestFixtures.staticModel("anthropic", "claude-haiku-4-5"), provider.model)
     }
 
     // -- Thinking budget (legacy budget_tokens path) --
@@ -582,7 +582,7 @@ class AnthropicProviderTest {
         // models (Claude 4.6+) default `display` to "omitted" on newer tiers,
         // which blanks the thinking block (signature only). We must pin
         // display=summarized so the readable thinking summary comes back.
-        provider.model = LLMModel.claudeSonnet5 // major 5 → adaptive thinking
+        provider.model = ModelRulesTestFixtures.staticModel("anthropic", "claude-sonnet-5") // major 5 → adaptive thinking
         server.enqueue(MockResponse().setBody("""{"content":[],"usage":{"input_tokens":0,"output_tokens":0}}"""))
 
         provider.sendMessage(
@@ -604,7 +604,7 @@ class AnthropicProviderTest {
         // reasons. Omitting it == showThinkingSummaries:true.
         val oauthProvider = AnthropicProvider(
             apiKey = "test-oauth-token",
-            model = LLMModel.claudeSonnet5,
+            model = ModelRulesTestFixtures.staticModel("anthropic", "claude-sonnet-5"),
             basePath = server.loopbackUrl("/").toString().trimEnd('/'),
             isOAuth = true,
             oauthIdentifierPromptOverride = "test-claude-code-prefix",

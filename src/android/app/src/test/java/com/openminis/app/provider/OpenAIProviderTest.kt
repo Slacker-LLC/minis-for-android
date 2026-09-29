@@ -25,11 +25,12 @@ class OpenAIProviderTest {
 
     @Before
     fun setUp() {
+        ModelRulesTestFixtures.installBundledCatalog()
         server = MockWebServer()
         server.start()
         provider = OpenAIProvider(
             apiKey = "test-key",
-            model = LLMModel.gpt4oMini,
+            model = ModelRulesTestFixtures.staticModel("openAI", "gpt-4o-mini"),
             basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
@@ -377,8 +378,8 @@ class OpenAIProviderTest {
 
     @Test
     fun `provider model can be changed`() {
-        provider.model = LLMModel.gpt4o
-        assertEquals(LLMModel.gpt4o, provider.model)
+        provider.model = ModelRulesTestFixtures.staticModel("openAI", "gpt-4o")
+        assertEquals(ModelRulesTestFixtures.staticModel("openAI", "gpt-4o"), provider.model)
     }
 
     // -- [T-reasoning-effort-data-driven] reasoning_effort on the wire --

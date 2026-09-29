@@ -60,7 +60,7 @@ class ResponsesApiTemperatureOverrideTest {
 
     @Test
     fun `session temperature reaches non reasoning Responses request`() {
-        val body = captureBody(LLMModel.gpt4oMini)
+        val body = captureBody(ModelRulesTestFixtures.staticModel("openAI", "gpt-4o-mini"))
 
         assertEquals(0.35, body.getDouble("temperature"), 0.001)
     }

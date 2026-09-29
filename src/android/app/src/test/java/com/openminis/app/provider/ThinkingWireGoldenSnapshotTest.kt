@@ -38,7 +38,8 @@ import org.junit.Test
  *     latter: live model metadata now clamps requests to its declared effort ceiling,
  *     so rows with an explicit `max` or `high` declaration intentionally changed.
  *  3. Do NOT regenerate expectations to turn a red test green without first explaining,
- *     in words, why the wire format legitimately changed.
+ *     in words, why the wire format legitimately changed. The only intentional PR1 delta
+ *     is `generic-unknown`: its catalog ceiling changes from XHIGH to HIGH by design.
  *
  * Only the thinking-related keys are captured (the rest of the body — messages, model,
  * stream flags — is noise for this purpose and would make the snapshot brittle). Keys
@@ -48,8 +49,8 @@ import org.junit.Test
  * deliberately. iOS calls the pure `injectThinkingParams` directly, so its rows show the
  * injector in isolation. Android's injector is private and reads instance state, so this
  * drives the real `sendMessageClamped`, which means the rows also include two upstream
- * effects: (a) the `catalogMaxThinkingLevel` ceiling — `gpt-5.3` matches no catalog rule
- * so it defaults to XHIGH, which is why MAX/ULTRA render as `"xhigh"` here and `"max"` on
+ * effects: (a) the `catalogMaxThinkingLevel` ceiling — `gpt-5.3` is explicitly covered by the known GPT-5 family rule
+ * at XHIGH, which is why MAX/ULTRA render as `"xhigh"` here and `"max"` on
  * iOS. Models with `reasoningEffortValues` are now clamped to that live declaration,
  * which is why the OpenRouter `high` case and the DeepSeek/GLM `max` cases below differ
  * from the pre-#121 snapshot; and (b) `explicitOffEffort`, which requires a literal
@@ -72,6 +73,7 @@ class ThinkingWireGoldenSnapshotTest {
 
     @Before
     fun setUp() {
+        ModelRulesTestFixtures.installBundledCatalog()
         server = MockWebServer()
         server.start()
     }
@@ -303,9 +305,9 @@ generic-unknown/OFF -> {}
 generic-unknown/LOW -> {reasoning_effort:"low"}
 generic-unknown/MEDIUM -> {reasoning_effort:"medium"}
 generic-unknown/HIGH -> {reasoning_effort:"high"}
-generic-unknown/XHIGH -> {reasoning_effort:"xhigh"}
-generic-unknown/MAX -> {reasoning_effort:"xhigh"}
-generic-unknown/ULTRA -> {reasoning_effort:"xhigh"}
+generic-unknown/XHIGH -> {reasoning_effort:"high"}
+generic-unknown/MAX -> {reasoning_effort:"high"}
+generic-unknown/ULTRA -> {reasoning_effort:"high"}
 sparse-high-max/OFF -> {}
 sparse-high-max/LOW -> {reasoning_effort:"high"}
 sparse-high-max/MEDIUM -> {reasoning_effort:"high"}
