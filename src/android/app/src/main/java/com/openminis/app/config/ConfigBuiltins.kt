@@ -3,8 +3,8 @@ package com.openminis.app.config
 import android.content.Context
 import com.openminis.app.config.collections.EnvVarsCollection
 import com.openminis.app.service.DynamicIslandSupport
-import com.openminis.app.config.collections.GroupsCollection
 import com.openminis.app.config.collections.ModelsCollection
+import com.openminis.app.config.collections.ModelSlotsCollection
 import com.openminis.app.config.collections.ProvidersCollection
 import com.openminis.app.config.fields.ClosureField
 import com.openminis.app.config.fields.PrefsBoolField
@@ -153,7 +153,7 @@ internal object ConfigBuiltins {
             ClosureField(
                 path = "session.primaryModel",
                 displayName = "Primary model (current session)",
-                description = "Set as `entry:<uuid>` or `group:<id>` (use `models` / `groups` topics to discover ids). Empty clears the binding.",
+                description = "Set as `entry:<uuid>` (use the models topic to discover ids). Empty clears the binding and follows the Main slot.",
                 valueSchema = ConfigSchema.Str(maxLength = 200),
                 risk = ConfigRisk.SENSITIVE,
                 revertable = true,
@@ -171,7 +171,7 @@ internal object ConfigBuiltins {
                     val sid = ChatViewModelStore.activeSessionId
                         ?: throw ConfigError.InvalidValue("No active session — open a chat first")
                     if (s.isEmpty()) {
-                        // Clear the binding — fall back to default group/entry on next load.
+                        // Clear the binding — follow the Main slot on next load.
                         runBlocking { chatRepo.dao.updateSessionBinding(sid, "", "") }
                         return@ClosureField
                     }
@@ -186,21 +186,8 @@ internal object ConfigBuiltins {
                                 ?: throw ConfigError.InvalidValue("Unknown model entry uuid: $uuid")
                             """{"type":"entry","entryId":"$uuid"}""" to entry.baseModel.id
                         }
-                        s.startsWith("group:") -> {
-                            val gid = s.removePrefix("group:")
-                            if (gid.isEmpty()) {
-                                throw ConfigError.InvalidValue("group id is empty")
-                            }
-                            val group = cfg.modelGroups.find { it.id == gid }
-                                ?: throw ConfigError.InvalidValue("Unknown group id: $gid")
-                            val firstEntryId = group.memberEntryIds.firstOrNull()
-                                ?: throw ConfigError.InvalidValue("Group $gid has no member entries")
-                            val firstEntry = cfg.modelEntries.find { it.id == firstEntryId }
-                                ?: throw ConfigError.InvalidValue("Group $gid references missing entry $firstEntryId")
-                            """{"type":"group","groupId":"$gid"}""" to firstEntry.baseModel.id
-                        }
                         else -> throw ConfigError.InvalidValue(
-                            "Expected `entry:<uuid>` or `group:<id>`, got '$s'"
+                            "Expected `entry:<uuid>`, got '$s'"
                         )
                     }
                     runBlocking {
@@ -241,9 +228,8 @@ internal object ConfigBuiltins {
     }
 
     /** Convert the `model_binding` JSON the chat layer writes into the
-     *  `entry:<uuid>` / `group:<id>` form the iOS minis-config surface uses.
-     *  Returns empty string when the session has no explicit binding (the
-     *  default group/entry fallback applies on next load). */
+     *  `entry:<uuid>` form used by the minis-config surface. Returns empty
+     *  when the session follows the Main slot. */
     private fun formatBinding(bindingJson: String?): String {
         if (bindingJson.isNullOrEmpty()) return ""
         return try {
@@ -252,10 +238,6 @@ internal object ConfigBuiltins {
                 "entry" -> {
                     val id = obj.optString("entryId")
                     if (id.isEmpty()) "" else "entry:$id"
-                }
-                "group" -> {
-                    val id = obj.optString("groupId")
-                    if (id.isEmpty()) "" else "group:$id"
                 }
                 else -> ""
             }
@@ -542,7 +524,24 @@ internal object ConfigBuiltins {
     ) {
         r.register(ProvidersCollection(providerRepo, envVarRepo))
         r.register(ModelsCollection(providerRepo))
-        r.register(GroupsCollection(providerRepo))
+        r.register(ModelSlotsCollection(providerRepo))
+        r.register(
+            ClosureField(
+                path = "slots.fallbackTrigger",
+                displayName = "Main slot fallback trigger",
+                description = "default retries the next Main-slot entry on rate limits/server errors; always retries on any error.",
+                valueSchema = ConfigSchema.StrEnum(listOf("default", "always")),
+                risk = ConfigRisk.SENSITIVE,
+                revertable = true,
+                reader = { ConfigValue.Str(providerRepo.config.value.fallbackTrigger.name) },
+                writer = { value ->
+                    val raw = (value as? ConfigValue.Str)?.value ?: throw ConfigError.TypeMismatch("string")
+                    val strategy = runCatching { com.openminis.app.data.model.FallbackStrategy.valueOf(raw) }.getOrNull()
+                        ?: throw ConfigError.InvalidValue("Unknown fallback trigger")
+                    providerRepo.setFallbackTrigger(strategy)
+                },
+            ),
+        )
         r.register(EnvVarsCollection(envVarRepo))
         // [T-android-thinking-rules-phase2] Custom thinking rules under
         // thinkingrules.<instanceId>:<ruleId>.<field>.
@@ -665,109 +664,35 @@ internal object ConfigBuiltins {
             )
         )
 
-        // Aggregate read-only summary so `minis-config get groups`
-        // returns every model group with its expanded entries.
+        // Aggregate read-only summary of the fixed model slots.
         r.register(
             ReadOnlyField(
-                path = "groups",
-                displayName = "Model groups (summary)",
-                description = "Read-only list of model groups with entries expanded.",
+                path = "slots",
+                displayName = "Model slots (summary)",
+                description = "Read-only mapping of fixed slot names to ordered model entry IDs.",
                 valueSchema = ConfigSchema.Json,
                 reader = {
                     val cfg = providerRepo.config.value
-                    val entriesById =
-                        HashMap<String, com.openminis.app.data.model.ModelEntry>(cfg.modelEntries.size)
-                    for (e in cfg.modelEntries) entriesById[e.id] = e
-                    val providersById =
-                        HashMap<String, com.openminis.app.data.model.ProviderInstance>(cfg.instances.size)
-                    for (inst in cfg.instances) providersById[inst.id] = inst
-                    ConfigValue.Arr(
-                        cfg.modelGroups.map { g ->
-                            val entries = g.memberEntryIds.map { entryId ->
-                                val e = entriesById[entryId]
-                                if (e == null) {
-                                    ConfigValue.Obj(
-                                        linkedMapOf(
-                                            "entry_id" to ConfigValue.Str(entryId),
-                                            "missing" to ConfigValue.Bool(true),
-                                        )
-                                    )
-                                } else {
-                                    val inst = providersById[e.providerInstanceId]
-                                    ConfigValue.Obj(
-                                        linkedMapOf(
-                                            "entry_id" to ConfigValue.Str(entryId),
-                                            "display_name" to ConfigValue.Str(e.model.displayName),
-                                            "model_id" to ConfigValue.Str(e.baseModel.id),
-                                            "provider_id" to ConfigValue.Str(e.providerInstanceId),
-                                            "provider_label" to (inst?.let { ConfigValue.Str(it.label) } ?: ConfigValue.Null),
-                                        )
-                                    )
-                                }
-                            }
-                            ConfigValue.Obj(
-                                linkedMapOf(
-                                    "id" to ConfigValue.Str(g.id),
-                                    "name" to ConfigValue.Str(g.name),
-                                    "strategy" to ConfigValue.Str(g.strategy.name),
-                                    "fallback_strategy" to ConfigValue.Str(g.fallbackStrategy.name),
-                                    "entries" to ConfigValue.Arr(entries),
+                    ConfigValue.Obj(
+                        buildMap {
+                            put("fallbackTrigger", ConfigValue.Str(cfg.fallbackTrigger.name))
+                            com.openminis.app.data.model.ModelSlot.entries.forEach { slot ->
+                                put(
+                                    slot.name,
+                                    ConfigValue.Arr(cfg.slots.entries(slot).map { ConfigValue.Str(it) }),
                                 )
-                            )
-                        }
+                            }
+                        },
                     )
                 },
             )
         )
+
     }
 
-    // -- Defaults — agent loop entries / groups, default primary/sub group --
+    // -- Defaults — Agent Loop entry list --
 
     private fun registerDefaults(r: ConfigRegistry, repo: ProviderRepository) {
-        r.register(
-            ClosureField(
-                path = "defaults.primaryGroup",
-                displayName = "Default primary group",
-                description = "Group used by new sessions. Empty string clears the default.",
-                valueSchema = ConfigSchema.Str(maxLength = 200),
-                risk = ConfigRisk.SENSITIVE,
-                revertable = true,
-                reader = { ConfigValue.Str(repo.defaultPrimaryGroupId ?: "") },
-                writer = { v ->
-                    val s = (v as? ConfigValue.Str)?.value ?: throw ConfigError.TypeMismatch("string")
-                    if (s.isEmpty()) {
-                        repo.defaultPrimaryGroupId = null
-                    } else {
-                        if (repo.config.value.modelGroups.none { it.id == s }) {
-                            throw ConfigError.InvalidValue("No group with id $s")
-                        }
-                        repo.defaultPrimaryGroupId = s
-                    }
-                },
-            )
-        )
-        r.register(
-            ClosureField(
-                path = "defaults.subGroup",
-                displayName = "Default sub group",
-                description = "Secondary group for fallback. Empty string clears the default.",
-                valueSchema = ConfigSchema.Str(maxLength = 200),
-                risk = ConfigRisk.SENSITIVE,
-                revertable = true,
-                reader = { ConfigValue.Str(repo.defaultSubGroupId ?: "") },
-                writer = { v ->
-                    val s = (v as? ConfigValue.Str)?.value ?: throw ConfigError.TypeMismatch("string")
-                    if (s.isEmpty()) {
-                        repo.defaultSubGroupId = null
-                    } else {
-                        if (repo.config.value.modelGroups.none { it.id == s }) {
-                            throw ConfigError.InvalidValue("No group with id $s")
-                        }
-                        repo.defaultSubGroupId = s
-                    }
-                },
-            )
-        )
         r.register(
             ClosureField(
                 path = "defaults.agentLoopEntries",
@@ -809,40 +734,7 @@ internal object ConfigBuiltins {
                 },
             )
         )
-        r.register(
-            ClosureField(
-                path = "defaults.agentLoopGroups",
-                displayName = "Agent loop groups",
-                description = "Whole groups exposed via minis-model-use.",
-                valueSchema = ConfigSchema.Array(ConfigSchema.Str()),
-                risk = ConfigRisk.SENSITIVE,
-                revertable = true,
-                reader = {
-                    // [T-android-agentloop-dirty-data-skip] Skip ids that no
-                    // longer match a real group (deleted / legacy bare UUID).
-                    val valid = repo.config.value.modelGroups.map { it.id }.toSet()
-                    ConfigValue.Arr(
-                        repo.config.value.agentLoopGroupIds
-                            .filter { it in valid }
-                            .map { ConfigValue.Str(it) }
-                    )
-                },
-                writer = { v ->
-                    val arr = (v as? ConfigValue.Arr)?.value ?: throw ConfigError.TypeMismatch("array")
-                    val ids = arr.mapNotNull { (it as? ConfigValue.Str)?.value }
-                    val valid = repo.config.value.modelGroups.map { it.id }.toSet()
-                    // [T-android-agentloop-dirty-data-skip] Silent-skip unknown
-                    // group ids (same rationale as agentLoopEntries above).
-                    val cleanIds = ids.filter { it in valid }
-                    ids.filterNot { it in valid }.forEach { bad ->
-                        com.openminis.app.logging.AppLogger.warning(
-                            "MinisConfig", "skipped unknown agentLoopGroups id: $bad"
-                        )
-                    }
-                    repo.setAgentLoopGroupIds(cleanIds)
-                },
-            )
-        )
+
     }
 
     // -- Soul (SOUL.md personality) --

@@ -12,7 +12,7 @@ import com.openminis.app.provider.ProviderFactory
 /** Result of one correction attempt. */
 data class CorrectionOutcome(
     val correctedText: String,
-    val modelGroupUsed: String,
+    val modelSlotUsed: String,
     val durationMs: Int,
 )
 
@@ -58,7 +58,7 @@ class LlmCorrectionStrategy(
     ): CorrectionOutcome {
         val started = System.currentTimeMillis()
         val resolved = resolveModel() ?: throw CorrectionError.NoModelAvailable
-        val (entry, groupKind) = resolved
+        val (entry, slotKind) = resolved
 
         val instance = repository.instance(entry.providerInstanceId)
             ?: throw CorrectionError.NoModelAvailable
@@ -79,7 +79,7 @@ class LlmCorrectionStrategy(
             TAG,
             "[correction] resolved instance=${instance.label} (${instance.id}) " +
                 "type=${instance.providerType} model=${entry.model.id} " +
-                "group=${groupKind} hasKey=${apiKey.isNotBlank()}",
+                "slot=${slotKind} hasKey=${apiKey.isNotBlank()}",
         )
 
         val prompt = buildPrompt(transcript, candidates, context)
@@ -98,21 +98,21 @@ class LlmCorrectionStrategy(
         if (cleaned.isEmpty()) throw CorrectionError.EmptyResponse
         return CorrectionOutcome(
             correctedText = cleaned,
-            modelGroupUsed = groupKind,
+            modelSlotUsed = slotKind,
             durationMs = (System.currentTimeMillis() - started).toInt(),
         )
     }
 
     /**
-     * Prefer the dedicated sub-model group, fall back to the primary. Mirrors
-     * iOS CorrectionModelResolver; reuses [ProviderRepository.resolveTitleSubEntry]
+     * Prefer the Light slot, falling back to the Main slot. Mirrors
+     * iOS CorrectionModelResolver; reuses [ProviderRepository.resolveTitleLightEntry]
      * so correction and title generation cannot drift apart on which
      * "lightweight model" they mean.
      */
     private fun resolveModel(): Pair<ModelEntry, String>? {
-        repository.resolveTitleSubEntry()?.let { return it to "sub" }
+        repository.resolveTitleLightEntry()?.let { return it to "light" }
         val entry = repository.primaryEntry(ModelSlot.main)
-        if (entry != null) return entry to "primary"
+        if (entry != null) return entry to "main"
         Log.e(TAG, "no correction model available (neither light nor main slot resolves)")
         return null
     }

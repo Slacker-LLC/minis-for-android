@@ -59,6 +59,7 @@ import androidx.compose.foundation.layout.FlowRow
  * in practice the only prefs used are the two voice directions, so Android
  * models them directly:
  *
+ *  - [TEXT_OUTPUT] — Main/Light scenarios: only text-output entries qualify.
  *  - [AUDIO_INPUT]  — ASR scenario: only audio-consuming entries qualify,
  *    and the System Recognition (Online/Offline) virtual entries lead.
  *  - [AUDIO_OUTPUT] — TTS scenario: only audio-producing entries qualify,
@@ -71,6 +72,7 @@ import androidx.compose.foundation.layout.FlowRow
  * seedCollapse: multi-voice vendors would fold all-but-one voice).
  */
 enum class PickerModalityFilter {
+    TEXT_OUTPUT,
     AUDIO_INPUT,
     AUDIO_OUTPUT,
     // [T-android-vision-group] Vision scenario: only image-consuming entries
@@ -78,6 +80,7 @@ enum class PickerModalityFilter {
     IMAGE_INPUT;
 
     fun matches(model: LLMModel): Boolean = when (this) {
+        TEXT_OUTPUT -> model.isTextOutput
         AUDIO_INPUT -> model.hasAudioInput
         AUDIO_OUTPUT -> model.hasAudioOutput
         IMAGE_INPUT -> model.hasImageInput
@@ -85,6 +88,7 @@ enum class PickerModalityFilter {
 
     /** System virtual entries that serve this direction, in display order. */
     fun systemEntries(): List<ModelEntry> = when (this) {
+        TEXT_OUTPUT -> emptyList()
         AUDIO_INPUT -> listOf(SystemVoiceEntries.asrOnline, SystemVoiceEntries.asrOffline)
         AUDIO_OUTPUT -> listOf(SystemVoiceEntries.tts)
         IMAGE_INPUT -> emptyList()

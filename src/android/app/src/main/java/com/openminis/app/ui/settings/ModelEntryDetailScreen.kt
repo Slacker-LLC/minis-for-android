@@ -1,5 +1,8 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -8,6 +11,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Slider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,12 +23,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.model.ModelOverrides
+import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.model.normalizeModalityName
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.components.RowLabel
@@ -30,6 +38,7 @@ import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.R
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import kotlin.math.roundToInt
 
 /**
  * Detail / edit screen for a single ModelEntry. T210: brought to iOS
@@ -68,6 +77,10 @@ fun ModelEntryDetailScreen(
     var thinkingEnabled by remember {
         mutableStateOf(overrides.supportsReasoning ?: baseModel.supportsReasoning ?: false)
     }
+    var defaultThinkingLevel by remember { mutableStateOf(overrides.defaultThinkingLevel) }
+    var thinkingMenuExpanded by remember { mutableStateOf(false) }
+    var contextLimitTokens by remember { mutableStateOf(overrides.contextLimitTokens) }
+    var lastContextLimitTokens by remember { mutableStateOf(overrides.lastContextLimitTokens) }
     // [T-eta-hosted-web-search] The provider's own web search; off unless the entry asked for it.
     var hostedWebSearch by remember {
         mutableStateOf(overrides.hostedWebSearch ?: baseModel.hostedWebSearch)
@@ -135,6 +148,9 @@ fun ModelEntryDetailScreen(
                         // supportsReasoning: persist only when user diverged from base.
                         supportsReasoning = thinkingEnabled.takeIf { it != (baseModel.supportsReasoning ?: false) },
                         hostedWebSearch = hostedWebSearch.takeIf { it != baseModel.hostedWebSearch },
+                        defaultThinkingLevel = defaultThinkingLevel,
+                        contextLimitTokens = contextLimitTokens,
+                        lastContextLimitTokens = lastContextLimitTokens,
                         // Modality lists: persist only when user-edited set differs
                         // from baseModel's set; otherwise leave null so the entry
                         // tracks future provider updates to the base modalities.
@@ -236,6 +252,67 @@ fun ModelEntryDetailScreen(
             )
         }
 
+        // ── Entry defaults ──────────────────────────────────────────────
+        SettingsSection(
+            header = stringResource(R.string.model_entry_default_thinking),
+        ) {
+            Box {
+                SettingsRow(
+                    title = stringResource(R.string.model_entry_default_thinking),
+                    subtitle = stringResource(thinkingLevelLabel(defaultThinkingLevel)),
+                    onClick = { thinkingMenuExpanded = true },
+                    showDivider = false,
+                )
+                DropdownMenu(
+                    expanded = thinkingMenuExpanded,
+                    onDismissRequest = { thinkingMenuExpanded = false },
+                ) {
+                    val choices = listOf<ThinkingLevel?>(null) + ThinkingLevel.entries
+                    choices.forEach { level ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(thinkingLevelLabel(level))) },
+                            onClick = {
+                                defaultThinkingLevel = level
+                                thinkingMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        SettingsSection(
+            header = stringResource(R.string.model_entry_context_limit_label),
+            footer = stringResource(R.string.model_entry_context_limit_footer),
+        ) {
+            val enabled = contextLimitTokens != null
+            SettingsSwitchRow(
+                title = stringResource(R.string.model_entry_context_limit_enabled),
+                checked = enabled,
+                onCheckedChange = { on ->
+                    if (on) {
+                        val restored = lastContextLimitTokens ?: 128_000
+                        contextLimitTokens = restored
+                        lastContextLimitTokens = restored
+                    } else {
+                        lastContextLimitTokens = contextLimitTokens ?: lastContextLimitTokens
+                        contextLimitTokens = null
+                    }
+                },
+                showDivider = enabled,
+            )
+            if (enabled) {
+                ContextLimitSlider(
+                    value = contextLimitTokens,
+                    unlimitedLabel = stringResource(R.string.model_entry_context_unlimited),
+                    onValueChange = { newTokens ->
+                        contextLimitTokens = newTokens
+                        lastContextLimitTokens = newTokens
+                    },
+                )
+            }
+        }
+
         // ── Visibility ──────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.model_entry_visibility),
@@ -335,5 +412,78 @@ fun ModelEntryDetailScreen(
             providerRepository = providerRepository,
             onDismiss = { showQuickTest = false },
         )
+    }
+}
+
+private fun thinkingLevelLabel(level: ThinkingLevel?): Int = when (level) {
+    null -> R.string.model_entry_thinking_default
+    ThinkingLevel.OFF -> R.string.model_entry_thinking_off
+    ThinkingLevel.LOW -> R.string.model_entry_thinking_low
+    ThinkingLevel.MEDIUM -> R.string.model_entry_thinking_medium
+    ThinkingLevel.HIGH -> R.string.model_entry_thinking_high
+    ThinkingLevel.XHIGH -> R.string.model_entry_thinking_xhigh
+    ThinkingLevel.MAX -> R.string.model_entry_thinking_max
+    ThinkingLevel.ULTRA -> R.string.model_entry_thinking_ultra
+}
+
+private const val ENTRY_CONTEXT_UNLIMITED_SENTINEL: Int = Int.MAX_VALUE
+private val ENTRY_CONTEXT_PRESETS = listOf(32_000, 64_000, 128_000, 200_000, 400_000, 1_000_000)
+
+private fun formatEntryContextPreset(tokens: Int): String =
+    if (tokens >= 1_000_000) "${tokens / 1_000_000}M" else "${tokens / 1_000}K"
+
+@Composable
+private fun ContextLimitSlider(
+    value: Int?,
+    unlimitedLabel: String,
+    onValueChange: (Int) -> Unit,
+) {
+    data class Step(val label: String, val tokens: Int)
+    val steps = remember(unlimitedLabel) {
+        ENTRY_CONTEXT_PRESETS.map { Step(formatEntryContextPreset(it), it) } +
+            Step(unlimitedLabel, ENTRY_CONTEXT_UNLIMITED_SENTINEL)
+    }
+    var selectedIndex by remember(steps, value) {
+        mutableStateOf(
+            when {
+                value == null || value >= ENTRY_CONTEXT_UNLIMITED_SENTINEL -> steps.lastIndex
+                else -> steps.indexOfLast { it.tokens <= value }.takeIf { it >= 0 } ?: 0
+            },
+        )
+    }
+    val currentLabel = when {
+        value == null || value >= ENTRY_CONTEXT_UNLIMITED_SENTINEL -> unlimitedLabel
+        else -> steps.firstOrNull { it.tokens == value }?.label ?: "${value / 1000}K"
+    }
+    SettingsCardBlock {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.model_entry_context_limit_label),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = currentLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Slider(
+            value = selectedIndex.toFloat(),
+            onValueChange = { index ->
+                val snapped = index.roundToInt().coerceIn(0, steps.lastIndex)
+                if (snapped != selectedIndex) {
+                    selectedIndex = snapped
+                    onValueChange(steps[snapped].tokens)
+                }
+            },
+            valueRange = 0f..steps.lastIndex.toFloat().coerceAtLeast(1f),
+            steps = (steps.size - 2).coerceAtLeast(0),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(steps.first().label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(unlimitedLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

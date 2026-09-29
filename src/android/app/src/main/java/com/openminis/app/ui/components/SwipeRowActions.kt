@@ -58,7 +58,7 @@ private enum class SwipeAnchor { Resting, Revealed }
  * list row, for lists that ALSO support long-press drag-to-reorder.
  *
  * Why not SwipeToDismissBox: the two existing usages in this app
- * (ModelGroupsScreen, MountedFoldersScreen) wire `currentValue == EndToStart`
+ * (ModelsScreen, MountedFoldersScreen) wire `currentValue == EndToStart`
  * straight to a delete call, so the row is destroyed the moment the swipe
  * passes its threshold — no confirmation, no undo, and no way to offer a
  * second (non-destructive) action like Edit. A reveal model keeps the row
@@ -73,7 +73,7 @@ private enum class SwipeAnchor { Resting, Revealed }
  *    reaches that condition, so it falls through to the reorderable library's
  *    long-press handle untouched.
  *  - The reorder handle in these lists is engaged by LONG PRESS (or by a
- *    dedicated handle in ModelGroupsScreen), which is a time-based trigger
+ *    dedicated handle in ModelsScreen), which is a time-based trigger
  *    rather than a horizontal-movement one, so neither gesture starves the
  *    other.
  * The net effect: horizontal = reveal, vertical/long-press = reorder, and the

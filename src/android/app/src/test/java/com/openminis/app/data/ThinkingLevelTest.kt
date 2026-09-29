@@ -1,6 +1,5 @@
 package com.openminis.app.data
 
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ThinkingLevel
 import kotlinx.serialization.json.Json
@@ -56,17 +55,6 @@ class ThinkingLevelTest {
         ignoreUnknownKeys = true
         encodeDefaults = true
         coerceInputValues = true
-    }
-
-    @Test
-    fun modelGroup_unknownThinkingLevel_coercesToNull_notThrow() {
-        // Simulate JSON a NEWER build wrote: defaultThinkingLevel="ULTRA" is a
-        // value this test's enum DOES know, so also throw in a truly-unknown one.
-        val wire = """{"id":"g1","name":"G","memberEntryIds":[],"defaultThinkingLevel":"SUPREME"}"""
-        val group = json.decodeFromString(ModelGroup.serializer(), wire)
-        // Unknown enum value on a nullable-with-default field coerces to null.
-        assertNull(group.defaultThinkingLevel)
-        assertEquals("G", group.name) // other fields intact — config NOT wiped
     }
 
     @Test

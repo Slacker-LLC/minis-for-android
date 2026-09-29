@@ -36,7 +36,7 @@ class RestoreProviderTypeToleranceTest {
     """.trimIndent()
 
     private fun config(vararg instances: String) =
-        """{"instances":[${instances.joinToString(",")}],"modelEntries":[],"modelGroups":[]}"""
+        """{"instances":[${instances.joinToString(",")}],"modelEntries":[]}"""
 
     private fun parse(json: String) = BackupImporter.parseProviderConfigLeniently(json)
 
@@ -140,7 +140,7 @@ class RestoreProviderTypeToleranceTest {
             """{"instances":[
                 {"id":"bad","providerType":"openAI"},
                 ${instance("good", "anthropic")}
-            ],"modelEntries":[],"modelGroups":[]}""",
+            ],"modelEntries":[]}""",
         )
         assertEquals("survivor kept", 1, parsed.config.instances.size)
         assertEquals("good", parsed.config.instances.single().id)
@@ -151,7 +151,7 @@ class RestoreProviderTypeToleranceTest {
     fun `a non-object array element is dropped alone`() {
         val parsed = parse(
             """{"instances":["garbage", ${instance("good", "openAI")}],
-                "modelEntries":[],"modelGroups":[]}""",
+                "modelEntries":[]}""",
         )
         assertEquals(1, parsed.config.instances.size)
         assertEquals(1, parsed.droppedInstances)
@@ -167,7 +167,7 @@ class RestoreProviderTypeToleranceTest {
             """{"instances":[
                 {"id":"a","label":"L","providerType":"openAI","credentialType":"futureCred"},
                 ${instance("b", "gemini")}
-            ],"modelEntries":[],"modelGroups":[]}""",
+            ],"modelEntries":[]}""",
         )
         assertEquals("sibling survives", 1, parsed.config.instances.size)
         assertEquals("b", parsed.config.instances.single().id)
@@ -182,14 +182,14 @@ class RestoreProviderTypeToleranceTest {
         // document must come through untouched.
         val parsed = parse(
             """{"instances":[${instance("a", "openAIResponses")}],
-                "modelEntries":[],"modelGroups":[],
+                "modelEntries":[],
                 "defaultPrimaryGroupId":"grp-1"}""",
         )
-        assertEquals("grp-1", parsed.config.defaultPrimaryGroupId)
+        assertTrue(parsed.rawJson.contains("\"defaultPrimaryGroupId\":\"grp-1\""))
     }
 
     @Test
-    fun `legacy model groups and pointers survive backup parsing for migration`() {
+    fun `legacy group fields remain available only at the raw migration boundary`() {
         val parsed = parse(
             """{"instances":[],"modelEntries":[],
                 "modelGroups":[{"id":"legacy-main","name":"Main",
@@ -199,16 +199,14 @@ class RestoreProviderTypeToleranceTest {
                 "agentLoopGroupIds":["legacy-main"]}""",
         )
 
-        val oldGroup = parsed.config.modelGroups.single()
-        assertEquals("legacy-main", oldGroup.id)
-        assertEquals(listOf("legacy-entry"), oldGroup.memberEntryIds)
-        assertEquals("legacy-main", parsed.config.defaultPrimaryGroupId)
-        assertEquals(listOf("legacy-main"), parsed.config.agentLoopGroupIds)
+        assertTrue(parsed.rawJson.contains("legacy-main"))
+        assertTrue(parsed.rawJson.contains("agentLoopGroupIds"))
+        assertTrue(parsed.config.instances.isEmpty())
     }
 
     @Test
     fun `a config with no instances array still parses`() {
-        val parsed = parse("""{"modelEntries":[],"modelGroups":[]}""")
+        val parsed = parse("""{"modelEntries":[]}""")
         assertNotNull(parsed.config)
         assertEquals(0, parsed.droppedInstances)
         assertTrue(parsed.config.instances.isEmpty())

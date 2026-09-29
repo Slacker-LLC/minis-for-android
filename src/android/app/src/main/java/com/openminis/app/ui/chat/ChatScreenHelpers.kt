@@ -259,10 +259,8 @@ import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderType
-import com.openminis.app.data.model.RoutingStrategy
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
@@ -308,24 +306,12 @@ internal fun getFileName(context: android.content.Context, uri: Uri): String? {
  * confirmation dialog before applying the binding.
  */
 internal sealed class PendingNonTextSelection {
+    abstract val entryId: String
     abstract val modelDisplayName: String
     abstract val modalityLabel: String
 
-    data class Group(
-        val groupId: String,
-        override val modelDisplayName: String,
-        override val modalityLabel: String,
-    ) : PendingNonTextSelection()
-
-    data class GroupEntry(
-        val groupId: String,
-        val entryId: String,
-        override val modelDisplayName: String,
-        override val modalityLabel: String,
-    ) : PendingNonTextSelection()
-
     data class Entry(
-        val entryId: String,
+        override val entryId: String,
         override val modelDisplayName: String,
         override val modalityLabel: String,
     ) : PendingNonTextSelection()

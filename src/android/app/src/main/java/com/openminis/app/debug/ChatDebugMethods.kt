@@ -252,24 +252,16 @@ internal object ChatDebugMethods {
             })
         }
 
-        val groupsArr = JSONArray()
-        for (group in cfg.modelGroups) {
-            val ids = JSONArray()
-            for (memberId in group.memberEntryIds) ids.put(memberId)
-            groupsArr.put(JSONObject().apply {
-                put("id", group.id)
-                put("name", group.name)
-                put("strategy", group.strategy.name)
-                put("isDefault", group.id == cfg.defaultPrimaryGroupId)
-                put("memberEntryIds", ids)
+        val slots = JSONObject()
+        for (slot in com.openminis.app.data.model.ModelSlot.entries) {
+            slots.put(slot.name, JSONArray().apply {
+                cfg.slots.entries(slot).forEach { put(it) }
             })
         }
-
         return JSONObject().apply {
-            put("defaultGroupId", cfg.defaultPrimaryGroupId ?: JSONObject.NULL)
-            put("groupCount", groupsArr.length())
+            put("fallbackTrigger", cfg.fallbackTrigger.name)
             put("entryCount", entriesArr.length())
-            put("groups", groupsArr)
+            put("slots", slots)
             put("entries", entriesArr)
         }
     }

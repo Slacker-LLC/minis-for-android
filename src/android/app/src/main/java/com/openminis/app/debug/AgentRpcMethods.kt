@@ -10,11 +10,9 @@ import org.json.JSONObject
  * `agent.settings.*` RPC handlers for the Web Remote frontend.
  *
  * Mirrors the DeepSeek Harness agent knobs that are worth exposing remotely:
- * the main agent is the default (Primary) model group, lightweight tasks /
- * delegated children use the Sub group when configured (otherwise they
- * inherit Primary), and the `subagent` tool has a depth cap and a per-run
- * timeout. Model group selection lives in `provider.groups.*`; this family
- * only covers the subagent limits.
+ * Model selection follows the fixed Main/Light slots; the `subagent` tool
+ * exposes only a depth cap and per-run timeout here. Slot selection lives in
+ * `provider.slots.*`.
  */
 internal object AgentRpcMethods {
 

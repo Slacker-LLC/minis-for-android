@@ -281,10 +281,8 @@ import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.ast.getTextInNode
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderType
-import com.openminis.app.data.model.RoutingStrategy
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
@@ -461,10 +459,6 @@ fun ChatScreen(
     onBrowseChatFiles: () -> Unit = {},
     /** T150: open FilePreviewScreen for a non-image attachment in a user bubble. */
     onPreviewAttachment: (com.openminis.app.ui.sandbox.FileItem) -> Unit = {},
-    /** [T-android-modelpicker-group-edit] Navigate to the Model Groups
-     *  management screen — wired to the "Edit" button on the model picker's
-     *  Model Groups section header. */
-    onModelGroupsClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -514,12 +508,9 @@ fun ChatScreen(
    val sessionCategory by viewModel.sessionCategory.collectAsState()
    val attachments by viewModel.attachments.collectAsState()
     val pastedTexts by viewModel.pastedTexts.collectAsState()
-   val availableGroups by viewModel.availableGroups.collectAsState()
-   val selectedGroupId by viewModel.selectedGroupId.collectAsState()
     val showBrowserSheet by viewModel.showBrowserSheet.collectAsState()
     val showMemorySheet by viewModel.showMemorySheet.collectAsState()
     val memoryToolRecords by viewModel.memoryToolRecords.collectAsState()
-    val selectedGroupName by viewModel.selectedGroupName.collectAsState()
     val providerName by viewModel.providerName.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -5531,7 +5522,6 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             val editingId by viewModel.editingMessageId.collectAsState()
-                            var expandedGroupId by remember(selectedGroupId) { mutableStateOf<String?>(selectedGroupId) }
                             Box(
                                 modifier = Modifier.weight(1f, fill = false),
                             ) {
@@ -5550,7 +5540,6 @@ fun ChatScreen(
                                             if (viewModel.showSlashMenu.value) {
                                                 viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
                                             }
-                                            expandedGroupId = selectedGroupId
                                             showModelQuickMenu = !showModelQuickMenu
                                         },
                                 ) {
@@ -5567,7 +5556,7 @@ fun ChatScreen(
                                                     CircleShape,
                                                 ),
                                         )
-                                        val rawModel = modelName.ifEmpty { selectedGroupName.ifEmpty { "选择模型" } }
+                                        val rawModel = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
                                         val displayModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
                                         Text(
                                             text = displayModel,
@@ -5599,190 +5588,51 @@ fun ChatScreen(
                                 val currentConfig by providerRepository.config.collectAsState()
                                 val activeEntryId by viewModel.activeEntryId.collectAsState()
 
-                                if (availableGroups.size > 1) {
-                                    // Multiple groups: show clean single-line group rows and expandable members
-                                    availableGroups.forEach { group ->
-                                        val isGroupSelected = group.id == selectedGroupId
-                                        val isExpanded = expandedGroupId == group.id
-                                        val memberEntries = group.memberEntryIds.mapNotNull { id ->
-                                            currentConfig.modelEntries.firstOrNull { it.id == id }
-                                        }
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = group.name,
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = if (isGroupSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                    color = ChatColors.primaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            },
-                                            leadingIcon = {
+                                val quickEntries = currentConfig.modelEntries.filter { !it.isHidden }.take(6)
+                                quickEntries.forEach { entry ->
+                                    val isEntrySelected = entry.id == activeEntryId
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = entry.model.displayName,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
+                                                color = ChatColors.primaryText,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        },
+                                        trailingIcon = if (isEntrySelected) {
+                                            {
                                                 Icon(
-                                                    Icons.Default.Layers,
+                                                    Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = if (isGroupSelected) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            },
-                                            trailingIcon = {
-                                                Icon(
-                                                    if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                    contentDescription = null,
-                                                    tint = ChatColors.secondaryText,
+                                                    tint = MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(16.dp),
                                                 )
-                                            },
-                                            modifier = Modifier.heightIn(min = 40.dp),
-                                            onClick = {
-                                                if (isExpanded) {
-                                                    expandedGroupId = null
-                                                } else {
-                                                    expandedGroupId = group.id
-                                                    if (!isGroupSelected) {
-                                                        viewModel.selectGroup(group.id)
-                                                    }
-                                                }
-                                            },
-                                        )
-
-                                        if (isExpanded) {
-                                            memberEntries.forEach { entry ->
-                                                val isEntrySelected = isGroupSelected && entry.id == activeEntryId
-                                                DropdownMenuItem(
-                                                    text = {
-                                                        Text(
-                                                            text = entry.model.displayName,
-                                                            fontSize = 13.sp,
-                                                            fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                            color = ChatColors.primaryText,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                        )
-                                                    },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            Icons.Default.AutoAwesome,
-                                                            contentDescription = null,
-                                                            tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText.copy(alpha = 0.5f),
-                                                            modifier = Modifier.size(16.dp),
-                                                        )
-                                                    },
-                                                    trailingIcon = if (isEntrySelected) {
-                                                        {
-                                                            Icon(
-                                                                Icons.Default.Check,
-                                                                contentDescription = null,
-                                                                tint = MaterialTheme.colorScheme.primary,
-                                                                modifier = Modifier.size(16.dp),
-                                                            )
-                                                        }
-                                                    } else null,
-                                                    modifier = Modifier
-                                                        .heightIn(min = 38.dp)
-                                                        .padding(start = 12.dp),
-                                                    onClick = {
-                                                        showModelQuickMenu = false
-                                                        viewModel.selectGroupEntry(group.id, entry.id)
-                                                    },
-                                                )
                                             }
-                                        }
-                                    }
-                                } else if (availableGroups.size == 1) {
-                                    // Single group (e.g. "Default Models"): directly list its member models in sleek single-line items!
-                                    val group = availableGroups.first()
-                                    val memberEntries = group.memberEntryIds.mapNotNull { id ->
-                                        currentConfig.modelEntries.firstOrNull { it.id == id }
-                                    }
-                                    memberEntries.forEach { entry ->
-                                        val isEntrySelected = (group.id == selectedGroupId || selectedGroupId == null) && entry.id == activeEntryId
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = entry.model.displayName,
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                    color = ChatColors.primaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Default.AutoAwesome,
-                                                    contentDescription = null,
-                                                    tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            },
-                                            trailingIcon = if (isEntrySelected) {
-                                                {
-                                                    Icon(
-                                                        Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                }
-                                            } else null,
-                                            modifier = Modifier.heightIn(min = 40.dp),
-                                            onClick = {
-                                                showModelQuickMenu = false
-                                                viewModel.selectGroupEntry(group.id, entry.id)
-                                            },
-                                        )
-                                    }
-                                } else {
-                                    // No groups: list enabled model entries directly
-                                    val enabledEntries = currentConfig.modelEntries.filter { !it.isHidden }.take(6)
-                                    enabledEntries.forEach { entry ->
-                                        val isEntrySelected = entry.id == activeEntryId
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = entry.model.displayName,
-                                                    fontSize = 13.5.sp,
-                                                    fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                    color = ChatColors.primaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Default.AutoAwesome,
-                                                    contentDescription = null,
-                                                    tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            },
-                                            trailingIcon = if (isEntrySelected) {
-                                                {
-                                                    Icon(
-                                                        Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                }
-                                            } else null,
-                                            modifier = Modifier.heightIn(min = 40.dp),
-                                            onClick = {
-                                                showModelQuickMenu = false
-                                                viewModel.selectEntry(entry.id)
-                                            },
-                                        )
-                                    }
+                                        } else null,
+                                        modifier = Modifier.heightIn(min = 40.dp),
+                                        onClick = {
+                                            showModelQuickMenu = false
+                                            viewModel.selectEntry(entry.id)
+                                        },
+                                    )
                                 }
 
                                 MinisMenuDivider()
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = stringResource(R.string.chat_models_all_groups),
+                                            text = stringResource(R.string.settings_models_title),
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = ChatColors.primaryText,
@@ -6650,42 +6500,9 @@ fun ChatScreen(
             config.modelEntries.firstOrNull { it.id == entryId }
 
         ModelPickerSheet(
-            groups = availableGroups,
-            selectedGroupId = selectedGroupId,
             activeEntryId = activeEntryId,
-            defaultPrimaryGroupId = config.defaultPrimaryGroupId,
             config = config,
             providerRepository = providerRepository,
-            onSelectGroup = { groupId ->
-                val group = availableGroups.firstOrNull { it.id == groupId }
-                val firstEntry = group?.memberEntryIds?.firstNotNullOfOrNull(::entryById)
-                val label = firstEntry?.model?.let(::nonTextLabelFor)
-                if (label != null) {
-                    pendingNonTextSelection = PendingNonTextSelection.Group(
-                        groupId = groupId,
-                        modelDisplayName = firstEntry.model.displayName,
-                        modalityLabel = label,
-                    )
-                } else {
-                    viewModel.selectGroup(groupId)
-                    showModelPicker = false
-                }
-            },
-            onSelectGroupEntry = { groupId, entryId ->
-                val entry = entryById(entryId)
-                val label = entry?.model?.let(::nonTextLabelFor)
-                if (entry != null && label != null) {
-                    pendingNonTextSelection = PendingNonTextSelection.GroupEntry(
-                        groupId = groupId,
-                        entryId = entryId,
-                        modelDisplayName = entry.model.displayName,
-                        modalityLabel = label,
-                    )
-                } else {
-                    viewModel.selectGroupEntry(groupId, entryId)
-                    showModelPicker = false
-                }
-            },
             onSelectEntry = { entryId ->
                 val entry = entryById(entryId)
                 val label = entry?.model?.let(::nonTextLabelFor)
@@ -6701,13 +6518,6 @@ fun ChatScreen(
                 }
             },
             onDismiss = { showModelPicker = false },
-            // [T-android-modelpicker-group-edit] Close the picker first, then
-            // navigate — pushing the management screen on top of an open bottom
-            // sheet leaves the sheet lingering behind it on back.
-            onEditGroups = {
-                showModelPicker = false
-                onModelGroupsClick()
-            },
         )
 
         pendingNonTextSelection?.let { pending ->
@@ -6723,12 +6533,7 @@ fun ChatScreen(
                 confirmText = stringResource(R.string.model_picker_non_text_warning_use_anyway),
                 dismissText = stringResource(R.string.model_picker_non_text_warning_choose_other),
                 onConfirm = {
-                    when (val sel = pending) {
-                        is PendingNonTextSelection.Group -> viewModel.selectGroup(sel.groupId)
-                        is PendingNonTextSelection.GroupEntry ->
-                            viewModel.selectGroupEntry(sel.groupId, sel.entryId)
-                        is PendingNonTextSelection.Entry -> viewModel.selectEntry(sel.entryId)
-                    }
+                    viewModel.selectEntry(pending.entryId)
                     pendingNonTextSelection = null
                     showModelPicker = false
                 },

@@ -6,7 +6,6 @@ import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelSlots
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ThinkingLevel
-import com.openminis.app.data.db.compositeEntryKey
 
 /** Migration-only representation of a row in the retained legacy group table. */
 internal data class LegacyModelGroup(
@@ -135,14 +134,7 @@ internal object LegacyGroupMigrator {
                 legacy.config.fallbackTrigger
             },
             modelEntries = updatedEntries,
-            modelGroups = mutableListOf(),
-            defaultPrimaryGroupId = null,
-            defaultSubGroupId = null,
-            voiceInputGroupId = null,
-            voiceOutputGroupId = null,
-            visionGroupId = null,
             agentLoopModelEntryIds = agentIds,
-            agentLoopGroupIds = mutableListOf(),
         )
 
         return MigrationResult(
@@ -156,47 +148,6 @@ internal object LegacyGroupMigrator {
             },
             warnings = warnings,
         )
-    }
-
-    /** Convert a decoded provider backup using its own UUID→durable-id map. */
-    fun migrateBackupConfig(config: ProviderConfig): ProviderConfig {
-        val aliases = buildMap {
-            config.modelEntries.forEach { entry ->
-                val durableId = compositeEntryKey(entry.providerInstanceId, entry.baseModel.id)
-                put(entry.id, durableId)
-                put(durableId, durableId)
-            }
-        }
-        val availableIds = config.modelEntries.mapTo(mutableSetOf()) { entry ->
-            compositeEntryKey(entry.providerInstanceId, entry.baseModel.id)
-        }
-        val groups = config.modelGroups.mapIndexed { index, group ->
-            LegacyModelGroup(
-                id = group.id,
-                memberEntryIds = group.memberEntryIds.toList(),
-                fallbackStrategy = group.fallbackStrategy,
-                defaultThinkingLevel = group.defaultThinkingLevel,
-                contextLimitTokens = group.contextLimitTokens,
-                lastContextLimitTokens = group.lastContextLimitTokens,
-                sortOrder = index,
-            )
-        }
-        return migrate(
-            LegacyState(
-                config = config,
-                groups = groups,
-                pointers = LegacyGroupPointers(
-                    main = config.defaultPrimaryGroupId,
-                    light = config.defaultSubGroupId,
-                    vision = config.visionGroupId,
-                    voiceInput = config.voiceInputGroupId,
-                    voiceOutput = config.voiceOutputGroupId,
-                ),
-                agentLoopGroupIds = config.agentLoopGroupIds.toList(),
-                entryIdAliases = aliases,
-                availableEntryIds = availableIds,
-            ),
-        ).config
     }
 
     private fun migrateBotBinding(

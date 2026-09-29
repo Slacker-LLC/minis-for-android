@@ -814,7 +814,7 @@ fun ProviderDetailScreen(
     }
 
     // T143: per-entry delete confirmation. removeEntry also strips the entry
-    // from any modelGroups it belongs to (see ProviderRepository L304-306),
+    // from any model slots it belongs to (see ProviderRepository L304-306),
     // so the StateFlow update propagates the row removal everywhere.
     entryToDelete?.let { e ->
         MinisAlertDialog(

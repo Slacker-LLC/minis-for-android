@@ -33,7 +33,7 @@ import java.io.File
  *                       [--max-tokens N] [--temperature F]
  *
  * Only entries/groups exposed via the "Available Models in Agent Loop" section
- * in Settings > Model Groups are visible (see ProviderRepository.resolvedAgentLoopEntries).
+ * in Settings > Models are visible (see ProviderRepository.resolvedAgentLoopEntries).
  */
 class ModelUseOffloadHandler(
     private val context: Context,
@@ -135,7 +135,7 @@ class ModelUseOffloadHandler(
                         if (providerFilter != null)
                             "No model '$modelArg' under provider '$providerFilter'. Use 'minis-model-use list' to see available combinations."
                         else
-                            "Model '$modelArg' not visible to the agent. Add it in Settings > Model Groups > Available Models in Agent Loop.",
+                            "Model '$modelArg' not visible to the agent. Add it in Settings > Models > Agent models.",
                     )
                     .toString() + "\n",
             )
@@ -1702,7 +1702,7 @@ class ModelUseOffloadHandler(
 
         private const val TAG = "ModelUseOffload"
         private const val NO_MODELS_HINT =
-            "No models available. Go to Settings > Model Groups to add models that the agent can use."
+            "No models available. Go to Settings > Models to add models that the agent can use."
 
         /** Appended to non-empty list/search results so the agent knows how to invoke a model.
          *  Three forms are supported by `run --model`:

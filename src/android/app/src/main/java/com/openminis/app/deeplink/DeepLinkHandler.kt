@@ -2,6 +2,7 @@ package com.openminis.app.deeplink
 
 import android.net.Uri
 import com.openminis.app.ui.navigation.Routes
+import com.openminis.app.data.model.ModelSlot
 
 /**
  * Parses minis:// deep link URIs into navigation actions.
@@ -14,8 +15,8 @@ import com.openminis.app.ui.navigation.Routes
  *   minis://settings                            → Settings home
  *   minis://settings/providers                  → Provider list
  *   minis://settings/providers/<instanceId>     → Provider detail
- *   minis://settings/model-groups               → Model Groups (incl. Agent Loop section)
- *   minis://settings/model-groups/<groupId>     → Model Group detail
+ *   minis://settings/models                     → fixed model slots
+ *   minis://settings/model-groups[/<groupId>]            → compatibility alias for Models
  *   minis://settings/usage                      → Token usage
  *   minis://settings/skills                     → Skills management
  *   minis://settings/system-prompt               → System prompt modules
@@ -170,9 +171,12 @@ object DeepLinkHandler {
             "providers" ->
                 if (arg != null) DeepLinkAction.OpenSettingsScreen(Routes.providerDetail(arg))
                 else DeepLinkAction.OpenSettingsScreen(Routes.PROVIDER_LIST)
-            "model-groups", "model_groups" ->
-                if (arg != null) DeepLinkAction.OpenSettingsScreen(Routes.modelGroupDetail(arg))
-                else DeepLinkAction.OpenSettingsScreen(Routes.MODEL_GROUPS)
+            "models", "model-slots", "model_slots", "model-groups", "model_groups" ->
+                DeepLinkAction.OpenSettingsScreen(Routes.MODELS)
+            "model-slot", "model_slot" -> {
+                val slot = arg?.let { value -> ModelSlot.entries.firstOrNull { it.name == value } }
+                DeepLinkAction.OpenSettingsScreen(slot?.let(Routes::modelSlotDetail) ?: Routes.MODELS)
+            }
             "usage", "usage-stats", "usage_stats" ->
                 DeepLinkAction.OpenSettingsScreen(Routes.USAGE_STATS)
             "skills" -> DeepLinkAction.OpenSettingsScreen(Routes.SKILLS)

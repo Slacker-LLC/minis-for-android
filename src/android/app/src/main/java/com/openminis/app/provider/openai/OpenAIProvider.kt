@@ -3477,7 +3477,7 @@ class OpenAIProvider private constructor(
 
         val transientCodes = setOf(500, 502, 503, 504, 529)
         if (statusCode in transientCodes) {
-            // 503 with permanent failure indicators → ProviderError (trigger group fallback)
+            // 503 with permanent failure indicators → ProviderError (trigger slot fallback)
             if (statusCode == 503 && (body.contains("no_available_providers") || body.contains("model_not_found"))) {
                 return LLMError.ProviderError(message)
             }

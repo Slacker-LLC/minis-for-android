@@ -19,7 +19,7 @@ import androidx.room.PrimaryKey
  * spread across typed columns: the format is a sealed hierarchy with per-case params
  * (offValue, path, budget floor, per-tier value maps), and a JSON blob keeps one
  * migration stable as new formats are added — the same tactic used by
- * [ProviderModelGroupEntity.memberEntryIdsJson].
+ * legacy [ProviderModelGroupEntity.memberEntryIdsJson].
  *
  * Lives in `provider.db` next to the instances the rules belong to (see
  * [ProviderDatabase]). Android provider config is local-only (no cloud sync), so a hard

@@ -156,11 +156,9 @@
     <string name="settings_back">Back</string>
     <string name="settings_title">Settings</string>
     <string name="settings_section_llm_providers">LLM Providers</string>
-    <string name="settings_section_llm_providers_footer">Configure which models the agent uses, manage API keys &amp; OAuth for each provider, and create model groups for fallback or load balancing.</string>
+    <string name="settings_section_llm_providers_footer">Configure which models the agent uses, manage API keys &amp; OAuth for each provider, and assign entries to fixed model slots.</string>
     <string name="settings_manage_providers">Manage Providers</string>
     <string name="settings_manage_providers_subtitle">API keys and OAuth sign-in</string>
-    <string name="settings_model_groups">Model Groups</string>
-    <string name="settings_model_groups_subtitle">Fallback and load balancing</string>
     <string name="settings_token_usage">Token Usage</string>
     <string name="settings_token_usage_subtitle">Track API usage across providers</string>
     <string name="settings_section_appearance">Appearance</string>
@@ -226,10 +224,7 @@
     <string name="quicktest_audio_replay">Replay</string>
     <string name="quicktest_transcript_result">Spoken: "%1$s"\nHeard: "%2$s"</string>
     <string name="quicktest_clip_failed">Couldn\'t synthesize the local test clip.</string>
-    <string name="model_groups_voice_input">Voice Input</string>
-    <string name="model_groups_voice_output">Voice Output</string>
     <!-- [T-android-vision-group / GH#182] Vision Input slot label: the group whose vision-capable members read images for a main model that cannot natively see them. -->
-    <string name="model_groups_vision">Vision Input</string>
     <!-- [T-mcp-env-var-picker-android] Insert a reference to an App env var as $$VAR -->
     <string name="mcp_form_env_insert_app_var">Insert app var</string>
     <!-- [T-mcp-env-var-delete-confirm-android] Clear-all env vars affordance + confirm -->
@@ -421,7 +416,7 @@
     <string name="onboarding_save_api_key">Save API Key</string>
     <string name="onboarding_saved">Saved</string>
     <string name="onboarding_select_models_title">Select Models</string>
-    <string name="onboarding_select_models_subtitle">Choose up to 3 models for your default group.</string>
+    <string name="onboarding_select_models_subtitle">Choose up to 3 models. The first selected becomes Main; the rest are not added as automatic fallbacks.</string>
     <string name="onboarding_search_models">Search models</string>
     <string name="onboarding_filter_models">Filter models</string>
     <string name="onboarding_done_count">Done (%1$d/3)</string>
@@ -1180,51 +1175,8 @@
     <string name="modelgroup_speech_output">Speech output</string>
     <string name="modelgroup_speech_transcription">Speech transcription</string>
     <string name="modelgroup_text_generation">Text generation</string>
-    <string name="model_group_detail_back">Back</string>
-    <string name="model_group_detail_name">Name</string>
-    <string name="model_group_detail_the_label_shown_in_the_model_picker_save">The label shown in the model picker. Saved automatically when you tap elsewhere.</string>
-    <string name="model_group_detail_routing_strategy">Routing Strategy</string>
-    <string name="model_group_detail_fallback">Fallback</string>
-    <string name="model_group_detail_load_balance">Load Balance</string>
-    <string name="model_group_detail_fallback_trigger">Fallback Trigger</string>
     <string name="common_default">Default</string>
-    <string name="model_group_detail_always">Always</string>
-    <string name="model_group_detail_unavailable">Unavailable</string>
-    <string name="model_group_detail_drag_to_reorder">Drag to reorder</string>
-    <string name="model_group_detail_more_options">More options</string>
-    <string name="model_group_detail_remove_from_group">Remove from group</string>
-    <string name="model_group_detail_add_models">Add Models</string>
-    <string name="model_group_detail_delete_group">Delete Group</string>
-    <string name="model_group_detail_remove_model">Remove Model</string>
-    <string name="model_group_detail_session_defaults">Session Defaults</string>
-    <string name="model_group_detail_session_defaults_footer">Applied automatically when a new session is bound to this group.</string>
-    <string name="model_group_detail_enable_reasoning">Enable Reasoning</string>
-    <string name="model_group_detail_intensity">Intensity</string>
-    <string name="model_group_detail_thinking_low">Low</string>
-    <string name="model_group_detail_thinking_medium">Medium</string>
-    <string name="model_group_detail_thinking_high">High</string>
-    <string name="model_group_detail_thinking_xhigh">XHigh</string>
-    <string name="model_group_detail_thinking_max">Max</string>
-    <string name="model_group_detail_thinking_ultra">Ultra</string>
-    <string name="model_group_detail_limit_context_window">Limit Context Window</string>
-    <string name="model_group_detail_max_context">Max Context</string>
-    <string name="model_group_detail_unlimited">Unlimited</string>
-    <string name="model_group_detail_context_limit_unavailable">Group members did not declare a context window — cannot apply a limit. Add a model or check model metadata first.</string>
-    <string name="model_group_detail_context_limit_runtime_capped">Current member max ctx=%1$s; saved %2$s will be clipped at runtime. The saved value is preserved and re-applies if you add a higher-context model.</string>
-    <string name="model_groups_model_groups">Model Groups</string>
-    <string name="model_groups_new_group">New Group</string>
-    <string name="model_groups_no_model_groups">No model groups</string>
-    <string name="model_groups_groups_let_you_combine_models_for_fallba">Groups let you combine models for fallback or load balancing.</string>
-    <string name="model_groups_primary_is_used_for_main_agent_tasks_sub">Primary is used for main agent tasks. Sub is used for lightweight tasks like title generation. If Sub is not set, it inherits from Primary.</string>
-    <string name="model_groups_group_name">Group name</string>
-    <string name="model_groups_create">Create</string>
-    <string name="model_groups_none">None</string>
-    <string name="add_models_to_group_search_models">Search models</string>
-    <string name="add_models_to_group_clear">Clear</string>
-    <string name="settings_agent_loop_models">Agent Loop Models</string>    <string name="agent_loop_models_groups">Groups</string>
-    <string name="agent_loop_models_picking_a_group_pins_every_model_in_it_a">Picking a group pins every model in it. Add or remove models inside Model Groups.</string>
-    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">Add a provider and refresh its model list to populate this picker.</string>
-    <string name="agent_loop_models_no_models_or_groups_available_yet">No models or groups available yet.</string>
+    <string name="settings_agent_loop_models">Agent Loop Models</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">Add a provider and refresh its model list to populate this picker.</string>
     <string name="agent_loop_models_selected">Selected</string>
     <string name="agent_loop_models_not_selected">Not selected</string>
 
@@ -1239,21 +1191,15 @@
     <string name="add_provider_subtitle_xai">Works with the Grok series of models</string>
     <string name="add_provider_configure_provider">Configure %1$s</string>
     <string name="add_provider_auto_append_v1_quoted">Auto Append \"/v1\"</string>
-    <string name="add_models_to_group_add_count">Add (%1$d)</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Models (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">Are you sure you want to delete \"%1$s\"? This cannot be undone.</string>
     <string name="provider_detail_delete_model_confirm">Are you sure you want to delete \"%1$s\"? This action cannot be undone.</string>
     <string name="agent_loop_models_model_count_singular">1 model</string>
     <string name="agent_loop_models_model_count_plural">%1$d models</string>
-    <string name="model_group_detail_models_header_count">MODELS (%1$d)</string>
     <!-- [T-disabled-provider-via-group-android] Badge shown on the group
          summary row when every member belongs to a currently-disabled
          provider — clarifies why the group appears empty in chat. -->
-    <string name="model_group_no_usable_models_badge">No usable models</string>
-    <string name="model_group_detail_remove_named_model_confirm">Remove \"%1$s\" from the group?</string>
-    <string name="model_group_detail_remove_this_model_fallback">this model</string>
-    <string name="model_group_detail_delete_named_group_confirm">Are you sure you want to delete \"%1$s\"? This cannot be undone.</string>
     <string name="provider_list_models_count">%1$d models</string>
 
     <!-- T180-bg-notif — Task Notifications toggle + completion notification
@@ -1315,18 +1261,10 @@
 
     <!-- T182 agent loop section i18n -->
     <string name="agent_loop_section_title">Available Models in Agent Loop</string>
-    <string name="agent_loop_section_footer">Models and groups listed here can be invoked from the terminal via minis-model-use. Only these are visible to the agent.</string>
-    <string name="agent_loop_section_empty_hint">No models or groups added</string>
     <string name="agent_loop_section_add_models">Add Models</string>
-    <string name="agent_loop_section_add_groups">Add Groups</string>
     <string name="agent_loop_section_add_models_title">Add Models</string>
-    <string name="agent_loop_section_add_groups_title">Add Groups</string>
     <string name="agent_loop_section_no_available_models">All eligible models are already added.</string>
-    <string name="agent_loop_section_no_available_groups">All groups are already added.</string>
-    <string name="agent_loop_section_empty_group_subtitle">(empty group)</string>
     <string name="agent_loop_section_remove">Remove from agent loop</string>
-    <string name="agent_loop_section_group_badge">Group</string>
-
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu, longpress, attach -->
     <string name="chat_menu_new_chat">New Chat</string>
     <string name="chat_new_chat_stop_dialog_body">A task is running in this chat. Starting a new chat will stop it.</string>
@@ -1355,8 +1293,6 @@
     <string name="chat_attach_add_file">Add File</string>
 
     <!-- T185 unified picker UI strings -->
-    <string name="add_models_to_group_all_in_group">All models are already in this group.</string>
-    <string name="add_models_to_group_no_match">No matching models found.</string>
 
    <!-- T187 — user-bubble long-press Edit + Exit Edit Mode + Clear Chat dialog -->
    <string name="chat_longpress_edit">Edit</string>
@@ -1440,9 +1376,6 @@
     <string name="model_picker_done">Done</string>
     <string name="model_picker_search_placeholder">Search models</string>
     <string name="model_picker_search_clear">Clear</string>
-    <string name="model_picker_groups_section">Model Groups</string>
-    <string name="model_picker_groups_edit">Edit</string>
-    <string name="model_picker_groups_footer">Bind this session to a group for automatic fallback or load balancing.</string>
     <string name="model_picker_default_badge">Default</string>
     <string name="model_picker_active_badge">Active</string>
     <string name="model_picker_no_linked_models">No models linked to this group.</string>
@@ -1496,10 +1429,7 @@
     <string name="voice_system_offline_subtitle">Android built-in, works offline</string>
     <string name="voice_input_picker_title">Voice Input</string>
     <string name="voice_input_picker_done">Done</string>
-    <string name="voice_input_picker_groups">Model Groups</string>
     <string name="voice_input_picker_system">System</string>
-    <string name="voice_input_picker_group_models">%1$d models</string>
-    <string name="voice_input_picker_group_footer">Pick a group whose audio-capable models drive this direction.</string>
     <string name="model_picker_non_text_warning_title">This model may not work as an Agent</string>
     <string name="model_picker_non_text_warning_body">%1$s outputs %2$s and usually can\'t drive an Agent task. Pick a text-output model for the session, or add this model to an Agent loop as a tool so the agent can call it on demand to generate %3$s.</string>
     <string name="model_picker_non_text_warning_use_anyway">Use anyway</string>
@@ -1954,7 +1884,7 @@
     <string name="settings_assistant_role_missing_toast">This device has no default-assistant setting</string>
     <string name="settings_system_enhance_footer">Root, the LSPosed module and the switches it reads are all here.</string>
     <string name="chat_new_session">New chat</string>
-    <string name="settings_category_models_sub">Providers, model groups, usage and auto-compact</string>
+    <string name="settings_category_models_sub">Providers, model slots, usage and auto-compact</string>
     <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
     <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
     <string name="settings_category_runtime_sub">Terminal, environment, storage and mounts</string>
@@ -2088,8 +2018,6 @@
     <string name="skills_edit_name">Edit name</string>
     <string name="storage_session_fallback_title">Session</string>
     <string name="storage_clear_confirm_body">This will delete %1$s of files. This action cannot be undone.</string>
-    <string name="model_groups_defaults">Defaults</string>
-    <string name="model_group_name_saved">Name saved</string>
     <string name="thinking_rule_unnamed">(unnamed rule)</string>
     <string name="session_edit_title">Edit Session</string>
     <string name="session_list_no_messages">No messages yet</string>
@@ -2200,7 +2128,6 @@
     <string name="session_config_skills_footer">Manage the skills enabled in this session</string>
     <string name="session_config_mcps_footer">Manage the MCP tool servers this session connects to</string>
     <string name="session_config_memory_footer">See and manage the memories this session has saved</string>
-    <string name="chat_models_all_groups">All models and groups…</string>
     <string name="chat_agent_presets">Agent presets</string>
     <string name="chat_agent_preset_current">In use</string>
     <string name="slash_model_subtitle">Switch model</string>
@@ -2214,4 +2141,59 @@
     <string name="offload_privilege_details">System privilege details</string>
     <string name="offload_privilege_details_footer">Overlay, accessibility keep-alive and speech correction</string>
     <string name="chat_plan_badge">Plan</string>
+
+    <!-- Model Slots -->
+    <string name="settings_models_title">Models</string>
+    <string name="model_slots_header">Model slots</string>
+    <string name="model_slots_footer">Choose and order compatible model entries for each fixed task slot.</string>
+    <string name="model_slot_main">Main</string>
+    <string name="model_slot_light">Light</string>
+    <string name="model_slot_vision">Vision</string>
+    <string name="model_slot_voice_input">Voice Input</string>
+    <string name="model_slot_voice_output">Voice Output</string>
+    <string name="model_slot_empty">No entries assigned</string>
+    <string name="model_slot_main_options">Main slot options</string>
+    <string name="model_slot_fallback_help">Try models in declared order. Fallback advances according to this setting.</string>
+    <string name="model_slot_fallback_title">Fallback on errors</string>
+    <string name="model_slot_fallback_always">On any error</string>
+    <string name="model_slot_fallback_default">On rate limits and server errors</string>
+    <string name="agent_loop_models_slots_footer">Only individually selected entries are exposed to the agent loop.</string>
+    <string name="agent_loop_models_slots_subtitle">Select the models available to agent tools</string>
+    <string name="model_slot_selected_models">Selected models</string>
+    <string name="model_slot_order_footer">Entries are tried in this order. Move entries to change priority.</string>
+    <string name="model_slot_legacy_unresolved">Unavailable entry retained from existing configuration</string>
+    <string name="model_slot_available_models">Available models</string>
+    <string name="model_slot_available_footer">Hidden models and models without the required slot capability are excluded.</string>
+    <string name="model_slot_no_candidates">No compatible models available</string>
+    <string name="model_slot_system_entry">Built-in device voice engine</string>
+    <string name="model_slot_provider_disabled">Provider disabled</string>
+    <string name="agent_loop_models_title">Agent Loop models</string>
+    <string name="model_slot_follow_default">Follow slot default</string>
+    <string name="model_slot_follow_default_footer">Uses the first available entry configured in this voice slot.</string>
+    <string name="agent_loop_add_models_count">Add %1$d models</string>
+    <string name="agent_loop_search_no_match">No models match</string>
+    <string name="agent_loop_search_placeholder">Search models</string>
+    <string name="agent_loop_search_clear">Clear search</string>
+    <string name="model_entry_default_thinking">Default thinking level</string>
+    <string name="model_entry_thinking_default">Use provider default</string>
+    <string name="model_entry_thinking_off">Off</string>
+    <string name="model_entry_thinking_low">Low</string>
+    <string name="model_entry_thinking_medium">Medium</string>
+    <string name="model_entry_thinking_high">High</string>
+    <string name="model_entry_thinking_xhigh">XHigh</string>
+    <string name="model_entry_thinking_max">Max</string>
+    <string name="model_entry_thinking_ultra">Ultra</string>
+    <string name="model_entry_context_limit_enabled">Limit context usage</string>
+    <string name="model_entry_context_limit_footer">Caps context sent to this model; unlimited leaves it uncapped.</string>
+    <string name="model_entry_context_limit_label">Context limit</string>
+    <string name="model_entry_context_unlimited">Unlimited</string>
+    <string name="model_slot_select_primary">Select primary model for %1$s</string>
+    <string name="model_slot_manage_backups">Manage backups</string>
+    <string name="model_slot_primary_entry">Primary model</string>
+    <string name="model_slot_fallback_position">Fallback %1$d</string>
+    <string name="model_slot_drag_to_reorder">Drag to reorder</string>
+    <plurals name="model_slot_backups_count">
+        <item quantity="one">+%1$d backup model</item>
+        <item quantity="other">+%1$d backup models</item>
+    </plurals>
 </resources>

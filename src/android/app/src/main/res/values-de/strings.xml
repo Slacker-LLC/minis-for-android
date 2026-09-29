@@ -118,11 +118,9 @@
     <string name="settings_back">Zurück</string>
     <string name="settings_title">Einstellungen</string>
     <string name="settings_section_llm_providers">LLM-Anbieter</string>
-    <string name="settings_section_llm_providers_footer">Konfiguriere die vom Agent genutzten Modelle, verwalte API-Keys und OAuth pro Anbieter und erstelle Modellgruppen für Fallback oder Lastverteilung.</string>
+    <string name="settings_section_llm_providers_footer">Konfiguriere die vom Agent genutzten Modelle, verwalte API-Schlüssel und OAuth pro Anbieter und ordne Einträge festen Modell-Slots zu.</string>
     <string name="settings_manage_providers">Anbieter verwalten</string>
     <string name="settings_manage_providers_subtitle">API-Keys und OAuth-Anmeldung</string>
-    <string name="settings_model_groups">Modellgruppen</string>
-    <string name="settings_model_groups_subtitle">Fallback und Lastverteilung</string>
     <string name="settings_token_usage">Token-Verbrauch</string>
     <string name="settings_token_usage_subtitle">API-Nutzung anbieterübergreifend verfolgen</string>
     <string name="settings_section_appearance">Darstellung</string>
@@ -511,7 +509,7 @@
     <string name="onboarding_save_api_key">API-Schlüssel speichern</string>
     <string name="onboarding_saved">Gespeichert</string>
     <string name="onboarding_select_models_title">Modelle auswählen</string>
-    <string name="onboarding_select_models_subtitle">Wählen Sie bis zu 3 Modelle für Ihre Standardgruppe.</string>
+    <string name="onboarding_select_models_subtitle">Wähle bis zu 3 Modelle. Das zuerst gewählte Modell wird zum Primärmodell; die übrigen werden nicht automatisch als Fallbacks hinzugefügt.</string>
     <string name="onboarding_search_models">Modelle suchen</string>
     <string name="onboarding_filter_models">Modelle filtern</string>
     <string name="onboarding_done_count">Fertig (%1$d/3)</string>
@@ -768,36 +766,8 @@
     <string name="modelgroup_speech_output">Sprachausgabe</string>
     <string name="modelgroup_speech_transcription">Sprachtranskription</string>
     <string name="modelgroup_text_generation">Textgenerierung</string>
-    <string name="model_group_detail_back">Zurück</string>
-    <string name="model_group_detail_name">Name</string>
-    <string name="model_group_detail_the_label_shown_in_the_model_picker_save">Das in der Modellauswahl angezeigte Label. Wird automatisch gespeichert, wenn du an anderer Stelle tippst.</string>
-    <string name="model_group_detail_routing_strategy">Routing-Strategie</string>
-    <string name="model_group_detail_fallback">Fallback</string>
-    <string name="model_group_detail_load_balance">Lastverteilung</string>
-    <string name="model_group_detail_fallback_trigger">Fallback-Auslöser</string>
     <string name="common_default">Standard</string>
-    <string name="model_group_detail_always">Immer</string>
-    <string name="model_group_detail_unavailable">Nicht verfügbar</string>
-    <string name="model_group_detail_drag_to_reorder">Zum Neuanordnen ziehen</string>
-    <string name="model_group_detail_more_options">Weitere Optionen</string>
-    <string name="model_group_detail_remove_from_group">Aus Gruppe entfernen</string>
-    <string name="model_group_detail_add_models">Modelle hinzufügen</string>
-    <string name="model_group_detail_delete_group">Gruppe löschen</string>
-    <string name="model_group_detail_remove_model">Modell entfernen</string>
-    <string name="model_groups_model_groups">Modellgruppen</string>
-    <string name="model_groups_new_group">Neue Gruppe</string>
-    <string name="model_groups_no_model_groups">Keine Modellgruppen</string>
-    <string name="model_groups_groups_let_you_combine_models_for_fallba">Gruppen ermöglichen die Kombination von Modellen für Fallback oder Lastverteilung.</string>
-    <string name="model_groups_primary_is_used_for_main_agent_tasks_sub">Primär wird für Hauptaufgaben verwendet. Sub für leichte Aufgaben wie Titelgenerierung. Wenn Sub nicht gesetzt ist, wird Primär übernommen.</string>
-    <string name="model_groups_group_name">Gruppenname</string>
-    <string name="model_groups_create">Erstellen</string>
-    <string name="model_groups_none">Keine</string>
-    <string name="add_models_to_group_search_models">Modelle suchen</string>
-    <string name="add_models_to_group_clear">Löschen</string>
-    <string name="settings_agent_loop_models">Agent-Loop-Modelle</string>    <string name="agent_loop_models_groups">Gruppen</string>
-    <string name="agent_loop_models_picking_a_group_pins_every_model_in_it_a">Eine Gruppe auszuwählen heftet alle Modelle in ihr an. Modelle in Modellgruppen hinzufügen oder entfernen.</string>
-    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">Anbieter hinzufügen und dessen Modellliste aktualisieren, um diese Auswahl zu füllen.</string>
-    <string name="agent_loop_models_no_models_or_groups_available_yet">Noch keine Modelle oder Gruppen verfügbar.</string>
+    <string name="settings_agent_loop_models">Agent-Loop-Modelle</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">Anbieter hinzufügen und dessen Modellliste aktualisieren, um diese Auswahl zu füllen.</string>
     <string name="agent_loop_models_selected">Ausgewählt</string>
     <string name="agent_loop_models_not_selected">Nicht ausgewählt</string>
 
@@ -807,17 +777,12 @@
     <string name="add_provider_built_in_models_count">%1$d integrierte Modelle</string>
     <string name="add_provider_configure_provider">%1$s konfigurieren</string>
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" automatisch anhängen</string>
-    <string name="add_models_to_group_add_count">Hinzufügen (%1$d)</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">Modelle (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">Möchtest du \"%1$s\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.</string>
     <string name="provider_detail_delete_model_confirm">Möchtest du \"%1$s\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.</string>
     <string name="agent_loop_models_model_count_singular">1 Modell</string>
     <string name="agent_loop_models_model_count_plural">%1$d Modelle</string>
-    <string name="model_group_detail_models_header_count">MODELLE (%1$d)</string>
-    <string name="model_group_detail_remove_named_model_confirm">\"%1$s\" aus der Gruppe entfernen?</string>
-    <string name="model_group_detail_remove_this_model_fallback">dieses Modell</string>
-    <string name="model_group_detail_delete_named_group_confirm">Möchtest du \"%1$s\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.</string>
     <string name="provider_list_models_count">%1$d Modelle</string>
 
     <!-- T180-bg-notif — Task Notifications toggle + completion notification
@@ -842,18 +807,10 @@
 
     <!-- T182 agent loop section i18n -->
     <string name="agent_loop_section_title">In der Agent-Loop verfügbare Modelle</string>
-    <string name="agent_loop_section_footer">Die hier aufgeführten Modelle und Gruppen können aus dem Terminal mit minis-model-use aufgerufen werden. Nur diese sind für den Agenten sichtbar.</string>
-    <string name="agent_loop_section_empty_hint">Keine Modelle oder Gruppen hinzugefügt</string>
     <string name="agent_loop_section_add_models">Modelle hinzufügen</string>
-    <string name="agent_loop_section_add_groups">Gruppen hinzufügen</string>
     <string name="agent_loop_section_add_models_title">Modelle hinzufügen</string>
-    <string name="agent_loop_section_add_groups_title">Gruppen hinzufügen</string>
     <string name="agent_loop_section_no_available_models">Alle infrage kommenden Modelle wurden bereits hinzugefügt.</string>
-    <string name="agent_loop_section_no_available_groups">Alle Gruppen wurden bereits hinzugefügt.</string>
-    <string name="agent_loop_section_empty_group_subtitle">(leere Gruppe)</string>
     <string name="agent_loop_section_remove">Aus Agent-Loop entfernen</string>
-    <string name="agent_loop_section_group_badge">Gruppe</string>
-
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu -->
     <string name="chat_menu_new_chat">Neuer Chat</string>
     <string name="chat_new_chat_stop_dialog_body">In diesem Chat läuft gerade eine Aufgabe. Ein neuer Chat wird sie stoppen.</string>
@@ -875,8 +832,6 @@
     <string name="chat_attach_add_file">Datei hinzufügen</string>
 
     <!-- T185 unified picker UI strings -->
-    <string name="add_models_to_group_all_in_group">Alle Modelle sind bereits in dieser Gruppe enthalten.</string>
-    <string name="add_models_to_group_no_match">Keine passenden Modelle gefunden.</string>
 
     <!-- T187 — user-bubble long-press Edit + Exit Edit + Clear Chat dialog -->
     <string name="chat_longpress_edit">Bearbeiten</string>
@@ -944,8 +899,6 @@
     <string name="model_picker_done">Fertig</string>
     <string name="model_picker_search_placeholder">Modelle suchen</string>
     <string name="model_picker_search_clear">Löschen</string>
-    <string name="model_picker_groups_section">Modellgruppen</string>
-    <string name="model_picker_groups_footer">Sitzung an eine Gruppe binden, um automatischen Fallback oder Lastverteilung zu nutzen.</string>
     <string name="model_picker_default_badge">Standard</string>
     <string name="model_picker_active_badge">Aktiv</string>
     <string name="model_picker_no_linked_models">Keine Modelle mit dieser Gruppe verknüpft.</string>
@@ -1552,7 +1505,7 @@
     <string name="settings_assistant_role_missing_toast">Dieses Gerät hat keine Assistenten-Einstellung</string>
     <string name="settings_system_enhance_footer">Root, die Modul-Schalter und was sie jeweils freischalten, stehen hier.</string>
     <string name="chat_new_session">Neuer Chat</string>
-    <string name="settings_category_models_sub">Anbieter, Modellgruppen, Nutzung und Auto-Kompakt</string>
+    <string name="settings_category_models_sub">Anbieter, Modell-Slots, Nutzung und Auto-Kompakt</string>
     <string name="settings_category_agent_sub">Skills, Charaktere, Persona, Prompt, Gedächtnis und MCP</string>
     <string name="settings_category_appearance_sub">Aussehen und Desktop-Haustier</string>
     <string name="settings_category_runtime_sub">Terminal, Umgebung, Speicher und Einhängepunkte</string>
@@ -1687,8 +1640,6 @@
     <string name="skills_edit_name">Namen bearbeiten</string>
     <string name="storage_session_fallback_title">Sitzung</string>
     <string name="storage_clear_confirm_body">Dadurch werden %1$s an Dateien gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</string>
-    <string name="model_groups_defaults">Standardwerte</string>
-    <string name="model_group_name_saved">Name gespeichert</string>
     <string name="thinking_rule_unnamed">(unbenannte Regel)</string>
     <string name="session_edit_title">Sitzung bearbeiten</string>
     <string name="session_list_no_messages">Noch keine Nachrichten</string>
@@ -1799,7 +1750,6 @@
     <string name="session_config_skills_footer">Die in dieser Sitzung aktiven Skills verwalten</string>
     <string name="session_config_mcps_footer">Die MCP-Toolserver dieser Sitzung verwalten</string>
     <string name="session_config_memory_footer">Die in dieser Sitzung gespeicherten Erinnerungen ansehen und verwalten</string>
-    <string name="chat_models_all_groups">Alle Modelle und Gruppen…</string>
     <string name="chat_agent_presets">Agent-Voreinstellungen</string>
     <string name="chat_agent_preset_current">In Verwendung</string>
     <string name="slash_model_subtitle">Modell wechseln</string>
@@ -1813,4 +1763,59 @@
     <string name="offload_privilege_details">Details zu Systemprivilegien</string>
     <string name="offload_privilege_details_footer">Overlay, Accessibility-Wachhaltung und Sprachkorrektur</string>
     <string name="chat_plan_badge">Plan</string>
+
+    <!-- Model Slots -->
+    <string name="settings_models_title">Modelle</string>
+    <string name="model_slots_header">Modell-Slots</string>
+    <string name="model_slots_footer">Wähle kompatible Modelle aus und ordne sie für jeden festen Aufgaben-Slot.</string>
+    <string name="model_slot_main">Hauptmodell</string>
+    <string name="model_slot_light">Leicht</string>
+    <string name="model_slot_vision">Bild</string>
+    <string name="model_slot_voice_input">Spracheingabe</string>
+    <string name="model_slot_voice_output">Sprachausgabe</string>
+    <string name="model_slot_empty">Keine Modelle zugewiesen</string>
+    <string name="model_slot_main_options">Optionen des Haupt-Slots</string>
+    <string name="model_slot_fallback_help">Modelle werden in der festgelegten Reihenfolge versucht. Der Fallback richtet sich nach dieser Einstellung.</string>
+    <string name="model_slot_fallback_title">Fallback bei Fehlern</string>
+    <string name="model_slot_fallback_always">Bei jedem Fehler</string>
+    <string name="model_slot_fallback_default">Bei Rate-Limits und Serverfehlern</string>
+    <string name="agent_loop_models_slots_footer">Nur einzeln ausgewählte Einträge sind für den Agent-Loop verfügbar.</string>
+    <string name="agent_loop_models_slots_subtitle">Wähle die Modelle für Agent-Tools aus</string>
+    <string name="model_slot_selected_models">Ausgewählte Modelle</string>
+    <string name="model_slot_order_footer">Modelle werden in dieser Reihenfolge versucht. Ändere die Priorität mit den Pfeilen.</string>
+    <string name="model_slot_legacy_unresolved">Nicht verfügbarer Eintrag aus der vorhandenen Konfiguration beibehalten</string>
+    <string name="model_slot_available_models">Verfügbare Modelle</string>
+    <string name="model_slot_available_footer">Ausgeblendete Modelle und Modelle ohne passende Fähigkeit werden ausgeschlossen.</string>
+    <string name="model_slot_no_candidates">Keine kompatiblen Modelle verfügbar</string>
+    <string name="model_slot_system_entry">Integrierte Geräte-Sprachfunktion</string>
+    <string name="model_slot_provider_disabled">Anbieter deaktiviert</string>
+    <string name="agent_loop_models_title">Agent-Loop-Modelle</string>
+    <string name="model_slot_follow_default">Slot-Standard verwenden</string>
+    <string name="model_slot_follow_default_footer">Verwendet den ersten verfügbaren Eintrag dieses Sprach-Slots.</string>
+    <string name="agent_loop_add_models_count">%1$d Modelle hinzufügen</string>
+    <string name="agent_loop_search_no_match">Keine passenden Modelle</string>
+    <string name="agent_loop_search_placeholder">Modelle suchen</string>
+    <string name="agent_loop_search_clear">Suche löschen</string>
+    <string name="model_entry_default_thinking">Standard-Denkstufe</string>
+    <string name="model_entry_thinking_default">Anbieterstandard verwenden</string>
+    <string name="model_entry_thinking_off">Aus</string>
+    <string name="model_entry_thinking_low">Niedrig</string>
+    <string name="model_entry_thinking_medium">Mittel</string>
+    <string name="model_entry_thinking_high">Hoch</string>
+    <string name="model_entry_thinking_xhigh">XHigh</string>
+    <string name="model_entry_thinking_max">Max</string>
+    <string name="model_entry_thinking_ultra">Ultra</string>
+    <string name="model_entry_context_limit_enabled">Kontextnutzung begrenzen</string>
+    <string name="model_entry_context_limit_footer">Begrenzt den an dieses Modell gesendeten Kontext; unbegrenzt bedeutet keine Begrenzung.</string>
+    <string name="model_entry_context_limit_label">Kontextlimit</string>
+    <string name="model_entry_context_unlimited">Unbegrenzt</string>
+    <string name="model_slot_select_primary">Hauptmodell für %1$s auswählen</string>
+    <string name="model_slot_manage_backups">Ersatzmodelle verwalten</string>
+    <string name="model_slot_primary_entry">Primärmodell</string>
+    <string name="model_slot_fallback_position">Fallback %1$d</string>
+    <string name="model_slot_drag_to_reorder">Zum Neuordnen ziehen</string>
+    <plurals name="model_slot_backups_count">
+        <item quantity="one">+%1$d Ersatzmodell</item>
+        <item quantity="other">+%1$d Ersatzmodelle</item>
+    </plurals>
 </resources>

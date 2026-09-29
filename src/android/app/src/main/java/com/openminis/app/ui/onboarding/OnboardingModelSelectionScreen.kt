@@ -50,12 +50,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.repository.ProviderRepository
 
 /**
  * Onboarding step 2: pick 1-3 models from configured providers
- * and create a "Default Models" group. Mirrors iOS OnboardingModelSelectionView.
+ * and configure the Main model slot. Mirrors iOS onboarding model selection.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,12 +219,11 @@ fun OnboardingModelSelectionScreen(
             MinisButton(
                 onClick = {
                     if (selected.isNotEmpty()) {
-                        val group = ModelGroup(name = "Default Models")
-                        group.memberEntryIds.addAll(selected)
-                        providerRepository.addGroup(group)
-                        if (config.defaultPrimaryGroupId == null) {
-                            providerRepository.defaultPrimaryGroupId = group.id
-                        }
+                        val current = providerRepository.config.value.slots.main
+                        providerRepository.setSlotEntries(
+                            com.openminis.app.data.model.ModelSlot.main,
+                            (current + selected).distinct(),
+                        )
                     }
                     onBack()
                 },

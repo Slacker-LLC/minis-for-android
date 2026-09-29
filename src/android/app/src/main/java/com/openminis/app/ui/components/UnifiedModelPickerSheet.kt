@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.SystemVoiceIds
 import com.openminis.app.data.repository.ProviderRepository
@@ -81,14 +80,14 @@ import com.openminis.app.ui.theme.UiStyle
  * visual language (ChatModelPickerSheet.ModelPickerSheet): 42dp capsule
  * search directly under the title, section CARDS on surfaceContainerHigh
  * with 14dp corners and EMBEDDED headers, titleMedium SemiBold header
- * typography, expandable bound-group row, per-provider cards with collapse
+ * typography, slot-follow row, per-provider cards with collapse
  * chevrons, provider dots, modality chips and Quick Test bolts. The previous
  * cut borrowed AddModelsToGroup's flat multi-select rows
  * (modelEntryPickerItems), which read as a different app next to the main
  * picker — the exact drift iOS avoids by having one UnifiedModelPicker.
  *
- * Selection semantics (unchanged): tap = select + dismiss; selecting the
- * bound group row clears the override (null = follow the group).
+ * Selection semantics: tap = select + dismiss; selecting the slot-follow row
+ * clears the device override (null = follow the ordered voice slot).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -96,25 +95,16 @@ fun UnifiedModelPickerSheet(
     providerRepository: ProviderRepository,
     title: String,
     modalityFilter: PickerModalityFilter,
-    /** The bound group (iOS groupScope .single); null hides the section. */
-    boundGroup: ModelGroup?,
-    boundGroupName: String?,
-    /** Current override entry id; null = follow the bound group. */
+    /** Current override entry id; null = follow the voice slot. */
     selectedId: String?,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
-    /**
-     * [T-android-picker-mainsheet-language] Optional "Edit" affordance on the
-     * group card's header (mirrors the main picker's onEditGroups and iOS's
-     * group-section Edit). Null hides the button — callers without a
-     * navigation route (the floating capsule) simply don't show it.
-     */
-    onEditGroups: (() -> Unit)? = null,
+    showSlotFollow: Boolean = true,
+    allowDeviceVoiceSelection: Boolean = true,
 ) {
     val config by providerRepository.config.collectAsState()
     var quickTestEntry by remember { mutableStateOf<ModelEntry?>(null) }
     var searchText by remember { mutableStateOf("") }
-    var groupExpanded by remember { mutableStateOf(false) }
     // [T-android-system-voice-catalog] Device TTS voice rows (voice-output
     // scenarios only) + the currently-picked voice for selection marks.
     val pickerContext = androidx.compose.ui.platform.LocalContext.current
@@ -123,8 +113,8 @@ fun UnifiedModelPickerSheet(
     }
     val pickedSystemVoice by com.openminis.app.speech.VoiceOutputState
         .systemVoiceName.collectAsState()
-    androidx.compose.runtime.LaunchedEffect(modalityFilter) {
-        if (modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
+    androidx.compose.runtime.LaunchedEffect(modalityFilter, allowDeviceVoiceSelection) {
+        if (allowDeviceVoiceSelection && modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
             com.openminis.app.speech.VoiceOutputState.init(pickerContext)
             systemVoices = com.openminis.app.speech.SystemTtsVoiceCatalog.voices(pickerContext)
         }
@@ -141,17 +131,16 @@ fun UnifiedModelPickerSheet(
     fun matches(text: String): Boolean =
         searchText.isBlank() || text.contains(searchText.trim(), ignoreCase = true)
 
-    // [T-android-voice-picker-active] Which group member actually serves the
-    // next request — recomputed whenever the config changes so the badge can't
-    // go stale after an instance is disabled or a member is removed.
-    val activeGroupMemberId = remember(config, modalityFilter) {
-        when (modalityFilter) {
-            PickerModalityFilter.AUDIO_INPUT ->
-                providerRepository.activeVoiceGroupMemberId(output = false)
-            PickerModalityFilter.AUDIO_OUTPUT ->
-                providerRepository.activeVoiceGroupMemberId(output = true)
-            else -> null
-        }
+    // Keep the picker badge consistent with the voice runtime resolver.
+    val voiceOutput = modalityFilter == PickerModalityFilter.AUDIO_OUTPUT
+    val slotTitle = stringResource(
+        if (voiceOutput) R.string.model_slot_voice_output else R.string.model_slot_voice_input,
+    )
+    val activeSlotEntryId = remember(config, modalityFilter) {
+        providerRepository.activeVoiceSlotEntryId(output = voiceOutput)
+    }
+    val activeSlotEntry = activeSlotEntryId?.let { id ->
+        config.modelEntries.firstOrNull { it.id == id } ?: SystemVoiceEntries.resolve(id)
     }
 
     val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -284,30 +273,16 @@ fun UnifiedModelPickerSheet(
                     .fillMaxWidth()
                     .weight(1f, fill = false),
             ) {
-                // ── Model Groups card ──
-                if (boundGroup != null && matches(boundGroupName ?: "")) {
-                    item("group_card") {
+                // ── Voice slot default ──
+                if (showSlotFollow && (matches(slotTitle) || (activeSlotEntry?.model?.displayName?.let(::matches) == true))) {
+                    item("slot_card") {
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                                 .background(cardColor, cardShape)
                                 .clip(cardShape),
                         ) {
-                            val editTrailing: (@Composable () -> Unit)? =
-                                if (onEditGroups == null) null else {
-                                    {
-                                        MinisTextButton(
-                                            onClick = onEditGroups,
-                                            modifier = Modifier.padding(end = 8.dp),
-                                        ) {
-                                            Text(stringResource(R.string.model_picker_groups_edit))
-                                        }
-                                    }
-                                }
-                            PickerSectionHeader(
-                                stringResource(R.string.model_picker_groups_section),
-                                trailing = editTrailing,
-                            )
+                            PickerSectionHeader(slotTitle)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -315,212 +290,27 @@ fun UnifiedModelPickerSheet(
                                     .padding(horizontal = 16.dp, vertical = 13.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                // Group-row anatomy copied from the MAIN picker
-                                // (ChatModelPickerSheet:600-762): GREEN check,
-                                // blue Layers glyph, icon+text strategy badge,
-                                // bodySmall member count, 24dp circled chevron.
-                                //
-                                // The group stays CHECKED while the effective
-                                // choice is one of its own members — group
-                                // membership and entry selection are separate
-                                // axes, exactly as iOS models them
-                                // (isGroupSelected == currentGroupId, tested
-                                // independently of the entry's isActive). Keying
-                                // this on `selectedId == null` alone made
-                                // pinning a member look like leaving the group,
-                                // even though the group is still what's bound
-                                // and still what the override falls back to.
-                                val groupSelected =
-                                    selectedId == null ||
-                                        boundGroup.memberEntryIds.contains(selectedId)
-                                Icon(
-                                    if (groupSelected) Icons.Default.CheckCircle
-                                    else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
-                                    tint = if (groupSelected) Color(0xFF34C759)
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(22.dp),
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Icon(
-                                    Icons.Default.Layers,
-                                    contentDescription = null,
-                                    tint = Color(0xFF007AFF),
-                                    modifier = Modifier.size(18.dp),
-                                )
+                                SelectionMark(selected = selectedId == null)
                                 Spacer(Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            boundGroupName ?: "",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .background(
-                                                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                                                    RoundedCornerShape(8.dp),
-                                                )
-                                                .padding(horizontal = 5.dp, vertical = 1.dp),
-                                        ) {
-                                            Icon(
-                                                Icons.Default.ArrowCircleDown,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(9.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                            )
-                                            Spacer(Modifier.width(2.dp))
-                                            Text(
-                                                "FB",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                            )
-                                        }
-                                    }
-                                    // Count what the expansion can actually
-                                    // RENDER, not the raw member-id count —
-                                    // otherwise a member that no longer
-                                    // resolves still inflates the number and
-                                    // the row promises rows it can't show.
                                     Text(
-                                        stringResource(
-                                            R.string.voice_input_picker_group_models,
-                                            boundGroup.memberEntryIds.count { id ->
-                                                config.modelEntries.any { it.id == id } ||
-                                                    SystemVoiceEntries.resolve(id) != null
-                                            },
-                                        ),
+                                        stringResource(R.string.model_slot_follow_default),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        activeSlotEntry?.model?.displayName
+                                            ?: stringResource(R.string.model_slot_empty),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                                            CircleShape,
-                                        )
-                                        .clip(CircleShape)
-                                        .clickable { groupExpanded = !groupExpanded },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        if (groupExpanded) Icons.Default.KeyboardArrowUp
-                                        else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            if (groupExpanded) {
-                                // Fall back to the VIRTUAL system entries: the
-                                // default voice groups are seeded with
-                                // "__builtin_system_speech__/…" member ids,
-                                // which are synthesized on demand and never
-                                // live in config.modelEntries. Resolving only
-                                // against modelEntries dropped every member of
-                                // those groups, so "2 models" expanded to an
-                                // empty list. Same fallback ModelGroupDetail
-                                // already uses.
-                                val members = boundGroup.memberEntryIds.mapNotNull { id ->
-                                    config.modelEntries.find { it.id == id }
-                                        ?: SystemVoiceEntries.resolve(id)
-                                }
-                                members.forEach { entry ->
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(start = 52.dp, end = 16.dp),
-                                        thickness = 0.5.dp,
-                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                                    )
-                                    val inst = config.instances
-                                        .find { it.id == entry.providerInstanceId }
-                                    // "In effect" — the member that actually
-                                    // serves the next request, from EITHER
-                                    // source: an explicit override pointing at
-                                    // it, or (group-follow) the member the
-                                    // group routes to. iOS fills the member
-                                    // checkmark from exactly this
-                                    // (UnifiedModelPicker expandedEntryRow's
-                                    // isActive), not from the override alone —
-                                    // a filled circle here means "this is the
-                                    // one", which is the question the
-                                    // expansion exists to answer.
-                                    val isActive = if (selectedId != null) {
-                                        selectedId == entry.id
-                                    } else {
-                                        entry.id == activeGroupMemberId
-                                    }
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { select(entry.id) }
-                                            .padding(
-                                                start = 46.dp,
-                                                end = 16.dp,
-                                                top = 10.dp,
-                                                bottom = 10.dp,
-                                            ),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        SelectionMark(selected = isActive)
-                                        Spacer(Modifier.width(10.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .background(
-                                                    providerDotColor(inst?.providerType),
-                                                    CircleShape,
-                                                ),
-                                        )
-                                        Spacer(Modifier.width(10.dp))
-                                        Text(
-                                            entry.model.displayName.ifBlank { entry.model.id },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            modifier = Modifier.weight(1f, fill = false),
-                                        )
-                                        // Badge only in the group-follow case:
-                                        // it explains WHY a row is checked when
-                                        // the user didn't pick it. With an
-                                        // explicit override the check is
-                                        // self-explanatory and the badge would
-                                        // just be noise.
-                                        if (isActive && selectedId == null) {
-                                            Spacer(Modifier.width(6.dp))
-                                            // Main picker's green "Active"
-                                            // badge (ChatModelPickerSheet:1178).
-                                            Text(
-                                                stringResource(R.string.model_picker_active_badge),
-                                                fontSize = 9.sp,
-                                                lineHeight = 11.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color(0xFF34C759),
-                                                modifier = Modifier
-                                                    .background(
-                                                        Color(0xFF34C759).copy(alpha = 0.1f),
-                                                        RoundedCornerShape(50),
-                                                    )
-                                                    .padding(horizontal = 5.dp, vertical = 1.dp),
-                                            )
-                                        }
-                                    }
-                                }
-                                // The last member's 10dp row padding alone left
-                                // it visually crowding the card's bottom edge —
-                                // the collapsed row's own 13dp padding sets the
-                                // expectation, so pad the expansion to match.
-                                Spacer(Modifier.height(6.dp))
                             }
                         }
                     }
-                    item("group_footer") {
+                    item("slot_footer") {
                         Text(
-                            stringResource(R.string.voice_input_picker_group_footer),
+                            stringResource(R.string.model_slot_follow_default_footer),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp),
@@ -553,7 +343,7 @@ fun UnifiedModelPickerSheet(
                                         .fillMaxWidth()
                                         .clickable {
                                             // Auto row: clear any picked voice.
-                                            if (modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
+                                            if (allowDeviceVoiceSelection && modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
                                                 VoiceOutputState.setSystemVoice(null, null)
                                             }
                                             select(entry.id)
@@ -562,14 +352,14 @@ fun UnifiedModelPickerSheet(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     // In effect from EITHER source, same rule as
-                                    // the group members above. The extra TTS
+                                    // the slot entries above. The extra TTS
                                     // clause stands: once a specific device
                                     // voice is picked, the mark belongs to that
                                     // voice's row, not to this "Auto" row.
                                     val systemInEffect =
-                                        (if (selectedId != null) selectedId == entry.id
-                                        else entry.id == activeGroupMemberId) &&
-                                            (modalityFilter != PickerModalityFilter.AUDIO_OUTPUT ||
+                                        (if (selectedId != null || !showSlotFollow) selectedId == entry.id
+                                        else entry.id == activeSlotEntryId) &&
+                                            (!allowDeviceVoiceSelection || modalityFilter != PickerModalityFilter.AUDIO_OUTPUT ||
                                                 pickedSystemVoice == null)
                                     SelectionMark(selected = systemInEffect)
                                     Spacer(Modifier.width(10.dp))
@@ -585,7 +375,7 @@ fun UnifiedModelPickerSheet(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    if (systemInEffect && selectedId == null) {
+                                    if (systemInEffect && selectedId == null && showSlotFollow) {
                                         Spacer(Modifier.width(6.dp))
                                         Text(
                                             stringResource(R.string.model_picker_active_badge),
@@ -611,7 +401,7 @@ fun UnifiedModelPickerSheet(
                             // layered under the entry-level selection: tapping a
                             // voice both records it and selects the system
                             // engine. Auto (the plain row above) clears it.
-                            if (modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
+                            if (allowDeviceVoiceSelection && modalityFilter == PickerModalityFilter.AUDIO_OUTPUT) {
                                 systemVoices
                                     .filter { matches(it.label) }
                                     .forEach { v ->

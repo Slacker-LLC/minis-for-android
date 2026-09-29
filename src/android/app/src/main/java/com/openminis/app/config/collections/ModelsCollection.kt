@@ -11,6 +11,7 @@ import com.openminis.app.config.fields.ReadOnlyField
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelOverrides
+import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ProviderRepository
 
 /**
@@ -29,7 +30,7 @@ class ModelsCollection(
     override val basePath: String get() = "models"
     override val displayName: String get() = "LLM models"
     override val description: String get() =
-        "Per-model overrides (display name, max output tokens, hidden flag, modalities, context window) and custom-model add/remove."
+        "Per-model overrides (display name, capabilities, default thinking level, context cap) and custom-model add/remove."
     override val addable: Boolean get() = true
     override val removable: Boolean get() = true
     override val risk: ConfigRisk get() = ConfigRisk.SENSITIVE
@@ -51,6 +52,8 @@ class ModelsCollection(
             modalitiesOverrideField(forId),
             contextWindowField(forId),
             contextWindowOverrideField(forId),
+            defaultThinkingLevelField(forId),
+            contextLimitTokensField(forId),
             supportsToolsField(forId),
             supportsVisionField(forId),
         )
@@ -376,7 +379,7 @@ class ModelsCollection(
             path = "models.$id.contextWindowOverride",
             displayName = "Context window override (tokens)",
             description = "User override in tokens. 0 clears the override and restores the API value.",
-            valueSchema = ConfigSchema.Int(min = 0, max = 10_000_000),
+            valueSchema = ConfigSchema.Optional(ConfigSchema.Int(min = 0, max = Int.MAX_VALUE)),
             risk = ConfigRisk.SENSITIVE,
             revertable = true,
             reader = {
@@ -387,6 +390,63 @@ class ModelsCollection(
                 val i = (v as? ConfigValue.Int)?.value ?: throw ConfigError.TypeMismatch("int")
                 mutate(id) { e ->
                     e.copy(overrides = e.overrides.copy(contextWindow = if (i == 0) null else i))
+                }
+            },
+        )
+
+    private fun defaultThinkingLevelField(id: String): ConfigField =
+        ClosureField(
+            path = "models.$id.defaultThinkingLevel",
+            displayName = "Default thinking level",
+            description = "Default thinking intensity copied into a new session bound to this entry. Null inherits the provider/model default.",
+            valueSchema = ConfigSchema.Optional(ConfigSchema.StrEnum(ThinkingLevel.entries.map { it.name })),
+            risk = ConfigRisk.SENSITIVE,
+            revertable = true,
+            reader = {
+                val level = entry(id)?.overrides?.defaultThinkingLevel
+                level?.let { ConfigValue.Str(it.name) } ?: ConfigValue.Null
+            },
+            writer = { value ->
+                val raw = when (value) {
+                    ConfigValue.Null -> null
+                    is ConfigValue.Str -> value.value
+                    else -> throw ConfigError.TypeMismatch("string or null")
+                }
+                val level = raw?.let {
+                    runCatching { ThinkingLevel.valueOf(it.uppercase()) }.getOrNull()
+                        ?: throw ConfigError.InvalidValue("Unknown thinking level: $it")
+                }
+                mutate(id) { e -> e.copy(overrides = e.overrides.copy(defaultThinkingLevel = level)) }
+            },
+        )
+
+    private fun contextLimitTokensField(id: String): ConfigField =
+        ClosureField(
+            path = "models.$id.contextLimitTokens",
+            displayName = "Context limit (tokens)",
+            description = "Optional per-entry context cap. Pass null or 0 to remove the cap.",
+            valueSchema = ConfigSchema.Optional(ConfigSchema.Int(min = 0, max = Int.MAX_VALUE)),
+            risk = ConfigRisk.SENSITIVE,
+            revertable = true,
+            reader = {
+                val limit = entry(id)?.overrides?.contextLimitTokens
+                limit?.let { ConfigValue.Int(it) } ?: ConfigValue.Null
+            },
+            writer = { value ->
+                val tokens = when (value) {
+                    ConfigValue.Null -> null
+                    is ConfigValue.Int -> value.value
+                    else -> throw ConfigError.TypeMismatch("integer or null")
+                }
+                if (tokens != null && tokens !in 0..10_000_000) {
+                    throw ConfigError.InvalidValue("Context limit must be between 0 and 2147483647")
+                }
+                val cap = tokens?.takeIf { it > 0 }
+                mutate(id) { e ->
+                    e.copy(overrides = e.overrides.copy(
+                        contextLimitTokens = cap,
+                        lastContextLimitTokens = cap ?: e.overrides.lastContextLimitTokens,
+                    ))
                 }
             },
         )

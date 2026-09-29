@@ -238,7 +238,7 @@ fun InlineVoiceInputPanel(
 
     val config by providerRepository.config.collectAsState()
     val choice = remember(config) { providerRepository.resolveVoiceInputChoice() }
-    val groupName = remember(config) { providerRepository.voiceInputGroupName() }
+    val slotName = remember(config) { providerRepository.voiceInputSlotName() }
     val modelLabel = if (choice.isSystem) {
         stringResource(
             if (choice.systemPreferOffline == true) R.string.voice_system_recognition_offline
@@ -389,8 +389,8 @@ fun InlineVoiceInputPanel(
 
     // ── Lifecycle: prepare on mount (default groups + engine warm), stop on exit.
     LaunchedEffect(Unit) {
-        providerRepository.ensureDefaultVoiceInputGroup()
-        providerRepository.ensureDefaultVoiceOutputGroup()
+        providerRepository.ensureDefaultVoiceInputSlot()
+        providerRepository.ensureDefaultVoiceOutputSlot()
         // [T-android-voice-correction] Load the jieba dictionaries now, while
         // the user is still reaching for the mic. The first segment call costs
         // seconds (~5MB dictionary + HMM model); paying it here rather than on
@@ -601,7 +601,7 @@ fun InlineVoiceInputPanel(
                     recordingTipIndex = recordingTipIndex,
                     resultTipIndex = resultTipIndex,
                     levels = levels,
-                    groupName = groupName,
+                    slotName = slotName,
                     modelLabel = modelLabel,
                     onMicTap = { handleMicTap() },
                     onTranscriptChange = { setTranscript(it) },
@@ -651,7 +651,7 @@ private fun ExpandedContent(
     recordingTipIndex: Int,
     resultTipIndex: Int,
     levels: List<Float>,
-    groupName: String?,
+    slotName: String?,
     modelLabel: String,
     onMicTap: () -> Unit,
     onTranscriptChange: (String) -> Unit,
@@ -768,9 +768,9 @@ private fun ExpandedContent(
                 .clickable { onOpenSelector() }
                 .padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
-            if (groupName != null) {
+            if (slotName != null) {
                 Text(
-                    groupName,
+                    slotName,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary,

@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
  * derived from the iOS reference screenshot and its pixel measurements.
  *
  * All Settings screens (ProviderDetail / MountedFolders / MountDetail /
- * ModelGroups / EnvironmentVariables / etc.) MUST consume from this
+ * Models / EnvironmentVariables / etc.) MUST consume from this
  * object rather than hard-coding values inline. When a value changes
  * here every screen updates atomically.
  */

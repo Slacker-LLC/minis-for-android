@@ -38,7 +38,6 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
 import com.openminis.app.data.repository.ChatRepository

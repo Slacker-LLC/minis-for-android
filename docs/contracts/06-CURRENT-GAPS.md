@@ -154,3 +154,7 @@ config registry 暴露为 `prompt.custom`（带确认与审计回退）。内置
 - 启动健康状态是首个失败短路，没有聚合视图。
 
 以上开放项均未做真机验证，不得据此声称设备行为结论。
+
+## PR4 — 下个版本移除旧模型组 Room 表（暂缓）
+
+PR2/PR3 只把运行配置迁移到固定 Model Slots，并保留旧表作为迁移/回滚兼容边界；本阶段不删 `provider_model_groups` 表、不升级 Room schema。后续 PR4 才能在数据升级路径和真机备份恢复验收完成后删除该表并将 Room schema 从当前 v4 升至 v5。

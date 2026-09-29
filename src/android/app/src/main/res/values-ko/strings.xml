@@ -118,11 +118,9 @@
     <string name="settings_back">뒤로</string>
     <string name="settings_title">설정</string>
     <string name="settings_section_llm_providers">LLM 제공자</string>
-    <string name="settings_section_llm_providers_footer">에이전트가 사용할 모델을 구성하고 각 제공자의 API 키와 OAuth를 관리하며 폴백 또는 로드 밸런싱용 모델 그룹을 만듭니다.</string>
+    <string name="settings_section_llm_providers_footer">에이전트가 사용할 모델을 구성하고 각 제공자의 API 키와 OAuth를 관리하며 항목을 고정 모델 슬롯에 할당합니다.</string>
     <string name="settings_manage_providers">제공자 관리</string>
     <string name="settings_manage_providers_subtitle">API 키와 OAuth 로그인</string>
-    <string name="settings_model_groups">모델 그룹</string>
-    <string name="settings_model_groups_subtitle">폴백 및 로드 밸런싱</string>
     <string name="settings_token_usage">토큰 사용량</string>
     <string name="settings_token_usage_subtitle">여러 제공자의 API 사용 현황 추적</string>
     <string name="settings_section_appearance">외관</string>
@@ -511,7 +509,7 @@
     <string name="onboarding_save_api_key">API 키 저장</string>
     <string name="onboarding_saved">저장됨</string>
     <string name="onboarding_select_models_title">모델 선택</string>
-    <string name="onboarding_select_models_subtitle">기본 그룹에 최대 3개 모델을 선택하세요.</string>
+    <string name="onboarding_select_models_subtitle">모델을 최대 3개까지 선택할 수 있습니다. 첫 번째 모델은 주 모델이 되고 나머지는 대체 모델로 자동 추가되지 않습니다.</string>
     <string name="onboarding_search_models">모델 검색</string>
     <string name="onboarding_filter_models">모델 필터링</string>
     <string name="onboarding_done_count">완료 (%1$d/3)</string>
@@ -768,36 +766,8 @@
     <string name="modelgroup_speech_output">음성 출력</string>
     <string name="modelgroup_speech_transcription">음성 전사</string>
     <string name="modelgroup_text_generation">텍스트 생성</string>
-    <string name="model_group_detail_back">뒤로</string>
-    <string name="model_group_detail_name">이름</string>
-    <string name="model_group_detail_the_label_shown_in_the_model_picker_save">모델 선택기에 표시되는 라벨입니다. 다른 곳을 누르면 자동으로 저장됩니다.</string>
-    <string name="model_group_detail_routing_strategy">라우팅 전략</string>
-    <string name="model_group_detail_fallback">대체</string>
-    <string name="model_group_detail_load_balance">로드 밸런싱</string>
-    <string name="model_group_detail_fallback_trigger">폴백 트리거</string>
     <string name="common_default">기본값</string>
-    <string name="model_group_detail_always">항상</string>
-    <string name="model_group_detail_unavailable">사용할 수 없음</string>
-    <string name="model_group_detail_drag_to_reorder">끌어서 순서 변경</string>
-    <string name="model_group_detail_more_options">더 보기</string>
-    <string name="model_group_detail_remove_from_group">그룹에서 제거</string>
-    <string name="model_group_detail_add_models">모델 추가</string>
-    <string name="model_group_detail_delete_group">그룹 삭제</string>
-    <string name="model_group_detail_remove_model">모델 제거</string>
-    <string name="model_groups_model_groups">모델 그룹</string>
-    <string name="model_groups_new_group">새 그룹</string>
-    <string name="model_groups_no_model_groups">모델 그룹 없음</string>
-    <string name="model_groups_groups_let_you_combine_models_for_fallba">그룹을 사용하면 대체 또는 로드 밸런싱을 위해 모델을 결합할 수 있습니다.</string>
-    <string name="model_groups_primary_is_used_for_main_agent_tasks_sub">주요 모델은 주요 에이전트 작업에, 보조 모델은 제목 생성 등 가벼운 작업에 사용됩니다. 보조가 미설정이면 주요를 상속합니다.</string>
-    <string name="model_groups_group_name">그룹 이름</string>
-    <string name="model_groups_create">생성</string>
-    <string name="model_groups_none">없음</string>
-    <string name="add_models_to_group_search_models">모델 검색</string>
-    <string name="add_models_to_group_clear">지우기</string>
-    <string name="settings_agent_loop_models">에이전트 루프 모델</string>    <string name="agent_loop_models_groups">그룹</string>
-    <string name="agent_loop_models_picking_a_group_pins_every_model_in_it_a">그룹을 선택하면 그룹 내 모든 모델이 고정됩니다. 모델 추가나 제거는 모델 그룹에서 하세요.</string>
-    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">제공업체를 추가하고 모델 목록을 새로 고치면 이 선택기에 표시됩니다.</string>
-    <string name="agent_loop_models_no_models_or_groups_available_yet">아직 사용할 수 있는 모델이나 그룹이 없습니다.</string>
+    <string name="settings_agent_loop_models">에이전트 루프 모델</string>    <string name="agent_loop_models_add_a_provider_and_refresh_its_model_lis">제공업체를 추가하고 모델 목록을 새로 고치면 이 선택기에 표시됩니다.</string>
     <string name="agent_loop_models_selected">선택됨</string>
     <string name="agent_loop_models_not_selected">선택 안 됨</string>
 
@@ -807,17 +777,12 @@
     <string name="add_provider_built_in_models_count">내장 모델 %1$d 개</string>
     <string name="add_provider_configure_provider">%1$s 구성</string>
     <string name="add_provider_auto_append_v1_quoted">\"/v1\" 자동 추가</string>
-    <string name="add_models_to_group_add_count">추가 (%1$d)</string>
     <string name="provider_detail_https_api_example_placeholder">https://api.example.com</string>
     <string name="provider_detail_models_count_header">모델 (%1$d)</string>
     <string name="provider_detail_delete_provider_confirm">\"%1$s\" 을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</string>
     <string name="provider_detail_delete_model_confirm">\"%1$s\" 을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</string>
     <string name="agent_loop_models_model_count_singular">모델 1 개</string>
     <string name="agent_loop_models_model_count_plural">모델 %1$d 개</string>
-    <string name="model_group_detail_models_header_count">모델 (%1$d)</string>
-    <string name="model_group_detail_remove_named_model_confirm">그룹에서 \"%1$s\" 을(를) 제거하시겠습니까?</string>
-    <string name="model_group_detail_remove_this_model_fallback">이 모델</string>
-    <string name="model_group_detail_delete_named_group_confirm">\"%1$s\" 을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.</string>
     <string name="provider_list_models_count">모델 %1$d 개</string>
 
     <!-- T180-bg-notif — Task Notifications toggle + completion notification
@@ -842,18 +807,10 @@
 
     <!-- T182 agent loop section i18n -->
     <string name="agent_loop_section_title">에이전트 루프에서 사용 가능한 모델</string>
-    <string name="agent_loop_section_footer">여기 나열된 모델과 그룹은 터미널에서 minis-model-use 로 호출할 수 있습니다. 에이전트는 이것들만 볼 수 있습니다.</string>
-    <string name="agent_loop_section_empty_hint">추가된 모델이나 그룹이 없습니다</string>
     <string name="agent_loop_section_add_models">모델 추가</string>
-    <string name="agent_loop_section_add_groups">그룹 추가</string>
     <string name="agent_loop_section_add_models_title">모델 추가</string>
-    <string name="agent_loop_section_add_groups_title">그룹 추가</string>
     <string name="agent_loop_section_no_available_models">추가할 수 있는 모든 모델이 이미 추가되었습니다.</string>
-    <string name="agent_loop_section_no_available_groups">모든 그룹이 이미 추가되었습니다.</string>
-    <string name="agent_loop_section_empty_group_subtitle">(빈 그룹)</string>
     <string name="agent_loop_section_remove">에이전트 루프에서 제거</string>
-    <string name="agent_loop_section_group_badge">그룹</string>
-
     <!-- T184-chatmenu-i18n — ChatScreen overflow ⋮ menu -->
     <string name="chat_menu_new_chat">새 채팅</string>
     <string name="chat_new_chat_stop_dialog_body">이 채팅에서 작업이 실행 중입니다. 새 채팅을 시작하면 중지됩니다.</string>
@@ -875,8 +832,6 @@
     <string name="chat_attach_add_file">파일 추가</string>
 
     <!-- T185 unified picker UI strings -->
-    <string name="add_models_to_group_all_in_group">모든 모델이 이미 이 그룹에 포함되어 있습니다.</string>
-    <string name="add_models_to_group_no_match">일치하는 모델이 없습니다.</string>
 
     <!-- T187 — user-bubble long-press Edit + Exit Edit + Clear Chat dialog -->
     <string name="chat_longpress_edit">편집</string>
@@ -944,8 +899,6 @@
     <string name="model_picker_done">완료</string>
     <string name="model_picker_search_placeholder">모델 검색</string>
     <string name="model_picker_search_clear">지우기</string>
-    <string name="model_picker_groups_section">모델 그룹</string>
-    <string name="model_picker_groups_footer">자동 폴백 또는 부하 분산을 위해 이 세션을 그룹에 연결합니다.</string>
     <string name="model_picker_default_badge">기본값</string>
     <string name="model_picker_active_badge">활성</string>
     <string name="model_picker_no_linked_models">이 그룹에 연결된 모델이 없습니다.</string>
@@ -1549,7 +1502,7 @@
     <string name="settings_assistant_role_missing_toast">이 기기에는 기본 어시스턴트 설정이 없습니다</string>
     <string name="settings_system_enhance_footer">Root, 모듈 스위치와 각각이 여는 기능이 여기에 모여 있습니다.</string>
     <string name="chat_new_session">새 대화</string>
-    <string name="settings_category_models_sub">공급자, 모델 그룹, 사용량, 자동 압축</string>
+    <string name="settings_category_models_sub">공급자, 모델 슬롯, 사용량, 자동 압축</string>
     <string name="settings_category_agent_sub">스킬, 캐릭터, 페르소나, 프롬프트, 기억, MCP</string>
     <string name="settings_category_appearance_sub">모양과 데스크톱 펫</string>
     <string name="settings_category_runtime_sub">터미널, 환경 변수, 저장소와 마운트</string>
@@ -1676,8 +1629,6 @@
     <string name="skills_edit_name">이름 편집</string>
     <string name="storage_session_fallback_title">세션</string>
     <string name="storage_clear_confirm_body">%1$s의 파일이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</string>
-    <string name="model_groups_defaults">기본값</string>
-    <string name="model_group_name_saved">이름이 저장되었습니다</string>
     <string name="thinking_rule_unnamed">(이름 없는 규칙)</string>
     <string name="session_edit_title">세션 편집</string>
     <string name="session_list_no_messages">아직 메시지가 없습니다</string>
@@ -1788,7 +1739,6 @@
     <string name="session_config_skills_footer">이 세션에서 사용할 스킬 관리</string>
     <string name="session_config_mcps_footer">이 세션이 연결하는 MCP 도구 서버 관리</string>
     <string name="session_config_memory_footer">이 세션에 쌓인 메모리를 보고 관리</string>
-    <string name="chat_models_all_groups">모든 모델 및 그룹…</string>
     <string name="chat_agent_presets">에이전트 프리셋</string>
     <string name="chat_agent_preset_current">사용 중</string>
     <string name="slash_model_subtitle">모델 전환</string>
@@ -1802,4 +1752,59 @@
     <string name="offload_privilege_details">시스템 권한 세부정보</string>
     <string name="offload_privilege_details_footer">오버레이, 접근성 유지, 음성 교정</string>
     <string name="chat_plan_badge">계획</string>
+
+    <!-- Model Slots -->
+    <string name="settings_models_title">모델</string>
+    <string name="model_slots_header">모델 슬롯</string>
+    <string name="model_slots_footer">고정된 작업 슬롯마다 호환 모델을 선택하고 순서를 지정하세요.</string>
+    <string name="model_slot_main">기본</string>
+    <string name="model_slot_light">경량</string>
+    <string name="model_slot_vision">비전</string>
+    <string name="model_slot_voice_input">음성 입력</string>
+    <string name="model_slot_voice_output">음성 출력</string>
+    <string name="model_slot_empty">할당된 모델 없음</string>
+    <string name="model_slot_main_options">기본 슬롯 옵션</string>
+    <string name="model_slot_fallback_help">선언된 순서로 모델을 시도합니다. 다음 모델로 넘어가는 조건은 이 설정을 따릅니다.</string>
+    <string name="model_slot_fallback_title">오류 시 대체</string>
+    <string name="model_slot_fallback_always">모든 오류</string>
+    <string name="model_slot_fallback_default">요청 제한 및 서버 오류</string>
+    <string name="agent_loop_models_slots_footer">개별로 선택한 항목만 Agent Loop에서 사용할 수 있습니다.</string>
+    <string name="agent_loop_models_slots_subtitle">Agent 도구에서 사용할 모델 선택</string>
+    <string name="model_slot_selected_models">선택된 모델</string>
+    <string name="model_slot_order_footer">이 순서대로 모델을 시도합니다. 화살표로 우선순위를 바꾸세요.</string>
+    <string name="model_slot_legacy_unresolved">기존 구성에서 가져온 사용할 수 없는 항목을 유지함</string>
+    <string name="model_slot_available_models">사용 가능한 모델</string>
+    <string name="model_slot_available_footer">숨김 모델과 이 슬롯의 기능을 지원하지 않는 모델은 제외됩니다.</string>
+    <string name="model_slot_no_candidates">호환되는 모델이 없습니다</string>
+    <string name="model_slot_system_entry">기기에 내장된 음성 엔진</string>
+    <string name="model_slot_provider_disabled">공급자 비활성화됨</string>
+    <string name="agent_loop_models_title">Agent Loop 모델</string>
+    <string name="model_slot_follow_default">슬롯 기본값 사용</string>
+    <string name="model_slot_follow_default_footer">음성 슬롯에서 사용 가능한 첫 번째 항목을 사용합니다.</string>
+    <string name="agent_loop_add_models_count">모델 %1$d개 추가</string>
+    <string name="agent_loop_search_no_match">일치하는 모델 없음</string>
+    <string name="agent_loop_search_placeholder">모델 검색</string>
+    <string name="agent_loop_search_clear">검색 지우기</string>
+    <string name="model_entry_default_thinking">기본 사고 수준</string>
+    <string name="model_entry_thinking_default">공급자 기본값 사용</string>
+    <string name="model_entry_thinking_off">끄기</string>
+    <string name="model_entry_thinking_low">낮음</string>
+    <string name="model_entry_thinking_medium">보통</string>
+    <string name="model_entry_thinking_high">높음</string>
+    <string name="model_entry_thinking_xhigh">XHigh</string>
+    <string name="model_entry_thinking_max">최대</string>
+    <string name="model_entry_thinking_ultra">Ultra</string>
+    <string name="model_entry_context_limit_enabled">컨텍스트 사용량 제한</string>
+    <string name="model_entry_context_limit_footer">이 모델에 전송하는 컨텍스트를 제한합니다. 무제한은 제한을 적용하지 않습니다.</string>
+    <string name="model_entry_context_limit_label">컨텍스트 제한</string>
+    <string name="model_entry_context_unlimited">무제한</string>
+    <string name="model_slot_select_primary">%1$s 기본 모델 선택</string>
+    <string name="model_slot_manage_backups">백업 모델 관리</string>
+    <string name="model_slot_primary_entry">주 모델</string>
+    <string name="model_slot_fallback_position">대체 %1$d</string>
+    <string name="model_slot_drag_to_reorder">드래그하여 순서 변경</string>
+    <plurals name="model_slot_backups_count">
+        <item quantity="one">백업 모델 +%1$d개</item>
+        <item quantity="other">백업 모델 +%1$d개</item>
+    </plurals>
 </resources>

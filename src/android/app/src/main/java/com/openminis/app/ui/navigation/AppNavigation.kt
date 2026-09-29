@@ -32,17 +32,16 @@ import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.ui.chat.ChatScreen
 import com.openminis.app.ui.sessions.SessionListScreen
 import com.openminis.app.ui.settings.AboutScreen
-import com.openminis.app.ui.settings.AddAgentLoopGroupsScreen
 import com.openminis.app.ui.settings.AddAgentLoopModelsScreen
 import com.openminis.app.ui.settings.AddCustomModelScreen
 import com.openminis.app.ui.settings.BackgroundSettingsScreen
 import com.openminis.app.ui.bots.BotsScreen
-import com.openminis.app.ui.settings.AddModelsToGroupScreen
 import com.openminis.app.ui.settings.ShadowVoiceDetailScreen
 import com.openminis.app.ui.settings.AddProviderScreen
 import com.openminis.app.ui.settings.ModelEntryDetailScreen
-import com.openminis.app.ui.settings.ModelGroupDetailScreen
-import com.openminis.app.ui.settings.ModelGroupsScreen
+import com.openminis.app.ui.settings.ModelSlotDetailScreen
+import com.openminis.app.ui.settings.ModelsScreen
+import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.ui.settings.ProviderDetailScreen
 import com.openminis.app.ui.settings.ProviderListScreen
 import com.openminis.app.ui.sandbox.FileBrowserScreen
@@ -108,15 +107,13 @@ object Routes {
     const val PROVIDER_DETAIL = "provider/{instanceId}"
     /** [T-android-provider-voice] Read-only shadow Voice Service detail. */
     const val SHADOW_VOICE_DETAIL = "voice_service/{instanceId}"
-    const val MODEL_GROUPS = "model_groups"
-    const val MODEL_GROUP_DETAIL = "model_group/{groupId}"
-    const val ADD_MODELS_TO_GROUP = "add_models_to_group/{groupId}"
+    const val MODELS = "models"
+    const val MODEL_SLOT_DETAIL = "model_slot/{slot}"
+    fun modelSlotDetail(slot: ModelSlot) = "model_slot/${slot.name}"
     /** T185: picker that adds model *entries* to the agent-loop set. */
     const val ADD_MODELS_TO_AGENT_LOOP = "add_models_to_agent_loop"
-    /** T185: picker that adds model *groups* to the agent-loop set. */
-    const val ADD_GROUPS_TO_AGENT_LOOP = "add_groups_to_agent_loop"
     /** T171→T182: AGENT_LOOP_MODELS deprecated (the screen lived inside
-     *  Settings, now the picker is a section inside ModelGroupsScreen).
+     *  Settings; agent tools expose individual model entries only.
      *  Route declared so any back-compat deep-link string from preview
      *  builds pops back instead of crashing. */
     const val AGENT_LOOP_MODELS = "agent_loop_models"
@@ -224,7 +221,6 @@ object Routes {
     fun chat(sessionId: String) = "chat/$sessionId"
     fun providerDetail(instanceId: String) = "provider/$instanceId"
     fun shadowVoiceDetail(instanceId: String) = "voice_service/$instanceId"
-    fun modelGroupDetail(groupId: String) = "model_group/$groupId"
     fun addModelsToGroup(groupId: String) = "add_models_to_group/$groupId"
     // [T-android-model-entry-route-slash-crash] entryId is a composite key
     // "<instanceId>/<modelId>" (compositeEntryKey) — it CONTAINS a '/'. Left
@@ -635,7 +631,7 @@ fun AppNavigation(
                     category = category,
                     onBack = { navController.safePopBackStack() },
                     onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
-                    onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
+                    onModelsClick = { navController.safeNavigate(Routes.MODELS) },
                     onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                     onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
                     onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
@@ -840,44 +836,23 @@ fun AppNavigation(
             )
         }
 
-        composable(Routes.MODEL_GROUPS) {
-            ModelGroupsScreen(
+        composable(Routes.MODELS) {
+            ModelsScreen(
                 providerRepository = providerRepository,
                 onBack = { navController.safePopBackStack() },
-                onGroupClick = { groupId ->
-                    navController.safeNavigate(Routes.modelGroupDetail(groupId))
-                },
-                onAddAgentLoopModels = {
-                    navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP)
-                },
-                onAddAgentLoopGroups = {
-                    navController.safeNavigate(Routes.ADD_GROUPS_TO_AGENT_LOOP)
-                },
+                onSlotClick = { slot -> navController.safeNavigate(Routes.modelSlotDetail(slot)) },
+                onAgentLoopModelsClick = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
             )
         }
 
         composable(
-            route = Routes.MODEL_GROUP_DETAIL,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType }),
+            route = Routes.MODEL_SLOT_DETAIL,
+            arguments = listOf(navArgument("slot") { type = NavType.StringType }),
         ) { backStackEntry ->
-            val groupId = backStackEntry.arguments?.getString("groupId") ?: return@composable
-            ModelGroupDetailScreen(
-                groupId = groupId,
-                providerRepository = providerRepository,
-                onBack = { navController.safePopBackStack() },
-                onAddModels = {
-                    navController.safeNavigate(Routes.addModelsToGroup(groupId))
-                },
-            )
-        }
-
-        composable(
-            route = Routes.ADD_MODELS_TO_GROUP,
-            arguments = listOf(navArgument("groupId") { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val groupId = backStackEntry.arguments?.getString("groupId") ?: return@composable
-            AddModelsToGroupScreen(
-                groupId = groupId,
+            val slotName = backStackEntry.arguments?.getString("slot") ?: return@composable
+            val slot = ModelSlot.entries.firstOrNull { it.name == slotName } ?: return@composable
+            ModelSlotDetailScreen(
+                slot = slot,
                 providerRepository = providerRepository,
                 onBack = { navController.safePopBackStack() },
             )
@@ -885,7 +860,7 @@ fun AppNavigation(
 
         // T185: full-screen picker for adding entries to the agent-loop
         // usable set (replaces the T182 ModalBottomSheet so the visual
-        // matches AddModelsToGroupScreen — same shared
+        // matches the model-slot editor — same shared
         // modelEntryPickerItems composable in ui/components/).
         composable(Routes.ADD_MODELS_TO_AGENT_LOOP) {
             AddAgentLoopModelsScreen(
@@ -894,19 +869,9 @@ fun AppNavigation(
             )
         }
 
-        // T185: companion picker for adding model groups to the agent-loop
-        // set. Simpler layout (no per-provider sectioning) but same
-        // selection/confirm semantics as the entries picker.
-        composable(Routes.ADD_GROUPS_TO_AGENT_LOOP) {
-            AddAgentLoopGroupsScreen(
-                providerRepository = providerRepository,
-                onBack = { navController.safePopBackStack() },
-            )
-        }
-
         // T182: AgentLoopModels is no longer a standalone screen. The
-        // picker now lives as the last section inside ModelGroupsScreen
-        // (mirrors iOS Views/Providers/ModelGroupsView.swift L77-79's
+        // picker now lists individual entries in the Models screen
+        // (mirrors iOS Views/Providers/ModelsView.swift's
         // `AgentLoopModelsSection`). Routes.AGENT_LOOP_MODELS is left
         // declared for back-compat with any deep-link string we may
         // have shipped to early users; safePopBackStack lands them on

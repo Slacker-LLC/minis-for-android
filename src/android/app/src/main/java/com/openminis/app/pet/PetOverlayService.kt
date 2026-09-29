@@ -340,8 +340,8 @@ class PetOverlayService : Service() {
                     window.setStatus("语音模型配置加载超时")
                     return@launch
                 }
-                repository.ensureDefaultVoiceInputGroup()
-                repository.ensureDefaultVoiceOutputGroup()
+                repository.ensureDefaultVoiceInputSlot()
+                repository.ensureDefaultVoiceOutputSlot()
                 val choice = repository.resolveVoiceInputChoice()
                 SpeechRecognitionManager.selectEngine(if (choice.isSystem) "system" else "provider")
                 (SpeechRecognitionManager.availableEngines()

@@ -31,7 +31,7 @@ class CorrectionEngineTest {
             locale: String,
         ): CorrectionOutcome {
             calls++
-            return CorrectionOutcome(reply(transcript), "sub", 1)
+            return CorrectionOutcome(reply(transcript), "light", 1)
         }
     }
 
@@ -84,7 +84,7 @@ class CorrectionEngineTest {
         assertFalse(s.hasChange)
         // Explicitly NOT a rejection — the model looked and found nothing.
         assertNull(s.rejectedReason)
-        assertEquals("sub", s.modelGroupUsed)
+        assertEquals("light", s.modelSlotUsed)
     }
 
     @Test

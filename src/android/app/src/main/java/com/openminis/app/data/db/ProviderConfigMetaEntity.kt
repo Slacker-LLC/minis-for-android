@@ -5,8 +5,7 @@ import androidx.room.PrimaryKey
 
 /**
  * Single-row-per-key meta store for provider config values that don't
- * belong to any of the per-row tables: defaultPrimaryGroupId,
- * defaultSubGroupId, and the json_sync_hash used to detect
+ * belong to any of the per-row tables: legacy group pointers (migration-only), and the json_sync_hash used to detect
  * downgrade-and-back-up scenarios where the legacy JSON mirror was
  * mutated by an older app build behind our back.
  *

@@ -1276,3 +1276,13 @@ curl -H "X-Minis-Token: $TOKEN" -H 'Content-Type: application/json' \
 - Phase 1 流式观感：未闭合投影与显现进度在真实模型输出上的观感、帧率与滚动跟随。
 - 系统提示词模块化：本仓库未复跑真机验证（来源仓库在小米 24129PN74C Debug 包上验证过输入框保存、config 读写与模块编辑/开关/恢复默认）；`debug.llmRequests` 抓取真实请求的注入顺序同样只在来源仓库做过。
 - 自定义提示词与模块覆盖不进入备份/恢复类别，换机后丢失（沿用来源仓库的已知限制）。
+
+## 九、模型槽位重构 PR0–PR3（2026-09-29）
+
+本轮按 PR0→PR3 顺序推进：PR0 特征基线测试（[PR #2](https://github.com/Slacker-LLC/minis-for-android/pull/2)）、PR1 数据驱动模型规则（[PR #3](https://github.com/Slacker-LLC/minis-for-android/pull/3)）、PR2 固定槽位与旧数据迁移（[PR #4](https://github.com/Slacker-LLC/minis-for-android/pull/4)，包含 B0 bot 和定时任务 entry binding 迁移），以及当前 `refactor/model-slots-pr3` 上的 PR3 UI、深链、Agent/debug 配置接口和文档更新。
+
+PR3 将运行时模型配置改为 Main、Light、Vision、Voice Input、Voice Output 五个固定槽位；会话、bot 和 scheduled task 使用 entry binding，旧模型组语义保留在迁移边界与兼容深链中。设置页复用统一单选模型选择器，槽位详情支持按声明顺序管理备用模型，主槽备用触发方式与逐模型默认思考强度/上下文上限均可配置。八种语言已更新，`provider_model_groups` Room 表仍保留，没有 schema/table 改动。
+
+宿主验证通过：`:app:testDebugUnitTest` 共 2,448 项、0 失败；`:app:lintDebug` 与 `:app:compileDebugAndroidTestKotlin` 成功；八种 strings.xml 和 plural 资源均通过 XML/键完整性检查。Lint 报告仍显示 202 warnings、7 hints，并有 34 条旧 baseline issue 未再触发；这些不阻止任务成功。新模型槽位 UI 与选择器文件没有 lint issue。真机升级旧数据库/备份后验证聊天、语音、视觉、bot、scheduled task 和 Agent `minis-model-use` 的行为仍待设备验收。
+
+Room schema 当前为 v4；如 `06-CURRENT-GAPS.md` 所记，删除旧表属于后续 PR4，需另行升至 v5，本轮不实施。

@@ -543,8 +543,9 @@ private fun BotEditorScreen(bot: BotEntity?, providerRepository: ProviderReposit
         Spacer(Modifier.height(24.dp))
     }
     if (picker) ModelPickerSheet(
-        groups = emptyList(), selectedGroupId = null, activeEntryId = selected?.id, defaultPrimaryGroupId = null,
-        config = config, providerRepository = providerRepository, onSelectGroup = {}, onSelectGroupEntry = { _, _ -> },
+        activeEntryId = selected?.id,
+        config = config,
+        providerRepository = providerRepository,
         onSelectEntry = { id ->
             if (providerRepository.allVisibleEntries().firstOrNull { it.id == id }?.model?.isTextOutput == true) {
                 binding = com.openminis.app.data.model.ModelBinding.encodeEntry(id); picker = false

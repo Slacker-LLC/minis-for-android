@@ -168,7 +168,7 @@ fun ProviderListScreen(
                     // ProviderInstancesView's .onMove).
                     //
                     // ReorderableColumn — not the LazyColumn variant used by
-                    // ModelGroupsScreen — because this screen renders inside
+                    // ModelsScreen — because this screen renders inside
                     // SettingsScaffold's verticalScroll Column, and the lazy
                     // variant needs a LazyListState. Converting the whole screen
                     // to a LazyColumn would churn the empty state and the Voice
@@ -216,7 +216,7 @@ fun ProviderListScreen(
                                 !apiKey.isNullOrBlank() || instance.allowsEmptyAPIKey
                             }
                             // Lift the dragged row above its neighbours so it
-                            // reads as "picked up" (matches ModelGroupsScreen).
+                            // reads as "picked up" (matches ModelsScreen).
                             val elevation by animateDpAsState(
                                 targetValue = if (isDragging) 4.dp else 0.dp,
                                 label = "provider_drag_elevation",

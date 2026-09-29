@@ -2,7 +2,7 @@ package com.openminis.app.config
 
 /**
  * A dynamically-keyed group of fields, e.g. one ProviderInstance per id,
- * one ModelEntry per uuid, one ModelGroup per id. Mirrors iOS
+ * one ModelEntry per uuid, one fixed ModelSlot per task. Mirrors iOS
  * `ConfigCollection` (Shared/Config/Fields/ConfigCollection.swift).
  *
  * Static fields go through the registry's flat field map. A collection
@@ -13,7 +13,7 @@ package com.openminis.app.config
  *      whole child rather than mutate a single field.
  */
 interface ConfigCollection {
-    /** First segment of every member's path, e.g. `models` or `groups`. */
+    /** First segment of every member's path, e.g. `models` or `slots`. */
     val basePath: String
     val displayName: String
     val description: String

@@ -6,10 +6,9 @@ import android.content.Context
  * User-tunable limits for the `subagent` delegation tool.
  *
  * DeepSeek Harness-style knobs, kept intentionally small: how deep a
- * delegation tree may grow and how long one child run may take. The child
- * still inherits the parent's model group unless a sub group is configured
- * (see `provider.groups.setSubDefault`), matching the "inherit from parent"
- * composition model.
+ * delegation tree may grow and how long one child run may take. Model
+ * selection follows the current fixed-slot configuration; these limits only
+ * bound delegation depth and duration.
  */
 object SubagentLimits {
     private const val PREFS = "minis_subagent_prefs"

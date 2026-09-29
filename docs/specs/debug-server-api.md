@@ -100,6 +100,8 @@ The current surface includes development and inspection namespaces for areas suc
 
 Exact method names and fields must come from `rpc.discover` on the build being tested.
 
+Model configuration uses fixed slots instead of model groups: `provider.slots.get` reads the five slots and ordered entry IDs, `provider.slots.set` updates slot entries and/or `fallbackTrigger`, and `provider.models.setDefaults` writes a model entry's default thinking level/context cap. `rpc.discover` remains the authoritative schema source.
+
 ## Bootstrap routes
 
 Authenticated GET routes expose machine-readable schema and optional debug-skill assets:

@@ -9,7 +9,7 @@ package com.openminis.app.data.model
  * entry in pickers and group detail instead of rendering as a stale member.
  *
  * uuid is the composite "<sentinel>/<model-id>" — exactly the member id shape
- * ensureDefaultVoiceInputGroup/-OutputGroup write (and the shape iOS
+ * ensureDefaultVoiceInputSlot/-OutputSlot write (and the shape iOS
  * ModelEntry.id produces), so `entry.id == memberId` holds everywhere.
  */
 object SystemVoiceEntries {

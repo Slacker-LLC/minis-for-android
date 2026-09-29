@@ -124,7 +124,7 @@ internal object ModelRulesParser {
         "adaptiveThinking", "requiresThoughtSignature",
     )
     private val filterKeys = setOf("includePrefixes", "excludeSuffixes", "excludeContains")
-    private val staticModelGroups = setOf("anthropic", "gemini", "openAI", "openRouter", "xAI", "kimi", "codexOAuth")
+    private val supportedProviderCatalogs = setOf("anthropic", "gemini", "openAI", "openRouter", "xAI", "kimi", "codexOAuth")
 
     fun parse(text: String, onInvalidRule: (String) -> Unit = {}): ModelRulesDocument? {
         if (text.toByteArray(Charsets.UTF_8).size > MODEL_RULES_MAX_BYTES) return null
@@ -136,7 +136,7 @@ internal object ModelRulesParser {
             val rawRules = root["rules"] as? JsonArray ?: return null
             val rawModels = root["staticModels"] as? JsonObject ?: return null
             val rawFilters = root["pickerFilters"] as? JsonObject ?: return null
-            if (rawModels.keys.any { it !in staticModelGroups }) return null
+            if (rawModels.keys.any { it !in supportedProviderCatalogs }) return null
 
             val parsedRules = mutableListOf<ModelRule>()
             val seenRuleIds = mutableSetOf<String>()

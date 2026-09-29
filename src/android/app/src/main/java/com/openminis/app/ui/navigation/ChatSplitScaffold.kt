@@ -918,7 +918,6 @@ fun ChatSplitScaffoldRoute(
                         FilePreviewHolder.currentItem = item
                         navController.safeNavigate(Routes.FILE_PREVIEW)
                     },
-                    onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
                 )
             },
         )
@@ -1065,7 +1064,6 @@ private fun ChatPhoneDrawerScaffold(
                 FilePreviewHolder.currentItem = item
                 navController.safeNavigate(Routes.FILE_PREVIEW)
             },
-            onModelGroupsClick = { navController.safeNavigate(Routes.MODEL_GROUPS) },
         )
     }
 }
