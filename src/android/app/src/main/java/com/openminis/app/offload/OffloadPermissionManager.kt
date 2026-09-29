@@ -6,9 +6,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -116,12 +119,14 @@ object OffloadPermissionManager {
      *  request after they already said no. Cleared with
      *  [clearSessionGrants]. */
     private val sessionDenials = mutableMapOf<String, MutableSet<String>>() // sessionId -> set of toolNames
+    private val unattendedSessionCounts = ConcurrentHashMap<String, AtomicInteger>()
+    private val unattendedTimeoutDenials = ConcurrentHashMap<String, MutableSet<String>>()
 
     /** Active permission request waiting for user response. */
     private val _pendingRequest = MutableStateFlow<PermissionRequest?>(null)
     val pendingRequest: StateFlow<PermissionRequest?> = _pendingRequest.asStateFlow()
 
-    private var pendingContinuation: kotlin.coroutines.Continuation<Response>? = null
+    private var pendingContinuation: CancellableContinuation<Response>? = null
 
     // ── Android system runtime permission request (for location etc.) ──────────
 
@@ -473,51 +478,114 @@ object OffloadPermissionManager {
      */
     enum class Response { ALLOW_SESSION, ALLOW_ONCE, DENY_SESSION }
 
+    data class PermissionCheckResult(
+        val allowed: Boolean,
+        val unattendedTimeout: Boolean = false,
+    )
+
+    internal sealed class AskOnceWaitResult {
+        data class Responded(val response: Response) : AskOnceWaitResult()
+        data object TimedOut : AskOnceWaitResult()
+    }
+
+    const val UNATTENDED_ASK_ONCE_TIMEOUT_MS = 60_000L
+
     /**
      * Check permission for a tool in the given session.
      * For ASK_ONCE, suspends until user responds via the dialog.
      * Returns true if allowed.
      */
-    suspend fun checkPermission(toolName: String, toolTitle: String, sessionId: String): Boolean {
+    suspend fun <T> withUnattendedSession(sessionId: String, block: suspend () -> T): T {
+        val key = sessionId.takeIf { it.isNotBlank() } ?: return block()
+        val counter = unattendedSessionCounts.computeIfAbsent(key) { AtomicInteger() }
+        counter.incrementAndGet()
+        try {
+            return block()
+        } finally {
+            unattendedSessionCounts.computeIfPresent(key) { _, active ->
+                if (active.decrementAndGet() <= 0) {
+                    unattendedTimeoutDenials.remove(key)
+                    null
+                } else active
+            }
+        }
+    }
+
+    internal fun isUnattendedSession(sessionId: String): Boolean =
+        unattendedSessionCounts[sessionId]?.get()?.let { it > 0 } == true
+
+    internal suspend fun awaitAskOnceResponse(
+        unattended: Boolean,
+        timeoutMs: Long = UNATTENDED_ASK_ONCE_TIMEOUT_MS,
+        await: suspend () -> Response,
+    ): AskOnceWaitResult {
+        if (!unattended) return AskOnceWaitResult.Responded(await())
+        val response = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { await() }
+        return response?.let(AskOnceWaitResult::Responded) ?: AskOnceWaitResult.TimedOut
+    }
+
+    suspend fun checkPermission(toolName: String, toolTitle: String, sessionId: String): Boolean =
+        checkPermissionDetailed(toolName, toolTitle, sessionId).allowed
+
+    suspend fun checkPermissionDetailed(
+        toolName: String,
+        toolTitle: String,
+        sessionId: String,
+    ): PermissionCheckResult {
         val level = getLevel(toolName)
         return when (level) {
-            PermissionLevel.BYPASS -> true
-            PermissionLevel.NOT_ALLOWED -> false
+            PermissionLevel.BYPASS -> PermissionCheckResult(true)
+            PermissionLevel.NOT_ALLOWED -> PermissionCheckResult(false)
             PermissionLevel.ASK_ONCE -> {
+                val unattended = isUnattendedSession(sessionId)
+                if (unattended && toolName in unattendedTimeoutDenials[sessionId].orEmpty()) {
+                    return PermissionCheckResult(false, unattendedTimeout = true)
+                }
                 // T338: a prior "Deny in this session" short-circuits
                 // before any grants check or dialog so the agent can't
                 // spam the user.
                 val denials = sessionDenials.getOrPut(sessionId) { mutableSetOf() }
-                if (toolName in denials) return false
+                if (toolName in denials) return PermissionCheckResult(false)
 
                 val grants = sessionGrants.getOrPut(sessionId) { mutableSetOf() }
-                if (toolName in grants) return true
+                if (toolName in grants) return PermissionCheckResult(true)
 
                 // Show dialog and wait for response.
                 val info = toolRegistry.find { it.toolName == toolName }
-                val response = suspendCancellableCoroutine<Response> { cont ->
-                    pendingContinuation = cont
-                    _pendingRequest.value = PermissionRequest(
-                        toolName = toolName,
-                        toolTitle = toolTitle,
-                        description = "Allow ${info?.displayName ?: toolName} access?",
-                        sessionId = sessionId,
-                    )
-                    cont.invokeOnCancellation {
-                        _pendingRequest.value = null
-                        pendingContinuation = null
+                when (val waited = awaitAskOnceResponse(unattended) {
+                    suspendCancellableCoroutine { cont ->
+                        pendingContinuation = cont
+                        _pendingRequest.value = PermissionRequest(
+                            toolName = toolName,
+                            toolTitle = toolTitle,
+                            description = "Allow ${info?.displayName ?: toolName} access?",
+                            sessionId = sessionId,
+                        )
+                        cont.invokeOnCancellation {
+                            if (pendingContinuation === cont) {
+                                _pendingRequest.value = null
+                                pendingContinuation = null
+                            }
+                        }
                     }
-                }
-
-                when (response) {
-                    Response.ALLOW_SESSION -> {
-                        grants.add(toolName)
-                        true
+                }) {
+                    AskOnceWaitResult.TimedOut -> {
+                        if (unattended) {
+                            unattendedTimeoutDenials.computeIfAbsent(sessionId) { ConcurrentHashMap.newKeySet() }
+                                .add(toolName)
+                        }
+                        PermissionCheckResult(false, unattendedTimeout = unattended)
                     }
-                    Response.ALLOW_ONCE -> true  // no caching; next call re-prompts
-                    Response.DENY_SESSION -> {
-                        denials.add(toolName)
-                        false
+                    is AskOnceWaitResult.Responded -> when (waited.response) {
+                        Response.ALLOW_SESSION -> {
+                            grants.add(toolName)
+                            PermissionCheckResult(true)
+                        }
+                        Response.ALLOW_ONCE -> PermissionCheckResult(true) // no caching; next call re-prompts
+                        Response.DENY_SESSION -> {
+                            denials.add(toolName)
+                            PermissionCheckResult(false)
+                        }
                     }
                 }
             }
@@ -527,7 +595,7 @@ object OffloadPermissionManager {
     /** Called from UI when user responds to the permission dialog. */
     fun respondToRequest(response: Response) {
         _pendingRequest.value = null
-        pendingContinuation?.resume(response)
+        pendingContinuation?.takeIf { it.isActive }?.resume(response)
         pendingContinuation = null
     }
 

@@ -37,6 +37,7 @@ import com.openminis.app.data.repository.BotRepository
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.service.SessionConcurrencyManager
+import com.openminis.app.tools.BotWakePolicy
 import com.openminis.app.ui.chat.ModelPickerSheet
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisButton
@@ -235,9 +236,7 @@ fun BotsScreen(
                         needsAttention?.let { task ->
                             item(key = "needs-user-${task.id}") {
                                 BotNeedsDecisionCard(task) {
-                                    val delegation = delegations.firstOrNull { it.rootTaskId == task.id }
-                                    delegation?.let { selectedTaskId = it.id }
-                                        ?: run { error = taskNoExecutionText }
+                                    openSession(task.currentOwnerSessionId ?: task.originSessionId)
                                 }
                             }
                         }
@@ -252,10 +251,24 @@ fun BotsScreen(
                             }
                             items(rootTasks, key = { it.id }) { rootTask ->
                                 val delegation = delegations.firstOrNull { it.rootTaskId == rootTask.id }
-                                BotTaskRow(rootTask, delegationStatusText(rootTask)) {
-                                    delegation?.let { selectedTaskId = it.id }
-                                        ?: run { error = taskNoExecutionText }
-                                }
+                                BotTaskRow(
+                                    task = rootTask,
+                                    status = delegationStatusText(rootTask),
+                                    onClick = {
+                                        delegation?.let { selectedTaskId = it.id }
+                                            ?: run { error = taskNoExecutionText }
+                                    },
+                                    onPause = {
+                                        scope.launch {
+                                            if (!taskRepository.pause(rootTask.id)) error = failureText
+                                        }
+                                    },
+                                    onCancel = {
+                                        scope.launch {
+                                            if (!taskRepository.cancel(rootTask.id)) error = failureText
+                                        }
+                                    },
+                                )
                             }
                             if (delegations.isNotEmpty()) {
                                 item {
@@ -582,14 +595,50 @@ private fun DelegationRow(task: BotDelegationEntity, bots: List<BotEntity>, onCl
 }
 
 @Composable
-private fun BotTaskRow(task: BotTaskEntity, status: String, onClick: () -> Unit) {
-    SettingsRow(
-        title = task.goal.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
-        subtitle = "$status · ${botTaskPhaseText(task)}",
-        icon = Icons.AutoMirrored.Outlined.Assignment,
-        onClick = onClick,
-        minHeight = 72.dp,
-    )
+private fun BotTaskRow(
+    task: BotTaskEntity,
+    status: String,
+    onClick: () -> Unit,
+    onPause: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        SettingsRow(
+            title = task.goal.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
+            subtitle = "$status · ${botTaskPhaseText(task)}",
+            icon = Icons.AutoMirrored.Outlined.Assignment,
+            onClick = onClick,
+            minHeight = 72.dp,
+        )
+        Text(
+            stringResource(
+                R.string.bots_task_budget_summary,
+                task.autoRunsUsed,
+                BotWakePolicy.MAX_AUTO_WAKES,
+                task.revisionRoundsUsed,
+                BotWakePolicy.MAX_REVISION_ROUNDS,
+                task.delegationsUsed,
+                BotWakePolicy.MAX_DELEGATIONS_PER_TASK,
+            ),
+            modifier = Modifier.padding(start = 56.dp, end = 16.dp, bottom = 2.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = ChatColors.secondaryText,
+        )
+        if (task.status in setOf(
+                BotTaskEntity.STATUS_ACTIVE,
+                BotTaskEntity.STATUS_NEEDS_USER,
+                BotTaskEntity.STATUS_WAITING,
+            )
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 48.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.Start,
+            ) {
+                TextButton(onClick = onPause) { Text(stringResource(R.string.bots_task_pause)) }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.bots_task_cancel)) }
+            }
+        }
+    }
 }
 
 @Composable

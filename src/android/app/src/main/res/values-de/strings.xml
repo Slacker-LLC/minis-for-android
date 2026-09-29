@@ -1818,4 +1818,11 @@
         <item quantity="one">+%1$d Ersatzmodell</item>
         <item quantity="other">+%1$d Ersatzmodelle</item>
     </plurals>
+    <string name="bots_task_budget_summary">Automatische Prüfungen %1$d/%2$d · Überarbeitungen %3$d/%4$d · Delegationen %5$d/%6$d</string>
+    <string name="bots_task_pause">Pausieren</string>
+    <string name="bots_task_cancel">Abbrechen</string>
+    <string name="bots_task_notification_title">Bot-Aufgabe: %1$s</string>
+    <string name="bots_task_notification_needs_user">Der zuständige Bot benötigt deine Eingabe.</string>
+    <string name="bots_task_notification_completed">Der zuständige Bot hat die Ergebnisse geprüft.</string>
+    <string name="bots_task_notification_budget">Das Budget für automatische Prüfungen ist ausgeschöpft.</string>
 </resources>

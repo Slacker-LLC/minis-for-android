@@ -29,6 +29,12 @@ interface BotDelegationDao {
     @Query("SELECT COUNT(*) FROM bot_delegations WHERE source_session_id = :sessionId AND source_run_id = :runId")
     suspend fun countForSourceRun(sessionId: String, runId: String): Int
 
+    @Query(
+        "SELECT COUNT(*) FROM bot_delegations WHERE root_task_id = :rootTaskId " +
+            "AND status IN ('QUEUED', 'WAITING_TARGET', 'RUNNING')",
+    )
+    suspend fun countNonTerminalForRootTask(rootTaskId: String): Int
+
     @Query("SELECT * FROM bot_delegations WHERE status = 'RUNNING' ORDER BY created_at ASC")
     suspend fun listRunning(): List<BotDelegationEntity>
 

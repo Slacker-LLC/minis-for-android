@@ -1815,4 +1815,11 @@
         <item quantity="one">予備モデル +%1$d 個</item>
         <item quantity="other">予備モデル +%1$d 個</item>
     </plurals>
+    <string name="bots_task_budget_summary">自動レビュー %1$d/%2$d · 修正 %3$d/%4$d · 委任 %5$d/%6$d</string>
+    <string name="bots_task_pause">一時停止</string>
+    <string name="bots_task_cancel">キャンセル</string>
+    <string name="bots_task_notification_title">Bot タスク：%1$s</string>
+    <string name="bots_task_notification_needs_user">担当 Bot があなたの対応を必要としています。</string>
+    <string name="bots_task_notification_completed">担当 Bot が結果のレビューを完了しました。</string>
+    <string name="bots_task_notification_budget">自動レビューの予算を使い切りました。</string>
 </resources>

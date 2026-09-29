@@ -15,9 +15,22 @@ interface BotInboxEventDao {
 
     @Query(
         "SELECT * FROM bot_inbox_events WHERE recipient_bot_id = :botId AND status = 'PENDING' " +
+            "AND (:rootTaskId IS NULL OR root_task_id = :rootTaskId) " +
             "ORDER BY created_at ASC LIMIT :limit",
     )
-    suspend fun listPending(botId: String, limit: Int): List<BotInboxEventEntity>
+    suspend fun listPending(botId: String, rootTaskId: String?, limit: Int): List<BotInboxEventEntity>
+
+    @Query(
+        "SELECT * FROM bot_inbox_events WHERE recipient_bot_id = :botId AND root_task_id = :rootTaskId " +
+            "AND status = 'PENDING' ORDER BY created_at ASC",
+    )
+    suspend fun listPendingForRootTask(botId: String, rootTaskId: String): List<BotInboxEventEntity>
+
+    @Query("SELECT * FROM bot_inbox_events WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT :limit")
+    suspend fun listPendingAll(limit: Int): List<BotInboxEventEntity>
+
+    @Query("SELECT MIN(lease_expires_at) FROM bot_inbox_events WHERE status = 'CLAIMED'")
+    suspend fun earliestLeaseExpiration(): Long?
 
     @Query(
         "UPDATE bot_inbox_events SET status = 'CLAIMED', lease_owner = :leaseOwner, " +

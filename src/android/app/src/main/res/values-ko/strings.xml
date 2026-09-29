@@ -1807,4 +1807,11 @@
         <item quantity="one">백업 모델 +%1$d개</item>
         <item quantity="other">백업 모델 +%1$d개</item>
     </plurals>
+    <string name="bots_task_budget_summary">자동 검토 %1$d/%2$d · 수정 %3$d/%4$d · 위임 %5$d/%6$d</string>
+    <string name="bots_task_pause">일시중지</string>
+    <string name="bots_task_cancel">취소</string>
+    <string name="bots_task_notification_title">Bot 작업: %1$s</string>
+    <string name="bots_task_notification_needs_user">담당 Bot이 사용자의 조치를 기다립니다.</string>
+    <string name="bots_task_notification_completed">담당 Bot이 결과 검토를 마쳤습니다.</string>
+    <string name="bots_task_notification_budget">자동 검토 예산을 모두 사용했습니다.</string>
 </resources>

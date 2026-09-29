@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import com.openminis.app.MinisApp
 import com.openminis.app.agent.AgentRunner
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.offload.OffloadPermissionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -124,7 +125,9 @@ object ScheduledAgentRunner {
         )
 
         if (waitForCompletion) {
-            val result = dispatch(app, task, sessionId, wait = true)
+            val result = OffloadPermissionManager.withUnattendedSession(sessionId) {
+                dispatch(app, task, sessionId, wait = true)
+            }
             val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
             val ok = result.status != "Error" && result.status != "Timeout"
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)
@@ -137,7 +140,9 @@ object ScheduledAgentRunner {
         // dispatch + completion off the app scope and return the session id
         // immediately so the UI can show "task started" without blocking.
         bgScope.launch {
-            val result = dispatch(app, task, sessionId, wait = true)
+            val result = OffloadPermissionManager.withUnattendedSession(sessionId) {
+                dispatch(app, task, sessionId, wait = true)
+            }
             val preview = (result.responseText ?: "").take(200).ifBlank { "(no response)" }
             val ok = result.status != "Error" && result.status != "Timeout"
             ScheduledTaskManager(app).markFired(task.id, sessionId, preview, ok = ok)

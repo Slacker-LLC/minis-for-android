@@ -60,12 +60,24 @@ internal object OffloadGate {
         args: OffloadArgs,
         request: NativeOffloadRequest? = null,
     ): NativeOffloadResult? {
-        if (allow(toolName, displayName, request?.sessionId)) return null
+        val sessionId = request?.sessionId ?: OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID
+        val decision = runBlocking {
+            OffloadPermissionManager.checkPermissionDetailed(toolName, displayName, sessionId)
+        }
+        if (decision.allowed) return null
+        val deniedCode = denialCode(decision)
         val body = JSONObject()
-            .put("error", "permission_denied")
-            .put("message",
-                "Agent is not allowed to use $displayName. Open Settings → Permissions to change.")
+            .put("error", deniedCode)
+            .put("message", if (decision.unattendedTimeout) {
+                "$displayName was denied because no user answered the unattended permission request within 60 seconds. " +
+                    "Tell the user this action needs their approval."
+            } else {
+                "Agent is not allowed to use $displayName. Open Settings → Permissions to change."
+            })
             .toString()
         return NativeOffloadResult(126, OffloadOutput.formatBody(body, args) + "\n")
     }
+
+    internal fun denialCode(decision: OffloadPermissionManager.PermissionCheckResult): String =
+        if (decision.unattendedTimeout) "permission_denied_unattended" else "permission_denied"
 }
