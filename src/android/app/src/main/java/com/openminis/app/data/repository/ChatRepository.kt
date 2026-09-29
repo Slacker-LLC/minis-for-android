@@ -132,6 +132,8 @@ class ChatRepository(
     }
 
     suspend fun deleteSession(id: String) {
+        com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
+        com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
         dao.deleteMessages(id)
         dao.deleteSession(id)
         withContext(Dispatchers.IO) {

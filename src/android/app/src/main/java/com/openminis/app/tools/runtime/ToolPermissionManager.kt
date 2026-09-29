@@ -112,6 +112,10 @@ object ToolPermissionManager {
         "android.capabilities" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "android.app" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
         "android.ui" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
+        "android.vscreen.open" to ToolPolicy(Level.LOCAL_ONLY, Level.LOCAL_ONLY),
+        "android.vscreen.launch" to ToolPolicy(Level.LOCAL_ONLY, Level.LOCAL_ONLY),
+        "android.vscreen.close" to ToolPolicy(Level.LOCAL_ONLY, Level.LOCAL_ONLY),
+        "android.vscreen.status" to ToolPolicy(Level.LOCAL_ONLY, Level.LOCAL_ONLY),
         "android.app.list" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "android.app.info" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_ALLOWED),
         "android.app.launch" to ToolPolicy(Level.MCP_ALLOWED, Level.MCP_CONFIRM),
@@ -167,16 +171,21 @@ object ToolPermissionManager {
      * execution semantics; the structured local-only Root entry is handled by
      * RootShellHandler and is not a remote MCP capability.
      */
-    private fun upstreamAgentPermissionFor(tool: String): UpstreamAgentPermission? = when {
+    private fun upstreamAgentPermissionFor(tool: String, displayId: Int?): UpstreamAgentPermission? = when {
         tool.startsWith("android.calendar.") -> UpstreamAgentPermission("calendar", "Calendar")
         tool == "android.location.get" -> UpstreamAgentPermission("location", "Location")
         tool == "android.clipboard" -> UpstreamAgentPermission("clipboard", "Clipboard")
         tool.startsWith("android.contacts.") -> UpstreamAgentPermission("contacts", "Contacts")
         tool == "android.media.images" -> UpstreamAgentPermission("photos", "Photos")
+        tool == "android.ui" && displayId != null && displayId > 0 ->
+            UpstreamAgentPermission("android.vscreen.ui", "VScreen UI")
         tool == "android.ui" || tool == "android.ui.observe" || tool.startsWith("android.input.") ->
             UpstreamAgentPermission("a11y_cli", "android-a11y-cli")
         else -> null
     }
+
+    fun isRemoteVirtualDisplayDenied(tool: String, caller: String, displayId: Int?): Boolean =
+        tool == "android.ui" && caller != CALLER_LOCAL && displayId != null && displayId > 0
 
     val localOnlyTools: Set<String> get() = table.filterValues { it.mcp == Level.LOCAL_ONLY }.keys
 
@@ -210,9 +219,10 @@ object ToolPermissionManager {
         tool: String,
         caller: String,
         sessionId: String = OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID,
+        displayId: Int? = null,
     ): Boolean {
         if (caller == CALLER_LOCAL) {
-            upstreamAgentPermissionFor(tool)?.let { upstream ->
+            upstreamAgentPermissionFor(tool, displayId)?.let { upstream ->
                 val allowed = runBlocking {
                     OffloadPermissionManager.checkPermission(
                         upstream.toolName,

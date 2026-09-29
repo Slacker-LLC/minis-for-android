@@ -6,8 +6,13 @@ internal object VirtualScreenPolicy {
     const val PHYSICAL_DISPLAY_REFUSED = "physical_display_refused"
     const val DISPLAY_GONE = "vscreen_display_gone"
     const val UNKNOWN_DISPLAY = "unknown_display"
+    const val UNAVAILABLE = "vscreen_unavailable"
+    const val APP_LEFT_DISPLAY = "app_left_virtual_display"
+    const val SCREENSHOT_BLOCKED_SECURE = "screenshot_blocked_secure"
     const val MAX_DUMP_BYTES = 64 * 1024
     const val MAX_SCREENSHOT_BYTES = 1_572_864
+
+    fun disabledToolError(enabled: Boolean): String? = if (enabled) null else UNAVAILABLE
 
     data class FlagCandidate(val flags: Int, val label: String)
 
