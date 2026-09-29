@@ -4937,19 +4937,28 @@ class ChatViewModel(
 
     /** Restore provider state from a JSON binding string. Returns true if successfully resolved. */
     private fun restoreFromBinding(bindingJson: String?): Boolean {
-        val binding = com.openminis.app.data.model.ModelBinding.parse(bindingJson)
-        if (binding !is com.openminis.app.data.model.ModelBinding.Entry) return false
-        val entry = providerRepository.config.value.modelEntries.find { it.id == binding.entryId } ?: return false
-        val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
-        val apiKey = providerRepository.usableApiKey(instance) ?: return false
-        currentModel = entry.model
-        _modelName.value = entry.model.displayName
-        _providerName.value = instance.label.ifEmpty { entry.model.provider }
-        _selectedGroupId.value = null
-        _selectedGroupName.value = ""
-        _activeEntryId.value = entry.id
-        currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
-        return true
+        return when (val binding = com.openminis.app.data.model.ModelBinding.parse(bindingJson)) {
+            is com.openminis.app.data.model.ModelBinding.Group -> {
+                val resolved = resolveProviderFromGroup(binding.groupId, binding.lastEntryId)
+                if (resolved) _selectedGroupId.value = binding.groupId
+                resolved
+            }
+            is com.openminis.app.data.model.ModelBinding.Entry -> {
+                val entry = providerRepository.config.value.modelEntries.find { it.id == binding.entryId }
+                    ?: return false
+                val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
+                val apiKey = providerRepository.usableApiKey(instance) ?: return false
+                currentModel = entry.model
+                _modelName.value = entry.model.displayName
+                _providerName.value = instance.label.ifEmpty { entry.model.provider }
+                _selectedGroupId.value = null
+                _selectedGroupName.value = ""
+                _activeEntryId.value = entry.id
+                currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+                true
+            }
+            null -> false
+        }
     }
 
     private fun resolveProviderFromGroup(groupId: String, preferredEntryId: String? = null): Boolean {
