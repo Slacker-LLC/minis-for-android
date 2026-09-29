@@ -13,6 +13,7 @@ class SessionPermissionStoreTest {
         assertTrue(SessionPermissionStore.isWorkspaceWritePath("/var/minis/attachments/photo.png"))
         assertTrue(SessionPermissionStore.isWorkspaceWritePath("/var/minis/offloads/result.json"))
         assertTrue(SessionPermissionStore.isWorkspaceWritePath("/var/minis/browser/page.html"))
+        assertTrue(SessionPermissionStore.isWorkspaceWritePath("/tmp/draft.txt"))
     }
 
     @Test
@@ -28,6 +29,7 @@ class SessionPermissionStoreTest {
     fun `workspace-write rejects traversal and invalid paths`() {
         assertFalse(SessionPermissionStore.isWorkspaceWritePath("../escape.txt"))
         assertFalse(SessionPermissionStore.isWorkspaceWritePath("/workspace/../escape.txt"))
+        assertFalse(SessionPermissionStore.isWorkspaceWritePath("/tmp/../../etc/passwd"))
         assertFalse(SessionPermissionStore.isWorkspaceWritePath(""))
         assertFalse(SessionPermissionStore.isWorkspaceWritePath("/workspace/a\u0000b"))
     }

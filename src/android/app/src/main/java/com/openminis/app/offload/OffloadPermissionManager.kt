@@ -2,6 +2,7 @@ package com.openminis.app.offload
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.openminis.app.scheduled.ScheduledTaskPermissionTier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,8 @@ object OffloadPermissionManager {
         val description: String,
         val sessionId: String,
     )
+
+    data class ScheduledTierDenial(val toolName: String, val summary: String)
 
     enum class PermissionCategory(val displayName: String) {
         PRIVACY("Privacy"),
@@ -127,6 +130,8 @@ object OffloadPermissionManager {
      *  [clearSessionGrants]. */
     private val sessionDenials = mutableMapOf<String, MutableSet<String>>() // sessionId -> set of toolNames
     private val unattendedSessionCounts = ConcurrentHashMap<String, AtomicInteger>()
+    private val unattendedTierCounts = ConcurrentHashMap<String, ConcurrentHashMap<ScheduledTaskPermissionTier, AtomicInteger>>()
+    private val scheduledTierDenials = ConcurrentHashMap<String, MutableList<ScheduledTierDenial>>()
     private val unattendedTimeoutDenials = ConcurrentHashMap<String, MutableSet<String>>()
 
     /** Active permission request waiting for user response. */
@@ -527,16 +532,33 @@ object OffloadPermissionManager {
      * For ASK_ONCE, suspends until user responds via the dialog.
      * Returns true if allowed.
      */
-    suspend fun <T> withUnattendedSession(sessionId: String, block: suspend () -> T): T {
+    suspend fun <T> withUnattendedSession(
+        sessionId: String,
+        tier: ScheduledTaskPermissionTier? = null,
+        block: suspend () -> T,
+    ): T {
         val key = sessionId.takeIf { it.isNotBlank() } ?: return block()
         val counter = unattendedSessionCounts.computeIfAbsent(key) { AtomicInteger() }
         counter.incrementAndGet()
+        val tierCounter = tier?.let {
+            val activeTier = unattendedTierCounts.computeIfAbsent(key) { ConcurrentHashMap() }
+                .computeIfAbsent(it) { AtomicInteger() }
+            activeTier.incrementAndGet()
+            activeTier
+        }
         try {
             return block()
         } finally {
+            if (tier != null && tierCounter != null) {
+                unattendedTierCounts.computeIfPresent(key) { _, tiers ->
+                    if (tierCounter.decrementAndGet() <= 0) tiers.remove(tier, tierCounter)
+                    if (tiers.isEmpty()) null else tiers
+                }
+            }
             unattendedSessionCounts.computeIfPresent(key) { _, active ->
                 if (active.decrementAndGet() <= 0) {
                     unattendedTimeoutDenials.remove(key)
+                    scheduledTierDenials.remove(key)
                     null
                 } else active
             }
@@ -545,6 +567,35 @@ object OffloadPermissionManager {
 
     internal fun isUnattendedSession(sessionId: String): Boolean =
         unattendedSessionCounts[sessionId]?.get()?.let { it > 0 } == true
+
+    /** Scheduled routine tiers are visible only while their exact session scope is active. */
+    fun tierFor(sessionId: String): ScheduledTaskPermissionTier? {
+        val active = unattendedTierCounts[sessionId] ?: return null
+        return when {
+            active[ScheduledTaskPermissionTier.READ_ONLY]?.get()?.let { it > 0 } == true ->
+                ScheduledTaskPermissionTier.READ_ONLY
+            active[ScheduledTaskPermissionTier.FULL]?.get()?.let { it > 0 } == true ->
+                ScheduledTaskPermissionTier.FULL
+            else -> null
+        }
+    }
+
+    fun recordScheduledTierDenial(sessionId: String, toolName: String, summary: String) {
+        if (tierFor(sessionId) != ScheduledTaskPermissionTier.READ_ONLY) return
+        val list = scheduledTierDenials.computeIfAbsent(sessionId) { mutableListOf() }
+        val denial = ScheduledTierDenial(
+            toolName = com.openminis.app.scheduled.ScheduledReadOnlyPolicy.sanitizeSummary(toolName).take(120),
+            summary = com.openminis.app.scheduled.ScheduledReadOnlyPolicy.sanitizeSummary(summary).take(200),
+        )
+        synchronized(list) {
+            if (denial !in list && list.size < 20) list += denial
+        }
+    }
+
+    fun consumeScheduledTierDenials(sessionId: String): List<ScheduledTierDenial> {
+        val list = scheduledTierDenials.remove(sessionId) ?: return emptyList()
+        return synchronized(list) { list.toList() }
+    }
 
     internal suspend fun awaitAskOnceResponse(
         unattended: Boolean,

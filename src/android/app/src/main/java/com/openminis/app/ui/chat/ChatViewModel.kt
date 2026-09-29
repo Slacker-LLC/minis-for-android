@@ -9760,7 +9760,20 @@ class ChatViewModel(
         }
         return when (name) {
         "browser_use" -> executeBrowserUseTool(argsJson)
-        "memory_write" -> executeMemoryWriteTool(argsJson)
+        "memory_write" -> {
+            val tier = com.openminis.app.offload.OffloadPermissionManager.tierFor(activeSessionId)
+            if (tier == com.openminis.app.scheduled.ScheduledTaskPermissionTier.READ_ONLY) {
+                val denial = com.openminis.app.scheduled.ScheduledReadOnlyPolicy.fileWriteDenial(
+                    name, runCatching { JSONObject(argsJson) }.getOrNull(),
+                ) ?: "file_write_denied_readonly_tier: memory_write"
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    activeSessionId, name, name,
+                )
+                ToolExecutionResult("Error: $denial", false)
+            } else {
+                executeMemoryWriteTool(argsJson)
+            }
+        }
         "memory_get" -> executeMemoryGetTool(argsJson)
         else -> ToolExecutionResult("Unknown tool: $name", false)
         }

@@ -90,6 +90,45 @@ object ToolExecutor {
     ): ToolExecutionResult {
         val canonical = ToolRegistry.canonicalName(name)
             ?: return ToolExecutionResult("Error: unknown_tool: $name", false)
+        val handler = ToolRegistry.handler(canonical)
+            ?: return ToolExecutionResult("Error: no handler for $canonical", false)
+        if (com.openminis.app.offload.OffloadPermissionManager.tierFor(sessionId) ==
+            com.openminis.app.scheduled.ScheduledTaskPermissionTier.READ_ONLY
+        ) {
+            val policy = com.openminis.app.scheduled.ScheduledReadOnlyPolicy
+            val mcpDenial = policy.mcpDenial(canonical, handler.isMcpTool)
+            if (mcpDenial != null) {
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    sessionId, canonical, "remote MCP integration",
+                )
+                return ToolExecutionResult("Error: $mcpDenial", false)
+            }
+            if (canonical == "linux.shell") {
+                val command = runCatching { JSONObject(argsJson).optString("command", "") }.getOrDefault("")
+                val denial = policy.shellDenial(command)
+                if (denial != null) {
+                    com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                        sessionId, canonical, denial.substringAfter(": ").take(200),
+                    )
+                    return ToolExecutionResult("Error: $denial", false)
+                }
+            } else if (policy.codeExecutionDenial(canonical) != null) {
+                val denial = policy.codeExecutionDenial(canonical)!!
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    sessionId, canonical, "code execution or package installation",
+                )
+                return ToolExecutionResult("Error: $denial", false)
+            } else {
+                val args = runCatching { JSONObject(argsJson) }.getOrNull()
+                val denial = policy.fileWriteDenial(canonical, args)
+                if (denial != null) {
+                    com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                        sessionId, canonical, policy.fileWriteSummary(canonical, args),
+                    )
+                    return ToolExecutionResult("Error: $denial", false)
+                }
+            }
+        }
         val requestedDisplayId = runCatching {
             val value = JSONObject(argsJson).opt("displayId")
             when (value) {
@@ -125,8 +164,6 @@ object ToolExecutor {
                 )
             }
         }
-        val handler = ToolRegistry.handler(canonical)
-            ?: return ToolExecutionResult("Error: no handler for $canonical", false)
         val raw = ProviderRouter.route(canonical)
             ?.execute(canonical, argsJson, sessionId, context, toolId) {
                 handler.execute(argsJson, sessionId, context, toolId)
@@ -141,6 +178,7 @@ object ToolExecutor {
 
 interface ToolHandler {
     val definition: AgentToolDefinition
+    val isMcpTool: Boolean get() = false
     suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String = ""): ToolExecutionResult
 }
 
@@ -172,12 +210,50 @@ class LinuxShellHandler : ToolHandler {
     override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
         val args = JSONObject(argsJson)
         val command = args.optString("command")
-        if (command.isBlank()) return ToolExecutionResult("Error: 'command' is required", false)
+        val readOnly = com.openminis.app.offload.OffloadPermissionManager.tierFor(sessionId) ==
+            com.openminis.app.scheduled.ScheduledTaskPermissionTier.READ_ONLY
+        if (readOnly) {
+            val policy = com.openminis.app.scheduled.ScheduledReadOnlyPolicy
+            val decision = policy.evaluateShell(command)
+            val staticDenial = policy.shellDenial(command)
+            if (staticDenial != null) {
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    sessionId, "linux.shell", staticDenial.substringAfter(": ").take(200),
+                )
+                return ToolExecutionResult("Error: $staticDenial", false)
+            }
+            val unsafeRedirect = decision.redirectPaths.firstOrNull { target ->
+                !isSafeTemporaryRedirect(sessionId, target)
+            }
+            if (unsafeRedirect != null) {
+                val summary = "temporary redirect path failed session validation: $unsafeRedirect"
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    sessionId, "linux.shell", policy.sanitizeSummary(summary),
+                )
+                return ToolExecutionResult(
+                    "Error: shell_denied_readonly_tier: ${policy.sanitizeSummary(summary)}",
+                    false,
+                )
+            }
+        }
+        if (command.isBlank()) {
+            val denial = "shell_denied_readonly_tier: <empty>"
+            if (readOnly) {
+                com.openminis.app.offload.OffloadPermissionManager.recordScheduledTierDenial(
+                    sessionId, "linux.shell", "<empty>",
+                )
+                return ToolExecutionResult("Error: $denial", false)
+            }
+            return ToolExecutionResult("Error: 'command' is required", false)
+        }
         val requestedMs = if (args.has("timeout")) args.optLong("timeout") * 1_000L else null
         val timeoutMs = ToolTimeoutPolicy.resolve("linux.shell", callerOverrideMs = requestedMs).timeoutMs ?: 900_000L
+        val commandToExecute = if (readOnly) {
+            com.openminis.app.scheduled.ScheduledReadOnlyPolicy.hardenGitInvocation(command)
+        } else command
         val result = com.openminis.app.runtime.ExecutionCoordinator.execute(
             sessionId = sessionId,
-            command = command,
+            command = commandToExecute,
             timeout = timeoutMs,
         )
         val failureKind = result.toToolFailureKind()
@@ -188,6 +264,21 @@ class LinuxShellHandler : ToolHandler {
             timedOut = failureKind == ToolFailureKind.TOOL_TIMEOUT,
             failureKind = failureKind,
         )
+    }
+
+    private suspend fun isSafeTemporaryRedirect(sessionId: String, rawPath: String): Boolean {
+        val policy = com.openminis.app.scheduled.ScheduledReadOnlyPolicy
+        val guestPath = policy.canonicalTemporaryPath(rawPath) ?: return false
+        val root = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveForFileAccess(
+            sessionId, policy.TEMP_DIRECTORY,
+        ) ?: return false
+        val target = com.openminis.app.runtime.ubuntu.UbuntuPaths.resolveForFileAccess(
+            sessionId, guestPath,
+        ) ?: return false
+        val rootPath = runCatching { root.canonicalPath.trimEnd(java.io.File.separatorChar) }.getOrNull()
+            ?: return false
+        val targetPath = runCatching { target.canonicalPath }.getOrNull() ?: return false
+        return targetPath.startsWith("$rootPath${java.io.File.separator}")
     }
 }
 
