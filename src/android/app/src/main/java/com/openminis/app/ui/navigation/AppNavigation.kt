@@ -55,6 +55,7 @@ import com.openminis.app.ui.settings.SettingsCategory
 import com.openminis.app.ui.settings.SettingsCategoryScreen
 import com.openminis.app.ui.settings.SettingsScreen
 import com.openminis.app.ui.settings.SystemPermissionsScreen
+import com.openminis.app.ui.settings.VirtualScreenSettingsScreen
 import com.openminis.app.ui.settings.SystemEnhanceScreen
 import com.openminis.app.ui.settings.SessionStorageDetailScreen
 import com.openminis.app.ui.settings.SkillDetailScreen
@@ -186,6 +187,7 @@ object Routes {
      * binder protocol + client SDK).
      */
     const val SHIZUKU = "shizuku"
+    const val VIRTUAL_SCREEN_SETTINGS = "virtual_screen_settings"
     /** T323: System Permissions (Accessibility service status, etc.). */
     const val SYSTEM_PERMISSIONS = "system_permissions"
     /** [T-eta-xposed-groups] The switches the LSPosed module reads. */
@@ -655,6 +657,7 @@ fun AppNavigation(
                     // were reachable only through each other; they belong to the same category.
                     onToolPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
                     onShizukuClick = { navController.safeNavigate(Routes.SHIZUKU) },
+                    onVirtualScreenClick = { navController.safeNavigate(Routes.VIRTUAL_SCREEN_SETTINGS) },
                     onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
                     onLogsClick = { navController.safeNavigate(Routes.LOGS) },
                     onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
@@ -1385,6 +1388,10 @@ fun AppNavigation(
             ShizukuPermissionScreen(
                 onBack = { navController.safePopBackStack() },
             )
+        }
+
+        composable(Routes.VIRTUAL_SCREEN_SETTINGS) {
+            VirtualScreenSettingsScreen(onBack = { navController.safePopBackStack() })
         }
 
         composable(Routes.SYSTEM_PERMISSIONS) {
