@@ -1,6 +1,7 @@
 package com.openminis.app.debug
 
 import android.content.Context
+import com.openminis.app.MinisApp
 import com.openminis.app.scheduled.ScheduledAgentRunner
 import com.openminis.app.scheduled.ScheduledRepeatMode
 import com.openminis.app.scheduled.ScheduledTargetMode
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
@@ -43,15 +45,29 @@ internal object ScheduledTaskRpcMethods {
     }
 
     fun create(context: Context, params: JSONObject): JSONObject {
-        val task = parseTask(params, current = null)
-        val created = manager(context).create(task)
+        val task = parseTask(context, params, current = null)
+        val created = try {
+            manager(context).create(task)
+        } catch (error: IllegalArgumentException) {
+            if (error.message?.startsWith("Bot routine limit reached") == true) {
+                throw RPCException(-32602, error.message ?: "Bot routine limit reached")
+            }
+            throw error
+        }
         return JSONObject().put("task", taskJson(created)).put("created", true)
     }
 
     fun update(context: Context, params: JSONObject): JSONObject {
         val mgr = manager(context)
         val current = requireTask(mgr, requiredTaskId(params))
-        val updated = mgr.update(parseTask(params, current))
+        val updated = try {
+            mgr.update(parseTask(context, params, current))
+        } catch (error: IllegalArgumentException) {
+            if (error.message?.startsWith("Bot routine limit reached") == true) {
+                throw RPCException(-32602, error.message ?: "Bot routine limit reached")
+            }
+            throw error
+        }
         return JSONObject().put("task", taskJson(updated)).put("updated", true)
     }
 
@@ -96,7 +112,7 @@ internal object ScheduledTaskRpcMethods {
     private fun requireTask(manager: ScheduledTaskManager, id: String): ScheduledTask =
         manager.get(id) ?: throw RPCException(-32602, "Scheduled task not found: $id")
 
-    private fun parseTask(params: JSONObject, current: ScheduledTask?): ScheduledTask {
+    private fun parseTask(context: Context, params: JSONObject, current: ScheduledTask?): ScheduledTask {
         val label = stringPatch(params, "label", current?.label ?: "").trim()
         if (label.isEmpty()) throw RPCException(-32602, "Scheduled task label cannot be empty")
         if (label.length > 120) throw RPCException(-32602, "Scheduled task label is too long (max 120)")
@@ -149,6 +165,13 @@ internal object ScheduledTaskRpcMethods {
         val modelId = nullableStringPatch(params, "modelId", current?.modelId)
         val modelBinding = nullableStringPatch(params, "modelBinding", current?.modelBinding)
         validateModelBinding(modelBinding)
+        val botId = nullableStringPatch(params, "botId", current?.botId)
+        if (botId != null) {
+            val app = context.applicationContext as? MinisApp
+            if (app?.subsystemsReady() != true || runBlocking { app.botRepository.getBot(botId) } == null) {
+                throw RPCException(-32602, "botId does not identify an available Bot")
+            }
+        }
 
         return ScheduledTask(
             id = current?.id ?: java.util.UUID.randomUUID().toString(),
@@ -161,6 +184,7 @@ internal object ScheduledTaskRpcMethods {
             targetMode = targetMode,
             modelId = modelId,
             modelBinding = modelBinding,
+            botId = botId,
             enabled = if (params.has("enabled")) params.optBoolean("enabled", true) else current?.enabled ?: true,
             createdAt = current?.createdAt ?: System.currentTimeMillis(),
             startDateMs = startDate,

@@ -208,9 +208,12 @@ object Routes {
     fun sharedFoldersDetail(folderId: String) = "shared_folders_detail/$folderId"
     /** [T-android-scheduled-tasks-design] Scheduled tasks list + editor. */
     const val SCHEDULED_TASKS = "scheduled_tasks"
-    const val SCHEDULED_TASK_EDIT = "scheduled_tasks/edit?taskId={taskId}"
-    fun scheduledTaskEdit(taskId: String? = null): String =
-        if (taskId == null) "scheduled_tasks/edit" else "scheduled_tasks/edit?taskId=$taskId"
+    const val SCHEDULED_TASK_EDIT = "scheduled_tasks/edit?taskId={taskId}&botId={botId}"
+    fun scheduledTaskEdit(taskId: String? = null, botId: String? = null): String = buildString {
+        append("scheduled_tasks/edit")
+        val args = listOfNotNull(taskId?.let { "taskId=$it" }, botId?.let { "botId=$it" })
+        if (args.isNotEmpty()) append("?").append(args.joinToString("&"))
+    }
     // [T-android-scheduled-tasks-run-records] per-task execution log.
     const val SCHEDULED_TASK_RUNS = "scheduled_tasks/runs/{taskId}"
     fun scheduledTaskRuns(taskId: String): String = "scheduled_tasks/runs/$taskId"
@@ -678,6 +681,9 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenRoutineEditor = { taskId, botId ->
+                            navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
+                        },
                     )
                 }
             }
@@ -699,6 +705,9 @@ fun AppNavigation(
                             popUpTo(Routes.SESSION_LIST) { inclusive = false }
                             launchSingleTop = true
                         }
+                    },
+                    onOpenRoutineEditor = { taskId, botId ->
+                        navController.safeNavigate(Routes.scheduledTaskEdit(taskId, botId))
                     },
                 )
             }
@@ -1488,11 +1497,18 @@ fun AppNavigation(
                     nullable = true
                     defaultValue = null
                 },
+                navArgument("botId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
             ),
         ) { backStackEntry ->
             val taskId = backStackEntry.arguments?.getString("taskId")
+            val botId = backStackEntry.arguments?.getString("botId")
             com.openminis.app.ui.scheduled.ScheduledTaskEditScreen(
                 taskId = taskId,
+                initialBotId = botId,
                 onBack = { navController.safePopBackStack() },
                 onOpenSession = { sessionId ->
                     navController.safeNavigate(Routes.chat(sessionId))

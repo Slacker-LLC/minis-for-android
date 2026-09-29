@@ -86,6 +86,7 @@ private enum class TargetKind { NEW, FOLLOW_UP, RERUN }
 @Composable
 fun ScheduledTaskEditScreen(
     taskId: String?,
+    initialBotId: String? = null,
     onBack: () -> Unit,
     onOpenSession: (sessionId: String) -> Unit,
 ) {
@@ -93,6 +94,7 @@ fun ScheduledTaskEditScreen(
     val vm: ScheduledTasksViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
         factory = ScheduledTasksViewModel.factory(context),
     )
+    val bots by vm.bots.collectAsState()
     val scope = rememberCoroutineScope()
     val isNew = taskId == null
 
@@ -108,6 +110,8 @@ fun ScheduledTaskEditScreen(
     var lastFiredAt by remember { mutableStateOf<Long?>(null) }
     var lastResultPreview by remember { mutableStateOf<String?>(null) }
     var lastResultSessionId by remember { mutableStateOf<String?>(null) }
+    var runHistory by remember { mutableStateOf<List<com.openminis.app.scheduled.ScheduledRun>>(emptyList()) }
+    var saveError by remember { mutableStateOf<String?>(null) }
 
     // [T-android-scheduled-tasks-full] target mode + model + date window
     var targetKind by remember { mutableStateOf(TargetKind.NEW) }
@@ -115,6 +119,9 @@ fun ScheduledTaskEditScreen(
     var targetSessionTitle by remember { mutableStateOf<String?>(null) }
     var targetMessageId by remember { mutableStateOf<String?>(null) }
     var targetMessagePreview by remember { mutableStateOf<String?>(null) }
+    var botId by remember(taskId, initialBotId) { mutableStateOf(initialBotId) }
+    var targetBotId by remember(taskId) { mutableStateOf<String?>(null) }
+    var targetBotLoaded by remember(taskId) { mutableStateOf(taskId == null) }
     // Three-way model selection mirroring ChatSessionEntity.modelBinding:
     //   - modelBinding == null  → "use app default" (resolved at run time)
     //   - {"type":"entry","entryId":"…"} → pinned to that entry
@@ -125,7 +132,7 @@ fun ScheduledTaskEditScreen(
     var endDateMs by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(taskId) {
-        if (taskId == null) { loaded = true; return@LaunchedEffect }
+        if (taskId == null) { botId = initialBotId; targetBotLoaded = true; loaded = true; return@LaunchedEffect }
         val existing = vm.get(taskId) ?: run { onBack(); return@LaunchedEffect }
         label = existing.label
         prompt = existing.prompt
@@ -138,6 +145,8 @@ fun ScheduledTaskEditScreen(
         lastFiredAt = existing.lastFiredAt
         lastResultPreview = existing.lastResultPreview
         lastResultSessionId = existing.lastResultSessionId
+        runHistory = existing.runHistory
+        botId = existing.botId ?: initialBotId
         startDateMs = existing.startDateMs
         endDateMs = existing.endDateMs
         when (val m = existing.targetMode) {
@@ -172,6 +181,10 @@ fun ScheduledTaskEditScreen(
         }
         targetSessionId?.let { sid ->
             targetSessionTitle = vm.listSessions().firstOrNull { it.id == sid }?.title
+            targetBotLoaded = false
+            targetBotId = vm.sessionBotId(sid)
+            if (existing.botId == null) botId = targetBotId
+            targetBotLoaded = true
         }
         loaded = true
     }
@@ -185,7 +198,9 @@ fun ScheduledTaskEditScreen(
         lastResultPreview = lastResultPreview, lastResultSessionId = lastResultSessionId,
         targetKind = targetKind, targetSessionId = targetSessionId,
         targetMessageId = targetMessageId,
+        runHistory = runHistory,
         modelBinding = modelBinding,
+        botId = botId,
         modelEntryIdLookup = { eid ->
             vm.listModels().firstOrNull { it.entryId == eid }?.modelId
         },
@@ -199,7 +214,9 @@ fun ScheduledTaskEditScreen(
         TargetKind.FOLLOW_UP -> targetSessionId != null
         TargetKind.RERUN -> targetSessionId != null && targetMessageId != null
     }
-    val canSave = targetOk && (!needsPrompt || prompt.isNotBlank())
+    val executorMatchesTarget = targetKind == TargetKind.NEW ||
+        (targetBotLoaded && botId == targetBotId)
+    val canSave = targetOk && executorMatchesTarget && (!needsPrompt || prompt.isNotBlank())
     val canRunNow = canSave && runNowState?.status != ScheduledTasksViewModel.RunStatus.RUNNING
 
     Scaffold(
@@ -241,17 +258,33 @@ fun ScheduledTaskEditScreen(
             customDays = customDays, onCustomDaysChange = { customDays = it },
             targetKind = targetKind, onTargetKindChange = {
                 targetKind = it
-                if (it == TargetKind.NEW) { targetSessionId = null; targetSessionTitle = null }
+                if (it == TargetKind.NEW) {
+                    targetSessionId = null
+                    targetSessionTitle = null
+                    targetBotId = null
+                    targetBotLoaded = true
+                }
                 if (it != TargetKind.RERUN) { targetMessageId = null; targetMessagePreview = null }
             },
             targetSessionTitle = targetSessionTitle,
             onPickSession = { id, title ->
                 targetSessionId = id; targetSessionTitle = title
                 targetMessageId = null; targetMessagePreview = null
+                targetBotLoaded = false
+                scope.launch {
+                    targetBotId = vm.sessionBotId(id)
+                    botId = targetBotId
+                    targetBotLoaded = true
+                }
             },
             targetMessagePreview = targetMessagePreview,
             onPickMessage = { id, preview -> targetMessageId = id; targetMessagePreview = preview },
             targetSessionId = targetSessionId,
+            bots = bots,
+            botId = botId,
+            targetBotId = targetBotId,
+            targetBotLoaded = targetBotLoaded,
+            onPickBot = { botId = it },
             modelBindingForPreselect = modelBinding,
             modelDisplay = modelDisplay,
             onPickModel = { binding, display -> modelBinding = binding; modelDisplay = display },
@@ -263,10 +296,34 @@ fun ScheduledTaskEditScreen(
             canSave = canSave,
             onRunNow = { vm.runNow(currentTask()) },
             onSave = {
-                scope.launch { vm.upsert(currentTask(), isNew = isNew); onBack() }
+                scope.launch {
+                    try {
+                        vm.upsert(currentTask(), isNew = isNew)
+                        onBack()
+                    } catch (exception: Exception) {
+                        val message = exception.message.orEmpty()
+                        saveError = if (message.startsWith("Bot routine limit reached")) {
+                            context.getString(
+                                R.string.scheduled_task_bot_routine_limit,
+                                ScheduledTask.MAX_ROUTINES_PER_BOT,
+                            )
+                        } else message.ifBlank { context.getString(R.string.scheduled_task_save_failed) }
+                    }
+                }
             },
             onDelete = {
                 if (taskId != null) scope.launch { vm.delete(taskId); onBack() }
+            },
+        )
+    }
+
+    saveError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { saveError = null },
+            title = { Text(stringResource(R.string.scheduled_task_save)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { saveError = null }) { Text(stringResource(R.string.ok)) }
             },
         )
     }
@@ -355,6 +412,11 @@ private fun EditFormBody(
     targetSessionTitle: String?, onPickSession: (String, String) -> Unit,
     targetMessagePreview: String?, onPickMessage: (String, String) -> Unit,
     targetSessionId: String?,
+    bots: List<com.openminis.app.data.db.BotEntity>,
+    botId: String?,
+    targetBotId: String?,
+    targetBotLoaded: Boolean,
+    onPickBot: (String?) -> Unit,
     modelBindingForPreselect: String?,
     modelDisplay: String?, onPickModel: (binding: String?, display: String?) -> Unit,
     startDateMs: Long?, onStartDateChange: (Long?) -> Unit,
@@ -375,6 +437,7 @@ private fun EditFormBody(
     var showSessionPicker by remember { mutableStateOf(false) }
     var showMessagePicker by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
+    var showBotPicker by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
 
@@ -394,6 +457,26 @@ private fun EditFormBody(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        val selectedBot = bots.firstOrNull { it.id == botId }
+        val executorName = selectedBot?.name ?: botId
+        val executorValue = if (targetKind == TargetKind.NEW) {
+            if (botId == null) stringResource(R.string.scheduled_task_executor_regular)
+            else if (selectedBot?.enabled == false) {
+                "${executorName ?: botId} · ${stringResource(R.string.scheduled_task_bot_disabled)}"
+            } else executorName ?: botId
+        } else {
+            val targetBot = bots.firstOrNull { it.id == targetBotId }
+            if (!targetBotLoaded) stringResource(R.string.scheduled_task_executor_loading)
+            else if (targetBotId == null) stringResource(R.string.scheduled_task_executor_regular)
+            else targetBot?.name ?: targetBotId
+        }
+        PickerRow(
+            title = stringResource(R.string.scheduled_task_executor),
+            value = executorValue,
+            enabled = targetKind == TargetKind.NEW,
+            onClick = { showBotPicker = true },
+        )
+
         // ── Target mode ──
         Column {
             SectionLabel(stringResource(R.string.scheduled_task_field_target))
@@ -407,7 +490,7 @@ private fun EditFormBody(
                 targetOpts.forEachIndexed { idx, (kind, resId) ->
                     SegmentedButton(
                         selected = targetKind == kind,
-                        onClick = { onTargetKindChange(kind) },
+                onClick = { onTargetKindChange(kind) },
                         shape = SegmentedButtonDefaults.itemShape(idx, targetOpts.size),
                     ) { Text(stringResource(resId), fontSize = 13.sp) }
                 }
@@ -534,7 +617,10 @@ private fun EditFormBody(
         // ── Model (optional) ──
         PickerRow(
             title = stringResource(R.string.scheduled_task_field_model),
-            value = modelDisplay ?: stringResource(R.string.scheduled_task_model_default),
+            value = modelDisplay ?: stringResource(
+                if (botId != null) R.string.scheduled_task_model_bot_default
+                else R.string.scheduled_task_model_default,
+            ),
             onClick = { showModelPicker = true },
             onClear = if (modelDisplay != null) ({ onPickModel(null, null) }) else null,
         )
@@ -562,6 +648,29 @@ private fun EditFormBody(
         SessionPickerDialog(vm = vm, onDismiss = { showSessionPicker = false }) { id, title ->
             onPickSession(id, title); showSessionPicker = false
         }
+    }
+    if (showBotPicker) {
+        AlertDialog(
+            onDismissRequest = { showBotPicker = false },
+            title = { Text(stringResource(R.string.scheduled_task_executor)) },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                    item(key = "regular") {
+                        TextButton(onClick = { onPickBot(null); showBotPicker = false }) {
+                            Text(stringResource(R.string.scheduled_task_executor_regular))
+                        }
+                    }
+                    items(bots.filter { it.enabled }, key = { it.id }) { bot ->
+                        TextButton(onClick = { onPickBot(bot.id); showBotPicker = false }) {
+                            Text(bot.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBotPicker = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
     if (showMessagePicker && targetSessionId != null) {
         MessagePickerDialog(vm = vm, sessionId = targetSessionId, onDismiss = { showMessagePicker = false }) { id, preview ->
@@ -772,10 +881,12 @@ private fun buildTask(
     lastFiredAt: Long?,
     lastResultPreview: String?,
     lastResultSessionId: String?,
+    runHistory: List<com.openminis.app.scheduled.ScheduledRun>,
     targetKind: TargetKind,
     targetSessionId: String?,
     targetMessageId: String?,
     modelBinding: String?,
+    botId: String?,
     modelEntryIdLookup: (String) -> String?,
     startDateMs: Long?,
     endDateMs: Long?,
@@ -812,6 +923,7 @@ private fun buildTask(
         targetMode = targetMode,
         modelId = derivedModelId,
         modelBinding = modelBinding,
+        botId = botId,
         enabled = enabled,
         createdAt = createdAt,
         startDateMs = startDateMs,
@@ -819,5 +931,6 @@ private fun buildTask(
         lastFiredAt = lastFiredAt,
         lastResultPreview = lastResultPreview,
         lastResultSessionId = lastResultSessionId,
+        runHistory = runHistory,
     )
 }

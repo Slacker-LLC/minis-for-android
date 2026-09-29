@@ -80,6 +80,7 @@ fun ScheduledTasksScreen(
         factory = ScheduledTasksViewModel.factory(context),
     )
     val tasks by vm.tasks.collectAsState()
+    val bots by vm.bots.collectAsState()
     var pendingDelete by remember { mutableStateOf<ScheduledTask?>(null) }
 
     Scaffold(
@@ -121,6 +122,7 @@ fun ScheduledTasksScreen(
             items(tasks, key = { it.id }) { task ->
                 ScheduledTaskRow(
                     task = task,
+                    botName = task.botId?.let { id -> bots.firstOrNull { it.id == id }?.name ?: id },
                     onClick = { onEditTask(task.id) },
                     onToggle = { vm.setEnabled(task.id, it) },
                     onEdit = { onEditTask(task.id) },
@@ -184,6 +186,7 @@ private fun EmptyState(padding: PaddingValues) {
 @Composable
 private fun ScheduledTaskRow(
     task: ScheduledTask,
+    botName: String?,
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
@@ -239,6 +242,15 @@ private fun ScheduledTaskRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (botName != null) {
+                    Text(
+                        text = stringResource(R.string.scheduled_task_bot_label, botName),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
             Switch(checked = task.enabled, onCheckedChange = onToggle)

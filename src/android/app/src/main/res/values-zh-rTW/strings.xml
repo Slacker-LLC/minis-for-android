@@ -2084,4 +2084,20 @@
     <string name="bots_task_notification_needs_user">負責 Bot 需要你處理。</string>
     <string name="bots_task_notification_completed">負責 Bot 已完成結果複核。</string>
     <string name="bots_task_notification_budget">自動複核預算已用盡。</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">執行者</string>
+    <string name="scheduled_task_executor_regular">一般聊天（無 Bot）</string>
+    <string name="scheduled_task_executor_loading">正在載入…</string>
+    <string name="scheduled_task_model_bot_default">使用此 Bot 的預設模型</string>
+    <string name="scheduled_task_bot_disabled">Bot 已停用</string>
+    <string name="scheduled_task_bot_label">Bot：%1$s</string>
+    <string name="bots_routines">例程</string>
+    <string name="bots_routines_disabled">此 Bot 已停用。例程仍保持啟用，但會略過執行，直到 Bot 恢復啟用。</string>
+    <string name="bots_new_routine">新增例程</string>
+    <string name="bots_routine_no_next">未安排下次執行</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">此 Bot 已有 %1$d 個例程。請先刪除一個再新增。</string>
+    <string name="scheduled_task_save_failed">無法儲存排程任務。</string>
 </resources>

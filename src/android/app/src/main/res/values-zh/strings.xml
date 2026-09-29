@@ -2113,4 +2113,20 @@
     <string name="bots_task_notification_needs_user">负责 Bot 需要你处理。</string>
     <string name="bots_task_notification_completed">负责 Bot 已完成结果复盘。</string>
     <string name="bots_task_notification_budget">自动复盘预算已用尽。</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">执行者</string>
+    <string name="scheduled_task_executor_regular">普通聊天（无 Bot）</string>
+    <string name="scheduled_task_executor_loading">正在加载…</string>
+    <string name="scheduled_task_model_bot_default">使用此 Bot 的默认模型</string>
+    <string name="scheduled_task_bot_disabled">Bot 已停用</string>
+    <string name="scheduled_task_bot_label">Bot：%1$s</string>
+    <string name="bots_routines">例程</string>
+    <string name="bots_routines_disabled">此 Bot 已停用。例程仍保持启用，但会跳过执行，直到 Bot 恢复启用。</string>
+    <string name="bots_new_routine">新建例程</string>
+    <string name="bots_routine_no_next">未安排下次运行</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">此 Bot 已有 %1$d 个例程。请先删除一个再添加。</string>
+    <string name="scheduled_task_save_failed">无法保存定时任务。</string>
 </resources>

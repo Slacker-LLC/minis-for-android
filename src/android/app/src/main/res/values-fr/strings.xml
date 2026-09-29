@@ -1716,4 +1716,20 @@
     <string name="bots_task_notification_needs_user">Le Bot responsable a besoin de votre intervention.</string>
     <string name="bots_task_notification_completed">Le Bot responsable a terminé l’examen des résultats.</string>
     <string name="bots_task_notification_budget">Le budget de révision automatique est épuisé.</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">Exécutant</string>
+    <string name="scheduled_task_executor_regular">Conversation standard (sans Bot)</string>
+    <string name="scheduled_task_executor_loading">Chargement…</string>
+    <string name="scheduled_task_model_bot_default">Utiliser le modèle par défaut de ce Bot</string>
+    <string name="scheduled_task_bot_disabled">Le Bot est désactivé</string>
+    <string name="scheduled_task_bot_label">Bot : %1$s</string>
+    <string name="bots_routines">Routines</string>
+    <string name="bots_routines_disabled">Ce Bot est désactivé. Ses routines restent activées, mais sont ignorées jusqu’à sa réactivation.</string>
+    <string name="bots_new_routine">Nouvelle routine</string>
+    <string name="bots_routine_no_next">Aucune prochaine exécution prévue</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">Ce Bot possède déjà %1$d routines. Supprimez-en une avant d’en ajouter une autre.</string>
+    <string name="scheduled_task_save_failed">Impossible d’enregistrer la tâche planifiée.</string>
 </resources>

@@ -84,7 +84,16 @@ class ScheduledTaskAlarmReceiver : BroadcastReceiver() {
                         task,
                         waitForCompletion = false,
                     )
+                    if (outcome.errorCode == ScheduledAgentRunner.ERROR_BOT_DISABLED) {
+                        // ONCE tasks are normally disabled immediately after a
+                        // fire. Keep this one armed so restoring the Bot can
+                        // schedule its next eligible occurrence.
+                        manager.setEnabled(taskId, true)
+                    }
                     if (!outcome.started) {
+                        if (outcome.errorCode == ScheduledAgentRunner.ERROR_BOT_DISABLED ||
+                            outcome.errorCode == ScheduledAgentRunner.ERROR_BOT_NOT_FOUND
+                        ) return@withTimeout
                         // The fire happened and nothing will run — the runner
                         // only logs that, so the row kept no trace of it and the
                         // run history showed a task that quietly stopped firing.

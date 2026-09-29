@@ -2079,4 +2079,20 @@
     <string name="bots_task_notification_needs_user">Ответственному Bot нужно ваше участие.</string>
     <string name="bots_task_notification_completed">Ответственный Bot завершил проверку результатов.</string>
     <string name="bots_task_notification_budget">Бюджет автоматических проверок исчерпан.</string>
+
+    <!-- B2: Bot-owned scheduled routines -->
+    <string name="scheduled_task_executor">Исполнитель</string>
+    <string name="scheduled_task_executor_regular">Обычный чат (без Bot)</string>
+    <string name="scheduled_task_executor_loading">Загрузка…</string>
+    <string name="scheduled_task_model_bot_default">Использовать модель Bot по умолчанию</string>
+    <string name="scheduled_task_bot_disabled">Bot отключён</string>
+    <string name="scheduled_task_bot_label">Bot: %1$s</string>
+    <string name="bots_routines">Сценарии</string>
+    <string name="bots_routines_disabled">Этот Bot отключён. Его сценарии остаются включёнными, но пропускаются до повторного включения Bot.</string>
+    <string name="bots_new_routine">Новый сценарий</string>
+    <string name="bots_routine_no_next">Следующий запуск не запланирован</string>
+
+    <!-- B2: capacity/save errors -->
+    <string name="scheduled_task_bot_routine_limit">У этого Bot уже есть сценарии: %1$d. Удалите один, прежде чем добавлять новый.</string>
+    <string name="scheduled_task_save_failed">Не удалось сохранить задачу.</string>
 </resources>
