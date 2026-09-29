@@ -85,6 +85,12 @@ CI/宿主测试不能替代以下证据：
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
+## VScreen capability pending hardware validation（2026-09-30）
+
+VScreen 使用 Shizuku **shell UID UserService** 和随 Android/OEM 版本变化的隐藏系统 API；能力默认关闭，只有当前系统/ROM 指纹下的设备自检全部通过才允许用户启用。指纹变化或自检失败会持久清除 enabled 状态，必须重新通过自检并由用户再次启用。UserService 仅接受非物理 display ID；Root UID、物理主屏输入/观察、未经限定的 socket、视频/OCR 路径均不属于本功能，本实现也不增加系统网络出口拦截。
+
+此工作区当前没有连接的 Android 真机或模拟器，因此没有声称隐藏 API 在目标 ROM 上通过真实运行探测。小米 15、连续 20 次创建/释放、后台/恢复、双任务、跳回主屏、截图以及自检失败分支的设备行为仍待设备验收；宿主编译与单测不能替代这些证据。
+
 ## 系统提示词：自定义输入框与提示词模块（2026-09-18）
 
 Settings → System prompt 的主入口现在是设备主人自己的系统提示词输入框（类似 Codex 的 custom instructions）：

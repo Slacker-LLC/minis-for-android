@@ -29,6 +29,17 @@ Minis for Android 含有从开源项目 **OpenMinis** 衍生的代码：
   - 使用与分发必须满足该许可：仅限非商业用途，且随附上述许可条款与 Required Notice。
   - 逐项对照见 `docs/analysis/`。
 
+- ShadowAuto — repository: https://github.com/android-notes/ShadowAuto
+  - pinned source commit: `611e5eb0e1c94befda3c17c97438912dfd30e8a8`
+  - license at derivation: Apache-2.0; license text: [third_party/shadowauto/LICENSE](third_party/shadowauto/LICENSE)
+  - Adapted files are listed in `THIRD_PARTY_LICENSES.md`. The pinned upstream tree has no separate `NOTICE`
+    file and the migrated source files have no file-level copyright headers; each adapted file records its
+    original path, pinned commit, Apache-2.0 notice, and the fact that it was modified. No copyright owner
+    has been inferred from the Git commit author.
+  - The port is limited to Shizuku shell UserService support for a virtual display, display-targeted UI/input,
+    IME policy, clipboard bridge, and bounded screenshots; upstream Main/automation/socket/video/OCR/root paths
+    are not imported.
+
 ## Obligations
 
 继续按 GPL-3.0 分发。架构或包名变化不消除原著作权与许可证义务。再分发修改后的二进制时，按 GPL-3.0 提供对应源码并保留版权与许可声明。
