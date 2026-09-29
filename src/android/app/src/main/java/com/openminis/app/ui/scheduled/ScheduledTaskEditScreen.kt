@@ -440,6 +440,10 @@ private fun EditFormBody(
     var showBotPicker by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    val screenContext = LocalContext.current
+    val virtualScreenAvailable = remember(screenContext) {
+        com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider.get(screenContext).isEnabled()
+    }
 
     Column(
         modifier = Modifier
@@ -611,6 +615,19 @@ private fun EditFormBody(
                 stringResource(R.string.scheduled_task_rerun_note),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Text(
+            text = stringResource(R.string.scheduled_vscreen_unattended_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!virtualScreenAvailable) {
+            Text(
+                text = stringResource(R.string.scheduled_vscreen_unavailable_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
 
