@@ -31,8 +31,9 @@ class BotRepository(private val dao: BotDao) {
         }
         check(bot.enabled) { "请先启用这位成员，再开始新话题。" }
         providerRepository.awaitConfigLoaded()
+        val isUnbound = bot.modelBinding.isNullOrBlank()
         val entry = checkNotNull(BotModelResolver.resolve(providerRepository, bot.modelBinding)) {
-            if (bot.modelBinding.isNullOrBlank()) "请先配置一个可用的对话模型。"
+            if (isUnbound) "请先配置一个可用的对话模型。"
             else "这位成员的默认模型不可用，请在成员资料中重新选择。"
         }
         val binding = org.json.JSONObject().put("type", "entry").put("entryId", entry.id).toString()

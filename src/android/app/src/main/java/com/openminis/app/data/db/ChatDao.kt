@@ -54,6 +54,13 @@ data class SessionTailRow(
     @ColumnInfo(name = "parts_json") val partsJson: String,
 )
 
+/** Minimal per-session fields consumed by the one-time model-binding migration. */
+data class SessionModelBindingMigration(
+    val id: String,
+    val binding: String?,
+    val modelId: String? = null,
+)
+
 @Dao
 interface ChatDao {
     // Sessions
@@ -65,6 +72,9 @@ interface ChatDao {
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): ChatSessionEntity?
+
+    @Query("SELECT * FROM sessions WHERE model_binding IS NOT NULL")
+    suspend fun listSessionsWithModelBinding(): List<ChatSessionEntity>
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     fun observeSession(id: String): Flow<ChatSessionEntity?>
@@ -92,6 +102,14 @@ interface ChatDao {
 
     @Query("UPDATE sessions SET model_binding = :binding, model_id = :modelId, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateSessionBinding(id: String, binding: String, modelId: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE sessions SET model_binding = :binding, model_id = COALESCE(:modelId, model_id) WHERE id = :id")
+    suspend fun updateModelBindingForMigration(id: String, binding: String?, modelId: String?)
+
+    @Transaction
+    suspend fun migrateModelBindings(rows: List<SessionModelBindingMigration>) {
+        for (row in rows) updateModelBindingForMigration(row.id, row.binding, row.modelId)
+    }
 
     /**
      * [T-eta-character-cards] The character bound to a session, or null for an ordinary chat. A

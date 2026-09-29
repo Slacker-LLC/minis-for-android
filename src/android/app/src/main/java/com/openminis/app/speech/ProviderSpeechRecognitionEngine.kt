@@ -138,14 +138,10 @@ class ProviderSpeechRecognitionEngine(private val appContext: Context) : SpeechR
     @SuppressLint("MissingPermission") // caller ensures RECORD_AUDIO per interface contract
     override fun start(locale: Locale, listener: SpeechRecognitionEngine.Listener) {
         val repo = repository()
-        // [T-voice-asr-group-failover] Resolve the whole ordered candidate
-        // chain instead of one entry. loadBalance groups get a fresh rotation
-        // seed per capture so takes spread across members; fallback groups
-        // keep declaration order. Provider construction is deferred to the
-        // transcription step, where a failing member advances to the next.
-        val candidates = repo?.resolveVoiceInputCandidates(
-            loadBalanceSeed = kotlin.random.Random.nextInt(Int.MAX_VALUE),
-        ).orEmpty()
+        // Resolve the whole voice-input slot in declaration order instead of
+        // rotating a load-balance group. Provider construction is deferred to
+        // transcription, where a failing member advances to the next.
+        val candidates = repo?.resolveVoiceInputCandidates().orEmpty()
         if (repo == null || candidates.isEmpty()) {
             listener.onError(
                 RecognitionError.OEM_NO_SERVICE,

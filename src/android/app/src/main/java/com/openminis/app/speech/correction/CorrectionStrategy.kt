@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.ModelEntry
+import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ProviderFactory
@@ -110,11 +111,9 @@ class LlmCorrectionStrategy(
      */
     private fun resolveModel(): Pair<ModelEntry, String>? {
         repository.resolveTitleSubEntry()?.let { return it to "sub" }
-        val primaryGroupId = repository.defaultPrimaryGroupId
-        val group = primaryGroupId?.let { repository.group(it) }
-        val entry = group?.let { repository.availableMemberEntries(it).firstOrNull() }
+        val entry = repository.primaryEntry(ModelSlot.main)
         if (entry != null) return entry to "primary"
-        Log.e(TAG, "no correction model available (neither sub nor primary group resolves)")
+        Log.e(TAG, "no correction model available (neither light nor main slot resolves)")
         return null
     }
 

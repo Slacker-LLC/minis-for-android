@@ -55,20 +55,35 @@ interface ProviderConfigDao {
     suspend fun replaceAll(
         instances: List<ProviderInstanceEntity>,
         entries: List<ProviderModelEntryEntity>,
-        groups: List<ProviderModelGroupEntity>,
         loopIds: List<ProviderAgentLoopIdEntity>,
         meta: List<ProviderConfigMetaEntity>,
+        migrationComplete: Boolean = false,
     ) {
+        val previousMeta = loadMeta()
+        val migrationMarker = previousMeta.firstOrNull {
+            it.key == ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1
+        }
+        val legacyPointers = if (migrationComplete || migrationMarker?.value == "true") {
+            emptyList()
+        } else {
+            previousMeta.filter { it.key in ProviderConfigMetaKeys.LEGACY_GROUP_META_KEYS }
+        }
+        val retainedMeta = (
+            legacyPointers +
+                if (migrationComplete) {
+                    listOf(ProviderConfigMetaEntity(ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1, "true"))
+                } else {
+                    listOfNotNull(migrationMarker)
+                }
+            ).distinctBy { it.key }
         clearAgentLoopIds()
-        clearGroups()
         clearEntries()
         clearInstances()
         clearMeta()
         upsertInstances(instances)
         upsertEntries(entries)
-        upsertGroups(groups)
         upsertAgentLoopIds(loopIds)
-        upsertMeta(meta)
+        upsertMeta((meta + retainedMeta).distinctBy { it.key })
     }
 
     @Query("SELECT COUNT(*) FROM provider_instances")

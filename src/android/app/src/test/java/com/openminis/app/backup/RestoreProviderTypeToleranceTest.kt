@@ -189,6 +189,24 @@ class RestoreProviderTypeToleranceTest {
     }
 
     @Test
+    fun `legacy model groups and pointers survive backup parsing for migration`() {
+        val parsed = parse(
+            """{"instances":[],"modelEntries":[],
+                "modelGroups":[{"id":"legacy-main","name":"Main",
+                    "memberEntryIds":["legacy-entry"],"strategy":"fallback",
+                    "fallbackStrategy":"always","sortOrder":3}],
+                "defaultPrimaryGroupId":"legacy-main",
+                "agentLoopGroupIds":["legacy-main"]}""",
+        )
+
+        val oldGroup = parsed.config.modelGroups.single()
+        assertEquals("legacy-main", oldGroup.id)
+        assertEquals(listOf("legacy-entry"), oldGroup.memberEntryIds)
+        assertEquals("legacy-main", parsed.config.defaultPrimaryGroupId)
+        assertEquals(listOf("legacy-main"), parsed.config.agentLoopGroupIds)
+    }
+
+    @Test
     fun `a config with no instances array still parses`() {
         val parsed = parse("""{"modelEntries":[],"modelGroups":[]}""")
         assertNotNull(parsed.config)

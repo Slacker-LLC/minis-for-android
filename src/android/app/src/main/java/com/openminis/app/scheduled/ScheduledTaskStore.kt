@@ -36,9 +36,30 @@ class ScheduledTaskStore(private val context: Context) {
 
     fun get(taskId: String): ScheduledTask? = all().firstOrNull { it.id == taskId }
 
-    fun upsert(task: ScheduledTask) {
-        val current = all().filter { it.id != task.id }
-        write(current + task)
+    fun upsert(task: ScheduledTask, synchronous: Boolean = false, preserveOrder: Boolean = false) {
+        val current = all()
+        val existingIndex = current.indexOfFirst { it.id == task.id }
+        val updated = if (preserveOrder && existingIndex >= 0) {
+            current.toMutableList().also { it[existingIndex] = task }
+        } else {
+            current.filter { it.id != task.id } + task
+        }
+        write(updated, synchronous = synchronous)
+    }
+
+    /** Rewrite only model bindings via all/upsert; trigger times/AlarmManager stay untouched. */
+    internal fun migrateModelBindings(updates: Map<String, ScheduledTaskBindingUpdate>): Int {
+        val current = all()
+        val (rewritten, changed) = rewriteScheduledTaskBindings(current, updates)
+        if (changed > 0) {
+            val oldById = current.associateBy { it.id }
+            rewritten.filter { oldById[it.id] != it }.forEach { task ->
+                // Sync commit before the Room migration marker; retry is idempotent if
+                // the process stops between individual task writes.
+                upsert(task, synchronous = true, preserveOrder = true)
+            }
+        }
+        return changed
     }
 
     fun delete(taskId: String) {
@@ -49,10 +70,15 @@ class ScheduledTaskStore(private val context: Context) {
         prefs.edit().remove(KEY_TASKS).apply()
     }
 
-    private fun write(tasks: List<ScheduledTask>) {
+    private fun write(tasks: List<ScheduledTask>, synchronous: Boolean = false) {
         val arr = JSONArray()
         for (t in tasks) arr.put(t.toJson())
-        prefs.edit().putString(KEY_TASKS, arr.toString()).apply()
+        val editor = prefs.edit().putString(KEY_TASKS, arr.toString())
+        if (synchronous) {
+            check(editor.commit()) { "failed to persist scheduled-task migration" }
+        } else {
+            editor.apply()
+        }
     }
 
     /**
@@ -76,4 +102,26 @@ class ScheduledTaskStore(private val context: Context) {
         private const val PREFS_NAME = "minis_scheduled_tasks_prefs"
         private const val KEY_TASKS = "tasks_json"
     }
+}
+
+internal data class ScheduledTaskBindingUpdate(
+    val modelBinding: String?,
+    val modelId: String? = null,
+)
+
+/** Pure helper shared by the SharedPreferences migration and its JVM tests. */
+internal fun rewriteScheduledTaskBindings(
+    tasks: List<ScheduledTask>,
+    updates: Map<String, ScheduledTaskBindingUpdate>,
+): Pair<List<ScheduledTask>, Int> {
+    var changed = 0
+    val rewritten = tasks.map { task ->
+        if (task.id !in updates) return@map task
+        val update = updates.getValue(task.id)
+        val modelId = update.modelId ?: task.modelId
+        if (task.modelBinding == update.modelBinding && task.modelId == modelId) return@map task
+        changed++
+        task.copy(modelBinding = update.modelBinding, modelId = modelId)
+    }
+    return rewritten to changed
 }

@@ -125,44 +125,33 @@ internal object HeadlessChatRunner {
         }
         val app = app(context)
         val cfg = app.providerRepository.config.value
-        // No explicit model → bind to the user's default primary group (the
-        // `isDefault: true` group in provider.groups.list), matching the in-app
-        // "new chat, no model picked" path (ChatViewModel priority-3 fallback on
-        // providerRepository.defaultPrimaryGroupId). Without this the session
-        // kept whatever model ensureSession seeded — the first visible provider
-        // entry (e.g. OpenRouter's aion-labs/aion-3.0-mini) — not the default group.
-        val resolvedGroupId = modelGroupId ?: run {
-            if (modelEntryId != null) return@run null
-            cfg.defaultPrimaryGroupId?.takeIf { gid -> cfg.modelGroups.any { it.id == gid } }
-        }
-        if (modelEntryId == null && resolvedGroupId == null) return@withContext null
-        if (modelEntryId != null) {
-            val entry = cfg.modelEntries.firstOrNull { it.id == modelEntryId }
-                ?: throw RPCException(-32602, "Entry not found: $modelEntryId")
+        // With no explicit choice, use the same main-slot/last-used resolver as
+        // interactive chats. A legacy group argument is only an adapter: choose
+        // its first currently available member and persist an entry binding.
+        val resolvedEntryId = modelEntryId ?: if (modelGroupId == null) {
+            com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)?.id
+        } else null
+        if (resolvedEntryId == null && modelGroupId == null) return@withContext null
+        if (resolvedEntryId != null) {
+            val entry = cfg.modelEntries.firstOrNull { it.id == resolvedEntryId }
+                ?: throw RPCException(-32602, "Entry not found: $resolvedEntryId")
             val instance = cfg.instances.firstOrNull { it.id == entry.providerInstanceId }
                 ?: throw RPCException(-32602, "Provider instance for entry not found")
             if (!instance.isEnabled) throw RPCException(-32602, "Provider instance is disabled")
-            // The binding column stores a JSON object the VM parses in
-            // restoreFromBinding (ChatViewModel: {"type":"entry","entryId":…}).
-            // Writing the bare literal "entry" left restoreFromBinding unable to
-            // resolve the entry, so activeEntryId never flipped non-null, the
-            // headless provider-resolve wait timed out, and sendMessage
-            // early-returned with no LLM request — RPC-driven sessions produced
-            // a lone user message and no assistant turn.
-            val binding = """{"type":"entry","entryId":"${entry.id}"}"""
+            val binding = com.openminis.app.data.model.ModelBinding.encodeEntry(entry.id)
             app.chatRepository.updateSessionBinding(sessionId, binding, entry.baseModel.id)
             return@withContext entry.model.displayName
         }
-        // modelGroupId (explicit) or the default primary group (implicit fallback)
-        val group = cfg.modelGroups.firstOrNull { it.id == resolvedGroupId }
-            ?: throw RPCException(-32602, "Group not found: $resolvedGroupId")
-        val firstMemberId = group.memberEntryIds.firstOrNull()
-        val firstMember = firstMemberId?.let { mid -> cfg.modelEntries.firstOrNull { it.id == mid } }
-        val resolvedModelId = firstMember?.baseModel?.id ?: ""
-        // Same JSON-object shape the VM expects for a group binding.
-        val groupBinding = """{"type":"group","groupId":"${group.id}"}"""
-        app.chatRepository.updateSessionBinding(sessionId, groupBinding, resolvedModelId)
-        return@withContext group.name
+        val group = cfg.modelGroups.firstOrNull { it.id == modelGroupId }
+            ?: throw RPCException(-32602, "Group not found: $modelGroupId")
+        val entry = app.providerRepository.availableMemberEntries(group).firstOrNull()
+            ?: throw RPCException(-32602, "Group has no available model entries: $modelGroupId")
+        app.chatRepository.updateSessionBinding(
+            sessionId,
+            com.openminis.app.data.model.ModelBinding.encodeEntry(entry.id),
+            entry.baseModel.id,
+        )
+        return@withContext entry.model.displayName
     }
 
     /**

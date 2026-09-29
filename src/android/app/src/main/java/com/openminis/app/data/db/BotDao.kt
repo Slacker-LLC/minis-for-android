@@ -21,6 +21,9 @@ interface BotDao {
     @Query("SELECT * FROM bots WHERE id = :id")
     suspend fun getBot(id: String): BotEntity?
 
+    @Query("UPDATE bots SET model_binding = :modelBinding WHERE id = :id")
+    suspend fun updateModelBinding(id: String, modelBinding: String?)
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertBot(bot: BotEntity)
 

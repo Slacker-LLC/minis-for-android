@@ -4,6 +4,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** Parsed form of the legacy session model_binding payload. */
 sealed interface ModelBinding {
@@ -26,5 +28,11 @@ sealed interface ModelBinding {
                 }
             }.getOrNull()
         }
+
+        /** Runtime binding format. New writes always pin one concrete entry. */
+        fun encodeEntry(entryId: String): String = buildJsonObject {
+            put("type", "entry")
+            put("entryId", entryId)
+        }.toString()
     }
 }

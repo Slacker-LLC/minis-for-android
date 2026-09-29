@@ -179,7 +179,9 @@ fun BotsScreen(
         BotDetails(
             bot = selectedBot,
             modelName = selectedBot.modelBinding?.let { binding ->
-                config.modelEntries.firstOrNull { it.id == binding || it.baseModel.id == binding }?.model?.displayName
+                val entryId = (com.openminis.app.data.model.ModelBinding.parse(binding)
+                    as? com.openminis.app.data.model.ModelBinding.Entry)?.entryId
+                config.modelEntries.firstOrNull { it.id == entryId }?.model?.displayName
             },
             sessions = recent,
             work = delegations.filter { it.sourceBotId == selectedBot.id || it.targetBotId == selectedBot.id },
@@ -515,7 +517,9 @@ private fun BotEditorScreen(bot: BotEntity?, providerRepository: ProviderReposit
     var picker by remember { mutableStateOf(false) }
     var modelError by remember { mutableStateOf(false) }
     val config by providerRepository.config.collectAsState()
-    val selected = config.modelEntries.firstOrNull { it.id == binding || it.baseModel.id == binding }
+    val selectedEntryId = (com.openminis.app.data.model.ModelBinding.parse(binding)
+        as? com.openminis.app.data.model.ModelBinding.Entry)?.entryId
+    val selected = config.modelEntries.firstOrNull { it.id == selectedEntryId }
     SettingsScaffold(title = stringResource(if (bot == null) R.string.bots_add else R.string.bots_edit), centerTitle = true,
         navigation = { MinisTextButton(onClick = onBack, enabled = !saving) { Text(stringResource(android.R.string.cancel)) } }, actions = {
             MinisTextButton(onClick = {
@@ -543,7 +547,7 @@ private fun BotEditorScreen(bot: BotEntity?, providerRepository: ProviderReposit
         config = config, providerRepository = providerRepository, onSelectGroup = {}, onSelectGroupEntry = { _, _ -> },
         onSelectEntry = { id ->
             if (providerRepository.allVisibleEntries().firstOrNull { it.id == id }?.model?.isTextOutput == true) {
-                binding = id; picker = false
+                binding = com.openminis.app.data.model.ModelBinding.encodeEntry(id); picker = false
             } else modelError = true
         }, onDismiss = { picker = false },
     )

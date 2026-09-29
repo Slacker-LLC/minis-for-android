@@ -6,6 +6,8 @@ import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
 import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelOverrides
+import com.openminis.app.data.model.ModelSlot
+import com.openminis.app.data.model.ModelSlots
 import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
@@ -23,10 +25,9 @@ import kotlinx.serialization.json.Json
  *
  * Entry IDs are rewritten to the composite "{instanceId}/{modelId}"
  * shape in [toSnapshot] so DB rows and the legacy JSON mirror share
- * the same id semantics post-migration. Group memberEntryIds and
- * agentLoopModelEntryIds are translated in lockstep using the same
- * map, so a group/agent-loop pin written before the migration still
- * resolves after.
+ * the same id semantics post-migration. Slot memberships and
+ * agentLoopModelEntryIds use that same durable key. Legacy group rows
+ * remain read-only migration input and are never written by new snapshots.
  */
 data class ProviderConfigSnapshot(
     val instances: List<ProviderInstanceEntity>,
@@ -37,6 +38,13 @@ data class ProviderConfigSnapshot(
 )
 
 object ProviderConfigMetaKeys {
+    const val SLOT_MAIN = "slots.main"
+    const val SLOT_LIGHT = "slots.light"
+    const val SLOT_VISION = "slots.vision"
+    const val SLOT_VOICE_INPUT = "slots.voiceInput"
+    const val SLOT_VOICE_OUTPUT = "slots.voiceOutput"
+    const val FALLBACK_TRIGGER = "slots.fallbackTrigger"
+    const val LEGACY_GROUPS_MIGRATED_V1 = "groups_migrated_v1"
     const val DEFAULT_PRIMARY_GROUP_ID = "default_primary_group_id"
     const val DEFAULT_SUB_GROUP_ID = "default_sub_group_id"
     // [T-android-provider-voice] Voice Input / Voice Output group bindings
@@ -47,6 +55,13 @@ object ProviderConfigMetaKeys {
     // [T-android-vision-group / GH#182] Vision Group pointer (per-device meta KV).
     const val VISION_GROUP_ID = "vision_group_id"
     const val JSON_SYNC_HASH = "json_sync_hash"
+    val LEGACY_GROUP_META_KEYS = setOf(
+        DEFAULT_PRIMARY_GROUP_ID,
+        DEFAULT_SUB_GROUP_ID,
+        VOICE_INPUT_GROUP_ID,
+        VOICE_OUTPUT_GROUP_ID,
+        VISION_GROUP_ID,
+    )
     private const val CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX = "cleartext_http_approved_origin:"
     fun cleartextHttpApprovedOrigin(instanceId: String): String =
         CLEARTEXT_HTTP_APPROVED_ORIGIN_PREFIX + instanceId
@@ -122,29 +137,9 @@ fun ProviderConfig.toSnapshot(
         }
     }
 
-    val groupRows = modelGroups.mapIndexed { idx, g ->
-        // Translate every member uuid to the composite shape. If an id
-        // is already in composite form (e.g. user upgraded once, wrote
-        // some config, downgraded, re-upgraded) it won't be in idMap;
-        // pass it through unchanged — both forms remain valid string ids
-        // and the lookup paths in ProviderRepository compare by string
-        // equality regardless of shape.
-        val translatedMembers = g.memberEntryIds.map { idMap[it] ?: it }
-        ProviderModelGroupEntity(
-            id = g.id,
-            name = g.name,
-            strategy = g.strategy.name,
-            fallbackStrategy = g.fallbackStrategy.name,
-            defaultThinkingLevel = g.defaultThinkingLevel?.name,
-            contextLimitTokens = g.contextLimitTokens,
-            lastContextLimitTokens = g.lastContextLimitTokens,
-            memberEntryIdsJson = jsonForBlobs.encodeToString(
-                ListSerializer(String.serializer()),
-                translatedMembers,
-            ),
-            sortOrder = idx,
-        )
-    }
+    // provider_model_groups is retained as a read-only migration source. New
+    // snapshots deliberately never write rows back to that table.
+    val groupRows = emptyList<ProviderModelGroupEntity>()
 
     val loopRows = ArrayList<ProviderAgentLoopIdEntity>(
         agentLoopModelEntryIds.size + agentLoopGroupIds.size,
@@ -154,15 +149,6 @@ fun ProviderConfig.toSnapshot(
             ProviderAgentLoopIdEntity(
                 kind = "entry",
                 targetId = idMap[id] ?: id,
-                sortOrder = idx,
-            )
-        )
-    }
-    agentLoopGroupIds.forEachIndexed { idx, id ->
-        loopRows.add(
-            ProviderAgentLoopIdEntity(
-                kind = "group",
-                targetId = id,
                 sortOrder = idx,
             )
         )
@@ -194,6 +180,23 @@ fun ProviderConfig.toSnapshot(
     visionGroupId?.let {
         metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.VISION_GROUP_ID, it))
     }
+    val stringListSerializer = ListSerializer(String.serializer())
+    val slotKeys = mapOf(
+        ModelSlot.main to ProviderConfigMetaKeys.SLOT_MAIN,
+        ModelSlot.light to ProviderConfigMetaKeys.SLOT_LIGHT,
+        ModelSlot.vision to ProviderConfigMetaKeys.SLOT_VISION,
+        ModelSlot.voiceInput to ProviderConfigMetaKeys.SLOT_VOICE_INPUT,
+        ModelSlot.voiceOutput to ProviderConfigMetaKeys.SLOT_VOICE_OUTPUT,
+    )
+    slotKeys.forEach { (slot, key) ->
+        metaRows.add(
+            ProviderConfigMetaEntity(
+                key,
+                jsonForBlobs.encodeToString(stringListSerializer, slots.entries(slot)),
+            ),
+        )
+    }
+    metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.FALLBACK_TRIGGER, fallbackTrigger.name))
     jsonSyncHash?.let {
         metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.JSON_SYNC_HASH, it))
     }
@@ -253,7 +256,8 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
     }.toMutableList()
 
     val stringListSerializer = ListSerializer(String.serializer())
-    val groups = this.groups.map { row ->
+    val migrationComplete = metaMap[ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1] == "true"
+    val groups = if (migrationComplete) mutableListOf() else this.groups.map { row ->
         ModelGroup(
             id = row.id,
             name = row.name,
@@ -277,20 +281,36 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
         .sortedBy { it.sortOrder }
         .map { it.targetId }
         .toMutableList()
-    val groupLoopIds = this.loopIds.filter { it.kind == "group" }
+    val groupLoopIds = if (migrationComplete) mutableListOf() else this.loopIds.filter { it.kind == "group" }
         .sortedBy { it.sortOrder }
         .map { it.targetId }
         .toMutableList()
 
+    fun slotEntries(key: String): List<String> = metaMap[key]?.let { raw ->
+        runCatching { jsonForBlobs.decodeFromString(stringListSerializer, raw) }.getOrNull()
+    } ?: emptyList()
+    val slots = ModelSlots(
+        main = slotEntries(ProviderConfigMetaKeys.SLOT_MAIN),
+        light = slotEntries(ProviderConfigMetaKeys.SLOT_LIGHT),
+        vision = slotEntries(ProviderConfigMetaKeys.SLOT_VISION),
+        voiceInput = slotEntries(ProviderConfigMetaKeys.SLOT_VOICE_INPUT),
+        voiceOutput = slotEntries(ProviderConfigMetaKeys.SLOT_VOICE_OUTPUT),
+    )
+    val fallbackTrigger = metaMap[ProviderConfigMetaKeys.FALLBACK_TRIGGER]
+        ?.let { runCatching { FallbackStrategy.valueOf(it) }.getOrNull() }
+        ?: FallbackStrategy.default
+
     return ProviderConfig(
         instances = instances,
         modelEntries = entries,
+        slots = slots,
+        fallbackTrigger = fallbackTrigger,
         modelGroups = groups,
-        defaultPrimaryGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_PRIMARY_GROUP_ID],
-        defaultSubGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_SUB_GROUP_ID],
-        voiceInputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_INPUT_GROUP_ID],
-        voiceOutputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_OUTPUT_GROUP_ID],
-        visionGroupId = metaMap[ProviderConfigMetaKeys.VISION_GROUP_ID],
+        defaultPrimaryGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_PRIMARY_GROUP_ID].takeUnless { migrationComplete },
+        defaultSubGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_SUB_GROUP_ID].takeUnless { migrationComplete },
+        voiceInputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_INPUT_GROUP_ID].takeUnless { migrationComplete },
+        voiceOutputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_OUTPUT_GROUP_ID].takeUnless { migrationComplete },
+        visionGroupId = metaMap[ProviderConfigMetaKeys.VISION_GROUP_ID].takeUnless { migrationComplete },
         agentLoopModelEntryIds = entryLoopIds,
         agentLoopGroupIds = groupLoopIds,
     )

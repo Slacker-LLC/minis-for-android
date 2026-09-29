@@ -181,6 +181,41 @@ enum class FallbackStrategy {
     always,
 }
 
+/** A fixed, ordered set of entry-id slots; system voice ids are valid in voice slots. */
+@Serializable
+data class ModelSlots(
+    val main: List<String> = emptyList(),
+    val light: List<String> = emptyList(),
+    val vision: List<String> = emptyList(),
+    val voiceInput: List<String> = emptyList(),
+    val voiceOutput: List<String> = emptyList(),
+) {
+    fun entries(slot: ModelSlot): List<String> = when (slot) {
+        ModelSlot.main -> main
+        ModelSlot.light -> light
+        ModelSlot.vision -> vision
+        ModelSlot.voiceInput -> voiceInput
+        ModelSlot.voiceOutput -> voiceOutput
+    }
+
+    fun withEntries(slot: ModelSlot, entryIds: List<String>): ModelSlots = when (slot) {
+        ModelSlot.main -> copy(main = entryIds.toList())
+        ModelSlot.light -> copy(light = entryIds.toList())
+        ModelSlot.vision -> copy(vision = entryIds.toList())
+        ModelSlot.voiceInput -> copy(voiceInput = entryIds.toList())
+        ModelSlot.voiceOutput -> copy(voiceOutput = entryIds.toList())
+    }
+}
+
+@Serializable
+enum class ModelSlot {
+    main,
+    light,
+    vision,
+    voiceInput,
+    voiceOutput,
+}
+
 @Serializable
 data class ModelGroup(
     val id: String = UUID.randomUUID().toString(),
@@ -347,6 +382,12 @@ data class ModelOverrides(
     val maxThinkingLevel: ThinkingLevel? = null,
     /** [T-eta-hosted-web-search] Per-entry opt-in for the provider's own web search. */
     val hostedWebSearch: Boolean? = null,
+    /** Session default copied when a chat newly binds to this entry. */
+    val defaultThinkingLevel: ThinkingLevel? = null,
+    /** Active context cap; null retains the prior uncapped behavior. */
+    val contextLimitTokens: Int? = null,
+    /** Last chosen cap, retained while the cap is switched off. */
+    val lastContextLimitTokens: Int? = null,
 ) {
     val isEmpty: Boolean
         get() = displayName == null
@@ -357,6 +398,9 @@ data class ModelOverrides(
             && outputModalities == null
             && maxThinkingLevel == null
             && hostedWebSearch == null
+            && defaultThinkingLevel == null
+            && contextLimitTokens == null
+            && lastContextLimitTokens == null
 }
 
 @Serializable
@@ -393,6 +437,8 @@ data class ModelEntry(
 data class ProviderConfig(
     val instances: MutableList<ProviderInstance> = mutableListOf(),
     val modelEntries: MutableList<ModelEntry> = mutableListOf(),
+    var slots: ModelSlots = ModelSlots(),
+    var fallbackTrigger: FallbackStrategy = FallbackStrategy.default,
     val modelGroups: MutableList<ModelGroup> = mutableListOf(),
     var defaultPrimaryGroupId: String? = null,
     var defaultSubGroupId: String? = null,
