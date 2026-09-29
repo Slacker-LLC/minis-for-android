@@ -7,6 +7,8 @@ import com.openminis.app.scheduled.ScheduledRepeatMode
 import com.openminis.app.scheduled.ScheduledTargetMode
 import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskManager
+import com.openminis.app.scheduled.ScheduledTaskPermissionTier
+import com.openminis.app.scheduled.ScheduledTaskTierMutationPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -173,6 +175,16 @@ internal object ScheduledTaskRpcMethods {
             }
         }
 
+        val permissionTier = if (params.has("permissionTier")) {
+            try {
+                ScheduledTaskTierMutationPolicy.parseAgentTier(params.opt("permissionTier") as? String)
+            } catch (error: IllegalArgumentException) {
+                throw RPCException(-32602, error.message ?: ScheduledTaskTierMutationPolicy.FULL_CONFIRMATION_REQUIRED)
+            }
+        } else {
+            current?.permissionTier ?: ScheduledTaskPermissionTier.READ_ONLY
+        }
+
         return ScheduledTask(
             id = current?.id ?: java.util.UUID.randomUUID().toString(),
             label = label,
@@ -193,6 +205,7 @@ internal object ScheduledTaskRpcMethods {
             lastResultPreview = current?.lastResultPreview,
             lastResultSessionId = current?.lastResultSessionId,
             runHistory = current?.runHistory.orEmpty(),
+            permissionTier = permissionTier,
         )
     }
 

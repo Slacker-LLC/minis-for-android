@@ -1912,4 +1912,13 @@
     <string name="vscreen_step_unknown">Kompatibilitätsprüfung</string>
     <string name="vscreen_title">Virtuelles Display</string>
     <string name="vscreen_width">Breite (px)</string>
+<string name="scheduled_task_permission_tier">Berechtigungen der Routine</string>
+<string name="scheduled_task_tier_read_only">Nur lesen</string>
+<string name="scheduled_task_tier_full">Vollzugriff</string>
+<string name="scheduled_task_tier_read_only_detail">Erlaubt freigegebene schreibgeschützte Shell-Befehle. Dateitools und Shell-Ausgaben dürfen nur in den temporären Sitzungsordner dieser Routine schreiben; MCP- und beliebige Codeausführung ist gesperrt. Andere App-Berechtigungen gelten weiterhin.</string>
+<string name="scheduled_task_tier_full_detail">Hebt die READ_ONLY-Beschränkungen für Shell, Dateien und MCP-Verbindungen auf; bestehende App-Berechtigungen und Bestätigungen für Hintergrundläufe gelten weiterhin. Dieser Modus blockiert den Netzwerkzugriff nicht.</string>
+<string name="scheduled_task_tier_full_confirmation_title">Vollzugriff bestätigen?</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL erlaubt dieser unbeaufsichtigten Routine beliebige Shell-Befehle, Dateischreibzugriffe außerhalb des temporären Ordners und Aufrufe verbundener MCP-Tools, soweit bestehende App-Berechtigungen dies zulassen. Wähle diese Option nur, wenn du dem Prompt und den konfigurierten Tools vertraust. Der Netzwerkzugriff bleibt uneingeschränkt.</string>
+<string name="scheduled_task_tier_full_confirm">Vollzugriff bestätigen</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY hat %1$s blockiert: %2$s</string>
 </resources>

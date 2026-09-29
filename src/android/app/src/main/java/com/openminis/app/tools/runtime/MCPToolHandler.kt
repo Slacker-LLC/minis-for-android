@@ -23,6 +23,7 @@ class MCPToolHandler(
 ) : ToolHandler {
 
     private val canonicalName = "mcp.$serverId.${remoteTool.name}"
+    override val isMcpTool: Boolean = true
 
     override val definition: AgentToolDefinition by lazy {
         AgentToolDefinition(

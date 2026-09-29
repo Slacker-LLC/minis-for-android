@@ -2290,4 +2290,13 @@
     <string name="vscreen_step_unknown">Compatibility check</string>
     <string name="vscreen_title">Virtual display</string>
     <string name="vscreen_width">Width (px)</string>
+<string name="scheduled_task_permission_tier">Routine permissions</string>
+<string name="scheduled_task_tier_read_only">Read-only</string>
+<string name="scheduled_task_tier_full">Full</string>
+<string name="scheduled_task_tier_read_only_detail">Allows approved read-only shell commands. File tools and shell output may write only to this routine session’s temporary folder; MCP and arbitrary-code tools are blocked. Other app permissions still apply.</string>
+<string name="scheduled_task_tier_full_detail">Removes this routine’s READ_ONLY shell, file and MCP limits; existing app permissions and unattended confirmations still apply. This tier does not restrict network access.</string>
+<string name="scheduled_task_tier_full_confirmation_title">Confirm Full access?</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL lets this unattended routine run arbitrary shell commands, write files beyond its temporary folder and call connected MCP tools, subject to existing app permissions. Select it only if you trust the prompt and configured tools. Network access remains unrestricted.</string>
+<string name="scheduled_task_tier_full_confirm">Confirm Full</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY blocked %1$s: %2$s</string>
 </resources>

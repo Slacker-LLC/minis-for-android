@@ -74,6 +74,8 @@ object SessionPermissionStore {
         }
         return normalized == "/workspace" ||
             normalized.startsWith("/workspace/") ||
+            normalized == "/tmp" ||
+            normalized.startsWith("/tmp/") ||
             normalized == "/var/minis/workspace" ||
             normalized.startsWith("/var/minis/workspace/") ||
             normalized == "/var/minis/attachments" ||

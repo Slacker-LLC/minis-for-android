@@ -154,6 +154,17 @@ class ScheduledTasksViewModel(private val appContext: Context) : ViewModel() {
             if (isNew) manager.create(task) else manager.update(task)
         }
 
+    /** Called only by the native editor; FULL writes carry its explicit confirmation result. */
+    suspend fun upsertFromEditor(
+        task: ScheduledTask,
+        isNew: Boolean,
+        fullTierConfirmed: Boolean,
+    ): ScheduledTask =
+        withContext(Dispatchers.IO) {
+            if (isNew) manager.createFromEditor(task, fullTierConfirmed)
+            else manager.updateFromEditor(task, fullTierConfirmed)
+        }
+
     /**
      * "Run now" button on the edit screen. Fires the task immediately without
      * touching the schedule.

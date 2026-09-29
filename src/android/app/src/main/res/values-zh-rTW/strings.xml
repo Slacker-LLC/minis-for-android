@@ -2171,4 +2171,13 @@
     <string name="vscreen_step_unknown">相容性檢查</string>
     <string name="vscreen_title">虛擬螢幕</string>
     <string name="vscreen_width">寬度（px）</string>
+<string name="scheduled_task_permission_tier">例程權限</string>
+<string name="scheduled_task_tier_read_only">唯讀</string>
+<string name="scheduled_task_tier_full">完整權限</string>
+<string name="scheduled_task_tier_read_only_detail">允許已核准的唯讀 shell 指令。檔案工具和 shell 輸出只能寫入此例程工作階段的暫存資料夾；MCP 和任意程式碼執行會遭封鎖。其他應用程式權限仍適用。</string>
+<string name="scheduled_task_tier_full_detail">移除此例程對 shell、檔案和 MCP 的 READ_ONLY 限制；現有應用程式權限和無人值守確認政策仍適用。此權限等級不會限制網路存取。</string>
+<string name="scheduled_task_tier_full_confirmation_title">確認完整權限？</string>
+<string name="scheduled_task_tier_full_confirmation_body">FULL 允許此無人值守例程在現有應用程式權限範圍內執行任意 shell 指令、寫入暫存資料夾以外的檔案，並呼叫已連線的 MCP 工具。僅在信任提示詞和已設定工具時選擇。網路存取仍不受限制。</string>
+<string name="scheduled_task_tier_full_confirm">確認完整權限</string>
+<string name="scheduled_task_readonly_denied_preview">READ_ONLY 已封鎖 %1$s：%2$s</string>
 </resources>
