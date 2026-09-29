@@ -4996,35 +4996,27 @@ class ChatViewModel(
 
     /** Restore provider state from a JSON binding string. Returns true if successfully resolved. */
     private fun restoreFromBinding(bindingJson: String?): Boolean {
-        bindingJson ?: return false
-        return try {
-            val obj = org.json.JSONObject(bindingJson)
-            when (obj.optString("type")) {
-                "group" -> {
-                    val groupId = obj.optString("groupId").takeIf { it.isNotEmpty() } ?: return false
-                    val lastEntryId = obj.optString("lastEntryId").takeIf { it.isNotEmpty() }
-                    val resolved = resolveProviderFromGroup(groupId, lastEntryId)
-                    if (resolved) _selectedGroupId.value = groupId
-                    resolved
-                }
-                "entry" -> {
-                    val entryId = obj.optString("entryId").takeIf { it.isNotEmpty() } ?: return false
-                    val entry = providerRepository.config.value.modelEntries.find { it.id == entryId } ?: return false
-                    val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
-                    val apiKey = providerRepository.usableApiKey(instance) ?: return false
-                    currentModel = entry.model
-                    _modelName.value = entry.model.displayName
-                    _providerName.value = instance.label.ifEmpty { entry.model.provider }
-                    _selectedGroupId.value = null
-                    _selectedGroupName.value = ""
-                    _activeEntryId.value = entry.id
-                    currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
-                    true
-                }
-                else -> false
+        return when (val binding = com.openminis.app.data.model.ModelBinding.parse(bindingJson)) {
+            is com.openminis.app.data.model.ModelBinding.Group -> {
+                val resolved = resolveProviderFromGroup(binding.groupId, binding.lastEntryId)
+                if (resolved) _selectedGroupId.value = binding.groupId
+                resolved
             }
-        } catch (_: Exception) {
-            false
+            is com.openminis.app.data.model.ModelBinding.Entry -> {
+                val entry = providerRepository.config.value.modelEntries.find { it.id == binding.entryId }
+                    ?: return false
+                val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
+                val apiKey = providerRepository.usableApiKey(instance) ?: return false
+                currentModel = entry.model
+                _modelName.value = entry.model.displayName
+                _providerName.value = instance.label.ifEmpty { entry.model.provider }
+                _selectedGroupId.value = null
+                _selectedGroupName.value = ""
+                _activeEntryId.value = entry.id
+                currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
+                true
+            }
+            null -> false
         }
     }
 
@@ -5213,10 +5205,8 @@ class ChatViewModel(
                 config.modelEntries.find { it.id == entryId }?.model?.id == primaryProvider.model.id
             }
         val result = mutableListOf<FallbackCandidate>()
-        // Iterate starting from the entry AFTER the primary, cycling around
-        for (offset in 1 until members.size) {
-            val idx = if (currentIdx >= 0) (currentIdx + offset) % members.size else offset
-            val entryId = members[idx]
+        val currentEntryId = members.getOrNull(currentIdx)
+        for (entryId in fallbackEntryIdsInAttemptOrder(members, currentEntryId)) {
             val entry = config.modelEntries.find { it.id == entryId } ?: continue
             val instance = config.instances.find { it.id == entry.providerInstanceId } ?: continue
             if (!instance.isEnabled) continue

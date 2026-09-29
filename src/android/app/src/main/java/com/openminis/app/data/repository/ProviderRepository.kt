@@ -1065,15 +1065,18 @@ class ProviderRepository(private val context: Context) {
      */
     fun availableMemberEntries(group: ModelGroup): List<ModelEntry> {
         val config = _config.value
-        return group.memberEntryIds.mapNotNull { entryId ->
+        val entriesById = group.memberEntryIds.distinct().mapNotNull { entryId ->
             val entry = config.modelEntries.find { it.id == entryId } ?: return@mapNotNull null
-            if (entry.isHidden) return@mapNotNull null
             val instance = config.instances.find { it.id == entry.providerInstanceId }
                 ?: return@mapNotNull null
-            if (!instance.isEnabled) return@mapNotNull null
-            if (!hasAnyCredential(instance)) return@mapNotNull null
-            entry
-        }
+            entryId to MemberAvailability(
+                value = entry,
+                hidden = entry.isHidden,
+                providerEnabled = instance.isEnabled,
+                credentialed = hasAnyCredential(instance),
+            )
+        }.toMap()
+        return availableMembersInDeclarationOrder(group.memberEntryIds, entriesById)
     }
 
     /**

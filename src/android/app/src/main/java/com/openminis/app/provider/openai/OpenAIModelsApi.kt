@@ -27,43 +27,19 @@ object OpenAIModelsApi {
     // (`/v1/responses` requires the `reasoning` object on this auth path),
     // so set supportsReasoning = true up front. Without it the Thinking
     // pill in chat is disabled and the user can't pick low/medium/high.
-    fun fetchModelsOAuth(): List<LLMModel> = listOf(
+    // Keep the current callable-id allow-list unchanged: unsupported ids can
+    // return HTTP 400 and render as an empty assistant turn. Re-probe against a
+    // live Codex token before adding any model back.
+    internal val codexOAuthStaticModels: List<LLMModel> = listOf(
         LLMModel.gpt6Astra,
-        // [T-android-thinking-level-arch] GPT-5.6 family — Codex OAuth only
-        // (not in LLMModel.allOpenAI, matching iOS). sol/terra reach ULTRA,
-        // luna reaches MAX (see ThinkingLevelCatalog).
         LLMModel("gpt-5.6-sol", "GPT-5.6 Sol", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-5.6-terra", "GPT-5.6 Terra", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-5.6-luna", "GPT-5.6 Luna", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-5.5", "GPT-5.5", "OpenAI", supportsReasoning = true),
         LLMModel("gpt-5.4", "GPT-5.4", "OpenAI", supportsReasoning = true),
-        // [T-codex-oauth-model-prune] Verified callable on a live
-        // ChatGPT-account token (2026-08-01); we had never listed it.
         LLMModel("gpt-5.4-mini", "GPT-5.4 Mini", "OpenAI", supportsReasoning = true),
-        // [T-codex-oauth-model-prune] gpt-5.3-codex, gpt-5.3-codex-spark,
-        // gpt-5-codex-mini, gpt-5.3, gpt-5.2 and gpt-5 were removed here.
-        // The Codex backend answers each with
-        //   HTTP 400 {"detail":"The '<id>' model is not supported when using
-        //   Codex with a ChatGPT account."}
-        // and that error renders as an EMPTY assistant turn, so leaving them in
-        // the picker reads to the user as "tool calls are broken" rather than
-        // "wrong model". Verified on-device 2026-08-01 against a real Codex
-        // OAuth token; the survivors match the set CLIProxyAPI ships for its
-        // Codex client (internal/registry/models/codex_client_models.json).
-        // Availability is tier-dependent — re-probe before restoring any id,
-        // do not add one back from documentation alone. Mirrors iOS
-        // LLMModel.allOpenAICodexOAuth.
-    ).let {
-        AppLogger.info(TAG, "Codex OAuth model list (${it.size} models): ${it.joinToString { m -> m.id }}")
-        ModelsDevApi.enrichModels(it)
-    } + listOf(
-        // [T-codex-gpt-image2-oauth-android] Special image-generation model on
-        // the Codex OAuth path. Appended AFTER enrichModels so its declared
-        // image input/output modalities survive (models.dev doesn't know it).
-        // It does NOT take the normal Chat Completions / Responses path — the
-        // gpt-image-2 branch in OpenAIProvider routes it through the Codex
-        // image_generation tool. Additive only: the GPT-5.x entries above and
-        // their existing OAuth flow are unchanged.
+        // Kept after Codex enrichment: this special image route has capabilities
+        // that models.dev does not declare.
         LLMModel(
             id = "gpt-image-2",
             displayName = "GPT Image 2",
@@ -72,6 +48,12 @@ object OpenAIModelsApi {
             outputModalities = listOf("image"),
         ),
     )
+
+    fun fetchModelsOAuth(): List<LLMModel> {
+        val codexModels = codexOAuthStaticModels.dropLast(1)
+        AppLogger.info(TAG, "Codex OAuth model list (${codexModels.size} models): ${codexModels.joinToString { it.id }}")
+        return ModelsDevApi.enrichModels(codexModels) + codexOAuthStaticModels.last()
+    }
 
     // Chat-capable model prefixes (matching iOS)
     private val chatPrefixes = listOf("gpt-", "o1", "o3", "o4-", "codex-", "chatgpt-")
