@@ -107,7 +107,7 @@ fun UsageStatsScreen(
         val records = chatDao.allUsageRecords()
 
         val modelLookup = mutableMapOf<String, Pair<String, String>>()
-        for (m in LLMModel.allModels) modelLookup[m.id] = m.displayName to m.provider
+        for (m in com.openminis.app.provider.rules.ModelRulesProvider.allStaticModels()) modelLookup[m.id] = m.displayName to m.provider
         providerConfig?.let { config ->
             for (entry in config.modelEntries) {
                 if (entry.model.id !in modelLookup) {

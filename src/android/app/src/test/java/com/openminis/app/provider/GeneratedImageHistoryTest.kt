@@ -24,7 +24,7 @@ class GeneratedImageHistoryTest {
                     "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"
             } else "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
             server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse))
-            val provider = OpenAIProvider("fixture-key", LLMModel.gpt4o.copy(inputModalities = listOf("text", "image")),
+            val provider = OpenAIProvider("fixture-key", ModelRulesTestFixtures.staticModel("openAI", "gpt-4o").copy(inputModalities = listOf("text", "image")),
                 server.loopbackUrl("/v1").toString(), useResponsesAPI = responses)
             val history = listOf(
                 LLMMessage(LLMMessage.Role.USER, "draw"),

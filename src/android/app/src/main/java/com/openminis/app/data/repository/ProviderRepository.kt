@@ -704,7 +704,7 @@ class ProviderRepository(private val context: Context) {
         //     baseline UX).
         //   - API-key instances on a third-party OpenAI-compatible base URL
         //     (e.g. xAI Grok https://api.x.ai, vLLM, Ollama, LiteLLM, DeepSeek
-        //     via OpenAI shim) MUST NOT inherit `LLMModel.allOpenAI` — that's
+        //     via OpenAI shim) MUST NOT inherit `the built-in OpenAI catalog` — that's
         //     where the "Refresh on Grok returns GPT-5.5/5.3-codex" bug came
         //     from. For these, leave entries empty and let refreshModels()
         //     populate from the upstream /v1/models call.
@@ -819,7 +819,7 @@ class ProviderRepository(private val context: Context) {
     /**
      * Whether [instance] points at a third-party OpenAI-compatible host
      * (xAI Grok, vLLM, Ollama, LiteLLM, DeepSeek via OpenAI shim, etc.).
-     * For these instances we must never substitute `LLMModel.allOpenAI` as a
+     * For these instances we must never substitute `the built-in OpenAI catalog` as a
      * fallback / seed — those are GPT-only IDs that don't exist upstream.
      * Mirrors iOS `ProviderConfigStore.isThirdPartyOpenAICompat`.
      */

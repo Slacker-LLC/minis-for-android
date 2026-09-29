@@ -70,16 +70,17 @@ enum class ProviderType(val displayName: String) {
         }
 
     val builtInModels: List<LLMModel>
-        get() = when (this) {
-            anthropic -> LLMModel.allAnthropic
-            gemini -> LLMModel.allGemini
-            openAI -> LLMModel.allOpenAI
-            openRouter -> LLMModel.allOpenRouter
-            xAI -> LLMModel.allXAI
-            kimiCode -> LLMModel.allKimi
-            // No built-in catalog for the decode-only types; models restored
-            // alongside the instance still appear as custom entries.
-            openAIResponses, antigravity, unsupported -> emptyList()
+        get() {
+            val key = when (this) {
+                anthropic -> "anthropic"
+                gemini -> "gemini"
+                openAI -> "openAI"
+                openRouter -> "openRouter"
+                xAI -> "xAI"
+                kimiCode -> "kimi"
+                openAIResponses, antigravity, unsupported -> return emptyList()
+            }
+            return com.openminis.app.provider.rules.ModelRulesProvider.staticModels(key)
         }
 
     companion object {

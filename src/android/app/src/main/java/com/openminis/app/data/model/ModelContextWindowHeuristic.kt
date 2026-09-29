@@ -14,7 +14,7 @@ package com.openminis.app.data.model
  */
 internal fun inferContextWindowTokens(model: LLMModel): Int {
     model.contextWindow?.takeIf { it > 0 }?.let { return it }
-    if (model.isGpt6Astra) return LLMModel.gpt6Astra.contextWindow!!
+    com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).contextWindow?.takeIf { it > 0 }?.let { return it }
     val idLower = model.id.lowercase()
 
     // 1M-class models — match before the generic claude-* / gemini-* fall-throughs.

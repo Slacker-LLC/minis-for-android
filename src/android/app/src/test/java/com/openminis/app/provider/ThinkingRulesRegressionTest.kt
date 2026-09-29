@@ -44,6 +44,7 @@ class ThinkingRulesRegressionTest {
 
     @Before
     fun setUp() {
+        ModelRulesTestFixtures.installBundledCatalog()
         server = MockWebServer()
         server.start()
     }
@@ -639,8 +640,10 @@ class ThinkingRulesRegressionTest {
     }
 
     @Test
-    fun `missing declaration keeps legacy catalog fallback`() {
-        assertEquals(ThinkingLevel.XHIGH, model("unknown-reasoner").catalogMaxThinkingLevel)
+    fun `unknown id uses HIGH while declared families retain their catalog ceilings`() {
+        assertEquals(ThinkingLevel.HIGH, model("unknown-reasoner").catalogMaxThinkingLevel)
+        assertEquals(ThinkingLevel.XHIGH, model("gpt-5.3").catalogMaxThinkingLevel)
+        assertEquals(ThinkingLevel.XHIGH, model("qwen/qwen3-235b-a22b").catalogMaxThinkingLevel)
         assertEquals(ThinkingLevel.HIGH, model("mimo-v2.5").catalogMaxThinkingLevel)
         assertEquals(
             ThinkingLevel.OFF,

@@ -34,7 +34,7 @@ import com.openminis.app.provider.thinking.ThinkingRuleResolver
 
 class GeminiProvider(
     private val apiKey: String,
-    override var model: LLMModel = LLMModel.gemini25Flash,
+    override var model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("gemini", "gemini-2.5-flash", "Gemini 2.5 Flash", "Google"),
     private val basePath: String = "https://generativelanguage.googleapis.com/v1beta",
 ) : LLMProvider {
     override val name = "Google"
@@ -196,7 +196,7 @@ class GeminiProvider(
         // functionCall 400s ("Function call is missing a thought_signature").
         // Only gemini-3.x enforces this, so gate the whole special-case on it
         // to leave 1.x/2.x/flash behaviour byte-for-byte unchanged.
-        val requiresSig = model.id.lowercase().contains("gemini-3")
+        val requiresSig = com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).requiresThoughtSignature == true
         // Tool-call ids we CANNOT safely replay as a functionCall because their
         // signature is missing (old sessions, non-3.x-origin history, dropped
         // field). For these, both the functionCall AND its paired functionResponse

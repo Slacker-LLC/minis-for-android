@@ -39,6 +39,7 @@ class XAIDynamicCatalogTest {
 
     @Before
     fun setUp() {
+        ModelRulesTestFixtures.installBundledCatalog()
         server = MockWebServer()
         server.start()
     }
@@ -60,7 +61,7 @@ class XAIDynamicCatalogTest {
 
     @Test
     fun liveCatalogSurfacesAModelMissingFromTheBuiltInList() {
-        // A model id deliberately NOT in LLMModel.allXAI, standing in for
+        // A model id deliberately NOT in the JSON-backed xAI catalog, standing in for
         // "released after this build".
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(
@@ -135,14 +136,14 @@ class XAIDynamicCatalogTest {
         // completes, so the newest known model belongs in it even though the
         // dynamic path no longer depends on that.
         assertTrue(
-            "grok-4.6 missing from LLMModel.allXAI",
-            LLMModel.allXAI.any { it.id == "grok-4.6" },
+            "grok-4.6 missing from the JSON-backed xAI catalog",
+            com.openminis.app.provider.rules.ModelRulesProvider.staticModels("xAI").any { it.id == "grok-4.6" },
         )
     }
 
     @Test
     fun builtInCatalogHasNoDuplicateIds() {
-        val ids = LLMModel.allXAI.map { it.id }
-        assertEquals("duplicate ids in allXAI: $ids", ids.size, ids.toSet().size)
+        val ids = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("xAI").map { it.id }
+        assertEquals("duplicate ids in the xAI catalog: $ids", ids.size, ids.toSet().size)
     }
 }

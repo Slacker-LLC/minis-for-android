@@ -54,7 +54,7 @@ class OpenAIEditImageTest {
         server.start()
         provider = OpenAIProvider(
             apiKey = "test-key",
-            model = LLMModel.gpt4oMini,
+            model = ModelRulesTestFixtures.staticModel("openAI", "gpt-4o-mini"),
             basePath = server.loopbackUrl("/").toString().trimEnd('/'),
         )
     }
@@ -91,7 +91,7 @@ class OpenAIEditImageTest {
             body.contains("""name="image"""") && body.contains("filename="),
         )
         assertTrue("prompt not forwarded", body.contains("make it a white studio backdrop"))
-        assertTrue("model not forwarded", body.contains(LLMModel.gpt4oMini.id))
+        assertTrue("model not forwarded", body.contains(ModelRulesTestFixtures.staticModel("openAI", "gpt-4o-mini").id))
         assertTrue("n not forwarded", body.contains("""name="n""""))
 
         // Parsing is the shared /images/generations path (unchanged); just

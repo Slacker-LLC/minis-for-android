@@ -4,6 +4,7 @@ import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -27,6 +28,9 @@ import org.junit.Test
  * and belongs in its own commit.
  */
 class ThinkingWireGeminiAnthropicSnapshotTest {
+
+    @Before
+    fun installRules() = ModelRulesTestFixtures.installBundledCatalog()
 
     private fun canonical(v: Any?): String = when (v) {
         null, JSONObject.NULL -> "null"

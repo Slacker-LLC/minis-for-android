@@ -45,147 +45,7 @@ data class LLMModel(
     val inputModalities: List<String>? = null,
     val outputModalities: List<String>? = null,
 ) {
-    val isGpt6Astra: Boolean get() = id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)
-
     companion object {
-        // Anthropic — mirrors iOS LLMTypes.swift allAnthropic.
-        // [T-android-claude-opus48-thinking-toggle] (Sow Sow 38845/38850) Every
-        // Claude 4.x model supports extended thinking, so hard-stamp
-        // supportsReasoning = true (same as the OpenAI gpt-5.x catalog). Without
-        // it the built-in fallback list — used when the /v1/models fetch fails
-        // on a direct-Anthropic instance — lands with supportsReasoning=null and
-        // ChatViewModel's `== true` gate hides the Deep Thinking toggle (the
-        // reported Opus 4.8 bug). The dynamic /v1/models path stamps it the same
-        // way via AnthropicProvider.supportsThinking.
-        // [T-anthropic-fable5-catalog-android] Claude Fable 5 (2026-06-09,
-        // first GA Mythos-class model; API id has no dated variant). Context
-        // window / max output deliberately unset — 1M ctx is third-party
-        // reported, not confirmed on Anthropic's model page; models.dev /
-        // dynamic lookup fills them in once catalogued, same as the sibling
-        // entries. 5-series adaptive thinking + no-temperature handling
-        // comes from parseClaudeVersion (243dadf3). Claude Mythos 5 has no
-        // public API id (Project Glasswing) and is intentionally absent.
-        // [T-anthropic-context-window] Explicit context/output caps per
-        // Anthropic's catalog (mirrors iOS): modern Opus/Sonnet 4.x & 5 and
-        // Fable 5 are 1M context; Haiku 4.5 is 200K. Output: 128K (Opus/Fable),
-        // 64K (Sonnet/Haiku). Set explicitly so the values don't depend on the
-        // id heuristic; models.dev enrich can still override at runtime.
-        val claudeFable5 = LLMModel("claude-fable-5", "Claude Fable 5", "Anthropic", contextWindow = 1_000_000, maxOutputTokens = 128_000, supportsReasoning = true)
-        val claudeOpus48 = LLMModel("claude-opus-4-8", "Claude Opus 4.8", "Anthropic", contextWindow = 1_000_000, maxOutputTokens = 128_000, supportsReasoning = true)
-        val claudeOpus46 = LLMModel("claude-opus-4-6", "Claude Opus 4.6", "Anthropic", contextWindow = 1_000_000, maxOutputTokens = 128_000, supportsReasoning = true)
-        // [T-anthropic-sonnet5-catalog-android] Claude Sonnet 5 — same 5-series
-        // adaptive-thinking + no-temperature handling (parseClaudeVersion) and
-        // identical modalities/capabilities as the Sonnet 4.6 entry below.
-        val claudeSonnet5 = LLMModel("claude-sonnet-5", "Claude Sonnet 5", "Anthropic", contextWindow = 1_000_000, maxOutputTokens = 64_000, supportsReasoning = true)
-        val claudeSonnet46 = LLMModel("claude-sonnet-4-6", "Claude Sonnet 4.6", "Anthropic", contextWindow = 1_000_000, maxOutputTokens = 64_000, supportsReasoning = true)
-        val claudeHaiku45 = LLMModel("claude-haiku-4-5", "Claude Haiku 4.5", "Anthropic", contextWindow = 200_000, maxOutputTokens = 64_000, supportsReasoning = true)
-
-        val allAnthropic = listOf(claudeFable5, claudeOpus48, claudeOpus46, claudeSonnet5, claudeSonnet46, claudeHaiku45)
-
-        // Gemini
-        val gemini3Pro = LLMModel("gemini-3-pro-preview", "Gemini 3 Pro (Preview)", "Google")
-        val gemini3Flash = LLMModel("gemini-3-flash-preview", "Gemini 3 Flash (Preview)", "Google")
-        val gemini25Pro = LLMModel("gemini-2.5-pro", "Gemini 2.5 Pro", "Google")
-        val gemini25Flash = LLMModel("gemini-2.5-flash", "Gemini 2.5 Flash", "Google")
-        val gemini25FlashLite = LLMModel("gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite", "Google")
-
-        val allGemini = listOf(gemini3Pro, gemini3Flash, gemini25Pro, gemini25Flash, gemini25FlashLite)
-
-        // OpenAI — GPT-5.x and o-series ALWAYS support reasoning
-        // (`reasoning_effort` field is required on Codex-OAuth and respected
-        // by /v1/responses for these models). Without the explicit
-        // `supportsReasoning = true` here the catalog falls back to `null`,
-        // ChatViewModel.currentModelSupportsReasoning resolves to `false`,
-        // and the Thinking pill in the composer is disabled — the user
-        // can't pick high/medium/low even though the provider plumbing
-        // honours it. Mirrors iOS LLMTypes.swift defaults plus the
-        // OpenAIAgentProvider `supportsReasoning ?? true` GPT-5.x
-        // assumption (T119).
-        // https://developers.openai.com/api/docs/models/gpt-6-astra
-        val gpt6Astra = LLMModel(
-            "gpt-6-astra", "GPT-6 Astra", "OpenAI",
-            contextWindow = 1_050_000, maxOutputTokens = 128_000,
-            supportsReasoning = true,
-            reasoningEffortValues = listOf("low", "medium", "high", "xhigh", "max"),
-            inputModalities = listOf("text", "image"), outputModalities = listOf("text"),
-        )
-        val gpt55 = LLMModel("gpt-5.5", "GPT-5.5", "OpenAI", supportsReasoning = true)
-        val gpt53Codex = LLMModel("gpt-5.3-codex", "GPT-5.3 Codex", "OpenAI", supportsReasoning = true)
-        val gpt52Codex = LLMModel("gpt-5.2-codex", "GPT-5.2 Codex", "OpenAI", supportsReasoning = true)
-        val gpt51CodexMax = LLMModel("gpt-5.1-codex-max", "GPT-5.1 Codex Max", "OpenAI", supportsReasoning = true)
-        val gpt52 = LLMModel("gpt-5.2", "GPT-5.2", "OpenAI", supportsReasoning = true)
-        val gpt4o = LLMModel("gpt-4o", "GPT-4o", "OpenAI")
-        val gpt4oMini = LLMModel("gpt-4o-mini", "GPT-4o Mini", "OpenAI")
-        val o3 = LLMModel("o3", "o3", "OpenAI", supportsReasoning = true)
-        val o4Mini = LLMModel("o4-mini", "o4 Mini", "OpenAI", supportsReasoning = true)
-        val codexMini = LLMModel("codex-mini-latest", "Codex Mini", "OpenAI", supportsReasoning = true)
-
-        val allOpenAI = listOf(gpt6Astra, gpt55, gpt53Codex, gpt52Codex, gpt51CodexMax, gpt52, gpt4o, gpt4oMini, o3, o4Mini, codexMini)
-
-        // OpenRouter (matching iOS built-in set)
-        val orClaudeSonnet4 = LLMModel("anthropic/claude-sonnet-4", "Claude Sonnet 4", "OpenRouter")
-        val orGemini25Flash = LLMModel("google/gemini-2.5-flash", "Gemini 2.5 Flash", "OpenRouter")
-        val orGpt4o = LLMModel("openai/gpt-4o", "GPT-4o", "OpenRouter")
-        val orLlamaMaverick = LLMModel("meta-llama/llama-4-maverick", "Llama 4 Maverick", "OpenRouter")
-
-        val allOpenRouter = listOf(orClaudeSonnet4, orGemini25Flash, orGpt4o, orLlamaMaverick)
-
-        // xAI (Grok) — OAuth-only path uses these as the built-in catalog.
-        // Source of truth = XAIModelsAPI; this list is what surfaces in the
-        // Add Provider → Models step before any models-cache call.
-        //
-        // Catalog ordering = default-pick order. Keep the newest confirmed
-        // fallback model first. T-xai-models-refresh dropped grok-3-* slugs
-        // (xAI server-side now redirects those to grok-4.3, so showing
-        // them in the picker is just noise) and added the multi-agent
-        // / build / fast / code-fast variants surfaced by xAI docs and
-        // OpenClaw's catalog (port iOS db973552).
-        // Official xAI catalog (docs.x.ai/docs/models) - synced from CLIProxyAPI models.json
-        // [T-provider-dynamic-catalog-reconcile] Seed/fallback for pre-network first paint.
-        val grok46 = LLMModel("grok-4.6", "Grok 4.6", "xAI", supportsReasoning = true)
-        val grok45 = LLMModel("grok-4.5", "Grok 4.5", "xAI", supportsReasoning = true)
-        val grok43 = LLMModel("grok-4.3", "Grok 4.3", "xAI", supportsReasoning = true)
-        val grok420Reasoning = LLMModel("grok-4.20-0309-reasoning", "Grok 4.20 Reasoning", "xAI", supportsReasoning = true)
-        val grok420NonReasoning = LLMModel("grok-4.20-0309-non-reasoning", "Grok 4.20", "xAI")
-        val grok420MultiAgent = LLMModel("grok-4.20-multi-agent-0309", "Grok 4.20 Multi-Agent", "xAI", supportsReasoning = true)
-        val grokBuild01 = LLMModel("grok-build-0.1", "Grok Build 0.1", "xAI")
-        val grok3Mini = LLMModel("grok-3-mini", "Grok 3 Mini", "xAI", supportsReasoning = true)
-        val grok3MiniFast = LLMModel("grok-3-mini-fast", "Grok 3 Mini Fast", "xAI", supportsReasoning = true)
-        val grokComposer25Fast = LLMModel("grok-composer-2.5-fast", "Grok Composer 2.5 Fast", "xAI")
-        // High-frequency fast / code variants surfaced by OpenClaw's catalog.
-        val grok4Fast = LLMModel("grok-4-fast", "Grok 4 Fast", "xAI", supportsReasoning = true)
-        val grok4FastNonReasoning = LLMModel("grok-4-fast-non-reasoning", "Grok 4 Fast (Non-Reasoning)", "xAI")
-        val grokCodeFast1 = LLMModel("grok-code-fast-1", "Grok Code Fast 1", "xAI", supportsReasoning = true)
-
-        val allXAI = listOf(
-            grok46,
-            grok45,
-            grok43,
-            grok420Reasoning,
-            grok420NonReasoning,
-            grok420MultiAgent,
-            grokBuild01,
-            grok3Mini,
-            grok3MiniFast,
-            grokComposer25Fast,
-            grok4Fast,
-            grok4FastNonReasoning,
-            grokCodeFast1,
-        )
-
-        // [T-kimi-oauth] Kimi Code (Coding Plan) built-in fallback — deliberately
-        // minimal and non-speculative (iOS parity): only confirmed current-gen
-        // models. kimi-k3 verified present as the first entry of a live
-        // GET /coding/v1/models fetch (2026-07-23). The real catalog replaces
-        // this via refreshModels after login — the upstream lineup shifts
-        // (K2 → K3 → …), so we never hand-author a "complete" list.
-        val kimiK3 = LLMModel("kimi-k3", "Kimi K3", "Kimi")
-        val kimiK2 = LLMModel("kimi-k2", "Kimi K2", "Kimi")
-
-        val allKimi = listOf(kimiK3, kimiK2)
-
-        val allModels = allAnthropic + allGemini + allOpenAI + allOpenRouter + allXAI + allKimi
-
         /**
          * Heuristic display-name formatter for API model ids.
          * Mirrors iOS `modelDisplayName(from:)`: splits on `/` and `-`, preserves a
@@ -250,7 +110,7 @@ data class LLMModel(
     val contextWindowTokens: Int
         get() {
             contextWindow?.let { if (it > 0) return it }
-            if (isGpt6Astra) return gpt6Astra.contextWindow!!
+            com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(id).contextWindow?.takeIf { it > 0 }?.let { return it }
             val lid = id.lowercase()
             // Anthropic Claude — modern Opus/Sonnet 4.x & 5 and Fable/Mythos 5
             // ship 1M; Haiku and legacy 2.x/3.x are 200K.

@@ -35,7 +35,7 @@ import com.openminis.app.provider.thinking.ThinkingRuleResolver
 
 class AnthropicProvider(
     private val apiKey: String,
-    override var model: LLMModel = LLMModel.claudeHaiku45,
+    override var model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("anthropic", "claude-haiku-4-5", "Claude Haiku 4.5", "Anthropic"),
     private val basePath: String = "https://api.anthropic.com",
     /** Whether this provider uses OAuth credentials (Bearer + beta header). */
     val isOAuth: Boolean = false,
@@ -795,53 +795,16 @@ class AnthropicProvider(
          * claude-3-5-sonnet still wins as (3,5) — never (3,0).
          * Returns null for non-Claude ids or ids without any version digits.
          */
-        private fun parseClaudeVersion(modelId: String): Pair<Int, Int>? {
-            val lower = modelId.lowercase()
-            if (!lower.contains("claude")) return null
-            val regex = Regex("""[-/]?(\d+)(?:[-.](\d+))?(?:$|[^0-9])""")
-            val match = regex.find(lower) ?: return null
-            val major = match.groupValues[1].toIntOrNull() ?: return null
-            val minor = match.groupValues[2].toIntOrNull() ?: 0
-            return major to minor
-        }
+        fun modelRejectsTemperature(modelId: String): Boolean =
+            com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).rejectsTemperature == true
 
-        /**
-         * Claude models from 4.6 onward reject the `temperature` parameter.
-         * Returns true when the model id parses as Claude version >= 4.6.
-         */
-        fun modelRejectsTemperature(modelId: String): Boolean {
-            val (major, minor) = parseClaudeVersion(modelId) ?: return false
-            return major > 4 || (major == 4 && minor >= 6)
-        }
+        /** Claude versions configured for adaptive effort thinking are listed in model-rules.json. */
+        fun modelUsesAdaptiveThinking(modelId: String): Boolean =
+            com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).adaptiveThinking == true
 
-        /**
-         * Claude 4.6 and later use *adaptive* thinking (`thinking.type="adaptive"` plus
-         * `output_config.effort = low|medium|high|xhigh|max`) and silently ignore the
-         * older `thinking.type="enabled" + budget_tokens` form. Older Claude models still
-         * need the legacy budget-based form.
-         */
-        fun modelUsesAdaptiveThinking(modelId: String): Boolean {
-            val (major, minor) = parseClaudeVersion(modelId) ?: return false
-            return major > 4 || (major == 4 && minor >= 6)
-        }
-
-        /**
-         * [T-android-claude-opus48-thinking-toggle] (Sow Sow 38845/38850) True
-         * when this Claude model supports extended thinking — i.e. the Deep
-         * Thinking toggle should appear for it. Anthropic added extended thinking
-         * with Claude 3.7; every 4.x model (opus / sonnet / haiku) supports it.
-         * Used to stamp `supportsReasoning = true` on models fetched from
-         * `/v1/models` (which returns no capability metadata), so the toggle shows
-         * on a direct-Anthropic instance even when models.dev hasn't catalogued
-         * the model yet (e.g. brand-new Opus 4.8). The provider already builds the
-         * correct `thinking` request for any such model (see
-         * modelUsesAdaptiveThinking / the legacy budget path), so this is purely
-         * the UI-capability flag those request paths assumed.
-         */
-        fun supportsThinking(modelId: String): Boolean {
-            val (major, minor) = parseClaudeVersion(modelId) ?: return false
-            return major > 4 || major == 4 || (major == 3 && minor >= 7)
-        }
+        /** Provider-listed Claude reasoning support is also supplied by model-rules.json. */
+        fun supportsThinking(modelId: String): Boolean =
+            com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).supportsReasoning == true
 
         /** Calculate thinking budget tokens based on level (legacy <=4.5 protocol). */
         fun thinkingBudget(maxTokens: Int, level: ThinkingLevel): Int {

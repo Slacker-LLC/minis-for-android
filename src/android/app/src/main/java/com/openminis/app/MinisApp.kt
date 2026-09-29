@@ -257,6 +257,8 @@ class MinisApp : Application(), ImageLoaderFactory {
             return
         }
 
+        com.openminis.app.provider.rules.ModelRulesProvider.initialize(this)
+
         // T-android-safemode-lateinit-crash: hand AppLogger a Context before
         // any early-return below can skip AppLogger.init(). This costs
         // nothing (no I/O, no prefs, no capture) and is what lets the in-app

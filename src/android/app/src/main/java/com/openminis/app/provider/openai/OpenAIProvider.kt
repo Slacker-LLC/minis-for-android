@@ -58,7 +58,7 @@ import com.openminis.app.provider.failOnSilentEmptyCompletion
 class OpenAIProvider private constructor(
     private val apiKey: String?,
     private val oauthTokenProvider: (suspend () -> String)?,
-    override var model: LLMModel = LLMModel.gpt4oMini,
+    override var model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "gpt-4o-mini", "GPT-4o Mini", "OpenAI"),
     private val basePath: String = "https://api.openai.com/v1",
     private val extraHeaders: Map<String, String> = emptyMap(),
     /** Codex account ID for OAuth mode (extracted from JWT). */
@@ -104,7 +104,7 @@ class OpenAIProvider private constructor(
      * Non-reasoning Responses relays do honor the per-session field.
      */
     override val supportsTemperatureOverride: Boolean
-        get() = !model.isGpt6Astra && model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
+        get() = com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).rejectsTemperature != true && model.supportsReasoning != true && (usesChatCompletionsAPI || !isOAuth)
 
     /**
      * [T-android-thinking-rules-phase2] Owning provider-instance id, set by
@@ -129,7 +129,7 @@ class OpenAIProvider private constructor(
     /** API Key constructor (Chat Completions API by default; set useResponsesAPI=true for /v1/responses). */
     constructor(
         apiKey: String,
-        model: LLMModel = LLMModel.gpt4oMini,
+        model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "gpt-4o-mini", "GPT-4o Mini", "OpenAI"),
         basePath: String = "https://api.openai.com/v1",
         extraHeaders: Map<String, String> = emptyMap(),
         useResponsesAPI: Boolean = false,
@@ -151,7 +151,7 @@ class OpenAIProvider private constructor(
     /** OAuth constructor (Codex Responses API). */
     constructor(
         oauthTokenProvider: suspend () -> String,
-        model: LLMModel = LLMModel.codexMini,
+        model: LLMModel = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback("openAI", "codex-mini-latest", "Codex Mini", "OpenAI"),
         codexAccountId: String? = null,
     ) : this(apiKey = null, oauthTokenProvider = oauthTokenProvider, model = model, codexAccountId = codexAccountId)
 
@@ -359,7 +359,7 @@ class OpenAIProvider private constructor(
     // Astra function calling requires Responses. Namespaced relay ids retain
     // their configured transport; the exact OpenAI id uses Responses by default.
     private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions ||
-        (!isOAuth && !useResponsesAPI && (isAzure || model.id != LLMModel.gpt6Astra.id))
+        (!isOAuth && !useResponsesAPI && (isAzure || model.id != "gpt-6-astra"))
 
     /**
      * [T-android-tool-splits-reply-fix] Chat Completions streams ONE
@@ -2328,11 +2328,11 @@ class OpenAIProvider private constructor(
      * (its body is part of the client fingerprint and must stay untouched).
      */
     private fun applyAstraRequestContract(body: JSONObject) {
-        if (!model.isGpt6Astra) return
+        if (!model.id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)) return
         // Enforce after passthrough merging so stale stored parameters cannot
         // reintroduce fields rejected by Astra. OFF/minimal map to its lowest tier.
         for (key in listOf("temperature", "top_p", "top_logprobs", "logprobs")) body.remove(key)
-        val allowed = LLMModel.gpt6Astra.reasoningEffortValues
+        val allowed = com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).reasoningEffortValues ?: model.reasoningEffortValues
         if (usesChatCompletionsAPI) {
             body.put("reasoning_effort", clampEffort(body.optString("reasoning_effort", "low"), allowed))
         } else {

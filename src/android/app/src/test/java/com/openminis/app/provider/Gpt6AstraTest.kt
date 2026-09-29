@@ -20,9 +20,13 @@ import okio.Buffer
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 
 class Gpt6AstraTest {
+    @Before
+    fun installRules() = ModelRulesTestFixtures.installBundledCatalog()
+
     private val messages = listOf(LLMMessage(LLMMessage.Role.USER, "hello"))
     private val tools = listOf(AgentToolDefinition("fixture_tool", "Fixture", emptyMap()))
     private val sse = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\n" +
@@ -37,7 +41,7 @@ class Gpt6AstraTest {
         assertTrue(model.inputModalities!!.contains("image"))
         assertEquals(ThinkingLevel.MAX, model.catalogMaxThinkingLevel)
         assertEquals(listOf("low", "medium", "high", "xhigh", "max"), model.reasoningEffortValues)
-        assertTrue(LLMModel.allOpenAI.contains(LLMModel.gpt6Astra))
+        assertTrue(com.openminis.app.provider.rules.ModelRulesProvider.staticModels("openAI").any { it.id == "gpt-6-astra" })
     }
 
     @Test
@@ -91,7 +95,7 @@ class Gpt6AstraTest {
 
     @Test
     fun `OAuth retains login route account headers tools and all supported effort tiers`() = runBlocking {
-        val provider = OpenAIProvider({ "fixture-token" }, LLMModel.gpt6Astra, "fixture-account")
+        val provider = OpenAIProvider({ "fixture-token" }, com.openminis.app.provider.rules.ModelRulesProvider.staticModels("openAI").single { it.id == "gpt-6-astra" }, "fixture-account")
         val captured = mutableListOf<Request>()
         interceptRequests(provider, captured)
         val expected = listOf("low", "low", "medium", "high", "xhigh", "max", "max")
@@ -121,15 +125,17 @@ class Gpt6AstraTest {
             assertEquals(1_050_000, inferContextWindowTokens(model))
             assertEquals(ThinkingLevel.MAX, model.catalogMaxThinkingLevel)
         }
-        assertFalse(LLMModel("gpt-6-astra-unrelated", "Fixture", "Custom").isGpt6Astra)
-        assertEquals(50_000, inferContextWindowTokens(LLMModel.gpt6Astra.copy(contextWindow = 50_000)))
+        val unrelated = LLMModel("gpt-6-astra-unrelated", "Fixture", "Custom")
+        assertNull(com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(unrelated.id).contextWindow)
+        assertEquals(ThinkingLevel.HIGH, unrelated.catalogMaxThinkingLevel)
+        assertEquals(50_000, inferContextWindowTokens(LLMModel("gpt-6-astra", "Astra", "OpenAI", contextWindow = 50_000)))
     }
 
     @Test
     fun `namespaced relay preserves configured Chat Completions transport`() {
-        val provider = OpenAIProvider("fixture", LLMModel.gpt6Astra.copy(id = "openai/gpt-6-astra"), "https://openrouter.ai/api/v1")
+        val provider = OpenAIProvider("fixture", com.openminis.app.provider.rules.ModelRulesProvider.staticModels("openAI").single { it.id == "gpt-6-astra" }.copy(id = "openai/gpt-6-astra"), "https://openrouter.ai/api/v1")
         assertTrue(provider.streamTextIsMonolithic)
-        assertTrue(OpenAIProvider("fixture", LLMModel.gpt4oMini).streamTextIsMonolithic)
+        assertTrue(OpenAIProvider("fixture", LLMModel("gpt-4o-mini", "GPT-4o Mini", "OpenAI")).streamTextIsMonolithic)
     }
 
     @Test

@@ -47,7 +47,7 @@ class ResponsesApiFinishedTest {
         )
         val provider = OpenAIProvider(
             apiKey = "test-key",
-            model = LLMModel.gpt4oMini,
+            model = ModelRulesTestFixtures.staticModel("openAI", "gpt-4o-mini"),
             basePath = server.loopbackUrl("/v1").toString().trimEnd('/'),
             useResponsesAPI = true,
         )
