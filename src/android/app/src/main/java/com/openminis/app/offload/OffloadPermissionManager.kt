@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -127,6 +129,8 @@ object OffloadPermissionManager {
     val pendingRequest: StateFlow<PermissionRequest?> = _pendingRequest.asStateFlow()
 
     private var pendingContinuation: CancellableContinuation<Response>? = null
+    /** Only one ASK_ONCE dialog may own the shared pending-request slot at a time. */
+    private val askOncePromptMutex = Mutex()
 
     // ── Android system runtime permission request (for location etc.) ──────────
 
@@ -451,6 +455,29 @@ object OffloadPermissionManager {
         }
     }
 
+    /**
+     * Resolve the permission level for an execution context. Privacy and
+     * integration tools with no valid user-selected level fail closed during
+     * unattended work; attended sessions keep their existing defaults. An
+     * explicit Settings choice (including ASK_ONCE) remains authoritative.
+     */
+    internal fun resolveLevelForSession(
+        info: ToolPermissionInfo?,
+        storedLevelName: String?,
+        unattended: Boolean,
+    ): PermissionLevel {
+        if (info == null) return PermissionLevel.BYPASS
+        val configured = storedLevelName?.let { name ->
+            runCatching { PermissionLevel.valueOf(name) }.getOrNull()
+        }
+        val sensitive = info.category == PermissionCategory.PRIVACY ||
+            info.category == PermissionCategory.INTEGRATIONS
+        if (unattended && sensitive && configured == null) {
+            return PermissionLevel.NOT_ALLOWED
+        }
+        return configured ?: info.defaultLevel
+    }
+
     fun setLevel(toolName: String, level: PermissionLevel) {
         prefs.edit().putString("level_$toolName", level.name).apply()
     }
@@ -519,8 +546,14 @@ object OffloadPermissionManager {
         timeoutMs: Long = UNATTENDED_ASK_ONCE_TIMEOUT_MS,
         await: suspend () -> Response,
     ): AskOnceWaitResult {
-        if (!unattended) return AskOnceWaitResult.Responded(await())
-        val response = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) { await() }
+        // The UI exposes one global pending request, so concurrent ASK_ONCE
+        // callers must queue rather than overwrite each other's continuation.
+        if (!unattended) {
+            return AskOnceWaitResult.Responded(askOncePromptMutex.withLock { await() })
+        }
+        val response = withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) {
+            askOncePromptMutex.withLock { await() }
+        }
         return response?.let(AskOnceWaitResult::Responded) ?: AskOnceWaitResult.TimedOut
     }
 
@@ -532,12 +565,17 @@ object OffloadPermissionManager {
         toolTitle: String,
         sessionId: String,
     ): PermissionCheckResult {
-        val level = getLevel(toolName)
+        val info = toolRegistry.find { it.toolName == toolName }
+        val unattended = isUnattendedSession(sessionId)
+        val level = resolveLevelForSession(
+            info = info,
+            storedLevelName = prefs.getString("level_$toolName", null),
+            unattended = unattended,
+        )
         return when (level) {
             PermissionLevel.BYPASS -> PermissionCheckResult(true)
             PermissionLevel.NOT_ALLOWED -> PermissionCheckResult(false)
             PermissionLevel.ASK_ONCE -> {
-                val unattended = isUnattendedSession(sessionId)
                 if (unattended && toolName in unattendedTimeoutDenials[sessionId].orEmpty()) {
                     return PermissionCheckResult(false, unattendedTimeout = true)
                 }

@@ -206,14 +206,18 @@ object ToolPermissionManager {
         }
     }
 
-    fun isAllowedFor(tool: String, caller: String): Boolean {
+    fun isAllowedFor(
+        tool: String,
+        caller: String,
+        sessionId: String = OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID,
+    ): Boolean {
         if (caller == CALLER_LOCAL) {
             upstreamAgentPermissionFor(tool)?.let { upstream ->
                 val allowed = runBlocking {
                     OffloadPermissionManager.checkPermission(
                         upstream.toolName,
                         upstream.displayName,
-                        OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID,
+                        sessionId.ifBlank { OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID },
                     )
                 }
                 if (!allowed) return false

@@ -1,8 +1,12 @@
 package com.openminis.app.offload
 
 import com.openminis.app.runtime.guest.OffloadGate
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -15,11 +19,47 @@ class UnattendedPermissionTest {
             unattended = true,
             timeoutMs = 20L,
         ) {
-            kotlinx.coroutines.suspendCancellableCoroutine { /* no ChatScreen is observing this request */ }
+            suspendCancellableCoroutine { /* no ChatScreen is observing this request */ }
         }
         assertEquals(OffloadPermissionManager.AskOnceWaitResult.TimedOut, result)
         val timedOut = OffloadPermissionManager.PermissionCheckResult(false, unattendedTimeout = true)
         assertEquals("permission_denied_unattended", OffloadGate.denialCode(timedOut))
+    }
+
+    @Test
+    fun `privacy and integration tools default deny only during unattended sessions`() {
+        val calendar = OffloadPermissionManager.toolRegistry.first { it.toolName == "calendar" }
+        val integration = OffloadPermissionManager.toolRegistry.first { it.toolName == "a11y_cli" }
+        val media = OffloadPermissionManager.toolRegistry.first { it.toolName == "speak" }
+
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.BYPASS,
+            OffloadPermissionManager.resolveLevelForSession(calendar, null, unattended = false),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.NOT_ALLOWED,
+            OffloadPermissionManager.resolveLevelForSession(calendar, null, unattended = true),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.NOT_ALLOWED,
+            OffloadPermissionManager.resolveLevelForSession(integration, null, unattended = true),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.BYPASS,
+            OffloadPermissionManager.resolveLevelForSession(calendar, "BYPASS", unattended = true),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.ASK_ONCE,
+            OffloadPermissionManager.resolveLevelForSession(calendar, "ASK_ONCE", unattended = true),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.NOT_ALLOWED,
+            OffloadPermissionManager.resolveLevelForSession(calendar, "not-a-level", unattended = true),
+        )
+        assertEquals(
+            OffloadPermissionManager.PermissionLevel.BYPASS,
+            OffloadPermissionManager.resolveLevelForSession(media, null, unattended = true),
+        )
     }
 
     @Test
@@ -38,6 +78,40 @@ class UnattendedPermissionTest {
         )
         assertTrue(System.currentTimeMillis() - startedAt >= 20L)
         assertEquals("permission_denied", OffloadGate.denialCode(OffloadPermissionManager.PermissionCheckResult(false)))
+    }
+
+    @Test
+    fun `concurrent ask once requests are presented one at a time`() = runBlocking {
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<OffloadPermissionManager.Response>()
+        var secondEntered = false
+
+        val first = async {
+            OffloadPermissionManager.awaitAskOnceResponse(unattended = false) {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+            }
+        }
+        firstEntered.await()
+        val second = async {
+            OffloadPermissionManager.awaitAskOnceResponse(unattended = false) {
+                secondEntered = true
+                OffloadPermissionManager.Response.ALLOW_ONCE
+            }
+        }
+        yield()
+        assertFalse(secondEntered)
+
+        releaseFirst.complete(OffloadPermissionManager.Response.DENY_SESSION)
+        assertEquals(
+            OffloadPermissionManager.AskOnceWaitResult.Responded(OffloadPermissionManager.Response.DENY_SESSION),
+            first.await(),
+        )
+        assertEquals(
+            OffloadPermissionManager.AskOnceWaitResult.Responded(OffloadPermissionManager.Response.ALLOW_ONCE),
+            second.await(),
+        )
+        assertTrue(secondEntered)
     }
 
     @Test

@@ -27,6 +27,10 @@
 
 源码已经补上 DNS 的 UDP 失败后 TCP 重试，单测通过；小米真机还没重测。HTTPS 测指定 IP 时要保留域名，用 `curl --resolve <host>:443:<ip> https://<host>/`，不要关闭证书检查。
 
+## 无人值守会话网络出口
+
+无人值守会话当前没有系统层网络出口限制。工具权限和例程权限分档属于应用层策略，不构成网络隔离；明确允许的浏览器、搜索/fetch 或完整权限下的命令仍可能访问网络。这是维护者明确决定保留的残余风险，本任务不增加网络出口拦截。
+
 旧 APK 的精简 rootfs 基础包只保证 `curl`/`wget`，因此 Guest 中曾出现
 `ping: command not found`。当前分支已将 `iputils-ping` 纳入 provision 包和 readiness probe；
 最新 Debug APK 已部署到小米 `24129PN74C` 真机；Guest 内 `command -v ping` 返回

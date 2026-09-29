@@ -7663,7 +7663,11 @@ class ChatViewModel(
             }
         } ?: baseSystemPrompt
         val effectiveSystemPrompt = com.openminis.app.scheduled.ScheduledRunPromptPolicy
-            .appendSafetyNote(promptWithOverrides, sessionSource)
+            .appendSafetyNote(
+                systemPrompt = promptWithOverrides,
+                sessionSource = sessionSource,
+                unattended = OffloadPermissionManager.isUnattendedSession(activeSessionId),
+            )
 
         // [T-android-mem-probe-trust] Send-path context shape. The existing
         // `messages-shape` probe only runs on session LOAD, so the 2026-08-15
