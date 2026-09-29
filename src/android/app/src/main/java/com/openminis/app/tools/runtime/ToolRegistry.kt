@@ -90,7 +90,18 @@ object ToolExecutor {
     ): ToolExecutionResult {
         val canonical = ToolRegistry.canonicalName(name)
             ?: return ToolExecutionResult("Error: unknown_tool: $name", false)
-        if (!ToolPermissionManager.isAllowedFor(canonical, caller, sessionId)) {
+        val requestedDisplayId = runCatching {
+            val value = JSONObject(argsJson).opt("displayId")
+            when (value) {
+                is Number -> value.toDouble().takeIf { it.isFinite() && it >= 0.0 && it <= Int.MAX_VALUE && it % 1.0 == 0.0 }?.toInt()
+                is String -> value.toIntOrNull()?.takeIf { it >= 0 }
+                else -> null
+            }
+        }.getOrNull()
+        if (ToolPermissionManager.isRemoteVirtualDisplayDenied(canonical, caller, requestedDisplayId)) {
+            return ToolExecutionResult("Error: permission_denied: virtual-display android.ui is local-only", false)
+        }
+        if (!ToolPermissionManager.isAllowedFor(canonical, caller, sessionId, requestedDisplayId)) {
             return ToolExecutionResult("Error: permission_denied: $canonical", false)
         }
         if (ToolPermissionManager.needsConfirm(canonical, caller) && !confirmBypassed) {

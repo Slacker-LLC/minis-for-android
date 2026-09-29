@@ -13,6 +13,12 @@ class VirtualScreenPolicyTest {
         assertEquals(VirtualScreenPolicy.DISPLAY_GONE, VirtualScreenPolicy.displayError(7, null))
         assertEquals(VirtualScreenPolicy.UNKNOWN_DISPLAY, VirtualScreenPolicy.displayError(8, 7))
         assertEquals(null, VirtualScreenPolicy.displayError(7, 7))
+        assertEquals("vscreen_unavailable", VirtualScreenPolicy.UNAVAILABLE)
+    }
+
+    @Test fun disabledNativeToolsAllReturnUnavailable() {
+        assertEquals(VirtualScreenPolicy.UNAVAILABLE, VirtualScreenPolicy.disabledToolError(false))
+        assertEquals(null, VirtualScreenPolicy.disabledToolError(true))
     }
 
     @Test fun virtualDisplayFlagsFallBackInTheRequiredOrder() {

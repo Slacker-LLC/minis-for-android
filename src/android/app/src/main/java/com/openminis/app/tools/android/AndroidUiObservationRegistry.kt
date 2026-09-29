@@ -91,6 +91,8 @@ object AndroidUiObservationRegistry {
     )
 
     private data class Observation(
+        val sessionId: String,
+        val displayId: Int,
         val generation: Long,
         val createdAt: Long,
         val fingerprint: String,
@@ -124,6 +126,8 @@ object AndroidUiObservationRegistry {
         service: MinisAccessibilityService,
         roots: List<AccessibilityNodeInfo>,
         options: UiObserveOptions,
+        sessionId: String = "",
+        displayId: Int = 0,
     ): JSONObject {
         val generation = generationFence.nextGeneration()
         val scanned = fingerprint(roots)
@@ -187,13 +191,18 @@ object AndroidUiObservationRegistry {
 
         roots.forEachIndexed { index, root -> walk(root, index, emptyList(), 0, null) }
         observations[generation] = Observation(
+            sessionId = sessionId,
+            displayId = displayId,
             generation = generation,
             createdAt = System.currentTimeMillis(),
             fingerprint = scanned.hash,
             snapshotTruncated = scanned.truncated,
             locators = locators,
         )
-        generationFence.install(generation, scanned.hash, locators.keys, truncated = scanned.truncated)
+        generationFence.install(
+            generation, scanned.hash, locators.keys,
+            truncated = scanned.truncated, sessionId = sessionId, displayId = displayId,
+        )
         trimLocked()
         val foreground = service.foregroundWindow()
         return JSONObject().apply {
@@ -212,9 +221,12 @@ object AndroidUiObservationRegistry {
     }
 
     @Synchronized
-    fun resolve(generation: Long, ref: String): UiRefResolution {
+    fun resolve(generation: Long, ref: String, sessionId: String = "", displayId: Int = 0): UiRefResolution {
         val observation = observations[generation]
             ?: return UiRefResolution.Error("STALE_UI_REF", "generation $generation is no longer retained; run android_ui observe again")
+        if (observation.sessionId != sessionId || observation.displayId != displayId) {
+            return UiRefResolution.Error("STALE_UI_REF", "generation $generation belongs to another session or display")
+        }
         val locator = observation.locators[ref]
             ?: return UiRefResolution.Error("UI_REF_NOT_FOUND", "ref $ref does not belong to generation $generation")
         val service = MinisAccessibilityService.getInstance()
@@ -223,7 +235,9 @@ object AndroidUiObservationRegistry {
         windowSetRefusal(windowSet)?.let { (code, message) -> return UiRefResolution.Error(code, message) }
         val roots = windowSet.roots
         val scanned = fingerprint(roots)
-        when (generationFence.validate(generation, ref, scanned.hash, scanned.truncated)) {
+        when (generationFence.validate(
+            generation, ref, scanned.hash, scanned.truncated, sessionId = sessionId, displayId = displayId,
+        )) {
             UiGenerationFence.Verdict.STALE -> return UiRefResolution.Error(
                 "STALE_UI_REF", "the window changed or generation $generation expired; run android_ui observe again",
             )
@@ -265,9 +279,11 @@ object AndroidUiObservationRegistry {
      * stays [UiChangeObservation.UNKNOWN]; none of those may be reported as an effect.
      */
     @Synchronized
-    fun changeEvidence(generation: Long, ref: String): UiChangeObservation {
-        if (observations[generation] == null) return UiChangeObservation.UNKNOWN
-        return when (val resolved = resolve(generation, ref)) {
+    fun changeEvidence(generation: Long, ref: String, sessionId: String = "", displayId: Int = 0): UiChangeObservation {
+        if (observations[generation]?.let { it.sessionId == sessionId && it.displayId == displayId } != true) {
+            return UiChangeObservation.UNKNOWN
+        }
+        return when (val resolved = resolve(generation, ref, sessionId, displayId)) {
             is UiRefResolution.Found -> UiChangeObservation.UNCHANGED
             is UiRefResolution.Error ->
                 if (resolved.code == "STALE_UI_REF") UiChangeObservation.CHANGED else UiChangeObservation.UNKNOWN
@@ -287,8 +303,13 @@ object AndroidUiObservationRegistry {
      * is not unique in the current tree are omitted instead of guessed.
      */
     @Synchronized
-    fun sampleAnchors(service: MinisAccessibilityService, generation: Long): List<UiAnchorSample>? {
-        val observation = observations[generation] ?: return null
+    fun sampleAnchors(
+        service: MinisAccessibilityService,
+        generation: Long,
+        sessionId: String = "",
+        displayId: Int = 0,
+    ): List<UiAnchorSample>? {
+        val observation = observations[generation]?.takeIf { it.sessionId == sessionId && it.displayId == displayId } ?: return null
         val wanted = observation.locators.values.take(MAX_EVIDENCE_ANCHORS)
         if (wanted.isEmpty()) return emptyList()
         val windowSet = service.visibleWindowSet()
@@ -377,10 +398,11 @@ object AndroidUiObservationRegistry {
             put("ref", locator.ref)
             parentRef?.let { put("parentRef", it) }
             put("depth", depth)
-            if (locator.text.isNotEmpty()) put("text", locator.text)
-            if (locator.contentDescription.isNotEmpty()) put("contentDescription", locator.contentDescription)
+            if (!locator.password && locator.text.isNotEmpty()) put("text", locator.text)
+            if (!locator.password && locator.contentDescription.isNotEmpty()) put("contentDescription", locator.contentDescription)
             if (locator.resourceId.isNotEmpty()) put("viewIdResourceName", locator.resourceId)
             if (locator.className.isNotEmpty()) put("className", locator.className)
+            put("password", locator.password)
             put("bounds", JSONObject()
                 .put("left", bounds.left).put("top", bounds.top)
                 .put("right", bounds.right).put("bottom", bounds.bottom))

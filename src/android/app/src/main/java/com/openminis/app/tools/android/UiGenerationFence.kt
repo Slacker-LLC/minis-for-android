@@ -9,6 +9,8 @@ class UiGenerationFence(
     enum class Verdict { VALID, STALE, REF_NOT_FOUND, TRUNCATED }
 
     private data class Entry(
+        val sessionId: String,
+        val displayId: Int,
         val fingerprint: String,
         val truncated: Boolean,
         val refs: Set<String>,
@@ -22,8 +24,15 @@ class UiGenerationFence(
     fun nextGeneration(): Long = ++nextGeneration
 
     @Synchronized
-    fun install(generation: Long, fingerprint: String, refs: Set<String>, truncated: Boolean = false) {
-        entries[generation] = Entry(fingerprint, truncated, refs.toSet(), clock())
+    fun install(
+        generation: Long,
+        fingerprint: String,
+        refs: Set<String>,
+        truncated: Boolean = false,
+        sessionId: String = "",
+        displayId: Int = 0,
+    ) {
+        entries[generation] = Entry(sessionId, displayId, fingerprint, truncated, refs.toSet(), clock())
         trim()
     }
 
@@ -33,8 +42,11 @@ class UiGenerationFence(
         ref: String,
         currentFingerprint: String,
         currentTruncated: Boolean = false,
+        sessionId: String = "",
+        displayId: Int = 0,
     ): Verdict {
         val entry = entries[generation] ?: return Verdict.STALE
+        if (entry.sessionId != sessionId || entry.displayId != displayId) return Verdict.STALE
         if (clock() - entry.createdAt > ttlMs) {
             entries.remove(generation)
             return Verdict.STALE
@@ -51,6 +63,11 @@ class UiGenerationFence(
     fun clear() {
         entries.clear()
         nextGeneration = 0L
+    }
+
+    @Synchronized
+    fun clearDisplay(displayId: Int) {
+        entries.entries.removeAll { it.value.displayId == displayId }
     }
 
     @Synchronized

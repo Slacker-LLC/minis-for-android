@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
+import com.openminis.app.tools.android.UiSensitiveValuePolicy
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -51,6 +52,28 @@ internal object UiNodeUtils {
 
     fun setText(root: AccessibilityNodeInfo?, text: String): Boolean {
         val node = findEditable(root, requireFocus = true) ?: findEditable(root, requireFocus = false) ?: return false
+        return setTextOnNode(node, text)
+    }
+
+    fun setTextTarget(root: AccessibilityNodeInfo?, targetIndex: Int, text: String): Boolean {
+        if (root == null || targetIndex < 1) return false
+        val state = TargetSearch(targetIndex)
+        findTarget(root, state)
+        val node = state.node ?: return false
+        val editable = safe { node.isEditable } || safeText { node.className }.contains("EditText", true)
+        return editable && setTextOnNode(node, text)
+    }
+
+    fun focusTarget(root: AccessibilityNodeInfo?, targetIndex: Int): Boolean {
+        if (root == null || targetIndex < 1) return false
+        val state = TargetSearch(targetIndex)
+        findTarget(root, state)
+        val node = state.node ?: return false
+        val editable = safe { node.isEditable } || safeText { node.className }.contains("EditText", true)
+        return editable && runCatching { node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }.getOrDefault(false)
+    }
+
+    private fun setTextOnNode(node: AccessibilityNodeInfo, text: String): Boolean {
         return runCatching {
             node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
@@ -74,11 +97,13 @@ internal object UiNodeUtils {
             return null
         }
         state.count++
-        val text = safeText { node.text }
-        val description = safeText { node.contentDescription }
-        val hint = safeText { node.hintText }
+        val password = safe { node.isPassword }
+        val text = UiSensitiveValuePolicy.redactAccessibilityValue(password, safeText { node.text })
+        val description = UiSensitiveValuePolicy.redactAccessibilityValue(password, safeText { node.contentDescription })
+        val hint = UiSensitiveValuePolicy.redactAccessibilityValue(password, safeText { node.hintText })
         val viewId = safeText { node.viewIdResourceName }
         val className = safeText { node.className }
+        val packageName = safeText { node.packageName }
         val editable = safe { node.isEditable } || className.contains("EditText", true)
         val visible = safe { node.isVisibleToUser }
         val enabled = safe { node.isEnabled }
@@ -91,6 +116,7 @@ internal object UiNodeUtils {
         if (targetIndex > 0) {
             state.targets.put(JSONObject().put("index", targetIndex).put("path", path)
                 .put("label", (text.ifBlank { description.ifBlank { hint } }).take(MAX_TEXT))
+                .put("packageName", packageName.take(MAX_TEXT))
                 .put("bounds", boundsValue(bounds)).put("actions", targetActions(clickable, longClickable, editable)))
         }
         if (visible && enabled && editable) {
@@ -118,6 +144,7 @@ internal object UiNodeUtils {
             .put("clickable", clickable)
             .put("longClickable", longClickable)
             .put("editable", editable)
+            .put("password", password)
             .put("focused", safe { node.isFocused })
             .put("selected", safe { node.isSelected })
             .put("checked", safe { node.isChecked })

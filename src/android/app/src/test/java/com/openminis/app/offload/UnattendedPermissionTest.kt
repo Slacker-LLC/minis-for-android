@@ -31,6 +31,7 @@ class UnattendedPermissionTest {
         val calendar = OffloadPermissionManager.toolRegistry.first { it.toolName == "calendar" }
         val integration = OffloadPermissionManager.toolRegistry.first { it.toolName == "a11y_cli" }
         val media = OffloadPermissionManager.toolRegistry.first { it.toolName == "speak" }
+        val vscreen = OffloadPermissionManager.toolRegistry.filter { it.toolName.startsWith("android.vscreen.") }
 
         assertEquals(
             OffloadPermissionManager.PermissionLevel.BYPASS,
@@ -60,6 +61,15 @@ class UnattendedPermissionTest {
             OffloadPermissionManager.PermissionLevel.BYPASS,
             OffloadPermissionManager.resolveLevelForSession(media, null, unattended = true),
         )
+        assertEquals(
+            setOf("android.vscreen.open", "android.vscreen.launch", "android.vscreen.close", "android.vscreen.status", "android.vscreen.ui"),
+            vscreen.map { it.toolName }.toSet(),
+        )
+        assertTrue(vscreen.all { it.defaultLevel == OffloadPermissionManager.PermissionLevel.NOT_ALLOWED })
+        assertTrue(vscreen.all {
+            OffloadPermissionManager.resolveLevelForSession(it, null, unattended = false) ==
+                OffloadPermissionManager.PermissionLevel.NOT_ALLOWED
+        })
     }
 
     @Test

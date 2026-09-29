@@ -121,6 +121,34 @@ internal class UiBridge {
         return false
     }
 
+    fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean {
+        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
+        if (targetIndex < 1) return false
+        val windows = windowsOnDisplay(automation ?: return false, displayId).values
+        var remaining = targetIndex
+        for (window in windows) {
+            val root = runCatching { window.root }.getOrNull() ?: continue
+            val count = countTargets(root)
+            if (remaining <= count) return UiNodeUtils.setTextTarget(root, remaining, text)
+            remaining -= count
+        }
+        return false
+    }
+
+    fun focusTarget(displayId: Int, targetIndex: Int): Boolean {
+        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
+        if (targetIndex < 1) return false
+        val windows = windowsOnDisplay(automation ?: return false, displayId).values
+        var remaining = targetIndex
+        for (window in windows) {
+            val root = runCatching { window.root }.getOrNull() ?: continue
+            val count = countTargets(root)
+            if (remaining <= count) return UiNodeUtils.focusTarget(root, remaining)
+            remaining -= count
+        }
+        return false
+    }
+
     fun hasWindowOnDisplay(displayId: Int, packageName: String): Boolean {
         if (displayId == 0) return false
         return windowsOnDisplay(automation ?: return false, displayId).values.any { window ->

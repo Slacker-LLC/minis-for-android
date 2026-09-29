@@ -60,6 +60,21 @@ internal class VirtualScreenPreferences(context: Context) {
         )
     }
 
+    fun displaySettings(): VirtualScreenDisplaySettings = VirtualScreenDisplaySettings(
+        width = preferences.getInt(KEY_WIDTH, VirtualScreenDisplaySettings.DEFAULT_WIDTH),
+        height = preferences.getInt(KEY_HEIGHT, VirtualScreenDisplaySettings.DEFAULT_HEIGHT),
+        dpi = preferences.getInt(KEY_DPI, VirtualScreenDisplaySettings.DEFAULT_DPI),
+    ).takeIf(VirtualScreenDisplaySettingsPolicy::isValid) ?: VirtualScreenDisplaySettings()
+
+    fun setDisplaySettings(settings: VirtualScreenDisplaySettings) {
+        require(VirtualScreenDisplaySettingsPolicy.isValid(settings)) { "invalid_vscreen_display_settings" }
+        preferences.edit()
+            .putInt(KEY_WIDTH, settings.width)
+            .putInt(KEY_HEIGHT, settings.height)
+            .putInt(KEY_DPI, settings.dpi)
+            .apply()
+    }
+
     fun hasCurrentPassingProbe(currentFingerprint: String = currentDeviceFingerprint()): Boolean =
         VirtualScreenProbeCachePolicy.mayEnable(lastProbe(), currentFingerprint)
 
@@ -70,6 +85,9 @@ internal class VirtualScreenPreferences(context: Context) {
         private const val KEY_TIMESTAMP = "probe_timestamp_ms"
         private const val KEY_FINGERPRINT = "probe_fingerprint"
         private const val KEY_JSON = "probe_json"
+        private const val KEY_WIDTH = "display_width"
+        private const val KEY_HEIGHT = "display_height"
+        private const val KEY_DPI = "display_dpi"
 
         fun currentDeviceFingerprint(): String = listOf(
             Build.FINGERPRINT.orEmpty(),

@@ -34,6 +34,7 @@ object AndroidUiController {
         val imageData: ByteArray? = null,
         val imageLinuxPath: String? = null,
         val imageHostPath: String? = null,
+        val imageMimeType: String? = null,
     )
 
     /** Window between an action and its re-observation, so evidence is read after the UI settles. */
@@ -65,40 +66,79 @@ object AndroidUiController {
         toolId: String,
     ): UiToolResult {
         val action = args.optString("action", "observe")
+        val displayId = UiDisplayRoutePolicy.parseDisplayId(args.has("displayId"), args.opt("displayId"))
+            ?: return error("invalid_display_id", "displayId must be a non-negative integer; use 0 for the physical display")
+        val leaseSessionId = sessionId.ifBlank { OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID }
+        val unattended = OffloadPermissionManager.isUnattendedSession(leaseSessionId)
+        UnattendedScreenAccessPolicy.denialCode(
+            displayId = displayId,
+            unattended = unattended,
+            allowUnattendedPhysical = UnattendedAccessPrefs.allowsPhysicalScreen(context),
+        )?.let { return error(it, "Unattended sessions cannot operate the physical display by default") }
+
+        val vscreenClient = com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider.get(context)
+        val activeVirtualDisplayId = if (displayId == 0) null else withContext(Dispatchers.IO) {
+            runCatching { vscreenClient.queryActiveDisplayId() }.getOrNull()
+        }
+        val route = UiDisplayRoutePolicy.route(displayId, activeVirtualDisplayId)
+        if (route == UiDisplayRoutePolicy.Route.UNKNOWN) return error(
+            if (activeVirtualDisplayId == null) "vscreen_unavailable" else "unknown_display",
+            if (activeVirtualDisplayId == null) "No current VScreen display is available; run android.vscreen.status and pass the id returned by android.vscreen.open" else "displayId is not the current VScreen display",
+        )
+        val permissionName = if (route == UiDisplayRoutePolicy.Route.VIRTUAL_SCREEN) "android.vscreen.ui" else "a11y_cli"
         val allowed = OffloadPermissionManager.checkPermission(
-            "a11y_cli",
-            "android_ui $action",
-            sessionId.ifBlank { OffloadPermissionManager.OFFLOAD_GLOBAL_SESSION_ID },
+            permissionName,
+            if (route == UiDisplayRoutePolicy.Route.VIRTUAL_SCREEN) "VScreen UI $action" else "android_ui $action",
+            leaseSessionId,
         )
         if (!allowed) return error(
             "PERMISSION_DENIED",
-            "android-a11y-cli integration is disabled; enable it under Settings → Permissions → Integrations",
+            "$permissionName integration is disabled; enable it under Settings → Permissions → Integrations",
         )
-        val service = MinisAccessibilityService.getInstance()
-            ?: return error("ACCESSIBILITY_NOT_CONNECTED", "enable Minis under Android Settings → Accessibility")
-        return withContext(Dispatchers.Default) {
-            when (action) {
-                "observe" -> observe(service, args, sessionId)
-                "screenshot" -> screenshot(context, service, sessionId, args, toolId)
-                "click" -> click(service, args, longPress = false)
-                "long_press" -> click(service, args, longPress = true)
-                "set_text" -> setText(context, service, args)
-                "input_text" -> insertText(context, service, args, allowClipboardFallback = false)
-                "paste_text" -> insertText(context, service, args, allowClipboardFallback = true)
-                "ime_enter" -> imeEnter(service, args)
-                "scroll" -> scroll(service, args)
-                // [T-eta-ui-system-panel] back/home plus the system panels the guest
-                // android-a11y-cli already drives and Eta exposes as open_system_panel.
-                "back", "home", "recents", "notifications", "quick_settings" -> {
-                    val requested = UiGlobalAction.parse(action)
-                        ?: return@withContext error("INVALID_ACTION", "unknown android_ui action: $action")
-                    global(service, platformGlobalAction(requested), requested.wireName)
+        val service = if (route == UiDisplayRoutePolicy.Route.ACCESSIBILITY) {
+            MinisAccessibilityService.getInstance()
+                ?: return error("ACCESSIBILITY_NOT_CONNECTED", "enable Minis under Android Settings → Accessibility")
+        } else null
+
+        val title = AndroidDebugSessionStore.get(leaseSessionId).sessionTitle ?: "Chat"
+        when (val lease = DeviceScreenLease.shared.acquire(displayId, leaseSessionId, title, unattended)) {
+            is DeviceScreenLease.Acquisition.Busy -> return UiToolResult(
+                JSONObject().put("success", false).put("error", "screen_busy").put("holderName", lease.holderName)
+                    .put("message", "Another session owns this display"),
+                false,
+            )
+            DeviceScreenLease.Acquisition.Preempted -> return error("screen_preempted", "This unattended screen lease was preempted by an attended session")
+            DeviceScreenLease.Acquisition.InvalidSession -> return error("INVALID_SESSION", "A non-empty sessionId is required for screen operations")
+            is DeviceScreenLease.Acquisition.Granted -> Unit
+        }
+        val result = withContext(Dispatchers.Default) {
+            if (route == UiDisplayRoutePolicy.Route.VIRTUAL_SCREEN) {
+                VirtualScreenUiBackend.execute(leaseSessionId, args, vscreenClient)
+            } else {
+                val physical = service ?: return@withContext error("ACCESSIBILITY_NOT_CONNECTED", "enable Minis under Android Settings → Accessibility")
+                when (action) {
+                    "observe" -> observe(physical, args, leaseSessionId)
+                    "screenshot" -> screenshot(context, physical, leaseSessionId, args, toolId)
+                    "click" -> click(physical, args, leaseSessionId, longPress = false)
+                    "long_press" -> click(physical, args, leaseSessionId, longPress = true)
+                    "set_text" -> setText(context, physical, args, leaseSessionId)
+                    "input_text" -> insertText(context, physical, args, leaseSessionId, allowClipboardFallback = false)
+                    "paste_text" -> insertText(context, physical, args, leaseSessionId, allowClipboardFallback = true)
+                    "ime_enter" -> imeEnter(physical, args, leaseSessionId)
+                    "scroll" -> scroll(physical, args, leaseSessionId)
+                    "back", "home", "recents", "notifications", "quick_settings" -> {
+                        val requested = UiGlobalAction.parse(action)
+                            ?: return@withContext error("INVALID_ACTION", "unknown android_ui action: $action")
+                        global(physical, platformGlobalAction(requested), requested.wireName)
+                    }
+                    "wait" -> waitFor(physical, args)
+                    "wait_for_package" -> waitForPackage(physical, args)
+                    else -> error("INVALID_ACTION", "unknown android_ui action: $action")
                 }
-                "wait" -> waitFor(service, args)
-                "wait_for_package" -> waitForPackage(service, args)
-                else -> error("INVALID_ACTION", "unknown android_ui action: $action")
             }
         }
+        DeviceScreenLease.shared.touch(displayId, leaseSessionId)
+        return result
     }
 
     private fun observe(service: MinisAccessibilityService, args: JSONObject, sessionId: String): UiToolResult {
@@ -117,6 +157,8 @@ object AndroidUiController {
                 resourceIdFilter = args.optString("resourceIdFilter", "").takeIf(String::isNotBlank),
                 packageFilter = args.optString("packageFilter", "").takeIf(String::isNotBlank),
             ),
+            sessionId = sessionId,
+            displayId = Display.DEFAULT_DISPLAY,
         )
         AndroidDebugSessionStore.update(sessionId) {
             it.copy(lastUiGeneration = result.optLong("generation"), targetPackage = result.optString("package").ifBlank { it.targetPackage })
@@ -187,7 +229,7 @@ object AndroidUiController {
                 height = height,
                 originalWidth = originalWidth,
                 originalHeight = originalHeight,
-            ),
+            ), sessionId = sessionId, displayId = displayId,
         )
         val bytes = output.toByteArray()
         val linuxPath = ContextOffload.offloadImage(context, sessionId, bytes, toolId, "image/png")
@@ -216,11 +258,11 @@ object AndroidUiController {
         return UiToolResult(json, true, bytes, linuxPath.takeIf(String::isNotEmpty), null)
     }
 
-    private suspend fun click(service: MinisAccessibilityService, args: JSONObject, longPress: Boolean): UiToolResult {
+    private suspend fun click(service: MinisAccessibilityService, args: JSONObject, sessionId: String, longPress: Boolean): UiToolResult {
         val generation = args.optLong("generation", -1L)
         val ref = args.optString("ref", "")
         if (generation >= 0L && ref.isNotBlank()) {
-            return when (val resolved = AndroidUiObservationRegistry.resolve(generation, ref)) {
+            return when (val resolved = AndroidUiObservationRegistry.resolve(generation, ref, sessionId, Display.DEFAULT_DISPLAY)) {
                 is UiRefResolution.Error -> error(resolved.code, resolved.message)
                 is UiRefResolution.Found -> {
                     if (!resolved.node.isEnabled || !resolved.node.isVisibleToUser) {
@@ -244,7 +286,7 @@ object AndroidUiController {
                         }
                         delay(ACTION_EVIDENCE_SETTLE_MS)
                         val foreground = service.foregroundWindow()
-                        val change = AndroidUiObservationRegistry.changeEvidence(generation, ref)
+                        val change = AndroidUiObservationRegistry.changeEvidence(generation, ref, sessionId, Display.DEFAULT_DISPLAY)
                         val report = AndroidUiActionEvidence.ofClick(ok, change, fallbackReport)
                         UiToolResult(report.into(JSONObject()
                             .put("action", if (longPress) "long_press" else "click")
@@ -283,7 +325,7 @@ object AndroidUiController {
             x = requestedX,
             y = requestedY,
             space = space,
-            frame = ScreenshotFrameRegistry.latest(),
+            frame = ScreenshotFrameRegistry.latest(sessionId, Display.DEFAULT_DISPLAY),
             screenWidth = display.widthPixels,
             screenHeight = display.heightPixels,
         )
@@ -301,8 +343,8 @@ object AndroidUiController {
             .put("x", x).put("y", y).put("success", ok).put("coordinateFallback", true)), ok)
     }
 
-    private fun setText(context: Context, service: MinisAccessibilityService, args: JSONObject): UiToolResult {
-        val resolved = resolveRef(args)
+    private fun setText(context: Context, service: MinisAccessibilityService, args: JSONObject, sessionId: String): UiToolResult {
+        val resolved = resolveRef(args, sessionId)
         if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
         resolved as UiRefResolution.Found
         if (!resolved.node.isEditable || !resolved.node.isEnabled) {
@@ -348,9 +390,10 @@ object AndroidUiController {
         context: Context,
         service: MinisAccessibilityService,
         args: JSONObject,
+        sessionId: String,
         allowClipboardFallback: Boolean,
     ): UiToolResult {
-        val resolved = resolveRef(args)
+        val resolved = resolveRef(args, sessionId)
         if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
         resolved as UiRefResolution.Found
         if (!resolved.node.isEditable || !resolved.node.isEnabled) {
@@ -455,12 +498,12 @@ object AndroidUiController {
      * Ported from Eta `imeEnter` (agent/accessibility/AgentAccessibilityService.kt @ c15de97); the
      * action needs Android 11, and anything older is refused with the reason.
      */
-    private fun imeEnter(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+    private fun imeEnter(service: MinisAccessibilityService, args: JSONObject, sessionId: String): UiToolResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return error("IME_ENTER_UNAVAILABLE", "ACTION_IME_ENTER needs Android 11 or newer")
         }
         val node = if (args.optString("ref", "").isNotBlank()) {
-            val resolved = resolveRef(args)
+            val resolved = resolveRef(args, sessionId)
             if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
             (resolved as UiRefResolution.Found).node
         } else {
@@ -481,12 +524,12 @@ object AndroidUiController {
         )
     }
 
-    private suspend fun scroll(service: MinisAccessibilityService, args: JSONObject): UiToolResult {
+    private suspend fun scroll(service: MinisAccessibilityService, args: JSONObject, sessionId: String): UiToolResult {
         if (args.optString("ref", "").isNotBlank()) {
-            val resolved = resolveRef(args)
+            val resolved = resolveRef(args, sessionId)
             if (resolved is UiRefResolution.Error) return error(resolved.code, resolved.message)
             resolved as UiRefResolution.Found
-            return scrollNode(service, resolved, args)
+            return scrollNode(service, resolved, args, sessionId)
         }
         val x = args.optDouble("x", Double.NaN)
         val y = args.optDouble("y", Double.NaN)
@@ -501,7 +544,7 @@ object AndroidUiController {
             args.optString("coordinateSpace", UiCoordinateSpace.DEFAULT.wireName),
         )
         val display = service.resources.displayMetrics
-        val frame = ScreenshotFrameRegistry.latest()
+        val frame = ScreenshotFrameRegistry.latest(sessionId, Display.DEFAULT_DISPLAY)
         val resolvedPoint = UiCoordinateSpacePolicy.resolvePoint(x, y, space, frame, display.widthPixels, display.heightPixels)
         if (resolvedPoint is UiCoordinateResolution.Refused) return error(resolvedPoint.code, resolvedPoint.message)
         resolvedPoint as UiCoordinateResolution.Resolved
@@ -529,6 +572,7 @@ object AndroidUiController {
         service: MinisAccessibilityService,
         resolved: UiRefResolution.Found,
         args: JSONObject,
+        sessionId: String,
     ): UiToolResult {
         val node = resolved.node
         val generation = resolved.locator.generation
@@ -563,7 +607,7 @@ object AndroidUiController {
         } else {
             null
         }
-        val before = if (axis != null) AndroidUiObservationRegistry.sampleAnchors(service, generation) else null
+        val before = if (axis != null) AndroidUiObservationRegistry.sampleAnchors(service, generation, sessionId, Display.DEFAULT_DISPLAY) else null
         var accepted = node.performAction(
             if (legacySign > 0) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD,
         )
@@ -597,7 +641,7 @@ object AndroidUiController {
             null
         }
         val anchorDelta = if (axis != null && before != null) {
-            AndroidUiObservationRegistry.sampleAnchors(service, generation)
+            AndroidUiObservationRegistry.sampleAnchors(service, generation, sessionId, Display.DEFAULT_DISPLAY)
                 ?.let { after -> RootScrollMotionContract.inferScrollDelta(anchorContentDeltas(before, after, axis)) }
         } else {
             null
@@ -807,13 +851,13 @@ object AndroidUiController {
         )
     }
 
-    private fun resolveRef(args: JSONObject): UiRefResolution {
+    private fun resolveRef(args: JSONObject, sessionId: String): UiRefResolution {
         val generation = args.optLong("generation", -1L)
         val ref = args.optString("ref", "")
         if (generation < 0L || ref.isBlank()) return UiRefResolution.Error(
             "INVALID_ARGS", "generation and ref from the latest observe are required",
         )
-        return AndroidUiObservationRegistry.resolve(generation, ref)
+        return AndroidUiObservationRegistry.resolve(generation, ref, sessionId, Display.DEFAULT_DISPLAY)
     }
 
     private fun error(code: String, message: String): UiToolResult = UiToolResult(

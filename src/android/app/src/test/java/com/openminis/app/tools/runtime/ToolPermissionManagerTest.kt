@@ -120,6 +120,18 @@ class ToolPermissionManagerTest {
     }
 
     @Test
+    fun `vscreen native tools are local-only and never exposed to remote mcp`() {
+        for (tool in listOf(
+            "android.vscreen.open", "android.vscreen.launch", "android.vscreen.close", "android.vscreen.status",
+        )) {
+            assertEquals(ToolPermissionManager.Level.LOCAL_ONLY, ToolPermissionManager.levelFor(tool, "local_agent"))
+            assertTrue(ToolPermissionManager.isAllowedFor(tool, "local_agent"))
+            assertFalse(ToolPermissionManager.isAllowedFor(tool, "mcp:tok1"))
+            assertFalse(ToolPermissionManager.mcpVisibleTools().contains(tool))
+        }
+    }
+
+    @Test
     fun `local caller can use intended local only tools including root shell`() {
         assertTrue(ToolPermissionManager.isAllowedFor("android.logs.clear", "local_agent"))
         assertTrue(ToolPermissionManager.isAllowedFor("root.shell", "local_agent"))
@@ -190,5 +202,13 @@ class ToolPermissionManagerTest {
             assertFalse(ToolPermissionManager.needsConfirm(tool, "local_agent"))
             assertTrue(ToolPermissionManager.mcpVisibleTools().contains(tool))
         }
+    }
+
+    @Test
+    fun `remote mcp cannot address a virtual display through android ui`() {
+        assertTrue(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "mcp:tok1", 7))
+        assertFalse(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "local_agent", 7))
+        assertFalse(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "mcp:tok1", 0))
+        assertFalse(ToolPermissionManager.isRemoteVirtualDisplayDenied("android.ui", "mcp:tok1", null))
     }
 }

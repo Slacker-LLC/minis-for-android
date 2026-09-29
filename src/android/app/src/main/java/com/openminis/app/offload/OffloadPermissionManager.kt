@@ -95,6 +95,11 @@ object OffloadPermissionManager {
         // is already authorized.
         ToolPermissionInfo("a11y_cli", "android-a11y-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
         ToolPermissionInfo("shizuku_cli", "android-shizuku-cli", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("android.vscreen.open", "VScreen: open virtual display", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("android.vscreen.launch", "VScreen: launch app", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("android.vscreen.close", "VScreen: close virtual display", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("android.vscreen.status", "VScreen: device status", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
+        ToolPermissionInfo("android.vscreen.ui", "VScreen: operate virtual display", PermissionCategory.INTEGRATIONS, PermissionLevel.NOT_ALLOWED),
     )
 
     /** Stable session-id used by NativeOffloadHandlers when calling

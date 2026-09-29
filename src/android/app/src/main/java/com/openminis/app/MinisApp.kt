@@ -764,6 +764,16 @@ class MinisApp : Application(), ImageLoaderFactory {
             ),
             aliasNames = listOf("android_ui"),
         )
+        listOf(
+            com.openminis.app.tools.android.AndroidAgentTools.VSCREEN_OPEN,
+            com.openminis.app.tools.android.AndroidAgentTools.VSCREEN_LAUNCH,
+            com.openminis.app.tools.android.AndroidAgentTools.VSCREEN_CLOSE,
+            com.openminis.app.tools.android.AndroidAgentTools.VSCREEN_STATUS,
+        ).forEach { toolName ->
+            com.openminis.app.tools.runtime.ToolRegistry.register(
+                com.openminis.app.tools.runtime.AndroidToolHandler(toolName, toolName),
+            )
+        }
         // P3 read-first wave 2: image read, agent goal/todo/subagent/ask, jobs
         com.openminis.app.tools.runtime.ToolRegistry.register(
             com.openminis.app.tools.runtime.LinuxReadImageHandler(),

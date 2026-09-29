@@ -177,6 +177,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
 
     override fun releaseDisplay() = synchronized(lock) { releaseSession() }
 
+    override fun getActiveDisplayId(): Int = synchronized(lock) {
+        checkNotDestroyed()
+        requireShellIdentity()
+        session?.displayId ?: 0
+    }
+
     override fun launch(packageName: String, activityOrNull: String?, displayId: Int): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         launchInternal(packageName, activityOrNull, displayId)
@@ -185,6 +191,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     override fun dump(displayId: Int, mode: String): String = synchronized(lock) {
         checkDisplay(displayId)
         ensureUi().dump(displayId, mode)
+    }
+
+    override fun hasPackageWindow(displayId: Int, packageName: String): Boolean = synchronized(lock) {
+        checkDisplay(displayId)
+        if (!PACKAGE_PATTERN.matches(packageName)) fail("invalid_package", "Invalid package name")
+        ensureUi().hasWindowOnDisplay(displayId, packageName)
     }
 
     override fun clickTarget(displayId: Int, targetIndex: Int): Boolean = synchronized(lock) {
@@ -229,6 +241,19 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         ensureUi().setText(displayId, text)
     }
 
+    override fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean = synchronized(lock) {
+        checkDisplay(displayId)
+        if (targetIndex < 1) fail("invalid_target", "targetIndex must be positive")
+        if (text.length > MAX_TEXT_LENGTH) fail("text_too_long", "Input text exceeds $MAX_TEXT_LENGTH characters")
+        ensureUi().setTextTarget(displayId, targetIndex, text)
+    }
+
+    override fun focusTarget(displayId: Int, targetIndex: Int): Boolean = synchronized(lock) {
+        checkDisplay(displayId)
+        if (targetIndex < 1) fail("invalid_target", "targetIndex must be positive")
+        ensureUi().focusTarget(displayId, targetIndex)
+    }
+
     override fun back(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_BACK)
     override fun home(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_HOME)
 
@@ -237,6 +262,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         val bitmap = active.captureBitmap(retries = 4, delayMs = 150L)
             ?: fail("screenshot_unavailable", "Virtual display did not produce a frame")
         val bytes = try {
+            if (!ScreenCapture.isNonBlack(bitmap)) {
+                fail(
+                    VirtualScreenPolicy.SCREENSHOT_BLOCKED_SECURE,
+                    "The frame is black; FLAG_SECURE or an unsupported capture policy may block pixels. Use the UI node tree or ask the user to take over; do not try OCR or another capture path.",
+                )
+            }
             ScreenCapture.jpeg(
                 bitmap,
                 if (maxDim <= 0) DEFAULT_MAX_DIM else maxDim,

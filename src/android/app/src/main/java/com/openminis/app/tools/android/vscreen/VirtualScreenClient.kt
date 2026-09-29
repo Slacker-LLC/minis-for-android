@@ -34,6 +34,8 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     private var binding = false
     private var connectionLatch = CountDownLatch(1)
     private var activeDisplayId: Int? = null
+    private var activeDisplaySize: Pair<Int, Int>? = null
+    private var activePackageName: String? = null
     private var displayLostPending = false
     private var reconnectAttempts = 0
     private var reconnectInFlight = false
@@ -63,6 +65,8 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     }
 
     val displayId: Int? get() = synchronized(stateLock) { activeDisplayId }
+    val foregroundPackageName: String? get() = synchronized(stateLock) { activePackageName }
+    fun displaySize(): Pair<Int, Int>? = synchronized(stateLock) { activeDisplaySize }
     val isConnected: Boolean get() = synchronized(stateLock) { remote != null }
     internal val lastProbe: VirtualScreenProbeSnapshot? get() = preferences.lastProbe()
 
@@ -96,18 +100,32 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         return result.toJson()
     }
 
-    fun openDisplay(width: Int = DEFAULT_WIDTH, height: Int = DEFAULT_HEIGHT, dpi: Int = DEFAULT_DPI): Int {
+    fun openDisplay(width: Int? = null, height: Int? = null, dpi: Int? = null): Int {
         if (!preferences.isEnabled()) {
-            val reason = if (preferences.lastProbe() == null) "vscreen_unavailable" else "vscreen_probe_stale_or_failed"
-            throw VirtualScreenClientException(reason, "VScreen is disabled or its device probe is not current and passing")
+            throw VirtualScreenClientException(VirtualScreenPolicy.UNAVAILABLE, "VScreen is disabled or its device probe is not current and passing")
         }
-        val id = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).createDisplay(width, height, dpi) }
+        val configured = preferences.displaySettings()
+        val actualWidth = width ?: configured.width
+        val actualHeight = height ?: configured.height
+        val actualDpi = dpi ?: configured.dpi
+        val id = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).createDisplay(actualWidth, actualHeight, actualDpi) }
         if (id == 0) throw VirtualScreenClientException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED, "Service returned the physical display")
         synchronized(stateLock) {
             activeDisplayId = id
+            activeDisplaySize = actualWidth to actualHeight
             displayLostPending = false
             reconnectAttempts = 0
         }
+        return id
+    }
+
+    /** Returns only the active non-physical display; 0 is never exposed as a VScreen id. */
+    fun queryActiveDisplayId(): Int? {
+        displayId?.let { return it }
+        if (!isEnabled()) return null
+        val id = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).getActiveDisplayId() }
+        if (id <= 0) return null
+        synchronized(stateLock) { activeDisplayId = id }
         return id
     }
 
@@ -117,15 +135,21 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         try {
             execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).releaseDisplay() }
         } finally {
-            synchronized(stateLock) { activeDisplayId = null }
+            synchronized(stateLock) { activeDisplayId = null; activeDisplaySize = null; activePackageName = null }
         }
     }
 
-    fun launch(displayId: Int, packageName: String, activity: String? = null): Boolean =
-        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).launch(packageName, activity, displayId) }
+    fun launch(displayId: Int, packageName: String, activity: String? = null): Boolean {
+        val launched = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).launch(packageName, activity, displayId) }
+        if (launched) synchronized(stateLock) { activePackageName = packageName }
+        return launched
+    }
 
     fun dump(displayId: Int, mode: String = "SIMPLE"): String =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).dump(displayId, mode) }
+
+    fun hasPackageWindow(displayId: Int, packageName: String): Boolean =
+        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).hasPackageWindow(displayId, packageName) }
 
     fun clickTarget(displayId: Int, targetIndex: Int): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).clickTarget(displayId, targetIndex) }
@@ -148,6 +172,12 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     fun setText(displayId: Int, text: String): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).setText(displayId, text) }
 
+    fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean =
+        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).setTextTarget(displayId, targetIndex, text) }
+
+    fun focusTarget(displayId: Int, targetIndex: Int): Boolean =
+        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).focusTarget(displayId, targetIndex) }
+
     fun back(displayId: Int): Boolean =
         execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).back(displayId) }
 
@@ -163,6 +193,8 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
             remote = null
             binding = false
             activeDisplayId = null
+            activeDisplaySize = null
+            activePackageName = null
             displayLostPending = false
             connectionLatch.countDown()
             wasBinding
@@ -224,6 +256,8 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
         synchronized(stateLock) {
             if (activeDisplayId != null) displayLostPending = true
             activeDisplayId = null
+            activeDisplaySize = null
+            activePackageName = null
             remote = null
             binding = false
             connectionLatch.countDown()
