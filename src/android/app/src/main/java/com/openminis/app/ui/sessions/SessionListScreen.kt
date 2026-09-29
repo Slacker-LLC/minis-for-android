@@ -150,6 +150,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.focus.FocusRequester
@@ -175,7 +176,6 @@ import com.openminis.app.R
 import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.ui.theme.ChatColors
-import com.openminis.app.ui.theme.minisFabColor
 import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.ProviderRepository
 import kotlin.math.roundToInt
@@ -1437,6 +1437,9 @@ private fun DualFabRow(
 
     val chatFab: @Composable () -> Unit = {
         val isGlass = LocalUiStyle.current == UiStyle.GLASS
+        val primary = MaterialTheme.colorScheme.primary
+        // Pick black or white for at least 4.5:1 contrast on the opaque CTA.
+        val fabContentColor = if (primary.luminance() > 0.179f) Color.Black else Color.White
         Box(
             modifier = Modifier
                 .offset { IntOffset(chatDragX.roundToInt(), 0) }
@@ -1457,9 +1460,9 @@ private fun DualFabRow(
             FloatingActionButton(
                 onClick = onNewChat,
                 shape = CircleShape,
-                containerColor = if (isGlass) Color.Transparent else minisFabColor(),
+                containerColor = if (isGlass) Color.Transparent else primary,
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(60.dp)
                     .combinedClickable(
                         onClick = onNewChat,
                         onLongClick = {
@@ -1469,10 +1472,9 @@ private fun DualFabRow(
                     .then(
                         if (isGlass) Modifier.glassSurface(
                             shape = CircleShape,
-                            // Upstream's tinted glass icon button uses a 75%
-                            // tint layer and no Material elevation.
-                            glassScrim = minisFabColor().copy(alpha = 0.75f),
-                            fallbackScrim = minisFabColor(),
+                            // Keep this primary action opaque so its icon remains legible.
+                            glassScrim = primary,
+                            fallbackScrim = primary,
                         ) else Modifier.shadow(8.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.2f)),
                     ),
                 elevation = if (isGlass) {
@@ -1481,7 +1483,12 @@ private fun DualFabRow(
                     FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                 },
             ) {
-                Icon(Icons.Outlined.Forum, contentDescription = stringResource(R.string.new_chat), tint = Color.White, modifier = Modifier.size(24.dp))
+                Icon(
+                    Icons.Outlined.AddComment,
+                    contentDescription = stringResource(R.string.new_chat),
+                    tint = fabContentColor,
+                    modifier = Modifier.size(24.dp),
+                )
             }
             DropdownMenu(
                 expanded = showGroupMenu,
@@ -1724,7 +1731,7 @@ private fun SectionHeader(title: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .padding(top = 4.dp),
+            .padding(top = 8.dp),
     ) {
         if (isPinned) {
             Icon(
@@ -1739,7 +1746,7 @@ private fun SectionHeader(title: String) {
         }
         Text(
             text = title,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -2583,7 +2590,7 @@ private fun SessionRow(
                 modifier = Modifier
                     .size(44.dp)
                     .background(
-                        color = style.color.copy(alpha = 0.18f),
+                        color = style.color.copy(alpha = 0.22f),
                         shape = CircleShape,
                     ),
                 contentAlignment = Alignment.Center,
@@ -2592,7 +2599,7 @@ private fun SessionRow(
                     imageVector = style.icon,
                     contentDescription = null,
                     tint = style.color,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
             if (isActive) {
@@ -2619,9 +2626,9 @@ private fun SessionRow(
         // Title + last message (or highlighted snippet during search)
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            val titleText = session.title ?: "New Chat"
+            val titleText = session.title ?: stringResource(R.string.new_chat)
             if (searchQuery.isNotBlank()) {
                 Text(
                     text = highlightedAnnotatedString(titleText, searchQuery),
@@ -2666,8 +2673,10 @@ private fun SessionRow(
         // Relative timestamp
         Text(
             text = timeText,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.outline,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
