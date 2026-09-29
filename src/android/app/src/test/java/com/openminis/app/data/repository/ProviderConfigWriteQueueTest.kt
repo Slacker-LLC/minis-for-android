@@ -9,7 +9,7 @@ import org.junit.Test
 class ProviderConfigWriteQueueTest {
 
     private fun config(label: String): ProviderConfig =
-        ProviderConfig(agentLoopGroupIds = mutableListOf(label))
+        ProviderConfig(agentLoopModelEntryIds = mutableListOf(label))
 
     @Test
     fun `writes are processed in submission order`() = runTest {
@@ -17,7 +17,7 @@ class ProviderConfigWriteQueueTest {
         val failures = mutableListOf<Throwable>()
         val queue = ProviderConfigWriteQueue(
             scope = this,
-            persist = { writes += it.agentLoopGroupIds.single() },
+            persist = { writes += it.agentLoopModelEntryIds.single() },
             onFailure = { failures += it },
         )
 
@@ -38,7 +38,7 @@ class ProviderConfigWriteQueueTest {
         val queue = ProviderConfigWriteQueue(
             scope = this,
             persist = {
-                val label = it.agentLoopGroupIds.single()
+                val label = it.agentLoopModelEntryIds.single()
                 if (label == "bad") error("synthetic failure")
                 writes += label
             },

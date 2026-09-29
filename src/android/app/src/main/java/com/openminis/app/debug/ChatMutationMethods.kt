@@ -78,8 +78,7 @@ internal object ChatMutationMethods {
 
         // Resolve model override (mutually exclusive with sessionId binding).
         val modelEntryId = if (params.has("modelEntryId") && !params.isNull("modelEntryId")) params.optString("modelEntryId").ifEmpty { null } else null
-        val modelGroupId = if (params.has("modelGroupId") && !params.isNull("modelGroupId")) params.optString("modelGroupId").ifEmpty { null } else null
-        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
+        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId)
 
         // Decode attachments — RPC carries base64; we materialize them as
         // FileProvider-backed Uris so InputAttachment + the existing image
@@ -131,8 +130,7 @@ internal object ChatMutationMethods {
         // override, so we update + restore around the call. Acceptable for
         // automation harnesses.)
         val modelEntryId = if (params.has("modelEntryId") && !params.isNull("modelEntryId")) params.optString("modelEntryId").ifEmpty { null } else null
-        val modelGroupId = if (params.has("modelGroupId") && !params.isNull("modelGroupId")) params.optString("modelGroupId").ifEmpty { null } else null
-        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
+        val overrideName = AgentRunner.applyModelOverride(context, sessionId, modelEntryId)
 
         val wait = params.optBoolean("wait", false)
         val timeoutSec = params.optInt("waitTimeout", 600).coerceIn(1, 1800)

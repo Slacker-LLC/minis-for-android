@@ -36,7 +36,8 @@ Current recognized routes include:
 | `minis://session/<sessionId>/<resource-path>?title=...` | Open session HTML preview |
 | `minis://settings` | Settings home |
 | `minis://settings/providers[/<instanceId>]` | Provider list/detail |
-| `minis://settings/model-groups[/<groupId>]` | Model groups/detail |
+| `minis://settings/models` | Model slots and Agent models |
+| `minis://settings/model-groups[/<groupId>]` | Silent compatibility alias to Models; any legacy group ID is ignored |
 | `minis://settings/usage` | Usage statistics |
 | `minis://settings/skills` | Skills |
 | `minis://settings/memory` | Memory |
@@ -51,7 +52,7 @@ Current recognized routes include:
 | `minis://settings/rootfs` | Rootfs management |
 | `minis://settings/environments` | Environment variables |
 
-Aliases accepted by the parser include `model_groups`, `usage-stats`, `usage_stats`, `mount_external`, `mounts`, `mounted-folders`, `mounted_folders`, `shared_folders`, `mirrors`, `rootfs-management`, and `rootfs_management`.
+The former `model-groups/<groupId>` path remains a silent alias to `models`; the group ID is ignored. Aliases accepted by the parser include `model_groups`, `usage-stats`, `usage_stats`, `mount_external`, `mounts`, `mounted-folders`, `mounted_folders`, `shared_folders`, `mirrors`, `rootfs-management`, and `rootfs_management`.
 
 `minis://settings/environments` accepts `create_key`, `create_value`, and `create_note`; non-empty `create_key` opens the prefilled creation flow. Unknown paths below `minis://settings/...` fall back to Settings home.
 

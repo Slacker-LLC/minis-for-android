@@ -488,12 +488,10 @@ object DebugMethodRegistry {
             example = ex("configJson" to "{\"version\":1,\"config\":{...}}"),
         ),
         MethodSpec(
-            name = "provider.groups.list",
-            description = "List all configured model groups.",
-            params = listOf(
-                ParamSpec("includeMembers", "bool", required = false, default = true, description = "Include resolved member summaries in each group."),
-            ),
-            returns = "{defaultGroupId, defaultSubGroupId, count, groups:[{id, name, strategy, fallbackStrategy, isDefault, isSub, inAgentLoop, memberEntryIds, members?}]}",
+            name = "provider.slots.get",
+            description = "List the five fixed model slots and their ordered entry IDs.",
+            params = emptyList(),
+            returns = "{count, fallbackTrigger, slots:{main:{entryIds,entries}, light:{...}, vision:{...}, voiceInput:{...}, voiceOutput:{...}}}",
             example = JSONObject(),
         ),
 
@@ -543,12 +541,12 @@ object DebugMethodRegistry {
         ),
         MethodSpec(
             name = "chat.models.list",
-            description = "Return the candidate models and groups visible to the chat picker.",
+            description = "Return the candidate models and fixed slot bindings visible to the chat picker.",
             params = listOf(
                 ParamSpec("includeHidden", "bool", required = false, default = false, description = "Include user-hidden entries."),
                 ParamSpec("includeDisabled", "bool", required = false, default = false, description = "Include entries from disabled provider instances."),
             ),
-            returns = "{defaultGroupId, groupCount, entryCount, groups:[...], entries:[...]}",
+            returns = "{fallbackTrigger, entryCount, slots:{main, light, vision, voiceInput, voiceOutput}, entries:[...]}",
             example = JSONObject(),
         ),
 
@@ -626,7 +624,7 @@ object DebugMethodRegistry {
                 ParamSpec("supportsPDFInput", "bool", required = false, description = "Modality flag."),
                 ParamSpec("supportsImageOutput", "bool", required = false, description = "Modality flag."),
             ),
-            returns = "Entry shape (same as provider.models.list[].entries[i]).",
+            returns = "Entry shape (same as provider.models.list[].entries[i]), including defaultThinkingLevel and contextLimitTokens when set.",
             example = ex("instanceId" to "pi_xyz", "modelId" to "vendor/model-pro"),
         ),
         MethodSpec(
@@ -673,68 +671,26 @@ object DebugMethodRegistry {
             example = ex("entryId" to "entry_123", "inLoop" to true),
         ),
         MethodSpec(
-            name = "provider.groups.create",
-            description = "Create a new model group.",
+            name = "provider.slots.set",
+            description = "Replace a fixed slot's ordered entry IDs and/or set the Main fallback trigger. Slot entry capabilities are validated; slots cannot be added or removed.",
             params = listOf(
-                ParamSpec("name", "string", required = true, description = "Display name."),
-                ParamSpec("memberEntryIds", "[string]", required = false, description = "Initial member entries (order significant for fallback)."),
-                ParamSpec("strategy", "string", required = false, default = "fallback", description = "fallback / loadBalance"),
-                ParamSpec("fallbackStrategy", "string", required = false, default = "default", description = "default / always"),
+                ParamSpec("slot", "string", required = false, description = "main / light / vision / voiceInput / voiceOutput; required together with entryIds."),
+                ParamSpec("entryIds", "[string]", required = false, description = "Ordered entry IDs; array order defines fallback order."),
+                ParamSpec("fallbackTrigger", "string", required = false, description = "default (429/5xx) or always; may be passed with a slot update."),
             ),
-            returns = "{group:{...}}",
-            example = ex("name" to "Coding", "memberEntryIds" to JSONArray().apply { put("entry_a") }),
+            returns = "{slot?, entryIds?, fallbackTrigger?}",
+            example = ex("slot" to "main", "entryIds" to JSONArray().apply { put("entry_a") }),
         ),
         MethodSpec(
-            name = "provider.groups.update",
-            description = "Patch fields on an existing group.",
+            name = "provider.models.setDefaults",
+            description = "Set or clear a model entry's default thinking level and context cap; pass null to inherit/unlimit.",
             params = listOf(
-                ParamSpec("groupId", "string", required = true, description = "Target group UUID."),
-                ParamSpec("name", "string", required = false, description = "Must be non-empty if supplied."),
-                ParamSpec("memberEntryIds", "[string]", required = false, description = "Replace members entirely; order preserved."),
-                ParamSpec("strategy", "string", required = false, description = "fallback / loadBalance"),
-                ParamSpec("fallbackStrategy", "string", required = false, description = "default / always"),
+                ParamSpec("entryId", "string", required = true, description = "Target model-entry UUID."),
+                ParamSpec("defaultThinkingLevel", "string|null", required = false, description = "OFF / LOW / MEDIUM / HIGH / XHIGH / MAX / ULTRA; null clears."),
+                ParamSpec("contextLimitTokens", "int|null", required = false, description = "1..2147483647 token cap; null or 0 clears."),
             ),
-            returns = "{group:{...}}",
-            example = ex("groupId" to "grp_xyz"),
-        ),
-        MethodSpec(
-            name = "provider.groups.delete",
-            description = "Remove a group. Sessions bound to it fall back to the default group.",
-            params = listOf(
-                ParamSpec("groupId", "string", required = true, description = "Target group UUID."),
-                ParamSpec("confirm", "bool", required = true, default = false, description = "Must be true."),
-            ),
-            returns = "{groupId, deleted, wasDefault}",
-            example = ex("groupId" to "grp_xyz", "confirm" to true),
-        ),
-        MethodSpec(
-            name = "provider.groups.setDefault",
-            description = "Set or clear the global default model group.",
-            params = listOf(
-                ParamSpec("groupId", "string", required = true, description = "Target group UUID, or null to clear."),
-            ),
-            returns = "{defaultGroupId}",
-            example = ex("groupId" to "grp_xyz"),
-        ),
-        MethodSpec(
-            name = "provider.groups.setSubDefault",
-            description = "Set or clear the sub model group (lightweight tasks such as title generation). " +
-                "Clearing makes sub tasks inherit the primary group.",
-            params = listOf(
-                ParamSpec("groupId", "string", required = true, description = "Target group UUID, or null to clear."),
-            ),
-            returns = "{defaultSubGroupId}",
-            example = ex("groupId" to "grp_xyz"),
-        ),
-        MethodSpec(
-            name = "provider.groups.setAgentLoop",
-            description = "Toggle whether a model group is exposed to the in-shell minis-model-use agent.",
-            params = listOf(
-                ParamSpec("groupId", "string", required = true, description = "Target group UUID."),
-                ParamSpec("inLoop", "bool", required = true, description = "true to add, false to remove."),
-            ),
-            returns = "{groupId, inLoop}",
-            example = ex("groupId" to "grp_xyz", "inLoop" to true),
+            returns = "{entryId, defaultThinkingLevel, contextLimitTokens}",
+            example = ex("entryId" to "entry_123", "defaultThinkingLevel" to "MEDIUM", "contextLimitTokens" to 128000),
         ),
 
         // --- Chat mutate ---
@@ -745,8 +701,7 @@ object DebugMethodRegistry {
                 ParamSpec("prompt", "string", required = true, description = "User message text."),
                 ParamSpec("sessionId", "string", required = false, description = "Existing session id; omit to create a new one (source=debug)."),
                 ParamSpec("attachments", "[object]", required = false, description = "Array of {name, data, mime?}; data is base64."),
-                ParamSpec("modelEntryId", "string", required = false, description = "Pin to a specific model entry (mutually exclusive with modelGroupId)."),
-                ParamSpec("modelGroupId", "string", required = false, description = "Pin to a model group."),
+                ParamSpec("modelEntryId", "string", required = false, description = "Pin to a specific model entry."),
                 ParamSpec("thinkingLevel", "string", required = false, description = "off / low / medium / high / xhigh / max / ultra — applies before send; leaves the VM setting alone when omitted."),
                 ParamSpec("wait", "bool", required = false, default = false, description = "Block until completion."),
                 ParamSpec("waitTimeout", "int", required = false, default = 600, description = "Seconds; clamped to [1, 1800]."),
@@ -761,7 +716,6 @@ object DebugMethodRegistry {
                 ParamSpec("sessionId", "string", required = true, description = "Target session id."),
                 ParamSpec("messageId", "string", required = false, description = "User message id; omit to retry from the most recent user message."),
                 ParamSpec("modelEntryId", "string", required = false, description = "Pin retry to a specific entry."),
-                ParamSpec("modelGroupId", "string", required = false, description = "Pin retry to a group."),
                 ParamSpec("wait", "bool", required = false, default = false, description = "Block until completion."),
                 ParamSpec("waitTimeout", "int", required = false, default = 600, description = "Seconds; clamped to [1, 1800]."),
             ),
@@ -1298,7 +1252,7 @@ object DebugMethodRegistry {
         MethodSpec(
             name = "agent.settings.get",
             description = "Return the subagent delegation limits (depth cap and per-run timeout). " +
-                "Main/sub model groups are managed through provider.groups.*.",
+                "Fixed model slots and their ordered entry IDs are managed through provider.slots.get/provider.slots.set; per-model defaults use provider.models.setDefaults.",
             params = emptyList(),
             returns = "{maxDepth, timeoutMinutes}",
             example = ex(),

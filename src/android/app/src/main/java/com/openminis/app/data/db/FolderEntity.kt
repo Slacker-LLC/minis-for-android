@@ -5,9 +5,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * [T-android-session-grouping] A session group. Code says "Folder", the UI says
- * "Group" — the same deliberate split iOS uses, because `ModelGroup` (LLM
- * fallback routing) already owns the word "Group" at symbol level.
+ * [T-android-session-grouping] A session collection. Code says "Folder", the UI
+ * says "Group" for iOS-compatible organization; model routing uses fixed slots.
  *
  * Mirrors the iOS `folders` table (ChatStore.swift:795) column-for-column so a
  * future sync layer can map the two without a translation step.

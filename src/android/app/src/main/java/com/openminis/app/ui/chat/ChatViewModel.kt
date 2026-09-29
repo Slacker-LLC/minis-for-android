@@ -54,7 +54,6 @@ import com.openminis.app.data.model.LLMMessage
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.LLMStreamChunk
 import com.openminis.app.data.model.LLMUsage
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelAttributionSnapshot
 import com.openminis.app.data.model.SessionOverrides
 import com.openminis.app.data.model.ThinkingLevel
@@ -890,15 +889,6 @@ class ChatViewModel(
      */
     private val _forceScrollToBottom = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
     val forceScrollToBottom: SharedFlow<Unit> = _forceScrollToBottom.asSharedFlow()
-
-    private val _availableGroups = MutableStateFlow<List<ModelGroup>>(emptyList())
-    val availableGroups: StateFlow<List<ModelGroup>> = _availableGroups.asStateFlow()
-
-    private val _selectedGroupId = MutableStateFlow<String?>(null)
-    val selectedGroupId: StateFlow<String?> = _selectedGroupId.asStateFlow()
-
-    private val _selectedGroupName = MutableStateFlow("")
-    val selectedGroupName: StateFlow<String> = _selectedGroupName.asStateFlow()
 
     private val _providerName = MutableStateFlow("")
     val providerName: StateFlow<String> = _providerName.asStateFlow()
@@ -4057,7 +4047,7 @@ class ChatViewModel(
             // so when ProviderRepository finishes its async config load and
             // emits the populated value, the collector can fire BEFORE
             // loadSession's `restoreFromBinding(session.modelBinding)` runs.
-            // The collector then resolves to the default group's first
+            // The collector then resolves to the Main slot's first
             // entry (X), `_modelName` flips to X, and seconds later
             // restoreFromBinding finds Y and re-sets `_modelName` to Y —
             // exactly the "top model picker first shows X, then flickers and switches to Y"
@@ -4073,21 +4063,14 @@ class ChatViewModel(
             // session whose binding successfully resolved to its target.
             sessionLoaded.first { it }
             providerRepository.config.collect { config ->
-                // T278: _availableGroups feeds the model picker sheet — it must
-                // track the latest config on every emission, even after the user
-                // has selected a model (currentProvider != null). The guard below
-                // is for the fallback-resolution path which CAN trample the user's
-                // selection; _availableGroups has no such risk because the sheet
-                // re-reads it on each open.
-                _availableGroups.value = config.modelGroups
-                // [T-android-disabled-provider-still-selectable-via-group #34]
-                // Runtime re-resolution when a GROUP-bound session's currently
+                // [T-android-disabled-provider-still-selectable-via-slot]
+                // Runtime re-resolution when a session's currently
                 // active member has its provider DISABLED mid-session. The
-                // selection paths (resolveProviderFromGroup → enabledMemberEntries)
-                // already skip disabled members, but they only run while
+                // Slot resolution already skips disabled members, but it only
                 // currentProvider == null (cold start / fallback). Once a group
                 // member is resolved, currentProvider is cached and the guard
-                // below short-circuits — so if the user then disables that
+                // runs while no provider is active. Once an entry resolves,
+                // currentProvider is cached — so if the user then disables that
                 // member's provider (e.g. a Coding Plan whose quota ran out,
                 // turned off to force fallback to the next provider), the stale
                 // currentProvider keeps routing to the disabled provider's
@@ -4125,7 +4108,7 @@ class ChatViewModel(
                     // ran before config finished (so restoreFromBinding fell
                     // through), the binding pointed at the right entry all
                     // along — we just couldn't resolve it. Try it again
-                    // before falling back to the default group, so the
+                    // before falling back to the Main slot, so the
                     // fallback target survives a cold start that races
                     // ProviderRepository's async load.
                     val sid = realSessionId.takeIf { it.isNotEmpty() }
@@ -4383,10 +4366,9 @@ class ChatViewModel(
             com.openminis.app.diagnostics.PerfLongCtx.step(sessionId, "loadSession.enter", "isDraft=$isDraft")
             try {
             val config = providerRepository.config.value
-            _availableGroups.value = config.modelGroups
 
             if (isDraft) {
-                // Draft session: just set up provider using default group or first entry
+                // Draft session: just set up provider using Main slot or first entry
                 _sessionTitle.value = "New Chat"
                 _sessionCategory.value = null
                 applyNewChatDefaultModel()
@@ -4409,7 +4391,7 @@ class ChatViewModel(
                 ?.let { runCatching { ThinkingLevel.valueOf(it) }.getOrNull() }
                 ?: ThinkingLevel.OFF
 
-            // Priority 1: restore from persisted model_binding (group or entry)
+            // Priority 1: restore the migrated entry-only model binding.
             var resolved = restoreFromBinding(session.modelBinding)
 
             // Priority 2: fall back to stored model_id
@@ -4426,7 +4408,6 @@ class ChatViewModel(
                             currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
                             _providerName.value = instance.label.ifEmpty { entry.model.provider }
                             resolved = true
-                            _selectedGroupId.value = null
                         }
                     }
                 }
@@ -4937,100 +4918,26 @@ class ChatViewModel(
 
     /** Restore provider state from a JSON binding string. Returns true if successfully resolved. */
     private fun restoreFromBinding(bindingJson: String?): Boolean {
-        return when (val binding = com.openminis.app.data.model.ModelBinding.parse(bindingJson)) {
-            is com.openminis.app.data.model.ModelBinding.Group -> {
-                val resolved = resolveProviderFromGroup(binding.groupId, binding.lastEntryId)
-                if (resolved) _selectedGroupId.value = binding.groupId
-                resolved
-            }
-            is com.openminis.app.data.model.ModelBinding.Entry -> {
-                val entry = providerRepository.config.value.modelEntries.find { it.id == binding.entryId }
-                    ?: return false
-                val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
-                val apiKey = providerRepository.usableApiKey(instance) ?: return false
-                currentModel = entry.model
-                _modelName.value = entry.model.displayName
-                _providerName.value = instance.label.ifEmpty { entry.model.provider }
-                _selectedGroupId.value = null
-                _selectedGroupName.value = ""
-                _activeEntryId.value = entry.id
-                currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
-                true
-            }
-            null -> false
-        }
-    }
-
-    private fun resolveProviderFromGroup(groupId: String, preferredEntryId: String? = null): Boolean {
-        val group = providerRepository.group(groupId) ?: return false
-        // [T-disabled-provider-via-group-android] Resolve through
-        // enabledMemberEntries so a member whose provider instance is
-        // currently disabled is silently skipped. Without this, a disabled
-        // provider sitting at the head of memberEntryIds got loaded and
-        // ChatViewModel would attempt to call it — the whole point of
-        // disabling the provider was to stop that.
-        //
-        // preferredEntryId comes from a prior session binding ("user picked
-        // this entry inside the group last time"). Honor it only if the
-        // entry is still enabled; otherwise fall back to the first enabled
-        // member so the session can still proceed on a now-degraded group.
-        val enabledMembers = providerRepository.availableMemberEntries(group)
-        if (enabledMembers.isEmpty()) return false
-        val targetEntry = if (preferredEntryId != null) {
-            enabledMembers.firstOrNull { it.id == preferredEntryId } ?: enabledMembers.first()
-        } else {
-            enabledMembers.first()
-        }
-        val instance = providerRepository.instance(targetEntry.providerInstanceId) ?: return false
+        val binding = com.openminis.app.data.model.ModelBinding.parse(bindingJson)
+        if (binding !is com.openminis.app.data.model.ModelBinding.Entry) return false
+        val entry = providerRepository.config.value.modelEntries.find { it.id == binding.entryId } ?: return false
+        val instance = providerRepository.instance(entry.providerInstanceId) ?: return false
         val apiKey = providerRepository.usableApiKey(instance) ?: return false
-
-        currentModel = targetEntry.model
-        _modelName.value = targetEntry.model.displayName
-        _providerName.value = instance.label.ifEmpty { targetEntry.model.provider }
-        _selectedGroupName.value = group.name
-        _activeEntryId.value = targetEntry.id
-        currentProvider = ProviderFactory.create(instance, apiKey, targetEntry.model, context)
+        currentModel = entry.model
+        _modelName.value = entry.model.displayName
+        _providerName.value = instance.label.ifEmpty { entry.model.provider }
+        _activeEntryId.value = entry.id
+        currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
         return true
     }
 
-    fun selectGroup(groupId: String) {
-        _selectedGroupId.value = groupId
-        _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
-        val resolved = resolveProviderFromGroup(groupId)
-        if (resolved) {
-            _activeEntryId.value?.let { entryId ->
-                persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(entryId))
-                applyEntrySessionDefaults(entryId)
-            }
-        }
-    }
-
-    /** Select a specific entry within a group (keeps group selected). */
-    fun selectGroupEntry(groupId: String, entryId: String) {
-        _selectedGroupId.value = groupId
-        _selectedGroupName.value = providerRepository.group(groupId)?.name ?: ""
-        val resolved = resolveProviderFromGroup(groupId, entryId)
-        if (resolved) {
-            _activeEntryId.value?.let { activeEntryId ->
-                persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(activeEntryId))
-                applyEntrySessionDefaults(activeEntryId)
-            }
-            // [T-newchat-default-model-fallback-android] Record the actually-
-            // resolved active entry as last-used (resolveProviderFromGroup may
-            // fall back off a disabled member, so _activeEntryId is the truth).
-            _activeEntryId.value?.let { providerRepository.lastUsedEntryId = it }
-        }
-    }
-
     /**
-     * T312: mirrors iOS `AIChatViewModel.applyGroupSessionDefaults`.
-     * When a session newly binds to a group (user picks the group, or a
-     * draft session resolves the default group), copy the group's
-     * `defaultThinkingLevel` into the session's persisted thinking_override.
+     * Apply an entry's configured thinking default when a session newly binds
+     * to that entry, preserving explicit user choices already stored on a session.
      * Context limit is in-memory only on iOS; Android has no equivalent
      * runtime field yet, so we only handle thinking level here.
      *
-     * Skips when the group has no default override (null) — leaves the
+     * Skips when the entry has no default override (null) — leaves the
      * session's existing override untouched so manual user choices on a
      * pre-bound chat aren't clobbered by a later group re-select that
      * happens to land on the same default state.
@@ -5048,14 +4955,13 @@ class ChatViewModel(
 
     /**
      * [T-newchat-default-model-fallback-android] Resolve and apply the default
-     * model for a NEW chat when no default group produced a model. Fallback
-     * chain tiers 2→3 (tier 1, the default group, is handled by the caller
-     * before this runs):
+     * model for a NEW chat: first available Main-slot entry, then last-used
+     * entry, then the newest provider's newest text model.
      *
      *   2) last-used model — the entry the user last actively selected / used,
      *      if it still exists, is visible, and its provider is enabled.
      *   3) newest provider's newest text-output model — the final catch-all so
-     *      a first-ever chat with providers but no group/last-used still gets a
+     *      a first-ever chat with providers but no Main-slot/last-used entry gets a
      *      sensible, text-capable default (image/audio-only models excluded).
      *
      * Sets currentModel / currentProvider / the name + activeEntry state flows.
@@ -5073,8 +4979,6 @@ class ChatViewModel(
         _modelName.value = entry.model.displayName
         _activeEntryId.value = entry.id
         _providerName.value = instance.label.ifEmpty { entry.model.provider }
-        _selectedGroupId.value = null
-        _selectedGroupName.value = ""
         val apiKey = providerRepository.usableApiKey(instance)
         if (apiKey != null) {
             currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
@@ -5083,7 +4987,7 @@ class ChatViewModel(
         return true
     }
 
-    /** Select a specific model entry (bypasses group selection). */
+    /** Select and persist one model entry for this session. */
     fun selectEntry(entryId: String) {
         val config = providerRepository.config.value
         val entry = config.modelEntries.find { it.id == entryId } ?: return
@@ -5093,15 +4997,13 @@ class ChatViewModel(
         currentModel = entry.model
         _modelName.value = entry.model.displayName
         _providerName.value = instance.label.ifEmpty { entry.model.provider }
-        _selectedGroupId.value = null
-        _selectedGroupName.value = ""
         _activeEntryId.value = entry.id
         currentProvider = ProviderFactory.create(instance, apiKey, entry.model, context)
         persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(entryId))
         applyEntrySessionDefaults(entry.id)
         // [T-newchat-default-model-fallback-android] Remember this as the
-        // global last-used model so the NEXT new chat (when no default group
-        // is set) defaults back to it. Tier 2 of the new-chat fallback chain.
+        // global last-used model so the NEXT new chat can reuse it when the
+        // Main slot has no available entry.
         providerRepository.lastUsedEntryId = entryId
     }
 
@@ -5161,14 +5063,13 @@ class ChatViewModel(
     }
 
     /**
-     * Group members that fallback skipped (disabled instance / missing
-     * credential / hidden entry), with reasons. Mirrors iOS
-     * ModelGroupRouter.unavailableMembers: when fallback exhausts, the user
-     * needs to know WHY the other group members never got tried — e.g. the
+     * Main-slot entries that fallback skipped (disabled instance / missing
+     * credential / hidden entry), with reasons. When fallback exhausts, the user
+     * needs to know WHY the other configured entries never got tried — e.g. the
      * Claude subscription was logged out, so every Anthropic entry was
      * silently filtered and fallback kept cycling OpenAI-only.
      */
-    private fun unavailableGroupMembers(): List<String> {
+    private fun unavailableSlotMembers(): List<String> {
         val config = providerRepository.config.value
         val result = mutableListOf<String>()
         for (entryId in config.slots.main) {
@@ -5201,7 +5102,7 @@ class ChatViewModel(
         for (entryId in fallbackEntryIdsInAttemptOrder(memberIds, currentEntryId)) {
             val entry = config.modelEntries.find { it.id == entryId } ?: continue
             val instance = providerRepository.instance(entry.providerInstanceId) ?: continue
-            // [T-disabled-provider-via-group-android] Skip disabled
+            // [T-disabled-provider-via-slot-android] Skip disabled
             // providers when walking the group's fallback chain so a
             // disabled provider sitting after the current entry doesn't
             // get picked up. buildFallbackProviders already does this; the
@@ -8907,11 +8808,10 @@ class ChatViewModel(
                         }
                         // [T-android-model-indicator-flash-on-endpoint-retry]
                         // Same-model recovery is a TRANSPARENT retry, not a real
-                        // model switch. A model group can hold several entries
-                        // for the SAME modelId behind different provider
-                        // instances/endpoints (e.g. deepseek-v4-flash via a dead
-                        // hub.oaifree.com key + via api.deepseek.com). When the
-                        // first 401s, group-fallback moves to the next instance —
+                        // model switch. A slot can hold several entries for the
+                        // SAME modelId behind different provider instances/endpoints
+                        // (e.g. duplicate provider credentials). When the first
+                        // fails, ordered slot fallback moves to the next instance —
                         // same modelId, different endpoint — which should recover
                         // silently. Only flash the model capsule when the
                         // resolved modelId ACTUALLY changes; an endpoint/instance-
@@ -8955,10 +8855,7 @@ class ChatViewModel(
                         // transparent same-model endpoint retry.
                         if (isRealModelChange) _fallbackTrigger.value++
                         // Persist the fallback model so re-entering the session starts from here
-                        val groupId = _selectedGroupId.value
-                        if (groupId != null && newEntry != null) {
-                            persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(newEntry.id))
-                        } else if (newEntry != null) {
+                        if (newEntry != null) {
                             persistBinding(com.openminis.app.data.model.ModelBinding.encodeEntry(newEntry.id))
                         }
                         val infoText = fallbackReasons.joinToString("\n") + "\n🔄 Switched to ${currentProvider.model.displayName}"
@@ -9027,7 +8924,7 @@ class ChatViewModel(
                             }
                         }
                         if (shouldFallback) {
-                            val skipped = unavailableGroupMembers()
+                            val skipped = unavailableSlotMembers()
                             if (fallbackReasons.isNotEmpty() || skipped.isNotEmpty()) {
                                 val trail = (fallbackReasons + skipped).joinToString("\n")
                                 val finalDesc = actual.message ?: actual.toString()
@@ -10306,7 +10203,7 @@ class ChatViewModel(
     /**
      * Resolve the immutable identity for the provider that actually emitted
      * this turn. The active entry id is important: model ids are not unique
-     * across provider instances, especially after group fallback.
+     * across provider instances, especially after slot fallback.
      */
     private fun modelAttributionSnapshot(provider: LLMProvider?): ModelAttributionSnapshot? {
         val actualProvider = provider ?: return null
@@ -11097,8 +10994,8 @@ class ChatViewModel(
             AppLogger.info("TitleGen", "skip guard=title-already-set title='${_sessionTitle.value.take(200)}'")
             return
         }
-        // Prefer a dedicated sub-model (cheap, non-OAuth) — mirrors iOS resolveSubEntry.
-        // Falls back to the primary provider if no sub-group is configured.
+        // Prefer a dedicated Light-slot model (cheap, non-OAuth) — mirrors iOS resolveSubEntry.
+        // Falls back to the primary provider if no Light-slot is configured.
         // [T-title-gen-fallback-first-message-android] If no provider can be
         // resolved at all, the session would silently stay "New Chat". Log the
         // reason and fall back to the first user message as the title.
@@ -11201,7 +11098,7 @@ class ChatViewModel(
                     append("Also pick a task category from: code, writing, research, analysis, creative, chat, math, translation, health, finance, travel, education, design, productivity, support, other.\n\n")
                     if (groupContext.isNotEmpty()) {
                         // The null path is spelled out and given its own
-                        // example: a closed option list pushes sub-models
+                        // example: a closed option list pushes Light-slot models
                         // toward always picking something, and a wrongly-filed
                         // session costs far more than a wrong category (which
                         // only drives a row icon).
@@ -11244,7 +11141,7 @@ class ChatViewModel(
                 // layer's injectThinkingParams honors OFF — e.g. DeepSeek V4 gets
                 // an explicit {"thinking":{"type":"disabled"}}, o-series/gpt-5
                 // omit reasoning_effort, Anthropic sends no thinking block — so a
-                // reasoning sub-model doesn't burn the whole budget on hidden
+                // reasoning Light-slot model doesn't burn the whole budget on hidden
                 // thinking and return empty text. As a belt-and-suspenders for
                 // models where OFF is still a no-op (e.g. Qwen3, which thinks by
                 // default), keep the T334 budget bump so it can finish thinking
@@ -11453,27 +11350,27 @@ class ChatViewModel(
 
     /**
      * Resolve the provider used for title generation. Mirrors iOS resolveSubEntry:
-     * prefer an explicitly configured sub-model (cheap, non-OAuth) so title
+     * prefer an explicitly configured Light-slot model (cheap, non-OAuth) so title
      * generation doesn't hit the expensive primary model or fail under the
      * OAuth-Anthropic Claude-Code-only gate. Falls back to null if no sub is
      * configured — caller uses the primary provider then.
      */
     private fun resolveTitleProvider(): LLMProvider? {
-        // [T-disabled-provider-via-group-android] Resolve the dedicated
-        // title-generation sub-model (first enabled member of defaultSubGroupId).
+        // [T-disabled-provider-via-slot-android] Resolve the dedicated
+        // title-generation Light-slot model (first enabled member of Light slot).
         // [T-android-regenerate-title-submodel] Shares
-        // ProviderRepository.resolveTitleSubEntry with the manual Regenerate
-        // path so both prefer the same sub-model. Silently degrades (caller
-        // falls back to the primary provider) when no sub-group is configured or
+        // ProviderRepository.resolveTitleLightEntry with the manual Regenerate
+        // path so both prefer the same Light-slot model. Silently degrades (caller
+        // falls back to the primary provider) when no Light-slot is configured or
         // every member sits behind a disabled provider.
-        val entry = providerRepository.resolveTitleSubEntry() ?: return null
+        val entry = providerRepository.resolveTitleLightEntry() ?: return null
         val instance = providerRepository.instance(entry.providerInstanceId) ?: return null
         var apiKey = providerRepository.loadApiKey(instance.id) ?: return null
 
         // [T-android-titlegen-oauth-refresh] Refresh the OAuth token before
         // building the provider — matches the manual Regenerate path
         // (SessionListViewModel.regenerateTitle) and iOS. Without this, an
-        // OAuth sub-model (e.g. OAuth Anthropic Claude Code) with an expired
+        // OAuth Light-slot model (e.g. OAuth Anthropic Claude Code) with an expired
         // cached token would 401 during auto-title-gen and silently drop to the
         // first-message fallback title. A refresh failure is non-fatal: log it
         // and proceed with the stale token so the request's own 401 flows into

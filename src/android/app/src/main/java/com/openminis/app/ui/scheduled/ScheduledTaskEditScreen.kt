@@ -576,69 +576,28 @@ private fun EditFormBody(
     // model" behaviour are unaffected.
     val providerRepo = vm.providerRepository
     if (showModelPicker && providerRepo != null) {
-        // [T-android-scheduled-task-model-binding] Reuse the chat-screen's
-        // ModelPickerSheet so groups and individual entries are both
-        // selectable; the editor only needs the JSON shape that
-        // ChatSessionEntity.modelBinding uses, so we synthesize it from the
-        // picker's three callback shapes (group / group+entry / standalone
-        // entry). The picker doesn't surface a "default model" option — we
-        // model that as null binding via the row's onClear action above.
+        // A null binding follows the Main slot; explicit bindings are entry-only.
         val cfg by providerRepo.config.collectAsState()
         val entryById: (String) -> com.openminis.app.data.model.ModelEntry? = { id ->
             cfg.modelEntries.firstOrNull { it.id == id }
         }
-        val groupById: (String) -> com.openminis.app.data.model.ModelGroup? = { id ->
-            cfg.modelGroups.firstOrNull { it.id == id }
+        val parsed = modelBindingForPreselect?.let { json ->
+            runCatching { org.json.JSONObject(json) }.getOrNull()
         }
-        // Pre-highlight the user's prior pick when re-opening the sheet:
-        //   - binding pinned to a group → highlight that group
-        //   - binding pinned to an entry → highlight that entry (no group)
-        //   - binding == null ("use default") → fall through to the app's
-        //     default primary group so the user sees it as the implicit
-        //     current selection (instead of an empty radio everywhere).
-        val preselectGroupId: String?
-        val preselectEntryId: String?
-        run {
-            val b = modelBindingForPreselect
-            val parsed = b?.let { json ->
-                runCatching { org.json.JSONObject(json) }.getOrNull()
-            }
-            val ptype = parsed?.optString("type")
-            preselectGroupId = when {
-                ptype == "group" -> parsed.optString("groupId").takeIf { it.isNotEmpty() }
-                b == null -> cfg.defaultPrimaryGroupId
-                else -> null
-            }
-            preselectEntryId = if (ptype == "entry") {
-                parsed.optString("entryId").takeIf { it.isNotEmpty() }
-            } else null
+        val preselectEntryId = when (parsed?.optString("type")) {
+            "entry" -> parsed.optString("entryId").takeIf { it.isNotEmpty() }
+            else -> cfg.slots.main.firstOrNull()
         }
         com.openminis.app.ui.chat.ModelPickerSheet(
-            groups = cfg.modelGroups,
-            selectedGroupId = preselectGroupId,
             activeEntryId = preselectEntryId,
-            defaultPrimaryGroupId = cfg.defaultPrimaryGroupId,
             config = cfg,
             providerRepository = providerRepo,
-            onSelectGroup = { groupId ->
-                val name = groupById(groupId)?.name ?: "Group"
-                val json = """{"type":"group","groupId":"$groupId"}"""
-                onPickModel(json, name); showModelPicker = false
-            },
-            onSelectGroupEntry = { _, entryId ->
-                // User explicitly picked a single entry inside a group → pin
-                // to that entry; matches the chat screen's per-group entry
-                // override semantics.
-                val entry = entryById(entryId)
-                val name = entry?.model?.displayName ?: "Model"
-                val json = """{"type":"entry","entryId":"$entryId"}"""
-                onPickModel(json, name); showModelPicker = false
-            },
             onSelectEntry = { entryId ->
                 val entry = entryById(entryId)
                 val name = entry?.model?.displayName ?: "Model"
                 val json = """{"type":"entry","entryId":"$entryId"}"""
-                onPickModel(json, name); showModelPicker = false
+                onPickModel(json, name)
+                showModelPicker = false
             },
             onDismiss = { showModelPicker = false },
         )

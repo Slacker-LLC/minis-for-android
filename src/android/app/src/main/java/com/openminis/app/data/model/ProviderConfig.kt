@@ -144,12 +144,6 @@ enum class ThinkingLevel {
     }
 }
 
-@Serializable
-enum class RoutingStrategy {
-    fallback,
-    loadBalance,
-}
-
 /**
  * [T-android-image-endpoint-mode] How an OpenAI-compatible provider routes
  * image-generation requests. Mirrors iOS `ImageEndpointMode`
@@ -171,7 +165,7 @@ enum class ImageEndpointMode {
 }
 
 /**
- * Controls when fallback to the next model in the group is triggered.
+ * Controls when fallback to the next model in the main slot is triggered.
  * - default: only on rate limiting (429) or server errors (5xx)
  * - always: on any error, including network errors, auth failures, etc.
  */
@@ -215,27 +209,6 @@ enum class ModelSlot {
     voiceInput,
     voiceOutput,
 }
-
-@Serializable
-data class ModelGroup(
-    val id: String = UUID.randomUUID().toString(),
-    var name: String,
-    val memberEntryIds: MutableList<String> = mutableListOf(),
-    var strategy: RoutingStrategy = RoutingStrategy.fallback,
-    var fallbackStrategy: FallbackStrategy = FallbackStrategy.default,
-    // T312: per-group session defaults. Mirrors iOS ModelGroup fields.
-    // null = "no default override" — sessions bound to this group keep
-    // OFF / unlimited unless the user opts in. Pre-T312 persisted JSON
-    // simply lacks both keys; kotlinx.serialization fills them with the
-    // declared defaults so older configs round-trip cleanly.
-    var defaultThinkingLevel: ThinkingLevel? = null,
-    var contextLimitTokens: Int? = null,
-    // T-ctxslider 54ab8e93: persisted memory of the last user-selected context
-    // limit, so toggling the "Limit Context Window" switch OFF→leave→ON
-    // restores the previous value instead of snapping back to 128K. Default
-    // null lets old JSON deserialize cleanly (kotlinx.serialization).
-    var lastContextLimitTokens: Int? = null,
-)
 
 @Serializable
 data class ProviderInstance(
@@ -439,31 +412,13 @@ data class ProviderConfig(
     val modelEntries: MutableList<ModelEntry> = mutableListOf(),
     var slots: ModelSlots = ModelSlots(),
     var fallbackTrigger: FallbackStrategy = FallbackStrategy.default,
-    val modelGroups: MutableList<ModelGroup> = mutableListOf(),
-    var defaultPrimaryGroupId: String? = null,
-    var defaultSubGroupId: String? = null,
-    // [T-android-provider-voice] Voice Input / Voice Output group bindings —
-    // mirrors iOS ProviderConfig.voiceInputGroupId / voiceOutputGroupId
-    // (per-device, provider_local_kv on iOS; meta KV rows here). Old persisted
-    // JSON lacks the keys and deserializes to null (ignoreUnknownKeys +
-    // declared defaults), so adding them is downgrade/round-trip safe.
-    var voiceInputGroupId: String? = null,
-    var voiceOutputGroupId: String? = null,
-    // [T-android-vision-group / GH#182] Vision Group binding — the group whose
-    // vision-capable members read images on behalf of a main model that cannot
-    // see pixels. Per-device pointer at an ordinary ModelGroup, mirroring
-    // voiceInputGroupId (meta KV row, not synced CRDT member maps). Absent in
-    // old persisted JSON → deserializes to null (ignoreUnknownKeys + default).
-    var visionGroupId: String? = null,
-    // Models and groups exposed to the agent loop (minis-model-use terminal
-    // command) — mirrors iOS agentLoopModelEntryIds / agentLoopGroupIds.
+    // Model entries exposed to the minis-model-use terminal command.
     val agentLoopModelEntryIds: MutableList<String> = mutableListOf(),
-    val agentLoopGroupIds: MutableList<String> = mutableListOf(),
     // T273: bumped by ProviderRepository.saveConfig on every mutation so
     // data-class structural equals returns false even when callers mutate
     // inner MutableLists in place. Without this, MutableStateFlow's
     // distinct-until-changed (uses equals, not ===) suppresses emission
-    // and ProviderDetailScreen / ModelGroupDetailScreen miss refreshes.
+    // and provider/model settings screens miss refreshes.
     // @Transient: revision is in-memory only, never persisted to prefs
     // or iCloud sync.
     //
@@ -489,7 +444,7 @@ data class ProviderConfig(
      * FIRST and never walks the mutable lists.
      *
      * The generated data-class equals compares fields in DECLARATION order, so
-     * it reached `instances` / `modelEntries` / `modelGroups` long before the
+     * it reached `instances` / `modelEntries` long before the
      * revision short-circuit at the end could help. Those are MutableLists that
      * writers (addInstance, provider.import, replaceEntries…) mutate IN PLACE
      * on a background thread, while StateFlowImpl.collect calls equals() on the

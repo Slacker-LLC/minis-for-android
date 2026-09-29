@@ -1464,38 +1464,8 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_groups_voice_input&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;model_groups_voice_input&quot;>Voice Input&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="229"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_groups_voice_output&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;model_groups_voice_output&quot;>Voice Output&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="230"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_groups_vision&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_groups_vision&quot;>Vision Input&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="232"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5182,170 +5152,20 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_session_defaults&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_session_defaults&quot;>Session Defaults&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1134"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_session_defaults_footer&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_session_defaults_footer&quot;>Applied automatically when a new session is bound to this group.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1135"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_enable_reasoning&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_enable_reasoning&quot;>Enable Reasoning&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1136"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_intensity&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_intensity&quot;>Intensity&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1137"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_low&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_low&quot;>Low&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1138"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_medium&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_medium&quot;>Medium&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1139"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_high&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_high&quot;>High&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1140"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_xhigh&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_xhigh&quot;>XHigh&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1141"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_max&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_max&quot;>Max&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1142"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_thinking_ultra&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_thinking_ultra&quot;>Ultra&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1143"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_limit_context_window&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_limit_context_window&quot;>Limit Context Window&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1144"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_max_context&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_max_context&quot;>Max Context&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1145"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_unlimited&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_unlimited&quot;>Unlimited&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1146"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_context_limit_unavailable&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_context_limit_unavailable&quot;>Group members did not declare a context window — cannot apply a limit. Add a model or check model metadata first.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1147"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_detail_context_limit_runtime_capped&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;model_group_detail_context_limit_runtime_capped&quot;>Current member max ctx=%1$s; saved %2$s will be clipped at runtime. The saved value is preserved and re-applies if you add a higher-context model.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1148"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -5402,16 +5222,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_group_no_usable_models_badge&quot; is not translated in &quot;de&quot; (German), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French), &quot;zh&quot; (Chinese)"
-        errorLine1="    &lt;string name=&quot;model_group_no_usable_models_badge&quot;>No usable models&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1188"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -6040,16 +5850,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="MissingTranslation"
-        message="&quot;voice_input_picker_groups&quot; is not translated in &quot;de&quot; (German), &quot;ru&quot; (Russian), &quot;ko&quot; (Korean), &quot;ja&quot; (Japanese), &quot;fr&quot; (French)"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_groups&quot;>Model Groups&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1414"
-            column="13"/>
-    </issue>
 
     <issue
         id="MissingTranslation"
@@ -9915,49 +9715,9 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.model_group_detail_context_limit_unavailable` appears to be unused"
-        errorLine1="    &lt;string name=&quot;model_group_detail_context_limit_unavailable&quot;>Group members did not declare a context window — cannot apply a limit. Add a model or check model metadata first.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1147"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.model_group_detail_context_limit_runtime_capped` appears to be unused"
-        errorLine1="    &lt;string name=&quot;model_group_detail_context_limit_runtime_capped&quot;>Current member max ctx=%1$s; saved %2$s will be clipped at runtime. The saved value is preserved and re-applies if you add a higher-context model.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1148"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.settings_agent_loop_models` appears to be unused"
-        errorLine1="    &lt;string name=&quot;settings_agent_loop_models&quot;>Agent Loop Models&lt;/string>    &lt;string name=&quot;agent_loop_models_groups&quot;>Groups&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1159"
-            column="13"/>
-    </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.agent_loop_models_picking_a_group_pins_every_model_in_it_a` appears to be unused"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_picking_a_group_pins_every_model_in_it_a&quot;>Picking a group pins every model in it. Add or remove models inside Model Groups.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1160"
-            column="13"/>
-    </issue>
 
     <issue
         id="UnusedResources"
@@ -9970,16 +9730,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.agent_loop_models_no_models_or_groups_available_yet` appears to be unused"
-        errorLine1="    &lt;string name=&quot;agent_loop_models_no_models_or_groups_available_yet&quot;>No models or groups available yet.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1162"
-            column="13"/>
-    </issue>
 
     <issue
         id="UnusedResources"
@@ -10036,16 +9786,6 @@
             column="13"/>
     </issue>
 
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.voice_input_picker_groups` appears to be unused"
-        errorLine1="    &lt;string name=&quot;voice_input_picker_groups&quot;>Model Groups&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1414"
-            column="13"/>
-    </issue>
 
     <issue
         id="UnusedResources"

@@ -1,8 +1,6 @@
 package com.openminis.app.ui.chat.voice
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.R
 import com.openminis.app.data.repository.ProviderRepository
@@ -29,15 +27,10 @@ fun VoiceInputPickerSheet(
     providerRepository: ProviderRepository,
     onDismiss: () -> Unit,
 ) {
-    val config by providerRepository.config.collectAsState()
     UnifiedModelPickerSheet(
         providerRepository = providerRepository,
         title = stringResource(R.string.voice_input_picker_title),
         modalityFilter = PickerModalityFilter.AUDIO_INPUT,
-        boundGroup = config.voiceInputGroupId?.let { gid ->
-            config.modelGroups.find { it.id == gid }
-        },
-        boundGroupName = providerRepository.voiceInputGroupName(),
         selectedId = providerRepository.voiceInputOverrideEntryId,
         onSelect = { providerRepository.voiceInputOverrideEntryId = it },
         onDismiss = onDismiss,
@@ -56,15 +49,10 @@ fun VoiceOutputPickerSheet(
     providerRepository: ProviderRepository,
     onDismiss: () -> Unit,
 ) {
-    val config by providerRepository.config.collectAsState()
     UnifiedModelPickerSheet(
         providerRepository = providerRepository,
         title = stringResource(R.string.tts_capsule_picker_title),
         modalityFilter = PickerModalityFilter.AUDIO_OUTPUT,
-        boundGroup = config.voiceOutputGroupId?.let { gid ->
-            config.modelGroups.find { it.id == gid }
-        },
-        boundGroupName = providerRepository.voiceOutputGroupName(),
         selectedId = providerRepository.voiceOutputOverrideEntryId,
         onSelect = { providerRepository.voiceOutputOverrideEntryId = it },
         onDismiss = onDismiss,

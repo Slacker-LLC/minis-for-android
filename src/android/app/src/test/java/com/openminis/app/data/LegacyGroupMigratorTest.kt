@@ -2,18 +2,22 @@ package com.openminis.app.data
 
 import com.openminis.app.data.migration.LegacyBindingRecord
 import com.openminis.app.data.migration.LegacyGroupMigrator
+import com.openminis.app.data.migration.LegacyGroupStateParser
 import com.openminis.app.data.migration.LegacyGroupPointers
 import com.openminis.app.data.migration.LegacyModelGroup
 import com.openminis.app.data.migration.LegacyState
 import com.openminis.app.data.model.FallbackStrategy
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.ProviderConfig
-import com.openminis.app.data.model.RoutingStrategy
 import com.openminis.app.data.model.ThinkingLevel
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -52,7 +56,6 @@ class LegacyGroupMigratorTest {
         assertEquals(listOf("o1"), result.config.slots.entries(ModelSlot.voiceOutput))
         assertEquals(FallbackStrategy.always, result.config.fallbackTrigger)
         assertEquals(listOf("m1", "m2", "l1"), result.config.agentLoopModelEntryIds)
-        assertEquals(emptyList<String>(), result.config.agentLoopGroupIds)
     }
 
     @Test
@@ -197,32 +200,44 @@ class LegacyGroupMigratorTest {
     }
 
     @Test
-    fun migratesLegacyBackupConfigAndCanonicalizesItsSlotReferences() {
+    fun parsesLegacyBackupJsonAtMigrationBoundaryAndCanonicalizesSlotReferences() {
         val backup = ProviderConfig(
             modelEntries = listOf(entry("legacy-one", "model-one"), entry("legacy-two", "model-two")).toMutableList(),
-            modelGroups = mutableListOf(
-                ModelGroup(
-                    id = "backup-main",
-                    name = "Backed up main",
-                    memberEntryIds = mutableListOf("legacy-two", "legacy-one"),
-                    strategy = RoutingStrategy.loadBalance,
-                    fallbackStrategy = FallbackStrategy.always,
-                    defaultThinkingLevel = ThinkingLevel.HIGH,
-                    contextLimitTokens = 100_000,
-                    lastContextLimitTokens = 200_000,
-                ),
+        )
+        val json = Json { encodeDefaults = true }
+        val root = json.encodeToJsonElement(ProviderConfig.serializer(), backup).jsonObject
+        val oldGroup = JsonObject(
+            mapOf(
+                "id" to JsonPrimitive("backup-main"),
+                "name" to JsonPrimitive("Backed up main"),
+                "memberEntryIds" to JsonArray(listOf(JsonPrimitive("legacy-two"), JsonPrimitive("legacy-one"))),
+                "strategy" to JsonPrimitive("loadBalance"),
+                "fallbackStrategy" to JsonPrimitive("always"),
+                "defaultThinkingLevel" to JsonPrimitive("HIGH"),
+                "contextLimitTokens" to JsonPrimitive(100_000),
+                "lastContextLimitTokens" to JsonPrimitive(200_000),
+                "sortOrder" to JsonPrimitive(0),
             ),
-            defaultPrimaryGroupId = "backup-main",
-            agentLoopGroupIds = mutableListOf("backup-main"),
+        )
+        val raw = JsonObject(
+            root + mapOf(
+                "modelGroups" to JsonArray(listOf(oldGroup)),
+                "defaultPrimaryGroupId" to JsonPrimitive("backup-main"),
+                "agentLoopGroupIds" to JsonArray(listOf(JsonPrimitive("backup-main"))),
+            ),
+        ).toString()
+        val state = LegacyGroupStateParser.fromJson(
+            config = backup,
+            rawJson = raw,
+            availableEntryIds = setOf("provider/model-one", "provider/model-two"),
         )
 
-        val migrated = LegacyGroupMigrator.migrateBackupConfig(backup)
+        val migrated = LegacyGroupMigrator.migrate(state).config
         assertEquals(listOf("provider/model-two", "provider/model-one"), migrated.slots.main)
         assertEquals(FallbackStrategy.always, migrated.fallbackTrigger)
         assertEquals(listOf("provider/model-two", "provider/model-one"), migrated.agentLoopModelEntryIds)
-        assertEquals(emptyList<ModelGroup>(), migrated.modelGroups)
-        assertNull(migrated.defaultPrimaryGroupId)
         assertEquals(ThinkingLevel.HIGH, migrated.modelEntries.first { it.baseModel.id == "model-two" }.overrides.defaultThinkingLevel)
         assertEquals(100_000, migrated.modelEntries.first { it.baseModel.id == "model-two" }.overrides.contextLimitTokens)
     }
+
 }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -471,7 +470,7 @@ fun SessionListScreen(
     val regeneratingIds by viewModel.regeneratingIds.collectAsState()
     val providerConfig by providerRepository.config.collectAsState()
     val hasProviders = providerConfig.instances.isNotEmpty()
-    val hasGroups = providerConfig.modelGroups.isNotEmpty()
+    val hasMainSlot = providerConfig.slots.main.isNotEmpty()
     // [T-android-startup-config-stall] Provider config now loads off-thread, so
     // for a brief startup window `providerConfig` is the empty placeholder.
     // Gate the onboarding/list render on this too (alongside the sessions
@@ -839,10 +838,10 @@ fun SessionListScreen(
                         // Show the 3-step onboarding whenever there are no sessions —
                         // Step 3 (Start a Conversation) is the call-to-action after the
                         // user finishes Steps 1 and 2, so we must keep the landing
-                        // visible even when hasProviders && hasGroups. Mirrors iOS
+                        // visible even when hasProviders && hasMainSlot. Mirrors iOS
                         // ContentView.emptyState.
                         // [T-android-startup-config-stall] Gated on configLoaded so
-                        // hasProviders/hasGroups reflect the real persisted config —
+                        // hasProviders/hasMainSlot reflect the real persisted config —
                         // otherwise a returning user with providers but no sessions
                         // would briefly see the "add a provider" step before the
                         // async config load emits. The list branch (sessions present)
@@ -850,7 +849,7 @@ fun SessionListScreen(
                         // it immediately without waiting on the config decode.
                         OnboardingLanding(
                             hasProviders = hasProviders,
-                            hasGroups = hasGroups,
+                            hasMainSlot = hasMainSlot,
                             onAddProvider = onAddProviderClick,
                             onSelectModels = onSelectModelsClick,
                             onStartConversation = {
@@ -1166,13 +1165,6 @@ fun SessionListScreen(
                             if (sessionId != null) onNewChatGuarded(sessionId)
                         }
                     },
-                    onNewChatWithGroup = { groupId ->
-                        scope.launch {
-                            val sessionId = viewModel.createNewSession(groupId = groupId)
-                            if (sessionId != null) onNewChatGuarded(sessionId)
-                        }
-                    },
-                    modelGroups = providerConfig.modelGroups,
                     onSearchToggle = {
                         if (isSearchActive) {
                             viewModel.searchQuery.value = ""
@@ -1393,8 +1385,6 @@ private fun DualFabRow(
     isSearching: Boolean,
     hasSessions: Boolean,
     onNewChat: () -> Unit,
-    onNewChatWithGroup: (String) -> Unit,
-    modelGroups: List<com.openminis.app.data.model.ModelGroup>,
     onSearchToggle: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onSearchDismiss: () -> Unit,
@@ -1432,9 +1422,6 @@ private fun DualFabRow(
     val density = LocalDensity.current
     val swapThreshold = with(density) { 100.dp.toPx() }
 
-    var showGroupMenu by remember { mutableStateOf(false) }
-    val topGroups = remember(modelGroups) { modelGroups.take(10) }
-
     val chatFab: @Composable () -> Unit = {
         val isGlass = LocalUiStyle.current == UiStyle.GLASS
         Box(
@@ -1460,12 +1447,6 @@ private fun DualFabRow(
                 containerColor = if (isGlass) Color.Transparent else minisFabColor(),
                 modifier = Modifier
                     .size(56.dp)
-                    .combinedClickable(
-                        onClick = onNewChat,
-                        onLongClick = {
-                            if (topGroups.isNotEmpty()) showGroupMenu = true
-                        },
-                    )
                     .then(
                         if (isGlass) Modifier.glassSurface(
                             shape = CircleShape,
@@ -1482,21 +1463,6 @@ private fun DualFabRow(
                 },
             ) {
                 Icon(Icons.Outlined.Forum, contentDescription = stringResource(R.string.new_chat), tint = Color.White, modifier = Modifier.size(24.dp))
-            }
-            DropdownMenu(
-                expanded = showGroupMenu,
-                onDismissRequest = { showGroupMenu = false },
-            ) {
-                topGroups.forEach { group ->
-                    DropdownMenuItem(
-                        text = { Text(group.name) },
-                        leadingIcon = { Icon(Icons.Outlined.Forum, contentDescription = null) },
-                        onClick = {
-                            showGroupMenu = false
-                            onNewChatWithGroup(group.id)
-                        },
-                    )
-                }
             }
         }
     }
@@ -2800,7 +2766,7 @@ private fun SessionBadgeOverlay(
 @Composable
 private fun OnboardingLanding(
     hasProviders: Boolean,
-    hasGroups: Boolean,
+    hasMainSlot: Boolean,
     onAddProvider: () -> Unit,
     onSelectModels: () -> Unit,
     onStartConversation: () -> Unit,
@@ -2859,26 +2825,26 @@ private fun OnboardingLanding(
                 number = 2,
                 title = stringResource(R.string.sessionlist_welcome_step2_title),
                 subtitle = when {
-                    hasGroups -> stringResource(R.string.sessionlist_welcome_step_done)
+                    hasMainSlot -> stringResource(R.string.sessionlist_welcome_step_done)
                     hasProviders -> stringResource(R.string.sessionlist_welcome_step2_subtitle)
                     else -> stringResource(R.string.sessionlist_welcome_step2_locked)
                 },
-                isDone = hasGroups,
+                isDone = hasMainSlot,
                 isLocked = !hasProviders,
-                onClick = { if (hasProviders && !hasGroups) onSelectModels() },
+                onClick = { if (hasProviders && !hasMainSlot) onSelectModels() },
             )
 
             SetupStepCard(
                 number = 3,
                 title = stringResource(R.string.sessionlist_welcome_step3_title),
-                subtitle = if (hasGroups) {
+                subtitle = if (hasMainSlot) {
                     stringResource(R.string.sessionlist_welcome_step3_subtitle)
                 } else {
                     stringResource(R.string.sessionlist_welcome_step3_locked)
                 },
                 isDone = false,
-                isLocked = !hasGroups,
-                onClick = { if (hasGroups) onStartConversation() },
+                isLocked = !hasMainSlot,
+                onClick = { if (hasMainSlot) onStartConversation() },
             )
         }
     }

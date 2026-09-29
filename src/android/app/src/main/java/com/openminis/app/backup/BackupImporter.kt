@@ -854,7 +854,7 @@ class BackupImporter(
             )
         }
 
-        val (before, after) = repo.mergeBackupProviderConfig(config)
+        val (before, after) = repo.mergeBackupProviderConfig(config, parsed.rawJson)
         report.imported = maxOf(0, after - before)
         // Everything the package carried that did not newly insert was already
         // present and left untouched — skipped, not updated.
@@ -1071,6 +1071,8 @@ class BackupImporter(
         internal data class LenientProviderConfig(
             val config: com.openminis.app.data.model.ProviderConfig,
             val droppedInstances: Int,
+            /** Original JSON is consumed only by the migration boundary. */
+            val rawJson: String,
         )
 
         /**
@@ -1112,6 +1114,7 @@ class BackupImporter(
                         com.openminis.app.data.model.ProviderConfig.serializer(), root,
                     ),
                     droppedInstances = 0,
+                    rawJson = text,
                 )
             }
 
@@ -1159,6 +1162,7 @@ class BackupImporter(
                     com.openminis.app.data.model.ProviderConfig.serializer(), patched,
                 ),
                 droppedInstances = dropped,
+                rawJson = text,
             )
         }
 

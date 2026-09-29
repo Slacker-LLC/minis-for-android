@@ -3,15 +3,18 @@ package com.openminis.app.debug
 import android.content.Context
 import com.openminis.app.MinisApp
 import com.openminis.app.data.model.FallbackStrategy
+import com.openminis.app.data.model.ModelSlot
+import com.openminis.app.data.model.hasAudioInput
+import com.openminis.app.data.model.hasAudioOutput
+import com.openminis.app.data.model.hasImageInput
+import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.ImageEndpointMode
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
-import com.openminis.app.data.model.RoutingStrategy
 import com.openminis.app.data.repository.ProviderRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +23,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 /**
- * Mutation handlers for the `provider.*` and `provider.groups.*` RPC methods —
+ * Mutation handlers for the `provider.*` RPC methods —
  * Phase 2.
  *
  * Each method routes through the existing [ProviderRepository] surface, which
@@ -469,169 +472,106 @@ internal object ProviderMutationMethods {
             put("supportsReasoning", effective.supportsReasoning ?: JSONObject.NULL)
             put("contextWindow", effective.contextWindow ?: JSONObject.NULL)
             put("maxOutputTokens", effective.maxOutputTokens ?: JSONObject.NULL)
+            put("defaultThinkingLevel", entry.overrides.defaultThinkingLevel?.name ?: JSONObject.NULL)
+            put("contextLimitTokens", entry.overrides.contextLimitTokens ?: JSONObject.NULL)
             val ov = JSONObject()
             ov.put("displayName", entry.overrides.displayName ?: JSONObject.NULL)
             ov.put("maxOutputTokens", entry.overrides.maxOutputTokens ?: JSONObject.NULL)
             ov.put("contextWindow", entry.overrides.contextWindow ?: JSONObject.NULL)
+            ov.put("defaultThinkingLevel", entry.overrides.defaultThinkingLevel?.name ?: JSONObject.NULL)
+            ov.put("contextLimitTokens", entry.overrides.contextLimitTokens ?: JSONObject.NULL)
             put("overrides", ov)
             put("userModifiedAt", entry.userModifiedAt ?: JSONObject.NULL)
         }
     }
 
-    // ─── Groups ─────────────────────────────────────────────────────────────
+    // ─── Fixed model slots ───────────────────────────────────────────────────
 
-    fun groupsCreate(context: Context, params: JSONObject): JSONObject {
+    fun slotsSet(context: Context, params: JSONObject): JSONObject {
         val repo = repo(context)
-        val name = params.optString("name", "").ifEmpty {
-            throw RPCException(-32602, "Missing 'name' param")
+        val result = JSONObject()
+        if (params.has("fallbackTrigger")) {
+            val raw = params.optString("fallbackTrigger", "")
+            val value = runCatching { FallbackStrategy.valueOf(raw) }.getOrNull()
+                ?: throw RPCException(-32602, "Unknown fallback trigger: $raw")
+            repo.setFallbackTrigger(value)
+            result.put("fallbackTrigger", value.name)
         }
-        val membersRaw = params.optJSONArray("memberEntryIds")
-        val members = mutableListOf<String>()
-        if (membersRaw != null) {
-            val knownEntryIds = repo.config.value.modelEntries.map { it.id }.toSet()
-            for (i in 0 until membersRaw.length()) {
-                val id = membersRaw.optString(i)
-                if (id.isNotEmpty() && id in knownEntryIds) members.add(id)
+        if (params.has("slot") || params.has("entryIds")) {
+            val rawSlot = params.optString("slot", "").ifEmpty {
+                throw RPCException(-32602, "Missing 'slot' param")
             }
-        }
-        val strategy = parseStrategy(params.optString("strategy", "fallback"))
-        val fallback = parseFallback(params.optString("fallbackStrategy", "default"))
-
-        val group = ModelGroup(
-            name = name,
-            memberEntryIds = members,
-            strategy = strategy,
-            fallbackStrategy = fallback,
-        )
-        repo.addGroup(group)
-        return JSONObject().put("group", groupToJson(repo, group))
-    }
-
-    fun groupsUpdate(context: Context, params: JSONObject): JSONObject {
-        val repo = repo(context)
-        val id = params.optString("groupId", "").ifEmpty {
-            throw RPCException(-32602, "Missing 'groupId' param")
-        }
-        val published = repo.group(id)
-            ?: throw RPCException(-32602, "Group not found: $id")
-
-        // [T-android-provider-mutator-lock] Edit a COPY. `repo.group(id)`
-        // returns the live object out of the published config, so writing its
-        // fields — and especially `memberEntryIds.clear()` — mutated state that
-        // Compose readers (ModelGroupDetailScreen, enabledMemberEntries) are
-        // iterating, from the debug server's HTTP thread. The clear() was the
-        // worse half: it opens a window where the group has ZERO members, and a
-        // concurrent saveConfig from any other mutator would snapshot and
-        // persist that empty group — silent data loss, not just a CME.
-        val current = published.copy(memberEntryIds = published.memberEntryIds.toMutableList())
-
-        if (params.has("name")) {
-            val n = params.optString("name", "")
-            if (n.isEmpty()) throw RPCException(-32602, "Group name must be non-empty")
-            current.name = n
-        }
-        if (params.has("memberEntryIds")) {
-            val arr = params.optJSONArray("memberEntryIds") ?: JSONArray()
-            val knownIds = repo.config.value.modelEntries.map { it.id }.toSet()
-            current.memberEntryIds.clear()
-            for (i in 0 until arr.length()) {
-                val mid = arr.optString(i)
-                if (mid.isNotEmpty() && mid in knownIds) current.memberEntryIds.add(mid)
+            val slot = ModelSlot.entries.firstOrNull { it.name == rawSlot }
+                ?: throw RPCException(-32602, "Unknown model slot: $rawSlot")
+            val array = params.optJSONArray("entryIds")
+                ?: throw RPCException(-32602, "Missing 'entryIds' array")
+            val cfg = repo.config.value
+            val ids = buildList {
+                for (i in 0 until array.length()) {
+                    val id = array.optString(i)
+                    if (id.isBlank()) continue
+                    val virtual = SystemVoiceEntries.resolve(id)
+                    val compatible = if (virtual != null) {
+                        when (slot) {
+                            ModelSlot.voiceInput -> virtual.model.hasAudioInput
+                            ModelSlot.voiceOutput -> virtual.model.hasAudioOutput
+                            else -> false
+                        }
+                    } else {
+                        val entry = cfg.modelEntries.firstOrNull { it.id == id }
+                        entry != null && !entry.isHidden && when (slot) {
+                            ModelSlot.main, ModelSlot.light -> entry.model.isTextOutput
+                            ModelSlot.vision -> entry.model.hasImageInput
+                            ModelSlot.voiceInput -> entry.model.hasAudioInput
+                            ModelSlot.voiceOutput -> entry.model.hasAudioOutput
+                        }
+                    }
+                    if (!compatible) throw RPCException(-32602, "Entry $id is not compatible with slot ${slot.name}")
+                    if (id !in this) add(id)
+                }
             }
+            repo.setSlotEntries(slot, ids)
+            result.put("slot", slot.name).put("entryIds", JSONArray(ids))
         }
-        if (params.has("strategy")) current.strategy = parseStrategy(params.optString("strategy"))
-        if (params.has("fallbackStrategy")) current.fallbackStrategy = parseFallback(params.optString("fallbackStrategy"))
-        repo.updateGroup(current)
-        return JSONObject().put("group", groupToJson(repo, current))
+        if (result.length() == 0) throw RPCException(-32602, "Pass slot+entryIds or fallbackTrigger")
+        return result
     }
 
-    fun groupsDelete(context: Context, params: JSONObject): JSONObject {
+    fun modelsSetDefaults(context: Context, params: JSONObject): JSONObject {
         val repo = repo(context)
-        val id = params.optString("groupId", "").ifEmpty {
-            throw RPCException(-32602, "Missing 'groupId' param")
+        val id = params.optString("entryId", "").ifEmpty {
+            throw RPCException(-32602, "Missing 'entryId' param")
         }
-        if (!params.optBoolean("confirm", false)) {
-            throw RPCException(-32602, "Pass confirm=true to delete a group")
+        val entry = repo.config.value.modelEntries.firstOrNull { it.id == id }
+            ?: throw RPCException(-32602, "Entry not found: $id")
+        var defaults = entry.overrides
+        if (params.has("defaultThinkingLevel")) {
+            val raw = if (params.isNull("defaultThinkingLevel")) null
+                else params.optString("defaultThinkingLevel").uppercase().takeIf { it.isNotBlank() }
+            val level = raw?.let { runCatching { com.openminis.app.data.model.ThinkingLevel.valueOf(it) }.getOrNull() }
+            if (raw != null && level == null) throw RPCException(-32602, "Unknown thinking level: $raw")
+            defaults = defaults.copy(defaultThinkingLevel = level)
         }
-        val current = repo.group(id)
-            ?: throw RPCException(-32602, "Group not found: $id")
-        val wasDefault = repo.config.value.defaultPrimaryGroupId == id
-        repo.removeGroup(id)
+        if (params.has("contextLimitTokens")) {
+            val tokens = if (params.isNull("contextLimitTokens")) null else params.optInt("contextLimitTokens", -1)
+            if (tokens != null && (tokens < 0 || tokens > Int.MAX_VALUE)) {
+                throw RPCException(-32602, "contextLimitTokens must be null or 0..2147483647")
+            }
+            val cap = tokens?.takeIf { it > 0 }
+            defaults = defaults.copy(
+                contextLimitTokens = cap,
+                lastContextLimitTokens = cap ?: defaults.lastContextLimitTokens,
+            )
+        }
+        if (!params.has("defaultThinkingLevel") && !params.has("contextLimitTokens")) {
+            throw RPCException(-32602, "Pass defaultThinkingLevel and/or contextLimitTokens")
+        }
+        repo.updateEntry(entry.copy(overrides = defaults))
         return JSONObject().apply {
-            put("groupId", id)
-            put("deleted", true)
-            put("wasDefault", wasDefault)
+            put("entryId", id)
+            put("defaultThinkingLevel", defaults.defaultThinkingLevel?.name ?: JSONObject.NULL)
+            put("contextLimitTokens", defaults.contextLimitTokens ?: JSONObject.NULL)
         }
     }
 
-    fun groupsSetDefault(context: Context, params: JSONObject): JSONObject {
-        val repo = repo(context)
-        if (!params.has("groupId")) throw RPCException(-32602, "Missing 'groupId' param")
-        val id = if (params.isNull("groupId")) null else params.optString("groupId", "").ifEmpty { null }
-        if (id != null && repo.group(id) == null) {
-            throw RPCException(-32602, "Group not found: $id")
-        }
-        repo.defaultPrimaryGroupId = id
-        return JSONObject().put("defaultGroupId", id ?: JSONObject.NULL)
-    }
-
-    /**
-     * Set the "sub" (lightweight tasks, e.g. title generation) model group.
-     * Passing null / empty clears it so tasks inherit the primary group,
-     * mirroring the on-device ModelGroups "Default Sub" picker.
-     */
-    fun groupsSetSubDefault(context: Context, params: JSONObject): JSONObject {
-        val repo = repo(context)
-        if (!params.has("groupId")) throw RPCException(-32602, "Missing 'groupId' param")
-        val id = if (params.isNull("groupId")) null else params.optString("groupId", "").ifEmpty { null }
-        if (id != null && repo.group(id) == null) {
-            throw RPCException(-32602, "Group not found: $id")
-        }
-        repo.defaultSubGroupId = id
-        return JSONObject().put("defaultSubGroupId", id ?: JSONObject.NULL)
-    }
-
-    fun groupsSetAgentLoop(context: Context, params: JSONObject): JSONObject {
-        val repo = repo(context)
-        val id = params.optString("groupId", "").ifEmpty {
-            throw RPCException(-32602, "Missing 'groupId' param")
-        }
-        if (!params.has("inLoop")) throw RPCException(-32602, "Missing 'inLoop' param")
-        val want = params.optBoolean("inLoop", false)
-        if (repo.group(id) == null) throw RPCException(-32602, "Group not found: $id")
-        val current = repo.config.value.agentLoopGroupIds.toMutableList()
-        current.removeAll { it == id }
-        if (want) current.add(id)
-        repo.setAgentLoopGroupIds(current)
-        return JSONObject().apply {
-            put("groupId", id)
-            put("inLoop", want)
-        }
-    }
-
-    private fun parseStrategy(s: String): RoutingStrategy = when (s) {
-        "loadBalance" -> RoutingStrategy.loadBalance
-        else -> RoutingStrategy.fallback
-    }
-
-    private fun parseFallback(s: String): FallbackStrategy = when (s) {
-        "always" -> FallbackStrategy.always
-        else -> FallbackStrategy.default
-    }
-
-    private fun groupToJson(repo: ProviderRepository, group: ModelGroup): JSONObject {
-        val cfg = repo.config.value
-        return JSONObject().apply {
-            put("id", group.id)
-            put("name", group.name)
-            put("strategy", group.strategy.name)
-            put("fallbackStrategy", group.fallbackStrategy.name)
-            put("isDefault", group.id == cfg.defaultPrimaryGroupId)
-            put("isSub", group.id == cfg.defaultSubGroupId)
-            put("inAgentLoop", group.id in cfg.agentLoopGroupIds)
-            val ids = JSONArray()
-            for (m in group.memberEntryIds) ids.put(m)
-            put("memberEntryIds", ids)
-        }
-    }
 }

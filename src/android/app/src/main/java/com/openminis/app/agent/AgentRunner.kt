@@ -37,8 +37,7 @@ internal object AgentRunner {
         context: Context,
         sessionId: String,
         modelEntryId: String?,
-        modelGroupId: String?,
-    ): String? = HeadlessChatRunner.applyModelOverride(context, sessionId, modelEntryId, modelGroupId)
+    ): String? = HeadlessChatRunner.applyModelOverride(context, sessionId, modelEntryId)
 
     suspend fun prompt(
         context: Context,

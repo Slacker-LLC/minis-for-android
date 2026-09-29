@@ -13,7 +13,7 @@ data class CorrectionSuggestion(
     val original: String,
     val corrected: String,
     val hasChange: Boolean,
-    val modelGroupUsed: String,
+    val modelSlotUsed: String,
     val durationMs: Int,
     /** Non-null when we deliberately declined to change anything. */
     val rejectedReason: String? = null,
@@ -97,7 +97,7 @@ class VoiceCorrectionEngine(
         if (corrected == text) {
             // Not a failure — the model looked and found nothing to fix.
             return CorrectionSuggestion(
-                transcript, transcript, false, outcome.modelGroupUsed, outcome.durationMs,
+                transcript, transcript, false, outcome.modelSlotUsed, outcome.durationMs,
             )
         }
 
@@ -107,7 +107,7 @@ class VoiceCorrectionEngine(
         if (ratio > VoiceCorrectionConfig.MAX_CHAR_CHANGE_RATIO) {
             Log.i(TAG, "[Correct] rejected diff_too_large ratio=${"%.2f".format(ratio)}")
             return CorrectionSuggestion(
-                transcript, transcript, false, outcome.modelGroupUsed, outcome.durationMs,
+                transcript, transcript, false, outcome.modelSlotUsed, outcome.durationMs,
                 "diff_too_large",
             )
         }
@@ -123,7 +123,7 @@ class VoiceCorrectionEngine(
             original = transcript,
             corrected = corrected,
             hasChange = true,
-            modelGroupUsed = outcome.modelGroupUsed,
+            modelSlotUsed = outcome.modelSlotUsed,
             durationMs = (System.currentTimeMillis() - started).toInt(),
             diffSummary = summary,
             appliedPairs = pairs,

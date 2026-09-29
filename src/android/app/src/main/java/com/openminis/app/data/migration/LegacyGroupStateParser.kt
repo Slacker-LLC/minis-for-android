@@ -27,6 +27,7 @@ internal object LegacyGroupStateParser {
         sessionBindings: List<LegacyBindingRecord>,
         scheduledBindings: List<LegacyBindingRecord>,
         botBindings: List<LegacyBindingRecord>,
+        legacyAgentLoopGroupIds: List<String> = emptyList(),
         legacyJsonConfig: ProviderConfig? = null,
         json: Json,
     ): LegacyState {
@@ -55,7 +56,7 @@ internal object LegacyGroupStateParser {
                 voiceInput = meta[ProviderConfigMetaKeys.VOICE_INPUT_GROUP_ID],
                 voiceOutput = meta[ProviderConfigMetaKeys.VOICE_OUTPUT_GROUP_ID],
             ),
-            agentLoopGroupIds = config.agentLoopGroupIds.toList(),
+            agentLoopGroupIds = legacyAgentLoopGroupIds,
             entryIdAliases = aliases(config) + (legacyJsonConfig?.let(::aliases) ?: emptyMap()),
             availableEntryIds = availableEntryIds,
             sessionBindings = sessionBindings,

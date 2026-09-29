@@ -107,51 +107,28 @@ internal object HeadlessChatRunner {
             s.id
         }
 
-    /**
-     * Apply a model-entry / model-group override to a session before send.
-     * - `modelEntryId`: bind to a specific entry (`binding=entry`).
-     * - `modelGroupId`: bind to a group (`binding=group`); the picker uses
-     *   the group's routing strategy at chat time.
-     * Returns the human-friendly `modelName` for the response.
-     */
+    /** Apply an entry-only override; without one the session follows its Main-slot resolver. */
     suspend fun applyModelOverride(
         context: Context,
         sessionId: String,
         modelEntryId: String?,
-        modelGroupId: String?,
     ): String? = withContext(Dispatchers.IO) {
-        if (modelEntryId != null && modelGroupId != null) {
-            throw RPCException(-32602, "modelEntryId and modelGroupId are mutually exclusive")
-        }
         val app = app(context)
         val cfg = app.providerRepository.config.value
-        // With no explicit choice, use the same main-slot/last-used resolver as
-        // interactive chats. A legacy group argument is only an adapter: choose
-        // its first currently available member and persist an entry binding.
-        val resolvedEntryId = modelEntryId ?: if (modelGroupId == null) {
-            com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)?.id
-        } else null
-        if (resolvedEntryId == null && modelGroupId == null) return@withContext null
-        if (resolvedEntryId != null) {
-            val entry = cfg.modelEntries.firstOrNull { it.id == resolvedEntryId }
-                ?: throw RPCException(-32602, "Entry not found: $resolvedEntryId")
-            val instance = cfg.instances.firstOrNull { it.id == entry.providerInstanceId }
-                ?: throw RPCException(-32602, "Provider instance for entry not found")
-            if (!instance.isEnabled) throw RPCException(-32602, "Provider instance is disabled")
-            val binding = com.openminis.app.data.model.ModelBinding.encodeEntry(entry.id)
-            app.chatRepository.updateSessionBinding(sessionId, binding, entry.baseModel.id)
-            return@withContext entry.model.displayName
-        }
-        val group = cfg.modelGroups.firstOrNull { it.id == modelGroupId }
-            ?: throw RPCException(-32602, "Group not found: $modelGroupId")
-        val entry = app.providerRepository.availableMemberEntries(group).firstOrNull()
-            ?: throw RPCException(-32602, "Group has no available model entries: $modelGroupId")
+        val resolvedEntryId = modelEntryId
+            ?: com.openminis.app.agent.BotModelResolver.resolve(app.providerRepository, null)?.id
+            ?: return@withContext null
+        val entry = cfg.modelEntries.firstOrNull { it.id == resolvedEntryId }
+            ?: throw RPCException(-32602, "Entry not found: $resolvedEntryId")
+        val instance = cfg.instances.firstOrNull { it.id == entry.providerInstanceId }
+            ?: throw RPCException(-32602, "Provider instance for entry not found")
+        if (!instance.isEnabled) throw RPCException(-32602, "Provider instance is disabled")
         app.chatRepository.updateSessionBinding(
             sessionId,
             com.openminis.app.data.model.ModelBinding.encodeEntry(entry.id),
             entry.baseModel.id,
         )
-        return@withContext entry.model.displayName
+        entry.model.displayName
     }
 
     /**

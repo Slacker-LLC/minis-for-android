@@ -4,17 +4,19 @@ import android.content.Context
 import com.openminis.app.MinisApp
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ProviderConfig
+import com.openminis.app.data.model.ModelSlot
+import com.openminis.app.data.model.SystemVoiceEntries
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Read-only `provider.*` and `provider.groups.*` RPC handlers — Phase 1.
+ * Read-only `provider.*` RPC handlers — Phase 1.
  *
  * Mirrors the read shape from `docs/debug-server-api.md`. Mutation handlers
  * (`provider.instances.create/update/delete/test`, `provider.models.*`,
- * `provider.groups.create/update/delete/setDefault`) land in Phase 2.
+ * `provider.slots.set` is the only slot mutation surface.
  *
  * Field naming is kept 1:1 with the iOS docs so the same automation scripts
  * work cross-platform; Android-only fields that have no iOS analogue (e.g.
@@ -152,10 +154,14 @@ internal object ProviderDebugMethods {
                 put("supportsReasoning", effective.supportsReasoning ?: JSONObject.NULL)
                 put("contextWindow", effective.contextWindow ?: JSONObject.NULL)
                 put("maxOutputTokens", effective.maxOutputTokens ?: JSONObject.NULL)
+                put("defaultThinkingLevel", entry.overrides.defaultThinkingLevel?.name ?: JSONObject.NULL)
+                put("contextLimitTokens", entry.overrides.contextLimitTokens ?: JSONObject.NULL)
                 val ov = JSONObject()
                 ov.put("displayName", entry.overrides.displayName ?: JSONObject.NULL)
                 ov.put("maxOutputTokens", entry.overrides.maxOutputTokens ?: JSONObject.NULL)
                 ov.put("contextWindow", entry.overrides.contextWindow ?: JSONObject.NULL)
+                ov.put("defaultThinkingLevel", entry.overrides.defaultThinkingLevel?.name ?: JSONObject.NULL)
+                ov.put("contextLimitTokens", entry.overrides.contextLimitTokens ?: JSONObject.NULL)
                 put("overrides", ov)
                 put("userModifiedAt", entry.userModifiedAt ?: JSONObject.NULL)
             })
@@ -233,53 +239,32 @@ internal object ProviderDebugMethods {
         }
     }
 
-    fun groupsList(context: Context, params: JSONObject): JSONObject {
+    fun slotsGet(context: Context, params: JSONObject): JSONObject {
         val repo = repo(context)
-        val includeMembers = params.optBoolean("includeMembers", true)
         val cfg = repo.config.value
-        val arr = JSONArray()
-        for (group in cfg.modelGroups) {
-            val isDefault = group.id == cfg.defaultPrimaryGroupId
-            val obj = JSONObject().apply {
-                put("id", group.id)
-                put("name", group.name)
-                put("strategy", group.strategy.name)
-                put("fallbackStrategy", group.fallbackStrategy.name)
-                put("isDefault", isDefault)
-                put("isSub", group.id == cfg.defaultSubGroupId)
-                put("inAgentLoop", group.id in cfg.agentLoopGroupIds)
-                val ids = JSONArray()
-                for (id in group.memberEntryIds) ids.put(id)
-                put("memberEntryIds", ids)
+        val slots = JSONObject()
+        for (slot in ModelSlot.entries) {
+            val ids = JSONArray()
+            val entries = JSONArray()
+            for (id in cfg.slots.entries(slot)) {
+                ids.put(id)
+                val entry = cfg.modelEntries.firstOrNull { it.id == id }
+                    ?: SystemVoiceEntries.resolve(id)
+                    ?: continue
+                val providerLabel = cfg.instances.firstOrNull { it.id == entry.providerInstanceId }?.label
+                entries.put(JSONObject().apply {
+                    put("entryId", entry.id)
+                    put("displayName", entry.model.displayName)
+                    put("modelId", entry.baseModel.id)
+                    put("providerLabel", providerLabel ?: "System")
+                })
             }
-            if (includeMembers) {
-                val members = JSONArray()
-                for (memberId in group.memberEntryIds) {
-                    // SystemVoiceEntries fallback: the default voice groups are
-                    // seeded with "__builtin_system_speech__/…" members that are
-                    // synthesized on demand and never stored in modelEntries, so
-                    // matching modelEntries alone reported `members: []` for both
-                    // voice groups while memberEntryIds listed two.
-                    val entry = cfg.modelEntries.find { it.id == memberId }
-                        ?: com.openminis.app.data.model.SystemVoiceEntries.resolve(memberId)
-                        ?: continue
-                    val instLabel = cfg.instances.find { it.id == entry.providerInstanceId }?.label
-                    members.put(JSONObject().apply {
-                        put("entryId", entry.id)
-                        put("modelId", entry.baseModel.id)
-                        put("displayName", entry.model.displayName)
-                        put("providerLabel", instLabel ?: "")
-                    })
-                }
-                obj.put("members", members)
-            }
-            arr.put(obj)
+            slots.put(slot.name, JSONObject().put("entryIds", ids).put("entries", entries))
         }
         return JSONObject().apply {
-            put("defaultGroupId", cfg.defaultPrimaryGroupId ?: JSONObject.NULL)
-            put("defaultSubGroupId", cfg.defaultSubGroupId ?: JSONObject.NULL)
-            put("count", arr.length())
-            put("groups", arr)
+            put("count", ModelSlot.entries.size)
+            put("fallbackTrigger", cfg.fallbackTrigger.name)
+            put("slots", slots)
         }
     }
 

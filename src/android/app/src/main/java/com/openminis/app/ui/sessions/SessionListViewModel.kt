@@ -507,7 +507,7 @@ class SessionListViewModel(
                 .any { idLower.contains(it) }
             outputsText && !nonChatId
         }
-        val subEntry = providerRepository.resolveTitleSubEntry()
+        val subEntry = providerRepository.resolveTitleLightEntry()
             ?.takeIf { sub -> titleEligible.any { it == sub } }
         // Anchor on the first selected session whose bound model is usable,
         // falling back to the dedicated sub-model and then anything eligible.
@@ -829,16 +829,16 @@ class SessionListViewModel(
                     outputsText && !nonChatId
                 }
                 // [T-android-regenerate-title-submodel] Priority: dedicated
-                // title sub-model (defaultSubGroupId's first enabled member) >
+                // title sub-model (Light slot's first enabled member) >
                 // session's bound primary model > every other eligible model.
                 // Aligns the manual Regenerate path with the auto-title path
                 // (ChatViewModel.resolveTitleProvider) and iOS resolveSubEntry —
                 // previously the sub-model was ignored here, so users who
                 // configured a cheap/fast title model still paid for the primary.
                 // The sub-entry must pass the same T334 modality filter; when no
-                // sub-group is configured / all members disabled it's null and we
+                // Light slot is configured / all entries are unavailable it's null and we
                 // fall through to the existing primary-first ordering.
-                val subEntry = providerRepository.resolveTitleSubEntry()
+                val subEntry = providerRepository.resolveTitleLightEntry()
                     ?.takeIf { sub -> titleEligible.any { it == sub } }
                 val primary = titleEligible.firstOrNull { it.model.id == session.modelId }
                     ?.takeIf { it != subEntry }
@@ -1089,17 +1089,12 @@ class SessionListViewModel(
      * only when the user sends the first message (deferred creation, matching iOS).
      */
     /**
-     * @param groupId MODEL group (fallback/load-balancing) — long-press FAB.
-     * @param folderId session GROUP (folder) — "New Chat in Group" on the
-     *   folder card's menu. Encoded in the draft id like the model group;
-     *   ChatViewModel files the session into the folder at draft promotion
-     *   (the folder_id row can only be written once the session exists —
-     *   iOS defers the same way via pendingFolderDraft).
+     * @param folderId session folder — encoded in the draft id and applied
+     *   when the draft is promoted to a persisted session.
      */
-    fun createNewSession(groupId: String? = null, folderId: String? = null): String? {
+    fun createNewSession(folderId: String? = null): String? {
         if (providerRepository.allVisibleEntries().isEmpty()) return null
         var id = "__new__${java.util.UUID.randomUUID()}"
-        if (groupId != null) id += "__grp__$groupId"
         if (folderId != null) id += "__fld__$folderId"
         return id
     }

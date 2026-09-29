@@ -30,7 +30,7 @@ import javax.net.ssl.SSLException
  *
  * Deliberately NOT ported: upstream retries HTTP 429 on the same endpoint
  * (transientStatus). Minis maps a provider-level rate limit to
- * [LLMError.RateLimited] and routes it to group fallback instead - the
+ * [LLMError.RateLimited] and routes it to slot fallback instead - the
  * pre-existing, documented behaviour of the agent loop - so 429 stays
  * non-retryable here while [Classification.isRateLimited] still names it for the
  * fallback decision.
@@ -63,7 +63,7 @@ object LLMFailureClassifier {
         val retryable: Boolean get() = kind == FailureKind.RETRYABLE
         val overflow: Boolean get() = kind == FailureKind.CONTEXT_OVERFLOW
 
-        /** A provider-level rate limit: Minis answers it with group fallback. */
+        /** A provider-level rate limit: Minis answers it with slot fallback. */
         val isRateLimited: Boolean get() = code == CODE_RATE_LIMITED
 
         /** Server-side failure: Minis answers it with retry, then fallback. */

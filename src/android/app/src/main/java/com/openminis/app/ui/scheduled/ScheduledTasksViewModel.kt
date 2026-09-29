@@ -84,19 +84,12 @@ class ScheduledTasksViewModel(private val appContext: Context) : ViewModel() {
             .map { MessageOption(it.id, extractPreview(it.partsJson), it.createdAt) }
     }
 
-    /** Best-effort human-readable label for a `model_binding` JSON string —
-     *  group name for {"type":"group"}, model display name for
-     *  {"type":"entry"}, null on parse failure or unknown ids. Mirrors the
-     *  chip text the chat screen renders for the same binding. */
+    /** Best-effort model display name for an entry-only model binding. */
     fun describeBinding(json: String?): String? {
         if (json.isNullOrBlank()) return null
         return runCatching {
             val o = org.json.JSONObject(json)
             when (o.optString("type")) {
-                "group" -> {
-                    val gid = o.optString("groupId").takeIf { it.isNotEmpty() } ?: return@runCatching null
-                    app.providerRepository.group(gid)?.name
-                }
                 "entry" -> {
                     val eid = o.optString("entryId").takeIf { it.isNotEmpty() } ?: return@runCatching null
                     app.providerRepository.config.value.modelEntries.firstOrNull { it.id == eid }?.model?.displayName

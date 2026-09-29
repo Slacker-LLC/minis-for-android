@@ -4,7 +4,6 @@ import com.openminis.app.data.model.FallbackStrategy
 import com.openminis.app.data.model.ImageEndpointMode
 import com.openminis.app.data.model.LLMModel
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ModelOverrides
 import com.openminis.app.data.model.ModelSlot
 import com.openminis.app.data.model.ModelSlots
@@ -12,8 +11,6 @@ import com.openminis.app.data.model.ProviderConfig
 import com.openminis.app.data.model.ProviderCredential
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
-import com.openminis.app.data.model.RoutingStrategy
-import com.openminis.app.data.model.ThinkingLevel
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -75,7 +72,7 @@ object ProviderConfigMetaKeys {
  * memberEntryIds blob on disk.
  *
  * [jsonSyncHash] is the hash of the legacy mirror JSON we just wrote
- * (or about to write) for downgrade-detection on next load. Pass null
+ * (or about to write) for mirror-sync detection on next load. Pass null
  * when called from the load path's first-time JSON→DB import (we'll
  * compute and store it immediately after).
  */
@@ -141,9 +138,7 @@ fun ProviderConfig.toSnapshot(
     // snapshots deliberately never write rows back to that table.
     val groupRows = emptyList<ProviderModelGroupEntity>()
 
-    val loopRows = ArrayList<ProviderAgentLoopIdEntity>(
-        agentLoopModelEntryIds.size + agentLoopGroupIds.size,
-    )
+    val loopRows = ArrayList<ProviderAgentLoopIdEntity>(agentLoopModelEntryIds.size)
     agentLoopModelEntryIds.forEachIndexed { idx, id ->
         loopRows.add(
             ProviderAgentLoopIdEntity(
@@ -164,21 +159,6 @@ fun ProviderConfig.toSnapshot(
                 )
             )
         }
-    }
-    defaultPrimaryGroupId?.let {
-        metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.DEFAULT_PRIMARY_GROUP_ID, it))
-    }
-    defaultSubGroupId?.let {
-        metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.DEFAULT_SUB_GROUP_ID, it))
-    }
-    voiceInputGroupId?.let {
-        metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.VOICE_INPUT_GROUP_ID, it))
-    }
-    voiceOutputGroupId?.let {
-        metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.VOICE_OUTPUT_GROUP_ID, it))
-    }
-    visionGroupId?.let {
-        metaRows.add(ProviderConfigMetaEntity(ProviderConfigMetaKeys.VISION_GROUP_ID, it))
     }
     val stringListSerializer = ListSerializer(String.serializer())
     val slotKeys = mapOf(
@@ -206,8 +186,8 @@ fun ProviderConfig.toSnapshot(
 
 /**
  * Reverse-map a snapshot back to [ProviderConfig]. Entries' uuid
- * field is set to the composite-key id stored in DB — so once we round-trip,
- * group/agentLoop refs in the mirror JSON also point at the composite shape.
+ * field is set to the composite-key id stored in DB, and slot/agent-loop
+ * references use that same durable key.
  */
 fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig {
     val metaMap = this.meta.associate { it.key to it.value }
@@ -256,32 +236,7 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
     }.toMutableList()
 
     val stringListSerializer = ListSerializer(String.serializer())
-    val migrationComplete = metaMap[ProviderConfigMetaKeys.LEGACY_GROUPS_MIGRATED_V1] == "true"
-    val groups = if (migrationComplete) mutableListOf() else this.groups.map { row ->
-        ModelGroup(
-            id = row.id,
-            name = row.name,
-            memberEntryIds = jsonForBlobs
-                .decodeFromString(stringListSerializer, row.memberEntryIdsJson)
-                .toMutableList(),
-            strategy = RoutingStrategy.valueOf(row.strategy),
-            fallbackStrategy = FallbackStrategy.valueOf(row.fallbackStrategy),
-            // [T-android-thinking-level-arch] decoded() (not valueOf()) so a
-            // level string a NEWER build persisted (e.g. "MAX"/"ULTRA") can't
-            // throw and blow up the whole DB load — which would fall back to the
-            // JSON mirror, which fails identically on the same enum value,
-            // wiping all providers/groups from the UI. Unknown → XHIGH.
-            defaultThinkingLevel = row.defaultThinkingLevel?.let { ThinkingLevel.decoded(it) },
-            contextLimitTokens = row.contextLimitTokens,
-            lastContextLimitTokens = row.lastContextLimitTokens,
-        )
-    }.toMutableList()
-
     val entryLoopIds = this.loopIds.filter { it.kind == "entry" }
-        .sortedBy { it.sortOrder }
-        .map { it.targetId }
-        .toMutableList()
-    val groupLoopIds = if (migrationComplete) mutableListOf() else this.loopIds.filter { it.kind == "group" }
         .sortedBy { it.sortOrder }
         .map { it.targetId }
         .toMutableList()
@@ -305,14 +260,7 @@ fun ProviderConfigSnapshot.toProviderConfig(jsonForBlobs: Json): ProviderConfig 
         modelEntries = entries,
         slots = slots,
         fallbackTrigger = fallbackTrigger,
-        modelGroups = groups,
-        defaultPrimaryGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_PRIMARY_GROUP_ID].takeUnless { migrationComplete },
-        defaultSubGroupId = metaMap[ProviderConfigMetaKeys.DEFAULT_SUB_GROUP_ID].takeUnless { migrationComplete },
-        voiceInputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_INPUT_GROUP_ID].takeUnless { migrationComplete },
-        voiceOutputGroupId = metaMap[ProviderConfigMetaKeys.VOICE_OUTPUT_GROUP_ID].takeUnless { migrationComplete },
-        visionGroupId = metaMap[ProviderConfigMetaKeys.VISION_GROUP_ID].takeUnless { migrationComplete },
         agentLoopModelEntryIds = entryLoopIds,
-        agentLoopGroupIds = groupLoopIds,
     )
 }
 

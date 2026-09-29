@@ -102,7 +102,7 @@ fun SettingsCategoryScreen(
     category: SettingsCategory,
     onBack: () -> Unit,
     onProvidersClick: () -> Unit = {},
-    onModelGroupsClick: () -> Unit = {},
+    onModelsClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onSkillsClick: () -> Unit = {},
     onCharactersClick: () -> Unit = {},
@@ -153,9 +153,9 @@ fun SettingsCategoryScreen(
                 SettingsRow(
                     icon = Icons.Outlined.Settings,
                     iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_model_groups),
-                    subtitle = stringResource(R.string.settings_model_groups_subtitle),
-                    onClick = onModelGroupsClick,
+                    title = stringResource(R.string.model_slots_header),
+                    subtitle = stringResource(R.string.model_slots_footer),
+                    onClick = onModelsClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.BarChart,

@@ -43,7 +43,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.data.model.ModelEntry
-import com.openminis.app.data.model.ModelGroup
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
@@ -53,7 +52,7 @@ import com.openminis.app.ui.components.MinisTextButton
 /**
  * Multi-step onboarding flow shown on first launch.
  * Step 1: Welcome + add at least one provider API key
- * Step 2: Select up to 3 models to form the default model group
+ * Step 2: Select models to configure the Main slot
  */
 @Composable
 fun OnboardingScreen(
@@ -340,14 +339,12 @@ private fun ModelSelectionStep(
                 }
                 MinisButton(
                     onClick = {
-                        // Create default model group from selections
                         if (selected.isNotEmpty()) {
-                            val group = ModelGroup(name = "Default Models")
-                            group.memberEntryIds.addAll(selected)
-                            providerRepository.addGroup(group)
-                            if (config.defaultPrimaryGroupId == null) {
-                                providerRepository.defaultPrimaryGroupId = group.id
-                            }
+                            val current = providerRepository.config.value.slots.main
+                            providerRepository.setSlotEntries(
+                                com.openminis.app.data.model.ModelSlot.main,
+                                (current + selected).distinct(),
+                            )
                         }
                         onComplete()
                     },
