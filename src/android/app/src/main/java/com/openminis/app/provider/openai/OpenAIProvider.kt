@@ -359,7 +359,7 @@ class OpenAIProvider private constructor(
     // Astra function calling requires Responses. Namespaced relay ids retain
     // their configured transport; the exact OpenAI id uses Responses by default.
     private val usesChatCompletionsAPI: Boolean get() = forceChatCompletions ||
-        (!isOAuth && !useResponsesAPI && (isAzure || model.id != "gpt-6-astra"))
+        (!isOAuth && !useResponsesAPI && (isAzure || model.id != LLMModel.gpt6Astra.id))
 
     /**
      * [T-android-tool-splits-reply-fix] Chat Completions streams ONE
@@ -2328,11 +2328,11 @@ class OpenAIProvider private constructor(
      * (its body is part of the client fingerprint and must stay untouched).
      */
     private fun applyAstraRequestContract(body: JSONObject) {
-        if (!model.id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)) return
+        if (!model.isGpt6Astra) return
         // Enforce after passthrough merging so stale stored parameters cannot
         // reintroduce fields rejected by Astra. OFF/minimal map to its lowest tier.
         for (key in listOf("temperature", "top_p", "top_logprobs", "logprobs")) body.remove(key)
-        val allowed = com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(model.id).reasoningEffortValues ?: model.reasoningEffortValues
+        val allowed = LLMModel.gpt6Astra.reasoningEffortValues
         if (usesChatCompletionsAPI) {
             body.put("reasoning_effort", clampEffort(body.optString("reasoning_effort", "low"), allowed))
         } else {

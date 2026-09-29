@@ -795,6 +795,16 @@ class AnthropicProvider(
          * claude-3-5-sonnet still wins as (3,5) — never (3,0).
          * Returns null for non-Claude ids or ids without any version digits.
          */
+        private fun parseClaudeVersion(modelId: String): Pair<Int, Int>? {
+            val lower = modelId.lowercase()
+            if (!lower.contains("claude")) return null
+            val regex = Regex("""[-/]?(\d+)(?:[-.](\d+))?(?:$|[^0-9])""")
+            val match = regex.find(lower) ?: return null
+            val major = match.groupValues[1].toIntOrNull() ?: return null
+            val minor = match.groupValues[2].toIntOrNull() ?: 0
+            return major to minor
+        }
+
         fun modelRejectsTemperature(modelId: String): Boolean =
             com.openminis.app.provider.rules.ModelRulesProvider.capabilitiesFor(modelId).rejectsTemperature == true
 

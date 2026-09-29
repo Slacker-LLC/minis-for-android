@@ -45,7 +45,15 @@ data class LLMModel(
     val inputModalities: List<String>? = null,
     val outputModalities: List<String>? = null,
 ) {
+    val isGpt6Astra: Boolean get() = id.substringAfterLast('/').equals("gpt-6-astra", ignoreCase = true)
+
     companion object {
+        /** The request-contract model record remains data-backed like the rest of the catalog. */
+        val gpt6Astra: LLMModel
+            get() = com.openminis.app.provider.rules.ModelRulesProvider.staticModelOrFallback(
+                "openAI", "gpt-6-astra", "GPT-6 Astra", "OpenAI",
+            )
+
         /**
          * Heuristic display-name formatter for API model ids.
          * Mirrors iOS `modelDisplayName(from:)`: splits on `/` and `-`, preserves a
