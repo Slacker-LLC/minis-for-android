@@ -90,7 +90,7 @@ object ToolExecutor {
     ): ToolExecutionResult {
         val canonical = ToolRegistry.canonicalName(name)
             ?: return ToolExecutionResult("Error: unknown_tool: $name", false)
-        if (!ToolPermissionManager.isAllowedFor(canonical, caller)) {
+        if (!ToolPermissionManager.isAllowedFor(canonical, caller, sessionId)) {
             return ToolExecutionResult("Error: permission_denied: $canonical", false)
         }
         if (ToolPermissionManager.needsConfirm(canonical, caller) && !confirmBypassed) {
