@@ -70,6 +70,17 @@ interface ChatDao {
     @Query("SELECT * FROM sessions WHERE source IS NULL OR source NOT IN ('subagent', 'bot_delegation', 'bot-delegation') ORDER BY updated_at DESC")
     suspend fun listSessions(): List<ChatSessionEntity>
 
+    /**
+     * Conversations that never got anything: no title, no group, no bot, no special source, not
+     * pinned and not a single message. [olderThan] keeps a row that a worker is creating right now.
+     */
+    @Query(
+        "SELECT s.id FROM sessions s WHERE s.title IS NULL AND s.folder_id IS NULL AND s.bot_id IS NULL " +
+            "AND s.source IS NULL AND s.pinned_at IS NULL AND s.created_at < :olderThan " +
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id)",
+    )
+    suspend fun emptyUntitledSessionIds(olderThan: Long): List<String>
+
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): ChatSessionEntity?
 

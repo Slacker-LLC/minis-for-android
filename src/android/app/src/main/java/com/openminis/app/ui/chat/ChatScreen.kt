@@ -450,6 +450,11 @@ fun ChatScreen(
      *  navigates to a fresh draft chat (same funnel as the session list's
      *  new-chat button), replacing this chat on the back stack. */
     onNewChat: () -> Unit = {},
+    /**
+     * Lets the host ask "is this chat a blank draft?" (see [ChatViewModel.isBlankDraft]) so its own
+     * New chat entry points, such as the drawer's, can skip opening yet another empty draft.
+     */
+    onProbeBlankDraft: ((() -> Boolean)) -> Unit = {},
     onOpenTerminal: () -> Unit = {},
     /** Open the in-app terminal with [command] pre-filled at the prompt
      *  (no trailing newline — the user reviews and presses Enter manually).
@@ -493,6 +498,10 @@ fun ChatScreen(
     // Callers needing the full history (compact / fork / regenerate / send)
     // continue to read viewModel.messages directly inside the VM.
     val messages by viewModel.uiMessages.collectAsState()
+    androidx.compose.runtime.DisposableEffect(viewModel) {
+        onProbeBlankDraft { viewModel.isBlankDraft }
+        onDispose { }
+    }
     val hasOlderMessages by viewModel.hasOlderMessages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
     val currentSession by remember(sessionId, chatRepository) {
@@ -762,7 +771,6 @@ fun ChatScreen(
     // AIChatView.showThinkingLevelSheet.
     var showThinkingLevelSheet by remember { mutableStateOf(false) }
     var showAttachMenu by remember { mutableStateOf(false) }
-    var showModelQuickMenu by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showAgentPresetSheet by remember { mutableStateOf(false) }
     var showSkillsSheet by remember { mutableStateOf(false) }
@@ -2491,11 +2499,12 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    // Board: session settings is the slider button; new chat lives in the "..." menu.
-                    IconButton(onClick = { showSessionConfigSheet = true }) {
+                    // New chat, on its own. On a chat where nothing has happened yet it does nothing:
+                    // there is no second empty draft to open.
+                    IconButton(onClick = { if (!viewModel.isBlankDraft) onNewChat() }) {
                         Icon(
-                            Icons.Outlined.Tune,
-                            contentDescription = stringResource(R.string.session_config_title),
+                            Icons.Outlined.Edit,
+                            contentDescription = stringResource(R.string.chat_new_session),
                         )
                     }
                     Box {
@@ -2508,23 +2517,8 @@ fun ChatScreen(
                             shape = RoundedCornerShape(14.dp),
                             tonalElevation = 0.dp,
                         ) {
-                            // Conversation actions only (board: settings-type entries live on the slider).
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_new_chat)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    onNewChat()
-                                },
-                                trailingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.chat_menu_open_terminal)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    onOpenTerminal()
-                                },
-                                trailingIcon = { Icon(Icons.Default.Terminal, contentDescription = null) },
-                            )
+                            // Conversation actions only: new chat is its own button and the terminal lives in
+                            // the drawer.
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_open_browser)) },
                                 onClick = {
@@ -2639,7 +2633,7 @@ fun ChatScreen(
                     emptyStateSettled = true
                 }
                 if (emptyStateSettled && messages.isEmpty() && !isStreaming) {
-                    ChatEmptyState(onPickPrompt = { viewModel.setInputText(it) })
+                    ChatEmptyState(onPick = { viewModel.sendMessage(it) })
                 }
                 var toolBarHeightPx by remember { mutableStateOf(0) }
                 val density = LocalDensity.current
@@ -3311,7 +3305,6 @@ fun ChatScreen(
                                     viewModel.dismissMentionMenu()
                                 }
                                 showAttachMenu = false
-                                showModelQuickMenu = false
                             }
                         },
                     // T303: anchor items to the visual bottom so a newly
@@ -5457,7 +5450,6 @@ fun ChatScreen(
                                     if (viewModel.showSlashMenu.value) {
                                         viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
                                     }
-                                    showModelQuickMenu = false
                                     showAttachMenu = !showAttachMenu
                                 },
                             ) {
@@ -5574,135 +5566,54 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier.weight(1f, fill = false),
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(18.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        0.5.dp,
-                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                    ),
-                                    modifier = Modifier
-                                        .height(36.dp)
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .clickable {
-                                            showAttachMenu = false
-                                            if (viewModel.showSlashMenu.value) {
-                                                viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                                            }
-                                            showModelQuickMenu = !showModelQuickMenu
-                                        },
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                        modifier = Modifier.padding(horizontal = 10.dp),
+                                // The model is chosen from the top bar; the composer only carries the
+                                // thinking strength (board: "Thinking · Medium"), and only for models that
+                                // can reason.
+                                if (viewModel.currentModelSupportsReasoning) {
+                                    val composerThinking by viewModel.thinkingLevel.collectAsState()
+                                    Surface(
+                                        shape = RoundedCornerShape(18.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            0.5.dp,
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                        ),
+                                        modifier = Modifier
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(18.dp))
+                                            .clickable {
+                                                showAttachMenu = false
+                                                if (viewModel.showSlashMenu.value) {
+                                                    viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                                }
+                                                showThinkingLevelSheet = true
+                                            },
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(7.dp)
-                                                .background(
-                                                    if (modelName.isNotEmpty()) ChatColors.ok else ChatColors.warn,
-                                                    CircleShape,
-                                                ),
-                                        )
-                                        val rawModel = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
-                                        val displayModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
-                                        Text(
-                                            text = displayModel,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = ChatColors.primaryText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f, fill = false),
-                                        )
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        tint = ChatColors.secondaryText,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-
-                            // Model selection floating menu (styled identically to Image 1: compact, clean, single-line)
-                            MinisMenu(
-                                expanded = showModelQuickMenu,
-                                onDismissRequest = { showModelQuickMenu = false },
-                                shape = RoundedCornerShape(16.dp),
-                                minWidth = 175.dp,
-                                tonalElevation = 0.dp,
-                                containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White,
-                            ) {
-                                val currentConfig by providerRepository.config.collectAsState()
-                                val activeEntryId by viewModel.activeEntryId.collectAsState()
-
-                                val quickEntries = currentConfig.modelEntries.filter { !it.isHidden }.take(6)
-                                quickEntries.forEach { entry ->
-                                    val isEntrySelected = entry.id == activeEntryId
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = entry.model.displayName,
-                                                fontSize = 13.5.sp,
-                                                fontWeight = if (isEntrySelected) FontWeight.SemiBold else FontWeight.Medium,
-                                                color = ChatColors.primaryText,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        },
-                                        leadingIcon = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                        ) {
                                             Icon(
                                                 Icons.Default.AutoAwesome,
                                                 contentDescription = null,
-                                                tint = if (isEntrySelected) ChatColors.ok else ChatColors.secondaryText,
-                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp),
                                             )
-                                        },
-                                        trailingIcon = if (isEntrySelected) {
-                                            {
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp),
-                                                )
-                                            }
-                                        } else null,
-                                        modifier = Modifier.heightIn(min = 40.dp),
-                                        onClick = {
-                                            showModelQuickMenu = false
-                                            viewModel.selectEntry(entry.id)
-                                        },
-                                    )
+                                            Text(
+                                                text = stringResource(
+                                                    R.string.chat_thinking_chip,
+                                                    thinkingLevelLabel(composerThinking),
+                                                ),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                    }
                                 }
-
-                                MinisMenuDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = stringResource(R.string.settings_models_title),
-                                            fontSize = 13.5.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = ChatColors.primaryText,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Settings,
-                                            contentDescription = null,
-                                            tint = ChatColors.secondaryText,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    },
-                                    modifier = Modifier.heightIn(min = 40.dp),
-                                    onClick = {
-                                        showModelQuickMenu = false
-                                        showModelPicker = true
-                                    },
-                                )
                             }
-                        }
 
                         // T187: Exit Edit Mode pill, only while editingMessageId
                         // is non-null. Tap clears the edit flag + composer text
@@ -6861,3 +6772,17 @@ private fun ThinkingLevelSheet(
         }
     }
 }
+
+/** Localized name of a thinking level, for the composer chip and the level sheet. */
+@Composable
+private fun thinkingLevelLabel(level: ThinkingLevel): String = stringResource(
+    when (level) {
+        ThinkingLevel.OFF -> R.string.thinking_level_off
+        ThinkingLevel.LOW -> R.string.thinking_level_low
+        ThinkingLevel.MEDIUM -> R.string.thinking_level_medium
+        ThinkingLevel.HIGH -> R.string.thinking_level_high
+        ThinkingLevel.XHIGH -> R.string.thinking_level_xhigh
+        ThinkingLevel.MAX -> R.string.thinking_level_max
+        ThinkingLevel.ULTRA -> R.string.thinking_level_ultra
+    },
+)

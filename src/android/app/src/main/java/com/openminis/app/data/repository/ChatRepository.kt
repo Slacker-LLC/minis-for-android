@@ -131,6 +131,17 @@ class ChatRepository(
         dao.updateSessionBot(sessionId, botId)
     }
 
+    /**
+     * Removes conversations that never received anything (see [ChatDao.emptyUntitledSessionIds]).
+     * Older builds left one behind whenever a chat was opened and the process was then killed; the
+     * drawer filled up with empty "New chat" rows. Run once per cold start, before any chat is open.
+     */
+    suspend fun pruneEmptyDrafts(minAgeMs: Long = 10 * 60 * 1000L): Int {
+        val ids = dao.emptyUntitledSessionIds(System.currentTimeMillis() - minAgeMs)
+        ids.forEach { deleteSession(it) }
+        return ids.size
+    }
+
     suspend fun deleteSession(id: String) {
         com.openminis.app.tools.android.DeviceScreenLease.shared.releaseSession(id)
         com.openminis.app.tools.android.AndroidDebugSessionStore.clear(id)
