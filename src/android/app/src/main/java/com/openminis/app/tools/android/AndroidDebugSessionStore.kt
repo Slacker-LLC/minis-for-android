@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 object AndroidDebugSessionStore {
     data class DebugSession(
         val sessionId: String,
+        val sessionTitle: String? = null,
         val targetPackage: String? = null,
         val launchActivity: String? = null,
         val artifactPath: String? = null,

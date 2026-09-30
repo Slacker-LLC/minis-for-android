@@ -126,6 +126,7 @@ fun SettingsCategoryScreen(
     onPermissionsClick: () -> Unit = {},
     onToolPermissionsClick: () -> Unit = {},
     onShizukuClick: () -> Unit = {},
+    onVirtualScreenClick: () -> Unit = {},
     onBackgroundClick: () -> Unit = {},
     onLogsClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
@@ -375,6 +376,13 @@ fun SettingsCategoryScreen(
                     title = stringResource(R.string.shizuku_title),
                     subtitle = stringResource(R.string.settings_shizuku_sub),
                     onClick = onShizukuClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Dashboard,
+                    iconColor = Color(0xFF5856D6),
+                    title = stringResource(R.string.settings_vscreen_entry),
+                    subtitle = stringResource(R.string.settings_vscreen_subtitle),
+                    onClick = onVirtualScreenClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.BatteryFull,

@@ -27,6 +27,10 @@
 
 源码已经补上 DNS 的 UDP 失败后 TCP 重试，单测通过；小米真机还没重测。HTTPS 测指定 IP 时要保留域名，用 `curl --resolve <host>:443:<ip> https://<host>/`，不要关闭证书检查。
 
+## 无人值守会话网络出口
+
+无人值守会话当前没有系统层网络出口限制。工具权限和例程权限分档属于应用层策略，不构成网络隔离；明确允许的浏览器、搜索/fetch 或完整权限下的命令仍可能访问网络。这是维护者明确决定保留的残余风险，本任务不增加网络出口拦截。
+
 旧 APK 的精简 rootfs 基础包只保证 `curl`/`wget`，因此 Guest 中曾出现
 `ping: command not found`。当前分支已将 `iputils-ping` 纳入 provision 包和 readiness probe；
 最新 Debug APK 已部署到小米 `24129PN74C` 真机；Guest 内 `command -v ping` 返回
@@ -80,6 +84,21 @@ CI/宿主测试不能替代以下证据：
 8. 真机确认 DNS 回退和 `android-photos export` 返回的 `/var/minis/offloads/...` 能直接读取。
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
+
+## VScreen capability pending hardware validation（2026-09-30）
+
+VScreen 使用 Shizuku **shell UID UserService** 和随 Android/OEM 版本变化的隐藏系统 API；能力默认关闭，只有当前系统/ROM 指纹下的设备自检全部通过才允许用户启用。指纹变化或自检失败会持久清除 enabled 状态，必须重新通过自检并由用户再次启用。UserService 仅接受非物理 display ID；Root UID、物理主屏输入/观察、未经限定的 socket、视频/OCR 路径均不属于本功能，本实现也不增加系统网络出口拦截。
+
+此工作区当前没有连接的 Android 真机或模拟器，因此没有声称隐藏 API 在目标 ROM 上通过真实运行探测。宿主编译与单测不能替代以下设备证据：
+
+- **V1**：在 Xiaomi 15/目标 HyperOS 上实测 UserService 隐藏 API 兼容性、自检失败关闭，以及连续 20 次虚拟显示创建/释放和资源清理。
+- **V2**：后台/恢复、双任务租约互斥、跳回主屏、物理屏始终不被输入/观察、安全窗口截图拒绝和虚拟显示释放。
+- **V3**：在设备上验证关闭 VScreen 与 probe 失败时设置页、例程保存提示和 UI 工具错误分支，不因异常状态误启用。
+- **V4**：在真机运行 READ_ONLY 例程验证 `ls` 成功、`rm` 明确拒绝且运行记录显示摘要；确认 FULL 必须在编辑器确认；从终端 CLI 试图 `--tier full` 被拒；验证只读临时写与 MCP 拒绝实际作用于例程 session。
+
+当前代码将例程 session 临时写路径限定为 `/var/minis/offloads`（Guest `/tmp` 别名），但没有新增网络出口拦截。浏览器工具仍可能提交表单或触发下载，这是 READ_ONLY 档位的残余风险；网络请求在各档位下均没有系统级出口限制。例程 tier 绑定到 `ScheduledAgentRunner` 使用的 session ID；不同 session 的委派目标/唤醒回合不继承该 tier，但仍受 F3 无人值守策略约束。若它们复用相同 session ID，则共同受该 session 当前最严格的活跃 tier 限制。上述行为也需要在设备上核验，不作为已通过的真机结论。
+
+**同会话并发限制：** 当前权限门按 `sessionId` 而非 turn token 识别例程范围，因此在例程运行窗口内，复用同一 `sessionId` 的前台交互、委派或唤醒回合会共享最严格的活跃 READ_ONLY/F3 无人值守状态。不会通过并发回合临时关闭 tier；denial preview 也按 session 收集，尚无 per-turn 归属。独立的 per-turn 隔离/归因尚未实现，宿主测试不能替代该并发行为的设备验证。
 
 ## 系统提示词：自定义输入框与提示词模块（2026-09-18）
 

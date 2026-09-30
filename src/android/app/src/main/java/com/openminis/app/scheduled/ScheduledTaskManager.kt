@@ -33,7 +33,17 @@ class ScheduledTaskManager(private val context: Context) {
     fun list(): List<ScheduledTask> = store.all()
     fun get(taskId: String): ScheduledTask? = store.get(taskId)
 
-    fun create(task: ScheduledTask): ScheduledTask {
+    /** Agent, CLI and RPC creation defaults to READ_ONLY and cannot request FULL. */
+    fun create(task: ScheduledTask): ScheduledTask = createInternal(task, allowFullTier = false)
+
+    /** Only the native editor calls this after its explicit FULL-tier confirmation. */
+    internal fun createFromEditor(task: ScheduledTask, fullTierConfirmed: Boolean): ScheduledTask =
+        createInternal(task, allowFullTier = fullTierConfirmed)
+
+    private fun createInternal(task: ScheduledTask, allowFullTier: Boolean): ScheduledTask {
+        require(ScheduledTaskTierMutationPolicy.canCreate(task.permissionTier, allowFullTier)) {
+            ScheduledTaskTierMutationPolicy.FULL_CONFIRMATION_REQUIRED
+        }
         return synchronized(MUTATION_LOCK) {
             require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task)) {
                 "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
@@ -44,8 +54,23 @@ class ScheduledTaskManager(private val context: Context) {
         }
     }
 
-    fun update(task: ScheduledTask): ScheduledTask {
+    /** Routine updates cannot elevate READ_ONLY data to FULL through Agent/CLI/RPC paths. */
+    fun update(task: ScheduledTask): ScheduledTask = updateInternal(task, allowFullTier = false)
+
+    /** Only the native editor calls this after its explicit FULL-tier confirmation. */
+    internal fun updateFromEditor(task: ScheduledTask, fullTierConfirmed: Boolean): ScheduledTask =
+        updateInternal(task, allowFullTier = fullTierConfirmed)
+
+    private fun updateInternal(task: ScheduledTask, allowFullTier: Boolean): ScheduledTask {
         return synchronized(MUTATION_LOCK) {
+            val existing = store.get(task.id)
+            require(
+                ScheduledTaskTierMutationPolicy.canUpdate(
+                    existing?.permissionTier, task.permissionTier, allowFullTier,
+                ),
+            ) {
+                ScheduledTaskTierMutationPolicy.FULL_CONFIRMATION_REQUIRED
+            }
             require(ScheduledTaskPolicy.withinBotRoutineLimit(store.all(), task, excludingTaskId = task.id)) {
                 "Bot routine limit reached (${ScheduledTask.MAX_ROUTINES_PER_BOT} routines per Bot)"
             }

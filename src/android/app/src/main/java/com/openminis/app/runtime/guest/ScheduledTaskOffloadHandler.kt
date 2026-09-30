@@ -13,6 +13,7 @@ import com.openminis.app.scheduled.ScheduledRepeatMode
 import com.openminis.app.scheduled.ScheduledTargetMode
 import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskManager
+import com.openminis.app.scheduled.ScheduledTaskTierMutationPolicy
 import com.openminis.app.scheduled.ScheduledTaskPolicy
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -84,6 +85,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
     }
 
     private fun handleCreate(args: OffloadArgs, request: NativeOffloadRequest): NativeOffloadResult {
+        val permissionTier = ScheduledTaskTierMutationPolicy.parseCliTier(args.get("tier"))
         val label = args.get("label", "l") ?: ""
         val (hour, minute) = parseTime(args.get("time", "t")
             ?: throw IllegalArgumentException("--time HH:MM required"))
@@ -110,6 +112,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
             enabled = !args.hasFlag("disabled"),
             startDateMs = args.get("start")?.let { parseDate(it) },
             endDateMs = args.get("end")?.let { parseDate(it) },
+            permissionTier = permissionTier,
         )
         manager.create(task)
         val out = withPrecision(JSONObject().put("created", taskJson(task, botNames())))
@@ -296,6 +299,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
         put("prompt", t.prompt)
         put("target", t.targetMode.encode())
         if (t.modelId != null) put("model", t.modelId)
+        put("permissionTier", t.permissionTier.name)
         t.botId?.let { id ->
             put("botId", id)
             put("bot", JSONObject().put("id", id).put("name", botNames[id] ?: JSONObject.NULL))
@@ -333,6 +337,7 @@ class ScheduledTaskOffloadHandler(private val context: Context) : NativeOffloadH
                    [--repeat once|daily|weekdays|custom --days mon,tue,...]
                    [--target new|follow-up|rerun --session <id> --message <id>]
                    [--model <modelId>] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--disabled]
+                   [--tier readonly|full]  Agent/CLI creation is READ_ONLY; --tier full is rejected.
             delete  --id <taskId>
             enable  --id <taskId>
             disable --id <taskId>

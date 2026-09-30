@@ -53,6 +53,25 @@ data class ScheduledRun(
  */
 enum class ScheduledRepeatMode { ONCE, DAILY, WEEKDAYS, CUSTOM }
 
+/** Privileges granted to one scheduled routine while its agent turn runs. */
+enum class ScheduledTaskPermissionTier {
+    READ_ONLY,
+    FULL;
+
+    companion object {
+        fun parse(raw: String?): ScheduledTaskPermissionTier? = when (raw?.trim()?.uppercase(java.util.Locale.ROOT)) {
+            READ_ONLY.name -> READ_ONLY
+            FULL.name -> FULL
+            else -> null
+        }
+
+        /** Old stored rows had no tier and retain their historical full access. */
+        fun fromPersistedJson(json: JSONObject): ScheduledTaskPermissionTier =
+            if (!json.has("permissionTier")) FULL
+            else parse(json.opt("permissionTier") as? String) ?: READ_ONLY
+    }
+}
+
 /**
  * What the task does when it fires. Mirrors the iOS App Intent set.
  *  - [NewSession]: run [ScheduledTask.prompt] in a brand-new chat.
@@ -99,6 +118,45 @@ sealed class ScheduledTargetMode {
     }
 }
 
+/** Pure mutation rules shared by the manager and unit tests. */
+object ScheduledTaskTierMutationPolicy {
+    const val FULL_CONFIRMATION_REQUIRED = "tier_full_requires_user_confirmation"
+
+    fun canCreate(tier: ScheduledTaskPermissionTier, editorConfirmedFull: Boolean): Boolean =
+        tier != ScheduledTaskPermissionTier.FULL || editorConfirmedFull
+
+    fun requiresFullConfirmation(
+        tier: ScheduledTaskPermissionTier,
+        editorConfirmedFull: Boolean,
+    ): Boolean = tier == ScheduledTaskPermissionTier.FULL && !editorConfirmedFull
+
+    fun parseCliTier(raw: String?): ScheduledTaskPermissionTier = when (
+        raw?.trim()?.lowercase(java.util.Locale.ROOT)
+    ) {
+        null, "readonly", "read-only", "read_only" -> ScheduledTaskPermissionTier.READ_ONLY
+        "full" -> throw IllegalArgumentException(FULL_CONFIRMATION_REQUIRED)
+        else -> throw IllegalArgumentException("--tier must be readonly|full")
+    }
+
+    /** Invalid RPC data is downgraded; FULL always requires the native confirmed editor. */
+    fun parseAgentTier(raw: String?): ScheduledTaskPermissionTier {
+        val tier = ScheduledTaskPermissionTier.parse(raw) ?: ScheduledTaskPermissionTier.READ_ONLY
+        require(tier != ScheduledTaskPermissionTier.FULL) { FULL_CONFIRMATION_REQUIRED }
+        return tier
+    }
+
+    fun canUpdate(
+        existingTier: ScheduledTaskPermissionTier?,
+        requestedTier: ScheduledTaskPermissionTier,
+        editorConfirmedFull: Boolean,
+    ): Boolean {
+        if (requestedTier != ScheduledTaskPermissionTier.FULL) return true
+        // Even preserving FULL while changing the prompt/config is an implicit
+        // authorization change; only an explicit editor confirmation may save it.
+        return editorConfirmedFull && existingTier != null
+    }
+}
+
 data class ScheduledTask(
     val id: String = UUID.randomUUID().toString(),
     val label: String,
@@ -134,6 +192,8 @@ data class ScheduledTask(
     val runHistory: List<ScheduledRun> = emptyList(),
     /** Bot that owns this routine; null keeps legacy ordinary-chat behavior. */
     val botId: String? = null,
+    /** New routines default to read-only; legacy JSON without this field is decoded as FULL. */
+    val permissionTier: ScheduledTaskPermissionTier = ScheduledTaskPermissionTier.READ_ONLY,
 ) {
 
     /**
@@ -216,6 +276,7 @@ data class ScheduledTask(
         if (modelId != null) put("modelId", modelId)
         if (modelBinding != null) put("modelBinding", modelBinding)
         if (!botId.isNullOrBlank()) put("botId", botId)
+        put("permissionTier", permissionTier.name)
         put("enabled", enabled)
         put("createdAt", createdAt)
         if (startDateMs != null) put("startDateMs", startDateMs)
@@ -265,6 +326,7 @@ data class ScheduledTask(
                 }
             } ?: emptyList(),
             botId = (o.opt("botId") as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            permissionTier = ScheduledTaskPermissionTier.fromPersistedJson(o),
         )
     }
 }

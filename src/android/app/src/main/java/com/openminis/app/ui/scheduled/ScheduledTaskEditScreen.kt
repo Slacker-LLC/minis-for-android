@@ -62,6 +62,8 @@ import com.openminis.app.R
 import com.openminis.app.scheduled.ScheduledRepeatMode
 import com.openminis.app.scheduled.ScheduledTargetMode
 import com.openminis.app.scheduled.ScheduledTask
+import com.openminis.app.scheduled.ScheduledTaskPermissionTier
+import com.openminis.app.scheduled.ScheduledTaskTierMutationPolicy
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -112,6 +114,10 @@ fun ScheduledTaskEditScreen(
     var lastResultSessionId by remember { mutableStateOf<String?>(null) }
     var runHistory by remember { mutableStateOf<List<com.openminis.app.scheduled.ScheduledRun>>(emptyList()) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var permissionTier by remember { mutableStateOf(ScheduledTaskPermissionTier.READ_ONLY) }
+    var showFullTierConfirmation by remember { mutableStateOf(false) }
+    var fullTierConfirmed by remember { mutableStateOf(false) }
+    var saveAfterFullConfirmation by remember { mutableStateOf(false) }
 
     // [T-android-scheduled-tasks-full] target mode + model + date window
     var targetKind by remember { mutableStateOf(TargetKind.NEW) }
@@ -141,6 +147,7 @@ fun ScheduledTaskEditScreen(
         hour = existing.timeOfDayHour
         minute = existing.timeOfDayMinute
         enabled = existing.enabled
+        permissionTier = existing.permissionTier
         createdAt = existing.createdAt
         lastFiredAt = existing.lastFiredAt
         lastResultPreview = existing.lastResultPreview
@@ -201,6 +208,7 @@ fun ScheduledTaskEditScreen(
         runHistory = runHistory,
         modelBinding = modelBinding,
         botId = botId,
+        permissionTier = permissionTier,
         modelEntryIdLookup = { eid ->
             vm.listModels().firstOrNull { it.entryId == eid }?.modelId
         },
@@ -218,6 +226,23 @@ fun ScheduledTaskEditScreen(
         (targetBotLoaded && botId == targetBotId)
     val canSave = targetOk && executorMatchesTarget && (!needsPrompt || prompt.isNotBlank())
     val canRunNow = canSave && runNowState?.status != ScheduledTasksViewModel.RunStatus.RUNNING
+
+    fun persistTask() {
+        scope.launch {
+            try {
+                vm.upsertFromEditor(currentTask(), isNew, fullTierConfirmed)
+                onBack()
+            } catch (exception: Exception) {
+                val message = exception.message.orEmpty()
+                saveError = if (message.startsWith("Bot routine limit reached")) {
+                    context.getString(
+                        R.string.scheduled_task_bot_routine_limit,
+                        ScheduledTask.MAX_ROUTINES_PER_BOT,
+                    )
+                } else message.ifBlank { context.getString(R.string.scheduled_task_save_failed) }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -253,6 +278,15 @@ fun ScheduledTaskEditScreen(
             label = label, onLabelChange = { label = it },
             prompt = prompt, onPromptChange = { prompt = it },
             needsPrompt = needsPrompt,
+            permissionTier = permissionTier,
+            onPermissionTierChange = { requested ->
+                if (requested == ScheduledTaskPermissionTier.FULL && permissionTier != requested) {
+                    showFullTierConfirmation = true
+                } else {
+                    permissionTier = requested
+                    if (requested != ScheduledTaskPermissionTier.FULL) fullTierConfirmed = false
+                }
+            },
             hour = hour, minute = minute, onTimeChange = { h, m -> hour = h; minute = m },
             repeatMode = repeatMode, onRepeatModeChange = { repeatMode = it },
             customDays = customDays, onCustomDaysChange = { customDays = it },
@@ -296,19 +330,11 @@ fun ScheduledTaskEditScreen(
             canSave = canSave,
             onRunNow = { vm.runNow(currentTask()) },
             onSave = {
-                scope.launch {
-                    try {
-                        vm.upsert(currentTask(), isNew = isNew)
-                        onBack()
-                    } catch (exception: Exception) {
-                        val message = exception.message.orEmpty()
-                        saveError = if (message.startsWith("Bot routine limit reached")) {
-                            context.getString(
-                                R.string.scheduled_task_bot_routine_limit,
-                                ScheduledTask.MAX_ROUTINES_PER_BOT,
-                            )
-                        } else message.ifBlank { context.getString(R.string.scheduled_task_save_failed) }
-                    }
+                if (ScheduledTaskTierMutationPolicy.requiresFullConfirmation(permissionTier, fullTierConfirmed)) {
+                    saveAfterFullConfirmation = true
+                    showFullTierConfirmation = true
+                } else {
+                    persistTask()
                 }
             },
             onDelete = {
@@ -324,6 +350,36 @@ fun ScheduledTaskEditScreen(
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { saveError = null }) { Text(stringResource(R.string.ok)) }
+            },
+        )
+    }
+
+    if (showFullTierConfirmation) {
+        AlertDialog(
+            onDismissRequest = {
+                showFullTierConfirmation = false
+                saveAfterFullConfirmation = false
+            },
+            title = { Text(stringResource(R.string.scheduled_task_tier_full_confirmation_title)) },
+            text = { Text(stringResource(R.string.scheduled_task_tier_full_confirmation_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    permissionTier = ScheduledTaskPermissionTier.FULL
+                    fullTierConfirmed = true
+                    showFullTierConfirmation = false
+                    if (saveAfterFullConfirmation) {
+                        saveAfterFullConfirmation = false
+                        persistTask()
+                    }
+                }) { Text(stringResource(R.string.scheduled_task_tier_full_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showFullTierConfirmation = false
+                    saveAfterFullConfirmation = false
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
             },
         )
     }
@@ -405,6 +461,8 @@ private fun EditFormBody(
     label: String, onLabelChange: (String) -> Unit,
     prompt: String, onPromptChange: (String) -> Unit,
     needsPrompt: Boolean,
+    permissionTier: ScheduledTaskPermissionTier,
+    onPermissionTierChange: (ScheduledTaskPermissionTier) -> Unit,
     hour: Int, minute: Int, onTimeChange: (Int, Int) -> Unit,
     repeatMode: ScheduledRepeatMode, onRepeatModeChange: (ScheduledRepeatMode) -> Unit,
     customDays: Set<Int>, onCustomDaysChange: (Set<Int>) -> Unit,
@@ -440,6 +498,10 @@ private fun EditFormBody(
     var showBotPicker by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    val screenContext = LocalContext.current
+    val virtualScreenAvailable = remember(screenContext) {
+        com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider.get(screenContext).isEnabled()
+    }
 
     Column(
         modifier = Modifier
@@ -513,6 +575,37 @@ private fun EditFormBody(
                     onClick = { if (targetSessionId != null) showMessagePicker = true },
                 )
             }
+        }
+
+        // ── Routine privilege tier ──
+        Column {
+            SectionLabel(stringResource(R.string.scheduled_task_permission_tier))
+            Spacer(Modifier.height(8.dp))
+            val tierOptions = listOf(
+                ScheduledTaskPermissionTier.READ_ONLY to R.string.scheduled_task_tier_read_only,
+                ScheduledTaskPermissionTier.FULL to R.string.scheduled_task_tier_full,
+            )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                tierOptions.forEachIndexed { index, (tier, labelRes) ->
+                    SegmentedButton(
+                        selected = permissionTier == tier,
+                        onClick = { onPermissionTierChange(tier) },
+                        shape = SegmentedButtonDefaults.itemShape(index, tierOptions.size),
+                    ) { Text(stringResource(labelRes), fontSize = 13.sp) }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(
+                    if (permissionTier == ScheduledTaskPermissionTier.READ_ONLY) {
+                        R.string.scheduled_task_tier_read_only_detail
+                    } else {
+                        R.string.scheduled_task_tier_full_detail
+                    },
+                ),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         // ── Time (compact) ──
@@ -611,6 +704,18 @@ private fun EditFormBody(
                 stringResource(R.string.scheduled_task_rerun_note),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = stringResource(R.string.scheduled_vscreen_unattended_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!virtualScreenAvailable) {
+            Text(
+                text = stringResource(R.string.scheduled_vscreen_unavailable_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
 
@@ -887,6 +992,7 @@ private fun buildTask(
     targetMessageId: String?,
     modelBinding: String?,
     botId: String?,
+    permissionTier: ScheduledTaskPermissionTier,
     modelEntryIdLookup: (String) -> String?,
     startDateMs: Long?,
     endDateMs: Long?,
@@ -924,6 +1030,7 @@ private fun buildTask(
         modelId = derivedModelId,
         modelBinding = modelBinding,
         botId = botId,
+        permissionTier = permissionTier,
         enabled = enabled,
         createdAt = createdAt,
         startDateMs = startDateMs,

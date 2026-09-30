@@ -81,6 +81,7 @@ object UbuntuPaths {
     )
 
     private val sessionAliases = listOf(
+        "/tmp" to "offloads",
         "/var/minis/workspace/attachments" to "attachments",
         "/var/minis/workspace/offloads" to "offloads",
         "/var/minis/workspace/browser" to "browser",

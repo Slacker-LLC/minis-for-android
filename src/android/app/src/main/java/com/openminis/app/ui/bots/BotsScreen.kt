@@ -545,7 +545,14 @@ private fun BotDetails(
                     SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(it))
                 } ?: stringResource(R.string.bots_routine_no_next)
                 val recentResult = task.runHistory.firstOrNull()?.preview ?: task.lastResultPreview
-                val subtitle = listOfNotNull(nextRun, recentResult?.take(80)).joinToString(" · ")
+                val screenFailure = when {
+                    recentResult?.contains("screen_busy", ignoreCase = true) == true ->
+                        stringResource(R.string.bots_routine_vscreen_busy)
+                    recentResult?.contains("vscreen_unavailable", ignoreCase = true) == true ->
+                        stringResource(R.string.bots_routine_vscreen_unavailable)
+                    else -> null
+                }
+                val subtitle = listOfNotNull(nextRun, screenFailure ?: recentResult?.take(80)).joinToString(" · ")
                 SettingsRow(
                     title = task.label.ifBlank { task.prompt.take(40) },
                     subtitle = subtitle,

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.scheduled.ScheduledRepeatMode
 import com.openminis.app.scheduled.ScheduledTask
+import com.openminis.app.scheduled.ScheduledTaskPermissionTier
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -228,13 +229,33 @@ private fun ScheduledTaskRow(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = task.label.ifBlank { task.prompt.take(40) },
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        modifier = Modifier.weight(1f, fill = false),
+                        text = task.label.ifBlank { task.prompt.take(40) },
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (task.permissionTier == ScheduledTaskPermissionTier.FULL) {
+                        Text(
+                            text = stringResource(R.string.scheduled_task_tier_full),
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = formatScheduleSummary(task),
