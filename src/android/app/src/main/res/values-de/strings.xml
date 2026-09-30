@@ -2043,4 +2043,7 @@
     <string name="scheduled_task_next_run">Nächster Lauf %1$s</string>
     <string name="scheduled_task_no_next_run">Kein nächster Lauf geplant</string>
     <string name="scheduled_tasks_footer">Jede Auslösung erstellt einen neuen Chat und sendet nach dem Ende eine Benachrichtigung. Tippe darauf, um das Ergebnis zu sehen.</string>
+    <string name="bots_progress_running">%1$d delegierte Aufgaben laufen</string>
+    <string name="bots_progress_none">Nichts in Arbeit</string>
+    <string name="bots_members_header">Mitglieder</string>
 </resources>

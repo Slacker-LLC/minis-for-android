@@ -2302,4 +2302,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL 允許此無人值守例程在現有應用程式權限範圍內執行任意 shell 指令、寫入暫存資料夾以外的檔案，並呼叫已連線的 MCP 工具。僅在信任提示詞和已設定工具時選擇。網路存取仍不受限制。</string>
 <string name="scheduled_task_tier_full_confirm">確認完整權限</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY 已封鎖 %1$s：%2$s</string>
+    <string name="bots_progress_running">%1$d 項委派工作進行中</string>
+    <string name="bots_progress_none">暫無進行中的工作</string>
+    <string name="bots_members_header">成員</string>
 </resources>

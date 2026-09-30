@@ -2331,4 +2331,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL 允许此无人值守例程在现有应用权限范围内执行任意 shell 命令、写入临时目录以外的文件并调用已连接的 MCP 工具。仅在信任提示词和已配置工具时选择。网络访问仍不受限制。</string>
 <string name="scheduled_task_tier_full_confirm">确认完整权限</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY 已阻止 %1$s：%2$s</string>
+    <string name="bots_progress_running">%1$d 项委派工作进行中</string>
+    <string name="bots_progress_none">暂无进行中的工作</string>
+    <string name="bots_members_header">成员</string>
 </resources>

@@ -1934,4 +1934,7 @@
     <string name="scheduled_task_next_run">Prochaine exécution %1$s</string>
     <string name="scheduled_task_no_next_run">Aucune prochaine exécution</string>
     <string name="scheduled_tasks_footer">Chaque déclenchement crée une nouvelle discussion et envoie une notification à la fin. Touchez-la pour voir le résultat.</string>
+    <string name="bots_progress_running">%1$d tâches déléguées en cours</string>
+    <string name="bots_progress_none">Rien en cours</string>
+    <string name="bots_members_header">Membres</string>
 </resources>

@@ -2421,4 +2421,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL lets this unattended routine run arbitrary shell commands, write files beyond its temporary folder and call connected MCP tools, subject to existing app permissions. Select it only if you trust the prompt and configured tools. Network access remains unrestricted.</string>
 <string name="scheduled_task_tier_full_confirm">Confirm Full</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY blocked %1$s: %2$s</string>
+    <string name="bots_progress_running">%1$d delegated tasks in progress</string>
+    <string name="bots_progress_none">Nothing in progress</string>
+    <string name="bots_members_header">Members</string>
 </resources>

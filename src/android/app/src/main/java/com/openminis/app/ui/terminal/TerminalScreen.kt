@@ -336,40 +336,52 @@ private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateEffect(): and
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 
+/** The board's bar: back chevron and label on the left, "Minis Shell" centered, Clear on the right. */
 @Composable
 private fun TerminalTopBar(
     onClose: () -> Unit,
     onClear: () -> Unit,
 ) {
     val chrome = terminalChrome()
-    Row(
+    androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(chrome.bg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 4.dp),
     ) {
-        CircularIconButton(
-            icon = Icons.Default.Close,
-            contentDescription = stringResource(R.string.common_close),
-            tint = chrome.fg,
-            onClick = onClose,
-        )
-        Spacer(modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable(onClick = onClose)
+                .padding(vertical = 10.dp)
+                .padding(start = 4.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                contentDescription = stringResource(R.string.common_close),
+                tint = chrome.accent,
+                modifier = Modifier.size(30.dp),
+            )
+            Text(stringResource(R.string.back), color = chrome.accent, fontSize = 17.sp, maxLines = 1)
+        }
         Text(
             stringResource(R.string.terminal_title),
             color = chrome.fg,
-            style = TextStyle(
-                fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 16.sp,
-            ),
+            fontSize = 17.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.Center),
         )
-        Spacer(modifier = Modifier.weight(1f))
-        CircularIconButton(
-            icon = Icons.Default.Brush,
-            contentDescription = stringResource(R.string.terminal_clear),
-            tint = chrome.accent,
-            onClick = onClear,
+        Text(
+            stringResource(R.string.terminal_clear),
+            color = chrome.accent,
+            fontSize = 17.sp,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable(onClick = onClear)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         )
     }
 }

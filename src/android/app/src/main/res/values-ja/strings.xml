@@ -2040,4 +2040,7 @@
     <string name="scheduled_task_next_run">次回実行 %1$s</string>
     <string name="scheduled_task_no_next_run">次回の実行は未設定</string>
     <string name="scheduled_tasks_footer">トリガーのたびに新しいチャットを作成し、完了すると通知します。通知をタップすると結果を確認できます。</string>
+    <string name="bots_progress_running">委任された作業 %1$d 件が進行中</string>
+    <string name="bots_progress_none">進行中の作業はありません</string>
+    <string name="bots_members_header">メンバー</string>
 </resources>

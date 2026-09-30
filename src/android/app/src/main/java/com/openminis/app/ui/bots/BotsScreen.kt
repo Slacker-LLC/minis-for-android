@@ -14,6 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -237,6 +240,7 @@ fun BotsScreen(
             title = stringResource(if (showProgress) R.string.bots_progress else R.string.bots_team),
             onBack = ::goBack,
             scrollable = false,
+            largeTitle = !showProgress,
             actions = {
                 if (!showProgress) {
                     // Watch what a member is doing on the virtual screen (only when it is switched on).
@@ -246,9 +250,6 @@ fun BotsScreen(
                         IconButton(onClick = { showVirtualScreenViewer = true }) {
                             Icon(Icons.Outlined.Visibility, stringResource(R.string.vscreen_viewer_menu))
                         }
-                    }
-                    IconButton(onClick = { if (onOpenProgress != null) onOpenProgress() else { showProgress = true } }) {
-                        Icon(Icons.AutoMirrored.Outlined.Assignment, stringResource(R.string.bots_progress))
                     }
                     IconButton(
                         onClick = ::addMember,
@@ -325,32 +326,51 @@ fun BotsScreen(
                     }
                 }
             } else {
-                LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-                    items(bots, key = { it.id }) { bot ->
-                        val botSessions = sessions.filter { it.botId == bot.id }
-                        val executing = delegations.any { it.targetBotId == bot.id && it.status == BotDelegationEntity.STATUS_RUNNING }
-                        val waiting = delegations.any { it.targetBotId == bot.id && it.status in setOf(BotDelegationEntity.STATUS_QUEUED, BotDelegationEntity.STATUS_WAITING_TARGET) }
-                        val status = when {
-                            executing || botSessions.any { it.id in running } -> R.string.bots_working
-                            !bot.enabled -> R.string.bots_disabled
-                            waiting || botSessions.any { it.id in suspended } -> R.string.bots_waiting
-                            else -> R.string.bots_available
+                LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                    item(key = "progress-entry") {
+                        val running = delegations.count {
+                            it.status == BotDelegationEntity.STATUS_RUNNING || it.status in setOf(BotDelegationEntity.STATUS_QUEUED, BotDelegationEntity.STATUS_WAITING_TARGET)
                         }
-                        val statusColor = when {
-                            executing || botSessions.any { it.id in running } -> MaterialTheme.colorScheme.primary
-                            !bot.enabled -> ChatColors.tertiaryText
-                            waiting || botSessions.any { it.id in suspended } -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.secondary
+                        SettingsSection {
+                            SettingsRow(
+                                icon = Icons.Outlined.AccountTree,
+                                iconColor = Color(0xFF0A84FF),
+                                title = stringResource(R.string.bots_progress),
+                                subtitle = if (running > 0) stringResource(R.string.bots_progress_running, running)
+                                else stringResource(R.string.bots_progress_none),
+                                onClick = { if (onOpenProgress != null) onOpenProgress() else { showProgress = true } },
+                                showDivider = false,
+                            )
                         }
-                        BotMemberRow(
-                            bot = bot,
-                            status = stringResource(status),
-                            statusColor = statusColor,
-                            preview = botSessions.firstOrNull()?.lastMessage ?: bot.systemPrompt?.lineSequence()?.firstOrNull { it.isNotBlank() },
-                            enabled = openingId == null,
-                            onOpen = { openConversation(bot) },
-                            onDetails = { if (onMemberDetails != null) onMemberDetails(bot.id) else { selectedBotId = bot.id } },
-                        )
+                    }
+                    item(key = "members") {
+                        SettingsSection(header = stringResource(R.string.bots_members_header)) {
+                            bots.forEachIndexed { index, bot ->
+                                val botSessions = sessions.filter { it.botId == bot.id }
+                                val executing = delegations.any { it.targetBotId == bot.id && it.status == BotDelegationEntity.STATUS_RUNNING }
+                                val waiting = delegations.any { it.targetBotId == bot.id && it.status in setOf(BotDelegationEntity.STATUS_QUEUED, BotDelegationEntity.STATUS_WAITING_TARGET) }
+                                val status = when {
+                                    executing || botSessions.any { it.id in running } -> R.string.bots_working
+                                    !bot.enabled -> R.string.bots_disabled
+                                    waiting || botSessions.any { it.id in suspended } -> R.string.bots_waiting
+                                    else -> R.string.bots_available
+                                }
+                                val statusColor = when {
+                                    executing || botSessions.any { it.id in running } -> MaterialTheme.colorScheme.primary
+                                    !bot.enabled -> ChatColors.tertiaryText
+                                    waiting || botSessions.any { it.id in suspended } -> ChatColors.warn
+                                    else -> ChatColors.ok
+                                }
+                                BotMemberRow(
+                                    bot = bot,
+                                    status = stringResource(status),
+                                    statusColor = statusColor,
+                                    preview = botSessions.firstOrNull()?.lastMessage ?: bot.systemPrompt?.lineSequence()?.firstOrNull { it.isNotBlank() },
+                                    showDivider = index != bots.lastIndex,
+                                    onOpen = { if (onMemberDetails != null) onMemberDetails(bot.id) else { selectedBotId = bot.id } },
+                                )
+                            }
+                        }
                     }
                     if (bots.size >= BotRepository.MAX_BOTS) {
                         item {
@@ -390,22 +410,35 @@ fun BotsScreen(
     }
 }
 
+/** Each member gets one of a few fixed tints, chosen from its id so it never changes. */
+internal fun memberTint(botId: String): Color {
+    val palette = listOf(Color(0xFF0A84FF), Color(0xFF34C759), Color(0xFFFF9500), Color(0xFFAF52DE), Color(0xFFFF375F))
+    return palette[Math.floorMod(botId.hashCode(), palette.size)]
+}
+
 @Composable
-internal fun BotAvatar(bot: BotEntity, modifier: Modifier = Modifier, statusColor: Color? = null) {
-    Box(modifier.size(42.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxSize().background(ChatColors.secondaryBg, CircleShape), contentAlignment = Alignment.Center) {
+internal fun BotAvatar(bot: BotEntity, modifier: Modifier = Modifier, statusColor: Color? = null, size: androidx.compose.ui.unit.Dp = 48.dp) {
+    val tint = if (bot.enabled) memberTint(bot.id) else ChatColors.tertiaryText
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().background(tint.copy(alpha = 0.14f), RoundedCornerShape(size / 4)), contentAlignment = Alignment.Center) {
             Text(bot.name.codePoints().findFirst().orElse('?'.code).let { String(Character.toChars(it)) },
-                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = ChatColors.primaryText)
+                fontSize = (size.value * 0.42f).sp, fontWeight = FontWeight.SemiBold, color = tint)
         }
-        statusColor?.let { color ->
-            Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(11.dp)
-                    .background(color, CircleShape)
-                    .border(2.dp, MaterialTheme.colorScheme.background, CircleShape),
-            )
-        }
+    }
+}
+
+/** A status as a small tinted pill with a dot: working, available, waiting, disabled. */
+@Composable
+internal fun StatusPill(text: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.14f), CircleShape)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(Modifier.size(6.dp).background(color, CircleShape))
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1)
     }
 }
 
@@ -415,29 +448,29 @@ private fun BotMemberRow(
     status: String,
     statusColor: Color,
     preview: String?,
-    enabled: Boolean,
+    showDivider: Boolean,
     onOpen: () -> Unit,
-    onDetails: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 88.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).clickable(enabled = enabled, onClick = onOpen).padding(vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BotAvatar(bot, statusColor = statusColor)
+    Column {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            BotAvatar(bot, size = 52.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(bot.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(status, style = MaterialTheme.typography.labelSmall, color = statusColor)
+                    Text(bot.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false))
+                    StatusPill(status, statusColor)
                 }
                 Text(preview ?: stringResource(R.string.bots_activity_empty), style = MaterialTheme.typography.bodySmall,
                     color = ChatColors.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = ChatColors.secondaryText.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
         }
-        IconButton(onClick = onDetails) {
-            Icon(Icons.Default.MoreVert, stringResource(R.string.bots_details), tint = ChatColors.secondaryText)
-        }
+        if (showDivider) HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator.copy(alpha = 0.5f), modifier = Modifier.padding(start = 80.dp))
     }
-    HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator.copy(alpha = 0.4f), modifier = Modifier.padding(start = 54.dp))
 }
 
 @Composable
@@ -517,10 +550,13 @@ private fun BotDetails(
     }) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            BotAvatar(bot)
-            Column(Modifier.weight(1f)) {
-                Text(bot.name, style = MaterialTheme.typography.titleLarge)
-                if (!bot.enabled) Text(stringResource(R.string.bots_disabled), style = MaterialTheme.typography.bodySmall, color = ChatColors.secondaryText)
+            BotAvatar(bot, size = 64.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(bot.name, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                StatusPill(
+                    stringResource(if (bot.enabled) R.string.bots_available else R.string.bots_disabled),
+                    if (bot.enabled) ChatColors.ok else ChatColors.tertiaryText,
+                )
             }
         }
         MinisButton(onClick = onOpen, enabled = !opening && (bot.enabled || sessions.isNotEmpty()),

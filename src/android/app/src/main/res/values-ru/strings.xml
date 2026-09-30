@@ -2297,4 +2297,7 @@
     <string name="scheduled_task_next_run">Следующий запуск: %1$s</string>
     <string name="scheduled_task_no_next_run">Следующий запуск не запланирован</string>
     <string name="scheduled_tasks_footer">Каждый запуск создаёт новый чат и присылает уведомление по завершении. Нажмите на него, чтобы увидеть результат.</string>
+    <string name="bots_progress_running">Делегированных задач в работе: %1$d</string>
+    <string name="bots_progress_none">Ничего не выполняется</string>
+    <string name="bots_members_header">Участники</string>
 </resources>
