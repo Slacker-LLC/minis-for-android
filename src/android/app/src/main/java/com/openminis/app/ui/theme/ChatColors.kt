@@ -170,3 +170,31 @@ val ChatColors: ChatPalette
     @Composable
     @ReadOnlyComposable
     get() = LocalChatPalette.current
+
+/**
+ * The chat's own layering: the page is the grey of the settings pages, and what sits on it (the
+ * user's bubble, tool and code surfaces, the quick cards) is white. Dark mode already layers on
+ * black, so it is returned unchanged. Applied to the message area and the top bar only; sheets and
+ * dialogs keep the plain palette.
+ */
+@Composable
+fun chatPagePalette(): ChatPalette {
+    val base = LocalChatPalette.current
+    return androidx.compose.runtime.remember(base) { layeredChatPalette(base) }
+}
+
+private fun layeredChatPalette(base: ChatPalette): ChatPalette {
+    if (base.isDark) return base
+    return base.copy(
+        background = ChatPageGrey,
+        secondaryBg = Color.White,
+        userBubble = Color.White,
+        toolBg = Color.White,
+        toolCapsuleBg = Color.White,
+        codeBlockBg = Color.White,
+        inlineCodeBg = Color.White,
+        inputIconBg = ChatPageGrey,
+    )
+}
+
+val ChatPageGrey = Color(0xFFF2F2F7)

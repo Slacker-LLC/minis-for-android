@@ -1005,10 +1005,13 @@ private fun ChatPhoneDrawerScaffold(
         scrimColor = com.openminis.app.ui.theme.minisOverlayScrim(ChatColors.isDark),
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = ChatColors.background,
+                drawerContainerColor = com.openminis.app.ui.theme.chatPagePalette().background,
                 drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
                 modifier = Modifier.width(drawerWidth),
             ) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.openminis.app.ui.theme.LocalChatPalette provides com.openminis.app.ui.theme.chatPagePalette(),
+                ) {
                 SessionDrawerContent(
                     viewModel = sessionListViewModel,
                     chatRepository = chatRepository,
@@ -1047,6 +1050,7 @@ private fun ChatPhoneDrawerScaffold(
                         )
                     },
                 )
+                }
             }
         },
     ) {

@@ -341,11 +341,11 @@ fun MinisSwitch(
 }
 
 
-/** The board's switch: iOS green when on, the fill grey when off, a white thumb either way. */
+/** The board's switch: the user's accent when on, the fill grey when off, a white thumb either way. */
 @Composable
 fun minisSwitchColors(): androidx.compose.material3.SwitchColors = SwitchDefaults.colors(
     checkedThumbColor = Color.White,
-    checkedTrackColor = if (ChatColors.isDark) Color(0xFF30D158) else Color(0xFF34C759),
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
     checkedBorderColor = Color.Transparent,
     uncheckedThumbColor = Color.White,
     uncheckedTrackColor = if (ChatColors.isDark) Color(0xFF39393D) else Color(0xFFE5E5EA),

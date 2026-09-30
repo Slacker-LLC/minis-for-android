@@ -807,12 +807,9 @@
     <string name="perm_reset_confirm_title">Reset All Permissions?</string>
     <string name="perm_reset_confirm_text">This will reset all permission preferences. Continue?</string>
     <string name="perm_reset_confirm">Reset</string>
-    <string name="perm_level_bypass">Bypass</string>
     <!-- T336 follow-up: ASK_ONCE actually grants for the whole app process
          lifetime (until next cold start), not for each individual call.
          Label rewritten to match the real behavior. -->
-    <string name="perm_level_ask_once">Once per launch</string>
-    <string name="perm_level_not_allowed">Not Allowed</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Configuration Tool</string>
     <!-- T336: dedicated SectionCard per integration CLI. Each surfaces
@@ -1931,7 +1928,6 @@
     <string name="settings_ready_action_open">Open</string>
     <string name="settings_ready_check">Check readiness</string>
     <string name="settings_ready_all_good">Everything is ready</string>
-    <string name="settings_ready_all_good_body">Root, file access, background running and notifications are in place.</string>
     <string name="settings_ready_fix_title">These need your attention</string>
     <string name="settings_ready_done">Done</string>
     <string name="settings_ready_optional">Optional</string>
@@ -2482,4 +2478,22 @@
     <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
     <string name="perm_vscreen_master_title">Let the agent use the virtual screen</string>
     <string name="perm_vscreen_master_sub">Master switch; the items below are its permissions</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">Connected · used by the virtual screen and Agent tools</string>
+    <string name="settings_ready_shizuku_bad">Not ready · install, start or authorize Shizuku</string>
+    <string name="settings_ready_overlay_title">Display over other apps</string>
+    <string name="settings_ready_overlay_ok">Allowed</string>
+    <string name="settings_ready_overlay_bad">Off · the desktop pet and floating controls need it</string>
+    <string name="settings_ready_role_ok">Set as the default assistant</string>
+    <string name="settings_ready_role_bad">Not set · needed to start Minis with the power key</string>
+    <string name="settings_ready_tool_ok">Granted in Android</string>
+    <string name="settings_ready_tool_bad">Not granted in Android · the Agent’s calls to this tool will fail</string>
+    <string name="settings_ready_all_good_body">Everything the Agent needs is ready.</string>
+    <string name="assistant_menu_copy_text">Copy text</string>
+    <string name="assistant_action_stop_reading">Stop reading</string>
+    <string name="assistant_regenerate_unavailable">Can’t regenerate this reply: the question before it has no text, or no model is set up.</string>
+    <string name="assistant_regenerate_confirm_title">Regenerate this reply?</string>
+    <string name="assistant_regenerate_confirm_body">The %1$d message(s) after it will be deleted and can’t be restored. To keep them, use Branch first.</string>
+    <string name="assistant_regenerate_confirm_action">Regenerate</string>
+    <string name="rootfs_not_installed_label">Not installed</string>
 </resources>

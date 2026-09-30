@@ -324,10 +324,7 @@
     <string name="perm_reset_confirm_title">Réinitialiser toutes les autorisations ?</string>
     <string name="perm_reset_confirm_text">Cela réinitialisera toutes les préférences d\'autorisation. Continuer ?</string>
     <string name="perm_reset_confirm">Réinitialiser</string>
-    <string name="perm_level_bypass">Autoriser</string>
     <!-- T336 follow-up: ASK_ONCE granted for the whole app launch -->
-    <string name="perm_level_ask_once">Demander à chaque lancement</string>
-    <string name="perm_level_not_allowed">Non autorisé</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Outil de configuration</string>
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (fr) -->
@@ -1440,7 +1437,6 @@
     <string name="settings_ready_action_open">Ouvrir</string>
     <string name="settings_ready_check">Vérifier l’état</string>
     <string name="settings_ready_all_good">Tout est prêt</string>
-    <string name="settings_ready_all_good_body">Root, l’accès aux fichiers, l’exécution en arrière-plan et les notifications sont en place.</string>
     <string name="settings_ready_fix_title">À traiter</string>
     <string name="settings_ready_done">Terminé</string>
     <string name="settings_ready_optional">Facultatif</string>
@@ -1995,4 +1991,22 @@
     <string name="perm_tool_vscreen_ui">Utiliser l\'écran virtuel</string>
     <string name="perm_vscreen_master_title">Autoriser l\'agent à utiliser l\'écran virtuel</string>
     <string name="perm_vscreen_master_sub">Interrupteur général ; les droits détaillés suivent</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">Connecté · utilisé par l’écran virtuel et les outils de l’agent</string>
+    <string name="settings_ready_shizuku_bad">Non prêt · installer, lancer ou autoriser Shizuku</string>
+    <string name="settings_ready_overlay_title">Affichage par-dessus les autres applications</string>
+    <string name="settings_ready_overlay_ok">Autorisé</string>
+    <string name="settings_ready_overlay_bad">Désactivé · la mascotte et les commandes flottantes en ont besoin</string>
+    <string name="settings_ready_role_ok">Défini comme assistant par défaut</string>
+    <string name="settings_ready_role_bad">Non défini · nécessaire pour lancer Minis avec le bouton d’alimentation</string>
+    <string name="settings_ready_tool_ok">Accordé dans Android</string>
+    <string name="settings_ready_tool_bad">Non accordé dans Android · les appels de l’agent à cet outil échoueront</string>
+    <string name="settings_ready_all_good_body">Tout ce dont l’agent a besoin est prêt.</string>
+    <string name="assistant_menu_copy_text">Copier le texte</string>
+    <string name="assistant_action_stop_reading">Arrêter la lecture</string>
+    <string name="assistant_regenerate_unavailable">Impossible de régénérer : la question correspondante n’a pas de texte ou aucun modèle n’est configuré.</string>
+    <string name="assistant_regenerate_confirm_title">Régénérer cette réponse ?</string>
+    <string name="assistant_regenerate_confirm_body">Les %1$d message(s) suivants seront supprimés et irrécupérables. Pour les garder, créez d’abord une branche.</string>
+    <string name="assistant_regenerate_confirm_action">Régénérer</string>
+    <string name="rootfs_not_installed_label">Non installé</string>
 </resources>

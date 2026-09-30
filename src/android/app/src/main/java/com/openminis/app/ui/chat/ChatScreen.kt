@@ -300,6 +300,8 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalChatPalette
+import com.openminis.app.ui.theme.chatPagePalette
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
@@ -794,6 +796,8 @@ fun ChatScreen(
     var showMoveSheet by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
     var deleteSingleMessageTargetId by remember { mutableStateOf<String?>(null) }
+    // Assistant reply the user asked to regenerate while later messages exist, with how many would go.
+    var regenerateTarget by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var deleteFromHereTargetId by remember { mutableStateOf<String?>(null) }
     // [T-new-chat-menu-entry] Confirmation gate for "New Chat" while the
     // current session is still streaming — stopping the running task needs
@@ -2409,8 +2413,9 @@ fun ChatScreen(
         // map (which is last-writer-wins across sessions).
         LocalMarkdownSessionId provides sessionId,
     ) {
+    val pagePalette = chatPagePalette()
     Scaffold(
-        containerColor = ChatColors.background,
+        containerColor = pagePalette.background,
         contentWindowInsets = WindowInsets(0),
         topBar = {
             androidx.compose.material3.CenterAlignedTopAppBar(
@@ -2544,8 +2549,8 @@ fun ChatScreen(
                 },
                 windowInsets = WindowInsets.statusBars,
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = ChatColors.background.copy(alpha = 0.92f),
-                    scrolledContainerColor = ChatColors.background.copy(alpha = 0.92f),
+                    containerColor = pagePalette.background.copy(alpha = 0.92f),
+                    scrolledContainerColor = pagePalette.background.copy(alpha = 0.92f),
                 ),
                 // [T-android-topbar-shrink] 76dp → 68dp. The earlier
                 // T-topbar-model-row-clip fix bumped 60dp → 76dp to give the
@@ -2592,6 +2597,7 @@ fun ChatScreen(
 
             // Messages + scroll-to-bottom button
             Box(modifier = Modifier.weight(1f)) {
+                CompositionLocalProvider(LocalChatPalette provides chatPagePalette()) {
                 // Empty conversation: greeting + quick actions (board). Held back briefly so an
                 // existing session whose history is still loading does not flash it.
                 var emptyStateSettled by remember(sessionId) { mutableStateOf(false) }
@@ -3777,7 +3783,17 @@ fun ChatScreen(
                                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
                                     },
                                     onRegenerate = {
-                                        viewModel.regenerateAssistantMessage(item.messageId)
+                                        // Regenerating cuts the chat back to this reply, so anything
+                                        // after it is asked about first instead of vanishing.
+                                        val later = viewModel.messagesAfter(item.messageId)
+                                        if (later > 0) {
+                                            regenerateTarget = item.messageId to later
+                                        } else if (!viewModel.regenerateAssistantMessage(item.messageId)) {
+                                            com.openminis.app.ui.components.MinisToast.show(
+                                                context,
+                                                context.getString(R.string.assistant_regenerate_unavailable),
+                                            )
+                                        }
                                     },
                                     onToggleSpeak = {
                                         viewModel.toggleReplySpeech(item.messageId, assistantDisplayIndex, item.messageMarkdown)
@@ -4175,7 +4191,8 @@ fun ChatScreen(
 
                 // T-chat-title-pill: sticky session title overlay. Sits
                 // above the LazyColumn (top-center), animates in once the
-            }
+                } // chat page palette
+}
 
             // T-chat-title-pill-edit: reuse SessionEditSheet from the session
             // list (same composable, exposed `internal`) so title + category
@@ -6261,6 +6278,24 @@ fun ChatScreen(
                         viewModel.clearChat()
                         viewModel.setInputText("")
                         showClearChatDialog = false
+                    },
+                )
+            }
+            regenerateTarget?.let { (targetId, later) ->
+                MinisAlertDialog(
+                    onDismissRequest = { regenerateTarget = null },
+                    title = stringResource(R.string.assistant_regenerate_confirm_title),
+                    text = stringResource(R.string.assistant_regenerate_confirm_body, later),
+                    confirmText = stringResource(R.string.assistant_regenerate_confirm_action),
+                    isDestructive = true,
+                    onConfirm = {
+                        regenerateTarget = null
+                        if (!viewModel.regenerateAssistantMessage(targetId)) {
+                            com.openminis.app.ui.components.MinisToast.show(
+                                context,
+                                context.getString(R.string.assistant_regenerate_unavailable),
+                            )
+                        }
                     },
                 )
             }

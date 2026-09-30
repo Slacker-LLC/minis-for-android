@@ -575,9 +575,6 @@
     <string name="perm_reset_confirm_title">Сбросить все разрешения?</string>
     <string name="perm_reset_confirm_text">Это сбросит все настройки разрешений. Продолжить?</string>
     <string name="perm_reset_confirm">Сбросить</string>
-    <string name="perm_level_bypass">Обход</string>
-    <string name="perm_level_ask_once">Один раз за запуск</string>
-    <string name="perm_level_not_allowed">Не разрешено</string>
     <string name="perm_section_config_tool">Инструмент настройки</string>
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
     <string name="perm_tool_shizuku_cli">android-shizuku-cli</string>
@@ -1786,7 +1783,6 @@
     <string name="settings_ready_action_open">Открыть</string>
     <string name="settings_ready_check">Проверить готовность</string>
     <string name="settings_ready_all_good">Всё готово</string>
-    <string name="settings_ready_all_good_body">Root, доступ к файлам, работа в фоне и уведомления готовы.</string>
     <string name="settings_ready_fix_title">Требует внимания</string>
     <string name="settings_ready_done">Готово</string>
     <string name="settings_ready_optional">Необязательно</string>
@@ -2358,4 +2354,22 @@
     <string name="perm_tool_vscreen_ui">Управлять виртуальным экраном</string>
     <string name="perm_vscreen_master_title">Разрешить агенту виртуальный экран</string>
     <string name="perm_vscreen_master_sub">Главный переключатель; ниже отдельные права</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">Подключено · для виртуального экрана и инструментов агента</string>
+    <string name="settings_ready_shizuku_bad">Не готово · установите, запустите или разрешите Shizuku</string>
+    <string name="settings_ready_overlay_title">Поверх других приложений</string>
+    <string name="settings_ready_overlay_ok">Разрешено</string>
+    <string name="settings_ready_overlay_bad">Выкл. · нужно питомцу и плавающим элементам</string>
+    <string name="settings_ready_role_ok">Назначен ассистентом по умолчанию</string>
+    <string name="settings_ready_role_bad">Не назначен · нужен для запуска Minis кнопкой питания</string>
+    <string name="settings_ready_tool_ok">Разрешено в Android</string>
+    <string name="settings_ready_tool_bad">Не разрешено в Android · вызовы этого инструмента агентом завершатся ошибкой</string>
+    <string name="settings_ready_all_good_body">Всё, что нужно агенту, готово.</string>
+    <string name="assistant_menu_copy_text">Копировать текст</string>
+    <string name="assistant_action_stop_reading">Остановить чтение</string>
+    <string name="assistant_regenerate_unavailable">Не удалось создать заново: у вопроса нет текста или не настроена модель.</string>
+    <string name="assistant_regenerate_confirm_title">Создать этот ответ заново?</string>
+    <string name="assistant_regenerate_confirm_body">Следующие за ним сообщения (%1$d) будут удалены без возможности восстановления. Чтобы сохранить их, сначала создайте ветку.</string>
+    <string name="assistant_regenerate_confirm_action">Создать заново</string>
+    <string name="rootfs_not_installed_label">Не установлено</string>
 </resources>

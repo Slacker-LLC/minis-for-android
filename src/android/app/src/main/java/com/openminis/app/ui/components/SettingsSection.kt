@@ -36,12 +36,12 @@ fun SettingsSection(
         Text(
             text = title.uppercaseForDisplay(),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
         )
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
+            color = SectionDesign.cardColor(),
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {

@@ -4,14 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +32,6 @@ import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
-import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.delay
@@ -134,7 +131,7 @@ fun OffloadPermissionScreen(
         if (vscreenTools.isNotEmpty()) {
             // One master switch; the five tools are its sub-items and only show while it is on.
             var vscreenOn by remember {
-                mutableStateOf(vscreenTools.any { OffloadPermissionManager.getLevel(it.toolName) != OffloadPermissionManager.PermissionLevel.NOT_ALLOWED })
+                mutableStateOf(vscreenTools.any { OffloadPermissionManager.isAllowed(it.toolName) })
             }
             SettingsSection(header = stringResource(R.string.settings_vscreen_entry)) {
                 SettingsSwitchRow(
@@ -146,7 +143,7 @@ fun OffloadPermissionScreen(
                         vscreenTools.forEach { tool ->
                             val current = OffloadPermissionManager.getLevel(tool.toolName)
                             if (on && current == OffloadPermissionManager.PermissionLevel.NOT_ALLOWED) {
-                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.BYPASS)
                             } else if (!on) {
                                 OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.NOT_ALLOWED)
                             }
@@ -255,89 +252,41 @@ private fun IntegrationSection(
     }
 }
 
+/** The Agent's access to one integration: a plain on/off switch. */
 @Composable
 private fun AgentPolicyRow(
     toolName: String,
     showDivider: Boolean,
 ) {
-    var currentLevel by remember { mutableStateOf(OffloadPermissionManager.getLevel(toolName)) }
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        SettingsRow(
-            title = stringResource(R.string.perm_agent_policy),
-            onClick = { expanded = true },
-            showChevron = true,
-            showDivider = showDivider,
-            trailing = {
-                Text(
-                    text = levelDisplayName(currentLevel),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = levelColor(currentLevel),
-                )
-            },
-        )
-        MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }, alignEnd = true) {
-            for (level in OffloadPermissionManager.PermissionLevel.entries) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            levelDisplayName(level),
-                            color = levelColor(level),
-                        )
-                    },
-                    onClick = {
-                        currentLevel = level
-                        OffloadPermissionManager.setLevel(toolName, level)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
+    var allowed by remember { mutableStateOf(OffloadPermissionManager.isAllowed(toolName)) }
+    SettingsSwitchRow(
+        title = stringResource(R.string.perm_agent_policy),
+        checked = allowed,
+        onCheckedChange = {
+            allowed = it
+            OffloadPermissionManager.setAllowed(toolName, it)
+        },
+        showDivider = showDivider,
+    )
 }
 
+/** One tool the Agent may use: on = allowed, off = denied. */
 @Composable
 private fun PermissionRow(
     tool: OffloadPermissionManager.ToolPermissionInfo,
     showDivider: Boolean,
 ) {
-    var currentLevel by remember { mutableStateOf(OffloadPermissionManager.getLevel(tool.toolName)) }
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        SettingsRow(
-            title = toolTitle(tool),
-            subtitle = tool.toolName,
-            onClick = { expanded = true },
-            showChevron = true,
-            showDivider = showDivider,
-            trailing = {
-                Text(
-                    text = levelDisplayName(currentLevel),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = levelColor(currentLevel),
-                )
-            },
-        )
-        MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }, alignEnd = true) {
-            for (level in OffloadPermissionManager.PermissionLevel.entries) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            levelDisplayName(level),
-                            color = levelColor(level),
-                        )
-                    },
-                    onClick = {
-                        currentLevel = level
-                        OffloadPermissionManager.setLevel(tool.toolName, level)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
+    var allowed by remember { mutableStateOf(OffloadPermissionManager.isAllowed(tool.toolName)) }
+    SettingsSwitchRow(
+        title = toolTitle(tool),
+        subtitle = tool.toolName,
+        checked = allowed,
+        onCheckedChange = {
+            allowed = it
+            OffloadPermissionManager.setAllowed(tool.toolName, it)
+        },
+        showDivider = showDivider,
+    )
 }
 
 private fun categoryHeaderRes(category: OffloadPermissionManager.PermissionCategory): Int = when (category) {
@@ -368,22 +317,6 @@ private fun toolTitleRes(toolName: String): Int = when (toolName) {
     "android.vscreen.status" -> R.string.perm_tool_vscreen_status
     "android.vscreen.ui" -> R.string.perm_tool_vscreen_ui
     else -> 0
-}
-
-@Composable
-private fun levelDisplayName(level: OffloadPermissionManager.PermissionLevel): String = stringResource(
-    when (level) {
-        OffloadPermissionManager.PermissionLevel.BYPASS -> R.string.perm_level_bypass
-        OffloadPermissionManager.PermissionLevel.ASK_ONCE -> R.string.perm_level_ask_once
-        OffloadPermissionManager.PermissionLevel.NOT_ALLOWED -> R.string.perm_level_not_allowed
-    },
-)
-
-@Composable
-private fun levelColor(level: OffloadPermissionManager.PermissionLevel): Color = when (level) {
-    OffloadPermissionManager.PermissionLevel.BYPASS -> ChatColors.ok
-    OffloadPermissionManager.PermissionLevel.ASK_ONCE -> MaterialTheme.colorScheme.tertiary
-    OffloadPermissionManager.PermissionLevel.NOT_ALLOWED -> MaterialTheme.colorScheme.error
 }
 
 private fun isA11yServiceEnabled(context: Context): Boolean {

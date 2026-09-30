@@ -112,6 +112,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -656,21 +657,11 @@ internal fun ToolCallPill(
     val isRunning = block.toolStatus == ToolBlockStatus.RUNNING ||
         block.toolStatus == ToolBlockStatus.STREAMING ||
         block.toolStatus == ToolBlockStatus.PENDING
-    val isDone = block.toolStatus == ToolBlockStatus.SUCCESS
     val isFailed = block.toolStatus == ToolBlockStatus.FAILED ||
         block.toolStatus == ToolBlockStatus.TIMEOUT
     val isCancelled = block.toolStatus == ToolBlockStatus.CANCELLED
 
-    val toolAccent = toolAccentColor(block.toolName)
     val toolIcon = toolIconFor(block.toolName)
-
-    // Icon color: tool color when running/done, error/cancel colors on failure
-    val iconTint = when {
-        isFailed -> ToolErrorColor
-        isCancelled -> ToolCancelColor
-        isDone -> ToolCheckColor
-        else -> toolAccent
-    }
 
     // iOS: always shows tool-type icon, only changes color based on status
     val displayIcon = toolIcon
@@ -682,139 +673,52 @@ internal fun ToolCallPill(
         else String.format("%.0fs", seconds)
     } else null
 
-    // T125: drop the spinner that used to replace the tool icon while
-    // running. iOS only animates a left→right shimmer sweep across the
-    // pill background and keeps the typed icon visible — the spinner
-    // both fought the icon for attention and looked stylistically off
-    // next to the iOS counterpart. The bottom FloatingToolStatusBar
-    // still shows a CircularProgressIndicator (that is the running-tool
-    // status surface, where a spinner reads correctly).
-    val shimmerTranslate = if (isRunning) {
-        val transition = rememberInfiniteTransition(label = "toolPillShimmer")
-        transition.animateFloat(
-            initialValue = -1f,
-            targetValue = 2f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2800, easing = LinearEasing),
-            ),
-            label = "toolPillShimmerTranslate",
-        )
-    } else null
-
     // [T-android-tool-bubble-longpress-menu] Long-press menu state, scoped
-    // to this pill. The DropdownMenu is anchored to the pill via the Box
-    // wrapper below so it opens beneath the tapped bubble.
+    // to this step. The menu is anchored to the row via the Box wrapper below.
     var showToolMenu by remember { mutableStateOf(false) }
 
-    // Pill stretches up to the full row width so long titles can ellipsize
-    // without pushing the duration out of view. Title takes the remaining
-    // space via weight(1f), duration stays fixed-width (softWrap=false).
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-      Box(modifier = Modifier.weight(1f, fill = false)) {
-        Row(
-            modifier = Modifier
-                .background(
-                    ChatColors.toolCapsuleBg,
-                    CircleShape,
-                )
-                .border(0.5.dp, ChatColors.toolBorder, CircleShape)
-                .clip(CircleShape)
-                .then(
-                    if (shimmerTranslate != null) {
-                        Modifier.drawWithContent {
-                            drawContent()
-                            val w = size.width
-                            val band = w * 0.6f
-                            val x = shimmerTranslate.value * w
-                            drawRect(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0f),
-                                        Color.White.copy(alpha = 0.18f),
-                                        Color.White.copy(alpha = 0f),
-                                    ),
-                                    start = Offset(x, 0f),
-                                    end = Offset(x + band, 0f),
-                                ),
-                            )
-                        }
-                    } else Modifier,
-                )
-                .combinedClickable(
-                    onClick = { onOpenDetail(block.id) },
-                    onLongClick = if (onRerunFromHere != null || onCopyDetails != null) {
-                        { showToolMenu = true }
-                    } else null,
-                )
-                .padding(horizontal = 12.dp)
-                .height(36.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Status icon — always the typed tool icon. Color shifts to
-            // reflect terminal status (success / failed / cancelled); while
-            // running it stays in the tool's accent color so the user can
-            // still recognize the tool at a glance.
-            Icon(
-                displayIcon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(14.dp),
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // [T-step-timestamp v2 aa8b1128] Inline HH:mm:ss prefix removed
-            // — user found it visually noisy on every tool pill. Start
-            // time + elapsed duration now live in the tool detail bottom
-            // sheet header instead (ToolDetailSheet, this file ~line
-            // 5209). formatStepTimestamp() is still defined further down
-            // because the detail sheet calls it.
-
-            // Tool title + streaming dots after title (iOS: Text + bouncing "...").
-            // weight(1f) lets the title absorb leftover width, ellipsis trims overflow.
-            Row(
-                modifier = Modifier.weight(1f, fill = false),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = block.toolTitle.ifEmpty { block.toolName },
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+    // One step row, the same shape as a thinking step (see StepRow): tool glyph, title, duration,
+    // and a chevron that says "opens the detail sheet". While the call runs the glyph is a small
+    // spinner in the accent and the row carries its own stop button; afterwards the glyph goes
+    // quiet and only a failure or a cancel keeps a colour.
+    val quietTint = ChatColors.secondaryText
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+        StepRow(
+            title = block.toolTitle.ifEmpty { block.toolName },
+            titleColor = if (isFailed) ToolErrorColor else ChatColors.primaryText,
+            note = durationText,
+            leading = {
                 if (isRunning) {
-                    // iOS streaming: "..." bouncing dots after title text
-                    StreamingDotsText()
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 1.5.dp,
+                    )
+                } else {
+                    Icon(
+                        displayIcon,
+                        contentDescription = null,
+                        tint = when {
+                            isFailed -> ToolErrorColor
+                            isCancelled -> ToolCancelColor
+                            else -> quietTint
+                        },
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
-            }
-
-            // Duration badge (iOS: monospaced gray text after title) — fixed width,
-            // never compressed by the title. The HH:mm:ss start time is
-            // surfaced inside the tool detail bottom sheet's bottom bar
-            // instead of here — the inline pill list stays clean.
-            if (durationText != null) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = durationText,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    softWrap = false,
-                    maxLines = 1,
-                )
-            }
-            // T168: restore per-tool stop button (reverts T117). Renders only
-            // for running/streaming/pending blocks so completed pills stay
-            // clean. Routes to the same global cancelStream() — there is no
-            // per-tool cancellation API on either platform.
-            if (isRunning && onStop != null) {
-                Spacer(modifier = Modifier.width(8.dp))
-                ToolStopButton(onStop = onStop)
-            }
-        }
+            },
+            trailing = {
+                if (isRunning && onStop != null) {
+                    ToolStopButton(onStop = onStop)
+                } else {
+                    StepOpenChevron()
+                }
+            },
+            onClick = { onOpenDetail(block.id) },
+            onLongClick = if (onRerunFromHere != null || onCopyDetails != null) {
+                { showToolMenu = true }
+            } else null,
+        )
         // [T-android-tool-bubble-longpress-menu] Long-press menu anchored to
         // the pill. Items mirror the user-bubble menu's style (MinisMenu +
         // DropdownMenuItem + leading icon). Each item no-ops gracefully if
@@ -848,15 +752,6 @@ internal fun ToolCallPill(
                 )
             }
         }
-      }
-        // T251: removed inline Retry affordance next to cancelled/failed pills —
-        // the pill's own status icon (yellow on FAILED, gray on CANCELLED) is
-        // already the unified failure tip. The button was visually noisy and
-        // redundant. ToolCallPill keeps the `onRetry` parameter so upstream
-        // callers don't need to change; the lambda just isn't surfaced inline
-        // any more. retryLast() / retryFromMessage() remain reachable from
-        // other entry points (long-press menu, etc.).
-        // iOS: Spacer(minLength: 0) — pill stays content-width, not full-row-width
     }
 }
 
@@ -890,7 +785,6 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
         // if the user hasn't taken control of its state yet.
         if (!isStreaming && !userTouched) expanded = false
     }
-    val thinkingBlue = ChatColors.thinking
     val charCount = block.content.length
     val charLabel = when {
         charCount >= 1000 -> "${charCount / 1000}K"
@@ -910,86 +804,52 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
     val overHardCap = charCount > thinkingHardCap
     var showFullContent by remember(block.id) { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .background(thinkingBlue.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-            .border(0.5.dp, thinkingBlue.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        // Header row — only the header reacts to taps. Mirrors iOS, where
-        // .onTapGesture is on the header HStack, not the whole VStack. With
-        // clickable on the outer Column, a release after dragging in the
-        // inner scroller registered as a tap and toggled `expanded`.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    userTouched = true
-                    // [T-thinking-render-perf-android] Over the hard cap the
-                    // inline scroller is bypassed entirely; tapping the header
-                    // opens the native full-content viewer instead of toggling
-                    // the (never-shown) inline expansion.
-                    if (overHardCap) showFullContent = true
-                    else expanded = !expanded
-                },
-        ) {
-            if (isStreaming && block.toolStatus != ToolBlockStatus.SUCCESS) {
-                // iOS: ProgressView().controlSize(.mini) while streaming
-                CircularProgressIndicator(
-                    modifier = Modifier.size(13.dp),
-                    color = thinkingBlue,
-                    strokeWidth = 1.5.dp,
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Psychology,
-                    contentDescription = null,
-                    tint = thinkingBlue,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            Text(
-                text = stringResource(R.string.appearance_section_deep_thinking),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = thinkingBlue,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            if (charCount > 0) {
-                Text(
-                    text = charLabel,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
-                    color = thinkingBlue.copy(alpha = 0.6f),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-            if (overHardCap) {
-                // [T-thinking-render-perf-android] No expand/collapse chevron —
-                // the content is too large for the inline Compose scroller.
-                // Offer the native full-content viewer instead.
-                Text(
-                    text = stringResource(R.string.thinking_view_full),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = thinkingBlue,
-                )
-            } else {
-                Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(if (expanded) R.string.chat_collapse else R.string.chat_expand),
-                    tint = thinkingBlue.copy(alpha = 0.5f),
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+        // Header: the same step row a tool call uses. Only the header reacts to taps (a release
+        // after dragging the inner scroller must not toggle), and the chevron turns down while the
+        // text is open.
+        val thinkingOpen = expanded && !overHardCap
+        StepRow(
+            title = stringResource(R.string.appearance_section_deep_thinking),
+            note = if (charCount > 0) charLabel else null,
+            leading = {
+                if (isStreaming && block.toolStatus != ToolBlockStatus.SUCCESS) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 1.5.dp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Psychology,
+                        contentDescription = null,
+                        tint = ChatColors.secondaryText,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            },
+            trailing = {
+                if (overHardCap) {
+                    // [T-thinking-render-perf-android] Too large for the inline scroller: the
+                    // native full-content viewer opens instead of an inline expansion.
+                    Text(
+                        text = stringResource(R.string.thinking_view_full),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    StepChevron(
+                        expanded = thinkingOpen,
+                        contentDescription = stringResource(if (thinkingOpen) R.string.chat_collapse else R.string.chat_expand),
+                    )
+                }
+            },
+            onClick = {
+                userTouched = true
+                if (overHardCap) showFullContent = true else expanded = !expanded
+            },
+        )
 
         // Expanded content. Mirrors iOS ThinkingBlockView (AssistantBlockView.swift:648):
         // an inner scroller capped at 300dp, auto-follow to the bottom while the
@@ -1056,9 +916,20 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
                         scrollState.scrollTo(scrollState.maxValue)
                     }
             }
+            val railColor = ChatColors.separator
             Column(
                 modifier = Modifier
-                    .padding(top = 6.dp)
+                    .padding(start = 11.dp, bottom = 4.dp)
+                    .drawBehind {
+                        drawLine(
+                            color = railColor,
+                            start = Offset(0f, 2.dp.toPx()),
+                            end = Offset(0f, size.height - 2.dp.toPx()),
+                            strokeWidth = 1.5.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        )
+                    }
+                    .padding(start = 14.dp)
                     .heightIn(max = 300.dp)
                     .verticalScroll(scrollState),
             ) {
@@ -1077,8 +948,8 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
                 Text(
                     text = displayContent,
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                    lineHeight = 19.sp,
+                    color = ChatColors.secondaryText,
+                    lineHeight = 20.sp,
                 )
             }
         }
@@ -1150,6 +1021,19 @@ private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * The row under an assistant reply. Each button does one thing, and nothing appears twice:
+ *
+ *  - Copy: a tap copies the reply as plain text and the glyph turns into a check for a moment;
+ *    a long press opens the other ways to take the text (plain, Markdown, select).
+ *  - Regenerate: rewrites this reply. It discards everything after it, so the caller asks first when
+ *    there is something after it ([onRegenerate] decides).
+ *  - Read aloud: starts reading; while this reply is being read the button is a stop button (pause
+ *    lives in the reading bar above the composer).
+ *  - Branch: copies the conversation up to this reply into a new session.
+ *  - More: share and delete, the two that are not about the text itself.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AssistantMessageActionBar(
     messageId: String,
@@ -1167,18 +1051,17 @@ fun AssistantMessageActionBar(
     onDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var isCopied by remember { mutableStateOf(false) }
-    var isBranchAnimating by remember { mutableStateOf(false) }
-    var moreMenuExpanded by remember { mutableStateOf(false) }
+    var isCopied by remember(messageId) { mutableStateOf(false) }
+    var copyMenuExpanded by remember(messageId) { mutableStateOf(false) }
+    var moreMenuExpanded by remember(messageId) { mutableStateOf(false) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
-    val copyOffset by animateDpAsState(
-        targetValue = if (isCopied) (-2).dp else 0.dp,
-        animationSpec = tween(durationMillis = 180),
-        finishedListener = {
-            if (isCopied) isCopied = false
-        },
-        label = "copyOffset",
-    )
+    LaunchedEffect(isCopied) {
+        if (isCopied) {
+            kotlinx.coroutines.delay(1400)
+            isCopied = false
+        }
+    }
 
     val regenSpec: AnimationSpec<Float> = if (isGenerating) {
         infiniteRepeatable(
@@ -1194,185 +1077,143 @@ fun AssistantMessageActionBar(
         label = "regenRotation",
     )
 
-    val branchOffset by animateDpAsState(
-        targetValue = if (isBranchAnimating) 2.dp else 0.dp,
-        animationSpec = tween(durationMillis = 200),
-        finishedListener = {
-            if (isBranchAnimating) isBranchAnimating = false
-        },
-        label = "branchOffset",
-    )
+    val active = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    val dim = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val canCopy = !isStreaming && rawText.isNotEmpty()
 
-    val waveTransition = rememberInfiniteTransition(label = "ttsWave")
-    val waveAlpha by waveTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "waveAlpha",
-    )
+    @Composable
+    fun ActionButton(
+        enabled: Boolean,
+        onClick: () -> Unit,
+        onLongClick: (() -> Unit)? = null,
+        content: @Composable () -> Unit,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .combinedClickable(
+                    enabled = enabled,
+                    onClick = onClick,
+                    onLongClick = onLongClick?.let { long ->
+                        {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            long()
+                        }
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) { content() }
+    }
 
     Row(
-        modifier = modifier
-            // [T-android-action-bar-left] `wrapContentWidth()`'s default alignment is CENTER, so
-            // the row of actions sat centred under the reply while every other line of the turn
-            // starts at the message's own left edge. The row wraps its children without that
-            // modifier and starts at the content column itself; the first glyph then sits one
-            // glyph-inset in (each action is a 42dp touch box around a 20dp icon), the same small
-            // inset Codex's own action row has under its text.
-            .padding(start = 0.dp, top = 4.dp, bottom = 8.dp),
+        // [T-android-action-bar-left] The row starts at the message's own left edge; the first glyph
+        // sits one glyph-inset in (each action is a 42dp touch box around a 20dp icon).
+        modifier = modifier.padding(start = 0.dp, top = 4.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 1. Copy
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = !isStreaming && rawText.isNotEmpty()) {
-                    isCopied = true
-                    onCopy()
-                },
-            contentAlignment = Alignment.Center,
+        // 1. Copy: tap = plain text, long press = the other copy modes.
+        ActionButton(
+            enabled = canCopy,
+            onClick = {
+                isCopied = true
+                onCopy()
+            },
+            onLongClick = { copyMenuExpanded = true },
         ) {
             Icon(
-                Icons.Default.ContentCopy,
+                if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                 contentDescription = stringResource(R.string.assistant_action_copy),
-                tint = if (isStreaming || rawText.isEmpty()) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                },
-                modifier = Modifier
-                    .size(20.dp)
-                    .offset(x = copyOffset, y = copyOffset),
+                tint = if (canCopy) active else dim,
+                modifier = Modifier.size(20.dp),
             )
+            MinisMenu(
+                expanded = copyMenuExpanded,
+                onDismissRequest = { copyMenuExpanded = false },
+                modifier = Modifier.widthIn(min = 190.dp),
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_copy_text)) },
+                    onClick = {
+                        copyMenuExpanded = false
+                        isCopied = true
+                        onCopy()
+                    },
+                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_copy_markdown)) },
+                    onClick = {
+                        copyMenuExpanded = false
+                        isCopied = true
+                        onCopyMarkdown()
+                    },
+                    leadingIcon = { Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.assistant_menu_select_text)) },
+                    onClick = {
+                        copyMenuExpanded = false
+                        onSelectText()
+                    },
+                    leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+            }
         }
 
         // 2. Regenerate
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = !isStreaming && !isGenerating) {
-                    onRegenerate()
-                },
-            contentAlignment = Alignment.Center,
-        ) {
+        ActionButton(enabled = !isStreaming && !isGenerating, onClick = onRegenerate) {
             Icon(
                 Icons.Default.Refresh,
                 contentDescription = stringResource(R.string.assistant_action_regenerate),
-                tint = if (isStreaming || isGenerating) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                },
-                modifier = Modifier
-                    .size(20.dp)
-                    .rotate(regenRotation),
+                tint = if (isStreaming || isGenerating) dim else active,
+                modifier = Modifier.size(20.dp).rotate(regenRotation),
             )
         }
 
-        // 3. Speak
-        val speakBg = if (isSpeaking) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(speakBg)
-                .clickable(enabled = !isStreaming && rawText.isNotEmpty()) {
-                    onToggleSpeak()
-                },
-            contentAlignment = Alignment.Center,
-        ) {
+        // 3. Read aloud: start, and stop while this reply is being read.
+        ActionButton(enabled = !isStreaming && rawText.isNotEmpty() || isSpeaking, onClick = onToggleSpeak) {
             Icon(
-                Icons.Default.VolumeUp,
-                contentDescription = stringResource(R.string.assistant_action_read_aloud),
-                tint = if (isSpeaking) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = waveAlpha)
-                } else if (isStreaming || rawText.isEmpty()) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                },
+                if (isSpeaking) Icons.Default.StopCircle else Icons.Default.VolumeUp,
+                contentDescription = stringResource(
+                    if (isSpeaking) R.string.assistant_action_stop_reading else R.string.assistant_action_read_aloud,
+                ),
+                tint = if (isSpeaking) MaterialTheme.colorScheme.primary else if (canCopy) active else dim,
                 modifier = Modifier.size(20.dp),
             )
         }
 
         // 4. Branch
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = !isStreaming) {
-                    isBranchAnimating = true
-                    onBranch()
-                },
-            contentAlignment = Alignment.Center,
-        ) {
+        ActionButton(enabled = !isStreaming, onClick = onBranch) {
             Icon(
                 Icons.Default.AccountTree,
                 contentDescription = stringResource(R.string.assistant_action_branch),
-                tint = if (isStreaming) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-                },
-                modifier = Modifier
-                    .size(20.dp)
-                    .offset(x = branchOffset),
+                tint = if (isStreaming) dim else active,
+                modifier = Modifier.size(20.dp),
             )
         }
 
-        // 5. More
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { moreMenuExpanded = true },
-            contentAlignment = Alignment.Center,
-        ) {
+        // 5. More: the actions that are not about the text.
+        ActionButton(enabled = true, onClick = { moreMenuExpanded = true }) {
             Icon(
                 Icons.Outlined.MoreHoriz,
                 contentDescription = stringResource(R.string.assistant_action_more),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                tint = active,
                 modifier = Modifier.size(20.dp),
             )
-
             MinisMenu(
                 expanded = moreMenuExpanded,
                 onDismissRequest = { moreMenuExpanded = false },
-                modifier = Modifier.widthIn(min = 210.dp),
+                modifier = Modifier.widthIn(min = 190.dp),
             ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.assistant_menu_copy_markdown)) },
-                    onClick = {
-                        moreMenuExpanded = false
-                        onCopyMarkdown()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.assistant_menu_share)) },
                     onClick = {
                         moreMenuExpanded = false
                         onShare()
                     },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
+                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 DropdownMenuItem(
                     text = {

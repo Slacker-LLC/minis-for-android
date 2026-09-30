@@ -324,10 +324,7 @@
     <string name="perm_reset_confirm_title">모든 권한을 재설정하시겠습니까?</string>
     <string name="perm_reset_confirm_text">모든 권한 설정이 재설정됩니다. 계속하시겠습니까?</string>
     <string name="perm_reset_confirm">초기화</string>
-    <string name="perm_level_bypass">건너뛰기</string>
     <!-- T336 follow-up: ASK_ONCE granted for the whole app launch -->
-    <string name="perm_level_ask_once">실행마다 묻기</string>
-    <string name="perm_level_not_allowed">허용 안 함</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">설정 도구</string>
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (ko) -->
@@ -1546,7 +1543,6 @@
     <string name="settings_ready_action_open">설정</string>
     <string name="settings_ready_check">준비 상태 확인</string>
     <string name="settings_ready_all_good">모두 준비되었습니다</string>
-    <string name="settings_ready_all_good_body">Root, 파일 접근, 백그라운드 실행, 알림이 모두 준비되었습니다.</string>
     <string name="settings_ready_fix_title">확인이 필요한 항목</string>
     <string name="settings_ready_done">완료</string>
     <string name="settings_ready_optional">선택</string>
@@ -2093,4 +2089,22 @@
     <string name="perm_tool_vscreen_ui">가상 화면 조작</string>
     <string name="perm_vscreen_master_title">에이전트의 가상 화면 사용 허용</string>
     <string name="perm_vscreen_master_sub">전체 스위치이며 아래는 개별 권한</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">연결됨 · 가상 화면과 에이전트 도구에서 사용</string>
+    <string name="settings_ready_shizuku_bad">준비 안 됨 · Shizuku 설치, 시작 또는 허용 필요</string>
+    <string name="settings_ready_overlay_title">다른 앱 위에 표시</string>
+    <string name="settings_ready_overlay_ok">허용됨</string>
+    <string name="settings_ready_overlay_bad">꺼짐 · 데스크톱 펫과 플로팅 컨트롤에 필요</string>
+    <string name="settings_ready_role_ok">기본 어시스턴트로 설정됨</string>
+    <string name="settings_ready_role_bad">설정 안 됨 · 전원 키로 Minis를 실행하려면 필요</string>
+    <string name="settings_ready_tool_ok">Android에서 허용됨</string>
+    <string name="settings_ready_tool_bad">Android에서 허용 안 됨 · 에이전트가 이 도구를 호출하면 실패합니다</string>
+    <string name="settings_ready_all_good_body">에이전트에 필요한 항목이 모두 준비되었습니다.</string>
+    <string name="assistant_menu_copy_text">텍스트 복사</string>
+    <string name="assistant_action_stop_reading">읽기 중지</string>
+    <string name="assistant_regenerate_unavailable">다시 생성할 수 없습니다: 이 답변의 질문에 텍스트가 없거나 모델이 설정되지 않았습니다.</string>
+    <string name="assistant_regenerate_confirm_title">이 답변을 다시 생성할까요?</string>
+    <string name="assistant_regenerate_confirm_body">이후의 메시지 %1$d개가 삭제되며 복구할 수 없습니다. 보관하려면 먼저 분기를 만드세요.</string>
+    <string name="assistant_regenerate_confirm_action">다시 생성</string>
+    <string name="rootfs_not_installed_label">설치되지 않음</string>
 </resources>

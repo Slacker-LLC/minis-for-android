@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -128,7 +129,7 @@ internal fun WorkProcessRowView(
                     userToggled = true
                     expanded = !expanded
                 }
-                .padding(vertical = 6.dp),
+                .heightIn(min = 40.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -140,13 +141,11 @@ internal fun WorkProcessRowView(
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(6.dp))
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+            StepChevron(
+                expanded = expanded,
                 contentDescription = stringResource(
                     if (expanded) R.string.work_process_collapse else R.string.work_process_expand,
                 ),
-                tint = ChatColors.tertiaryText,
-                modifier = Modifier.size(16.dp),
             )
         }
         HorizontalDivider(
@@ -169,9 +168,7 @@ internal fun WorkProcessRowView(
                 ),
             ),
         ) {
-            Column {
-                // [T-android-work-items] What the run consisted of, by type - the same idea as
-                // Codex's grouped work items, in one line above the individual steps.
+            Column(modifier = Modifier.padding(start = 4.dp, top = 2.dp)) {
                 // [T-android-work-items] What the run consisted of, by type - the same idea as
                 // Codex's grouped work items, in one line above the individual steps. The labels
                 // are resolved with a plain loop: a composable call inside joinToString's lambda
@@ -189,7 +186,7 @@ internal fun WorkProcessRowView(
                         color = ChatColors.secondaryText,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                     )
                 }
                 val trailingBlockId = process.blocks.lastOrNull()?.id
@@ -210,7 +207,7 @@ internal fun WorkProcessRowView(
                                 text = block.content,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ChatColors.secondaryText,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                             )
                         }
                         else -> if (block.kind == TOOL_USE_KIND) {
@@ -231,7 +228,7 @@ internal fun WorkProcessRowView(
                                 // without opening anything.
                                 fileChangeSummary(block)?.let { change ->
                                     Row(
-                                        modifier = Modifier.padding(start = 34.dp, end = 12.dp, bottom = 6.dp),
+                                        modifier = Modifier.padding(start = 30.dp, end = 4.dp, bottom = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Text(

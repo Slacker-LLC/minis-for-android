@@ -218,7 +218,9 @@ private fun androidx.compose.material3.ColorScheme.withAccent(accent: AccentColo
         primaryContainer = primary.copy(alpha = 0.22f).compositeOver(surface),
         onPrimaryContainer = if (dark) accent.light else accent.dark,
         inversePrimary = if (dark) accent.light else accent.dark,
-        surfaceTint = primary,
+        // Not the accent: Material mixes surfaceTint into every elevated surface (menus, dialogs,
+        // sheets), which turned those popups accent-coloured. They stay white; the accent is for emphasis.
+        surfaceTint = Color.Transparent,
     )
 }
 

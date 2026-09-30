@@ -148,7 +148,7 @@ fun UnifiedModelPickerSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else com.openminis.app.ui.settings.settingsSheetColor(),
         // Slim drag handle, same as the main picker / StandardChatSheet — the
         // Material default puts ~44dp of whitespace above the title.
         dragHandle = {
@@ -215,7 +215,8 @@ fun UnifiedModelPickerSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .height(42.dp),
+                    .height(42.dp)
+                    .background(com.openminis.app.ui.components.SectionDesign.cardColor(), RoundedCornerShape(50)),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface,

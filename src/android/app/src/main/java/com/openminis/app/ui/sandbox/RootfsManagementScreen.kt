@@ -99,7 +99,13 @@ fun RootfsManagementScreen(
             // --- Status section ---
             SettingsSection(title = stringResource(R.string.rootfs_status_section)) {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.rootfs_installed_label)) },
+                    headlineContent = {
+                        Text(
+                            stringResource(
+                                if (state.isInstalled) R.string.rootfs_installed_label else R.string.rootfs_not_installed_label,
+                            ),
+                        )
+                    },
                     supportingContent = {
                         Text(
                             buildString {
@@ -117,7 +123,7 @@ fun RootfsManagementScreen(
                             if (state.isInstalled) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
                             contentDescription = null,
                             tint = if (state.isInstalled)
-                                MaterialTheme.colorScheme.primary
+                                com.openminis.app.ui.theme.ChatColors.ok
                             else
                                 MaterialTheme.colorScheme.error,
                         )
@@ -257,7 +263,7 @@ fun RootfsManagementScreen(
                         text = msg,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (state.lastOperationSuccess)
-                            MaterialTheme.colorScheme.primary
+                            com.openminis.app.ui.theme.ChatColors.ok
                         else
                             MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp),

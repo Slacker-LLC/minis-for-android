@@ -324,10 +324,7 @@
     <string name="perm_reset_confirm_title">Alle Berechtigungen zurücksetzen?</string>
     <string name="perm_reset_confirm_text">Alle Berechtigungseinstellungen werden zurückgesetzt. Fortfahren?</string>
     <string name="perm_reset_confirm">Zurücksetzen</string>
-    <string name="perm_level_bypass">Bypass</string>
     <!-- T336 follow-up: ASK_ONCE granted for the whole app launch -->
-    <string name="perm_level_ask_once">Pro Start fragen</string>
-    <string name="perm_level_not_allowed">Nicht erlaubt</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Konfigurationstool</string>
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (de) -->
@@ -1549,7 +1546,6 @@
     <string name="settings_ready_action_open">Öffnen</string>
     <string name="settings_ready_check">Bereitschaft prüfen</string>
     <string name="settings_ready_all_good">Alles bereit</string>
-    <string name="settings_ready_all_good_body">Root, Dateizugriff, Hintergrundbetrieb und Benachrichtigungen sind bereit.</string>
     <string name="settings_ready_fix_title">Das braucht deine Aufmerksamkeit</string>
     <string name="settings_ready_done">Fertig</string>
     <string name="settings_ready_optional">Optional</string>
@@ -2104,4 +2100,22 @@
     <string name="perm_tool_vscreen_ui">Virtuellen Bildschirm bedienen</string>
     <string name="perm_vscreen_master_title">Agent darf den virtuellen Bildschirm nutzen</string>
     <string name="perm_vscreen_master_sub">Hauptschalter; darunter die Einzelrechte</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">Verbunden · für virtuellen Bildschirm und Agent-Werkzeuge</string>
+    <string name="settings_ready_shizuku_bad">Nicht bereit · Shizuku installieren, starten oder autorisieren</string>
+    <string name="settings_ready_overlay_title">Über anderen Apps anzeigen</string>
+    <string name="settings_ready_overlay_ok">Erlaubt</string>
+    <string name="settings_ready_overlay_bad">Aus · Desktop-Pet und schwebende Steuerung brauchen es</string>
+    <string name="settings_ready_role_ok">Als Standardassistent festgelegt</string>
+    <string name="settings_ready_role_bad">Nicht festgelegt · nötig, um Minis mit der Ein-/Aus-Taste zu starten</string>
+    <string name="settings_ready_tool_ok">In Android erteilt</string>
+    <string name="settings_ready_tool_bad">In Android nicht erteilt · Aufrufe dieses Werkzeugs durch den Agent schlagen fehl</string>
+    <string name="settings_ready_all_good_body">Alles, was der Agent braucht, ist bereit.</string>
+    <string name="assistant_menu_copy_text">Text kopieren</string>
+    <string name="assistant_action_stop_reading">Vorlesen beenden</string>
+    <string name="assistant_regenerate_unavailable">Antwort kann nicht neu erzeugt werden: Die Frage davor hat keinen Text, oder es ist kein Modell eingerichtet.</string>
+    <string name="assistant_regenerate_confirm_title">Diese Antwort neu erzeugen?</string>
+    <string name="assistant_regenerate_confirm_body">Die %1$d folgenden Nachrichten werden gelöscht und lassen sich nicht wiederherstellen. Zum Behalten zuerst einen Zweig erstellen.</string>
+    <string name="assistant_regenerate_confirm_action">Neu erzeugen</string>
+    <string name="rootfs_not_installed_label">Nicht installiert</string>
 </resources>

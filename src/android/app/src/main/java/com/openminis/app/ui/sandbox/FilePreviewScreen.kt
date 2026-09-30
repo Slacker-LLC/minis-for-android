@@ -23,6 +23,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -215,7 +216,8 @@ fun FilePreviewScreen(
                 },
             onBack = onBack,
             backLabel = stringResource(R.string.filebrowser_title),
-            background = MaterialTheme.colorScheme.background,
+            // Chrome on the grey page colour, the document itself on white.
+            background = com.openminis.app.ui.settings.settingsPageBackground(),
             actions = {
                     // T142: Share works for any file — FileProvider URI +
                     // ACTION_SEND + FLAG_GRANT_READ_URI_PERMISSION. iOS parity.
@@ -227,7 +229,9 @@ fun FilePreviewScreen(
         },
         bottomBar = {
             // Board: the actions live in a bar under the content; the rest go to an action sheet.
-            androidx.compose.foundation.layout.Column {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.background(com.openminis.app.ui.settings.settingsPageBackground()),
+            ) {
                 androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 androidx.compose.foundation.layout.Row(
                     modifier = Modifier

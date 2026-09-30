@@ -582,7 +582,6 @@
     <string name="sessionlist_welcome_step_done">已完成</string>
 
     <!-- T336 follow-up: ASK_ONCE 在進程生命週期內只問一次,改文案避免誤導 -->
-    <string name="perm_level_ask_once">本次啟動詢問</string>
 
     <!-- T336: dedicated SectionCard per integration CLI. -->
     <string name="perm_tool_a11y_cli">android-a11y-cli</string>
@@ -1093,7 +1092,6 @@
     <string name="settings_ready_action_open">去設定</string>
     <string name="settings_ready_check">檢查就緒狀態</string>
     <string name="settings_ready_all_good">一切就緒</string>
-    <string name="settings_ready_all_good_body">Root、檔案存取、背景執行與通知都已就緒。</string>
     <string name="settings_ready_fix_title">這些需要你處理</string>
     <string name="settings_ready_done">完成</string>
     <string name="settings_ready_optional">可選</string>
@@ -1480,8 +1478,6 @@
     <string name="perm_reset_confirm_title">重置所有許可權？</string>
     <string name="perm_reset_confirm_text">這將重置所有許可權偏好。是否繼續？</string>
     <string name="perm_reset_confirm">重置</string>
-    <string name="perm_level_bypass">自動允許</string>
-    <string name="perm_level_not_allowed">不允許</string>
     <string name="perm_section_config_tool">配置工具</string>
     <string name="perm_allow_minis_config">允許 minis-config</string>
     <string name="perm_minis_config_desc">停用後，智慧體將無法透過 minis-config 讀取或修改任何設定。日誌 → 配置變更 中的變更歷史仍可檢視。智慧體會收到 permission_denied 錯誤，並透過深度連結引導你操作。</string>
@@ -2363,4 +2359,22 @@
     <string name="perm_tool_vscreen_ui">操作虛擬螢幕</string>
     <string name="perm_vscreen_master_title">允許 Agent 使用虛擬螢幕</string>
     <string name="perm_vscreen_master_sub">總開關，下面是各項權限</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">已連線 · 供虛擬螢幕與 Agent 工具使用</string>
+    <string name="settings_ready_shizuku_bad">未就緒 · 需要安裝、啟動或授權 Shizuku</string>
+    <string name="settings_ready_overlay_title">顯示在其他應用程式上層</string>
+    <string name="settings_ready_overlay_ok">已允許</string>
+    <string name="settings_ready_overlay_bad">未允許 · 桌寵和懸浮控制項需要它</string>
+    <string name="settings_ready_role_ok">已設為預設助理</string>
+    <string name="settings_ready_role_bad">未設定 · 用電源鍵喚起 Minis 需要它</string>
+    <string name="settings_ready_tool_ok">Android 已授權</string>
+    <string name="settings_ready_tool_bad">Android 未授權 · Agent 呼叫這個工具會失敗</string>
+    <string name="settings_ready_all_good_body">Agent 需要的各項都已就緒。</string>
+    <string name="assistant_menu_copy_text">複製文字</string>
+    <string name="assistant_action_stop_reading">停止朗讀</string>
+    <string name="assistant_regenerate_unavailable">無法重新生成：這則回覆對應的提問沒有文字，或尚未設定模型。</string>
+    <string name="assistant_regenerate_confirm_title">重新生成這則回覆？</string>
+    <string name="assistant_regenerate_confirm_body">它之後的 %1$d 則訊息會被刪除，且無法還原。想保留的話，請先用「建立分支」。</string>
+    <string name="assistant_regenerate_confirm_action">重新生成</string>
+    <string name="rootfs_not_installed_label">未安裝</string>
 </resources>

@@ -324,10 +324,7 @@
     <string name="perm_reset_confirm_title">すべての権限をリセットしますか？</string>
     <string name="perm_reset_confirm_text">すべての権限設定がリセットされます。続行しますか？</string>
     <string name="perm_reset_confirm">リセット</string>
-    <string name="perm_level_bypass">バイパス</string>
     <!-- T336 follow-up: ASK_ONCE granted for the whole app launch -->
-    <string name="perm_level_ask_once">起動ごとに確認</string>
-    <string name="perm_level_not_allowed">許可しない</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">設定ツール</string>
     <!-- T336: dedicated SectionCard per integration CLI. TODO translate (ja) -->
@@ -1554,7 +1551,6 @@
     <string name="settings_ready_action_open">設定へ</string>
     <string name="settings_ready_check">準備状況を確認</string>
     <string name="settings_ready_all_good">すべて準備できています</string>
-    <string name="settings_ready_all_good_body">Root、ファイルアクセス、バックグラウンド実行、通知の準備ができています。</string>
     <string name="settings_ready_fix_title">対応が必要な項目</string>
     <string name="settings_ready_done">完了</string>
     <string name="settings_ready_optional">任意</string>
@@ -2101,4 +2097,22 @@
     <string name="perm_tool_vscreen_ui">仮想画面を操作</string>
     <string name="perm_vscreen_master_title">Agent に仮想画面の使用を許可</string>
     <string name="perm_vscreen_master_sub">マスタースイッチ。以下は個別の権限</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">接続済み · 仮想スクリーンと Agent ツールで使用</string>
+    <string name="settings_ready_shizuku_bad">未準備 · Shizuku のインストール、起動、許可が必要</string>
+    <string name="settings_ready_overlay_title">他のアプリの上に重ねて表示</string>
+    <string name="settings_ready_overlay_ok">許可済み</string>
+    <string name="settings_ready_overlay_bad">オフ · デスクトップペットとフローティング操作に必要</string>
+    <string name="settings_ready_role_ok">デフォルトのアシスタントに設定済み</string>
+    <string name="settings_ready_role_bad">未設定 · 電源キーで Minis を起動するのに必要</string>
+    <string name="settings_ready_tool_ok">Android で許可済み</string>
+    <string name="settings_ready_tool_bad">Android で未許可 · Agent がこのツールを呼ぶと失敗します</string>
+    <string name="settings_ready_all_good_body">Agent に必要なものはすべて準備できています。</string>
+    <string name="assistant_menu_copy_text">テキストをコピー</string>
+    <string name="assistant_action_stop_reading">読み上げを停止</string>
+    <string name="assistant_regenerate_unavailable">再生成できません：この返信の質問にテキストがないか、モデルが未設定です。</string>
+    <string name="assistant_regenerate_confirm_title">この返信を再生成しますか？</string>
+    <string name="assistant_regenerate_confirm_body">この後の %1$d 件のメッセージが削除され、元に戻せません。残すには先にブランチを作成してください。</string>
+    <string name="assistant_regenerate_confirm_action">再生成</string>
+    <string name="rootfs_not_installed_label">未インストール</string>
 </resources>

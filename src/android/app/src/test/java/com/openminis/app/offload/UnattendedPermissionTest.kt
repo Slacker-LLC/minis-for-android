@@ -133,4 +133,12 @@ class UnattendedPermissionTest {
         }
         assertFalse(OffloadPermissionManager.isUnattendedSession(sessionId))
     }
+
+    @Test
+    fun `legacy ask-once choice fails closed to not allowed`() {
+        assertEquals("NOT_ALLOWED", OffloadPermissionManager.migrateLegacyLevel("ASK_ONCE"))
+        assertEquals("BYPASS", OffloadPermissionManager.migrateLegacyLevel("BYPASS"))
+        assertEquals("NOT_ALLOWED", OffloadPermissionManager.migrateLegacyLevel("NOT_ALLOWED"))
+        assertEquals(null, OffloadPermissionManager.migrateLegacyLevel(null))
+    }
 }

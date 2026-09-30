@@ -38,7 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import com.openminis.app.ui.settings.MinisSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -151,7 +151,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     },
                     showDivider = false,
                 ) {
-                    Switch(
+                    MinisSwitch(
                         checked = state.enabled,
                         onCheckedChange = actions.onToggleEnabled,
                         enabled = state.selected != null,
@@ -170,7 +170,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     title = "说话气泡",
                     subtitle = "显示回答，以及 Agent 在干什么",
                 ) {
-                    Switch(checked = state.bubble, onCheckedChange = actions.onBubble)
+                    MinisSwitch(checked = state.bubble, onCheckedChange = actions.onBubble)
                 }
                 PetRow(
                     icon = Icons.Outlined.RecordVoiceOver,
@@ -197,7 +197,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     title = "自主巡游",
                     subtitle = "空闲时自己在屏幕上溜达",
                 ) {
-                    Switch(checked = state.wander, onCheckedChange = actions.onWander)
+                    MinisSwitch(checked = state.wander, onCheckedChange = actions.onWander)
                 }
                 PetRow(
                     icon = Icons.Outlined.ZoomOutMap,
@@ -205,7 +205,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     title = "边缘吸附",
                     subtitle = "松手后自动贴到最近的一侧",
                 ) {
-                    Switch(checked = state.edgeSnap, onCheckedChange = actions.onEdgeSnap)
+                    MinisSwitch(checked = state.edgeSnap, onCheckedChange = actions.onEdgeSnap)
                 }
                 PetRow(
                     icon = Icons.Outlined.VisibilityOff,
@@ -213,7 +213,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     title = "闲置后贴边隐藏",
                     subtitle = "半分钟没互动就缩到屏幕边上，点一下回来",
                 ) {
-                    Switch(checked = state.autoHide, onCheckedChange = actions.onAutoHide)
+                    MinisSwitch(checked = state.autoHide, onCheckedChange = actions.onAutoHide)
                 }
                 PetRow(
                     icon = Icons.Outlined.TouchApp,
@@ -222,7 +222,7 @@ internal fun PetControlScreen(state: PetUiState, actions: PetActions) {
                     subtitle = "单击说话，双击回主界面，长按出菜单",
                     showDivider = false,
                 ) {
-                    Switch(checked = state.tapOpensApp, onCheckedChange = actions.onTapOpensApp)
+                    MinisSwitch(checked = state.tapOpensApp, onCheckedChange = actions.onTapOpensApp)
                 }
             }
 
