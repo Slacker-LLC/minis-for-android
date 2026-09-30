@@ -607,18 +607,16 @@ private fun ColumnScope.ApiKeyConfigSection(
                         },
                         showDivider = false,
                     )
-                    Text(
+                    com.openminis.app.ui.components.MinisBanner(
                         text = stringResource(R.string.provider_insecure_http_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        kind = com.openminis.app.ui.components.BannerKind.WARNING,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 } else {
-                    Text(
+                    com.openminis.app.ui.components.MinisBanner(
                         text = stringResource(R.string.provider_cleartext_local_only),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        kind = com.openminis.app.ui.components.BannerKind.ERROR,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
             }
