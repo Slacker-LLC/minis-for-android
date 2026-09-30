@@ -1777,6 +1777,8 @@
     <string name="drawer_recent">Zuletzt</string>
     <string name="drawer_no_search_match">Keine passenden Unterhaltungen</string>
     <string name="drawer_search_results">%1$d Ergebnisse</string>
+    <string name="drawer_select_done">Fertig</string>
+    <string name="drawer_move_n">%1$d verschieben</string>
     <string name="chat_empty_greeting_morning">Guten Morgen</string>
     <string name="chat_empty_greeting_afternoon">Guten Tag</string>
     <string name="chat_empty_greeting_evening">Guten Abend</string>

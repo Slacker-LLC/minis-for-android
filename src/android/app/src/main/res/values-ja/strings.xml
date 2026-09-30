@@ -1774,6 +1774,8 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">一致する会話がありません</string>
     <string name="drawer_search_results">%1$d 件の結果</string>
+    <string name="drawer_select_done">完了</string>
+    <string name="drawer_move_n">%1$d 件を移動</string>
     <string name="chat_empty_greeting_morning">おはようございます</string>
     <string name="chat_empty_greeting_afternoon">こんにちは</string>
     <string name="chat_empty_greeting_evening">こんばんは</string>

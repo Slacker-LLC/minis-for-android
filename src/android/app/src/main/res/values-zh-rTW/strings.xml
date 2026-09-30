@@ -2037,6 +2037,8 @@
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">未找到相關對話</string>
     <string name="drawer_search_results">%1$d 個結果</string>
+    <string name="drawer_select_done">完成</string>
+    <string name="drawer_move_n">移動 %1$d 項</string>
     <string name="chat_empty_greeting_morning">早安</string>
     <string name="chat_empty_greeting_afternoon">午安</string>
     <string name="chat_empty_greeting_evening">晚上好</string>
