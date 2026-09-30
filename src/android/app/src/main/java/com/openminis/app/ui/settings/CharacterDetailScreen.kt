@@ -1,5 +1,9 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +68,7 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
     var dirty by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<Int?>(null) }
     var addingEntry by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(characterId) {
         withContext(Dispatchers.IO) {
@@ -118,99 +123,97 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        val context = androidx.compose.ui.platform.LocalContext.current
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
         ) {
-            item {
-                Text(
-                    text = stringResource(R.string.characters_book_settings),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            item {
-                NumberField(
-                    label = stringResource(R.string.characters_book_scan_depth),
-                    value = current.scanDepth,
-                    onValue = { draft = current.copy(scanDepth = it); dirty = true },
-                )
-            }
-            item {
-                NumberField(
-                    label = stringResource(R.string.characters_book_token_budget),
-                    value = current.tokenBudget,
-                    onValue = { draft = current.copy(tokenBudget = it); dirty = true },
-                )
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(stringResource(R.string.characters_book_recursive))
-                    MinisSwitch(
-                        checked = current.recursiveScanning == true,
-                        onCheckedChange = { draft = current.copy(recursiveScanning = it); dirty = true },
+            SettingsSection(header = stringResource(R.string.characters_book_settings)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(
+                        label = stringResource(R.string.characters_book_scan_depth),
+                        value = current.scanDepth,
+                        onValue = { draft = current.copy(scanDepth = it); dirty = true },
+                    )
+                    NumberField(
+                        label = stringResource(R.string.characters_book_token_budget),
+                        value = current.tokenBudget,
+                        onValue = { draft = current.copy(tokenBudget = it); dirty = true },
                     )
                 }
+                SettingsSwitchRow(
+                    title = stringResource(R.string.characters_book_recursive),
+                    checked = current.recursiveScanning == true,
+                    onCheckedChange = { draft = current.copy(recursiveScanning = it); dirty = true },
+                    showDivider = false,
+                )
             }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = stringResource(R.string.characters_entries, current.entries.size),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    IconButton(onClick = { addingEntry = true }) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.characters_entry_add))
-                    }
-                }
-            }
-            items(current.entries.indices.toList(), key = { it }) { index ->
-                val entry = current.entries[index]
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { editingEntry = index },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    MinisSwitch(
-                        checked = entry.enabled,
-                        onCheckedChange = { enabled ->
-                            val entries = current.entries.toMutableList()
-                            entries[index] = entry.copy(enabled = enabled)
-                            draft = current.copy(entries = entries)
-                            dirty = true
+
+            SettingsSection(header = stringResource(R.string.characters_entries, current.entries.size)) {
+                current.entries.forEachIndexed { index, entry ->
+                    SettingsRow(
+                        title = entry.name.ifBlank { stringResource(R.string.characters_entry_unnamed) },
+                        subtitle = entry.keys.joinToString(", ").ifBlank { null },
+                        onClick = { editingEntry = index },
+                        showChevron = false,
+                        trailing = {
+                            MinisSwitch(
+                                checked = entry.enabled,
+                                onCheckedChange = { enabled ->
+                                    val entries = current.entries.toMutableList()
+                                    entries[index] = entry.copy(enabled = enabled)
+                                    draft = current.copy(entries = entries)
+                                    dirty = true
+                                },
+                            )
                         },
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = entry.name.ifBlank { stringResource(R.string.characters_entry_unnamed) },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = entry.keys.joinToString(", "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    IconButton(onClick = {
-                        val entries = current.entries.toMutableList().also { it.removeAt(index) }
-                        draft = current.copy(entries = entries)
-                        dirty = true
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.characters_entry_delete))
-                    }
                 }
+                SettingsRow(
+                    title = stringResource(R.string.characters_entry_add),
+                    icon = Icons.Default.Add,
+                    onClick = { addingEntry = true },
+                    showDivider = false,
+                )
             }
+
+            SettingsSection {
+                SettingsRow(
+                    title = stringResource(R.string.characters_export),
+                    onClick = { profile?.let { p -> scope.launch { shareCharacter(context, p) } } },
+                    showDivider = false,
+                )
+            }
+            SettingsSection {
+                SettingsRow(
+                    title = stringResource(R.string.characters_delete),
+                    titleColor = MaterialTheme.colorScheme.error,
+                    showChevron = false,
+                    onClick = { confirmDelete = true },
+                    showDivider = false,
+                )
+            }
+            Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (confirmDelete) {
+        com.openminis.app.ui.components.MinisAlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.characters_delete)) },
+            text = { Text(stringResource(R.string.characters_delete_confirm, profile?.card?.name ?: "")) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) { runCatching { CharacterRepository.delete(characterId) } }
+                        onBack()
+                    }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
     }
 
     val editing = editingEntry?.let { index -> current?.entries?.getOrNull(index)?.let { index to it } }
