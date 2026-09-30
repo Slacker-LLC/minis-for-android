@@ -184,54 +184,24 @@ fun FullscreenImageViewer(
         var offsetX by remember { mutableFloatStateOf(0f) }
         var offsetY by remember { mutableFloatStateOf(0f) }
         var showChrome by remember { mutableStateOf(true) }
+        var dismissProgress by remember { mutableFloatStateOf(0f) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(Color.Black.copy(alpha = 1f - 0.85f * dismissProgress)),
         ) {
             // ── Image ──────────────────────────────────────────────────────────
-            AsyncImage(
+            ZoomableImagePage(
                 model = model,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY,
-                    )
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 8f)
-                            if (scale > 1f) {
-                                offsetX += pan.x
-                                offsetY += pan.y
-                            } else {
-                                offsetX = 0f
-                                offsetY = 0f
-                            }
-                        }
-                    }
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                if (scale > 1f) {
-                                    scale = 1f; offsetX = 0f; offsetY = 0f
-                                } else {
-                                    scale = 2.5f
-                                }
-                            },
-                            onTap = { showChrome = !showChrome },
-                        )
-                    },
+                onTap = { showChrome = !showChrome },
+                onDismiss = onDismiss,
+                onDismissProgress = { dismissProgress = it },
             )
 
             // ── Close button (top-end) ─────────────────────────────────────────
             AnimatedVisibility(
-                visible = showChrome,
+                visible = showChrome && dismissProgress == 0f,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopEnd),
@@ -253,7 +223,7 @@ fun FullscreenImageViewer(
 
             // ── Bottom action buttons ──────────────────────────────────────────
             AnimatedVisibility(
-                visible = showChrome,
+                visible = showChrome && dismissProgress == 0f,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),

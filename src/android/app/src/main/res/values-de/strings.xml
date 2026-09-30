@@ -1966,7 +1966,6 @@
     <string name="vscreen_fail_action_devopts">Entwickleroptionen</string>
     <string name="vscreen_view_failures">Fehlgeschlagene ansehen</string>
     <string name="vscreen_viewer_title">Virtueller Bildschirm</string>
-    <string name="vscreen_viewer_idle">Der virtuelle Bildschirm wird gerade nicht benutzt.</string>
     <string name="vscreen_viewer_disabled">Der virtuelle Bildschirm ist aus. Aktiviere ihn unter Einstellungen → System &amp; Berechtigungen.</string>
     <string name="vscreen_viewer_menu">Virtuellen Bildschirm ansehen</string>
     <string name="vscreen_viewer_app">Im Vordergrund: %1$s</string>
@@ -2118,4 +2117,18 @@
     <string name="assistant_regenerate_confirm_body">Die %1$d folgenden Nachrichten werden gelöscht und lassen sich nicht wiederherstellen. Zum Behalten zuerst einen Zweig erstellen.</string>
     <string name="assistant_regenerate_confirm_action">Neu erzeugen</string>
     <string name="rootfs_not_installed_label">Nicht installiert</string>
+    <string name="vscreen_viewer_idle">Der virtuelle Bildschirm ist nicht geöffnet. Hier öffnen oder vom Agent öffnen lassen.</string>
+    <string name="vscreen_viewer_open">Virtuellen Bildschirm öffnen</string>
+    <string name="vscreen_viewer_close">Virtuellen Bildschirm schließen</string>
+    <string name="vscreen_viewer_close_ai">Der Agent nutzt diesen Bildschirm. Schließen unterbricht seine Arbeit.</string>
+    <string name="vscreen_viewer_back">Zurück</string>
+    <string name="vscreen_viewer_home">Start</string>
+    <string name="vscreen_viewer_launch">App starten</string>
+    <string name="vscreen_viewer_type">Text eingeben</string>
+    <string name="vscreen_viewer_type_hint">Füllt das fokussierte Feld auf dem virtuellen Bildschirm und ersetzt den Inhalt.</string>
+    <string name="vscreen_viewer_type_send">Einfügen</string>
+    <string name="vscreen_viewer_search_apps">Apps suchen</string>
+    <string name="vscreen_viewer_launch_failed">Die App konnte nicht auf dem virtuellen Bildschirm gestartet werden.</string>
+    <string name="vscreen_viewer_open_failed">Virtueller Bildschirm konnte nicht geöffnet werden: %1$s</string>
+    <string name="vscreen_viewer_fps">%1$d fps</string>
 </resources>

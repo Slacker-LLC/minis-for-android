@@ -174,11 +174,13 @@ fun ImageGalleryViewer(
             pageCount = { items.size },
         )
         var showChrome by remember { mutableStateOf(true) }
+        // How far the picture has been dragged toward closing; the backdrop and the chrome fade with it.
+        var dismissProgress by remember { mutableFloatStateOf(0f) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(Color.Black.copy(alpha = 1f - 0.85f * dismissProgress)),
         ) {
             // Pager is the bottom-most surface so per-page pointer input
             // (pinch / pan / double-tap) wins over the dialog's outer
@@ -193,12 +195,14 @@ fun ImageGalleryViewer(
                 GalleryPage(
                     item = items[page],
                     onTapChrome = { showChrome = !showChrome },
+                    onDismiss = onDismiss,
+                    onDismissProgress = { dismissProgress = it },
                 )
             }
 
             // ── Close button ────────────────────────────────────────
             AnimatedVisibility(
-                visible = showChrome,
+                visible = showChrome && dismissProgress == 0f,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopEnd),
@@ -221,7 +225,7 @@ fun ImageGalleryViewer(
             // ── Bottom caption + actions ────────────────────────────
             val currentItem = items.getOrNull(pagerState.currentPage) ?: items[0]
             AnimatedVisibility(
-                visible = showChrome,
+                visible = showChrome && dismissProgress == 0f,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -326,54 +330,15 @@ fun ImageGalleryViewer(
 private fun GalleryPage(
     item: ImageGalleryItem,
     onTapChrome: () -> Unit,
+    onDismiss: () -> Unit,
+    onDismissProgress: (Float) -> Unit,
 ) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = item.model,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                )
-                // When zoomed, this pointerInput intercepts horizontal pan
-                // so the parent pager doesn't change pages while the user
-                // is panning around inside a magnified image. Mirrors iOS
-                // UIScrollView naturally blocking the parent TabView swipe.
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 8f)
-                        if (scale > 1f) {
-                            offsetX += pan.x
-                            offsetY += pan.y
-                        } else {
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
-                    }
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            if (scale > 1f) {
-                                scale = 1f; offsetX = 0f; offsetY = 0f
-                            } else {
-                                scale = 2.5f
-                            }
-                        },
-                        onTap = { onTapChrome() },
-                    )
-                },
-        )
-    }
+    ZoomableImagePage(
+        model = item.model,
+        onTap = onTapChrome,
+        onDismiss = onDismiss,
+        onDismissProgress = onDismissProgress,
+    )
 }
 
 /**

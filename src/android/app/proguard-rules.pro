@@ -9,3 +9,5 @@
 -keep class com.openminis.app.tools.android.vscreen.service.VirtualScreenUserService { *; }
 -keep interface com.openminis.app.tools.android.vscreen.IVirtualScreenService { *; }
 -keep class com.openminis.app.tools.android.vscreen.IVirtualScreenService$Stub { *; }
+-keep interface com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink { *; }
+-keep class com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink$Stub { *; }

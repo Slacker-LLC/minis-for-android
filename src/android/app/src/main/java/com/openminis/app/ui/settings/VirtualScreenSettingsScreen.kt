@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,8 +78,16 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
     var dpiText by remember { mutableStateOf(savedSpec.dpi.toString()) }
     var activeDisplayId by remember { mutableStateOf<Int?>(client.displayId) }
 
+    // The bitmap is captured when the effect starts: reading previewBitmap inside onDispose would return
+    // the NEW bitmap (the state has already changed by then) and recycle the picture about to be drawn.
     DisposableEffect(previewBitmap) {
-        onDispose { previewBitmap?.recycle() }
+        val shown = previewBitmap
+        onDispose { shown?.recycle() }
+    }
+    // A display opened earlier (by the agent, or before the app was restarted) is still held by the service.
+    LaunchedEffect(Unit) {
+        val info = withContext(Dispatchers.IO) { runCatching { client.displayInfo() }.getOrNull() }
+        if (info != null) activeDisplayId = info.id
     }
 
     fun refreshProbe(json: String) {
@@ -376,7 +385,6 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                                 val result = withContext(Dispatchers.IO) {
                                     val id = client.displayId ?: runCatching { client.queryActiveDisplayId() }.getOrNull()
                                         ?: return@withContext null
-                                    if (DeviceScreenLease.shared.owner(id) != null) return@withContext false
                                     runCatching {
                                         client.releaseDisplay()
                                         VirtualScreenObservationRegistry.clearDisplay(id)
@@ -386,10 +394,8 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                                 }
                                 when (result) {
                                     null -> previewMessage = context.getString(R.string.vscreen_no_display)
-                                    false -> operationMessage = context.getString(R.string.bots_routine_vscreen_busy)
                                     else -> {
                                         activeDisplayId = null
-                                        previewBitmap?.recycle()
                                         previewBitmap = null
                                         previewMessage = context.getString(R.string.vscreen_released)
                                     }

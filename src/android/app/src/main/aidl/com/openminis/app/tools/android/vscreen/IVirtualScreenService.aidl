@@ -1,6 +1,7 @@
 package com.openminis.app.tools.android.vscreen;
 
 import android.os.ParcelFileDescriptor;
+import com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink;
 
 interface IVirtualScreenService {
     String probe() = 1;
@@ -22,6 +23,15 @@ interface IVirtualScreenService {
     boolean hasPackageWindow(int displayId, String packageName) = 17;
     boolean setTextTarget(int displayId, int targetIndex, @nullable String text) = 18;
     boolean focusTarget(int displayId, int targetIndex) = 19;
+
+    // Live viewing and manual control (service version 2).
+    /** [displayId, width, height, dpi] of the active display, or an empty array when there is none. */
+    int[] getDisplayInfo() = 20;
+    /** Start pushing every new frame of the active display to [sink] as a HardwareBuffer. */
+    void startFrameStream(IVirtualScreenFrameSink sink) = 21;
+    void stopFrameStream() = 22;
+    /** One raw touch event (MotionEvent action) at display-local x/y, for dragging by hand. */
+    boolean touch(int displayId, int action, int x, int y, long downTimeMs) = 23;
 
     // Reserved by the Shizuku server. The server invokes transaction 16777115.
     void destroy() = 16777114;

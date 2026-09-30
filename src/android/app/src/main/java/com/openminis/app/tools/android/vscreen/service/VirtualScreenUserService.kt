@@ -9,6 +9,7 @@ import android.os.Process
 import android.util.Log
 import android.view.KeyEvent
 import androidx.annotation.Keep
+import com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink
 import com.openminis.app.tools.android.vscreen.IVirtualScreenService
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeFailure
@@ -257,6 +258,36 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         checkDisplay(displayId)
         if (targetIndex < 1) fail("invalid_target", "targetIndex must be positive")
         ensureUi().focusTarget(displayId, targetIndex)
+    }
+
+    override fun getDisplayInfo(): IntArray = synchronized(lock) {
+        checkNotDestroyed()
+        requireShellIdentity()
+        session?.let { intArrayOf(it.displayId, it.width, it.height, it.dpi) } ?: IntArray(0)
+    }
+
+    override fun startFrameStream(sink: IVirtualScreenFrameSink?) = synchronized(lock) {
+        checkNotDestroyed()
+        requireShellIdentity()
+        val active = session ?: fail(VirtualScreenPolicy.DISPLAY_GONE, "No virtual display is open")
+        active.setFrameSink(sink)
+    }
+
+    override fun stopFrameStream() = synchronized(lock) {
+        session?.setFrameSink(null)
+        Unit
+    }
+
+    /** Touch events arrive at drag rate; the bridge is built once and the call does not take the big lock. */
+    private val touchBridge by lazy { InputBridge() }
+
+    override fun touch(displayId: Int, action: Int, x: Int, y: Int, downTimeMs: Long): Boolean {
+        val active: VirtualDisplaySession
+        synchronized(lock) {
+            active = checkDisplay(displayId)
+            checkCoordinates(active, x, y)
+        }
+        return touchBridge.touch(displayId, action, x, y, downTimeMs)
     }
 
     override fun back(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_BACK)

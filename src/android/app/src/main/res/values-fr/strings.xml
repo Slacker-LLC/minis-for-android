@@ -1857,7 +1857,6 @@
     <string name="vscreen_fail_action_devopts">Options pour les développeurs</string>
     <string name="vscreen_view_failures">Voir ce qui a échoué</string>
     <string name="vscreen_viewer_title">Écran virtuel</string>
-    <string name="vscreen_viewer_idle">L’écran virtuel n’est pas utilisé pour le moment.</string>
     <string name="vscreen_viewer_disabled">L’écran virtuel est désactivé. Activez-le dans Réglages → Système et autorisations.</string>
     <string name="vscreen_viewer_menu">Voir l’écran virtuel</string>
     <string name="vscreen_viewer_app">Au premier plan : %1$s</string>
@@ -2009,4 +2008,18 @@
     <string name="assistant_regenerate_confirm_body">Les %1$d message(s) suivants seront supprimés et irrécupérables. Pour les garder, créez d’abord une branche.</string>
     <string name="assistant_regenerate_confirm_action">Régénérer</string>
     <string name="rootfs_not_installed_label">Non installé</string>
+    <string name="vscreen_viewer_idle">L’écran virtuel n’est pas ouvert. Ouvrez-le ici ou laissez l’agent l’ouvrir.</string>
+    <string name="vscreen_viewer_open">Ouvrir l’écran virtuel</string>
+    <string name="vscreen_viewer_close">Fermer l’écran virtuel</string>
+    <string name="vscreen_viewer_close_ai">L’agent utilise cet écran. Le fermer interrompt son travail.</string>
+    <string name="vscreen_viewer_back">Retour</string>
+    <string name="vscreen_viewer_home">Accueil</string>
+    <string name="vscreen_viewer_launch">Lancer une app</string>
+    <string name="vscreen_viewer_type">Saisir du texte</string>
+    <string name="vscreen_viewer_type_hint">Remplit le champ actif de l’écran virtuel en remplaçant son contenu.</string>
+    <string name="vscreen_viewer_type_send">Remplir</string>
+    <string name="vscreen_viewer_search_apps">Rechercher une app</string>
+    <string name="vscreen_viewer_launch_failed">Impossible de lancer cette app sur l’écran virtuel.</string>
+    <string name="vscreen_viewer_open_failed">Impossible d’ouvrir l’écran virtuel : %1$s</string>
+    <string name="vscreen_viewer_fps">%1$d i/s</string>
 </resources>

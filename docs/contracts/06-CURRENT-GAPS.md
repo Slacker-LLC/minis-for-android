@@ -91,6 +91,10 @@ CI/宿主测试不能替代以下证据：
 - Root 启动的 Shizuku 使服务以 uid 0 运行，旧代码硬性拒绝（`root_user_service_refused`）；现按上文接受 root。Binder 身份是按进程而不是按线程的（实测线程内 `setuid` 后虚拟屏所有者仍为 uid 0），所以不能在进程内降为 shell。
 - 拉起应用改用 `cmd activity start-activity --display`：手工构造的 `ActivityThread` 不是系统认识的调用方进程，`Context.startActivity` 会得到 `Not allowed to start activity`。输入探测放在拉起之后（空显示屏上没有窗口可接收按键）。
 - 在该设备上探测 10 步全部通过（包括虚拟显示屏、UiAutomation、拉起设置页、输入、非黑屏截图）。**未验证**：智能体实际操作时实时查看器的画面帧、adb 启动的 Shizuku（shell 身份）路径、其它 OEM。
+- 实时查看器（2026-10-01 同一台设备）：查看器不再每秒截图，而是由 UserService 把虚拟屏的每一帧以 `HardwareBuffer` 经 Binder 推给 App，在自定义 View 里直接绘制（实测滚动时 85–122 帧/秒计数，虚拟屏本身的刷新率是 60 Hz，计数包含重复帧）；触摸按拖动实时转成 `MotionEvent` 注入虚拟屏；查看器可开启 / 关闭虚拟屏、返回 / 主页、在其上启动应用、向聚焦输入框填入文字。
+- UserService 改为 `daemon(true)`（版本号 2）：虚拟屏不再随 App 进程被杀而消失，实测强杀 App 后 display 仍在、重新打开查看器能接回。代价是：升级 App 后只有 `USER_SERVICE_VERSION` 变化时 Shizuku 才会换掉旧服务，改动 UserService 或 AIDL 必须同步加大这个数字。**未验证**：Release（R8）构建下的帧流（已补 `IVirtualScreenFrameSink` 的 keep 规则）、adb 启动的 Shizuku（shell 身份）下的帧流与触摸、长时间（数小时）保持。
+- 教 AI 知道坐标：`android.vscreen.open`、`status`、`observe`、`screenshot` 的结果都带 `displayWidth/displayHeight` 和坐标说明；虚拟屏上的 `x/y` 默认按显示屏像素（此前默认是「截图坐标」，没有截图就被拒绝，AI 只好先截一张图），截图默认按显示屏原分辨率输出（此前被缩到最长边 1280）。手机上的实际 AI 调用效果**未验证**。
+- 用手机自己的 `am start`/`monkey` 启动应用时，没指定 `--display 0` 会落到拥有焦点的虚拟屏上（本 App 的主界面曾因此出现在虚拟屏里）；这是测试方法的问题，从桌面图标启动不受影响。
 - 探测与 UiAutomation 互斥：同一时刻系统只允许一个 UiAutomation 客户端，Maestro 等自动化驱动在后台时会让「UiAutomation」步骤报 `already registered`。
 
 ## VScreen capability pending hardware validation（2026-09-30）

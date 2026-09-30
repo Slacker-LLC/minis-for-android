@@ -40,10 +40,11 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     private var reconnectAttempts = 0
     private var reconnectInFlight = false
     private var closed = false
+    private var frameSink: IVirtualScreenFrameSink? = null
 
     private val args = Shizuku.UserServiceArgs(
         ComponentName(appContext, VirtualScreenUserService::class.java),
-    ).daemon(false)
+    ).daemon(true)
         .processNameSuffix("vscreen")
         .tag("minis-vscreen")
         .version(USER_SERVICE_VERSION)
@@ -66,7 +67,26 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
 
     val displayId: Int? get() = synchronized(stateLock) { activeDisplayId }
     val foregroundPackageName: String? get() = synchronized(stateLock) { activePackageName }
-    fun displaySize(): Pair<Int, Int>? = synchronized(stateLock) { activeDisplaySize }
+    fun displaySize(): Pair<Int, Int>? {
+        synchronized(stateLock) { activeDisplaySize }?.let { return it }
+        // The display may have been opened before this process started (the service keeps it alive).
+        return runCatching { displayInfo() }.getOrNull()?.let { it.width to it.height }
+    }
+
+    data class DisplayInfo(val id: Int, val width: Int, val height: Int, val dpi: Int)
+
+    /** The display the service is holding right now, read from the service itself; null when none. */
+    fun displayInfo(): DisplayInfo? {
+        if (!isEnabled()) return null
+        val raw = execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).getDisplayInfo() }
+        if (raw.size < 4 || raw[0] <= 0) return null
+        val info = DisplayInfo(raw[0], raw[1], raw[2], raw[3])
+        synchronized(stateLock) {
+            activeDisplayId = info.id
+            activeDisplaySize = info.width to info.height
+        }
+        return info
+    }
     val isConnected: Boolean get() = synchronized(stateLock) { remote != null }
     internal val lastProbe: VirtualScreenProbeSnapshot? get() = preferences.lastProbe()
 
@@ -186,6 +206,31 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
 
     fun screenshot(displayId: Int, maxDim: Int = 1280, jpegQuality: Int = 85): ParcelFileDescriptor =
         execute(SCREENSHOT_TIMEOUT_MS) { requireRemote(SCREENSHOT_TIMEOUT_MS).screenshot(displayId, maxDim, jpegQuality) }
+
+    /**
+     * Live frames of the open display. [onFrame] runs on a binder thread for every frame (the caller draws
+     * it and must close the buffer); [onEnded] runs when the display is released or the service dies.
+     */
+    fun startFrameStream(onFrame: (android.hardware.HardwareBuffer) -> Unit, onEnded: () -> Unit) {
+        val sink = object : IVirtualScreenFrameSink.Stub() {
+            override fun onFrame(buffer: android.hardware.HardwareBuffer?) {
+                if (buffer != null) onFrame(buffer)
+            }
+
+            override fun onEnded() = onEnded()
+        }
+        synchronized(stateLock) { frameSink = sink }
+        execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).startFrameStream(sink) }
+    }
+
+    fun stopFrameStream() {
+        synchronized(stateLock) { frameSink = null }
+        runCatching { execute(DEFAULT_TIMEOUT_MS) { requireRemote(DEFAULT_TIMEOUT_MS).stopFrameStream() } }
+    }
+
+    /** One raw touch event; called from the viewer's own pump thread, not the shared worker. */
+    fun touch(displayId: Int, action: Int, x: Int, y: Int, downTimeMs: Long): Boolean =
+        requireRemote(DEFAULT_TIMEOUT_MS).touch(displayId, action, x, y, downTimeMs)
 
     fun unbind(remove: Boolean = true) {
         val shouldUnbind = synchronized(stateLock) {
@@ -359,7 +404,9 @@ class VirtualScreenClient(context: Context) : AutoCloseable {
     ) : IllegalStateException(message, cause)
 
     companion object {
-        private const val USER_SERVICE_VERSION = 1
+        // Bumped whenever the UserService code or its AIDL changes: a daemon service outlives the app, so
+        // Shizuku only replaces it when this number differs. 2 = frame stream, raw touch, display info.
+        private const val USER_SERVICE_VERSION = 2
         private const val DEFAULT_TIMEOUT_MS = 8_000L
         private const val SCREENSHOT_TIMEOUT_MS = 15_000L
         private const val DEFAULT_WIDTH = 720

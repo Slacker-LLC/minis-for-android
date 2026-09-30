@@ -1955,7 +1955,6 @@
     <string name="vscreen_fail_action_devopts">개발자 옵션</string>
     <string name="vscreen_view_failures">통과하지 못한 항목 보기</string>
     <string name="vscreen_viewer_title">가상 화면</string>
-    <string name="vscreen_viewer_idle">지금은 가상 화면을 사용하지 않습니다.</string>
     <string name="vscreen_viewer_disabled">가상 화면이 꺼져 있습니다. ‘설정 → 시스템 및 권한’에서 켜세요.</string>
     <string name="vscreen_viewer_menu">가상 화면 보기</string>
     <string name="vscreen_viewer_app">전면: %1$s</string>
@@ -2107,4 +2106,18 @@
     <string name="assistant_regenerate_confirm_body">이후의 메시지 %1$d개가 삭제되며 복구할 수 없습니다. 보관하려면 먼저 분기를 만드세요.</string>
     <string name="assistant_regenerate_confirm_action">다시 생성</string>
     <string name="rootfs_not_installed_label">설치되지 않음</string>
+    <string name="vscreen_viewer_idle">가상 화면이 아직 열리지 않았습니다. 여기서 열거나 에이전트가 열게 하세요.</string>
+    <string name="vscreen_viewer_open">가상 화면 열기</string>
+    <string name="vscreen_viewer_close">가상 화면 닫기</string>
+    <string name="vscreen_viewer_close_ai">에이전트가 이 화면을 사용 중입니다. 닫으면 작업이 중단됩니다.</string>
+    <string name="vscreen_viewer_back">뒤로</string>
+    <string name="vscreen_viewer_home">홈</string>
+    <string name="vscreen_viewer_launch">앱 실행</string>
+    <string name="vscreen_viewer_type">텍스트 입력</string>
+    <string name="vscreen_viewer_type_hint">가상 화면에서 포커스된 입력란의 내용을 바꿔 입력합니다.</string>
+    <string name="vscreen_viewer_type_send">입력</string>
+    <string name="vscreen_viewer_search_apps">앱 검색</string>
+    <string name="vscreen_viewer_launch_failed">가상 화면에서 앱을 실행할 수 없습니다.</string>
+    <string name="vscreen_viewer_open_failed">가상 화면을 열 수 없습니다: %1$s</string>
+    <string name="vscreen_viewer_fps">%1$d fps</string>
 </resources>

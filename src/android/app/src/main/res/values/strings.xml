@@ -2347,7 +2347,6 @@
     <string name="vscreen_fail_action_devopts">Developer options</string>
     <string name="vscreen_view_failures">See what failed</string>
     <string name="vscreen_viewer_title">Virtual screen</string>
-    <string name="vscreen_viewer_idle">Nothing is using the virtual screen right now.</string>
     <string name="vscreen_viewer_disabled">The virtual screen is off. Turn it on under Settings → System &amp; permissions.</string>
     <string name="vscreen_viewer_menu">View virtual screen</string>
     <string name="vscreen_viewer_app">In front: %1$s</string>
@@ -2496,4 +2495,18 @@
     <string name="assistant_regenerate_confirm_body">The %1$d message(s) after it will be deleted and can’t be restored. To keep them, use Branch first.</string>
     <string name="assistant_regenerate_confirm_action">Regenerate</string>
     <string name="rootfs_not_installed_label">Not installed</string>
+    <string name="vscreen_viewer_idle">The virtual screen is not open. Open it here, or let the agent open it.</string>
+    <string name="vscreen_viewer_open">Open virtual screen</string>
+    <string name="vscreen_viewer_close">Close virtual screen</string>
+    <string name="vscreen_viewer_close_ai">The agent is using this screen. Closing it interrupts what it is doing.</string>
+    <string name="vscreen_viewer_back">Back</string>
+    <string name="vscreen_viewer_home">Home</string>
+    <string name="vscreen_viewer_launch">Open app</string>
+    <string name="vscreen_viewer_type">Type text</string>
+    <string name="vscreen_viewer_type_hint">Fills the field that has focus on the virtual screen, replacing what is there.</string>
+    <string name="vscreen_viewer_type_send">Fill in</string>
+    <string name="vscreen_viewer_search_apps">Search apps</string>
+    <string name="vscreen_viewer_launch_failed">Could not start that app on the virtual screen.</string>
+    <string name="vscreen_viewer_open_failed">Could not open the virtual screen: %1$s</string>
+    <string name="vscreen_viewer_fps">%1$d fps</string>
 </resources>

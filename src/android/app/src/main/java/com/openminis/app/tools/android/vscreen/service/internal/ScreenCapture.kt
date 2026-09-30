@@ -11,6 +11,9 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 internal object ScreenCapture {
+    /** A virtual display is at most 2560 px on a side, so a full-resolution capture fits. */
+    private const val MAX_OUTPUT_DIM = 2560
+
     fun bitmapFromImage(image: Image): Bitmap {
         val plane = image.planes.firstOrNull() ?: throw IllegalStateException("image_plane_unavailable")
         val width = image.width
@@ -47,7 +50,7 @@ internal object ScreenCapture {
 
     /** The Binder response is a PFD; this bounded local buffer is never marshalled as a Binder byte array. */
     fun jpeg(bitmap: Bitmap, maxDim: Int, requestedQuality: Int, maxBytes: Int): ByteArray {
-        var current = scaled(bitmap, maxDim.coerceIn(256, 1280))
+        var current = scaled(bitmap, maxDim.coerceIn(256, MAX_OUTPUT_DIM))
         val initialQuality = requestedQuality.coerceIn(30, 95)
         try {
             while (true) {
