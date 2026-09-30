@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import androidx.compose.foundation.layout.imePadding
 import com.openminis.app.browser.BrowserTabPool.Tab as BrowserTab
 import com.openminis.app.ui.theme.ChatColors
 import androidx.compose.ui.input.pointer.pointerInput
@@ -101,9 +102,10 @@ import kotlinx.coroutines.launch
  * WebView, and navigation controls. Mirrors iOS BrowserSheetView.
  */
 @Composable
-fun BrowserSheet(
+fun BrowserScreen(
     tabPool: BrowserTabPool,
     onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val tabs by tabPool.tabs.collectAsState()
     val selectedTabId by tabPool.selectedTabId.collectAsState()
@@ -123,7 +125,6 @@ fun BrowserSheet(
 
     var urlInput by remember(currentURL) { mutableStateOf(currentURL) }
     var showHistory by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
     // [T-android-browser-download-ux] Downloads panel + badge state.
     var showDownloads by remember { mutableStateOf(false) }
     val downloadEntries by tabPool.downloads.collectAsState()
@@ -154,11 +155,16 @@ fun BrowserSheet(
     var showMore by remember { mutableStateOf(false) }
     val isDesktop = userAgentProfile == UserAgentProfile.DESKTOP_CHROME
 
-    StandardChatSheet(
-        title = pageTitle.ifEmpty { stringResource(R.string.browser_title) },
-        onDismiss = onDismiss,
-        header = false,
-        fullScreen = true,
+    // Web back first, then leave the page.
+    androidx.activity.compose.BackHandler(enabled = canGoBack && !isAgentBusy) { selectedTab?.manager?.goBack() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ── Top row: close, address pill, tab counter (board) ──
@@ -447,7 +453,7 @@ fun BrowserSheet(
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(R.string.browser_settings_title)) },
                             trailingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            onClick = { showMore = false; showSettings = true },
+                            onClick = { showMore = false; onOpenSettings() },
                         )
                     }
                 }
@@ -492,12 +498,6 @@ fun BrowserSheet(
         )
     }
 
-    if (showSettings) {
-        BrowserSettingsSheet(
-            tabPool = tabPool,
-            onDismiss = { showSettings = false },
-        )
-    }
 }
 
 @Composable

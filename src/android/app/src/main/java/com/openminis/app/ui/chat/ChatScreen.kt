@@ -294,7 +294,6 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.tools.AgentStateStore
-import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.glass.glassSurface
@@ -6377,11 +6376,12 @@ fun ChatScreen(
     }
 
     // Browser bottom sheet
-    if (showBrowserSheet) {
-        BrowserSheet(
-            tabPool = viewModel.browserTabPool,
-            onDismiss = { viewModel.dismissBrowserSheet() },
-        )
+    // The browser is a page on the nav stack, not a popup; the chat hands over its tab pool.
+    LaunchedEffect(showBrowserSheet) {
+        if (showBrowserSheet) {
+            com.openminis.app.ui.browser.BrowserHolder.open(viewModel.browserTabPool)
+            viewModel.dismissBrowserSheet()
+        }
     }
 
     // Session Token Usage bottom sheet

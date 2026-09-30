@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import com.openminis.app.ui.settings.SettingsSearchField
@@ -80,7 +81,7 @@ import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrowserSettingsSheet(
+fun BrowserSettingsScreen(
     tabPool: BrowserTabPool,
     onDismiss: () -> Unit,
 ) {
@@ -130,7 +131,14 @@ fun BrowserSettingsSheet(
     // Cookie filter (mirrors iOS `.searchable("Filter by domain")`).
     var cookieFilterText by remember { mutableStateOf("") }
 
-    com.openminis.app.ui.components.MinisFullScreenDialog(onDismiss = onDismiss) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
