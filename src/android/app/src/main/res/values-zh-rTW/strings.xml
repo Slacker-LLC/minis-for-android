@@ -2336,4 +2336,5 @@
     <string name="chat_quick_edit">編輯</string>
     <string name="chat_quick_edit_title">設定快捷動作</string>
     <string name="chat_quick_edit_footer">選擇顯示在快捷卡上的動作，至少保留一個。</string>
+    <string name="scheduled_tasks_empty_title">還沒有定時任務</string>
 </resources>

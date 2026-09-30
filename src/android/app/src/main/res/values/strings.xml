@@ -2455,4 +2455,5 @@
     <string name="chat_quick_edit">Edit</string>
     <string name="chat_quick_edit_title">Configure quick actions</string>
     <string name="chat_quick_edit_footer">Choose which actions appear on the quick cards. Keep at least one on.</string>
+    <string name="scheduled_tasks_empty_title">No scheduled tasks</string>
 </resources>

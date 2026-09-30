@@ -1968,4 +1968,5 @@
     <string name="chat_quick_edit">Modifier</string>
     <string name="chat_quick_edit_title">Configurer les actions rapides</string>
     <string name="chat_quick_edit_footer">Choisissez les actions affichées sur les cartes. Gardez-en au moins une.</string>
+    <string name="scheduled_tasks_empty_title">Aucune tâche planifiée</string>
 </resources>

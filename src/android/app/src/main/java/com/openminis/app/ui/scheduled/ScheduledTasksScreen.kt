@@ -107,10 +107,13 @@ fun ScheduledTasksScreen(
         },
     ) {
         if (tasks.isEmpty()) {
-            Text(
-                stringResource(R.string.scheduled_tasks_empty),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+            com.openminis.app.ui.components.MinisEmptyState(
+                icon = androidx.compose.material.icons.Icons.Outlined.Schedule,
+                title = stringResource(R.string.scheduled_tasks_empty_title),
+                description = stringResource(R.string.scheduled_tasks_empty),
+                actionLabel = stringResource(R.string.scheduled_task_new),
+                onAction = { onEditTask(null) },
+                modifier = Modifier.padding(top = 48.dp),
             )
         } else {
             tasks.forEach { task ->

@@ -117,11 +117,9 @@ fun BrowserDownloadsSheet(
             }
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             if (downloads.isEmpty()) {
-                Text(
-                    stringResource(R.string.browser_downloads_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp).align(Alignment.CenterHorizontally),
+                com.openminis.app.ui.components.MinisEmptyState(
+                    icon = androidx.compose.material.icons.Icons.Default.Download,
+                    title = stringResource(R.string.browser_downloads_empty),
                 )
             } else {
                 LazyColumn(modifier = Modifier.padding(top = 12.dp)) {

@@ -2074,4 +2074,5 @@
     <string name="chat_quick_edit">編集</string>
     <string name="chat_quick_edit_title">クイックアクションを設定</string>
     <string name="chat_quick_edit_footer">クイックカードに表示する操作を選びます。最低 1 つは残してください。</string>
+    <string name="scheduled_tasks_empty_title">定期タスクはありません</string>
 </resources>

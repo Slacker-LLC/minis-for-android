@@ -2066,4 +2066,5 @@
     <string name="chat_quick_edit">편집</string>
     <string name="chat_quick_edit_title">빠른 작업 설정</string>
     <string name="chat_quick_edit_footer">빠른 카드에 표시할 작업을 선택하세요. 하나 이상 켜 두세요.</string>
+    <string name="scheduled_tasks_empty_title">예약 작업이 없습니다</string>
 </resources>

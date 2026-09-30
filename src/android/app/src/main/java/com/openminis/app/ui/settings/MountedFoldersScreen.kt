@@ -370,39 +370,13 @@ private fun initialPickerUri(): Uri? = runCatching {
 
 @Composable
 private fun AllFilesAccessBanner(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(ChatColors.warn.copy(alpha = 0.14f))
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            Icons.Outlined.WarningAmber,
-            contentDescription = null,
-            tint = ChatColors.warn,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.mount_all_files_access_required),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = stringResource(R.string.mount_all_files_access_required_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    com.openminis.app.ui.components.MinisBanner(
+        text = stringResource(R.string.mount_all_files_access_required) + "。" +
+            stringResource(R.string.mount_all_files_access_required_desc),
+        modifier = Modifier.padding(horizontal = 16.dp).padding(top = 12.dp),
+        actionLabel = stringResource(R.string.mount_add_grant_action),
+        onAction = onClick,
+    )
 }
 
 /**
