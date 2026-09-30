@@ -138,6 +138,8 @@ fun TerminalScreen(
         onDispose { emulator.onResponse = null }
     }
 
+    var showClearSheet by remember { mutableStateOf(false) }
+
     // Clear emulator when session clearOutput() ticks.
     val clearVersion by terminalSession.clearVersion.collectAsStateEffect()
     LaunchedEffect(clearVersion) {
@@ -272,15 +274,7 @@ fun TerminalScreen(
                     terminalSession.stop()
                     onBack()
                 },
-                onClear = {
-                    // T310: send Ctrl+U (NAK, 0x15) so readline kills any
-                    // half-typed line in the shell. Otherwise those chars
-                    // stay in the line buffer and get prepended to the
-                    // user's next command after the visual clear.
-                    terminalSession.sendRawBytes(byteArrayOf(0x15))
-                    terminalSession.clearOutput()
-                    emulator.feed("\u001Bc".toByteArray())
-                },
+                onClear = { showClearSheet = true },
             )
         }
 
@@ -314,6 +308,27 @@ fun TerminalScreen(
                     else byteArrayOf(0x1B, '['.code.toByte())
                     terminalSession.sendRawBytes(prefix + byteArrayOf(dir.code.toByte()))
                 },
+            )
+        }
+
+        if (showClearSheet) {
+            com.openminis.app.ui.components.MinisActionSheet(
+                onDismiss = { showClearSheet = false },
+                actions = listOf(
+                    com.openminis.app.ui.components.MinisAction(
+                        label = stringResource(R.string.terminal_clear),
+                        destructive = true,
+                        onClick = {
+                            // T310: send Ctrl+U (NAK, 0x15) so readline kills any
+                            // half-typed line in the shell. Otherwise those chars
+                            // stay in the line buffer and get prepended to the
+                            // user's next command after the visual clear.
+                            terminalSession.sendRawBytes(byteArrayOf(0x15))
+                            terminalSession.clearOutput()
+                            emulator.feed("\u001Bc".toByteArray())
+                        },
+                    ),
+                ),
             )
         }
 
@@ -421,42 +436,45 @@ private fun KeyboardAccessoryBar(
     onSendRaw: (ByteArray) -> Unit,
     onArrow: (Char) -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(terminalChrome().accessoryBg),
-    ) {
+    val chrome = terminalChrome()
+    Column(modifier = Modifier.fillMaxWidth().background(chrome.bg)) {
+        androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = chrome.fg.copy(alpha = 0.12f))
         Row(
             modifier = Modifier
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-        QuickCommandButton(
-            label = stringResource(if (keyboardVisible) R.string.terminal_hide_keyboard else R.string.terminal_show_keyboard),
-            icon = if (keyboardVisible) Icons.Default.KeyboardHide else Icons.Outlined.Keyboard,
-            onClick = onToggleKeyboard,
-        )
-        QuickCommandButton("Esc", iconText = "⎋") { onSendRaw(byteArrayOf(0x1B)) }
-        QuickCommandButton("Tab", icon = Icons.AutoMirrored.Filled.KeyboardTab) { onSendRaw(byteArrayOf(0x09)) }
-        // [T-android-shell-toolbar-enter-key] The soft keyboard's Return
-        // inserts a newline inside the terminal, so it can't send a real
-        // carriage return to run a command line / trigger an in-CLI prompt.
-        // This writes CR (0x0D) on the same raw-PTY path as Esc/Tab/C-c.
-        // Placed right after Tab, mirroring iOS fa3d2f8c.
-        QuickCommandButton("⏎", iconText = "⏎") { onSendRaw(byteArrayOf(0x0D)) }
-        QuickCommandButton("Ctrl", iconText = "^", isActive = ctrlActive, onClick = onCtrlToggle)
-        QuickCommandButton("\u2191", icon = Icons.Default.KeyboardArrowUp) { onArrow('A') }
-        QuickCommandButton("\u2193", icon = Icons.Default.KeyboardArrowDown) { onArrow('B') }
-        QuickCommandButton("\u2190", icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft) { onArrow('D') }
-        QuickCommandButton("\u2192", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight) { onArrow('C') }
-        QuickCommandButton("C-c", icon = Icons.Outlined.Cancel) { onSendRaw(byteArrayOf(0x03)) }
-        QuickCommandButton("C-d", icon = Icons.Default.Eject) { onSendRaw(byteArrayOf(0x04)) }
-        QuickCommandButton("C-z", icon = Icons.Outlined.PauseCircle) { onSendRaw(byteArrayOf(0x1A)) }
+            Row(
+                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                QuickCommandButton("Esc") { onSendRaw(byteArrayOf(0x1B)) }
+                QuickCommandButton("Tab") { onSendRaw(byteArrayOf(0x09)) }
+                // [T-android-shell-toolbar-enter-key] The soft keyboard's Return
+                // inserts a newline inside the terminal, so it can't send a real
+                // carriage return to run a command line / trigger an in-CLI prompt.
+                // This writes CR (0x0D) on the same raw-PTY path as Esc/Tab/C-c.
+                QuickCommandButton("⏎") { onSendRaw(byteArrayOf(0x0D)) }
+                QuickCommandButton("Ctrl", isActive = ctrlActive, onClick = onCtrlToggle)
+                QuickCommandButton("\u2191") { onArrow('A') }
+                QuickCommandButton("\u2193") { onArrow('B') }
+                QuickCommandButton("\u2190") { onArrow('D') }
+                QuickCommandButton("\u2192") { onArrow('C') }
+                QuickCommandButton("C-c") { onSendRaw(byteArrayOf(0x03)) }
+                QuickCommandButton("C-d") { onSendRaw(byteArrayOf(0x04)) }
+                QuickCommandButton("C-z") { onSendRaw(byteArrayOf(0x1A)) }
+            }
+            Text(
+                stringResource(if (keyboardVisible) R.string.terminal_hide_keyboard else R.string.terminal_show_keyboard),
+                color = chrome.accent,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onToggleKeyboard)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
         }
     }
 }
@@ -464,28 +482,21 @@ private fun KeyboardAccessoryBar(
 @Composable
 private fun QuickCommandButton(
     label: String,
-    icon: ImageVector? = null,
-    iconText: String? = null,
     isActive: Boolean = false,
     onClick: () -> Unit,
 ) {
     val chrome = terminalChrome()
-    val bg = if (isActive) chrome.keyActiveBg else chrome.keyBg
+    val bg = if (isActive) chrome.keyActiveBg else chrome.fg.copy(alpha = 0.08f)
     val fg = if (isActive) Color.White else chrome.keyFg
-    Row(
+    Box(
         modifier = Modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .height(32.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = 11.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        when {
-            icon != null -> Icon(icon, null, tint = fg, modifier = Modifier.size(12.dp))
-            iconText != null -> Text(iconText, color = fg, style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp))
-        }
-        Text(label, color = fg, style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp), maxLines = 1)
+        Text(label, color = fg, style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 13.sp), maxLines = 1)
     }
 }
