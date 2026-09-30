@@ -653,8 +653,6 @@ fun AppNavigation(
                         )
                         navController.safeNavigate(Routes.FILE_BROWSER)
                     },
-                    onOpenSkills = { navController.safeNavigate(Routes.SKILLS) },
-                    onOpenMemory = { navController.safeNavigate(Routes.MEMORY) },
                     onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onOpenSessionFiles = { navController.safeNavigate(Routes.STORAGE) },
                 )

@@ -85,7 +85,6 @@ import com.openminis.app.ui.components.SectionTextField
 
 private enum class AddProviderStep {
     CHOOSE_TYPE,
-    CHOOSE_CREDENTIAL,
     CONFIGURE,
 }
 
@@ -110,26 +109,11 @@ fun AddProviderScreen(
     val handleBack: () -> Unit = {
         when (step) {
             AddProviderStep.CHOOSE_TYPE -> onBack()
-            AddProviderStep.CHOOSE_CREDENTIAL -> {
+            // The type list goes straight to the form; back from it returns to the list.
+            AddProviderStep.CONFIGURE -> {
                 step = AddProviderStep.CHOOSE_TYPE
                 selectedType = null
-            }
-            AddProviderStep.CONFIGURE -> {
-                // Voice-template entry skipped the credential step entirely —
-                // back returns straight to the type/template list.
-                if (selectedVoiceTemplate != null) {
-                    step = AddProviderStep.CHOOSE_TYPE
-                    selectedType = null
-                    selectedVoiceTemplate = null
-                } else {
-                    val creds = availableCredentials(selectedType!!)
-                    if (creds.size == 1) {
-                        step = AddProviderStep.CHOOSE_TYPE
-                        selectedType = null
-                    } else {
-                        step = AddProviderStep.CHOOSE_CREDENTIAL
-                    }
-                }
+                selectedVoiceTemplate = null
                 selectedCredential = null
             }
         }
@@ -143,14 +127,9 @@ fun AddProviderScreen(
             onBack = handleBack,
             onSelect = { type ->
                 selectedType = type
-                val creds = availableCredentials(type)
-                if (creds.size == 1) {
-                    // Skip credential picker if only one option
-                    selectedCredential = creds.first()
-                    step = AddProviderStep.CONFIGURE
-                } else {
-                    step = AddProviderStep.CHOOSE_CREDENTIAL
-                }
+                // Straight to the form; providers with more than one way to sign in get a switch there.
+                selectedCredential = availableCredentials(type).first()
+                step = AddProviderStep.CONFIGURE
             },
             onSelectVoiceTemplate = { template ->
                 // Mirror iOS applyVoiceTemplate: pick the underlying protocol,
@@ -161,17 +140,10 @@ fun AddProviderScreen(
                 step = AddProviderStep.CONFIGURE
             },
         )
-        AddProviderStep.CHOOSE_CREDENTIAL -> ChooseCredentialScreen(
-            providerType = selectedType!!,
-            onBack = handleBack,
-            onSelect = { credential ->
-                selectedCredential = credential
-                step = AddProviderStep.CONFIGURE
-            },
-        )
         AddProviderStep.CONFIGURE -> ConfigureProviderScreen(
             providerType = selectedType!!,
             credentialType = selectedCredential!!,
+            onCredentialChange = { selectedCredential = it },
             providerRepository = providerRepository,
             voiceTemplate = selectedVoiceTemplate,
             onBack = handleBack,
@@ -320,74 +292,6 @@ private fun ChooseProviderScreen(
     }
 }
 
-// -- Step 2: Choose Credential Type --
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChooseCredentialScreen(
-    providerType: ProviderType,
-    onBack: () -> Unit,
-    onSelect: (ProviderCredential) -> Unit,
-) {
-    val credentials = availableCredentials(providerType)
-
-    SettingsScaffold(
-        title = stringResource(R.string.add_provider_auth_method),
-        onBack = onBack,
-    ) {
-        SettingsSection(
-            header = stringResource(R.string.add_provider_choose_authentication),
-        ) {
-            credentials.forEachIndexed { index, credential ->
-                val (title, description, icon) = when (credential) {
-                    ProviderCredential.apiKey -> Triple(
-                        stringResource(R.string.provider_list_api_key),
-                        apiKeyDescription(providerType),
-                        Icons.Default.Key,
-                    )
-                    ProviderCredential.oauth -> Triple(
-                        "OAuth",
-                        oauthDescription(providerType),
-                        Icons.Default.Person,
-                    )
-                }
-                SettingsRow(
-                    title = title,
-                    subtitle = description,
-                    icon = icon,
-                    onClick = { onSelect(credential) },
-                    showDivider = index < credentials.size - 1,
-                )
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-}
-
-private fun apiKeyDescription(type: ProviderType): String = when (type) {
-    ProviderType.openAI -> "Supports OpenAI official API and compatible third-party endpoints"
-    ProviderType.anthropic -> "Use an API key from your Anthropic account"
-    ProviderType.gemini -> "Use an API key from your Google Gemini account"
-    ProviderType.openRouter -> "Use an API key from your OpenRouter account"
-    ProviderType.xAI -> "Use an API key from your xAI Console (api.x.ai)"
-    ProviderType.kimiCode -> "Use an API key from your Moonshot account"
-    ProviderType.openAIResponses -> "Supports the OpenAI Responses API and compatible endpoints"
-    ProviderType.antigravity,
-    ProviderType.unsupported -> "This provider type is not supported on Android"
-}
-
-private fun oauthDescription(type: ProviderType): String = when (type) {
-    ProviderType.anthropic -> "Sign in with your Claude account"
-    ProviderType.gemini -> "Sign in with Google for Cloud Code Assist"
-    ProviderType.openAI -> "Sign in with OpenAI Codex"
-    ProviderType.xAI -> "Sign in with xAI (requires SuperGrok or X Premium+)"
-    ProviderType.openRouter -> "Sign in with OpenRouter"
-    ProviderType.kimiCode -> "Sign in with your Kimi account (Coding Plan)"
-    ProviderType.openAIResponses -> "Sign in with OpenAI Codex"
-    ProviderType.antigravity,
-    ProviderType.unsupported -> "This provider type is not supported on Android"
-}
-
 // -- Step 3: Configure & Save --
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -395,6 +299,7 @@ private fun oauthDescription(type: ProviderType): String = when (type) {
 private fun ConfigureProviderScreen(
     providerType: ProviderType,
     credentialType: ProviderCredential,
+    onCredentialChange: (ProviderCredential) -> Unit,
     providerRepository: ProviderRepository,
     voiceTemplate: com.openminis.app.data.model.VoiceProviderTemplate? = null,
     onBack: () -> Unit,
@@ -437,7 +342,18 @@ private fun ConfigureProviderScreen(
     SettingsScaffold(
         title = stringResource(R.string.add_provider_configure_provider, providerType.displayName),
         onBack = onBack,
+        backLabel = stringResource(R.string.provider_list_add_provider),
     ) {
+        // More than one way to sign in (API key / OAuth): a switch on the form, not a page of its own.
+        val credentials = availableCredentials(providerType)
+        if (voiceTemplate == null && credentials.size > 1) {
+            SettingsSegmented(
+                options = credentials.map { if (it == ProviderCredential.apiKey) stringResource(R.string.provider_list_api_key) else "OAuth" },
+                selectedIndex = credentials.indexOf(credentialType).coerceAtLeast(0),
+                onSelect = { onCredentialChange(credentials[it]) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         // Identity section — Label only. Each provider auto-suggests a
         // unique label so users don't have to type one for the common case.
         SettingsSection(
