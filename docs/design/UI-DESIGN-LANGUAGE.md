@@ -30,25 +30,30 @@ Compose 代码的文字版规则，不重复画板内容。
 | 令牌 | 浅色 | 深色 | 用途 | Compose 位置 |
 |---|---|---|---|---|
 | page | `#FFFFFF` | `#000000` | 页面底色 | `NeutralGroupedBg` / `minisPageBackground()` |
-| card | `#FFFFFF` + 0.5dp hairline（画板）；代码现状见下 | `#1C1C1E` | 分组卡片 | `NeutralGroupedCard` |
+| card | `#FFFFFF` + 0.5dp hairline | `#1C1C1E` + hairline | 分组卡片 | `SectionDesign.cardColor()` / `cardBorder()` / `Modifier.groupedCard()` |
 | fill | `#F2F2F7` | 沿用 T153 提亮值（`#26262A` 等） | 输入框、气泡、图块、分段控件底 | `ChatPalette.secondaryBg` / `toolBg` |
 | hairline | `#E5E5EA` | `#38383A` | 分隔线、卡片描边 | `NeutralOutline` |
-| sheet | `#FFFFFF` 不透明 | `#1C1C1E` 不透明 | sheet / 对话框 / 菜单 | `MinisShapes` + 弹层组件 |
+| sheet | `#FFFFFF` 不透明 | `#1C1C1E` 不透明 | sheet / 对话框（菜单见下） | `minisSheetColor()` + 弹层组件 |
 | bar | 白 72% + 模糊 | 黑 72% + 模糊 | 顶栏/底栏（玻璃） | `GlassKit` |
 | scrim | 黑 18% | 黑 55% | 弹层遮罩 | 各弹层组件 |
 | accent | `#0068D6` | `#0A84FF` | 文字按钮、开关、选中态 | `TealPrimary`（名字保留，值变更） |
 | fg | `#000000` | `#FFFFFF` | 主文字 | `onBackground` |
 | fg2 | `#636369` | `#98989F` | 次要文字 | `ChatPalette.secondaryText` |
-| ok / warn / bad | `#1F7A36` / `#A65100` / `#D70015` | `#30D158` / `#FF9F0A` / `#FF453A` | 状态文字与图标 | 状态色 |
+| ok / warn / bad | `#1F7A36` / `#A65100` / `#D70015` | `#30D158` / `#FF9F0A` / `#FF453A` | 状态文字与图标 | `ChatColors.ok/warn/bad`；`colorScheme.error` 与 `bad` 同值 |
 
 深色列中 fg2、ok/warn/bad 采用 iOS 系统深色色值作为起点，画板未逐项固定。深色 fill 沿用代码里
 T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 iOS 原值；注意 `#0A84FF` 落在
 `#26262A` 上只有 4.13:1，所以深色下文字按钮应放在页面/sheet/卡片表面，不要放在 fill 上。
 设计稿里的 ok 绿 `#248A3D` 在白底只有 4.40:1，未达 AA，已改为 `#1F7A36`（5.39:1）。
 
-**卡片的代码现状与画板的差异**：画板中卡片是白底 + 发丝线。代码里卡片是 `surfaceContainer*` 体系
-（约 70 处引用），逐处加发丝线改动面过大；步骤 1 先把浅色所有容器层统一为 fill `#F2F2F7`（一种灰），
-「白底 + 发丝线」的卡片作为后续项记录在实现状态里，未做。
+**卡片与 fill 的分工**：卡片是白底 + 发丝线（深色 `#1C1C1E` + 发丝线），由 `SectionDesign` 的
+`cardColor()` / `cardBorder()` / `groupedCard()` 提供，设置页、挂载/共享文件夹页、模型选择器等分组卡片都走它。
+`surfaceContainer*` 体系保持为 fill 灰（`#F2F2F7`），只给输入框、气泡、图块、代码块用，不再当卡片色。
+深色菜单（`MinisMenu`）刻意保留抬升的 `#2C2C2E`，因为它常叠在 `#1C1C1E` 的 sheet 上，同色会失去层次。
+
+**分类标识色例外**：设置分类、会话分类、备份分类、工具类型等「图标标识色」（iOS 系统色板）不属于状态色，
+不受 ok/warn/bad 约束；其中处于非 Compose 上下文的映射函数保持原字面值，Compose 内的
+`#34C759` / `#FF9500` / `#FF9F0A` / `#FF3B30` 已统一改为 `ok` / `warn` / `bad`。终端配色有独立调色板，不在此列。
 
 对比度（相对 `#FFFFFF`，已按 WCAG 相对亮度公式计算）：
 
@@ -63,9 +68,8 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 约束：
 
 - 深色调色板在 T153 中被有意提亮，落地时不得回退可读性；变更深色值必须复算对比度。
-- 禁止在业务代码里写死 `Color(0xFF…)` 表示表面色（页面/卡片/弹层/灰）。现有热点：
-  `MinisAlertDialog.kt`、`OffloadPermissionDialog.kt`、`ChatAgentStateUI.kt`，以及零散的
-  `F5FAFA`/`F0F0F0`/`EBEBEB`。
+- 禁止在业务代码里写死 `Color(0xFF…)` 表示表面色（页面/卡片/弹层/灰）：卡片用 `SectionDesign.cardColor()`，
+  弹层用 `minisSheetColor()`，灰用 `surfaceContainer*`（fill）。状态色用 `ChatColors.ok/warn/bad`。
 - 代码块与终端跟随主题：浅色为 fill 底 + 黑色文字；深色沿用深灰底（`#262626`）+ 浅绿文字；不再固定
   黑底绿字。聊天里的代码块已按此调整；终端页仍是固定深色，属于步骤 5。
 - 米色 `fabAccent` 去除，改用 accent。
@@ -164,8 +168,9 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 | 会话列表整页 | 左侧抽屉 | 见第 8 节 |
 
 注意：IA 调整只移动入口与页面组织，**不改变**任何 Runtime、权限或存储行为。涉及 Root、共享目录、
-挂载的页面只调整位置，权限确认流程保持原样。画板里「会话文件」并入文件中心这一项**未做**：代码里没有
-独立的会话文件页面可合并。
+挂载的页面只调整位置，权限确认流程保持原样。画板里「会话文件」并入文件中心：会话文件页面
+（`SessionStorageDetailScreen` 的 Session Files）本来就存在，入口是「设置 → 文件 → 存储 → 会话」，
+已经在「文件」分类下，无需再加一行；聊天菜单里的「聊天文件」入口保留（它按当前会话打开）。
 
 ## 10. 页面与代码映射（主要）
 
@@ -213,14 +218,14 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 | 步骤 | 内容 | 状态 |
 |---|---|---|
 | 0 | 设计语言文档（本文） | 已完成 |
-| 1 | 主题令牌：灰度统一、强调色 AA、遮罩、聊天代码块、终端跟随主题 | 已完成（令牌与单测）；白底 + 发丝线的卡片**未做**，浅色卡片暂用 fill 灰 |
-| 2 | 按钮收敛为文字按钮 + 防回退测试 | 已完成；同页半粗主要按钮数量未逐页审计 |
-| 3 | 弹层统一：`AlertDialog`（52 处）、`ModalBottomSheet`（27 处）走共享外壳 + 守卫测试 | 已完成；深色 sheet 仍是各处原有的 surface/背景色，未统一到 `#1C1C1E` |
+| 1 | 主题令牌：灰度统一、强调色 AA、遮罩、聊天代码块、终端跟随主题 | 已完成（令牌与单测）；卡片已改回白底 + 发丝线，状态色 `ok/warn/bad` 与 `colorScheme.error` 已统一 |
+| 2 | 按钮收敛为文字按钮 + 防回退测试 | 已完成；已逐页审计：卡片内小按钮与删除按钮降为普通字重，同页最多一个半粗主按钮 |
+| 3 | 弹层统一：`AlertDialog`（52 处）、`ModalBottomSheet`（27 处）走共享外壳 + 守卫测试 | 已完成；深色 sheet/对话框统一为 `minisSheetColor()`（`#1C1C1E`），守卫测试防回退 |
 | 4 | 抽屉：分组、置顶、多选、长按菜单 | 已完成（编译通过）；**未在真机/模拟器上验证** |
-| 5 | 信息架构：「文件」分类、会话配置合并、设置 7 类、终端跟随主题 | 已完成；「会话文件」合并未做（无对应页面）；**未在真机/模拟器上验证** |
-| 验证 | `compileDebugKotlin`、`testDebugUnitTest`（2493 例，1 例失败，见下）、i18n 审计 | 已跑，含 `lintDebug`；Release/R8、真机截图**未跑** |
+| 5 | 信息架构：「文件」分类、会话配置合并、设置 7 类、终端跟随主题 | 已完成；「会话文件」已在「文件」分类下可达；**未在真机/模拟器上验证** |
+| 验证 | `compileDebugKotlin`、`testDebugUnitTest`（2498 例全过）、`lintDebug`、`minifyReleaseWithR8`、i18n 审计 | 已跑；用 Robolectric 临时渲染过设置卡片、按钮、状态色、弹窗的浅/深色截图（未入库）；**真机/模拟器表现、Release APK 安装运行未验证** |
 
-已知：`RevealProgressTest` 的 `a last grapheme that keeps growing stays correct` 在 main（`0c7903e`）
-上同样失败，与本次改动无关。`lintDebug` 通过（无新增错误，基线之外仅有警告）。
+已知：`RevealProgressTest` 的失败原因是增量字素边界只回退一个边界，遇到「代理对被拆在两个流式分片之间」时
+会漏合并（ZWJ 序列、国旗）；已改为回退两个边界并通过。它属于独立的渲染逻辑修复，单独提交。
 
 与代码不一致时以代码为准并修正本文。
