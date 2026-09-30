@@ -37,7 +37,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -68,6 +67,7 @@ import kotlinx.coroutines.launch
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.util.bringIntoViewOnFocus
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,7 +121,7 @@ fun BrowserSettingsSheet(
     // Cookie filter (mirrors iOS `.searchable("Filter by domain")`).
     var cookieFilterText by remember { mutableStateOf("") }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

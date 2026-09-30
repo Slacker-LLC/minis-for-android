@@ -38,7 +38,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -146,7 +145,7 @@ fun UnifiedModelPickerSheet(
     val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val cardShape = RoundedCornerShape(14.dp)
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

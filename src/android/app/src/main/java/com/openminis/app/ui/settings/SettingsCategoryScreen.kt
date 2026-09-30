@@ -30,7 +30,6 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,6 +53,7 @@ import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
@@ -438,7 +438,7 @@ fun SettingsCategoryScreen(
     }
 
     if (showFeedbackSheet) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showFeedbackSheet = false },
             containerColor = if (LocalUiStyle.current == UiStyle.GLASS) {
                 Color.Transparent

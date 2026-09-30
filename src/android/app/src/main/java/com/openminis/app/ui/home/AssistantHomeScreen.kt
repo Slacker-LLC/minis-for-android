@@ -39,7 +39,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -66,6 +65,7 @@ import com.openminis.app.ui.settings.SettingsSwitchRow
 import com.openminis.app.ui.theme.ChatColors
 import java.time.LocalTime
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-android-assistant-home] The assistant home page: a greeting plus a 2×2
@@ -288,7 +288,7 @@ fun AssistantHomeScreen(
     }
 
     if (showActionPicker) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showActionPicker = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {

@@ -28,7 +28,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -49,6 +48,7 @@ import java.util.Date
 import java.util.Locale
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +66,7 @@ fun BrowserHistorySheet(
         else mapOf("Results" to historyStore.search(searchQuery))
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

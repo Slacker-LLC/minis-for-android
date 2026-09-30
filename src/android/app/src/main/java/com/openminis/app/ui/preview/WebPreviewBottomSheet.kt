@@ -40,7 +40,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -65,6 +64,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Immersive 90%-tall bottom sheet that hosts a [WebViewHolder] for a
@@ -138,7 +138,7 @@ fun WebPreviewBottomSheet(
         }
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = {
             AppLogger.info("WebPreviewSheet", "dismiss")
             onDismiss()

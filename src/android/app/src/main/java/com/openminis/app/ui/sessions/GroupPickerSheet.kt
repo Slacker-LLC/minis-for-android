@@ -26,7 +26,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -46,6 +45,7 @@ import com.openminis.app.data.db.FolderEntity
 import com.openminis.app.ui.components.MinisSmallButton
 import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.components.SectionTextField
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-android-session-grouping] What the user chose in the group picker.
@@ -121,7 +121,7 @@ fun GroupPickerSheet(
         else -> stringResource(R.string.group_picker_title_move)
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

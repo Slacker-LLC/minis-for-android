@@ -27,7 +27,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -51,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Environment Variables \u2014 adopts the SettingsScaffold/SettingsSection
@@ -300,7 +300,7 @@ private fun EnvVarFormSheet(
         else -> null
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

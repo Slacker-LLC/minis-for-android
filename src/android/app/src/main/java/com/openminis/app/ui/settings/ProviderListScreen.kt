@@ -29,7 +29,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -59,6 +58,7 @@ import com.openminis.app.ui.components.SwipeRowAction
 import com.openminis.app.ui.components.SwipeRowActions
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,7 +316,7 @@ fun ProviderListScreen(
     }
 
     if (showMenu) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {

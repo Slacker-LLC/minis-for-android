@@ -30,7 +30,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -48,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.openminis.app.R
 import com.openminis.app.browser.BrowserTabPool
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-android-browser-download-ux] Downloads panel — Android port of iOS
@@ -73,7 +73,7 @@ fun BrowserDownloadsSheet(
     // actually looked at the panel.
     LaunchedEffect(Unit) { tabPool.markDownloadsSeen() }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

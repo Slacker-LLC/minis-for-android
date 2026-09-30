@@ -146,7 +146,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -275,6 +274,7 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Fuzzy match: substring first, then all query chars appear in order.
@@ -362,7 +362,7 @@ internal fun ModelPickerSheet(
         result
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

@@ -106,7 +106,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.components.SectionTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Badge
@@ -190,6 +189,7 @@ import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisOutlinedButton
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 // FAB color — use shared theme values
 
@@ -2964,7 +2964,7 @@ internal fun SessionEditSheet(
         selectedCategory = liveSession.category
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,

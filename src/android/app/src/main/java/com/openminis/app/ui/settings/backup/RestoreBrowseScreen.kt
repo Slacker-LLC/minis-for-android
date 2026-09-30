@@ -27,7 +27,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -54,6 +53,7 @@ import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-android-restore-browse] Walk a destination's folders and pick a backup.
@@ -350,7 +350,7 @@ private fun ProgressSheet(
         skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden },
     )
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = {},
         sheetState = sheetState,
         dragHandle = null,

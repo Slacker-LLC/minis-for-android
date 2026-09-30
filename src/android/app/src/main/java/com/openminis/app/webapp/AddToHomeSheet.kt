@@ -44,7 +44,6 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Web
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -75,6 +74,7 @@ import java.io.File
 import java.util.UUID
 import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Source of HTML bytes for the "Add to Home Screen" sheet. T-pwa-2 only
@@ -223,7 +223,7 @@ fun AddToHomeSheet(
         }
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
