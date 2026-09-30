@@ -2071,4 +2071,7 @@
     <string name="thinking_rules_hub_footer">思考ルールはプロバイダのプロトコルに依存するため、プロバイダごとに編集します。</string>
     <string name="thinking_rules_hub_custom">カスタムルール対応</string>
     <string name="thinking_rules_hub_official">公式プロトコル、カスタムルール不要</string>
+    <string name="chat_quick_edit">編集</string>
+    <string name="chat_quick_edit_title">クイックアクションを設定</string>
+    <string name="chat_quick_edit_footer">クイックカードに表示する操作を選びます。最低 1 つは残してください。</string>
 </resources>

@@ -2333,4 +2333,7 @@
     <string name="thinking_rules_hub_footer">思考規則依賴各供應商的協議，因此在各供應商內分別編輯。</string>
     <string name="thinking_rules_hub_custom">支援自訂規則</string>
     <string name="thinking_rules_hub_official">官方協議，無需自訂規則</string>
+    <string name="chat_quick_edit">編輯</string>
+    <string name="chat_quick_edit_title">設定快捷動作</string>
+    <string name="chat_quick_edit_footer">選擇顯示在快捷卡上的動作，至少保留一個。</string>
 </resources>

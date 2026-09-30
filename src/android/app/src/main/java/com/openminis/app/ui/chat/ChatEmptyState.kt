@@ -90,6 +90,30 @@ internal fun suggestionWindow(poolSize: Int, seed: Int, page: Int, count: Int = 
     return List(take) { order[(start + it) % poolSize] }
 }
 
+/**
+ * Pool indices the user left switched on. Never empty: if everything is off (or the stored set
+ * names nothing that exists) the whole pool comes back, so the screen cannot end up with no cards.
+ */
+internal fun enabledSuggestions(poolSize: Int, disabled: Set<Int>): List<Int> {
+    val on = (0 until poolSize).filter { it !in disabled }
+    return if (on.isEmpty()) (0 until poolSize).toList() else on
+}
+
+private const val QUICK_PREFS = "chat_quick_actions"
+private const val QUICK_DISABLED_KEY = "disabled"
+
+private fun readDisabled(context: android.content.Context): Set<Int> = runCatching {
+    context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE)
+        .getStringSet(QUICK_DISABLED_KEY, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
+}.getOrDefault(emptySet())
+
+private fun writeDisabled(context: android.content.Context, disabled: Set<Int>) {
+    runCatching {
+        context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE).edit()
+            .putStringSet(QUICK_DISABLED_KEY, disabled.map { it.toString() }.toSet()).apply()
+    }
+}
+
 private val SuggestionPool = listOf(
     QuickCard(Icons.Outlined.Visibility, R.string.chat_quick_screen_title, R.string.chat_quick_screen_sub, R.string.chat_quick_screen_prompt),
     QuickCard(Icons.Outlined.Language, R.string.chat_quick_browse_title, R.string.chat_quick_browse_sub, R.string.chat_quick_browse_prompt),
@@ -127,7 +151,11 @@ fun ChatEmptyState(
     }
     val seed = rememberSaveable { Random.nextInt() }
     var page by rememberSaveable { mutableIntStateOf(0) }
-    val cards = suggestionWindow(SuggestionPool.size, seed, page).map { SuggestionPool[it] }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var disabled by remember { androidx.compose.runtime.mutableStateOf(readDisabled(context)) }
+    var editing by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val enabled = enabledSuggestions(SuggestionPool.size, disabled)
+    val cards = suggestionWindow(enabled.size, seed, page).map { SuggestionPool[enabled[it]] }
     // Centered when it fits; scrolls when it does not (keyboard up, small screen, large font).
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Column(
@@ -172,6 +200,9 @@ fun ChatEmptyState(
             MinisTextButton(onClick = { page += 1 }) {
                 Text(stringResource(R.string.chat_quick_shuffle), fontSize = 15.sp)
             }
+            MinisTextButton(onClick = { editing = true }) {
+                Text(stringResource(R.string.chat_quick_edit), fontSize = 15.sp)
+            }
         }
         Spacer(Modifier.height(16.dp))
         cards.chunked(2).forEach { row ->
@@ -190,6 +221,76 @@ fun ChatEmptyState(
             }
         }
     }
+    }
+    if (editing) {
+        QuickActionsEditor(
+            disabled = disabled,
+            onToggle = { index, on ->
+                val next = if (on) disabled - index else disabled + index
+                // Keep at least one card on.
+                if (next.count { it in 0 until SuggestionPool.size } < SuggestionPool.size) {
+                    disabled = next
+                    writeDisabled(context, next)
+                }
+            },
+            onDismiss = { editing = false },
+        )
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickActionsEditor(disabled: Set<Int>, onToggle: (index: Int, on: Boolean) -> Unit, onDismiss: () -> Unit) {
+    com.openminis.app.ui.components.MinisModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Text(
+                stringResource(R.string.chat_quick_edit_title),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd)) {
+                Text(stringResource(R.string.first_run_done), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Text(
+            stringResource(R.string.chat_quick_edit_footer),
+            fontSize = 13.sp,
+            color = ChatColors.secondaryText,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(14.dp))
+                .background(ChatColors.secondaryBg),
+        ) {
+            SuggestionPool.forEachIndexed { index, card ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(card.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(card.title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(card.subtitle), fontSize = 13.sp, color = ChatColors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    com.openminis.app.ui.settings.MinisSwitch(
+                        checked = index !in disabled,
+                        onCheckedChange = { onToggle(index, it) },
+                    )
+                }
+                if (index < SuggestionPool.size - 1) {
+                    HorizontalDivider(modifier = Modifier.padding(start = 48.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 

@@ -1965,4 +1965,7 @@
     <string name="thinking_rules_hub_footer">Les règles dépendent du protocole et se modifient par fournisseur.</string>
     <string name="thinking_rules_hub_custom">Règles personnalisées prises en charge</string>
     <string name="thinking_rules_hub_official">Protocole officiel, pas de règles personnalisées</string>
+    <string name="chat_quick_edit">Modifier</string>
+    <string name="chat_quick_edit_title">Configurer les actions rapides</string>
+    <string name="chat_quick_edit_footer">Choisissez les actions affichées sur les cartes. Gardez-en au moins une.</string>
 </resources>

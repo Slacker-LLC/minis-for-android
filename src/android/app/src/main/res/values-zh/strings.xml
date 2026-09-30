@@ -2362,4 +2362,7 @@
     <string name="thinking_rules_hub_footer">思考规则依赖各服务商的协议，因此在各服务商内分别编辑。</string>
     <string name="thinking_rules_hub_custom">支持自定义规则</string>
     <string name="thinking_rules_hub_official">官方协议，无需自定义规则</string>
+    <string name="chat_quick_edit">编辑</string>
+    <string name="chat_quick_edit_title">配置快捷动作</string>
+    <string name="chat_quick_edit_footer">选择显示在快捷卡上的动作，至少保留一个。</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.zIndex
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -2652,7 +2653,10 @@ fun ChatScreen(
                     val activeEntry by viewModel.activeEntryId.collectAsState()
                     val providerDone = setupConfig.instances.any { it.isEnabled } && setupConfig.modelEntries.isNotEmpty()
                     val modelDone = activeEntry != null || setupConfig.slots.main.isNotEmpty()
+                    // zIndex: the (empty) message list is declared after this and its gesture handlers
+                    // would otherwise block every tap on the cards, Shuffle and Edit.
                     ChatEmptyState(
+                        modifier = Modifier.zIndex(1f),
                         onPick = { viewModel.sendMessage(it) },
                         setup = if (providerDone && modelDone) null else FirstRunSetup(
                             providerDone = providerDone,
@@ -3317,14 +3321,19 @@ fun ChatScreen(
                         // handler. We close the menu on the very first finger
                         // down anywhere inside the chat list, exactly like
                         // tapping outside an iOS popover.
-                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy, showAttachMenu) {
+                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy, showAttachMenu, messages.isEmpty()) {
                             awaitEachGesture {
                                 awaitFirstDown(
                                     requireUnconsumed = false,
                                     pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial,
                                 )
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
+                                // Not while the empty-state cards are showing: hiding the keyboard on
+                                // finger-down re-lays the page out under the finger, so the tap on a
+                                // card / Shuffle / Edit lands on nothing and never fires.
+                                if (messages.isNotEmpty()) {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
+                                }
                                 if (slashMenuOpen) {
                                     viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
                                 }

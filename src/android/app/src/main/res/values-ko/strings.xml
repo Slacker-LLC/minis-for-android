@@ -2063,4 +2063,7 @@
     <string name="thinking_rules_hub_footer">사고 규칙은 공급자의 프로토콜에 따라 달라 공급자별로 편집합니다.</string>
     <string name="thinking_rules_hub_custom">사용자 규칙 지원</string>
     <string name="thinking_rules_hub_official">공식 프로토콜, 사용자 규칙 불필요</string>
+    <string name="chat_quick_edit">편집</string>
+    <string name="chat_quick_edit_title">빠른 작업 설정</string>
+    <string name="chat_quick_edit_footer">빠른 카드에 표시할 작업을 선택하세요. 하나 이상 켜 두세요.</string>
 </resources>

@@ -2328,4 +2328,7 @@
     <string name="thinking_rules_hub_footer">Правила зависят от протокола и редактируются для каждого провайдера.</string>
     <string name="thinking_rules_hub_custom">Поддерживаются свои правила</string>
     <string name="thinking_rules_hub_official">Официальный протокол, правила не нужны</string>
+    <string name="chat_quick_edit">Изменить</string>
+    <string name="chat_quick_edit_title">Настроить быстрые действия</string>
+    <string name="chat_quick_edit_footer">Выберите действия для карточек. Оставьте хотя бы одно.</string>
 </resources>

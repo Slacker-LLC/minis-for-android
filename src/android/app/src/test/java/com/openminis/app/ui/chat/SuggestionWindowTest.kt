@@ -35,3 +35,18 @@ class SuggestionWindowTest {
         assertEquals(4, suggestionWindow(12, 1, -3).size)
     }
 }
+
+class EnabledSuggestionsTest {
+    @org.junit.Test fun offCardsAreLeftOut() {
+        org.junit.Assert.assertEquals(listOf(0, 2, 3), enabledSuggestions(4, setOf(1)))
+    }
+
+    @org.junit.Test fun turningEverythingOffFallsBackToTheWholePool() {
+        org.junit.Assert.assertEquals(listOf(0, 1, 2), enabledSuggestions(3, setOf(0, 1, 2)))
+    }
+
+    @org.junit.Test fun staleIndicesFromAnOlderPoolAreIgnored() {
+        org.junit.Assert.assertEquals(listOf(0, 1, 2), enabledSuggestions(3, setOf(9, 10)))
+        org.junit.Assert.assertEquals(listOf(1, 2), enabledSuggestions(3, setOf(0, 99)))
+    }
+}
