@@ -80,7 +80,10 @@ class RootfsManager private constructor(private val context: Context) {
         null
     }
 
-    suspend fun getRootfsSize(): Long = checkHealth().sizeBytes ?: 0L
+    suspend fun getRootfsSize(): Long = withContext(Dispatchers.IO) {
+        if (!UbuntuRuntime.isInitialized) UbuntuRuntime.init(context)
+        UbuntuKernel.measureRootfsSize()
+    }
 
     suspend fun restoreUserData(backupDir: File) = withContext(Dispatchers.IO) {
         Log.i(TAG, "restoreUserData ignored for ${backupDir.path}: persistent data is not stored in rootfs")
@@ -194,6 +197,18 @@ class RootfsManager private constructor(private val context: Context) {
             commands += "echo 'MINIS_ROOTFS:METADATA'"
             commands += "cat \"\$ROOTFS/etc/minis/rootfs.json\""
             return commands.joinToString("\n")
+        }
+
+        /** The fixed, read-only size probe: `du` in 1 KiB blocks, one filesystem only (-x), nothing else. */
+        internal fun buildSizeProbeCommand(rootfs: String): String =
+            "du -skx ${shellQuote(rootfs)} 2>/dev/null | head -n 1"
+
+        /** First integer on the first line of `du -sk` output, as bytes; null when it is not a number. */
+        internal fun parseSizeProbeOutput(output: String): Long? {
+            val kib = output.lineSequence().firstOrNull { it.isNotBlank() }
+                ?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.toLongOrNull()
+                ?: return null
+            return if (kib < 0) null else kib * 1024L
         }
 
         internal fun evaluateProbeOutput(output: String): RootfsHealth {
