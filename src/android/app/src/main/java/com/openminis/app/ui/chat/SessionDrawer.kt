@@ -160,9 +160,7 @@ fun SessionDrawerContent(
         if (isSelecting) {
             SelectionHeader(
                 count = selectedIds.size,
-                onCancel = { viewModel.clearSelection() },
-                onMove = { viewModel.requestGroupPickerForSelection() },
-                onDelete = { showBulkDelete = true },
+                onDone = { viewModel.clearSelection() },
             )
         } else {
             Text(
@@ -318,6 +316,14 @@ fun SessionDrawerContent(
             }
         }
 
+        if (isSelecting) {
+            SelectionFooter(
+                count = selectedIds.size,
+                bottomInset = bottomInset,
+                onMove = { viewModel.requestGroupPickerForSelection() },
+                onDelete = { showBulkDelete = true },
+            )
+        }
         // Bottom docked settings row (full width; no floating button).
         if (!isSelecting) {
             HorizontalDivider(
@@ -451,43 +457,61 @@ fun SessionDrawerContent(
     }
 }
 
+/** Multi-select header from the board: a large "N selected" title with Done on the right. */
 @Composable
 private fun SelectionHeader(
     count: Int,
-    onCancel: () -> Unit,
-    onMove: () -> Unit,
-    onDelete: () -> Unit,
+    onDone: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp),
+            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        MinisTextButton(onClick = onCancel) {
-            Text(stringResource(R.string.cancel), fontSize = 15.sp)
-        }
         Text(
             text = stringResource(R.string.sessionlist_n_selected, count),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
             color = ChatColors.primaryText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        Row {
-            MinisTextButton(onClick = onMove, enabled = count > 0) {
-                Text(stringResource(R.string.group_move_action), fontSize = 15.sp)
-            }
-            MinisTextButton(onClick = onDelete, enabled = count > 0) {
-                Text(
-                    stringResource(R.string.delete),
-                    fontSize = 15.sp,
-                    color = if (count > 0) MaterialTheme.colorScheme.error else Color.Unspecified,
-                )
-            }
+        MinisTextButton(onClick = onDone) {
+            Text(stringResource(R.string.drawer_select_done), fontSize = 16.sp)
+        }
+    }
+}
+
+/** Multi-select actions docked at the bottom: move (accent) and delete (red), disabled at zero. */
+@Composable
+private fun SelectionFooter(
+    count: Int,
+    bottomInset: Dp,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(bottom = bottomInset),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MinisTextButton(onClick = onMove, enabled = count > 0) {
+            Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(6.dp))
+            Text(stringResource(R.string.drawer_move_n, count), fontSize = 15.sp)
+        }
+        MinisTextButton(onClick = onDelete, enabled = count > 0) {
+            val tint = if (count > 0) MaterialTheme.colorScheme.error else Color.Unspecified
+            Icon(Icons.Outlined.Delete, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.size(6.dp))
+            Text(stringResource(R.string.delete), fontSize = 15.sp, color = tint)
         }
     }
 }

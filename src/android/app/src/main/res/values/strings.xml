@@ -2155,6 +2155,8 @@
     <string name="drawer_recent">Recent</string>
     <string name="drawer_no_search_match">No matching conversations</string>
     <string name="drawer_search_results">%1$d results</string>
+    <string name="drawer_select_done">Done</string>
+    <string name="drawer_move_n">Move %1$d</string>
     <string name="chat_empty_greeting_morning">Good morning</string>
     <string name="chat_empty_greeting_afternoon">Good afternoon</string>
     <string name="chat_empty_greeting_evening">Good evening</string>

@@ -1668,6 +1668,8 @@
     <string name="drawer_recent">Récent</string>
     <string name="drawer_no_search_match">Aucune conversation correspondante</string>
     <string name="drawer_search_results">%1$d résultats</string>
+    <string name="drawer_select_done">Terminé</string>
+    <string name="drawer_move_n">Déplacer %1$d</string>
     <string name="chat_empty_greeting_morning">Bonjour</string>
     <string name="chat_empty_greeting_afternoon">Bon après-midi</string>
     <string name="chat_empty_greeting_evening">Bonsoir</string>

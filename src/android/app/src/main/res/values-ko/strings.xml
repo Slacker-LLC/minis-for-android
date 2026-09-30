@@ -1766,6 +1766,8 @@
     <string name="drawer_recent">최근</string>
     <string name="drawer_no_search_match">일치하는 대화가 없습니다</string>
     <string name="drawer_search_results">결과 %1$d개</string>
+    <string name="drawer_select_done">완료</string>
+    <string name="drawer_move_n">%1$d개 이동</string>
     <string name="chat_empty_greeting_morning">좋은 아침이에요</string>
     <string name="chat_empty_greeting_afternoon">안녕하세요</string>
     <string name="chat_empty_greeting_evening">좋은 저녁이에요</string>
