@@ -126,7 +126,7 @@ fun ProviderListScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.provider_list_providers),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_models),
         actions = {
             IconButton(onClick = { showMenu = true }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.provider_list_add_provider))

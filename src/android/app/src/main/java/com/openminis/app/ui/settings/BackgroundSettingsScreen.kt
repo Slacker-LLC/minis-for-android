@@ -138,7 +138,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
     // by that much, so this page's cards sat 16dp narrower than the same cards elsewhere.
     SettingsScaffold(
         title = stringResource(R.string.bg_section_header),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
             Spacer(Modifier.size(8.dp))
             // T180-bg-notif: Task Notifications toggle. Mirrors iOS

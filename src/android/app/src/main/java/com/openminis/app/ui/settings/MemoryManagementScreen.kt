@@ -84,7 +84,7 @@ fun MemoryManagementScreen(
         files = withContext(Dispatchers.IO) { memoryRepository.listAllFiles() }
     }
 
-    SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack, backLabel = stringResource(R.string.settings_cat_agent)) {
         // Always-visible global toggle — sits above the file list so the
         // user finds it whether or not any memory files exist yet.
         SettingsSection(

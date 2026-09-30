@@ -90,7 +90,7 @@ fun EnvironmentVariablesScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.env_var_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_runtime),
         // T75-part1 moved Add off a FAB onto the top-bar action slot;
         // kept here for visual continuity.
         actions = {

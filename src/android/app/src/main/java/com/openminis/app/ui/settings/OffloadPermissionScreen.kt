@@ -73,7 +73,7 @@ fun OffloadPermissionScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.perm_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
         actions = {
             MinisTextButton(onClick = { showResetConfirm = true }) {
                 Text(stringResource(R.string.perm_reset_all))

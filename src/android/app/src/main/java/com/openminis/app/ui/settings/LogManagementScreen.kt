@@ -125,7 +125,7 @@ fun LogManagementScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.log_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_data),
         scrollable = false,
     ) {
         // Segmented selector lives outside the scrolling content so the

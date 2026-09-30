@@ -128,7 +128,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     // bar, same scroll container, and the bottom spacing this page used to leave out.
     SettingsScaffold(
         title = stringResource(R.string.system_permissions_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
             SettingsSection(
                 header = stringResource(R.string.settings_assistant_role),

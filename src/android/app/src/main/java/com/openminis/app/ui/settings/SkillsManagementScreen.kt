@@ -167,7 +167,7 @@ fun SkillsManagementScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.skill_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_agent),
         // T75-part1 already moved Add off the FAB onto the top-bar action
         // slot; kept here for visual continuity with the rest of Settings.
         actions = {

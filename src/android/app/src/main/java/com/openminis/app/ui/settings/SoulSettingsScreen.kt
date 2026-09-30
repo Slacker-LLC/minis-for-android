@@ -233,6 +233,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     SettingsScaffold(
         title = stringResource(R.string.soul_settings_title),
         onBack = attemptBack,
+        backLabel = stringResource(R.string.settings_cat_agent),
         actions = {
             // Save lives in the app bar, where a top-level commit action
             // belongs and where it stays reachable without scrolling the

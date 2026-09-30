@@ -62,7 +62,7 @@ fun SystemPromptSettingsScreen(onBack: () -> Unit, onModulesClick: () -> Unit = 
 
     SettingsScaffold(
         title = stringResource(R.string.settings_system_prompt),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_agent),
         actions = {
             if (dirty) {
                 MinisTextButton(onClick = {

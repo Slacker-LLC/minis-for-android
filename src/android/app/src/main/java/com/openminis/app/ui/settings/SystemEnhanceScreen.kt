@@ -123,7 +123,7 @@ fun SystemEnhanceScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.system_enhance_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
         SettingsSection(header = stringResource(R.string.system_enhance_section_status)) {
             SettingsRow(

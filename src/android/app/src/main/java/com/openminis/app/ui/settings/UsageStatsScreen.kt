@@ -183,7 +183,7 @@ fun UsageStatsScreen(
         isLoaded = true
     }
 
-    SettingsScaffold(title = stringResource(R.string.usage_title), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.usage_title), onBack = onBack, backLabel = stringResource(R.string.settings_cat_models)) {
         if (!isLoaded) return@SettingsScaffold
 
         SettingsSection(header = stringResource(R.string.usage_section_total)) {

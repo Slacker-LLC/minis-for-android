@@ -226,7 +226,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
         )
     }
 
-    SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack, backLabel = stringResource(R.string.settings_section_system)) {
         Text(
             text = stringResource(R.string.vscreen_intro),
             style = MaterialTheme.typography.bodyMedium,
