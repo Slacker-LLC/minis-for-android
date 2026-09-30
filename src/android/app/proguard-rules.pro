@@ -8,4 +8,4 @@
 # descriptor is part of the Binder contract; keep both names and methods stable.
 -keep class com.openminis.app.tools.android.vscreen.service.VirtualScreenUserService { *; }
 -keep interface com.openminis.app.tools.android.vscreen.IVirtualScreenService { *; }
--keep class com.openminis.app.tools.android.vscreen.IVirtualScreenService\$Stub { *; }
+-keep class com.openminis.app.tools.android.vscreen.IVirtualScreenService$Stub { *; }
