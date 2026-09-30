@@ -304,7 +304,7 @@ fun ImageGalleryViewer(
                                         if (bmp != null) {
                                             val saved = saveToGallery(context, bmp)
                                             val msg = if (saved) savedToAlbumMsg else saveFailedMsg
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                            com.openminis.app.ui.components.MinisToast.show(context, msg)
                                         }
                                     }
                                 },

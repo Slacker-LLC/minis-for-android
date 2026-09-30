@@ -383,7 +383,7 @@ private fun MdText(
                         clipboardManager.setText(AnnotatedString(snippet))
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         val preview = if (snippet.length > 40) snippet.take(37) + "…" else snippet
-                        Toast.makeText(context, "Copied: $preview", Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, "Copied: $preview")
                     }
                 }
             }
@@ -2785,7 +2785,7 @@ private fun RenderTable(block: MdBlock.Table) {
                         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                             as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("table", md))
-                        Toast.makeText(context, tableCopiedToast, Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, tableCopiedToast)
                     }
                 },
                 copyTableImage = {
@@ -2814,11 +2814,11 @@ private fun RenderTable(block: MdBlock.Table) {
                                     val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                                         as android.content.ClipboardManager
                                     cm.setPrimaryClip(clip)
-                                    Toast.makeText(context, tableImageCopiedToast, Toast.LENGTH_SHORT).show()
+                                    com.openminis.app.ui.components.MinisToast.show(context, tableImageCopiedToast)
                                 }
                             }
                         } catch (e: Exception) {
-                            Toast.makeText(context, tableImageCopyFailedToast, Toast.LENGTH_SHORT).show()
+                            com.openminis.app.ui.components.MinisToast.show(context, tableImageCopyFailedToast)
                         }
                     }
                     Unit

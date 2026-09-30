@@ -6167,13 +6167,13 @@ class ChatViewModel(
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, context.getString(com.openminis.app.R.string.chat_branch_failed))
                     }
                 }
             } catch (e: Exception) {
                 com.openminis.app.logging.AppLogger.warning("ChatViewModel", "forkSessionAtMessage failed: ${e.message}")
                 withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
+                    com.openminis.app.ui.components.MinisToast.show(context, context.getString(com.openminis.app.R.string.chat_branch_failed))
                 }
             }
         }

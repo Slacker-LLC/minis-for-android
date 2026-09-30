@@ -192,7 +192,7 @@ private fun AvatarThumbnail(profile: CharacterProfile) {
 internal suspend fun shareCharacter(context: android.content.Context, profile: CharacterProfile) {
     val uri = withContext(Dispatchers.IO) { shareCard(context, profile) }
     if (uri == null) {
-        Toast.makeText(context, R.string.characters_export_failed, Toast.LENGTH_LONG).show()
+        com.openminis.app.ui.components.MinisToast.show(context, R.string.characters_export_failed)
     } else {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = if (profile.avatarPath != null) "image/png" else "application/json"

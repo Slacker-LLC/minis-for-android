@@ -3836,7 +3836,7 @@ fun ChatScreen(
                                     },
                                     onBranch = {
                                         viewModel.forkSessionAtMessage(item.messageId) { newId ->
-                                            android.widget.Toast.makeText(context, context.getString(R.string.chat_branch_created), android.widget.Toast.LENGTH_SHORT).show()
+                                            com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.chat_branch_created))
                                             onMoveToSession(newId)
                                         }
                                     },

@@ -1,52 +1,50 @@
 package com.openminis.app.ui.chat
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class SuggestionWindowTest {
+class SuggestionPickTest {
     @Test fun showsFourDistinctValidCards() {
-        val w = suggestionWindow(SuggestionPoolSize, seed = 7, page = 0)
+        val w = pickSuggestions(SuggestionPoolSize, seed = 7, uses = emptyMap())
         assertEquals(4, w.size)
         assertEquals(4, w.toSet().size)
         assertTrue(w.all { it in 0 until SuggestionPoolSize })
     }
 
-    @Test fun sameSeedAndPageAlwaysGiveTheSameCards() {
-        assertEquals(suggestionWindow(12, 42, 1), suggestionWindow(12, 42, 1))
+    @Test fun sameSeedAndHistoryGiveTheSameCards() {
+        assertEquals(pickSuggestions(12, 42, mapOf(3 to 5)), pickSuggestions(12, 42, mapOf(3 to 5)))
     }
 
-    @Test fun shuffleShowsNewCardsUntilThePoolIsUsedUp() {
-        val seen = mutableSetOf<Int>()
-        for (page in 0 until 3) seen += suggestionWindow(12, 5, page)
-        assertEquals("three pages of four should cover all twelve", 12, seen.size)
-        assertNotEquals(suggestionWindow(12, 5, 0), suggestionWindow(12, 5, 1))
+    @Test fun differentChatsStartOnDifferentCards() {
+        val sets = (1..20).map { pickSuggestions(12, it, emptyMap()).toSet() }.toSet()
+        assertTrue("seeds should not all give the same four", sets.size > 1)
     }
 
-    @Test fun differentChatsStartOnDifferentWindows() {
-        val firsts = (1..20).map { suggestionWindow(12, it, 0) }.toSet()
-        assertTrue("seeds should not all give the same four", firsts.size > 1)
+    @Test fun mostUsedCardsAreAlwaysThere() {
+        for (seed in 1..30) {
+            val w = pickSuggestions(12, seed, mapOf(2 to 9, 7 to 4, 5 to 1))
+            assertTrue("seed $seed lost the favourite", 2 in w)
+            assertTrue("seed $seed lost the second favourite", 7 in w)
+        }
+    }
+
+    @Test fun unusedCardsAreNeverRankedAsFavourites() {
+        val w = pickSuggestions(12, 3, mapOf(4 to 2))
+        assertTrue(4 in w)
+        assertEquals(4, w.size)
     }
 
     @Test fun smallOrEmptyPoolsAreSafe() {
-        assertEquals(emptyList<Int>(), suggestionWindow(0, 1, 0))
-        assertEquals(3, suggestionWindow(3, 1, 0).size)
-        assertEquals(4, suggestionWindow(12, 1, -3).size)
-    }
-}
-
-class EnabledSuggestionsTest {
-    @org.junit.Test fun offCardsAreLeftOut() {
-        org.junit.Assert.assertEquals(listOf(0, 2, 3), enabledSuggestions(4, setOf(1)))
+        assertEquals(emptyList<Int>(), pickSuggestions(0, 1, emptyMap()))
+        assertEquals(3, pickSuggestions(3, 1, emptyMap()).size)
+        assertEquals(4, pickSuggestions(12, 1, mapOf(99 to 5)).size)
     }
 
-    @org.junit.Test fun turningEverythingOffFallsBackToTheWholePool() {
-        org.junit.Assert.assertEquals(listOf(0, 1, 2), enabledSuggestions(3, setOf(0, 1, 2)))
-    }
-
-    @org.junit.Test fun staleIndicesFromAnOlderPoolAreIgnored() {
-        org.junit.Assert.assertEquals(listOf(0, 1, 2), enabledSuggestions(3, setOf(9, 10)))
-        org.junit.Assert.assertEquals(listOf(1, 2), enabledSuggestions(3, setOf(0, 99)))
+    @Test fun usesRoundTripAndIgnoreGarbage() {
+        val uses = mapOf(1 to 3, 10 to 1)
+        assertEquals(uses, parseUses(formatUses(uses)))
+        assertEquals(emptyMap<Int, Int>(), parseUses(null))
+        assertEquals(mapOf(2 to 4), parseUses("x,2:4,3:0,5:-1,a:b,7"))
     }
 }

@@ -442,7 +442,7 @@ private fun BorderedMarkdownTable(
                         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                             as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("table", md))
-                        android.widget.Toast.makeText(context, copiedToast, android.widget.Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, copiedToast)
                     }
                 },
             )

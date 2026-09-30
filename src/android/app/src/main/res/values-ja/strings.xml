@@ -1810,7 +1810,6 @@
     <string name="chat_quick_recap_title">最近の会話を要約</string>
     <string name="chat_quick_recap_sub">最近取り組んだこと</string>
     <string name="chat_quick_recap_prompt">最近の会話で取り組んだことを要約して。</string>
-    <string name="chat_quick_shuffle">入れ替え</string>
     <string name="chat_thinking_chip">思考 · %1$s</string>
     <string name="files_hub_used_by">Minis の使用量</string>
     <string name="files_section_sandbox">サンドボックス内のフォルダ</string>
@@ -2071,10 +2070,21 @@
     <string name="thinking_rules_hub_footer">思考ルールはプロバイダのプロトコルに依存するため、プロバイダごとに編集します。</string>
     <string name="thinking_rules_hub_custom">カスタムルール対応</string>
     <string name="thinking_rules_hub_official">公式プロトコル、カスタムルール不要</string>
-    <string name="chat_quick_edit">編集</string>
-    <string name="chat_quick_edit_title">クイックアクションを設定</string>
-    <string name="chat_quick_edit_footer">クイックカードに表示する操作を選びます。最低 1 つは残してください。</string>
     <string name="scheduled_tasks_empty_title">定期タスクはありません</string>
     <string name="scheduled_run_ok">成功</string>
     <string name="scheduled_run_failed">失敗</string>
+    <string name="chat_empty_greeting_dawn">夜明け前ですね</string>
+    <string name="chat_empty_greeting_dawn_b">早起きですね</string>
+    <string name="chat_empty_greeting_morning_b">おはよう</string>
+    <string name="chat_empty_greeting_noon">こんにちは</string>
+    <string name="chat_empty_greeting_noon_b">お昼ですね</string>
+    <string name="chat_empty_greeting_afternoon_b">午後もいい感じ？</string>
+    <string name="chat_empty_greeting_evening_b">こんばんは、お疲れさま</string>
+    <string name="chat_empty_greeting_night">夜更けですね</string>
+    <string name="chat_empty_greeting_night_b">まだ起きてる？</string>
+    <string name="chat_empty_prompt_b">何をお手伝いしましょうか？</string>
+    <string name="chat_empty_prompt_c">何から始めましょう？</string>
+    <string name="chat_empty_prompt_d">どこから始めますか？</string>
+    <string name="chat_empty_prompt_e">任せてください、話してみて。</string>
+    <string name="chat_empty_prompt_f">今日の予定は？</string>
 </resources>

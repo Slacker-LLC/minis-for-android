@@ -64,53 +64,91 @@ import com.openminis.app.ui.theme.ChatColors
 import java.util.Calendar
 import kotlin.random.Random
 
-/** Time-of-day slot for the empty-chat greeting (board: "早上好" + "今天想做点什么？"). */
-enum class GreetingSlot { MORNING, AFTERNOON, EVENING }
+/** Time-of-day slot for the empty-chat greeting. */
+enum class GreetingSlot { DAWN, MORNING, NOON, AFTERNOON, EVENING, NIGHT }
 
-/** 00:00-11:59 morning, 12:00-17:59 afternoon, 18:00-23:59 evening. */
+/** 00-04 dawn, 05-10 morning, 11-13 noon, 14-17 afternoon, 18-22 evening, 23 late night. */
 fun greetingSlotFor(hourOfDay: Int): GreetingSlot = when (hourOfDay) {
-    in 0..11 -> GreetingSlot.MORNING
-    in 12..17 -> GreetingSlot.AFTERNOON
-    else -> GreetingSlot.EVENING
+    in 0..4 -> GreetingSlot.DAWN
+    in 5..10 -> GreetingSlot.MORNING
+    in 11..13 -> GreetingSlot.NOON
+    in 14..17 -> GreetingSlot.AFTERNOON
+    in 18..22 -> GreetingSlot.EVENING
+    else -> GreetingSlot.NIGHT
 }
+
+/** Two wordings per time of day; [variant] (any int, e.g. a per-chat seed) picks one. */
+internal fun greetingRes(slot: GreetingSlot, variant: Int): Int {
+    val pair = when (slot) {
+        GreetingSlot.DAWN -> R.string.chat_empty_greeting_dawn to R.string.chat_empty_greeting_dawn_b
+        GreetingSlot.MORNING -> R.string.chat_empty_greeting_morning to R.string.chat_empty_greeting_morning_b
+        GreetingSlot.NOON -> R.string.chat_empty_greeting_noon to R.string.chat_empty_greeting_noon_b
+        GreetingSlot.AFTERNOON -> R.string.chat_empty_greeting_afternoon to R.string.chat_empty_greeting_afternoon_b
+        GreetingSlot.EVENING -> R.string.chat_empty_greeting_evening to R.string.chat_empty_greeting_evening_b
+        GreetingSlot.NIGHT -> R.string.chat_empty_greeting_night to R.string.chat_empty_greeting_night_b
+    }
+    return if (Math.floorMod(variant, 2) == 0) pair.first else pair.second
+}
+
+private val PromptVariants = listOf(
+    R.string.chat_empty_prompt,
+    R.string.chat_empty_prompt_b,
+    R.string.chat_empty_prompt_c,
+    R.string.chat_empty_prompt_d,
+    R.string.chat_empty_prompt_e,
+    R.string.chat_empty_prompt_f,
+)
+
+/** The line under the greeting; [variant] picks one of several wordings. */
+internal fun promptRes(variant: Int): Int = PromptVariants[Math.floorMod(variant, PromptVariants.size)]
 
 /** Cards shown per screen. */
 private const val VISIBLE_SUGGESTIONS = 4
 
-/**
- * Which suggestions to show: a window of [count] from a pool of [poolSize], ordered by a shuffle
- * that depends only on [seed]. Each [page] moves to the next window and wraps, so "Shuffle" walks
- * through the whole pool before repeating, and a given chat keeps the same cards while it is open.
- */
-internal fun suggestionWindow(poolSize: Int, seed: Int, page: Int, count: Int = VISIBLE_SUGGESTIONS): List<Int> {
-    if (poolSize <= 0) return emptyList()
-    val order = (0 until poolSize).shuffled(Random(seed))
-    val take = minOf(count, poolSize)
-    val start = Math.floorMod(page * take, poolSize)
-    return List(take) { order[(start + it) % poolSize] }
-}
+/** How many of the cards come from what the user taps most; the rest are random. */
+private const val HABIT_SLOTS = 2
 
 /**
- * Pool indices the user left switched on. Never empty: if everything is off (or the stored set
- * names nothing that exists) the whole pool comes back, so the screen cannot end up with no cards.
+ * Which suggestions to show: up to [HABIT_SLOTS] of the ones used most ([uses] = taps per pool
+ * index), then random ones to fill [count]. The random part depends only on [seed], so a chat keeps
+ * the same cards while it is open and a new chat starts on a different set. Nothing the user has
+ * not used is ever ranked, so with no history it is simply a random set.
  */
-internal fun enabledSuggestions(poolSize: Int, disabled: Set<Int>): List<Int> {
-    val on = (0 until poolSize).filter { it !in disabled }
-    return if (on.isEmpty()) (0 until poolSize).toList() else on
+internal fun pickSuggestions(poolSize: Int, seed: Int, uses: Map<Int, Int>, count: Int = VISIBLE_SUGGESTIONS): List<Int> {
+    if (poolSize <= 0) return emptyList()
+    val take = minOf(count, poolSize)
+    val order = (0 until poolSize).shuffled(Random(seed))
+    val favourites = order
+        .filter { (uses[it] ?: 0) > 0 }
+        .sortedByDescending { uses[it] ?: 0 }   // stable: ties keep the seeded order
+        .take(minOf(HABIT_SLOTS, take))
+    val rest = order.filter { it !in favourites }.take(take - favourites.size)
+    return (favourites + rest).shuffled(Random(seed + 1))
 }
 
 private const val QUICK_PREFS = "chat_quick_actions"
-private const val QUICK_DISABLED_KEY = "disabled"
+private const val QUICK_USES_KEY = "uses"
 
-private fun readDisabled(context: android.content.Context): Set<Int> = runCatching {
-    context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE)
-        .getStringSet(QUICK_DISABLED_KEY, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
-}.getOrDefault(emptySet())
+/** Stored as "index:count,index:count"; anything malformed is ignored. */
+internal fun parseUses(raw: String?): Map<Int, Int> = raw.orEmpty().split(',').mapNotNull { part ->
+    val (i, n) = part.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+    val index = i.toIntOrNull() ?: return@mapNotNull null
+    val count = n.toIntOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+    index to count
+}.toMap()
 
-private fun writeDisabled(context: android.content.Context, disabled: Set<Int>) {
+internal fun formatUses(uses: Map<Int, Int>): String = uses.entries.joinToString(",") { "${it.key}:${it.value}" }
+
+private fun readUses(context: android.content.Context): Map<Int, Int> = runCatching {
+    parseUses(context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE).getString(QUICK_USES_KEY, null))
+}.getOrDefault(emptyMap())
+
+private fun recordUse(context: android.content.Context, index: Int) {
     runCatching {
-        context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE).edit()
-            .putStringSet(QUICK_DISABLED_KEY, disabled.map { it.toString() }.toSet()).apply()
+        val prefs = context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE)
+        val uses = parseUses(prefs.getString(QUICK_USES_KEY, null)).toMutableMap()
+        uses[index] = (uses[index] ?: 0) + 1
+        prefs.edit().putString(QUICK_USES_KEY, formatUses(uses)).apply()
     }
 }
 
@@ -129,13 +167,13 @@ private val SuggestionPool = listOf(
     QuickCard(Icons.Outlined.History, R.string.chat_quick_recap_title, R.string.chat_quick_recap_sub, R.string.chat_quick_recap_prompt),
 )
 
-/** Size of the pool, for the tests that keep it and [suggestionWindow] consistent. */
+/** Size of the pool, for the tests that keep it and [pickSuggestions] consistent. */
 internal val SuggestionPoolSize: Int get() = SuggestionPool.size
 
 /**
  * The empty conversation: a greeting and a few things the agent can do right now. Tapping a card
- * sends its prompt. The cards come from a pool of [SuggestionPool] entries, four at a time, and a
- * new chat starts on a different window, so the screen is not the same four tiles every time.
+ * sends its prompt. The four cards are chosen automatically from [SuggestionPool]: what the user
+ * taps most, plus random ones, so there is nothing to shuffle or configure.
  */
 @Composable
 fun ChatEmptyState(
@@ -150,12 +188,10 @@ fun ChatEmptyState(
         return
     }
     val seed = rememberSaveable { Random.nextInt() }
-    var page by rememberSaveable { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    var disabled by remember { androidx.compose.runtime.mutableStateOf(readDisabled(context)) }
-    var editing by remember { androidx.compose.runtime.mutableStateOf(false) }
-    val enabled = enabledSuggestions(SuggestionPool.size, disabled)
-    val cards = suggestionWindow(enabled.size, seed, page).map { SuggestionPool[enabled[it]] }
+    val uses = remember { readUses(context) }
+    val picks = remember(seed) { pickSuggestions(SuggestionPool.size, seed, uses) }
+    val cards = picks.map { it to SuggestionPool[it] }
     // Centered when it fits; scrolls when it does not (keyboard up, small screen, large font).
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Column(
@@ -174,123 +210,34 @@ fun ChatEmptyState(
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = stringResource(
-                when (slot) {
-                    GreetingSlot.MORNING -> R.string.chat_empty_greeting_morning
-                    GreetingSlot.AFTERNOON -> R.string.chat_empty_greeting_afternoon
-                    GreetingSlot.EVENING -> R.string.chat_empty_greeting_evening
-                },
-            ),
+            text = stringResource(greetingRes(slot, seed / 7)),
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = ChatColors.primaryText,
         )
         Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.chat_empty_prompt),
-                fontSize = 16.sp,
-                color = ChatColors.secondaryText,
-                modifier = Modifier.weight(1f),
-            )
-            MinisTextButton(onClick = { page += 1 }) {
-                Text(stringResource(R.string.chat_quick_shuffle), fontSize = 15.sp)
-            }
-            MinisTextButton(onClick = { editing = true }) {
-                Text(stringResource(R.string.chat_quick_edit), fontSize = 15.sp)
-            }
-        }
+        Text(
+            text = stringResource(promptRes(seed / 3)),
+            fontSize = 16.sp,
+            color = ChatColors.secondaryText,
+        )
         Spacer(Modifier.height(16.dp))
         cards.chunked(2).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                row.forEach { card ->
+                row.forEach { (index, card) ->
                     val prompt = stringResource(card.prompt)
                     QuickActionCard(
                         card = card,
-                        onClick = { onPick(prompt) },
+                        onClick = { recordUse(context, index); onPick(prompt) },
                         modifier = Modifier.weight(1f),
                     )
                 }
             }
         }
     }
-    }
-    if (editing) {
-        QuickActionsEditor(
-            disabled = disabled,
-            onToggle = { index, on ->
-                val next = if (on) disabled - index else disabled + index
-                // Keep at least one card on.
-                if (next.count { it in 0 until SuggestionPool.size } < SuggestionPool.size) {
-                    disabled = next
-                    writeDisabled(context, next)
-                }
-            },
-            onDismiss = { editing = false },
-        )
-    }
-}
-
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-@Composable
-private fun QuickActionsEditor(disabled: Set<Int>, onToggle: (index: Int, on: Boolean) -> Unit, onDismiss: () -> Unit) {
-    com.openminis.app.ui.components.MinisModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-            Text(
-                stringResource(R.string.chat_quick_edit_title),
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.align(Alignment.Center),
-            )
-            MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd)) {
-                Text(stringResource(R.string.first_run_done), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Text(
-            stringResource(R.string.chat_quick_edit_footer),
-            fontSize = 13.sp,
-            color = ChatColors.secondaryText,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-        )
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
-                .clip(RoundedCornerShape(14.dp))
-                .background(ChatColors.secondaryBg),
-        ) {
-            SuggestionPool.forEachIndexed { index, card ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(card.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(card.title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(card.subtitle), fontSize = 13.sp, color = ChatColors.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    com.openminis.app.ui.settings.MinisSwitch(
-                        checked = index !in disabled,
-                        onCheckedChange = { onToggle(index, it) },
-                    )
-                }
-                if (index < SuggestionPool.size - 1) {
-                    HorizontalDivider(modifier = Modifier.padding(start = 48.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

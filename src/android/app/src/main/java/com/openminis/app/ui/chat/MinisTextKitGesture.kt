@@ -1058,7 +1058,7 @@ fun MinisSelectionToolbarHost(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 fun toast(msg: String) {
-                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    com.openminis.app.ui.components.MinisToast.show(context, msg)
                 }
                 fun preview(text: String): String =
                     if (text.length > 40) text.take(37) + "…" else text

@@ -2065,7 +2065,6 @@
     <string name="chat_quick_recap_title">Кратко изложить последние диалоги</string>
     <string name="chat_quick_recap_sub">Над чем вы работали</string>
     <string name="chat_quick_recap_prompt">Кратко изложи, над чем мы работали в моих последних диалогах.</string>
-    <string name="chat_quick_shuffle">Другие</string>
     <string name="chat_thinking_chip">Размышление · %1$s</string>
     <string name="files_hub_used_by">Занято Minis</string>
     <string name="files_section_sandbox">Папки в песочнице</string>
@@ -2328,10 +2327,21 @@
     <string name="thinking_rules_hub_footer">Правила зависят от протокола и редактируются для каждого провайдера.</string>
     <string name="thinking_rules_hub_custom">Поддерживаются свои правила</string>
     <string name="thinking_rules_hub_official">Официальный протокол, правила не нужны</string>
-    <string name="chat_quick_edit">Изменить</string>
-    <string name="chat_quick_edit_title">Настроить быстрые действия</string>
-    <string name="chat_quick_edit_footer">Выберите действия для карточек. Оставьте хотя бы одно.</string>
     <string name="scheduled_tasks_empty_title">Нет задач по расписанию</string>
     <string name="scheduled_run_ok">Успешно</string>
     <string name="scheduled_run_failed">Сбой</string>
+    <string name="chat_empty_greeting_dawn">Доброе раннее утро</string>
+    <string name="chat_empty_greeting_dawn_b">Уже не спится?</string>
+    <string name="chat_empty_greeting_morning_b">С добрым утром</string>
+    <string name="chat_empty_greeting_noon">Добрый день</string>
+    <string name="chat_empty_greeting_noon_b">Обеденное время</string>
+    <string name="chat_empty_greeting_afternoon_b">Хорошего дня</string>
+    <string name="chat_empty_greeting_evening_b">Добрый вечер</string>
+    <string name="chat_empty_greeting_night">Уже поздно</string>
+    <string name="chat_empty_greeting_night_b">Ещё не спите?</string>
+    <string name="chat_empty_prompt_b">Чем могу помочь?</string>
+    <string name="chat_empty_prompt_c">С чего начнём?</string>
+    <string name="chat_empty_prompt_d">Где начнём?</string>
+    <string name="chat_empty_prompt_e">Доверьте это мне, рассказывайте.</string>
+    <string name="chat_empty_prompt_f">Что сегодня в планах?</string>
 </resources>

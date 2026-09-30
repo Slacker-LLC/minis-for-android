@@ -1040,7 +1040,7 @@ private fun shareSkillZip(context: android.content.Context, zip: java.io.File) {
             context, "${context.packageName}.fileprovider", zip,
         )
     } catch (t: Throwable) {
-        Toast.makeText(context, context.getString(R.string.skill_export_failed), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.skill_export_failed))
         return
     }
     val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -1054,7 +1054,7 @@ private fun shareSkillZip(context: android.content.Context, zip: java.io.File) {
         context.getString(R.string.skill_export_share),
     ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
     runCatching { context.startActivity(chooser) }.onFailure {
-        Toast.makeText(context, context.getString(R.string.skill_export_failed), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.skill_export_failed))
     }
 }
 

@@ -464,7 +464,7 @@ fun AgentStateBars(
                                         .clickable {
                                             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             cm.setPrimaryClip(ClipData.newPlainText("deliverable", d.path))
-                                            Toast.makeText(context, context.getString(R.string.chat_copied_path, d.path), Toast.LENGTH_SHORT).show()
+                                            com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.chat_copied_path, d.path))
                                         }
                                         .padding(horizontal = 6.dp, vertical = 2.dp),
                                 )

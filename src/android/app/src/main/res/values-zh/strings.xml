@@ -2105,7 +2105,6 @@
     <string name="chat_quick_recap_title">总结最近的对话</string>
     <string name="chat_quick_recap_sub">最近都做了什么</string>
     <string name="chat_quick_recap_prompt">总结一下我最近的对话里都做了什么。</string>
-    <string name="chat_quick_shuffle">换一批</string>
     <string name="chat_thinking_chip">思考 · %1$s</string>
     <string name="files_hub_used_by">Minis 占用</string>
     <string name="files_section_sandbox">沙箱内的目录</string>
@@ -2362,10 +2361,21 @@
     <string name="thinking_rules_hub_footer">思考规则依赖各服务商的协议，因此在各服务商内分别编辑。</string>
     <string name="thinking_rules_hub_custom">支持自定义规则</string>
     <string name="thinking_rules_hub_official">官方协议，无需自定义规则</string>
-    <string name="chat_quick_edit">编辑</string>
-    <string name="chat_quick_edit_title">配置快捷动作</string>
-    <string name="chat_quick_edit_footer">选择显示在快捷卡上的动作，至少保留一个。</string>
     <string name="scheduled_tasks_empty_title">还没有定时任务</string>
     <string name="scheduled_run_ok">成功</string>
     <string name="scheduled_run_failed">失败</string>
+    <string name="chat_empty_greeting_dawn">凌晨好</string>
+    <string name="chat_empty_greeting_dawn_b">这么早就醒了</string>
+    <string name="chat_empty_greeting_morning_b">早安</string>
+    <string name="chat_empty_greeting_noon">中午好</string>
+    <string name="chat_empty_greeting_noon_b">午安</string>
+    <string name="chat_empty_greeting_afternoon_b">午后好</string>
+    <string name="chat_empty_greeting_evening_b">今晚好</string>
+    <string name="chat_empty_greeting_night">夜深了</string>
+    <string name="chat_empty_greeting_night_b">还没休息吗</string>
+    <string name="chat_empty_prompt_b">有什么我可以帮你的？</string>
+    <string name="chat_empty_prompt_c">想让我帮你做点什么？</string>
+    <string name="chat_empty_prompt_d">从哪里开始？</string>
+    <string name="chat_empty_prompt_e">交给我吧，说说看。</string>
+    <string name="chat_empty_prompt_f">今天有什么安排？</string>
 </resources>

@@ -101,11 +101,11 @@ fun ProviderListScreen(
                     context = context,
                     uri = uri,
                     onImportSingle = { jsonStr -> providerRepository.importInstanceJSON(jsonStr) },
-                    onExtractFailed = { Toast.makeText(context, toastFailed, Toast.LENGTH_SHORT).show() },
-                    onNoSupported = { Toast.makeText(context, toastNoSupported, Toast.LENGTH_SHORT).show() },
+                    onExtractFailed = { com.openminis.app.ui.components.MinisToast.show(context, toastFailed) },
+                    onNoSupported = { com.openminis.app.ui.components.MinisToast.show(context, toastNoSupported) },
                     onSummary = { ok, total ->
                         val msg = context.getString(R.string.import_zip_summary, ok, total)
-                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, msg)
                     },
                 )
             } else {
@@ -113,14 +113,14 @@ fun ProviderListScreen(
                 if (jsonStr != null) {
                     val label = providerRepository.importInstanceJSON(jsonStr)
                     if (label != null) {
-                        Toast.makeText(context, context.getString(R.string.provider_imported_toast, label), Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.provider_imported_toast, label))
                     } else {
-                        Toast.makeText(context, context.getString(R.string.share_provider_json_import_failed), Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.share_provider_json_import_failed))
                     }
                 }
             }
         } catch (e: Exception) {
-            Toast.makeText(context, context.getString(R.string.filepreview_file_read_error), Toast.LENGTH_SHORT).show()
+            com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.filepreview_file_read_error))
         }
     }
 

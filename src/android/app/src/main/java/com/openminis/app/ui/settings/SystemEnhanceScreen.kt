@@ -87,7 +87,7 @@ fun SystemEnhanceScreen(
     }
 
     fun writeFailed() {
-        Toast.makeText(context, context.getString(R.string.module_settings_write_failed), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.module_settings_write_failed))
     }
 
     // The assistant role can also change from the OEM settings app, so re-read it whenever this

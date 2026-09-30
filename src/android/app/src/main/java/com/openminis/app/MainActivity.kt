@@ -622,6 +622,8 @@ class MainActivity : ComponentActivity() {
                 // agent triggers a change. Mirrors iOS MinisApp.swift
                 // root-level `.sheet(item: gate.pending)`.
                 com.openminis.app.ui.settings.ConfigConfirmDialogHost()
+                // Light feedback capsules (MinisToast); falls back to the system Toast without this host.
+                com.openminis.app.ui.components.MinisToastHost()
                 }
             }
         }

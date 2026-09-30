@@ -301,7 +301,7 @@ fun FilePreviewScreen(
                 com.openminis.app.ui.components.MinisAction(stringResource(R.string.filebrowser_copy_abs_path)) {
                     val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     clip.setPrimaryClip(android.content.ClipData.newPlainText("path", item.file.absolutePath))
-                    Toast.makeText(context, context.getString(R.string.filebrowser_copy_abs_path_toast), Toast.LENGTH_SHORT).show()
+                    com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.filebrowser_copy_abs_path_toast))
                 },
             ),
         )
@@ -943,7 +943,7 @@ private fun openExternally(context: Context, item: FileItem, mime: String) {
         context.startActivity(Intent.createChooser(intent, "Open with…"))
     } catch (e: Exception) {
         AppLogger.warning("FilePreview", "openExternally failed: ${e.message}")
-        Toast.makeText(context, context.getString(R.string.file_preview_no_app), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.file_preview_no_app))
     }
 }
 
@@ -1043,7 +1043,7 @@ private fun shareFile(context: Context, item: FileItem) {
         if (!item.file.exists()) {
             val msg = "File does not exist: ${item.file.name}"
             AppLogger.warning("FilePreview", "share failed: $msg")
-            Toast.makeText(context, context.getString(R.string.file_share_failed_toast, msg), Toast.LENGTH_SHORT).show()
+            com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.file_share_failed_toast, msg))
             return
         }
         val authority = "${context.packageName}.fileprovider"
@@ -1059,7 +1059,7 @@ private fun shareFile(context: Context, item: FileItem) {
         context.startActivity(Intent.createChooser(intent, context.getString(R.string.file_share_chooser_title)))
     } catch (e: Exception) {
         AppLogger.warning("FilePreview", "share failed for ${item.name}: ${e.message}")
-        Toast.makeText(context, context.getString(R.string.file_share_failed_toast, e.message ?: ""), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.file_share_failed_toast, e.message ?: ""))
     }
 }
 
@@ -1118,7 +1118,7 @@ private fun printFile(context: Context, item: FileItem) {
         holder = webView
     } catch (e: Exception) {
         AppLogger.warning("FilePreview", "print failed for ${item.name}: ${e.message}")
-        Toast.makeText(context, context.getString(R.string.file_print_failed_toast, e.message ?: ""), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.file_print_failed_toast, e.message ?: ""))
     }
 }
 

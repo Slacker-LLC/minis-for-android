@@ -2194,7 +2194,6 @@
     <string name="chat_quick_recap_title">Summarize recent chats</string>
     <string name="chat_quick_recap_sub">What you worked on lately</string>
     <string name="chat_quick_recap_prompt">Summarize what we worked on in my recent conversations.</string>
-    <string name="chat_quick_shuffle">Shuffle</string>
     <string name="chat_thinking_chip">Thinking · %1$s</string>
     <string name="files_hub_used_by">Minis usage</string>
     <string name="files_section_sandbox">Directories in the sandbox</string>
@@ -2452,10 +2451,21 @@
     <string name="thinking_rules_hub_footer">Thinking rules are edited per provider because they depend on its protocol.</string>
     <string name="thinking_rules_hub_custom">Custom rules supported</string>
     <string name="thinking_rules_hub_official">Official protocol, no custom rules</string>
-    <string name="chat_quick_edit">Edit</string>
-    <string name="chat_quick_edit_title">Configure quick actions</string>
-    <string name="chat_quick_edit_footer">Choose which actions appear on the quick cards. Keep at least one on.</string>
     <string name="scheduled_tasks_empty_title">No scheduled tasks</string>
     <string name="scheduled_run_ok">Succeeded</string>
     <string name="scheduled_run_failed">Failed</string>
+    <string name="chat_empty_greeting_dawn">Good early morning</string>
+    <string name="chat_empty_greeting_dawn_b">Up before the sun?</string>
+    <string name="chat_empty_greeting_morning_b">Rise and shine</string>
+    <string name="chat_empty_greeting_noon">Good noon</string>
+    <string name="chat_empty_greeting_noon_b">Lunch time</string>
+    <string name="chat_empty_greeting_afternoon_b">Hope your afternoon is going well</string>
+    <string name="chat_empty_greeting_evening_b">Evening already</string>
+    <string name="chat_empty_greeting_night">It\'s getting late</string>
+    <string name="chat_empty_greeting_night_b">Still up?</string>
+    <string name="chat_empty_prompt_b">How can I help?</string>
+    <string name="chat_empty_prompt_c">What should we start with?</string>
+    <string name="chat_empty_prompt_d">Where shall we begin?</string>
+    <string name="chat_empty_prompt_e">Leave it to me, tell me more.</string>
+    <string name="chat_empty_prompt_f">What\'s on your plate today?</string>
 </resources>

@@ -46,7 +46,7 @@ internal fun MCPServerExposureSection() {
 
     fun copy(text: String, toast: String) {
         clipboard.setText(AnnotatedString(text))
-        Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, toast)
     }
 
     SettingsSection(
@@ -95,7 +95,7 @@ internal fun MCPServerExposureSection() {
                 if (token != null) {
                     copy(token.token, context.getString(R.string.mcp_new_token_copied))
                 } else {
-                    Toast.makeText(context, context.getString(R.string.mcp_token_create_failed), Toast.LENGTH_SHORT).show()
+                    com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.mcp_token_create_failed))
                 }
             },
             showChevron = false,

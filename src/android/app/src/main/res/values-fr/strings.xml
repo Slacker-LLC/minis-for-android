@@ -1704,7 +1704,6 @@
     <string name="chat_quick_recap_title">Résumer les conversations récentes</string>
     <string name="chat_quick_recap_sub">Ce sur quoi vous avez travaillé</string>
     <string name="chat_quick_recap_prompt">Résume ce sur quoi nous avons travaillé dans mes conversations récentes.</string>
-    <string name="chat_quick_shuffle">Autres idées</string>
     <string name="chat_thinking_chip">Réflexion · %1$s</string>
     <string name="files_hub_used_by">Utilisé par Minis</string>
     <string name="files_section_sandbox">Dossiers dans le bac à sable</string>
@@ -1965,10 +1964,21 @@
     <string name="thinking_rules_hub_footer">Les règles dépendent du protocole et se modifient par fournisseur.</string>
     <string name="thinking_rules_hub_custom">Règles personnalisées prises en charge</string>
     <string name="thinking_rules_hub_official">Protocole officiel, pas de règles personnalisées</string>
-    <string name="chat_quick_edit">Modifier</string>
-    <string name="chat_quick_edit_title">Configurer les actions rapides</string>
-    <string name="chat_quick_edit_footer">Choisissez les actions affichées sur les cartes. Gardez-en au moins une.</string>
     <string name="scheduled_tasks_empty_title">Aucune tâche planifiée</string>
     <string name="scheduled_run_ok">Réussi</string>
     <string name="scheduled_run_failed">Échec</string>
+    <string name="chat_empty_greeting_dawn">Bonjour, lève-tôt</string>
+    <string name="chat_empty_greeting_dawn_b">Déjà debout ?</string>
+    <string name="chat_empty_greeting_morning_b">Belle matinée</string>
+    <string name="chat_empty_greeting_noon">Bon midi</string>
+    <string name="chat_empty_greeting_noon_b">Bon appétit</string>
+    <string name="chat_empty_greeting_afternoon_b">Bel après-midi</string>
+    <string name="chat_empty_greeting_evening_b">Bonne soirée</string>
+    <string name="chat_empty_greeting_night">Il se fait tard</string>
+    <string name="chat_empty_greeting_night_b">Toujours debout ?</string>
+    <string name="chat_empty_prompt_b">Comment puis-je vous aider ?</string>
+    <string name="chat_empty_prompt_c">Par quoi commencer ?</string>
+    <string name="chat_empty_prompt_d">On commence où ?</string>
+    <string name="chat_empty_prompt_e">Je m\'en occupe, dites-moi.</string>
+    <string name="chat_empty_prompt_f">Au programme aujourd\'hui ?</string>
 </resources>
