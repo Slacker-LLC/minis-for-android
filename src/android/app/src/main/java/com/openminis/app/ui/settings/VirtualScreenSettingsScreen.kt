@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import com.openminis.app.ui.theme.ChatColors
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
@@ -251,7 +252,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                     Text(
                         text = stringResource(if (probePassed) R.string.vscreen_probe_passed else R.string.vscreen_probe_failed),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (probePassed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        color = if (probePassed) ChatColors.ok else MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
                     if (!probePassed) {

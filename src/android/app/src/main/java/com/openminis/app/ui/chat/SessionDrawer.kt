@@ -579,14 +579,14 @@ private fun DrawerNewChatRow(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Outlined.Edit,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = ChatColors.primaryText,
             modifier = Modifier.size(20.dp),
         )
         Text(
             text = stringResource(R.string.scheduled_task_target_new),
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
+            color = ChatColors.primaryText,
         )
     }
 }
@@ -624,13 +624,13 @@ private fun DrawerGridEntry(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = ChatColors.primaryText,
             modifier = Modifier.size(22.dp),
         )
         Text(
             text = title,
             fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.primary,
+            color = ChatColors.primaryText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -810,7 +810,7 @@ private fun DrawerSessionRow(
     val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
     // One accent, one wash: the open conversation gets a light accent fill and an accent label.
     val accent = MaterialTheme.colorScheme.primary
-    val bgColor = if (isCurrent && !isSelecting) accent.copy(alpha = 0.10f) else Color.Transparent
+    val bgColor = if (isCurrent && !isSelecting) ChatColors.secondaryBg else Color.Transparent
     var showMenu by remember { mutableStateOf(false) }
 
     Box(
@@ -846,7 +846,7 @@ private fun DrawerSessionRow(
                 text = title,
                 fontSize = 15.sp,
                 fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
-                color = if (isCurrent) accent else ChatColors.primaryText,
+                color = ChatColors.primaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),

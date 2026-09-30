@@ -239,7 +239,7 @@ private fun IntegrationSection(
                 Text(
                     text = stringResource(systemStatusTitleRes),
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (systemReady) MaterialTheme.colorScheme.primary
+                    color = if (systemReady) ChatColors.ok
                     else MaterialTheme.colorScheme.error,
                 )
             },
@@ -381,7 +381,7 @@ private fun levelDisplayName(level: OffloadPermissionManager.PermissionLevel): S
 
 @Composable
 private fun levelColor(level: OffloadPermissionManager.PermissionLevel): Color = when (level) {
-    OffloadPermissionManager.PermissionLevel.BYPASS -> MaterialTheme.colorScheme.primary
+    OffloadPermissionManager.PermissionLevel.BYPASS -> ChatColors.ok
     OffloadPermissionManager.PermissionLevel.ASK_ONCE -> MaterialTheme.colorScheme.tertiary
     OffloadPermissionManager.PermissionLevel.NOT_ALLOWED -> MaterialTheme.colorScheme.error
 }
