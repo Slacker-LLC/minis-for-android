@@ -2078,4 +2078,6 @@
     <string name="chat_quick_edit_title">Schnellaktionen konfigurieren</string>
     <string name="chat_quick_edit_footer">Wähle, welche Aktionen auf den Karten erscheinen. Mindestens eine bleibt aktiv.</string>
     <string name="scheduled_tasks_empty_title">Keine geplanten Aufgaben</string>
+    <string name="scheduled_run_ok">Erfolgreich</string>
+    <string name="scheduled_run_failed">Fehlgeschlagen</string>
 </resources>

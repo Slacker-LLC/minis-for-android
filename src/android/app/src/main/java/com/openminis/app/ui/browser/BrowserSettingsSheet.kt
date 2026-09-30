@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import com.openminis.app.ui.settings.SettingsSearchField
 import com.openminis.app.ui.settings.SettingsRow
@@ -129,16 +130,10 @@ fun BrowserSettingsSheet(
     // Cookie filter (mirrors iOS `.searchable("Filter by domain")`).
     var cookieFilterText by remember { mutableStateOf("") }
 
-    MinisModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
-    ) {
-        GlassSheetWindowBlur()
+    com.openminis.app.ui.components.MinisFullScreenDialog(onDismiss = onDismiss) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .glassSheetSurface()
+                .fillMaxSize()
                 // [T-android-browser-settings-keyboard-overlap] imePadding
                 // shrinks the sheet's content frame when the keyboard
                 // opens; verticalScroll lets the user (or the focused-
@@ -147,7 +142,6 @@ fun BrowserSettingsSheet(
                 // Previously the Column was a fixed Column with no
                 // scroll, so Width/Height/idle-timeout fields below the
                 // viewport stayed glued and the keyboard ate them.
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)

@@ -1,5 +1,7 @@
 package com.openminis.app.ui.bots
 
+import com.openminis.app.ui.settings.SettingsTextArea
+import com.openminis.app.ui.settings.SettingsInlineTextRow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -674,13 +676,21 @@ private fun BotEditorScreen(bot: BotEntity?, providerRepository: ProviderReposit
             }, enabled = name.isNotBlank() && !saving) { Text(stringResource(R.string.save)) }
         }) {
         SettingsSection(header = stringResource(R.string.bots_name)) {
-            SectionTextField(value = name, onValueChange = { name = it.take(BotRepository.NAME_MAX_CHARS) },
-                modifier = Modifier.padding(horizontal = 16.dp), placeholder = stringResource(R.string.bots_name))
+            SettingsInlineTextRow(
+                title = stringResource(R.string.bots_name),
+                value = name,
+                onValueChange = { name = it.take(BotRepository.NAME_MAX_CHARS) },
+                placeholder = stringResource(R.string.bots_name),
+                showDivider = false,
+            )
         }
         SettingsSection(header = stringResource(R.string.bots_role)) {
-            SectionTextField(value = prompt, onValueChange = { prompt = it.take(BotRepository.SYSTEM_PROMPT_MAX_CHARS) },
-                modifier = Modifier.padding(horizontal = 16.dp).heightIn(min = 168.dp), singleLine = false,
-                placeholder = stringResource(R.string.bots_role_hint))
+            SettingsTextArea(
+                value = prompt,
+                onValueChange = { prompt = it.take(BotRepository.SYSTEM_PROMPT_MAX_CHARS) },
+                placeholder = stringResource(R.string.bots_role_hint),
+                minHeight = 168.dp,
+            )
         }
         SettingsSection(header = stringResource(R.string.bots_model), footer = stringResource(R.string.bots_model_footer)) {
             SettingsRow(title = if (binding == null) stringResource(R.string.bots_follow_default)

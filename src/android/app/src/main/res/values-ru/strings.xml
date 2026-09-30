@@ -2332,4 +2332,6 @@
     <string name="chat_quick_edit_title">Настроить быстрые действия</string>
     <string name="chat_quick_edit_footer">Выберите действия для карточек. Оставьте хотя бы одно.</string>
     <string name="scheduled_tasks_empty_title">Нет задач по расписанию</string>
+    <string name="scheduled_run_ok">Успешно</string>
+    <string name="scheduled_run_failed">Сбой</string>
 </resources>

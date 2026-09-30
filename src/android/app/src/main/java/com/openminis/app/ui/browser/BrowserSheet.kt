@@ -157,8 +157,8 @@ fun BrowserSheet(
     StandardChatSheet(
         title = pageTitle.ifEmpty { stringResource(R.string.browser_title) },
         onDismiss = onDismiss,
-        heightFraction = 0.96f,
         header = false,
+        fullScreen = true,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ── Top row: close, address pill, tab counter (board) ──

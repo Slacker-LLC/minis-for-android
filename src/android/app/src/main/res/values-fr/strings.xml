@@ -1969,4 +1969,6 @@
     <string name="chat_quick_edit_title">Configurer les actions rapides</string>
     <string name="chat_quick_edit_footer">Choisissez les actions affichées sur les cartes. Gardez-en au moins une.</string>
     <string name="scheduled_tasks_empty_title">Aucune tâche planifiée</string>
+    <string name="scheduled_run_ok">Réussi</string>
+    <string name="scheduled_run_failed">Échec</string>
 </resources>
