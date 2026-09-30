@@ -58,14 +58,10 @@ fun OffloadPermissionScreen(
     val context = LocalContext.current
 
     var a11yEnabled by remember { mutableStateOf(isA11yServiceEnabled(context)) }
-    var a11yRestricted by remember { mutableStateOf(false) }
-    var unrestricting by remember { mutableStateOf(false) }
-    var unrestrictFailed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         while (true) {
             a11yEnabled = isA11yServiceEnabled(context) || MinisAccessibilityService.getInstance() != null
-            a11yRestricted = !a11yEnabled && RestrictedSettingsManager.isRestricted(context)
             delay(1000)
         }
     }
@@ -119,43 +115,6 @@ fun OffloadPermissionScreen(
             systemActionTitleRes = R.string.perm_a11y_open_settings,
             onSystemAction = { openAccessibilitySettings(context) },
         )
-
-        if (a11yRestricted) {
-            SettingsSection(
-                header = stringResource(R.string.system_permissions_a11y_restricted_header),
-                footer = stringResource(R.string.system_permissions_a11y_restricted_footer),
-            ) {
-                if (shizukuSnap.state == ShizukuManager.State.READY) {
-                    SettingsRow(
-                        title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
-                        subtitle = when {
-                            unrestricting ->
-                                stringResource(R.string.system_permissions_a11y_restricted_working)
-                            unrestrictFailed ->
-                                stringResource(R.string.system_permissions_a11y_restricted_failed)
-                            else ->
-                                stringResource(R.string.system_permissions_a11y_restricted_shizuku_sub)
-                        },
-                        onClick = {
-                            if (unrestricting) return@SettingsRow
-                            unrestricting = true
-                            unrestrictFailed = false
-                            scope.launch {
-                                val ok = RestrictedSettingsManager.clearWithShizuku(context)
-                                unrestricting = false
-                                unrestrictFailed = !ok
-                            }
-                        },
-                    )
-                }
-                SettingsRow(
-                    title = stringResource(R.string.system_permissions_a11y_restricted_manual),
-                    subtitle = stringResource(R.string.system_permissions_a11y_restricted_manual_sub),
-                    onClick = { openAppDetailsSettings(context) },
-                    showDivider = false,
-                )
-            }
-        }
 
         IntegrationSection(
             iconVector = Icons.Outlined.Shield,

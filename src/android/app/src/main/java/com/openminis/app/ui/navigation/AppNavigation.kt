@@ -111,7 +111,6 @@ object Routes {
     /** [T-android-provider-voice] Read-only shadow Voice Service detail. */
     const val SHADOW_VOICE_DETAIL = "voice_service/{instanceId}"
     const val MODELS = "models"
-    const val THINKING_RULES = "thinking_rules"
     const val MODEL_SLOT_DETAIL = "model_slot/{slot}"
     fun modelSlotDetail(slot: ModelSlot) = "model_slot/${slot.name}"
     /** T185: picker that adds model *entries* to the agent-loop set. */
@@ -658,15 +657,6 @@ fun AppNavigation(
                     onOpenMemory = { navController.safeNavigate(Routes.MEMORY) },
                     onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onOpenSessionFiles = { navController.safeNavigate(Routes.STORAGE) },
-                    onBrowseRootfs = {
-                        val rootfs = RootfsManager.getInstance(filesContext.applicationContext)
-                        FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                            rootPath = rootfs.rootfsDir,
-                            rootLabel = "/",
-                        )
-                        navController.safeNavigate(Routes.FILE_BROWSER)
-                    },
-                    onOpenTerminal = { navController.safeNavigate(Routes.terminal()) },
                 )
             } else {
                 SettingsCategoryScreen(
@@ -675,7 +665,6 @@ fun AppNavigation(
                     onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
                     onModelsClick = { navController.safeNavigate(Routes.MODELS) },
                     onAgentLoopModelsClick = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
-                    onThinkingRulesClick = { navController.safeNavigate(Routes.THINKING_RULES) },
                     onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                     onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
                     onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
@@ -683,14 +672,8 @@ fun AppNavigation(
                     onSystemPromptClick = { navController.safeNavigate(Routes.SYSTEM_PROMPT) },
                     onMemoryClick = { navController.safeNavigate(Routes.MEMORY) },
                     onMcpClick = { navController.safeNavigate(Routes.MCP) },
-                    onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
                     onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
-                    // FILE_BROWSER needs a prepared view-model, so "Browse files" opens the Files
-                    // hub (the same page as the drawer's Files entry) until that page is reworked.
-                    onFileBrowserClick = {
-                        navController.safeNavigate(Routes.settingsCategory(SettingsCategory.FILES.key))
-                    },
                     onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
                     onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
                     onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
@@ -893,14 +876,6 @@ fun AppNavigation(
                 onVoiceServiceClick = { id ->
                     navController.safeNavigate(Routes.shadowVoiceDetail(id))
                 },
-            )
-        }
-
-        composable(Routes.THINKING_RULES) {
-            com.openminis.app.ui.settings.ThinkingRulesHubScreen(
-                providerRepository = providerRepository,
-                onBack = { navController.safePopBackStack() },
-                onProviderClick = { navController.safeNavigate(Routes.providerDetail(it)) },
             )
         }
 

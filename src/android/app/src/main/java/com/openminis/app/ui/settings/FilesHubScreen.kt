@@ -74,8 +74,6 @@ fun FilesHubScreen(
     onOpenMemory: () -> Unit,
     onOpenMounts: () -> Unit,
     onOpenSessionFiles: () -> Unit,
-    onBrowseRootfs: () -> Unit,
-    onOpenTerminal: () -> Unit,
 ) {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf<StorageSnapshot?>(null) }
@@ -148,25 +146,6 @@ fun FilesHubScreen(
                         )
                     }
                 },
-            )
-        }
-
-        SettingsSection(
-            header = stringResource(R.string.files_section_advanced),
-            footer = stringResource(R.string.files_advanced_footer),
-        ) {
-            SettingsRow(
-                icon = Icons.Outlined.Dns,
-                iconColor = Color(0xFF636366),
-                title = stringResource(R.string.files_browse_rootfs),
-                onClick = onBrowseRootfs,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Terminal,
-                iconColor = Color(0xFF1C1C1E),
-                title = stringResource(R.string.files_open_in_terminal),
-                onClick = onOpenTerminal,
-                showDivider = false,
             )
         }
 

@@ -137,7 +137,6 @@ fun SettingsCategoryScreen(
     onProvidersClick: () -> Unit = {},
     onModelsClick: () -> Unit = {},
     onAgentLoopModelsClick: () -> Unit = {},
-    onThinkingRulesClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onSkillsClick: () -> Unit = {},
     onCharactersClick: () -> Unit = {},
@@ -145,7 +144,6 @@ fun SettingsCategoryScreen(
     onSystemPromptClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
     onMcpClick: () -> Unit = {},
-    onTerminalClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
@@ -159,7 +157,6 @@ fun SettingsCategoryScreen(
     onAboutClick: () -> Unit = {},
     onTeamClick: () -> Unit = {},
     onScheduledTasksClick: () -> Unit = {},
-    onFileBrowserClick: () -> Unit = {},
     onRootfsManagementClick: () -> Unit = {},
     onOpenBackground: () -> Unit = {},
 ) {
@@ -199,13 +196,6 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.settings_agent_loop_models),
                         subtitle = stringResource(R.string.settings_agent_loop_models_subtitle),
                         onClick = onAgentLoopModelsClick,
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.Psychology,
-                        iconColor = Color(0xFFAF52DE),
-                        title = stringResource(R.string.settings_thinking_rules),
-                        subtitle = stringResource(R.string.settings_thinking_rules_subtitle),
-                        onClick = onThinkingRulesClick,
                         showDivider = false,
                     )
                 }
@@ -321,7 +311,7 @@ fun SettingsCategoryScreen(
             SettingsCategory.CHAT, SettingsCategory.APPEARANCE, SettingsCategory.FILES -> Unit
 
             SettingsCategory.RUNTIME -> {
-                SettingsSection {
+                SettingsSection(footer = stringResource(R.string.settings_runtime_footer)) {
                     SettingsRow(
                         icon = Icons.Outlined.Dns,
                         iconColor = Color(0xFF636366),
@@ -335,25 +325,6 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.settings_env_vars),
                         subtitle = stringResource(R.string.settings_env_vars_subtitle),
                         onClick = onEnvVarsClick,
-                        showDivider = false,
-                    )
-                }
-                SettingsSection(
-                    header = stringResource(R.string.settings_runtime_section_tools),
-                    footer = stringResource(R.string.settings_runtime_footer),
-                ) {
-                    SettingsRow(
-                        icon = Icons.Outlined.Terminal,
-                        iconColor = Color(0xFF1C1C1E),
-                        title = stringResource(R.string.terminal_title),
-                        subtitle = stringResource(R.string.settings_terminal_subtitle),
-                        onClick = onTerminalClick,
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.Folder,
-                        iconColor = Color(0xFF007AFF),
-                        title = stringResource(R.string.settings_runtime_browse_files),
-                        onClick = onFileBrowserClick,
                         showDivider = false,
                     )
                 }
