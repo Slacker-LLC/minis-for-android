@@ -215,6 +215,7 @@ fun FilePreviewScreen(
                 },
             onBack = onBack,
             backLabel = stringResource(R.string.filebrowser_title),
+            background = MaterialTheme.colorScheme.background,
             actions = {
                     // T142: Share works for any file — FileProvider URI +
                     // ACTION_SEND + FLAG_GRANT_READ_URI_PERMISSION. iOS parity.

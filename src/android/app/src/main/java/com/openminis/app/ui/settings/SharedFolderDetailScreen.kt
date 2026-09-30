@@ -65,6 +65,7 @@ fun SharedFolderDetailScreen(
     }
 
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
             title = { Text(stringResource(R.string.shared_folder_detail_title)) },

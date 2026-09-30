@@ -63,6 +63,7 @@ fun SessionMcpsSheet(
     }
 
     StandardChatSheet(
+        containerColor = com.openminis.app.ui.settings.settingsSheetColor(),
         title = stringResource(R.string.session_mcps_title),
         onDismiss = onDismiss,
     ) {

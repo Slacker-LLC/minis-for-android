@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import com.openminis.app.ui.settings.settingsSheetColor
 import com.openminis.app.i18n.uppercaseForDisplay
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.settings.SettingsSearchField
@@ -78,7 +79,7 @@ fun BrowserHistorySheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else settingsSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(

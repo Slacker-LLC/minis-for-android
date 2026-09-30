@@ -144,6 +144,7 @@ fun SessionAdvancedSettingsSheet(
     }
 
     StandardChatSheet(
+        containerColor = com.openminis.app.ui.settings.settingsSheetColor(),
         title = stringResource(R.string.session_advanced_settings_title),
         onDismiss = onDismiss,
     ) {

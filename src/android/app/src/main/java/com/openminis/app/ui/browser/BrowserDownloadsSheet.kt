@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import com.openminis.app.ui.settings.settingsSheetColor
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.openminis.app.ui.components.MinisTextButton
 import androidx.compose.ui.unit.sp
@@ -85,7 +86,7 @@ fun BrowserDownloadsSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else settingsSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(

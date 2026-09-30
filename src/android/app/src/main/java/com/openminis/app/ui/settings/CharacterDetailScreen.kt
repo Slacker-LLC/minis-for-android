@@ -80,6 +80,7 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
 
     val current = draft
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
             title = {

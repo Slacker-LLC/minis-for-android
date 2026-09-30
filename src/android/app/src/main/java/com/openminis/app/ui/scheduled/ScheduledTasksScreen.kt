@@ -182,7 +182,10 @@ private fun ScheduledTaskCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(com.openminis.app.ui.components.SectionDesign.cardColor())
+            .padding(16.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),

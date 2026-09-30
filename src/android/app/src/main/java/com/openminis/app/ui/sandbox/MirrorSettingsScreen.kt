@@ -618,6 +618,7 @@ fun MirrorCategoryDetailScreen(
     val allForCategory = MirrorCatalog.mirrors(category)
 
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
             title = { Text(category.displayName) },

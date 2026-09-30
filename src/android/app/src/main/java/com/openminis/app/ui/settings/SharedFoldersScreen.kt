@@ -56,6 +56,7 @@ fun SharedFoldersScreen(
     onFolderClick: (folderId: String) -> Unit,
 ) {
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
             title = { Text(stringResource(R.string.shared_folders_title)) },

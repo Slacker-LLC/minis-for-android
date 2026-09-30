@@ -261,6 +261,7 @@ fun ScheduledTaskEditScreen(
     }
 
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
                 title = {

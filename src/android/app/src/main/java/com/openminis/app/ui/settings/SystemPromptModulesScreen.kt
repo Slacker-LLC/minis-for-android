@@ -186,7 +186,7 @@ private fun ModuleEditorSheet(
 ) {
     var text by remember(snapshot.module.id, snapshot.text) { mutableStateOf(snapshot.text) }
 
-    MinisModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    MinisModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = settingsSheetColor()) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             // Cancel / title / Save, the board's sheet header.
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {

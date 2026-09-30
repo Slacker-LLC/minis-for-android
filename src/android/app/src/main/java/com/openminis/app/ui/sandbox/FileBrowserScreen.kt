@@ -104,6 +104,7 @@ fun FileBrowserScreen(
     BackHandler(enabled = true, onBack = handleBack)
 
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
             MinisTopBar(
             title = { Text(stringResource(R.string.filebrowser_title)) },
@@ -171,8 +172,14 @@ fun FileBrowserScreen(
                 }
 
                 else -> {
+                    // The list is one white card on the grey page, like the settings lists.
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                            .background(com.openminis.app.ui.components.SectionDesign.cardColor()),
                         contentPadding = PaddingValues(vertical = 4.dp),
                     ) {
                         items(state.items, key = { it.file.absolutePath }) { item ->

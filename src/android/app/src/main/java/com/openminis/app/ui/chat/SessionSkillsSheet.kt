@@ -86,6 +86,7 @@ fun SessionSkillsSheet(
     }
 
     StandardChatSheet(
+        containerColor = com.openminis.app.ui.settings.settingsSheetColor(),
         title = stringResource(R.string.session_skills_title),
         onDismiss = onDismiss,
     ) {

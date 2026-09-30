@@ -89,6 +89,16 @@ import com.openminis.app.ui.components.groupedCard
  * The page colour behind settings cards: a light grey in light mode (cards are white and read as
  * raised), black in dark mode (cards are the raised dark grey).
  */
+/** Fill for a control that sits directly on the grey page (search field, segmented track): a step darker than the page. */
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun fillOnGrey(): Color = if (ChatColors.isDark) Color(0xFF2C2C2E) else Color(0xFFE3E3E8)
+
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun settingsSheetColor(): Color =
+    if (ChatColors.isDark) Color(0xFF111113) else Color(0xFFF2F2F7)
+
 @Composable
 @androidx.compose.runtime.ReadOnlyComposable
 fun settingsPageBackground(): Color =
@@ -142,7 +152,7 @@ fun MinisNavBar(
     navigation: (@Composable () -> Unit)?,
     actions: (@Composable () -> Unit)?,
     inlineTitle: Boolean,
-    background: Color = MaterialTheme.colorScheme.background,
+    background: Color = Color.Unspecified,
 ) = MinisNavBar(
     titleSlot = if (inlineTitle) {
         {
@@ -172,10 +182,11 @@ fun MinisNavBar(
     backLabel: String,
     navigation: (@Composable () -> Unit)?,
     actions: (@Composable () -> Unit)?,
-    background: Color = MaterialTheme.colorScheme.background,
+    background: Color = Color.Unspecified,
 ) {
     val inlineTitle = titleSlot != null
-    Column(modifier = Modifier.fillMaxWidth().background(background).statusBarsPadding()) {
+    val barBackground = if (background == Color.Unspecified) settingsPageBackground() else background
+    Column(modifier = Modifier.fillMaxWidth().background(barBackground).statusBarsPadding()) {
         Box(modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Row(modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 when {
@@ -227,6 +238,8 @@ fun MinisTopBar(
     onBack: (() -> Unit)? = null,
     backLabel: String? = null,
     navigation: (@Composable () -> Unit)? = null,
+    /** The bar's colour; the settings page grey unless the page under it is plain white. */
+    background: Color = Color.Unspecified,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     MinisNavBar(
@@ -235,6 +248,7 @@ fun MinisTopBar(
         backLabel = backLabel ?: stringResource(R.string.back),
         navigation = navigation,
         actions = { Row(verticalAlignment = Alignment.CenterVertically) { actions() } },
+        background = background,
     )
 }
 
@@ -349,7 +363,7 @@ fun SettingsSegmented(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val track = if (ChatColors.isDark) Color(0xFF2C2C2E) else Color(0xFFF2F2F7)
+    val track = fillOnGrey()
     val raised = if (ChatColors.isDark) Color(0xFF636366) else Color.White
     Row(
         modifier = modifier
@@ -761,7 +775,7 @@ fun SettingsSearchField(
         modifier = modifier
             .fillMaxWidth()
             .height(40.dp)
-            .background(ChatColors.secondaryBg, RoundedCornerShape(12.dp))
+            .background(fillOnGrey(), RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

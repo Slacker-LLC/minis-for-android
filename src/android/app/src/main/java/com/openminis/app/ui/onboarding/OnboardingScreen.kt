@@ -208,7 +208,7 @@ private fun ApiKeyStep(
     var apiKey by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+    Column(modifier = Modifier.fillMaxSize().background(com.openminis.app.ui.settings.settingsPageBackground()).statusBarsPadding().navigationBarsPadding().imePadding()) {
         OnboardingHeader(
             title = stringResource(R.string.onboarding_provider_title),
             subtitle = stringResource(R.string.onboarding_provider_subtitle),
@@ -318,7 +318,7 @@ internal fun ModelSelectionStep(
     // Group by instance
     val grouped = filteredEntries.groupBy { it.providerInstanceId }
 
-    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+    Column(modifier = Modifier.fillMaxSize().background(com.openminis.app.ui.settings.settingsPageBackground()).statusBarsPadding().navigationBarsPadding()) {
         OnboardingHeader(
             title = stringResource(R.string.onboarding_select_models_title),
             subtitle = stringResource(R.string.onboarding_select_models_subtitle),
@@ -331,7 +331,7 @@ internal fun ModelSelectionStep(
                 .padding(horizontal = 16.dp)
                 .height(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(ChatColors.secondaryBg)
+                .background(com.openminis.app.ui.settings.fillOnGrey())
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

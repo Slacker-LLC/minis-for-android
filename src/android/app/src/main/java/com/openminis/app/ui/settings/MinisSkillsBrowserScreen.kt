@@ -125,7 +125,7 @@ fun MinisSkillsBrowserScreen(
                 },
         )
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
     ) { padding ->
         Box(
             modifier = Modifier

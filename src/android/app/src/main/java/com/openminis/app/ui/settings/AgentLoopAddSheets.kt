@@ -110,7 +110,7 @@ fun AddAgentLoopModelsScreen(
                 },
             )
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
     ) { padding ->
         LazyColumn(
             modifier = Modifier

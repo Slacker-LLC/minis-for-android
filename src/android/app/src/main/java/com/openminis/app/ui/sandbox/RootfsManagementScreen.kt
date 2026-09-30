@@ -77,7 +77,7 @@ fun RootfsManagementScreen(
     // T168: iOS-style inset-grouped background. surfaceContainerLowest sits
     // a hair below `surface`, so the rounded section cards (which use
     // `surface`) read as raised pads against the page bg.
-    val groupedBg = MaterialTheme.colorScheme.surfaceContainerLowest
+    val groupedBg = com.openminis.app.ui.settings.settingsPageBackground()
     Scaffold(
         topBar = {
             MinisTopBar(
@@ -85,7 +85,7 @@ fun RootfsManagementScreen(
             onBack = onBack,
         )
         },
-        containerColor = groupedBg,
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
     ) { padding ->
         Column(
             modifier = Modifier
