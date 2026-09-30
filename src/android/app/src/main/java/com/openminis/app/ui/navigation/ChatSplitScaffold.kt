@@ -965,6 +965,8 @@ private fun ChatPhoneDrawerScaffold(
     var currentSessionId by rememberSaveable(initialSessionId) {
         mutableStateOf(initialSessionId ?: newDraftSessionId())
     }
+    // Reported by the visible ChatScreen; lets the drawer's "New chat" reuse a blank draft.
+    var blankDraftProbe by remember { mutableStateOf<(() -> Boolean)?>(null) }
 
     LaunchedEffect(initialSessionId) {
         if (initialSessionId == null) {
@@ -1013,7 +1015,8 @@ private fun ChatPhoneDrawerScaffold(
                         scope.launch { drawerState.close() }
                     },
                     onNewChat = {
-                        currentSessionId = newDraftSessionId()
+                        // Already on a blank draft: keep it instead of stacking another.
+                        if (blankDraftProbe?.invoke() != true) currentSessionId = newDraftSessionId()
                         scope.launch { drawerState.close() }
                     },
                     onOpenSettings = {
@@ -1064,6 +1067,7 @@ private fun ChatPhoneDrawerScaffold(
                 focusManager.clearFocus()
                 scope.launch { drawerState.open() }
             },
+            onProbeBlankDraft = { blankDraftProbe = it },
             onNewChat = {
                 currentSessionId = newDraftSessionId()
             },

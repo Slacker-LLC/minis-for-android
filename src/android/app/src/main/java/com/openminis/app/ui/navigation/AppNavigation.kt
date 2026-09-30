@@ -692,6 +692,8 @@ fun AppNavigation(
                     onBackgroundClick = { navController.safeNavigate(Routes.BACKGROUND) },
                     onLogsClick = { navController.safeNavigate(Routes.LOGS) },
                     onAboutClick = { navController.safeNavigate(Routes.ABOUT) },
+                    onTeamClick = { navController.safeNavigate(Routes.BOTS) },
+                    onScheduledTasksClick = { navController.safeNavigate(Routes.SCHEDULED_TASKS) },
                 )
             }
         }

@@ -1771,6 +1771,8 @@ class ChatViewModel(
     fun setMemoryEnabledForSession(enabled: Boolean) {
         if (_memoryEnabled.value == enabled) return
         _memoryEnabled.value = enabled
+        // A row-less draft snapshots this flag into the row it creates on the first send.
+        if (hasNoRow) return
         viewModelScope.launch {
             val sid = ensureSession()
             chatRepository.dao.updateMemoryEnabled(sid, if (enabled) 1 else 0)
@@ -1781,11 +1783,9 @@ class ChatViewModel(
     private fun toggleMemoryEnabled() {
         val newValue = !_memoryEnabled.value
         _memoryEnabled.value = newValue
-        viewModelScope.launch {
-            // Toggling before the first message means the row doesn't exist
-            // yet — materialize the session row so the preference lands on
-            // the persisted id instead of silently updating zero rows under
-            // the draft key.
+        // Before the first message there is no row; ensureSession() copies this flag into the row
+        // it creates, so a row-less draft needs no write here.
+        if (!hasNoRow) viewModelScope.launch {
             val sid = ensureSession()
             chatRepository.dao.updateMemoryEnabled(sid, if (newValue) 1 else 0)
         }
@@ -1865,6 +1865,10 @@ class ChatViewModel(
      * preference on the persisted id rather than the `__new__…` draft key.
      */
     private fun persistThinkingOverride(level: ThinkingLevel) {
+        if (hasNoRow) {
+            pendingThinkingOverride = level
+            return
+        }
         viewModelScope.launch {
             val sid = ensureSession()
             chatRepository.dao.updateThinkingOverride(sid, level.name)
@@ -3953,6 +3957,24 @@ class ChatViewModel(
     /** The real session ID (same as sessionId for existing sessions, generated on first message for drafts). */
     internal var realSessionId: String = if (isDraft) "" else sessionId
 
+    /** A draft that has no database row yet: nothing persisted, nothing to clean up on exit. */
+    private val hasNoRow: Boolean get() = isDraft && realSessionId.isEmpty()
+
+    /**
+     * Thinking level chosen on a draft before its row exists. Materialising the row just to store a
+     * preference left an empty conversation behind every time a chat was opened (the model entry's
+     * default thinking level is applied on open), so the level is held here and written together
+     * with the row on the first real send.
+     */
+    private var pendingThinkingOverride: ThinkingLevel? = null
+
+    /**
+     * True for a draft where nothing has happened: no row, no attachment, no typed text, no run.
+     * "New chat" on such a chat has nothing to replace, so it must not open another draft.
+     */
+    val isBlankDraft: Boolean
+        get() = hasNoRow && _attachments.value.isEmpty() && _inputText.value.isBlank() && !_isStreaming.value
+
     /**
      * DSH-style event projection of this exact native VM. It does not own any
      * chat state: messages / streamingById remain canonical; the emitter only
@@ -4218,6 +4240,10 @@ class ChatViewModel(
             memoryEnabled = _memoryEnabled.value,
         )
         realSessionId = session.id
+        pendingThinkingOverride?.let {
+            chatRepository.dao.updateThinkingOverride(session.id, it.name)
+            pendingThinkingOverride = null
+        }
         // Held draft events now have a real FK target. Keep their source order
         // and allocate sequence numbers only after Room's high-water mark is
         // known, so a process restart cannot collide with old rows.
@@ -4956,6 +4982,10 @@ class ChatViewModel(
         val level = entry.overrides.defaultThinkingLevel ?: return
         if (_thinkingLevel.value == level) return
         _thinkingLevel.value = level
+        if (hasNoRow) {
+            pendingThinkingOverride = level
+            return
+        }
         viewModelScope.launch {
             val sid = ensureSession()
             chatRepository.dao.updateThinkingOverride(sid, level.name)

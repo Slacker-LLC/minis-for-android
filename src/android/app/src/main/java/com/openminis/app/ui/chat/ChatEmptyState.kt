@@ -18,6 +18,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BatteryFull
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Newspaper
+import androidx.compose.material.icons.outlined.PieChart
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Memory
@@ -26,7 +35,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,8 +50,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 import java.util.Calendar
+import kotlin.random.Random
 
 /** Time-of-day slot for the empty-chat greeting (board: "早上好" + "今天想做点什么？"). */
 enum class GreetingSlot { MORNING, AFTERNOON, EVENING }
@@ -50,24 +65,55 @@ fun greetingSlotFor(hourOfDay: Int): GreetingSlot = when (hourOfDay) {
     else -> GreetingSlot.EVENING
 }
 
+/** Cards shown per screen. */
+private const val VISIBLE_SUGGESTIONS = 4
+
 /**
- * The empty conversation: a greeting and four quick actions (board: new chat empty state).
- * Tapping a card puts its prompt in the composer; it never sends on its own, because some of
- * these actions drive other apps and the user should see the words first.
+ * Which suggestions to show: a window of [count] from a pool of [poolSize], ordered by a shuffle
+ * that depends only on [seed]. Each [page] moves to the next window and wraps, so "Shuffle" walks
+ * through the whole pool before repeating, and a given chat keeps the same cards while it is open.
+ */
+internal fun suggestionWindow(poolSize: Int, seed: Int, page: Int, count: Int = VISIBLE_SUGGESTIONS): List<Int> {
+    if (poolSize <= 0) return emptyList()
+    val order = (0 until poolSize).shuffled(Random(seed))
+    val take = minOf(count, poolSize)
+    val start = Math.floorMod(page * take, poolSize)
+    return List(take) { order[(start + it) % poolSize] }
+}
+
+private val SuggestionPool = listOf(
+    QuickCard(Icons.Outlined.Visibility, R.string.chat_quick_screen_title, R.string.chat_quick_screen_sub, R.string.chat_quick_screen_prompt),
+    QuickCard(Icons.Outlined.Language, R.string.chat_quick_browse_title, R.string.chat_quick_browse_sub, R.string.chat_quick_browse_prompt),
+    QuickCard(Icons.Outlined.Memory, R.string.chat_quick_memory_title, R.string.chat_quick_memory_sub, R.string.chat_quick_memory_prompt),
+    QuickCard(Icons.Outlined.BatteryFull, R.string.chat_quick_battery_title, R.string.chat_quick_battery_sub, R.string.chat_quick_battery_prompt),
+    QuickCard(Icons.Outlined.PieChart, R.string.chat_quick_storage_title, R.string.chat_quick_storage_sub, R.string.chat_quick_storage_prompt),
+    QuickCard(Icons.Outlined.FolderOpen, R.string.chat_quick_tidy_title, R.string.chat_quick_tidy_sub, R.string.chat_quick_tidy_prompt),
+    QuickCard(Icons.Outlined.Description, R.string.chat_quick_script_title, R.string.chat_quick_script_sub, R.string.chat_quick_script_prompt),
+    QuickCard(Icons.Outlined.Newspaper, R.string.chat_quick_news_title, R.string.chat_quick_news_sub, R.string.chat_quick_news_prompt),
+    QuickCard(Icons.Outlined.Terminal, R.string.chat_quick_env_title, R.string.chat_quick_env_sub, R.string.chat_quick_env_prompt),
+    QuickCard(Icons.Outlined.Schedule, R.string.chat_quick_schedule_title, R.string.chat_quick_schedule_sub, R.string.chat_quick_schedule_prompt),
+    QuickCard(Icons.Outlined.Apps, R.string.chat_quick_apps_title, R.string.chat_quick_apps_sub, R.string.chat_quick_apps_prompt),
+    QuickCard(Icons.Outlined.History, R.string.chat_quick_recap_title, R.string.chat_quick_recap_sub, R.string.chat_quick_recap_prompt),
+)
+
+/** Size of the pool, for the tests that keep it and [suggestionWindow] consistent. */
+internal val SuggestionPoolSize: Int get() = SuggestionPool.size
+
+/**
+ * The empty conversation: a greeting and a few things the agent can do right now. Tapping a card
+ * sends its prompt. The cards come from a pool of [SuggestionPool] entries, four at a time, and a
+ * new chat starts on a different window, so the screen is not the same four tiles every time.
  */
 @Composable
 fun ChatEmptyState(
-    onPickPrompt: (String) -> Unit,
+    onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val slot = remember { greetingSlotFor(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
     val accent = MaterialTheme.colorScheme.primary
-    val cards = listOf(
-        QuickCard(Icons.Outlined.Visibility, R.string.chat_quick_screen_title, R.string.chat_quick_screen_sub, R.string.chat_quick_screen_prompt),
-        QuickCard(Icons.Outlined.ChatBubbleOutline, R.string.chat_quick_wechat_title, R.string.chat_quick_wechat_sub, R.string.chat_quick_wechat_prompt),
-        QuickCard(Icons.Outlined.Language, R.string.chat_quick_browse_title, R.string.chat_quick_browse_sub, R.string.chat_quick_browse_prompt),
-        QuickCard(Icons.Outlined.Memory, R.string.chat_quick_memory_title, R.string.chat_quick_memory_sub, R.string.chat_quick_memory_prompt),
-    )
+    val seed = rememberSaveable { Random.nextInt() }
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    val cards = suggestionWindow(SuggestionPool.size, seed, page).map { SuggestionPool[it] }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -97,12 +143,22 @@ fun ChatEmptyState(
             color = ChatColors.primaryText,
         )
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.chat_empty_prompt),
-            fontSize = 16.sp,
-            color = ChatColors.secondaryText,
-        )
-        Spacer(Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.chat_empty_prompt),
+                fontSize = 16.sp,
+                color = ChatColors.secondaryText,
+                modifier = Modifier.weight(1f),
+            )
+            MinisTextButton(onClick = { page += 1 }) {
+                Text(stringResource(R.string.chat_quick_shuffle), fontSize = 15.sp)
+            }
+        }
+        Spacer(Modifier.height(16.dp))
         cards.chunked(2).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -112,7 +168,7 @@ fun ChatEmptyState(
                     val prompt = stringResource(card.prompt)
                     QuickActionCard(
                         card = card,
-                        onClick = { onPickPrompt(prompt) },
+                        onClick = { onPick(prompt) },
                         modifier = Modifier.weight(1f),
                     )
                 }

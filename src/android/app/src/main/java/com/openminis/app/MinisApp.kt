@@ -949,6 +949,11 @@ class MinisApp : Application(), ImageLoaderFactory {
             com.openminis.app.service.SessionBadgeStore.reconcileInterruptedSessions(interrupted - active)
         }
 
+        // Empty conversations left behind by earlier launches (opened, then the process died).
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching { chatRepository.pruneEmptyDrafts() }
+        }
+
         // T180-bg-notif: background-settings + task-completion notifier.
         // The notifier is wired into SessionActivityTracker's completion
         // hook so any session whose stream finishes (success or error)
