@@ -355,7 +355,7 @@ fun ScheduledTaskEditScreen(
     }
 
     if (showFullTierConfirmation) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = {
                 showFullTierConfirmation = false
                 saveAfterFullConfirmation = false
