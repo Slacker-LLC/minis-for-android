@@ -1,5 +1,7 @@
 package com.openminis.app.ui.sandbox
 
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.SwapVert
 import com.openminis.app.R
 import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.ui.res.stringResource
@@ -106,18 +108,19 @@ fun FileBrowserScreen(
             MinisTopBar(
             title = { Text(stringResource(R.string.filebrowser_title)) },
             onBack = handleBack,
+            backLabel = stringResource(R.string.settings_section_files),
             actions = {
-                    // T-hidden-files a3e7f1d0: trailing toolbar collapsed
-                    // to a single ⋯ menu (was a Sort-only IconButton). All
-                    // functional actions now live under one entry point.
-                    MoreMenu(
+                    // Board: a sort icon with the ordering choices and a ⋯ menu for view options.
+                    SortMenu(
                         sortKey = state.sortKey,
                         ascending = state.sortAscending,
                         foldersFirst = state.foldersFirst,
-                        showHidden = state.showHidden,
                         onSelectKey = { viewModel.setSort(key = it) },
                         onToggleDirection = { viewModel.setSort(ascending = !state.sortAscending) },
                         onToggleFoldersFirst = { viewModel.setSort(foldersFirst = !state.foldersFirst) },
+                    )
+                    MoreMenu(
+                        showHidden = state.showHidden,
                         onToggleShowHidden = { viewModel.setShowHidden(!state.showHidden) },
                     )
                 },
@@ -411,7 +414,7 @@ private fun FileItemRow(
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.filebrowser_copy_abs_path)) },
-                leadingIcon = {
+                trailingIcon = {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null)
                 },
                 onClick = {
@@ -434,7 +437,7 @@ private fun FileItemRow(
                 com.openminis.app.ui.components.MinisMenuDivider()
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = {
+                    trailingIcon = {
                         Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                     },
                     onClick = {
@@ -479,24 +482,20 @@ private fun FileItemRow(
 }
 
 @Composable
-private fun MoreMenu(
+private fun SortMenu(
     sortKey: FileSortKey,
     ascending: Boolean,
     foldersFirst: Boolean,
-    showHidden: Boolean,
     onSelectKey: (FileSortKey) -> Unit,
     onToggleDirection: () -> Unit,
     onToggleFoldersFirst: () -> Unit,
-    onToggleShowHidden: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.filebrowser_more_action))
+            Icon(Icons.Filled.SwapVert, contentDescription = stringResource(R.string.filebrowser_sort_name), tint = MaterialTheme.colorScheme.primary)
         }
         com.openminis.app.ui.components.MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            // Display options — sort key choices first so the most
-            // frequent toggle (sort) is the closest tap.
             for (key in FileSortKey.entries) {
                 DropdownMenuItem(
                     text = { Text(stringResource(when (key) {
@@ -505,47 +504,42 @@ private fun MoreMenu(
                         FileSortKey.SIZE -> R.string.filebrowser_sort_size
                         FileSortKey.KIND -> R.string.filebrowser_sort_kind
                     })) },
-                    leadingIcon = {
-                        if (key == sortKey) {
-                            Icon(Icons.Filled.Check, contentDescription = null)
-                        } else {
-                            Spacer(modifier = Modifier.size(24.dp))
-                        }
-                    },
-                    onClick = {
-                        onSelectKey(key)
-                        expanded = false
-                    },
+                    trailingIcon = { if (key == sortKey) Icon(Icons.Filled.Check, contentDescription = null) },
+                    onClick = { onSelectKey(key); expanded = false },
                 )
             }
-            HorizontalDivider()
+            com.openminis.app.ui.components.MinisMenuDivider()
             DropdownMenuItem(
-                text = { Text(stringResource(if (ascending) R.string.filebrowser_sort_ascending else R.string.filebrowser_sort_descending)) },
-                leadingIcon = {
-                    Icon(
-                        if (ascending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    onToggleDirection()
-                    expanded = false
-                },
+                text = { Text(stringResource(R.string.filebrowser_sort_ascending)) },
+                trailingIcon = { if (ascending) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { if (!ascending) onToggleDirection(); expanded = false },
             )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.filebrowser_sort_descending)) },
+                trailingIcon = { if (!ascending) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { if (ascending) onToggleDirection(); expanded = false },
+            )
+            com.openminis.app.ui.components.MinisMenuDivider()
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.filebrowser_sort_folders_first)) },
-                leadingIcon = {
-                    if (foldersFirst) {
-                        Icon(Icons.Filled.Check, contentDescription = null)
-                    } else {
-                        Spacer(modifier = Modifier.size(24.dp))
-                    }
-                },
-                onClick = {
-                    onToggleFoldersFirst()
-                    expanded = false
-                },
+                trailingIcon = { if (foldersFirst) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { onToggleFoldersFirst(); expanded = false },
             )
+        }
+    }
+}
+
+@Composable
+private fun MoreMenu(
+    showHidden: Boolean,
+    onToggleShowHidden: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Filled.MoreHoriz, contentDescription = stringResource(R.string.filebrowser_more_action), tint = MaterialTheme.colorScheme.primary)
+        }
+        com.openminis.app.ui.components.MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = {
                     Text(stringResource(
@@ -553,16 +547,10 @@ private fun MoreMenu(
                         else R.string.filebrowser_show_hidden
                     ))
                 },
-                leadingIcon = {
-                    Icon(
-                        if (showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = null,
-                    )
+                trailingIcon = {
+                    Icon(if (showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
                 },
-                onClick = {
-                    onToggleShowHidden()
-                    expanded = false
-                },
+                onClick = { onToggleShowHidden(); expanded = false },
             )
         }
     }

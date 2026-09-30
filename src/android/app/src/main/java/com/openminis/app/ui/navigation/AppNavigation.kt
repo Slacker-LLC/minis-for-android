@@ -644,7 +644,16 @@ fun AppNavigation(
                     chatDao = chatRepository.dao,
                     mountedFoldersStore = mountedFoldersStore,
                     onBack = { navController.safePopBackStack() },
-                    onOpenShared = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
+                    // The board opens the shared folder straight into the file browser.
+                    onOpenShared = {
+                        FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
+                            rootPath = java.io.File(filesContext.cacheDir, "guest-file-browser"),
+                            rootLabel = filesContext.getString(com.openminis.app.R.string.shared_folder_name_shared),
+                            appContext = filesContext.applicationContext,
+                            guestRootPath = "/var/minis/shared",
+                        )
+                        navController.safeNavigate(Routes.FILE_BROWSER)
+                    },
                     onOpenSkills = { navController.safeNavigate(Routes.SKILLS) },
                     onOpenMemory = { navController.safeNavigate(Routes.MEMORY) },
                     onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },

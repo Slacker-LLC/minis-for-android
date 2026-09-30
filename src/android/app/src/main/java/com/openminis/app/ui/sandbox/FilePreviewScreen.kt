@@ -46,8 +46,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -188,6 +191,8 @@ fun FilePreviewScreen(
         return
     }
 
+    var showPreviewSheet by remember { mutableStateOf(false) }
+
     // T279: mirror FileBrowserScreen — vanilla Scaffold + vanilla TopAppBar.
     // Earlier attempts (custom containerColor, contentWindowInsets=0,
     // windowInsets=statusBars on TopAppBar, body windowInsetsPadding +
@@ -209,11 +214,43 @@ fun FilePreviewScreen(
                     )
                 },
             onBack = onBack,
+            backLabel = stringResource(R.string.filebrowser_title),
             actions = {
                     // T142: Share works for any file — FileProvider URI +
                     // ACTION_SEND + FLAG_GRANT_READ_URI_PERMISSION. iOS parity.
                     IconButton(onClick = { shareFile(context, item) }) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.filepreview_share))
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.filepreview_share), tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+        )
+        },
+        bottomBar = {
+            // Board: the actions live in a bar under the content; the rest go to an action sheet.
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                ) {
+                    PreviewBarAction(Icons.Default.Share, stringResource(R.string.filepreview_share)) { shareFile(context, item) }
+                    if (item.isImageFile) {
+                        // T142 image → MediaStore Save to Gallery.
+                        PreviewBarAction(Icons.Default.Download, stringResource(R.string.filepreview_save_to_gallery)) {
+                            scope.launch {
+                                val ok = saveImageToGallery(context, item.file)
+                                Toast.makeText(
+                                    context,
+                                    context.getString(if (ok) R.string.image_saved_to_album_toast else R.string.image_save_failed_toast),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    } else {
+                        // T144 non-image → SAF Save-As (user picks location).
+                        PreviewBarAction(Icons.Default.Download, stringResource(R.string.filepreview_save_as)) { saveAsLauncher.launch(item.name) }
                     }
                     // Print: HTML renders via WebView; markdown / plain text /
                     // json / csv print their raw text wrapped in a WebView so we
@@ -223,32 +260,11 @@ fun FilePreviewScreen(
                     if (item.isHtmlFile || item.isMarkdownFile || item.isTextFile ||
                         item.isJsonFile || item.isCsvFile
                     ) {
-                        IconButton(onClick = { printFile(context, item) }) {
-                            Icon(Icons.Default.Print, contentDescription = stringResource(R.string.action_print))
-                        }
+                        PreviewBarAction(Icons.Default.Print, stringResource(R.string.action_print)) { printFile(context, item) }
                     }
-                    if (item.isImageFile) {
-                        // T142 image → MediaStore Save to Gallery.
-                        IconButton(onClick = {
-                            scope.launch {
-                                val ok = saveImageToGallery(context, item.file)
-                                Toast.makeText(
-                                    context,
-                                    context.getString(if (ok) R.string.image_saved_to_album_toast else R.string.image_save_failed_toast),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }) {
-                            Icon(Icons.Default.Download, contentDescription = stringResource(R.string.filepreview_save_to_gallery))
-                        }
-                    } else {
-                        // T144 non-image → SAF Save-As (user picks location).
-                        IconButton(onClick = { saveAsLauncher.launch(item.name) }) {
-                            Icon(Icons.Default.Download, contentDescription = stringResource(R.string.filepreview_save_as))
-                        }
-                    }
-                },
-        )
+                    PreviewBarAction(Icons.Default.MoreHoriz, stringResource(R.string.filebrowser_more_action)) { showPreviewSheet = true }
+                }
+            }
         },
     ) { padding ->
         Box(
@@ -271,6 +287,38 @@ fun FilePreviewScreen(
                 FileCategory.UNKNOWN -> FileInfoView(item)
             }
         }
+    }
+
+    if (showPreviewSheet) {
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(item.file.extension.lowercase()) ?: "*/*"
+        com.openminis.app.ui.components.MinisActionSheet(
+            onDismiss = { showPreviewSheet = false },
+            title = item.name,
+            actions = listOf(
+                com.openminis.app.ui.components.MinisAction(stringResource(R.string.filepreview_open_externally)) {
+                    openExternally(context, item, mime)
+                },
+                com.openminis.app.ui.components.MinisAction(stringResource(R.string.filebrowser_copy_abs_path)) {
+                    val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clip.setPrimaryClip(android.content.ClipData.newPlainText("path", item.file.absolutePath))
+                    Toast.makeText(context, context.getString(R.string.filebrowser_copy_abs_path_toast), Toast.LENGTH_SHORT).show()
+                },
+            ),
+        )
+    }
+}
+
+@Composable
+private fun PreviewBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1)
     }
 }
 
