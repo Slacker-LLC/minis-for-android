@@ -98,6 +98,7 @@ fun MountedFoldersScreen(
     store: MountedFoldersStore,
     onBack: () -> Unit,
     onMountClick: (mountId: String) -> Unit,
+    onOpenSystemPermissions: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -152,26 +153,8 @@ fun MountedFoldersScreen(
     // refusal dialog that names it as the reason.
     fun openAllFilesAccess() {
     when {
-        // Android 11+: special All Files Access page.
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> runCatching {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    Uri.parse("package:${context.packageName}"),
-                ),
-            )
-        }.onFailure {
-            // Some OEMs (HarmonyOS/EMUI) don't host the per-app page —
-            // fall back to the app details screen.
-            runCatching {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:${context.packageName}"),
-                    ),
-                )
-            }
-        }
+        // Android 11+: the grant lives in System & permissions like every other one.
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> onOpenSystemPermissions()
         // Android 10: request the legacy storage runtime permissions
         // (READ for readdir, WRITE for the badge + agent writes).
         Build.VERSION.SDK_INT == Build.VERSION_CODES.Q ->

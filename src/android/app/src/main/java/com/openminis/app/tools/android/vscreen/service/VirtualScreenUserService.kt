@@ -26,12 +26,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
 import kotlin.math.sqrt
 
-/** Shizuku shell UserService. It intentionally has no network or local-socket listener. */
+/** Shizuku-protocol UserService (shell or root). It intentionally has no network or local-socket listener. */
 @Keep
 class VirtualScreenUserService : IVirtualScreenService.Stub() {
     private val lock = Any()
-    private val identityError: String? = if (Process.myUid() == Process.SHELL_UID) null else
-        if (Process.myUid() == 0) "root_user_service_refused" else "unexpected_user_service_uid"
+    // The Shizuku-protocol server decides the uid: shell (adb-started Shizuku) or root (a root-started
+    // Shizuku, or Sui). Both can create a virtual display and drive it; anything else is not a
+    // Shizuku-protocol service and is refused. (Binder identity is per process, so a root service
+    // cannot be narrowed to shell from the inside.)
+    private val identityError: String? =
+        if (Process.myUid() == Process.SHELL_UID || Process.myUid() == 0) null else "unexpected_user_service_uid"
     private val contextError: String? = if (identityError == null) ShellContext.initialize() else identityError
     private var session: VirtualDisplaySession? = null
     private var uiBridge: UiBridge? = null
@@ -48,8 +52,8 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             "Android ${Build.VERSION.RELEASE} API $sdk; ${Build.MANUFACTURER} ${Build.MODEL}; supported range Android 10+"
         }
         recorder.check("shizuku", "shizuku_shell_user_service") {
-            if (identityError != null) throw VirtualScreenProbeFailure(identityError, "VScreen requires Shizuku shell UID 2000; actual UID=${Process.myUid()}")
-            "UserService active with shell UID ${Process.myUid()} (app-side READY state was checked before binding)"
+            if (identityError != null) throw VirtualScreenProbeFailure(identityError, "VScreen requires a Shizuku-protocol shell (2000) or root (0) service; actual UID=${Process.myUid()}")
+            "UserService active as ${if (Process.myUid() == 0) "root" else "shell"} UID ${Process.myUid()} (app-side READY state was checked before binding)"
         }
         recorder.check("context", "shell_context_ready") {
             if (contextError != null) throw VirtualScreenProbeFailure("shell_context_unavailable", contextError)
@@ -92,16 +96,6 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
                 if (!ui.connect()) throw VirtualScreenProbeFailure("uiautomation_unavailable", "UiAutomation connect returned false")
                 "UiAutomation connected in Shizuku UserService"
             }
-            recorder.check("input", "input_injected") {
-                val ok = InputBridge().key(active.displayId, KeyEvent.KEYCODE_UNKNOWN)
-                if (!ok) {
-                    val hint = if (isXiaomi()) {
-                        "; Xiaomi/HyperOS: enable Developer options > USB debugging (Security settings) / 小米或 HyperOS 请在开发者选项开启“USB 调试（安全设置）”"
-                    } else ""
-                    throw VirtualScreenProbeFailure("input_injection_failed", "KEYCODE_UNKNOWN injection was rejected$hint")
-                }
-                "KEYCODE_UNKNOWN delivered to display ${active.displayId}"
-            }
             recorder.check("launch", "settings_window_on_virtual_display") {
                 if (!ui.connect()) throw VirtualScreenProbeFailure("uiautomation_unavailable", "UiAutomation is not connected")
                 if (!launchInternal("com.android.settings", null, active.displayId)) {
@@ -118,6 +112,17 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
                 }
                 if (!found) throw VirtualScreenProbeFailure("app_left_virtual_display", "Settings window was not observed on display ${active.displayId}")
                 "com.android.settings window observed on display ${active.displayId}"
+            }
+            recorder.check("input", "input_injected") {
+                // Sent after the launch step: an input event needs a window on the display to be delivered to.
+                val ok = InputBridge().key(active.displayId, KeyEvent.KEYCODE_UNKNOWN)
+                if (!ok) {
+                    val hint = if (isXiaomi()) {
+                        "; Xiaomi/HyperOS: enable Developer options > USB debugging (Security settings) / 小米或 HyperOS 请在开发者选项开启“USB 调试（安全设置）”"
+                    } else ""
+                    throw VirtualScreenProbeFailure("input_injection_failed", "KEYCODE_UNKNOWN injection was rejected$hint")
+                }
+                "KEYCODE_UNKNOWN delivered to display ${active.displayId}"
             }
             recorder.check("screenshot", "non_black_screenshot") {
                 val bitmap = active.captureBitmap(retries = 4, delayMs = 150L)
@@ -312,17 +317,36 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     private fun launchInternal(packageName: String, activityOrNull: String?, displayId: Int): Boolean {
         if (!PACKAGE_PATTERN.matches(packageName)) fail("invalid_package", "Invalid package name")
         val context = ShellContext.get()
-        val intent = if (activityOrNull.isNullOrBlank()) {
-            context.packageManager.getLaunchIntentForPackage(packageName)
+        val component: ComponentName = if (activityOrNull.isNullOrBlank()) {
+            context.packageManager.getLaunchIntentForPackage(packageName)?.component ?: return false
         } else {
             val className = if (activityOrNull.startsWith('.')) packageName + activityOrNull else activityOrNull
             if (!className.startsWith("$packageName.")) fail("invalid_activity", "Activity must belong to the requested package")
-            Intent().setComponent(ComponentName(packageName, className))
-        } ?: return false
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val options = ActivityOptions.makeBasic()
-        ActivityOptions::class.java.getMethod("setLaunchDisplayId", Int::class.javaPrimitiveType).invoke(options, displayId)
-        context.startActivity(intent, options.toBundle())
+            ComponentName(packageName, className)
+        }
+        return startOnDisplay(component, displayId)
+    }
+
+    /**
+     * Context.startActivity needs a caller process the system knows; this service process is not one
+     * (the system answers "Not allowed to start activity"). `cmd activity start-activity` is the
+     * platform's own shell entry point for the same call and works for shell and root alike. The
+     * argument vector is built here from a validated package and a component name, with no shell.
+     */
+    private fun startOnDisplay(component: ComponentName, displayId: Int): Boolean {
+        val command = listOf(
+            "cmd", "activity", "start-activity", "--user", "0", "--display", displayId.toString(),
+            "-f", NEW_TASK_FLAG, "-n", component.flattenToShortString(),
+        )
+        val process = ProcessBuilder(command).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        if (!process.waitFor(LAUNCH_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            fail("app_launch_failed", "Launch request timed out")
+        }
+        if (process.exitValue() != 0 || output.contains("Error", ignoreCase = true)) {
+            fail("app_launch_failed", output.trim().take(300).ifEmpty { "Launch request was rejected" })
+        }
         return true
     }
 
@@ -339,7 +363,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     private fun requireShellIdentity() {
-        if (identityError != null) fail(identityError, "VScreen requires Shizuku shell UID 2000; actual UID=${Process.myUid()}")
+        if (identityError != null) fail(identityError, "VScreen requires a Shizuku-protocol shell (2000) or root (0) service; actual UID=${Process.myUid()}")
     }
 
     private fun releaseSession() {
@@ -386,6 +410,8 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         private const val MAX_PROBE_DIM = 2400
         private const val MAX_PROBE_PIXELS = 4_194_304L
         private const val PROBE_LAUNCH_WAIT_MS = 4_000L
+        private const val LAUNCH_TIMEOUT_SECONDS = 8L
+        private const val NEW_TASK_FLAG = "268435456" // Intent.FLAG_ACTIVITY_NEW_TASK
         private val PACKAGE_PATTERN = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
     }
 }

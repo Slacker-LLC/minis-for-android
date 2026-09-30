@@ -342,7 +342,7 @@ fun SettingsCategoryScreen(
             }
 
             SettingsCategory.SYSTEM -> {
-                ReadinessSection(items = rememberReadiness(), onOpenBackground = onOpenBackground)
+                ReadinessCheckSection(onOpenBackground = onOpenBackground)
                 SettingsSection(
                     header = stringResource(R.string.settings_manage_header),
                     footer = stringResource(R.string.settings_system_footer),

@@ -38,6 +38,7 @@ internal object VirtualScreenCopyPolicy {
         "no_probe_display" to R.string.vscreen_reason_cleanup_skipped,
         "hidden_api_unavailable" to R.string.vscreen_reason_hidden_api,
         "timeout" to R.string.vscreen_reason_timeout,
+        "vscreen_timeout" to R.string.vscreen_reason_service_timeout,
         "probe_step_failed" to R.string.vscreen_reason_generic_failure,
         "vscreen_probe_failed" to R.string.vscreen_reason_generic_failure,
         "vscreen_probe_required" to R.string.vscreen_reason_probe_required,
@@ -66,6 +67,16 @@ internal object VirtualScreenCopyPolicy {
         else -> R.string.vscreen_status_unknown
     }
 
+    /** Where a failed check can be fixed, so the result dialog can offer a single "go there" button. */
+    enum class FailAction { NONE, SHIZUKU, DEVELOPER_OPTIONS }
+
+    fun actionFor(code: String, xiaomi: Boolean): FailAction = when (code) {
+        "shizuku_not_ready", "shizuku_unavailable", "permission_denied", "unexpected_user_service_uid",
+        "root_user_service_refused" -> FailAction.SHIZUKU
+        "input_injection_failed" -> if (xiaomi) FailAction.DEVELOPER_OPTIONS else FailAction.NONE
+        else -> FailAction.NONE
+    }
+
     fun knownReasonCodes(): Set<String> = reasons.keys
     fun knownStepIds(): Set<String> = steps.keys
 
@@ -80,6 +91,6 @@ internal object VirtualScreenCopyPolicy {
         "settings_window_on_virtual_display", "app_launch_failed", "app_left_virtual_display",
         "non_black_screenshot", "screenshot_unavailable", "screenshot_black", "screenshot_blocked_secure",
         "probe_display_released", "no_probe_display", "hidden_api_unavailable", "timeout",
-        "probe_step_failed", "vscreen_probe_failed", "vscreen_probe_required",
+        "probe_step_failed", "vscreen_probe_failed", "vscreen_probe_required", "vscreen_timeout",
     )
 }

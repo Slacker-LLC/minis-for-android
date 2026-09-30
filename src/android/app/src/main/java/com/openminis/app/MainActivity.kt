@@ -433,8 +433,10 @@ class MainActivity : ComponentActivity() {
                             .setPositiveButton(R.string.a11y_repair_action_open_settings) { d, _ ->
                                 d.dismiss()
                                 try {
+                                    // Every grant is handled in System & permissions.
                                     startActivity(
-                                        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                        Intent(Intent.ACTION_VIEW, Uri.parse("minis://settings/system")).apply {
+                                            setPackage(packageName)
                                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                         }
                                     )

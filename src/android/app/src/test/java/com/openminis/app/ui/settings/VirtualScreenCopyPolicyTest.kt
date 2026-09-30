@@ -24,3 +24,27 @@ class VirtualScreenCopyPolicyTest {
         assertEquals(R.string.vscreen_status_unknown, VirtualScreenCopyPolicy.status("future"))
     }
 }
+
+class VirtualScreenFailActionTest {
+    @Test fun shizukuProblemsPointToShizuku() {
+        for (code in listOf("shizuku_not_ready", "shizuku_unavailable", "permission_denied", "unexpected_user_service_uid")) {
+            assertEquals(code, VirtualScreenCopyPolicy.FailAction.SHIZUKU, VirtualScreenCopyPolicy.actionFor(code, xiaomi = false))
+        }
+    }
+
+    @Test fun developerOptionsHintOnlyOnXiaomi() {
+        assertEquals(
+            VirtualScreenCopyPolicy.FailAction.DEVELOPER_OPTIONS,
+            VirtualScreenCopyPolicy.actionFor("input_injection_failed", xiaomi = true),
+        )
+        assertEquals(
+            VirtualScreenCopyPolicy.FailAction.NONE,
+            VirtualScreenCopyPolicy.actionFor("input_injection_failed", xiaomi = false),
+        )
+    }
+
+    @Test fun unknownAndTimeoutCodesOfferNoAction() {
+        assertEquals(VirtualScreenCopyPolicy.FailAction.NONE, VirtualScreenCopyPolicy.actionFor("vscreen_timeout", xiaomi = true))
+        assertEquals(VirtualScreenCopyPolicy.FailAction.NONE, VirtualScreenCopyPolicy.actionFor("never_seen", xiaomi = true))
+    }
+}

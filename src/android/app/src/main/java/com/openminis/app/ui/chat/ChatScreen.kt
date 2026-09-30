@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Visibility
+import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ViewSidebar
@@ -778,6 +780,7 @@ fun ChatScreen(
     var showMcpsSheet by remember { mutableStateOf(false) }
     // GH#32/#35: session-local prompt/model/tool overrides.
     var showSessionConfigSheet by remember { mutableStateOf(false) }
+    var showVirtualScreenViewer by remember { mutableStateOf(false) }
     var showSessionAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
@@ -2535,6 +2538,16 @@ fun ChatScreen(
                                 },
                                 trailingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
                             )
+                            if (VirtualScreenClientProvider.get(context).isEnabled()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.vscreen_viewer_menu)) },
+                                    onClick = {
+                                        showChatMenu = false
+                                        showVirtualScreenViewer = true
+                                    },
+                                    trailingIcon = { Icon(Icons.Outlined.Visibility, contentDescription = null) },
+                                )
+                            }
                             MinisMenuDivider()
                             // Destructive, last, in red.
                             DropdownMenuItem(
@@ -6422,6 +6435,10 @@ fun ChatScreen(
             },
             onDismiss = { showThinkingLevelSheet = false },
         )
+    }
+
+    if (showVirtualScreenViewer) {
+        com.openminis.app.ui.settings.VirtualScreenViewerDialog(onDismiss = { showVirtualScreenViewer = false })
     }
 
     // Model Picker bottom sheet

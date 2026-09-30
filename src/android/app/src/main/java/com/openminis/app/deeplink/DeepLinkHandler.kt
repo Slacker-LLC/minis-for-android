@@ -31,6 +31,7 @@ import com.openminis.app.data.model.ModelSlot
  *   minis://settings/background                 → Background settings
  *   minis://settings/about                      → About
  *   minis://settings/permissions                → Permissions
+ *   minis://settings/system                     → System & permissions (readiness check and every grant)
  *   minis://settings/environments[?create_key=...&create_value=...&create_note=...]
  *                                               → Environment variables
  *   minis://settings/rootfs                     → Rootfs management (mirror config lives here)
@@ -201,6 +202,8 @@ object DeepLinkHandler {
             "background" -> DeepLinkAction.OpenSettingsScreen(Routes.BACKGROUND)
             "about" -> DeepLinkAction.OpenSettingsScreen(Routes.ABOUT)
             "permissions" -> DeepLinkAction.OpenPermissionSettings
+            // The one place every grant lives (readiness check, Root, Shizuku, accessibility, files...).
+            "system", "system-permissions" -> DeepLinkAction.OpenSettingsScreen(Routes.settingsCategory("system"))
             // mirrors live as a section inside Rootfs management — no
             // standalone destination, so route both /mirrors and /rootfs
             // there. The user lands on the same screen; mirror config is

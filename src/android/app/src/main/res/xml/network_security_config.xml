@@ -10,10 +10,7 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <!-- Pre-T354 entry kept for explicitness; the base-config above already
-         covers localhost/127.0.0.1 (OAuth callback server). -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-    </domain-config>
+    <!-- No <domain-config> for localhost / 127.0.0.1: base-config above already permits cleartext, and on
+         Android 17 the duplicate rule makes the process Shizuku starts for VScreen die during startup
+         ("Found multiple conflicting per-domain rules"). -->
 </network-security-config>

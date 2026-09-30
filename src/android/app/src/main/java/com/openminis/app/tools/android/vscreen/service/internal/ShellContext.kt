@@ -18,8 +18,8 @@ import java.lang.reflect.Constructor
 
 /** Minimal shell-identity context bootstrap. No receiver/content-provider APIs are assumed. */
 internal class ShellContext private constructor(base: Context) : ContextWrapper(base) {
-    override fun getPackageName(): String = PACKAGE_NAME
-    override fun getOpPackageName(): String = PACKAGE_NAME
+    override fun getPackageName(): String = identityPackage()
+    override fun getOpPackageName(): String = identityPackage()
     override fun getApplicationContext(): Context = this
 
     @SuppressLint("SoonBlockedPrivateApi")
@@ -38,10 +38,16 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
 
     @SuppressLint("NewApi")
     override fun getAttributionSource(): AttributionSource =
-        AttributionSource.Builder(Process.SHELL_UID).setPackageName(PACKAGE_NAME).build()
+        AttributionSource.Builder(Process.myUid()).setPackageName(identityPackage()).build()
 
     companion object {
-        const val PACKAGE_NAME = "com.android.shell"
+        const val SHELL_PACKAGE_NAME = "com.android.shell"
+
+        /** System services accept the package name "root" for uid 0 and "com.android.shell" for uid 2000. */
+        const val ROOT_PACKAGE_NAME = "root"
+
+        /** The package name that matches the uid this process really runs as. */
+        fun identityPackage(uid: Int = Process.myUid()): String = if (uid == 0) ROOT_PACKAGE_NAME else SHELL_PACKAGE_NAME
         @Volatile private var instance: ShellContext? = null
 
         /** Runs only inside Shizuku's separate shell UserService process, which its API docs say has no non-SDK restrictions. */
@@ -69,7 +75,7 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
             runCatching {
                 val bindDataClass = Class.forName("android.app.ActivityThread\$AppBindData")
                 val bindData = bindDataClass.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
-                val info = ApplicationInfo().apply { packageName = PACKAGE_NAME }
+                val info = ApplicationInfo().apply { packageName = identityPackage() }
                 bindDataClass.getDeclaredField("appInfo").apply { isAccessible = true }.set(bindData, info)
                 activityThreadClass.getDeclaredField("mBoundApplication").apply { isAccessible = true }.set(thread, bindData)
             }

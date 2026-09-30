@@ -42,7 +42,9 @@ import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
 import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettings
 import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettingsPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenPreferences
+import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.MinisOutlinedButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,7 +55,7 @@ private data class ProbeRow(val id: String, val status: String, val code: String
 private data class PreviewResult(val displayId: Int?, val bitmap: Bitmap?)
 
 @Composable
-fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
+fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = {}) {
     val context = LocalContext.current
     val client = remember(context) { VirtualScreenClientProvider.get(context) }
     val preferences = remember(context) { VirtualScreenPreferences(context) }
@@ -63,6 +65,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
     var probePassed by remember { mutableStateOf(client.lastProbe?.passed == true) }
     var probeRows by remember { mutableStateOf(client.lastProbe?.json?.let(::parseProbeRows).orEmpty()) }
     var operationMessage by remember { mutableStateOf("") }
+    var showFailures by remember { mutableStateOf(false) }
     var previewMessage by remember { mutableStateOf("") }
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var previewBusy by remember { mutableStateOf(false) }
@@ -103,6 +106,8 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
                 return@launch
             }
             refreshProbe(result)
+            // A failed check tells the user what failed right away, in one dialog.
+            if (!probePassed) showFailures = true
             if (enableWhenPassed && probePassed) {
                 val enabledResult = withContext(Dispatchers.IO) {
                     runCatching { client.setEnabled(true) }.isSuccess
@@ -158,6 +163,69 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
         if (VirtualScreenDisplaySettingsPolicy.isValid(spec)) preferences.setDisplaySettings(spec)
     }
 
+    if (showFailures) {
+        val failed = probeRows.filter { it.status == "fail" }
+        val xiaomi = android.os.Build.MANUFACTURER.equals("xiaomi", ignoreCase = true) ||
+            android.os.Build.MANUFACTURER.equals("redmi", ignoreCase = true)
+        val action = failed.map { VirtualScreenCopyPolicy.actionFor(it.code, xiaomi) }
+            .firstOrNull { it != VirtualScreenCopyPolicy.FailAction.NONE }
+        MinisAlertDialog(
+            onDismissRequest = { showFailures = false },
+            title = { Text(stringResource(R.string.vscreen_fail_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    failed.forEach { row ->
+                        Column {
+                            Text(
+                                text = stringResource(VirtualScreenCopyPolicy.step(row.id)),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = stringResource(VirtualScreenCopyPolicy.reason(row.code)),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                text = row.code,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (action != null) {
+                    MinisTextButton(onClick = {
+                        showFailures = false
+                        when (action) {
+                            VirtualScreenCopyPolicy.FailAction.SHIZUKU -> onOpenShizuku()
+                            VirtualScreenCopyPolicy.FailAction.DEVELOPER_OPTIONS -> runCatching {
+                                context.startActivity(
+                                    android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+                                )
+                            }
+                            VirtualScreenCopyPolicy.FailAction.NONE -> Unit
+                        }
+                    }) {
+                        Text(
+                            stringResource(
+                                if (action == VirtualScreenCopyPolicy.FailAction.SHIZUKU) {
+                                    R.string.vscreen_fail_action_shizuku
+                                } else {
+                                    R.string.vscreen_fail_action_devopts
+                                },
+                            ),
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                MinisTextButton(onClick = { showFailures = false }) { Text(stringResource(R.string.common_close)) }
+            },
+        )
+    }
+
     SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack) {
         Text(
             text = stringResource(R.string.vscreen_intro),
@@ -185,24 +253,25 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
                     else Text(stringResource(R.string.vscreen_check_compatibility))
                 }
                 if (probeRows.isNotEmpty()) {
+                    // The full step list is not shown: a pass is one line, a failure opens a dialog
+                    // that lists only what failed.
                     Text(
                         text = stringResource(if (probePassed) R.string.vscreen_probe_passed else R.string.vscreen_probe_failed),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (probePassed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
-                    probeRows.forEachIndexed { index, row ->
-                        val reason = stringResource(VirtualScreenCopyPolicy.reason(row.code))
-                        val detail = row.detail.takeIf { it.isNotBlank() }?.let { "\n$it" }.orEmpty()
-                        SettingsRow(
-                            title = "${stringResource(VirtualScreenCopyPolicy.step(row.id))} · ${stringResource(VirtualScreenCopyPolicy.status(row.status))}",
-                            subtitle = "${row.code}: $reason$detail",
-                            showDivider = index != probeRows.lastIndex,
-                            minHeight = 64.dp,
-                        )
+                    if (!probePassed) {
+                        MinisTextButton(onClick = { showFailures = true }) {
+                            Text(stringResource(R.string.vscreen_view_failures))
+                        }
                     }
                 }
-                if (operationMessage.isNotBlank()) {
+                // The pass/fail line above already says this; only show other messages (busy, released...).
+                if (operationMessage.isNotBlank() &&
+                    operationMessage != context.getString(R.string.vscreen_probe_passed) &&
+                    operationMessage != context.getString(R.string.vscreen_probe_failed)
+                ) {
                     Text(
                         operationMessage,
                         style = MaterialTheme.typography.bodySmall,
