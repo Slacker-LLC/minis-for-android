@@ -59,8 +59,10 @@ internal fun graphemeBoundaries(text: String): IntArray {
  * Incremental boundary update for append-only text.
  *
  * New content can EXTEND the previous last grapheme (combining accent, ZWJ
- * emoji, flag, CRLF), so the last old boundary is not trustworthy: keep
- * everything before the second-to-last boundary and rescan from there. Any
+ * emoji, flag, CRLF), and a chunk that ends inside a surrogate pair leaves a
+ * dangling fragment as the last one, so the last TWO old boundaries are not
+ * trustworthy: keep everything before the third-to-last boundary and rescan
+ * from there. Any
  * non-append input (or an inconsistent previous index) falls back to a full
  * rebuild.
  */
@@ -80,7 +82,10 @@ internal fun updateGraphemeBoundaries(
     }
     if (text == previousText) return previousBoundaries
 
-    val restartBoundaryIndex = (previousBoundaries.lastIndex - 1).coerceAtLeast(0)
+    // Restart two boundaries back, not one. When a chunk ends mid surrogate pair
+    // the dangling high surrogate is its own last "grapheme", and the extendable
+    // cluster (ZWJ tail, first regional indicator) is the one BEFORE it.
+    val restartBoundaryIndex = (previousBoundaries.lastIndex - 2).coerceAtLeast(0)
     val restartOffset = previousBoundaries[restartBoundaryIndex]
     val suffixBoundaries = graphemeBoundaries(text.substring(restartOffset))
     return IntArray(restartBoundaryIndex + suffixBoundaries.size).also { merged ->
