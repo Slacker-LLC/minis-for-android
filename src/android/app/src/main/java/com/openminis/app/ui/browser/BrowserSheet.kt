@@ -157,7 +157,7 @@ fun BrowserSheet(
     StandardChatSheet(
         title = pageTitle.ifEmpty { stringResource(R.string.browser_title) },
         onDismiss = onDismiss,
-        heightFraction = 0.72f,
+        heightFraction = 0.86f,
         header = false,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

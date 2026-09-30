@@ -140,8 +140,8 @@ fun BrowserSettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // A sheet, not a page: about two thirds of the screen, scrolling inside.
-                .height((LocalConfiguration.current.screenHeightDp * 0.66f).dp)
+                // A sheet, not a page: about 83% of the screen, scrolling inside.
+                .height((LocalConfiguration.current.screenHeightDp * 0.83f).dp)
                 .glassSheetSurface()
                 .imePadding()
                 // [T-android-browser-settings-keyboard-overlap] imePadding
