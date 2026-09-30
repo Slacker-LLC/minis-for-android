@@ -63,22 +63,8 @@ fun StandardChatSheet(
     heightFraction: Float = 0.9f,
     /** False when the content draws its own top row (the browser does). */
     header: Boolean = true,
-    /** True for a full page (the browser): covers the screen instead of rising as a sheet. */
-    fullScreen: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    if (fullScreen) {
-        com.openminis.app.ui.components.MinisFullScreenDialog(onDismiss = onDismiss) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (header) {
-                    StandardChatSheetHeader(title = title, onDismiss = onDismiss, leadingAction = leadingAction)
-                    HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
-                }
-                Box(modifier = Modifier.fillMaxSize()) { content() }
-            }
-        }
-        return
-    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val configuration = LocalConfiguration.current
     val sheetHeight = (configuration.screenHeightDp * heightFraction.coerceIn(0.1f, 1f)).dp

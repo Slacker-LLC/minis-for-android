@@ -1,5 +1,6 @@
 package com.openminis.app.ui.browser
 
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import com.openminis.app.ui.settings.SettingsSearchField
@@ -130,10 +131,19 @@ fun BrowserSettingsSheet(
     // Cookie filter (mirrors iOS `.searchable("Filter by domain")`).
     var cookieFilterText by remember { mutableStateOf("") }
 
-    com.openminis.app.ui.components.MinisFullScreenDialog(onDismiss = onDismiss) {
+    MinisModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+    ) {
+        GlassSheetWindowBlur()
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                // A sheet, not a page: about two thirds of the screen, scrolling inside.
+                .height((LocalConfiguration.current.screenHeightDp * 0.66f).dp)
+                .glassSheetSurface()
+                .imePadding()
                 // [T-android-browser-settings-keyboard-overlap] imePadding
                 // shrinks the sheet's content frame when the keyboard
                 // opens; verticalScroll lets the user (or the focused-
