@@ -2028,6 +2028,7 @@
     <string name="drawer_terminal">Терминал</string>
     <string name="drawer_recent">Недавние</string>
     <string name="drawer_no_search_match">Совпадений не найдено</string>
+    <string name="drawer_search_results">Результатов: %1$d</string>
     <string name="drawer_no_history">Бесед пока нет</string>
     <string name="drawer_rename_session">Переименовать беседу</string>
     <string name="drawer_delete_session">Удалить беседу</string>

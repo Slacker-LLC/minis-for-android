@@ -1773,6 +1773,7 @@
     <string name="drawer_terminal">ターミナル</string>
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">一致する会話がありません</string>
+    <string name="drawer_search_results">%1$d 件の結果</string>
     <string name="drawer_no_history">まだ会話がありません</string>
     <string name="drawer_rename_session">会話の名前を変更</string>
     <string name="drawer_delete_session">会話を削除</string>

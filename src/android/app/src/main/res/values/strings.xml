@@ -2154,6 +2154,7 @@
     <string name="drawer_terminal">Terminal</string>
     <string name="drawer_recent">Recent</string>
     <string name="drawer_no_search_match">No matching conversations</string>
+    <string name="drawer_search_results">%1$d results</string>
     <string name="drawer_no_history">No conversations yet</string>
     <string name="drawer_rename_session">Rename conversation</string>
     <string name="drawer_delete_session">Delete conversation</string>

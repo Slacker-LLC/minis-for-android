@@ -2036,6 +2036,7 @@
     <string name="drawer_terminal">終端</string>
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">未找到相關對話</string>
+    <string name="drawer_search_results">%1$d 個結果</string>
     <string name="drawer_no_history">暫無歷史對話</string>
     <string name="drawer_rename_session">重新命名會話</string>
     <string name="drawer_delete_session">刪除會話</string>

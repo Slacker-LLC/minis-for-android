@@ -30,6 +30,15 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.Folder
+import com.openminis.app.ui.components.MinisMenuDivider
+import com.openminis.app.ui.components.MinisMenuDefaults
+import com.openminis.app.ui.components.MinisMenu
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
@@ -108,8 +117,16 @@ fun SessionDrawerContent(
     val groupPickerRequest by viewModel.groupPickerRequest.collectAsState()
 
     val scope = rememberCoroutineScope()
-    var searchQuery by remember { mutableStateOf("") }
-    var isSearching by remember { mutableStateOf(false) }
+    // Search runs through the view-model so the drawer gets the same message-content matches and
+    // snippets the session list page shows; the field text is mirrored into it.
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchSnippets by viewModel.searchSnippets.collectAsState()
+    androidx.compose.runtime.DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.isSearchActive.value = false
+            viewModel.searchQuery.value = ""
+        }
+    }
 
     var sessionToRename by remember { mutableStateOf<ChatSessionEntity?>(null) }
     var renameText by remember { mutableStateOf("") }
@@ -117,14 +134,9 @@ fun SessionDrawerContent(
     var showBulkDelete by remember { mutableStateOf(false) }
     val folderDialogs = rememberFolderDialogState()
 
-    val searchActive = isSearching && searchQuery.isNotBlank()
-    val filteredSessions = remember(sessions, searchQuery, isSearching) {
-        if (searchActive) {
-            sessions.filter { (it.title ?: "").contains(searchQuery.trim(), ignoreCase = true) }
-        } else {
-            sessions
-        }
-    }
+    val searchActive = searchQuery.isNotBlank()
+    // displayedSessions is already the search result set while a query is active.
+    val filteredSessions = sessions
 
     // Groups are shown only when not searching: a filtered flat list is what a
     // search wants, and it avoids collapsing matches inside closed groups.
@@ -153,102 +165,56 @@ fun SessionDrawerContent(
                 onDelete = { showBulkDelete = true },
             )
         } else {
+            Text(
+                text = "Minis",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = ChatColors.primaryText,
+                modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+            )
+            DrawerSearchField(
+                value = searchQuery,
+                onValueChange = {
+                    viewModel.searchQuery.value = it
+                    viewModel.isSearchActive.value = it.isNotBlank()
+                },
+                placeholder = stringResource(R.string.drawer_search_chats),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!searchActive) {
+                DrawerNewChatRow(onClick = onNewChat)
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(
-                    text = "Minis",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ChatColors.primaryText,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = {
-                            isSearching = !isSearching
-                            if (!isSearching) searchQuery = ""
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = ChatColors.primaryText,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    MinisTextButton(
-                        onClick = { viewModel.isSelecting.value = true },
-                        enabled = sessions.isNotEmpty(),
-                    ) {
-                        Text(stringResource(R.string.common_edit), fontSize = 15.sp)
-                    }
-                }
-            }
-        }
-
-        // Search field (shown when the search icon is tapped)
-        if (isSearching && !isSelecting) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text(stringResource(R.string.drawer_search_chats), fontSize = 14.sp) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(10.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = ChatColors.secondaryBg,
-                    unfocusedContainerColor = ChatColors.secondaryBg,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                ),
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-        }
-
-        if (!isSelecting) {
-            // New chat: a plain accent text row — no tinted pill (design language §6).
-            Text(
-                text = stringResource(R.string.scheduled_task_target_new),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onNewChat)
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 2.dp),
-            ) {
-                DrawerToolRow(
+                DrawerGridEntry(
                     icon = Icons.Outlined.Group,
                     title = stringResource(R.string.bots_team),
                     onClick = onOpenBots,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerToolRow(
+                DrawerGridEntry(
                     icon = Icons.Outlined.Schedule,
                     title = stringResource(R.string.scheduled_tasks_title),
                     onClick = onOpenScheduledTasks,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerToolRow(
+                DrawerGridEntry(
                     icon = Icons.Default.Terminal,
                     title = stringResource(R.string.drawer_terminal),
                     onClick = onOpenTerminal,
+                    modifier = Modifier.weight(1f),
                 )
-                DrawerToolRow(
+                DrawerGridEntry(
                     icon = Icons.Outlined.Folder,
                     title = stringResource(R.string.settings_section_files),
                     onClick = onOpenStorage,
+                    modifier = Modifier.weight(1f),
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -260,6 +226,21 @@ fun SessionDrawerContent(
                 .fillMaxWidth(),
             contentPadding = PaddingValues(vertical = 2.dp),
         ) {
+            if (searchActive) {
+                if (filteredSessions.isNotEmpty()) {
+                    item(key = "hdr-results") {
+                        SectionLabel(stringResource(R.string.drawer_search_results, filteredSessions.size))
+                    }
+                }
+                items(filteredSessions, key = { "s-${it.id}" }) { session ->
+                    DrawerSearchResultRow(
+                        session = session,
+                        query = searchQuery.trim(),
+                        snippet = searchSnippets[session.id],
+                        onOpen = { onSelectSession(session.id) },
+                    )
+                }
+            } else {
             if (pinned.isNotEmpty()) {
                 item(key = "hdr-pinned") { SectionLabel(stringResource(R.string.sessionlist_section_pinned)) }
                 items(pinned, key = { "p-${it.id}" }) { session ->
@@ -277,7 +258,6 @@ fun SessionDrawerContent(
             }
 
             if (folderBlocks.isNotEmpty()) {
-                item(key = "hdr-groups") { SectionLabel(stringResource(R.string.group_section_header)) }
                 folderBlocks.forEach { block ->
                     item(key = "f-${block.folder.id}") {
                         FolderHeaderRow(
@@ -302,7 +282,7 @@ fun SessionDrawerContent(
                             isCurrent = session.id == selectedSessionId,
                             isSelecting = isSelecting,
                             isChecked = session.id in selectedIds,
-                            indent = 16.dp,
+                            indent = 12.dp,
                             onOpen = { onSelectSession(session.id) },
                             onRename = { sessionToRename = session; renameText = session.title ?: "" },
                             onDelete = { sessionToDelete = session },
@@ -323,6 +303,7 @@ fun SessionDrawerContent(
                     onRename = { sessionToRename = session; renameText = session.title ?: "" },
                     onDelete = { sessionToDelete = session },
                 )
+            }
             }
 
             if (filteredSessions.isEmpty()) {
@@ -518,39 +499,176 @@ private fun SectionLabel(text: String) {
         fontSize = 12.5.sp,
         fontWeight = FontWeight.Medium,
         color = ChatColors.secondaryText,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
     )
 }
 
+/** Always-visible search field: fill grey, search glyph, clear button once something is typed. */
 @Composable
-private fun DrawerToolRow(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit,
+private fun DrawerSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
 ) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = ChatColors.primaryText),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+        modifier = modifier.fillMaxWidth(),
+        decorationBox = { inner ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ChatColors.secondaryBg)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = ChatColors.secondaryText,
+                    modifier = Modifier.size(18.dp),
+                )
+                Box(modifier = Modifier.weight(1f)) {
+                    if (value.isEmpty()) {
+                        Text(text = placeholder, fontSize = 15.sp, color = ChatColors.secondaryText, maxLines = 1)
+                    }
+                    inner()
+                }
+                if (value.isNotEmpty()) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.model_picker_search_clear),
+                        tint = ChatColors.secondaryText,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { onValueChange("") },
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** New chat: accent glyph and label, no tinted pill (the buttons are text). */
+@Composable
+private fun DrawerNewChatRow(onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
-            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
+            imageVector = Icons.Outlined.Edit,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = stringResource(R.string.scheduled_task_target_new),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/** One of the four daily entries: glyph over a short label, both in the accent. */
+@Composable
+private fun DrawerGridEntry(
+    icon: ImageVector,
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = ChatColors.secondaryText,
-            modifier = Modifier.size(19.dp),
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
         )
         Text(
             text = title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Normal,
-            color = ChatColors.primaryText,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/** Search hit: title with the match highlighted, then the matching message excerpt if any. */
+@Composable
+private fun DrawerSearchResultRow(
+    session: ChatSessionEntity,
+    query: String,
+    snippet: String?,
+    onOpen: () -> Unit,
+) {
+    val newSessionLabel = stringResource(R.string.drawer_new_session)
+    val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = com.openminis.app.ui.sessions.highlightedAnnotatedString(title, query),
+            fontSize = 15.sp,
+            color = ChatColors.primaryText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (snippet != null) {
+            Text(
+                text = com.openminis.app.ui.sessions.highlightedAnnotatedString(snippet, query),
+                fontSize = 12.5.sp,
+                color = ChatColors.secondaryText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Menu look from the board: 14dp corners, 44dp rows, the glyph on the right. */
+@Composable
+private fun DrawerMenuItem(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+) {
+    DropdownMenuItem(
+        text = { Text(text, fontSize = 15.sp) },
+        trailingIcon = { Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        onClick = onClick,
+        colors = if (destructive) MinisMenuDefaults.destructiveItemColors() else MinisMenuDefaults.itemColors(
+            leadingIconColor = MaterialTheme.colorScheme.onSurface,
+            trailingIconColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        contentPadding = MinisMenuDefaults.ItemPadding,
+        modifier = Modifier.height(44.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -566,39 +684,38 @@ private fun FolderHeaderRow(
     onDeleteWithSessions: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 1.5.dp),
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .height(38.dp)
                 .combinedClickable(
                     enabled = enabled,
                     onClick = onToggle,
                     onLongClick = { showMenu = true },
                 )
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
-                imageVector = Icons.Outlined.Folder,
-                contentDescription = null,
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    if (block.isCollapsed) R.string.group_expand else R.string.group_collapse,
+                ),
                 tint = ChatColors.secondaryText,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier
+                    .size(18.dp)
+                    .rotate(if (block.isCollapsed) -90f else 0f),
             )
             Text(
                 text = block.folder.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = ChatColors.primaryText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = ChatColors.secondaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f),
             )
             Text(
                 text = if (block.totalCount == 0) {
@@ -610,50 +727,44 @@ private fun FolderHeaderRow(
                 color = ChatColors.secondaryText,
                 maxLines = 1,
             )
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(
-                    if (block.isCollapsed) R.string.group_expand else R.string.group_collapse,
-                ),
-                tint = ChatColors.secondaryText,
-                modifier = Modifier
-                    .size(18.dp)
-                    .rotate(if (block.isCollapsed) -90f else 0f),
-            )
         }
 
-        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.group_new_chat_in)) },
-                onClick = { showMenu = false; onNewChatInGroup() },
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (block.folder.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
-                        ),
-                    )
-                },
-                onClick = { showMenu = false; onTogglePin() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.group_rename)) },
+        MinisMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+            shape = RoundedCornerShape(14.dp),
+            minWidth = 220.dp,
+            // The board's menus are plain white; the default tonal lift tints them with the accent.
+            tonalElevation = 0.dp,
+        ) {
+            DrawerMenuItem(
+                text = stringResource(R.string.group_rename),
+                icon = Icons.Outlined.Edit,
                 onClick = { showMenu = false; onRename() },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.group_dissolve)) },
+            DrawerMenuItem(
+                text = stringResource(R.string.group_new_chat_in),
+                icon = Icons.Outlined.EditNote,
+                onClick = { showMenu = false; onNewChatInGroup() },
+            )
+            DrawerMenuItem(
+                text = stringResource(
+                    if (block.folder.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
+                ),
+                icon = Icons.Outlined.PushPin,
+                onClick = { showMenu = false; onTogglePin() },
+            )
+            MinisMenuDivider()
+            DrawerMenuItem(
+                text = stringResource(R.string.group_dissolve),
+                icon = Icons.AutoMirrored.Outlined.Undo,
                 onClick = { showMenu = false; onDissolve() },
             )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.group_delete_with_sessions, block.totalCount),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                },
+            DrawerMenuItem(
+                text = stringResource(R.string.group_delete_with_sessions, block.totalCount),
+                icon = Icons.Outlined.Delete,
                 onClick = { showMenu = false; onDeleteWithSessions() },
+                destructive = true,
             )
         }
     }
@@ -674,20 +785,21 @@ private fun DrawerSessionRow(
 ) {
     val newSessionLabel = stringResource(R.string.drawer_new_session)
     val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
-    // One accent, one grey: the open conversation gets the fill grey and an accent label.
-    val bgColor = if (isCurrent && !isSelecting) ChatColors.secondaryBg else Color.Transparent
+    // One accent, one wash: the open conversation gets a light accent fill and an accent label.
+    val accent = MaterialTheme.colorScheme.primary
+    val bgColor = if (isCurrent && !isSelecting) accent.copy(alpha = 0.10f) else Color.Transparent
     var showMenu by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp + indent, end = 12.dp, top = 1.5.dp, bottom = 1.5.dp),
+            .padding(start = 8.dp + indent, end = 8.dp, top = 1.dp, bottom = 1.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(42.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(10.dp))
                 .background(bgColor)
                 .combinedClickable(
                     onClick = {
@@ -703,50 +815,57 @@ private fun DrawerSessionRow(
                 Icon(
                     imageVector = if (isChecked) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
                     contentDescription = null,
-                    tint = if (isChecked) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
+                    tint = if (isChecked) accent else ChatColors.secondaryText,
                     modifier = Modifier.size(20.dp),
                 )
             }
             Text(
                 text = title,
-                fontSize = 14.sp,
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary else ChatColors.primaryText,
+                fontSize = 15.sp,
+                fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
+                color = if (isCurrent) accent else ChatColors.primaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
         }
 
-        DropdownMenu(
+        MinisMenu(
             expanded = showMenu,
             onDismissRequest = { showMenu = false },
+            shape = RoundedCornerShape(14.dp),
+            minWidth = 220.dp,
+            // The board's menus are plain white; the default tonal lift tints them with the accent.
+            tonalElevation = 0.dp,
         ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.drawer_rename)) },
+            DrawerMenuItem(
+                text = stringResource(R.string.drawer_rename),
+                icon = Icons.Outlined.Edit,
                 onClick = { showMenu = false; onRename() },
             )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (session.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
-                        ),
-                    )
-                },
+            DrawerMenuItem(
+                text = stringResource(
+                    if (session.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
+                ),
+                icon = Icons.Outlined.PushPin,
                 onClick = { showMenu = false; viewModel.togglePin(session.id) },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.group_move_to)) },
+            DrawerMenuItem(
+                text = stringResource(R.string.group_move_to),
+                icon = Icons.Outlined.Folder,
                 onClick = { showMenu = false; viewModel.requestGroupPicker(session.id) },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.sessionlist_select_action)) },
+            DrawerMenuItem(
+                text = stringResource(R.string.sessionlist_select_action),
+                icon = Icons.Outlined.CheckCircleOutline,
                 onClick = { showMenu = false; viewModel.enterSelection(session.id) },
             )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+            MinisMenuDivider()
+            DrawerMenuItem(
+                text = stringResource(R.string.delete),
+                icon = Icons.Outlined.Delete,
                 onClick = { showMenu = false; onDelete() },
+                destructive = true,
             )
         }
     }
