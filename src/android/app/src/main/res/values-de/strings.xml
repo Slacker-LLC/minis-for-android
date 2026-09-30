@@ -1776,6 +1776,7 @@
     <string name="drawer_terminal">Terminal</string>
     <string name="drawer_recent">Zuletzt</string>
     <string name="drawer_no_search_match">Keine passenden Unterhaltungen</string>
+    <string name="drawer_search_results">%1$d Ergebnisse</string>
     <string name="drawer_no_history">Noch keine Unterhaltungen</string>
     <string name="drawer_rename_session">Unterhaltung umbenennen</string>
     <string name="drawer_delete_session">Unterhaltung löschen</string>

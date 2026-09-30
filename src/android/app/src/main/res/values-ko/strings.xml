@@ -1765,6 +1765,7 @@
     <string name="drawer_terminal">터미널</string>
     <string name="drawer_recent">최근</string>
     <string name="drawer_no_search_match">일치하는 대화가 없습니다</string>
+    <string name="drawer_search_results">결과 %1$d개</string>
     <string name="drawer_no_history">아직 대화가 없습니다</string>
     <string name="drawer_rename_session">대화 이름 변경</string>
     <string name="drawer_delete_session">대화 삭제</string>

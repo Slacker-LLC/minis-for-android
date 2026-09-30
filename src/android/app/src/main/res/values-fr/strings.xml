@@ -1667,6 +1667,7 @@
     <string name="drawer_terminal">Terminal</string>
     <string name="drawer_recent">Récent</string>
     <string name="drawer_no_search_match">Aucune conversation correspondante</string>
+    <string name="drawer_search_results">%1$d résultats</string>
     <string name="drawer_no_history">Aucune conversation</string>
     <string name="drawer_rename_session">Renommer la conversation</string>
     <string name="drawer_delete_session">Supprimer la conversation</string>
