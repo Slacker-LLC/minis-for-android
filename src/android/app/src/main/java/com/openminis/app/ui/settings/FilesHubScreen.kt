@@ -82,7 +82,7 @@ fun FilesHubScreen(
     LaunchedEffect(Unit) { snapshot = loadStorageSnapshot(context, chatDao) }
     val mounts by mountedFoldersStore.entries.collectAsState()
 
-    SettingsScaffold(title = stringResource(R.string.settings_section_files), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.settings_section_files), onBack = onBack, largeTitle = true) {
         UsageHeader(snapshot)
 
         SettingsSection(

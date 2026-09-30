@@ -1,6 +1,7 @@
 package com.openminis.app.ui.chat
 
 import androidx.compose.ui.res.stringResource
+import com.openminis.app.ui.settings.MinisSwitch
 import com.openminis.app.R
 
 import androidx.compose.foundation.background
@@ -125,7 +126,7 @@ fun SessionConfigSheet(
                 icon = Icons.Default.Compress,
                 onClick = { viewModel.setAutoCompactEnabled(!autoCompactOn) },
                 trailing = {
-                    Switch(
+                    MinisSwitch(
                         checked = autoCompactOn,
                         onCheckedChange = { viewModel.setAutoCompactEnabled(it) },
                     )
@@ -138,7 +139,7 @@ fun SessionConfigSheet(
                     icon = Icons.Default.Bolt,
                     onClick = { viewModel.setFastModeEnabled(!fastModeOn) },
                     trailing = {
-                        Switch(
+                        MinisSwitch(
                             checked = fastModeOn,
                             onCheckedChange = { viewModel.setFastModeEnabled(it) },
                         )

@@ -1472,6 +1472,9 @@
     <string name="scheduled_task_menu_edit">编辑</string>
     <string name="scheduled_task_menu_runs">运行记录</string>
     <string name="scheduled_task_menu_delete">删除</string>
+    <string name="scheduled_task_next_run">下次运行 %1$s</string>
+    <string name="scheduled_task_no_next_run">未安排下次运行</string>
+    <string name="scheduled_tasks_footer">每次触发都会创建一个新的聊天会话，完成后发送通知。点击通知即可查看结果。</string>
     <string name="scheduled_task_runs_title">运行记录</string>
     <string name="scheduled_task_runs_empty">还没有运行记录。该任务尚未触发 —— 触发后运行记录会显示在这里。</string>
     <string name="scheduled_task_runs_open_session">打开会话</string>

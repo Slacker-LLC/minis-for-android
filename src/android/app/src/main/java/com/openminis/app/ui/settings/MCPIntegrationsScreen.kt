@@ -156,7 +156,7 @@ fun MCPIntegrationsScreen(
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Switch(
+                                MinisSwitch(
                                     checked = server.enabled,
                                     onCheckedChange = { enabled ->
                                         ioScope.launch(Dispatchers.IO) {
@@ -380,23 +380,17 @@ private fun MCPFormTab(
     val isUrlTransport = transport != 2
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = transport == 0,
-                onClick = { transport = 0; errorText = null },
-                shape = SegmentedButtonDefaults.itemShape(0, 3),
-            ) { Text(stringResource(R.string.mcp_transport_http)) }
-            SegmentedButton(
-                selected = transport == 1,
-                onClick = { transport = 1; errorText = null },
-                shape = SegmentedButtonDefaults.itemShape(1, 3),
-            ) { Text(stringResource(R.string.mcp_transport_sse)) }
-            SegmentedButton(
-                selected = transport == 2,
-                onClick = { transport = 2; errorText = null },
-                shape = SegmentedButtonDefaults.itemShape(2, 3),
-            ) { Text(stringResource(R.string.mcp_transport_stdio)) }
-        }
+        SettingsSegmented(
+                options = listOf(stringResource(R.string.mcp_transport_http), stringResource(R.string.mcp_transport_sse), stringResource(R.string.mcp_transport_stdio)),
+                selectedIndex = listOf(transport == 0, transport == 1, transport == 2).indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run { transport = 0; errorText = null }
+                    1 -> run { transport = 1; errorText = null }
+                    2 -> run { transport = 2; errorText = null }
+                    }
+                },
+            )
 
         FieldLabel(stringResource(R.string.mcp_form_name))
         DialogTextField(

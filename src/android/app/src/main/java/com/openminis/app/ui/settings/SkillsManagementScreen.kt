@@ -311,7 +311,7 @@ fun SkillsManagementScreen(
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Switch(
+                                MinisSwitch(
                                     checked = skill.isEnabled,
                                     onCheckedChange = { skillRepository.setEnabled(skill.id, it) },
                                 )
@@ -683,14 +683,10 @@ fun SkillDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(skill.name) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(skill.name) },
+            onBack = onBack,
+            actions = {
                     // [T-android-skill-export] Export the skill as a .zip and
                     // hand it to the system share sheet — the round-trip
                     // partner of the existing zip import, and the Android
@@ -722,7 +718,7 @@ fun SkillDetailScreen(
                         )
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(
@@ -1196,14 +1192,10 @@ fun SkillFileViewerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     if (isEditing) {
                         MinisTextButton(onClick = {
                             val pending = editContent
@@ -1228,7 +1220,7 @@ fun SkillFileViewerScreen(
                         }) { Text(stringResource(R.string.skill_file_edit)) }
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         if (isEditing) {

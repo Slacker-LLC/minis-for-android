@@ -76,20 +76,16 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
     val current = draft
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            MinisTopBar(
+            title = {
                     Text(
                         text = profile?.card?.name ?: stringResource(R.string.characters_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            onBack = onBack,
+            actions = {
                     TextButton(
                         enabled = dirty && current != null && profile != null,
                         onClick = {
@@ -108,7 +104,7 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
                         },
                     ) { Text(stringResource(R.string.common_save)) }
                 },
-            )
+        )
         },
     ) { padding ->
         if (current == null) {
@@ -154,7 +150,7 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(stringResource(R.string.characters_book_recursive))
-                    Switch(
+                    MinisSwitch(
                         checked = current.recursiveScanning == true,
                         onCheckedChange = { draft = current.copy(recursiveScanning = it); dirty = true },
                     )
@@ -182,7 +178,7 @@ fun CharacterDetailScreen(characterId: String, onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Switch(
+                    MinisSwitch(
                         checked = entry.enabled,
                         onCheckedChange = { enabled ->
                             val entries = current.entries.toMutableList()
@@ -296,11 +292,11 @@ private fun EntryEditorDialog(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.characters_entry_before))
-                    Switch(checked = before, onCheckedChange = { before = it })
+                    MinisSwitch(checked = before, onCheckedChange = { before = it })
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.characters_entry_constant))
-                    Switch(checked = constant, onCheckedChange = { constant = it })
+                    MinisSwitch(checked = constant, onCheckedChange = { constant = it })
                 }
             }
         },

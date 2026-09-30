@@ -332,7 +332,7 @@ private fun BgToggleRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        MinisSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,

@@ -1931,4 +1931,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL permet à cette routine sans surveillance d’exécuter des commandes shell arbitraires, d’écrire hors de son dossier temporaire et d’appeler les outils MCP connectés, sous réserve des autorisations existantes de l’application. Choisissez ce niveau uniquement si vous faites confiance au prompt et aux outils configurés. L’accès réseau reste sans restriction.</string>
 <string name="scheduled_task_tier_full_confirm">Confirmer l’accès complet</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY a bloqué %1$s : %2$s</string>
+    <string name="scheduled_task_next_run">Prochaine exécution %1$s</string>
+    <string name="scheduled_task_no_next_run">Aucune prochaine exécution</string>
+    <string name="scheduled_tasks_footer">Chaque déclenchement crée une nouvelle discussion et envoie une notification à la fin. Touchez-la pour voir le résultat.</string>
 </resources>

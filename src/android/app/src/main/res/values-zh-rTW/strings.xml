@@ -1819,6 +1819,9 @@
     <string name="scheduled_task_menu_edit">編輯</string>
     <string name="scheduled_task_menu_runs">執行記錄</string>
     <string name="scheduled_task_menu_delete">刪除</string>
+    <string name="scheduled_task_next_run">下次執行 %1$s</string>
+    <string name="scheduled_task_no_next_run">未安排下次執行</string>
+    <string name="scheduled_tasks_footer">每次觸發都會建立一個新的聊天，完成後傳送通知。點擊通知即可查看結果。</string>
     <string name="scheduled_task_runs_title">執行記錄</string>
     <string name="scheduled_task_runs_empty">還沒有執行記錄。該任務尚未觸發 —— 觸發後執行記錄會顯示在這裡。</string>
     <string name="scheduled_task_runs_open_session">開啟會話</string>

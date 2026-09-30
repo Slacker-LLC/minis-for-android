@@ -1,7 +1,17 @@
 package com.openminis.app.ui.scheduled
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.foundation.background
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.settings.SettingsSwitch
+import com.openminis.app.ui.settings.SettingsScaffold
+import com.openminis.app.ui.components.MinisTextButton
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.scheduled.ScheduledRepeatMode
+import com.openminis.app.scheduled.ScheduledTargetMode
 import com.openminis.app.scheduled.ScheduledTask
 import com.openminis.app.scheduled.ScheduledTaskPermissionTier
 import java.text.SimpleDateFormat
@@ -85,53 +96,41 @@ fun ScheduledTasksScreen(
     val bots by vm.bots.collectAsState()
     var pendingDelete by remember { mutableStateOf<ScheduledTask?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.scheduled_tasks_title),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { onEditTask(null) }, shape = CircleShape) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scheduled_task_new))
+    SettingsScaffold(
+        title = stringResource(R.string.scheduled_tasks_title),
+        onBack = onBack,
+        largeTitle = true,
+        actions = {
+            IconButton(onClick = { onEditTask(null) }) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scheduled_task_new), tint = MaterialTheme.colorScheme.primary)
             }
         },
-    ) { padding ->
+    ) {
         if (tasks.isEmpty()) {
-            EmptyState(padding)
-            return@Scaffold
-        }
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            items(tasks, key = { it.id }) { task ->
-                ScheduledTaskRow(
+            Text(
+                stringResource(R.string.scheduled_tasks_empty),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+            )
+        } else {
+            tasks.forEach { task ->
+                ScheduledTaskCard(
                     task = task,
                     botName = task.botId?.let { id -> bots.firstOrNull { it.id == id }?.name ?: id },
                     onClick = { onEditTask(task.id) },
                     onToggle = { vm.setEnabled(task.id, it) },
+                    onRunNow = { vm.runNow(task) },
                     onEdit = { onEditTask(task.id) },
                     onViewRuns = { onViewRuns(task.id) },
                     onDelete = { pendingDelete = task },
                 )
             }
+            Text(
+                stringResource(R.string.scheduled_tasks_footer),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            )
         }
     }
 
@@ -146,7 +145,7 @@ fun ScheduledTasksScreen(
                     vm.delete(toDelete.id)
                     pendingDelete = null
                 }) {
-                    Text(stringResource(R.string.scheduled_task_delete_confirm))
+                    Text(stringResource(R.string.scheduled_task_delete_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -158,183 +157,155 @@ fun ScheduledTasksScreen(
     }
 }
 
+/**
+ * One routine, as the board draws it: name over "Daily 07:30 · New chat", the owning member as a chip,
+ * the switch on the right; under a hairline the next run, Run now and a "..." menu (edit, run history,
+ * delete). A switched-off routine is dimmed.
+ */
 @Composable
-private fun EmptyState(padding: PaddingValues) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Outlined.Schedule,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.scheduled_tasks_empty),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ScheduledTaskRow(
+private fun ScheduledTaskCard(
     task: ScheduledTask,
     botName: String?,
     onClick: () -> Unit,
     onToggle: (Boolean) -> Unit,
+    onRunNow: () -> Unit,
     onEdit: () -> Unit,
     onViewRuns: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val context = LocalContext.current
     var menuExpanded by remember(task.id) { mutableStateOf(false) }
-    Box {
+    val dim = if (task.enabled) 1f else 0.55f
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .combinedClickable(onClick = onClick, onLongClick = { menuExpanded = true })
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (task.enabled)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.Schedule,
-                    contentDescription = null,
-                    tint = if (task.enabled)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        modifier = Modifier.weight(1f, fill = false),
-                        text = task.label.ifBlank { task.prompt.take(40) },
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (task.permissionTier == ScheduledTaskPermissionTier.FULL) {
-                        Text(
-                            text = stringResource(R.string.scheduled_task_tier_full),
-                            modifier = Modifier
-                                .padding(start = 6.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer)
-                                .padding(horizontal = 6.dp, vertical = 3.dp),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(2.dp))
+            Column(modifier = Modifier.weight(1f).alpha(dim)) {
                 Text(
-                    text = formatScheduleSummary(task),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
+                    text = task.label.ifBlank { task.prompt.take(40) },
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (botName != null) {
-                    Text(
-                        text = stringResource(R.string.scheduled_task_bot_label, botName),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Text(
+                    text = scheduleSummary(context, task),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (botName != null || task.permissionTier == ScheduledTaskPermissionTier.FULL) {
+                    Row(modifier = Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (botName != null) {
+                            Chip(stringResource(R.string.scheduled_task_bot_label, botName), ChatColors.ok)
+                        }
+                        if (task.permissionTier == ScheduledTaskPermissionTier.FULL) {
+                            Chip(stringResource(R.string.scheduled_task_tier_full), ChatColors.warn)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            SettingsSwitch(checked = task.enabled, onCheckedChange = onToggle)
+        }
+        HorizontalDivider(modifier = Modifier.padding(top = 10.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = task.nextTriggerMs()?.let { stringResource(R.string.scheduled_task_next_run, relativeWhen(context, it)) }
+                    ?: stringResource(R.string.scheduled_task_no_next_run),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            MinisTextButton(onClick = onRunNow) { Text(stringResource(R.string.scheduled_task_run_now), fontSize = 15.sp) }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.MoreHoriz, contentDescription = stringResource(R.string.common_more), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                com.openminis.app.ui.components.MinisMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(14.dp),
+                    tonalElevation = 0.dp,
+                ) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scheduled_task_menu_edit)) },
+                        trailingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                        onClick = { menuExpanded = false; onEdit() },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scheduled_task_menu_runs)) },
+                        trailingIcon = { Icon(Icons.Outlined.History, contentDescription = null) },
+                        onClick = { menuExpanded = false; onViewRuns() },
+                    )
+                    com.openminis.app.ui.components.MinisMenuDivider()
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scheduled_task_menu_delete), color = MaterialTheme.colorScheme.error) },
+                        trailingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = { menuExpanded = false; onDelete() },
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
-            Switch(checked = task.enabled, onCheckedChange = onToggle)
-        }
-
-        // [T-android-scheduled-tasks-run-records] Long-press menu: Edit / Run
-        // records / Delete (delete is confirmed by the caller's dialog).
-        com.openminis.app.ui.components.MinisMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-        ) {
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text(stringResource(R.string.scheduled_task_menu_edit)) },
-                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                onClick = { menuExpanded = false; onEdit() },
-            )
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text(stringResource(R.string.scheduled_task_menu_runs)) },
-                leadingIcon = { Icon(Icons.Outlined.History, contentDescription = null) },
-                onClick = { menuExpanded = false; onViewRuns() },
-            )
-            androidx.compose.material3.DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.scheduled_task_menu_delete),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                },
-                leadingIcon = {
-                    Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                },
-                onClick = { menuExpanded = false; onDelete() },
-            )
         }
     }
 }
 
-internal fun formatScheduleSummary(task: ScheduledTask): String {
+@Composable
+private fun Chip(text: String, tint: Color) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        color = tint,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        maxLines = 1,
+    )
+}
+
+/** "Daily 07:30 · New chat": the repeat rule, the time and what a trigger does. */
+private fun scheduleSummary(context: android.content.Context, task: ScheduledTask): String {
     val time = "%02d:%02d".format(task.timeOfDayHour, task.timeOfDayMinute)
     val repeat = when (task.repeatMode) {
-        ScheduledRepeatMode.ONCE -> "Once"
-        ScheduledRepeatMode.DAILY -> "Daily"
-        ScheduledRepeatMode.WEEKDAYS -> "Weekdays"
+        ScheduledRepeatMode.ONCE -> context.getString(R.string.scheduled_task_repeat_once)
+        ScheduledRepeatMode.DAILY -> context.getString(R.string.scheduled_task_repeat_daily)
+        ScheduledRepeatMode.WEEKDAYS -> context.getString(R.string.scheduled_task_repeat_weekdays)
         ScheduledRepeatMode.CUSTOM -> {
-            val days = task.customDays.sorted().joinToString(",") { dowShort(it) }
-            if (days.isBlank()) "Custom" else days
+            val names = java.text.DateFormatSymbols.getInstance().shortWeekdays
+            val days = task.customDays.sorted().joinToString(",") { names.getOrNull(it).orEmpty() }
+            days.ifBlank { context.getString(R.string.scheduled_task_repeat_custom) }
         }
     }
-    val next = task.nextTriggerMs()?.let {
-        val sdf = SimpleDateFormat("MMM d HH:mm", Locale.getDefault())
-        " · next ${sdf.format(Date(it))}"
-    } ?: ""
-    return "$repeat $time$next"
+    val target = when (task.targetMode) {
+        ScheduledTargetMode.NewSession -> R.string.scheduled_task_target_new
+        is ScheduledTargetMode.AppendToSession -> R.string.scheduled_task_target_followup
+        is ScheduledTargetMode.RerunMessage -> R.string.scheduled_task_target_rerun
+    }
+    return "$repeat $time · ${context.getString(target)}"
 }
 
-private fun dowShort(dow: Int): String = when (dow) {
-    java.util.Calendar.SUNDAY -> "Sun"
-    java.util.Calendar.MONDAY -> "Mon"
-    java.util.Calendar.TUESDAY -> "Tue"
-    java.util.Calendar.WEDNESDAY -> "Wed"
-    java.util.Calendar.THURSDAY -> "Thu"
-    java.util.Calendar.FRIDAY -> "Fri"
-    java.util.Calendar.SATURDAY -> "Sat"
-    else -> ""
-}
+/** "Tomorrow 07:30" / "明天 07:30", localized by the platform. */
+private fun relativeWhen(context: android.content.Context, ms: Long): String =
+    android.text.format.DateUtils.getRelativeDateTimeString(
+        context, ms, android.text.format.DateUtils.DAY_IN_MILLIS, android.text.format.DateUtils.WEEK_IN_MILLIS, 0,
+    ).toString()

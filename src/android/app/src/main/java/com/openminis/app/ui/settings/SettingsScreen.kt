@@ -119,6 +119,7 @@ fun SettingsScreen(
     SettingsScaffold(
         title = stringResource(R.string.settings_title),
         onBack = onBack,
+        largeTitle = true,
     ) {
         // Level 1 lists subjects, not screens (design: Settings home): a readiness banner while
         // something needs attention, then the seven categories in two cards. Terminal, files and

@@ -98,7 +98,7 @@ fun SystemPromptModulesScreen(onBack: () -> Unit) {
                         onClick = { editingId = snapshot.module.id },
                         showDivider = index < modules.lastIndex,
                         trailing = {
-                            Switch(
+                            MinisSwitch(
                                 checked = snapshot.isEnabled,
                                 onCheckedChange = { enabled ->
                                     scope.launch {

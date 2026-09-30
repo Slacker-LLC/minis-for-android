@@ -2294,4 +2294,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL позволяет этому сценарию без присмотра выполнять произвольные команды shell, записывать файлы за пределами временной папки и вызывать подключённые инструменты MCP с учётом существующих разрешений приложения. Выбирайте этот вариант, только если доверяете запросу и настроенным инструментам. Сетевой доступ остаётся неограниченным.</string>
 <string name="scheduled_task_tier_full_confirm">Подтвердить полный доступ</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY заблокировал %1$s: %2$s</string>
+    <string name="scheduled_task_next_run">Следующий запуск: %1$s</string>
+    <string name="scheduled_task_no_next_run">Следующий запуск не запланирован</string>
+    <string name="scheduled_tasks_footer">Каждый запуск создаёт новый чат и присылает уведомление по завершении. Нажмите на него, чтобы увидеть результат.</string>
 </resources>

@@ -66,14 +66,10 @@ fun SharedFolderDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.shared_folder_detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
+            MinisTopBar(
+            title = { Text(stringResource(R.string.shared_folder_detail_title)) },
+            onBack = onBack,
+        )
         },
     ) { padding ->
         Column(

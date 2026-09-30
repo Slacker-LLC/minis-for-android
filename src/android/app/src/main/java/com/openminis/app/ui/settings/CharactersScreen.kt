@@ -112,19 +112,15 @@ fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.characters_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(stringResource(R.string.characters_title)) },
+            onBack = onBack,
+            actions = {
                     IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.characters_import))
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         if (characters.isEmpty()) {

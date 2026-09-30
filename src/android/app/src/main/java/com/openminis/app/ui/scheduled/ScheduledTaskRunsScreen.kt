@@ -1,6 +1,7 @@
 package com.openminis.app.ui.scheduled
 
 import androidx.compose.foundation.clickable
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,8 +69,8 @@ fun ScheduledTaskRunsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            MinisTopBar(
+            title = {
                     Column {
                         Text(
                             stringResource(R.string.scheduled_task_runs_title),
@@ -87,15 +88,8 @@ fun ScheduledTaskRunsScreen(
                         }
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
+            onBack = onBack,
+        )
         },
     ) { padding ->
         if (runs.isEmpty()) {

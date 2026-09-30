@@ -1,6 +1,7 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -100,14 +101,10 @@ fun FileBrowserScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.filebrowser_title)) },
-                navigationIcon = {
-                    IconButton(onClick = handleBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(stringResource(R.string.filebrowser_title)) },
+            onBack = handleBack,
+            actions = {
                     // T-hidden-files a3e7f1d0: trailing toolbar collapsed
                     // to a single ⋯ menu (was a Sort-only IconButton). All
                     // functional actions now live under one entry point.
@@ -122,7 +119,7 @@ fun FileBrowserScreen(
                         onToggleShowHidden = { viewModel.setShowHidden(!state.showHidden) },
                     )
                 },
-            )
+        )
         },
     ) { padding ->
         Column(

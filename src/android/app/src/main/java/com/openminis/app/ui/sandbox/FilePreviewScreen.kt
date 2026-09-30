@@ -1,6 +1,7 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.ui.res.stringResource
 import android.content.ContentValues
 import android.content.Context
@@ -197,8 +198,8 @@ fun FilePreviewScreen(
     // (FileBrowserScreen) renders correctly with zero overrides; do the same.
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
+            MinisTopBar(
+            title = {
                     Text(
                         text = if (showFullPath) (item.guestPath ?: item.file.absolutePath) else item.name,
                         maxLines = 1,
@@ -207,12 +208,8 @@ fun FilePreviewScreen(
                         modifier = Modifier.clickable { showFullPath = !showFullPath },
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            onBack = onBack,
+            actions = {
                     // T142: Share works for any file — FileProvider URI +
                     // ACTION_SEND + FLAG_GRANT_READ_URI_PERMISSION. iOS parity.
                     IconButton(onClick = { shareFile(context, item) }) {
@@ -251,7 +248,7 @@ fun FilePreviewScreen(
                         }
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Box(

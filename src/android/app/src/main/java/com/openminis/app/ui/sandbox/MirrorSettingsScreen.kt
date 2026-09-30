@@ -1,6 +1,8 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisSwitch
+import com.openminis.app.ui.settings.MinisTopBar
 import com.openminis.app.sandbox.RootfsManager
 
 import android.content.Context
@@ -617,14 +619,10 @@ fun MirrorCategoryDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(category.displayName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.mirror_back))
-                    }
-                },
-            )
+            MinisTopBar(
+            title = { Text(category.displayName) },
+            onBack = onBack,
+        )
         },
     ) { padding ->
         Column(
@@ -646,7 +644,7 @@ fun MirrorCategoryDetailScreen(
             ListItem(
                 headlineContent = { Text(stringResource(R.string.mirror_use_mirror_toggle)) },
                 trailingContent = {
-                    Switch(
+                    MinisSwitch(
                         checked = vm.useCustomMirror[category] == true,
                         onCheckedChange = { checked ->
                             vm.setUseCustom(context, category, checked)

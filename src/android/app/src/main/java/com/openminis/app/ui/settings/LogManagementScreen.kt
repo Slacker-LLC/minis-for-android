@@ -130,22 +130,17 @@ fun LogManagementScreen(
     ) {
         // Segmented selector lives outside the scrolling content so the
         // tabs stay visible as the body scrolls.
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            SegmentedButton(
-                selected = tab == "logs",
-                onClick = { tab = "logs" },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            ) { Text(stringResource(R.string.log_title)) }
-            SegmentedButton(
-                selected = tab == "config-audit",
-                onClick = { tab = "config-audit" },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            ) { Text(stringResource(R.string.logs_tab_config_changes)) }
-        }
+        SettingsSegmented(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                options = listOf(stringResource(R.string.log_title), stringResource(R.string.logs_tab_config_changes)),
+                selectedIndex = listOf(tab == "logs", tab == "config-audit").indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run { tab = "logs" }
+                    1 -> run { tab = "config-audit" }
+                    }
+                },
+            )
 
         if (tab == "config-audit") {
             // Audit body. Owns its own scrolling.
@@ -445,14 +440,10 @@ fun LogDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     IconButton(onClick = {
                         val file = File(File(context.filesDir, "logs"), fileName)
                         if (file.exists()) shareLogFile(context, file)
@@ -460,7 +451,7 @@ fun LogDetailScreen(
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share))
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         when {

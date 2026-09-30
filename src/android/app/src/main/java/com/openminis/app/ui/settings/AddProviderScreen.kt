@@ -645,18 +645,16 @@ private fun ColumnScope.ApiKeyConfigSection(
             },
         ) {
             SettingsCardBlock {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !useResponsesAPI,
-                        onClick = { useResponsesAPI = false },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) { Text(stringResource(R.string.provider_detail_chat_completions)) }
-                    SegmentedButton(
-                        selected = useResponsesAPI,
-                        onClick = { useResponsesAPI = true },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) { Text(stringResource(R.string.provider_detail_responses_api)) }
-                }
+                SettingsSegmented(
+                options = listOf(stringResource(R.string.provider_detail_chat_completions), stringResource(R.string.provider_detail_responses_api)),
+                selectedIndex = listOf(!useResponsesAPI, useResponsesAPI).indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run { useResponsesAPI = false }
+                    1 -> run { useResponsesAPI = true }
+                    }
+                },
+            )
             }
         }
     }

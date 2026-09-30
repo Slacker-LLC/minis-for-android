@@ -100,14 +100,10 @@ fun MinisSkillsBrowserScreen(
             // would fight the WebView measure pass. Match the SettingsScaffold
             // bar styling (background colour + SemiBold title) so the visual
             // signature stays consistent with the rest of the settings stack.
-            TopAppBar(
-                title = { Text(stringResource(R.string.skills_browser_title), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = handleBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(stringResource(R.string.skills_browser_title), fontWeight = FontWeight.SemiBold) },
+            onBack = handleBack,
+            actions = {
                     MinisTextButton(
                         onClick = {
                             scope.launch {
@@ -127,10 +123,7 @@ fun MinisSkillsBrowserScreen(
                         Text(stringResource(R.string.skills_browser_import_button), style = MaterialTheme.typography.titleMedium)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
+        )
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->

@@ -169,6 +169,8 @@ fun SettingsCategoryScreen(
     SettingsScaffold(
         title = stringResource(category.titleRes),
         onBack = onBack,
+        backLabel = stringResource(R.string.settings_title),
+        largeTitle = true,
     ) {
         when (category) {
             SettingsCategory.MODELS -> {

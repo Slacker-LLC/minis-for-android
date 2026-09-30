@@ -300,14 +300,10 @@ fun MemoryFileEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     // [T-global-memory-save-always-visible] Always render Save —
                     // no hasChanges gate (see KDoc above).
                     MinisTextButton(onClick = {
@@ -331,7 +327,7 @@ fun MemoryFileEditScreen(
                         Text("Save")
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(

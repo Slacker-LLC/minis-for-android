@@ -191,14 +191,10 @@ fun MountedFoldersScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_mount_external_folders)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(stringResource(R.string.settings_mount_external_folders)) },
+            onBack = onBack,
+            actions = {
                     IconButton(
                         onClick = {
                             // On Android 10, a folder can readdir but still EACCES on
@@ -226,7 +222,7 @@ fun MountedFoldersScreen(
                         Icon(Icons.Filled.Add, contentDescription = null)
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(
@@ -701,7 +697,7 @@ private fun AddMountSheet(
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Switch(checked = allowWrite, onCheckedChange = { allowWrite = it })
+                MinisSwitch(checked = allowWrite, onCheckedChange = { allowWrite = it })
             }
 
             Spacer(Modifier.height(20.dp))

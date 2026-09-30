@@ -1634,6 +1634,9 @@
     <string name="scheduled_task_menu_edit">Edit</string>
     <string name="scheduled_task_menu_runs">Run records</string>
     <string name="scheduled_task_menu_delete">Delete</string>
+    <string name="scheduled_task_next_run">Next run %1$s</string>
+    <string name="scheduled_task_no_next_run">No next run scheduled</string>
+    <string name="scheduled_tasks_footer">Each trigger creates a new chat and sends a notification when it finishes. Tap the notification to see the result.</string>
     <string name="scheduled_task_runs_title">Run records</string>
     <string name="scheduled_task_runs_empty">No runs yet. This task hasn\'t fired — runs will appear here after it does.</string>
     <string name="scheduled_task_runs_open_session">Open session</string>

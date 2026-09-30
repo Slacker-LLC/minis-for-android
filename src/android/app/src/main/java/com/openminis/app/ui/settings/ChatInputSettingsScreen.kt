@@ -76,7 +76,12 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
     val tileGreen = ChatColors.ok
     val tileTeal = Color(0xFF5AC8FA)
 
-    SettingsScaffold(title = stringResource(R.string.settings_cat_chat), onBack = onBack) {
+    SettingsScaffold(
+        title = stringResource(R.string.settings_cat_chat),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_title),
+        largeTitle = true,
+    ) {
 
         // -- Return Key (mirrors iOS AppearanceSettingsView stringResource(R.string.appearance_section_return_key) section) --
         // 0=Newline (default), 1=Send. Hardware Shift+Enter always inserts a

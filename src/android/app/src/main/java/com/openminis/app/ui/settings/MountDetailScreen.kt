@@ -97,14 +97,10 @@ fun MountDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.mount_detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(stringResource(R.string.mount_detail_title)) },
+            onBack = onBack,
+            actions = {
                     MinisTextButton(
                         enabled = canSave,
                         onClick = {
@@ -118,7 +114,7 @@ fun MountDetailScreen(
                         Text(stringResource(R.string.save))
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(
@@ -183,7 +179,7 @@ fun MountDetailScreen(
                         )
                     }
                     Spacer(Modifier.width(12.dp))
-                    Switch(
+                    MinisSwitch(
                         checked = allowWrite,
                         onCheckedChange = { allowWrite = it },
                         // Disable when the OS-level grant itself isn't writable.

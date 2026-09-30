@@ -1,6 +1,7 @@
 package com.openminis.app.ui.bots
 
 import androidx.activity.compose.BackHandler
+import com.openminis.app.ui.settings.MinisSwitch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -571,7 +572,7 @@ private fun BotDetails(
                     subtitle = subtitle,
                     onClick = { onOpenRoutineEditor(task.id, bot.id) },
                     trailing = {
-                        Switch(checked = task.enabled, onCheckedChange = { onToggleRoutine(task.id, it) })
+                        MinisSwitch(checked = task.enabled, onCheckedChange = { onToggleRoutine(task.id, it) })
                     },
                     showDivider = index < routines.lastIndex,
                 )

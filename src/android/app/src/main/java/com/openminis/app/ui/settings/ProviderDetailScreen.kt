@@ -326,7 +326,7 @@ fun ProviderDetailScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f),
                     )
-                    Switch(
+                    MinisSwitch(
                         checked = appendV1Suffix,
                         onCheckedChange = { appendV1Suffix = it },
                     )
@@ -415,26 +415,24 @@ fun ProviderDetailScreen(
                 },
             ) {
                 SettingsCardBlock {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = !instance.useResponsesAPI,
-                            onClick = {
+                    SettingsSegmented(
+                options = listOf(stringResource(R.string.provider_detail_chat_completions), stringResource(R.string.provider_detail_responses_api)),
+                selectedIndex = listOf(!instance.useResponsesAPI, instance.useResponsesAPI).indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run {
                                 if (instance.useResponsesAPI) {
                                     providerRepository.updateInstance(instance.copy(useResponsesAPI = false))
                                 }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        ) { Text(stringResource(R.string.provider_detail_chat_completions)) }
-                        SegmentedButton(
-                            selected = instance.useResponsesAPI,
-                            onClick = {
+                            }
+                    1 -> run {
                                 if (!instance.useResponsesAPI) {
                                     providerRepository.updateInstance(instance.copy(useResponsesAPI = true))
                                 }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        ) { Text(stringResource(R.string.provider_detail_responses_api)) }
+                            }
                     }
+                },
+            )
                 }
             }
         }
@@ -487,10 +485,12 @@ fun ProviderDetailScreen(
                 },
             ) {
                 SettingsCardBlock {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = mode == com.openminis.app.data.model.ImageEndpointMode.auto,
-                            onClick = {
+                    SettingsSegmented(
+                options = listOf(stringResource(R.string.soul_lang_auto), stringResource(R.string.provider_image_mode_images_api), stringResource(R.string.chat_default_title)),
+                selectedIndex = listOf(mode == com.openminis.app.data.model.ImageEndpointMode.auto, mode == com.openminis.app.data.model.ImageEndpointMode.imagesGenerations, mode == com.openminis.app.data.model.ImageEndpointMode.chatCompletions).indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run {
                                 if (mode != com.openminis.app.data.model.ImageEndpointMode.auto) {
                                     providerRepository.updateInstance(
                                         instance.copy(
@@ -498,12 +498,8 @@ fun ProviderDetailScreen(
                                         ),
                                     )
                                 }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                        ) { Text(stringResource(R.string.soul_lang_auto)) }
-                        SegmentedButton(
-                            selected = mode == com.openminis.app.data.model.ImageEndpointMode.imagesGenerations,
-                            onClick = {
+                            }
+                    1 -> run {
                                 if (mode != com.openminis.app.data.model.ImageEndpointMode.imagesGenerations) {
                                     providerRepository.updateInstance(
                                         instance.copy(
@@ -513,12 +509,8 @@ fun ProviderDetailScreen(
                                         ),
                                     )
                                 }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                        ) { Text(stringResource(R.string.provider_image_mode_images_api)) }
-                        SegmentedButton(
-                            selected = mode == com.openminis.app.data.model.ImageEndpointMode.chatCompletions,
-                            onClick = {
+                            }
+                    2 -> run {
                                 if (mode != com.openminis.app.data.model.ImageEndpointMode.chatCompletions) {
                                     providerRepository.updateInstance(
                                         instance.copy(
@@ -527,10 +519,10 @@ fun ProviderDetailScreen(
                                         ),
                                     )
                                 }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                        ) { Text(stringResource(R.string.chat_default_title)) }
+                            }
                     }
+                },
+            )
                 }
             }
         }

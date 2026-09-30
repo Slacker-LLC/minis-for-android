@@ -2037,4 +2037,7 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL を選ぶと、この無人ルーティンは既存のアプリ権限の範囲で任意の shell コマンドを実行し、一時フォルダー外へファイルを書き込み、接続済み MCP ツールを呼び出せます。プロンプトと設定済みツールを信頼できる場合のみ選択してください。ネットワークアクセスは制限されません。</string>
 <string name="scheduled_task_tier_full_confirm">フルアクセスを確認</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY により %1$s をブロック: %2$s</string>
+    <string name="scheduled_task_next_run">次回実行 %1$s</string>
+    <string name="scheduled_task_no_next_run">次回の実行は未設定</string>
+    <string name="scheduled_tasks_footer">トリガーのたびに新しいチャットを作成し、完了すると通知します。通知をタップすると結果を確認できます。</string>
 </resources>

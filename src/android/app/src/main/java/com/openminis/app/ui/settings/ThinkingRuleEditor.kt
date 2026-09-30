@@ -128,7 +128,7 @@ fun ThinkingRuleEditorDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(stringResource(R.string.thinking_rules_all_models))
-                    Switch(checked = allModels, onCheckedChange = { allModels = it })
+                    MinisSwitch(checked = allModels, onCheckedChange = { allModels = it })
                 }
                 if (!allModels) {
                     OutlinedTextField(
@@ -180,7 +180,7 @@ fun ThinkingRuleEditorDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(stringResource(R.string.thinking_rules_send_off_value))
-                            Switch(checked = sendOffValue, onCheckedChange = { sendOffValue = it })
+                            MinisSwitch(checked = sendOffValue, onCheckedChange = { sendOffValue = it })
                         }
                         if (sendOffValue) {
                             OutlinedTextField(

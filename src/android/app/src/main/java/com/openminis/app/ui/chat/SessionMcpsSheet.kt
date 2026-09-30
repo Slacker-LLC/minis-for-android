@@ -1,6 +1,7 @@
 package com.openminis.app.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import com.openminis.app.ui.settings.MinisSwitch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -87,7 +88,7 @@ fun SessionMcpsSheet(
                             showChevron = false,
                             showDivider = index < servers.size - 1,
                             trailing = {
-                                Switch(
+                                MinisSwitch(
                                     checked = overrides[server.id] ?: server.enabled,
                                     onCheckedChange = { enabled ->
                                         overrides[server.id] = enabled

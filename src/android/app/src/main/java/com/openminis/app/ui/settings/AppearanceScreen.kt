@@ -214,7 +214,12 @@ fun AppearanceScreen(
     val tileBlue = Color(0xFF007AFF)
     val tileOrange = ChatColors.warn
 
-    SettingsScaffold(title = stringResource(R.string.appearance_title), onBack = onBack) {
+    SettingsScaffold(
+        title = stringResource(R.string.appearance_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_title),
+        largeTitle = true,
+    ) {
 
         // -- Theme --
         // Each row carries its own leading icon + tile colour, mirroring the
@@ -225,29 +230,19 @@ fun AppearanceScreen(
             header = stringResource(R.string.appearance_section_theme),
             footer = stringResource(R.string.appearance_theme_footer),
         ) {
-            data class ThemeRow(val label: String, val icon: ImageVector, val tint: Color)
-            val themeRows = listOf(
-                ThemeRow(stringResource(R.string.appearance_theme_system), Icons.Outlined.BrightnessAuto, tilePurple),
-                ThemeRow(stringResource(R.string.appearance_theme_light), Icons.Outlined.LightMode, tileOrange),
-                ThemeRow(stringResource(R.string.appearance_theme_dark), Icons.Outlined.DarkMode, tilePurple),
-            )
-            themeRows.forEachIndexed { idx, row ->
-                SettingsChoiceRow(
-                    title = row.label,
-                    selected = themeMode == idx,
-                    onSelect = {
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf(
+                        stringResource(R.string.appearance_theme_system),
+                        stringResource(R.string.appearance_theme_light),
+                        stringResource(R.string.appearance_theme_dark),
+                    ),
+                    selectedIndex = themeMode,
+                    onSelect = { idx ->
                         themeMode = idx
                         prefs.edit().putInt(KEY_THEME_MODE, idx).apply()
                         onThemeChanged(idx)
                     },
-                    leading = {
-                        androidx.compose.material3.Icon(
-                            row.icon,
-                            contentDescription = null,
-                            tint = row.tint,
-                        )
-                    },
-                    showDivider = idx < themeRows.size - 1,
                 )
             }
         }
@@ -303,27 +298,14 @@ fun AppearanceScreen(
             footer = "Android 12–15 启用原生模糊（Android 13–15 含折射）；" +
                 "Android 16 使用兼容磨砂效果，低版本自动降级。",
         ) {
-            data class UiStyleRow(val label: String, val icon: ImageVector, val tint: Color)
-            val styleRows = listOf(
-                UiStyleRow("经典", Icons.Outlined.Style, tilePurple),
-                UiStyleRow("玻璃拟态", Icons.Outlined.BlurOn, tileBlue),
-            )
-            styleRows.forEachIndexed { idx, row ->
-                SettingsChoiceRow(
-                    title = row.label,
-                    selected = uiStyle == idx,
-                    onSelect = {
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = listOf("经典", "玻璃拟态"),
+                    selectedIndex = uiStyle,
+                    onSelect = { idx ->
                         uiStyle = idx
                         prefs.edit().putInt(KEY_UI_STYLE, idx).apply()
                     },
-                    leading = {
-                        androidx.compose.material3.Icon(
-                            row.icon,
-                            contentDescription = null,
-                            tint = row.tint,
-                        )
-                    },
-                    showDivider = idx < styleRows.size - 1,
                 )
             }
         }

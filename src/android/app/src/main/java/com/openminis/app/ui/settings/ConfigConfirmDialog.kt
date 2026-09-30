@@ -151,7 +151,7 @@ private fun ConfirmRow(item: PendingConfigChangeItem, onToggle: (Boolean) -> Uni
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.weight(1f))
-            Switch(
+            MinisSwitch(
                 checked = item.isApproved,
                 onCheckedChange = onToggle,
             )

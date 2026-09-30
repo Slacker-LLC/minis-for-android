@@ -1,6 +1,7 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisTopBar
 import com.openminis.app.ui.components.MinisTextButton
 
 import android.text.format.Formatter
@@ -80,15 +81,10 @@ fun RootfsManagementScreen(
     val groupedBg = MaterialTheme.colorScheme.surfaceContainerLowest
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.rootfs_management_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = groupedBg),
-            )
+            MinisTopBar(
+            title = { Text(stringResource(R.string.rootfs_management_title)) },
+            onBack = onBack,
+        )
         },
         containerColor = groupedBg,
     ) { padding ->
