@@ -2046,4 +2046,7 @@
     <string name="bots_progress_running">%1$d delegierte Aufgaben laufen</string>
     <string name="bots_progress_none">Nichts in Arbeit</string>
     <string name="bots_members_header">Mitglieder</string>
+    <string name="browser_desktop_site">Desktop-Version</string>
+    <string name="browser_tab_count_title">%1$d Tabs</string>
+    <string name="browser_share">Teilen</string>
 </resources>

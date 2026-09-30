@@ -1937,4 +1937,7 @@
     <string name="bots_progress_running">%1$d tâches déléguées en cours</string>
     <string name="bots_progress_none">Rien en cours</string>
     <string name="bots_members_header">Membres</string>
+    <string name="browser_desktop_site">Version ordinateur</string>
+    <string name="browser_tab_count_title">%1$d onglets</string>
+    <string name="browser_share">Partager</string>
 </resources>

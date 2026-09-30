@@ -2300,4 +2300,7 @@
     <string name="bots_progress_running">Делегированных задач в работе: %1$d</string>
     <string name="bots_progress_none">Ничего не выполняется</string>
     <string name="bots_members_header">Участники</string>
+    <string name="browser_desktop_site">Версия для ПК</string>
+    <string name="browser_tab_count_title">Вкладок: %1$d</string>
+    <string name="browser_share">Поделиться</string>
 </resources>

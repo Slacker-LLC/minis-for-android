@@ -2305,4 +2305,7 @@
     <string name="bots_progress_running">%1$d 項委派工作進行中</string>
     <string name="bots_progress_none">暫無進行中的工作</string>
     <string name="bots_members_header">成員</string>
+    <string name="browser_desktop_site">桌面版網頁</string>
+    <string name="browser_tab_count_title">%1$d 個分頁</string>
+    <string name="browser_share">分享</string>
 </resources>

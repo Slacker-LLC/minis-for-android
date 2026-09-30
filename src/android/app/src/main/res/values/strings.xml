@@ -2424,4 +2424,7 @@
     <string name="bots_progress_running">%1$d delegated tasks in progress</string>
     <string name="bots_progress_none">Nothing in progress</string>
     <string name="bots_members_header">Members</string>
+    <string name="browser_desktop_site">Desktop site</string>
+    <string name="browser_tab_count_title">%1$d tabs</string>
+    <string name="browser_share">Share</string>
 </resources>

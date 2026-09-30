@@ -61,6 +61,8 @@ fun StandardChatSheet(
     onDismiss: () -> Unit,
     leadingAction: (@Composable () -> Unit)? = null,
     heightFraction: Float = 0.9f,
+    /** False when the content draws its own top row (the browser does). */
+    header: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -82,12 +84,14 @@ fun StandardChatSheet(
                 .height(sheetHeight)
                 .glassSheetSurface(),
         ) {
-            StandardChatSheetHeader(
-                title = title,
-                onDismiss = onDismiss,
-                leadingAction = leadingAction,
-            )
-            HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
+            if (header) {
+                StandardChatSheetHeader(
+                    title = title,
+                    onDismiss = onDismiss,
+                    leadingAction = leadingAction,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 content()
             }

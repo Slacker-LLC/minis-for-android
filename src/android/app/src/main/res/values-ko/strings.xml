@@ -2035,4 +2035,7 @@
     <string name="bots_progress_running">위임된 작업 %1$d건 진행 중</string>
     <string name="bots_progress_none">진행 중인 작업 없음</string>
     <string name="bots_members_header">멤버</string>
+    <string name="browser_desktop_site">데스크톱 사이트</string>
+    <string name="browser_tab_count_title">탭 %1$d개</string>
+    <string name="browser_share">공유</string>
 </resources>
