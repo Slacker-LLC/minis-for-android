@@ -2351,4 +2351,9 @@
     <string name="session_prompt_title">Промпт сеанса</string>
     <string name="chat_agent_presets_hint">Применяется к этому сеансу сразу.</string>
     <string name="chat_agent_preset_applied">Переключено на %1$s (со следующего сообщения)</string>
+    <string name="perm_tool_vscreen_open">Открыть виртуальный экран</string>
+    <string name="perm_tool_vscreen_launch">Запустить на нём приложение</string>
+    <string name="perm_tool_vscreen_close">Закрыть виртуальный экран</string>
+    <string name="perm_tool_vscreen_status">Читать состояние устройства</string>
+    <string name="perm_tool_vscreen_ui">Управлять виртуальным экраном</string>
 </resources>

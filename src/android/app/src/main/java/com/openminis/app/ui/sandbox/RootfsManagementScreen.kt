@@ -61,7 +61,6 @@ import com.openminis.app.ui.components.MinisAlertDialog
 @Composable
 fun RootfsManagementScreen(
     onBack: () -> Unit,
-    onBrowseFiles: () -> Unit,
     onMirrorCategoryClick: (MirrorCategory) -> Unit = {},
     viewModel: RootfsManagementViewModel = viewModel(),
 ) {
@@ -158,27 +157,6 @@ fun RootfsManagementScreen(
             }
 
             if (state.isInstalled) {
-                // --- Browse section ---
-                SettingsSection(title = stringResource(R.string.rootfs_browse_section)) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.rootfs_browse_files_label)) },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Folder,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        trailingContent = {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickableListItem(onClick = onBrowseFiles),
-                        colors = transparentListItemColors(),
-                    )
-                }
-
                 // --- Mirrors section ---
                 SettingsSection(title = stringResource(R.string.rootfs_mirrors_section)) {
                     MirrorsSectionView(onNavigate = onMirrorCategoryClick)

@@ -2356,4 +2356,9 @@
     <string name="session_prompt_title">對話提示詞</string>
     <string name="chat_agent_presets_hint">選擇後立即套用於目前對話。</string>
     <string name="chat_agent_preset_applied">已切換為 %1$s（下一則訊息生效）</string>
+    <string name="perm_tool_vscreen_open">開啟虛擬螢幕</string>
+    <string name="perm_tool_vscreen_launch">在虛擬螢幕啟動應用程式</string>
+    <string name="perm_tool_vscreen_close">關閉虛擬螢幕</string>
+    <string name="perm_tool_vscreen_status">讀取裝置狀態</string>
+    <string name="perm_tool_vscreen_ui">操作虛擬螢幕</string>
 </resources>

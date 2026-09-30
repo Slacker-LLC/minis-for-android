@@ -2097,4 +2097,9 @@
     <string name="session_prompt_title">Sitzungs-Prompt</string>
     <string name="chat_agent_presets_hint">Gilt sofort für diese Sitzung.</string>
     <string name="chat_agent_preset_applied">Auf %1$s umgestellt (gilt ab der nächsten Nachricht)</string>
+    <string name="perm_tool_vscreen_open">Virtuellen Bildschirm öffnen</string>
+    <string name="perm_tool_vscreen_launch">App darauf starten</string>
+    <string name="perm_tool_vscreen_close">Virtuellen Bildschirm schließen</string>
+    <string name="perm_tool_vscreen_status">Gerätestatus lesen</string>
+    <string name="perm_tool_vscreen_ui">Virtuellen Bildschirm bedienen</string>
 </resources>

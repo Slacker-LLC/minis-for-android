@@ -227,13 +227,6 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
     }
 
     SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack, backLabel = stringResource(R.string.settings_section_system)) {
-        Text(
-            text = stringResource(R.string.vscreen_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-        )
-
         SettingsSection(header = stringResource(R.string.vscreen_title)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.vscreen_enabled_label),
@@ -291,39 +284,29 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                 height = heightText.toIntOrNull() ?: 0,
                 dpi = dpiText.toIntOrNull() ?: 0,
             )
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = widthText,
-                        onValueChange = { widthText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                        label = { Text(stringResource(R.string.vscreen_width)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = !sizeLocked,
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = heightText,
-                        onValueChange = { heightText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                        label = { Text(stringResource(R.string.vscreen_height)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = !sizeLocked,
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                OutlinedTextField(
-                    value = dpiText,
-                    onValueChange = { dpiText = it.filter(Char::isDigit).take(3); saveDisplaySettingsIfValid() },
-                    label = { Text(stringResource(R.string.vscreen_dpi)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    enabled = !sizeLocked,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            SettingsInlineTextRow(
+                title = stringResource(R.string.vscreen_width),
+                value = widthText,
+                onValueChange = { widthText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
+                numeric = true,
+                enabled = !sizeLocked,
+            )
+            SettingsInlineTextRow(
+                title = stringResource(R.string.vscreen_height),
+                value = heightText,
+                onValueChange = { heightText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
+                numeric = true,
+                enabled = !sizeLocked,
+            )
+            SettingsInlineTextRow(
+                title = stringResource(R.string.vscreen_dpi),
+                value = dpiText,
+                onValueChange = { dpiText = it.filter(Char::isDigit).take(3); saveDisplaySettingsIfValid() },
+                numeric = true,
+                enabled = !sizeLocked,
+                showDivider = false,
+            )
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 if (!VirtualScreenDisplaySettingsPolicy.isValid(currentSpec)) {
                     Text(
                         stringResource(R.string.vscreen_resolution_bounds),

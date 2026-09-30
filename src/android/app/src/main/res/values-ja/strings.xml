@@ -2094,4 +2094,9 @@
     <string name="session_prompt_title">セッションプロンプト</string>
     <string name="chat_agent_presets_hint">選択すると現在のセッションにすぐ適用されます。</string>
     <string name="chat_agent_preset_applied">%1$s に切り替えました（次のメッセージから有効）</string>
+    <string name="perm_tool_vscreen_open">仮想画面を開く</string>
+    <string name="perm_tool_vscreen_launch">仮想画面でアプリを起動</string>
+    <string name="perm_tool_vscreen_close">仮想画面を閉じる</string>
+    <string name="perm_tool_vscreen_status">端末の状態を読む</string>
+    <string name="perm_tool_vscreen_ui">仮想画面を操作</string>
 </resources>

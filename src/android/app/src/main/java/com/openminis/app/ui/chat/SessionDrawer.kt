@@ -208,12 +208,6 @@ fun SessionDrawerContent(
                     onClick = onOpenTerminal,
                     modifier = Modifier.weight(1f),
                 )
-                DrawerGridEntry(
-                    icon = Icons.Outlined.Folder,
-                    title = stringResource(R.string.settings_section_files),
-                    onClick = onOpenStorage,
-                    modifier = Modifier.weight(1f),
-                )
             }
             Spacer(modifier = Modifier.height(4.dp))
         }
@@ -330,26 +324,24 @@ fun SessionDrawerContent(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 thickness = 0.5.dp,
             )
+            // Files and Settings are the two "places" of the app, so they sit together at the bottom,
+            // apart from the agent's working tools (team, tasks, terminal) in the grid above.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onOpenSettings)
-                    .padding(horizontal = 16.dp, vertical = 13.dp)
                     .padding(bottom = bottomInset),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = stringResource(R.string.settings),
-                    tint = ChatColors.secondaryText,
-                    modifier = Modifier.size(20.dp),
+                DrawerDockEntry(
+                    icon = Icons.Outlined.Folder,
+                    title = stringResource(R.string.settings_section_files),
+                    onClick = onOpenStorage,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = stringResource(R.string.settings),
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ChatColors.primaryText,
+                DrawerDockEntry(
+                    icon = Icons.Default.Settings,
+                    title = stringResource(R.string.settings),
+                    onClick = onOpenSettings,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -607,6 +599,20 @@ private fun DrawerNewChatRow(onClick: () -> Unit) {
 }
 
 /** One of the four daily entries: glyph over a short label, both in the accent. */
+@Composable
+private fun DrawerDockEntry(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = title, tint = ChatColors.secondaryText, modifier = Modifier.size(20.dp))
+        Text(text = title, fontSize = 14.5.sp, fontWeight = FontWeight.Medium, color = ChatColors.primaryText)
+    }
+}
+
 @Composable
 private fun DrawerGridEntry(
     icon: ImageVector,

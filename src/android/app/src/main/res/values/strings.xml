@@ -2475,4 +2475,9 @@
     <string name="session_prompt_title">Session prompt</string>
     <string name="chat_agent_presets_hint">Applies to this session right away.</string>
     <string name="chat_agent_preset_applied">Switched to %1$s (takes effect on the next message)</string>
+    <string name="perm_tool_vscreen_open">Open the virtual screen</string>
+    <string name="perm_tool_vscreen_launch">Launch an app on it</string>
+    <string name="perm_tool_vscreen_close">Close the virtual screen</string>
+    <string name="perm_tool_vscreen_status">Read device status</string>
+    <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
 </resources>

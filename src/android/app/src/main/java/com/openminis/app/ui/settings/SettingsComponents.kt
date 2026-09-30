@@ -784,15 +784,23 @@ fun SettingsInlineTextRow(
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     showDivider: Boolean = true,
+    numeric: Boolean = false,
+    enabled: Boolean = true,
 ) {
     SettingsRow(
         title = title,
         showDivider = showDivider,
         trailing = {
-            Box(modifier = modifier.widthIn(min = 80.dp, max = 220.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(modifier = modifier.widthIn(min = if (numeric) 56.dp else 80.dp, max = if (numeric) 96.dp else 220.dp), contentAlignment = Alignment.CenterEnd) {
                 androidx.compose.foundation.text.BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
+                    enabled = enabled,
+                    keyboardOptions = if (numeric) {
+                        androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    } else {
+                        androidx.compose.foundation.text.KeyboardOptions.Default
+                    },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

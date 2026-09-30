@@ -1988,4 +1988,9 @@
     <string name="session_prompt_title">Invite de session</string>
     <string name="chat_agent_presets_hint">S\'applique immédiatement à cette session.</string>
     <string name="chat_agent_preset_applied">Passé à %1$s (effectif au prochain message)</string>
+    <string name="perm_tool_vscreen_open">Ouvrir l\'écran virtuel</string>
+    <string name="perm_tool_vscreen_launch">Lancer une app dessus</string>
+    <string name="perm_tool_vscreen_close">Fermer l\'écran virtuel</string>
+    <string name="perm_tool_vscreen_status">Lire l\'état de l\'appareil</string>
+    <string name="perm_tool_vscreen_ui">Utiliser l\'écran virtuel</string>
 </resources>

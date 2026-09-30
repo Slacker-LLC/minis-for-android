@@ -2414,48 +2414,8 @@ fun ChatScreen(
         topBar = {
             androidx.compose.material3.CenterAlignedTopAppBar(
                 title = {
-                    if (currentBot == null) {
-                        // Board: session title over the model name (monospace, tap to change).
-                        val rawModel = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
-                        val topModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                        ) {
-                            Text(
-                                // ChatViewModel's placeholder title is the English literal "New Chat";
-                                // show the localized label until a real title exists.
-                                text = sessionTitle.takeIf { it.isNotBlank() && it != "New Chat" }
-                                    ?: stringResource(R.string.drawer_new_session),
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { showModelPicker = true },
-                            ) {
-                                Text(
-                                    text = topModel,
-                                    fontSize = 12.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    color = ChatColors.secondaryText,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.settings_models_title),
-                                    tint = ChatColors.secondaryText,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                        }
-                    }
+                    // Plain chats have no title here (the model and thinking strength live in the
+                    // composer); a team member keeps its name and status.
                     currentBot?.let { bot ->
                         Column(
                             Modifier.clickable { onBotDetails(bot.id) }.padding(vertical = 6.dp),
@@ -2478,7 +2438,7 @@ fun ChatScreen(
                     if (!isTwoPane) {
                         if (onOpenDrawer != null) {
                             IconButton(onClick = onOpenDrawer) {
-                                Icon(Icons.Outlined.ViewSidebar, contentDescription = stringResource(R.string.common_menu))
+                                com.openminis.app.ui.components.SidebarPanelIcon()
                             }
                         } else {
                             IconButton(onClick = onBack) {
@@ -2490,17 +2450,7 @@ fun ChatScreen(
                             onClick = onToggleSidebar,
                             modifier = Modifier.offset(y = (-2).dp),
                         ) {
-                            Icon(
-                                Icons.Filled.Menu,
-                                contentDescription = stringResource(
-                                    if (sidebarCollapsed) {
-                                        R.string.chat_show_sidebar
-                                    } else {
-                                        R.string.chat_hide_sidebar
-                                    },
-                                ),
-                                modifier = Modifier.size(28.dp),
-                            )
+                            com.openminis.app.ui.components.SidebarPanelIcon(size = 26.dp)
                         }
                     }
                 },
@@ -2609,7 +2559,7 @@ fun ChatScreen(
                 // user-configured font scale on xhdpi/xxhdpi without
                 // re-clipping (T-topbar-model-row-clip regression check).
                 // Font sizes + lineHeights stay untouched per spec.
-                expandedHeight = 68.dp,
+                expandedHeight = if (currentBot == null) 52.dp else 68.dp,
             )
         },
        snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -5586,9 +5536,55 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier.weight(1f, fill = false),
                             ) {
-                                // The model is chosen from the top bar; the composer only carries the
-                                // thinking strength (board: "Thinking · Medium"), and only for models that
-                                // can reason.
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                // Model chip (plain chats): the model in use, tap to switch.
+                                if (currentBot == null) {
+                                    val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
+                                    val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
+                                    Surface(
+                                        shape = RoundedCornerShape(18.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            0.5.dp,
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                        ),
+                                        modifier = Modifier
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(18.dp))
+                                            .clickable {
+                                                showAttachMenu = false
+                                                if (viewModel.showSlashMenu.value) {
+                                                    viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                                }
+                                                showModelPicker = true
+                                            },
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(start = 12.dp, end = 6.dp),
+                                        ) {
+                                            Text(
+                                                text = chipModel,
+                                                fontSize = 12.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                color = ChatColors.secondaryText,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.widthIn(max = 70.dp),
+                                            )
+                                            Icon(
+                                                Icons.Default.KeyboardArrowDown,
+                                                contentDescription = stringResource(R.string.settings_models_title),
+                                                tint = ChatColors.secondaryText,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                                // Thinking strength (board: "Thinking · Medium"), only for models that can reason.
                                 if (viewModel.currentModelSupportsReasoning) {
                                     val composerThinking by viewModel.thinkingLevel.collectAsState()
                                     Surface(
@@ -5632,6 +5628,7 @@ fun ChatScreen(
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
 

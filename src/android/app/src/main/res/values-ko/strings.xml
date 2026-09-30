@@ -2086,4 +2086,9 @@
     <string name="session_prompt_title">세션 프롬프트</string>
     <string name="chat_agent_presets_hint">선택하면 현재 세션에 바로 적용됩니다.</string>
     <string name="chat_agent_preset_applied">%1$s(으)로 전환했습니다(다음 메시지부터 적용)</string>
+    <string name="perm_tool_vscreen_open">가상 화면 열기</string>
+    <string name="perm_tool_vscreen_launch">가상 화면에서 앱 실행</string>
+    <string name="perm_tool_vscreen_close">가상 화면 닫기</string>
+    <string name="perm_tool_vscreen_status">기기 상태 읽기</string>
+    <string name="perm_tool_vscreen_ui">가상 화면 조작</string>
 </resources>

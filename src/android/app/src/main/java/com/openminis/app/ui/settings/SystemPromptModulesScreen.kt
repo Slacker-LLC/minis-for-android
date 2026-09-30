@@ -1,5 +1,9 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -75,6 +79,7 @@ fun SystemPromptModulesScreen(onBack: () -> Unit) {
     SettingsScaffold(
         title = stringResource(R.string.system_prompt_modules_title),
         onBack = onBack,
+        backLabel = stringResource(R.string.settings_system_prompt),
         actions = {
             if (loaded?.any { it.isCustomized || !it.isEnabled } == true) {
                 MinisTextButton(onClick = { confirmResetAll = true }) {
@@ -83,12 +88,6 @@ fun SystemPromptModulesScreen(onBack: () -> Unit) {
             }
         },
     ) {
-        Text(
-            text = stringResource(R.string.system_prompt_intro),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-        )
         loaded.orEmpty().groupBy { it.module.group }.forEach { (group, modules) ->
             SettingsSection(header = group) {
                 modules.forEachIndexed { index, snapshot ->
@@ -160,7 +159,6 @@ fun SystemPromptModulesScreen(onBack: () -> Unit) {
 @Composable
 private fun moduleSubtitle(snapshot: PromptModuleStore.ModuleSnapshot): String {
     val parts = buildList {
-        add(snapshot.module.id)
         add(
             stringResource(
                 if (snapshot.isCustomized) R.string.system_prompt_badge_custom
@@ -189,56 +187,52 @@ private fun ModuleEditorSheet(
     var text by remember(snapshot.module.id, snapshot.text) { mutableStateOf(snapshot.text) }
 
     MinisModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(snapshot.module.title, style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            // Cancel / title / Save, the board's sheet header.
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) {
+                    Text(stringResource(android.R.string.cancel), fontSize = 17.sp)
+                }
+                Text(
+                    snapshot.module.title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 88.dp),
+                )
+                MinisTextButton(onClick = { onSave(text) }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                    Text(stringResource(R.string.save), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
             Text(
                 snapshot.module.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
             )
-            Text(
-                snapshot.module.id,
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 220.dp, max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                label = { Text(stringResource(R.string.system_prompt_editor_hint)) },
-            )
-            Text(
-                stringResource(R.string.system_prompt_char_count, text.length),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SettingsSection {
+                SettingsTextArea(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = stringResource(R.string.system_prompt_editor_hint),
+                    monospace = true,
+                    minHeight = 220.dp,
+                    maxHeight = 420.dp,
+                )
+            }
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 MinisTextButton(onClick = onReset) {
-                    Text(stringResource(R.string.system_prompt_reset_module))
+                    Text(stringResource(R.string.system_prompt_reset_module), color = MaterialTheme.colorScheme.error)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    MinisTextButton(onClick = onDismiss) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                    MinisTextButton(onClick = { onSave(text) }) {
-                        Text(stringResource(R.string.save))
-                    }
-                }
+                Text(
+                    stringResource(R.string.system_prompt_char_count, text.length),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

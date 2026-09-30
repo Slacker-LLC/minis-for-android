@@ -2385,4 +2385,9 @@
     <string name="session_prompt_title">会话提示词</string>
     <string name="chat_agent_presets_hint">选择后立即应用于当前会话。</string>
     <string name="chat_agent_preset_applied">已切换为 %1$s（下一条消息生效）</string>
+    <string name="perm_tool_vscreen_open">打开虚拟屏幕</string>
+    <string name="perm_tool_vscreen_launch">在虚拟屏幕启动应用</string>
+    <string name="perm_tool_vscreen_close">关闭虚拟屏幕</string>
+    <string name="perm_tool_vscreen_status">读取设备状态</string>
+    <string name="perm_tool_vscreen_ui">操作虚拟屏幕</string>
 </resources>

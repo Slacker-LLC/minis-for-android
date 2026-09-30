@@ -127,6 +127,18 @@ fun OffloadPermissionScreen(
             onStatusRowClick = onOpenPrivilegedBackend,
         )
 
+        // The virtual screen's tools are opt-in like the other integrations, so they are set here too.
+        val vscreenTools = grouped[OffloadPermissionManager.PermissionCategory.INTEGRATIONS]
+            .orEmpty()
+            .filter { it.toolName.startsWith("android.vscreen.") }
+        if (vscreenTools.isNotEmpty()) {
+            SettingsSection(header = stringResource(R.string.settings_vscreen_entry)) {
+                vscreenTools.forEachIndexed { idx, tool ->
+                    PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1)
+                }
+            }
+        }
+
         // Fork-only system grants remain reachable without creating a second
         // Agent permission model. Root authority is intentionally absent here.
         SettingsSection(
@@ -327,6 +339,11 @@ private fun toolTitleRes(toolName: String): Int = when (toolName) {
     "photos" -> R.string.perm_tool_photos
     "a11y_cli" -> R.string.perm_tool_a11y_cli
     "shizuku_cli" -> R.string.perm_tool_shizuku_cli
+    "android.vscreen.open" -> R.string.perm_tool_vscreen_open
+    "android.vscreen.launch" -> R.string.perm_tool_vscreen_launch
+    "android.vscreen.close" -> R.string.perm_tool_vscreen_close
+    "android.vscreen.status" -> R.string.perm_tool_vscreen_status
+    "android.vscreen.ui" -> R.string.perm_tool_vscreen_ui
     else -> 0
 }
 

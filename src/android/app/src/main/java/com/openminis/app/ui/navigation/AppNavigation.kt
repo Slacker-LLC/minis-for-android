@@ -1111,14 +1111,6 @@ fun AppNavigation(
             val context = androidx.compose.ui.platform.LocalContext.current
             RootfsManagementScreen(
                 onBack = { navController.safePopBackStack() },
-                onBrowseFiles = {
-                    val rootfs = RootfsManager.getInstance(context.applicationContext)
-                    FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
-                        rootPath = rootfs.rootfsDir,
-                        rootLabel = "/",
-                    )
-                    navController.safeNavigate(Routes.FILE_BROWSER)
-                },
                 // [T-android-mirror-manual-select] Without this callback the
                 // mirror rows fall back to the declaration-site no-op default
                 // and MirrorCategoryDetailScreen (manual mirror selection,
@@ -1164,30 +1156,16 @@ fun AppNavigation(
             arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val context = androidx.compose.ui.platform.LocalContext.current
-            val rootfs = RootfsManager.getInstance(context.applicationContext)
-            val varMinis = java.io.File(rootfs.rootfsDir, "var/minis")
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-            val vm = remember(rootfs.rootfsDir.absolutePath, varMinis.absolutePath, sessionId) {
+            // The Root-owned rootfs cannot be walked from the app, so this listing goes through the
+            // guest file API: /var/minis as this chat sees it (its workspace, attachments, ...).
+            val vm = remember(sessionId) {
                 FileBrowserViewModel(
-                    rootPath = rootfs.rootfsDir,
-                    initialPath = varMinis.takeIf { it.exists() },
-                    rootLabel = "/",
-                    // T121: route directory listings through RuntimePathRegistry bind
-                    // mounts so /var/minis/{skills,memory,shared} resolve to
-                    // their backing host dirs (filesDir/minis-global/<subdir>).
-                    // Without this the browser walks the rootfs tarball
-                    // directly and shows the empty placeholder dirs that ship
-            // inside the rootfs's placeholder var/minis/ — every subdir reads as
-                    // "Empty folder" even though the agent has files there.
-                    linuxRootPath = "/",
-                    // T147: scope per-session subdirs (attachments / workspace
-                    // / offloads / browser) to THIS chat's host dir even when
-            // another session was the last to boot — that
-                    // global bindMounts state is last-writer-wins and would
-                    // otherwise hide the agent's generated files for the
-                    // session the user is looking at.
-                    sessionId = sessionId,
+                    rootPath = java.io.File(context.cacheDir, "guest-file-browser"),
+                    rootLabel = context.getString(com.openminis.app.R.string.chat_menu_browse_chat_files),
                     appContext = context.applicationContext,
+                    guestRootPath = "/var/minis",
+                    guestSessionId = sessionId,
                 )
             }
             FileBrowserScreen(

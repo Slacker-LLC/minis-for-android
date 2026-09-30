@@ -91,45 +91,37 @@ fun VirtualScreenViewerDialog(onDismiss: () -> Unit) {
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = ChatColors.background) {
-            Column(modifier = Modifier.statusBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.vscreen_viewer_title),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
-                }
-                val current = frame
-                when (current?.state) {
-                    ViewerState.LIVE -> {
-                        current.app?.let {
-                            Text(
-                                text = stringResource(R.string.vscreen_viewer_app, it),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    // A sheet that rises from the bottom at the browser's height, not a full-screen dialog.
+    com.openminis.app.ui.chat.StandardChatSheet(
+        title = stringResource(R.string.vscreen_viewer_title),
+        onDismiss = onDismiss,
+        heightFraction = 0.86f,
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val current = frame
+            when (current?.state) {
+                ViewerState.LIVE -> {
+                    current.app?.let {
+                        Text(
+                            text = stringResource(R.string.vscreen_viewer_app, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        current.bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = stringResource(R.string.vscreen_viewer_title),
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            current.bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = stringResource(R.string.vscreen_viewer_title),
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
                     }
-                    ViewerState.IDLE -> Message(stringResource(R.string.vscreen_viewer_idle))
-                    ViewerState.DISABLED -> Message(stringResource(R.string.vscreen_viewer_disabled))
-                    null -> Unit
                 }
+                ViewerState.IDLE -> Message(stringResource(R.string.vscreen_viewer_idle))
+                ViewerState.DISABLED -> Message(stringResource(R.string.vscreen_viewer_disabled))
+                null -> Unit
             }
         }
     }
