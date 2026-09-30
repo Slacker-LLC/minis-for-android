@@ -218,9 +218,9 @@ T153 有意提亮的一组值（`#26262A`/`#2C2C30`/`#3A3A3F`），不回退成 
 | 3 | 弹层统一：`AlertDialog`（52 处）、`ModalBottomSheet`（27 处）走共享外壳 + 守卫测试 | 已完成；深色 sheet 仍是各处原有的 surface/背景色，未统一到 `#1C1C1E` |
 | 4 | 抽屉：分组、置顶、多选、长按菜单 | 已完成（编译通过）；**未在真机/模拟器上验证** |
 | 5 | 信息架构：「文件」分类、会话配置合并、设置 7 类、终端跟随主题 | 已完成；「会话文件」合并未做（无对应页面）；**未在真机/模拟器上验证** |
-| 验证 | `compileDebugKotlin`、`testDebugUnitTest`（2493 例，1 例失败，见下）、i18n 审计 | 已跑；lint、Release/R8、真机截图**未跑** |
+| 验证 | `compileDebugKotlin`、`testDebugUnitTest`（2493 例，1 例失败，见下）、i18n 审计 | 已跑，含 `lintDebug`；Release/R8、真机截图**未跑** |
 
-已知：`RevealProgressTest` 的 `a last grapheme that keeps growing stays correct` 在本机 JDK 上失败；
-该测试与本次改动的文件无关，是否为基线既有失败**未在 main 上复核**。
+已知：`RevealProgressTest` 的 `a last grapheme that keeps growing stays correct` 在 main（`0c7903e`）
+上同样失败，与本次改动无关。`lintDebug` 通过（无新增错误，基线之外仅有警告）。
 
 与代码不一致时以代码为准并修正本文。
