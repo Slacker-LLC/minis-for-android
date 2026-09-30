@@ -251,7 +251,6 @@ fun SkillsManagementScreen(
 
         SettingsSection(
             header = stringResource(R.string.skill_section_installed),
-            footer = stringResource(R.string.skill_section_footer),
         ) {
             if (skills.isEmpty()) {
                 // Centred empty-state inside the section card so the empty

@@ -120,7 +120,6 @@ fun ModelSlotDetailScreen(
 
         SettingsSection(
             header = stringResource(R.string.model_slot_available_models),
-            footer = stringResource(R.string.model_slot_available_footer),
         ) {
             if (candidates.isEmpty()) {
                 SettingsRow(

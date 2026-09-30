@@ -1641,12 +1641,6 @@ class ChatViewModel(
             subtitle = "",
         ),
         SlashCommand(
-            id = "clear",
-            icon = Icons.Default.Delete,
-            title = "Clear",
-            subtitle = "",
-        ),
-        SlashCommand(
             id = "compact",
             icon = Icons.Default.Compress,
             title = "Compact",
@@ -1674,6 +1668,12 @@ class ChatViewModel(
             id = "export",
             icon = Icons.Outlined.FileDownload,
             title = "Export",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "clear",
+            icon = Icons.Default.Delete,
+            title = "Clear",
             subtitle = "",
         ),
     )

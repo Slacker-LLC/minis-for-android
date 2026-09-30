@@ -4429,12 +4429,12 @@ fun ChatScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(
                                         text = "/${cmd.title.lowercase()}",
-                                        fontSize = 14.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         color = titleColor,
                                         maxLines = 1,
-                                        modifier = Modifier.widthIn(min = 92.dp),
+                                        modifier = Modifier.widthIn(min = 108.dp),
                                     )
                                     // One line, ellipsised: long Skill descriptions must not stretch the row.
                                     Text(

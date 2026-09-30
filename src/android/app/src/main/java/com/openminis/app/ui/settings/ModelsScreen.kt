@@ -81,7 +81,6 @@ fun ModelsScreen(
         if (config.slots.main.size > 1) {
             SettingsSection(
                 header = stringResource(R.string.model_slot_main_options),
-                footer = stringResource(R.string.model_slot_fallback_help),
             ) {
                 val always = config.fallbackTrigger == FallbackStrategy.always
                 SettingsRow(

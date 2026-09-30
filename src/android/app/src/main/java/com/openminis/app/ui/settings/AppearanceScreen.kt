@@ -311,7 +311,6 @@ fun AppearanceScreen(
         // -- Font Size --
         SettingsSection(
             header = stringResource(R.string.appearance_section_font_size),
-            footer = stringResource(R.string.appearance_font_size_footer),
         ) {
             SettingsRow(
                 icon = Icons.Outlined.FormatSize,
@@ -381,7 +380,6 @@ fun AppearanceScreen(
         // refreshes its icon cache within a few seconds.
         SettingsSection(
             header = stringResource(R.string.appearance_section_app_icon),
-            footer = stringResource(R.string.appearance_app_icon_footer),
         ) {
             data class IconOption(
                 val variant: AppIconRepository.Variant,
@@ -507,7 +505,6 @@ fun AppearanceScreen(
         // -- Language --
         SettingsSection(
             header = stringResource(R.string.appearance_section_language),
-            footer = stringResource(R.string.appearance_language_footer),
         ) {
             languageOptions.forEachIndexed { idx, lang ->
                 SettingsChoiceRow(

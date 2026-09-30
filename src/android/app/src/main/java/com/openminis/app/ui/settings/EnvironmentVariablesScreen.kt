@@ -101,7 +101,6 @@ fun EnvironmentVariablesScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.env_var_privacy_header),
-            footer = stringResource(R.string.env_var_privacy_footer),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.env_var_privacy_toggle),
@@ -117,7 +116,6 @@ fun EnvironmentVariablesScreen(
 
         SettingsSection(
             header = stringResource(R.string.env_var_section_header),
-            footer = stringResource(R.string.env_var_section_footer),
         ) {
             if (entries.isEmpty()) {
                 // Centred empty-state message inside the same card so the

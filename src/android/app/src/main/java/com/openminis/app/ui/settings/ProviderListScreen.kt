@@ -289,11 +289,6 @@ fun ProviderListScreen(
         if (shadows.isNotEmpty()) {
             SettingsSection(
                 header = stringResource(R.string.voice_services_section),
-                footer = if (providerRepository.hasFoldedShadowDuplicates()) {
-                    stringResource(R.string.voice_services_duplicate_hint)
-                } else {
-                    null
-                },
             ) {
                 shadows.forEachIndexed { index, shadow ->
                     ShadowVoiceRow(

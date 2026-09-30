@@ -445,7 +445,6 @@ fun ProviderDetailScreen(
         if (instance.supportsAzureMode) {
             SettingsSection(
                 header = stringResource(R.string.provider_detail_azure_openai),
-                footer = stringResource(R.string.provider_detail_azure_openai_footer),
             ) {
                 SettingsSwitchRow(
                     title = stringResource(R.string.provider_detail_azure_openai),

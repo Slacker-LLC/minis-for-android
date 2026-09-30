@@ -343,7 +343,6 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
 
         SettingsSection(
             header = stringResource(R.string.soul_section_personality),
-            footer = stringResource(R.string.soul_personality_footer),
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 SettingsTextArea(

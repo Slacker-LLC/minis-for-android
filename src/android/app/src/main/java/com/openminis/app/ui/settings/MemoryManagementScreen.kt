@@ -89,7 +89,6 @@ fun MemoryManagementScreen(
         // user finds it whether or not any memory files exist yet.
         SettingsSection(
             header = stringResource(R.string.settings_memory_global_header),
-            footer = stringResource(R.string.settings_memory_global_footer),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_memory_global_enabled_title),
@@ -123,7 +122,6 @@ fun MemoryManagementScreen(
         } else {
             SettingsSection(
                 header = stringResource(R.string.memory_section_files),
-                footer = stringResource(R.string.memory_section_footer),
             ) {
                 files.forEachIndexed { index, file ->
                     MemoryFileRow(

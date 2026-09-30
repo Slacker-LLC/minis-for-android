@@ -247,7 +247,6 @@ private fun ChooseProviderScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.add_provider_choose_provider),
-            footer = stringResource(R.string.add_provider_you_can_add_multiple_instances_of_the_sa),
         ) {
             providerDisplayOrder.forEachIndexed { index, type ->
                 val displayTitle = when (type) {
@@ -298,9 +297,6 @@ private fun ChooseProviderScreen(
         val templateNotes = templates.mapNotNull { it.note }
         SettingsSection(
             header = stringResource(R.string.add_provider_voice_chat_providers),
-            footer = (
-                listOf(stringResource(R.string.add_provider_voice_templates_footer)) + templateNotes
-                ).joinToString("\n"),
         ) {
             templates.forEachIndexed { index, template ->
                 val capabilityRes = when (template.capability) {
@@ -341,7 +337,6 @@ private fun ChooseCredentialScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.add_provider_choose_authentication),
-            footer = stringResource(R.string.add_provider_pick_the_auth_method_that_matches_your_a),
         ) {
             credentials.forEachIndexed { index, credential ->
                 val (title, description, icon) = when (credential) {
@@ -532,7 +527,6 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
     SettingsSection(
         header = stringResource(R.string.add_provider_credential),
-        footer = stringResource(R.string.add_provider_your_key_is_stored_securely_in_encrypted),
     ) {
         SettingsCardBlock {
             RowLabel(text = stringResource(R.string.provider_list_api_key))
@@ -765,7 +759,6 @@ private fun ColumnScope.OAuthConfigSection(
         // ── Authenticated state — Token + Save ─────────────────────────
         SettingsSection(
             header = stringResource(R.string.add_provider_authentication),
-            footer = stringResource(R.string.add_provider_sign_in_succeeded_the_token_is_stored_in),
         ) {
             SettingsCardBlock {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -813,11 +806,6 @@ private fun ColumnScope.OAuthConfigSection(
         // ── Sign In ────────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.provider_detail_sign_in),
-            footer = if (oauthAvailableInThisBuild) {
-                stringResource(R.string.add_provider_opens_the_provider_s_web_sign_in_flow_af)
-            } else {
-                stringResource(R.string.provider_oauth_not_available_in_this_build)
-            },
         ) {
             SettingsCardBlock {
                 MinisOutlinedButton(
@@ -927,7 +915,6 @@ private fun ColumnScope.OAuthConfigSection(
         }
         SettingsSection(
             header = stringResource(R.string.add_provider_or_configure_manually),
-            footer = stringResource(R.string.add_provider_for_third_party_coding_plans_e_g_minimax),
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))

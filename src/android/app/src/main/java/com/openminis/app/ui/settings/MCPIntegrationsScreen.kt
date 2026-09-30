@@ -109,7 +109,6 @@ fun MCPIntegrationsScreen(
         MCPServerExposureSection()
         SettingsSection(
             header = stringResource(R.string.mcp_section_servers),
-            footer = stringResource(R.string.mcp_section_footer),
         ) {
             if (servers.isEmpty()) {
                 Column(

@@ -78,7 +78,6 @@ fun SystemPromptSettingsScreen(onBack: () -> Unit, onModulesClick: () -> Unit = 
     ) {
         SettingsSection(
             header = stringResource(R.string.system_prompt_custom_section),
-            footer = stringResource(R.string.system_prompt_custom_footer),
         ) {
             SettingsTextArea(
                 value = current,
