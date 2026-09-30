@@ -244,6 +244,8 @@ fun SettingsScaffold(
     // Kept for source compatibility: every title is centered in the iOS-style bar now.
     @Suppress("UNUSED_PARAMETER") centerTitle: Boolean = false,
     floatingActionButton: @Composable (() -> Unit)? = null,
+    /** A bar pinned under the scrolling content (e.g. the team member page's Continue / New topic). */
+    bottomBar: @Composable (() -> Unit)? = null,
     scrollable: Boolean = true,
     /** Name of the page the back button returns to; "Back" when the caller does not know it. */
     backLabel: String? = null,
@@ -263,6 +265,7 @@ fun SettingsScaffold(
             )
         },
         floatingActionButton = { floatingActionButton?.invoke() },
+        bottomBar = { bottomBar?.invoke() },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         // T183: imePadding() shrinks the scroll container by the IME's

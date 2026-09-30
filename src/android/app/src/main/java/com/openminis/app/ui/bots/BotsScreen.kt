@@ -1,5 +1,11 @@
 package com.openminis.app.ui.bots
 
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.PauseCircle
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.activity.compose.BackHandler
 import com.openminis.app.ui.settings.MinisSwitch
 import androidx.compose.foundation.background
@@ -533,21 +539,49 @@ private fun BotDetails(
 ) {
     var menu by remember { mutableStateOf(false) }
     var expanded by rememberSaveable(bot.id) { mutableStateOf(false) }
-    SettingsScaffold(title = stringResource(R.string.bots_details), onBack = onBack, actions = {
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.bots_more)) }
-            MinisMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.bots_edit)) }, onClick = { menu = false; onEdit() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.bots_new_topic)) }, enabled = bot.enabled && !opening,
-                    onClick = { menu = false; onNewTopic() })
-                DropdownMenuItem(text = { Text(stringResource(if (bot.enabled) R.string.bots_disable else R.string.bots_enable)) },
-                    onClick = { menu = false; onToggle() })
-                MinisMenuDivider()
-                DropdownMenuItem(text = { Text(stringResource(R.string.bots_delete), color = MaterialTheme.colorScheme.error) },
-                    onClick = { menu = false; onDelete() })
+    SettingsScaffold(
+        title = "",
+        onBack = onBack,
+        backLabel = stringResource(R.string.bots_team),
+        bottomBar = {
+            Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    MinisTextButton(
+                        onClick = onOpen,
+                        enabled = !opening && (bot.enabled || sessions.isNotEmpty()),
+                    ) { Text(stringResource(R.string.bots_continue), fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                    MinisTextButton(
+                        onClick = onNewTopic,
+                        enabled = bot.enabled && !opening,
+                    ) { Text(stringResource(R.string.bots_new_topic), fontSize = 17.sp) }
+                }
             }
-        }
-    }) {
+        },
+        actions = {
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreHoriz, stringResource(R.string.bots_more), tint = MaterialTheme.colorScheme.primary) }
+                MinisMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bots_edit)) },
+                        trailingIcon = { Icon(Icons.Outlined.Edit, null) },
+                        onClick = { menu = false; onEdit() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(if (bot.enabled) R.string.bots_disable else R.string.bots_enable)) },
+                        trailingIcon = { Icon(if (bot.enabled) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle, null) },
+                        onClick = { menu = false; onToggle() },
+                    )
+                    MinisMenuDivider()
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bots_delete), color = MaterialTheme.colorScheme.error) },
+                        trailingIcon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = { menu = false; onDelete() },
+                    )
+                }
+            }
+        },
+    ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             BotAvatar(bot, size = 64.dp)
@@ -558,12 +592,6 @@ private fun BotDetails(
                     if (bot.enabled) ChatColors.ok else ChatColors.tertiaryText,
                 )
             }
-        }
-        MinisButton(onClick = onOpen, enabled = !opening && (bot.enabled || sessions.isNotEmpty()),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-            Icon(Icons.AutoMirrored.Outlined.Chat, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.bots_continue))
         }
         SettingsSection(header = stringResource(R.string.bots_role), footer = if (!bot.enabled) stringResource(R.string.bots_disabled_footer) else null) {
             Column(Modifier.padding(16.dp)) {
