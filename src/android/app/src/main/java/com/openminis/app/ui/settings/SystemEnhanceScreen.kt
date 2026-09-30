@@ -36,6 +36,7 @@ import com.openminis.app.runtime.ubuntu.RootAccess
 import com.openminis.app.runtime.ubuntu.RootAccessState
 import com.openminis.app.runtime.ubuntu.RootAccessStatus
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.xposed.ModulePrefs
 import com.openminis.app.xposed.ModuleSettingsStore
 import com.openminis.app.xposed.PowerAssistantTarget
@@ -127,7 +128,7 @@ fun SystemEnhanceScreen(
         SettingsSection(header = stringResource(R.string.system_enhance_section_status)) {
             SettingsRow(
                 icon = Icons.Outlined.Key,
-                iconColor = Color(0xFFFF9F0A),
+                iconColor = ChatColors.warn,
                 title = stringResource(R.string.system_enhance_root),
                 subtitle = rootStateSubtitle(rootState),
                 trailing = {
@@ -147,7 +148,7 @@ fun SystemEnhanceScreen(
             )
             SettingsRow(
                 icon = Icons.Outlined.Accessibility,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.system_enhance_protection),
                 subtitle = stringResource(
                     if (protection) {
@@ -160,7 +161,7 @@ fun SystemEnhanceScreen(
             )
             SettingsRow(
                 icon = Icons.Outlined.Extension,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.system_enhance_hooks),
                 subtitle = stringResource(R.string.system_enhance_hooks_subtitle),
                 trailing = {
@@ -183,7 +184,7 @@ fun SystemEnhanceScreen(
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Search,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.module_settings_gesture_bar),
                 subtitle = stringResource(R.string.module_settings_gesture_bar_sub),
                 checked = gestureBar,
@@ -204,7 +205,7 @@ fun SystemEnhanceScreen(
             )
             SettingsSwitchRow(
                 icon = Icons.Outlined.TouchApp,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.module_settings_double_finger),
                 subtitle = stringResource(R.string.module_settings_double_finger_sub),
                 checked = doubleFinger,
@@ -225,7 +226,7 @@ fun SystemEnhanceScreen(
             )
             SettingsSwitchRow(
                 icon = Icons.Outlined.RecordVoiceOver,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.module_settings_hotword),
                 subtitle = stringResource(R.string.module_settings_hotword_sub),
                 checked = hotword,

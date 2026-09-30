@@ -75,4 +75,40 @@ class MinisDialogUsageGuardTest {
             offenders.isEmpty(),
         )
     }
+
+    // Dark scheme `surface` is the page black; sheets must use minisSheetColor()
+    // (#1C1C1E in dark) so they read as a raised layer.
+    private val pageSurfaceAsSheet = Regex(
+        """Color\.Transparent\s+else\s+(MaterialTheme\.colorScheme\.surface|ChatColors\.background)\b""",
+    )
+
+    internal fun findPageSurfaceSheets(source: String): List<String> =
+        source.lines().mapIndexedNotNull { i, line ->
+            val code = line.substringBefore("//").trim()
+            if (pageSurfaceAsSheet.containsMatchIn(code)) "${i + 1}: ${line.trim()}" else null
+        }
+
+    @Test
+    fun `flags page surface used as sheet container but not minisSheetColor`() {
+        assertEquals(
+            1,
+            findPageSurfaceSheets("containerColor = if (g) Color.Transparent else MaterialTheme.colorScheme.surface,").size,
+        )
+        assertEquals(1, findPageSurfaceSheets("containerColor = if (g) Color.Transparent else ChatColors.background,").size)
+        assertTrue(findPageSurfaceSheets("containerColor = if (g) Color.Transparent else minisSheetColor(),").isEmpty())
+    }
+
+    @Test
+    fun `no sheet uses the page surface as its container`() {
+        val root = File("src/main/java/com/openminis/app")
+        assertTrue("source root not found (cwd=${File(".").absolutePath})", root.isDirectory)
+        val offenders = root.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .flatMap { f -> findPageSurfaceSheets(f.readText()).map { "${f.path}:$it" } }
+            .toList()
+        assertTrue(
+            "Use minisSheetColor() for sheet containers.\n" + offenders.joinToString("\n") { "  $it" },
+            offenders.isEmpty(),
+        )
+    }
 }

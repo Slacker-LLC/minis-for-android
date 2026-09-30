@@ -9,6 +9,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -81,7 +82,7 @@ private val NeutralDarkGroupedCard = Color(0xFF1C1C1E)
 private val NeutralDarkGroupedCardElevated = Color(0xFF2C2C2E)
 private val NeutralDarkOutline = Color(0xFF38383A)
 
-private val LightColorScheme = lightColorScheme(
+internal val LightColorScheme = lightColorScheme(
     primary = TealPrimary,
     onPrimary = TealOnPrimary,
     primaryContainer = TealPrimaryContainer,
@@ -107,9 +108,13 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerHighest = NeutralGroupedCardElevated,
     outline = NeutralOutline,
     outlineVariant = NeutralOutline,
+    // Design language §3 "bad": Material's default error (#B3261E / #F2B8B5) is a
+    // different red, and the dark default reads pink on black.
+    error = Color(0xFFD70015),
+    onError = Color(0xFFFFFFFF),
 )
 
-private val DarkColorScheme = darkColorScheme(
+internal val DarkColorScheme = darkColorScheme(
     primary = TealDarkPrimary,
     onPrimary = TealDarkOnPrimary,
     primaryContainer = TealDarkPrimaryContainer,
@@ -131,6 +136,8 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerHighest = NeutralDarkGroupedCardElevated,
     outline = NeutralDarkOutline,
     outlineVariant = NeutralDarkOutline,
+    error = Color(0xFFFF453A),
+    onError = Color(0xFF000000),
 )
 
 // The page background painted into the GlassHost backdrop layer. Must stay
@@ -138,6 +145,16 @@ private val DarkColorScheme = darkColorScheme(
 // private to Theme.kt).
 fun minisPageBackground(darkTheme: Boolean): Color =
     if (darkTheme) Color(0xFF000000) else Color(0xFFFFFFFF)
+
+/**
+ * Opaque surface for sheets, dialogs and popovers (design language §3 "sheet"):
+ * white in light, the raised `#1C1C1E` in dark. The dark colour scheme's own
+ * `surface` is the page black, so overlays must not use it directly.
+ */
+@Composable
+@ReadOnlyComposable
+fun minisSheetColor(): Color =
+    if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
 
 // Scrim behind dialogs / sheets / menus: black 18% on the white page, 55% on
 // the black page (docs/design/UI-DESIGN-LANGUAGE.md §3, §7).

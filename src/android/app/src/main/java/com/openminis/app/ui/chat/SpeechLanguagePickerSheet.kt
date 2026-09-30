@@ -40,6 +40,7 @@ import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.theme.minisSheetColor
 import java.util.Locale
 import com.openminis.app.ui.components.MinisModalBottomSheet
 
@@ -72,7 +73,7 @@ fun SpeechLanguagePickerSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.background,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(modifier = Modifier.fillMaxWidth().glassSheetSurface()) {

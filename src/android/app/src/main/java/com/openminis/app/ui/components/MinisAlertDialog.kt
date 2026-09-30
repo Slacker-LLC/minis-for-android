@@ -46,6 +46,7 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.theme.minisOverlayScrim
+import com.openminis.app.ui.theme.minisSheetColor
 
 // UI design language §7 (docs/design/UI-DESIGN-LANGUAGE.md): alert = centred, opaque
 // white, 14dp corners; title + optional message, then text-only actions separated
@@ -108,7 +109,7 @@ private fun MinisDialogShell(
                 color = when {
                     blurredGlass -> minisGlassScrim().copy(alpha = 0.85f)
                     isGlass -> Color.Transparent
-                    else -> MaterialTheme.colorScheme.surface
+                    else -> minisSheetColor()
                 },
                 tonalElevation = 0.dp,
                 border = if (!isGlass) BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)) else null,

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
+import com.openminis.app.ui.theme.minisSheetColor
 import java.io.File
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import androidx.core.content.ContextCompat
@@ -5538,7 +5539,7 @@ fun ChatScreen(
                                             modifier = Modifier
                                                 .size(7.dp)
                                                 .background(
-                                                    if (modelName.isNotEmpty()) Color(0xFF34C759) else Color(0xFFFF9500),
+                                                    if (modelName.isNotEmpty()) ChatColors.ok else ChatColors.warn,
                                                     CircleShape,
                                                 ),
                                         )
@@ -5592,7 +5593,7 @@ fun ChatScreen(
                                             Icon(
                                                 Icons.Default.AutoAwesome,
                                                 contentDescription = null,
-                                                tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
+                                                tint = if (isEntrySelected) ChatColors.ok else ChatColors.secondaryText,
                                                 modifier = Modifier.size(18.dp),
                                             )
                                         },
@@ -6092,7 +6093,7 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
-                                    .background(Color(0xFFFF3B30), CircleShape)
+                                    .background(ChatColors.bad, CircleShape)
                                     .clip(CircleShape)
                                     .clickable { viewModel.cancelStream() },
                                 contentAlignment = Alignment.Center,
@@ -6742,7 +6743,7 @@ private fun ThinkingLevelSheet(
     }
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 12.dp)) {

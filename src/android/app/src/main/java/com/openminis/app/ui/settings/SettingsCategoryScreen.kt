@@ -50,10 +50,12 @@ import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.openExternalUrl
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.ui.theme.minisSheetColor
 
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
@@ -201,14 +203,14 @@ fun SettingsCategoryScreen(
                 )
                 SettingsRow(
                     icon = Icons.Outlined.AutoAwesome,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.settings_soul),
                     subtitle = stringResource(R.string.settings_soul_subtitle),
                     onClick = onSoulClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.Description,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.settings_system_prompt),
                     subtitle = stringResource(R.string.settings_system_prompt_subtitle),
                     onClick = onSystemPromptClick,
@@ -300,21 +302,21 @@ fun SettingsCategoryScreen(
                 )
                 SettingsRow(
                     icon = Icons.Outlined.Folder,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.settings_shared_folders),
                     subtitle = stringResource(R.string.settings_shared_folders_subtitle),
                     onClick = onSharedFoldersClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.FolderShared,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.settings_mount_external_folders),
                     subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
                     onClick = onMountedFoldersClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.Backup,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.settings_backup_restore),
                     subtitle = stringResource(R.string.settings_backup_restore_subtitle),
                     onClick = onBackupClick,
@@ -327,7 +329,7 @@ fun SettingsCategoryScreen(
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Terminal,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.terminal_title),
                     subtitle = stringResource(R.string.settings_terminal_subtitle),
                     onClick = onTerminalClick,
@@ -348,7 +350,7 @@ fun SettingsCategoryScreen(
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Build,
-                    iconColor = Color(0xFFFF9F0A),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.system_enhance_title),
                     subtitle = stringResource(R.string.system_enhance_row_subtitle),
                     onClick = onSystemEnhanceClick,
@@ -376,7 +378,7 @@ fun SettingsCategoryScreen(
                 )
                 SettingsRow(
                     icon = Icons.Outlined.BatteryFull,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.bg_section_header),
                     subtitle = stringResource(R.string.bg_section_subtitle),
                     onClick = onBackgroundClick,
@@ -452,7 +454,7 @@ fun SettingsCategoryScreen(
             containerColor = if (LocalUiStyle.current == UiStyle.GLASS) {
                 Color.Transparent
             } else {
-                MaterialTheme.colorScheme.surface
+                minisSheetColor()
             },
         ) {
             GlassSheetWindowBlur()

@@ -56,6 +56,10 @@ data class ChatPalette(
     val sheetHeaderBg: Color,
     val sheetHeaderBorder: Color,
     val fabAccent: Color,
+    /** Status text / icon colours (design language §3): success, caution, error. */
+    val ok: Color,
+    val warn: Color,
+    val bad: Color,
 )
 
 val LightChatPalette = ChatPalette(
@@ -93,6 +97,9 @@ val LightChatPalette = ChatPalette(
     sheetHeaderBg = Color(0xFFFFFFFF),
     sheetHeaderBorder = Color(0x1A000000),
     fabAccent = Color(0xFF0068D6),
+    ok = Color(0xFF1F7A36),
+    warn = Color(0xFFA65100),
+    bad = Color(0xFFD70015),
 )
 
 // T153: Android-specific dark palette tweaks. iOS borrows the system
@@ -151,6 +158,9 @@ val DarkChatPalette = ChatPalette(
     sheetHeaderBg = Color(0xFF2C2C2E),
     sheetHeaderBorder = Color(0x33FFFFFF),
     fabAccent = Color(0xFF0A84FF),
+    ok = Color(0xFF30D158),
+    warn = Color(0xFFFF9F0A),
+    bad = Color(0xFFFF453A),
 )
 
 val LocalChatPalette = compositionLocalOf { LightChatPalette }

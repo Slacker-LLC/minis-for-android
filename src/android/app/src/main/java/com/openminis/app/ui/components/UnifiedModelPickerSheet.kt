@@ -68,6 +68,7 @@ import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.theme.minisSheetColor
 
 /**
  * [T-android-unified-model-picker] Android counterpart of iOS
@@ -142,13 +143,12 @@ fun UnifiedModelPickerSheet(
         config.modelEntries.firstOrNull { it.id == id } ?: SystemVoiceEntries.resolve(id)
     }
 
-    val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val cardShape = RoundedCornerShape(14.dp)
 
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         // Slim drag handle, same as the main picker / StandardChatSheet — the
         // Material default puts ~44dp of whitespace above the title.
         dragHandle = {
@@ -278,8 +278,7 @@ fun UnifiedModelPickerSheet(
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
-                                .background(cardColor, cardShape)
-                                .clip(cardShape),
+                                .groupedCard(cardShape),
                         ) {
                             PickerSectionHeader(slotTitle)
                             Row(
@@ -325,8 +324,7 @@ fun UnifiedModelPickerSheet(
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
-                                .background(cardColor, cardShape)
-                                .clip(cardShape),
+                                .groupedCard(cardShape),
                         ) {
                             PickerSectionHeader(stringResource(R.string.voice_input_picker_system))
                             systemEntries.forEachIndexed { i, entry ->
@@ -381,10 +379,10 @@ fun UnifiedModelPickerSheet(
                                             fontSize = 9.sp,
                                             lineHeight = 11.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF34C759),
+                                            color = ChatColors.ok,
                                             modifier = Modifier
                                                 .background(
-                                                    Color(0xFF34C759).copy(alpha = 0.1f),
+                                                    ChatColors.ok.copy(alpha = 0.1f),
                                                     RoundedCornerShape(50),
                                                 )
                                                 .padding(horizontal = 5.dp, vertical = 1.dp),
@@ -461,8 +459,7 @@ fun UnifiedModelPickerSheet(
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
-                                .background(cardColor, cardShape)
-                                .clip(cardShape),
+                                .groupedCard(cardShape),
                         ) {
                             // Provider header — main picker's embedded header:
                             // start16/end8 top10/bottom8, 24dp circled chevron,

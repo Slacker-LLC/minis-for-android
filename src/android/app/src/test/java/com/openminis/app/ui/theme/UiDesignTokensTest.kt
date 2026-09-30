@@ -69,4 +69,36 @@ class UiDesignTokensTest {
         }
         assertTrue("accents below 4.5:1: $failures", failures.isEmpty())
     }
+
+    @Test
+    fun `status colours meet AA on page and fill in both themes`() {
+        val failures = listOf(
+            "ok light/white" to contrast(LightChatPalette.ok, white),
+            "ok light/fill" to contrast(LightChatPalette.ok, fill),
+            "warn light/white" to contrast(LightChatPalette.warn, white),
+            "warn light/fill" to contrast(LightChatPalette.warn, fill),
+            "bad light/white" to contrast(LightChatPalette.bad, white),
+            "bad light/fill" to contrast(LightChatPalette.bad, fill),
+            "ok dark/black" to contrast(DarkChatPalette.ok, black),
+            "ok dark/card" to contrast(DarkChatPalette.ok, darkCard),
+            "warn dark/black" to contrast(DarkChatPalette.warn, black),
+            "warn dark/card" to contrast(DarkChatPalette.warn, darkCard),
+            "bad dark/black" to contrast(DarkChatPalette.bad, black),
+            "bad dark/card" to contrast(DarkChatPalette.bad, darkCard),
+        ).filter { it.second < 4.5 }
+        assertTrue("status colours below 4.5:1: $failures", failures.isEmpty())
+    }
+
+    @Test
+    fun `old iOS system green would have failed, so the status check can fail`() {
+        assertTrue(contrast(Color(0xFF34C759), white) < 4.5)
+    }
+
+    @Test
+    fun `scheme error colour equals the bad status token`() {
+        // Destructive text buttons use colorScheme.error; it must be the same red
+        // as ChatColors.bad so a delete button and an error label match.
+        assertEquals(LightChatPalette.bad, LightColorScheme.error)
+        assertEquals(DarkChatPalette.bad, DarkColorScheme.error)
+    }
 }

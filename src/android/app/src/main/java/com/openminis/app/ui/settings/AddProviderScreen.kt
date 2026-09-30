@@ -75,6 +75,8 @@ import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisOutlinedButton
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.launch
 import java.util.UUID
 import com.openminis.app.ui.components.MinisButton
@@ -774,7 +776,7 @@ private fun ColumnScope.OAuthConfigSection(
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = Color(0xFF34C759),
+                        tint = ChatColors.ok,
                         modifier = Modifier.size(20.dp),
                     )
                     Spacer(Modifier.width(8.dp))
@@ -822,7 +824,7 @@ private fun ColumnScope.OAuthConfigSection(
             },
         ) {
             SettingsCardBlock {
-                MinisButton(
+                MinisOutlinedButton(
                     onClick = {
                         isAuthenticating = true
                         errorMessage = null

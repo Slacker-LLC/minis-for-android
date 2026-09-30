@@ -718,10 +718,10 @@ private fun ExpandedContent(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFFF9500).copy(alpha = 0.12f))
+                    .background(ChatColors.warn.copy(alpha = 0.12f))
                     .padding(horizontal = 12.dp, vertical = 5.dp),
             ) {
-                Text("⚠︎", fontSize = 10.sp, color = Color(0xFFFF9500))
+                Text("⚠︎", fontSize = 10.sp, color = ChatColors.warn)
                 Spacer(Modifier.width(5.dp))
                 Text(
                     transcribeError,

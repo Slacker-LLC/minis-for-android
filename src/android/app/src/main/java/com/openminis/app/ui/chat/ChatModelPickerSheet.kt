@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.openminis.app.ui.theme.minisSheetColor
 import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
@@ -365,7 +366,7 @@ internal fun ModelPickerSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         // Match the slim drag handle used by StandardChatSheet (6dp top / 4dp
         // bottom) so the title sits flush with the indicator instead of the
         // Material default's ~44dp whitespace gap above it.
@@ -783,10 +784,10 @@ internal fun ModelPickerSheet(
                                                     fontSize = 9.sp,
                                                     lineHeight = 11.sp,
                                                     fontWeight = FontWeight.Medium,
-                                                    color = Color(0xFF34C759),
+                                                    color = ChatColors.ok,
                                                     modifier = Modifier
                                                         .background(
-                                                            Color(0xFF34C759).copy(alpha = 0.1f),
+                                                            ChatColors.ok.copy(alpha = 0.1f),
                                                             RoundedCornerShape(50),
                                                         )
                                                         .padding(horizontal = 5.dp, vertical = 1.dp),

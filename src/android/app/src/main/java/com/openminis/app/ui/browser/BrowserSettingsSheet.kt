@@ -63,6 +63,7 @@ import com.openminis.app.R
 import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.browser.UserAgentProfile
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.ui.theme.minisSheetColor
 import kotlinx.coroutines.launch
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.util.bringIntoViewOnFocus
@@ -124,7 +125,7 @@ fun BrowserSettingsSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(

@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -497,7 +498,7 @@ fun MirrorsSectionView(onNavigate: (MirrorCategory) -> Unit) {
     ListItem(
         headlineContent = { Text(if (vm.isTesting) stringResource(R.string.mirror_test_speed_testing) else stringResource(R.string.mirror_detect_fast_label)) },
         leadingContent = {
-            CircleIconBadge(icon = Icons.Filled.Bolt, tint = Color(0xFFFF9500))
+            CircleIconBadge(icon = Icons.Filled.Bolt, tint = ChatColors.warn)
         },
         modifier = Modifier
             .fillMaxWidth()
@@ -582,9 +583,9 @@ private fun CircleIconBadge(icon: ImageVector, tint: Color) {
 @Composable
 private fun LatencyBadge(ms: Int) {
     val color = when {
-        ms < 200 -> Color(0xFF34C759)
-        ms < 500 -> Color(0xFFFF9500)
-        else -> Color(0xFFFF3B30)
+        ms < 200 -> ChatColors.ok
+        ms < 500 -> ChatColors.warn
+        else -> ChatColors.bad
     }
     Box(
         modifier = Modifier
@@ -725,7 +726,7 @@ fun MirrorCategoryDetailScreen(
             ListItem(
                 headlineContent = { Text(if (vm.isTesting) stringResource(R.string.mirror_test_speed_testing) else stringResource(R.string.mirror_test_speed_label)) },
                 leadingContent = {
-                    CircleIconBadge(icon = Icons.Filled.Bolt, tint = Color(0xFFFF9500))
+                    CircleIconBadge(icon = Icons.Filled.Bolt, tint = ChatColors.warn)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

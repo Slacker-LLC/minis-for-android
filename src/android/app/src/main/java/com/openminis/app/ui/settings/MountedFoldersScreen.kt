@@ -57,8 +57,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +76,7 @@ import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
 import com.openminis.app.data.SafMountHelper
 import com.openminis.app.ui.components.DialogTextField
+import com.openminis.app.ui.theme.minisSheetColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -291,8 +294,9 @@ fun MountedFoldersScreen(
                             enableDismissFromStartToEnd = false,
                         ) {
                             Surface(
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                color = SectionDesign.cardColor(),
                                 shape = RoundedCornerShape(12.dp),
+                                border = SectionDesign.cardBorder(),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 MountRow(entry = entry, onClick = { onMountClick(entry.id) })
@@ -303,7 +307,7 @@ fun MountedFoldersScreen(
                         item {
                             Text(
                                 text = stringResource(R.string.mount_folders_limit_reached),
-                                color = Color(0xFFFF9500),
+                                color = ChatColors.warn,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                             )
@@ -437,11 +441,12 @@ private fun initialPickerUri(): Uri? = runCatching {
 @Composable
 private fun InfoBanner() {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = SectionDesign.cardColor(),
+        shape = RoundedCornerShape(12.dp),
+        border = SectionDesign.cardBorder(),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .clip(RoundedCornerShape(12.dp)),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
             text = stringResource(R.string.mount_folders_info_banner),
@@ -551,7 +556,7 @@ private fun ListHeader(count: Int, atCapacity: Boolean) {
         Text(
             text = "$count / ${MountedFoldersStore.MAX_MOUNTS}",
             style = MaterialTheme.typography.labelSmall,
-            color = if (atCapacity) Color(0xFFFF9500) else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (atCapacity) ChatColors.warn else MaterialTheme.colorScheme.onSurfaceVariant,
             fontFamily = FontFamily.Monospace,
         )
     }
@@ -619,9 +624,9 @@ private fun MountRow(
 @Composable
 private fun AccessBadge(entry: MountedFoldersStore.Entry) {
     val (text, color) = when {
-        !entry.isWritable -> stringResource(R.string.mount_badge_readonly) to Color(0xFFFF9500)
+        !entry.isWritable -> stringResource(R.string.mount_badge_readonly) to ChatColors.warn
         !entry.userAllowWrite -> stringResource(R.string.mount_badge_locked) to Color(0xFFAF52DE)
-        else -> stringResource(R.string.mount_badge_rw) to Color(0xFF34C759)
+        else -> stringResource(R.string.mount_badge_rw) to ChatColors.ok
     }
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -652,7 +657,7 @@ private fun AddMountSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(

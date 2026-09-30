@@ -46,6 +46,7 @@ import com.openminis.app.ui.components.MinisSmallButton
 import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.components.SectionTextField
 import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.ui.theme.minisSheetColor
 
 /**
  * [T-android-session-grouping] What the user chose in the group picker.
@@ -124,7 +125,7 @@ fun GroupPickerSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 24.dp)) {

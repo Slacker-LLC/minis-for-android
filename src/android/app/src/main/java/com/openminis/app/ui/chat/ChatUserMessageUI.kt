@@ -443,7 +443,7 @@ internal fun UserMessageBubble(
                                 Icon(
                                     imageVector = Icons.Filled.Cancel,
                                     contentDescription = stringResource(R.string.chat_withdraw_queued_message),
-                                    tint = Color(0xFFFF3B30),
+                                    tint = ChatColors.bad,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }

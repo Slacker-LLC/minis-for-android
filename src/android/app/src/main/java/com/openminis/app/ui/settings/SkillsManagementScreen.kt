@@ -4,6 +4,9 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.SkillArchiveReader
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.groupedCard
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.minisSheetColor
 import com.openminis.app.util.BoundedStreams
 
 import android.net.Uri
@@ -325,7 +328,7 @@ fun SkillsManagementScreen(
     if (showAddMenu) {
         MinisModalBottomSheet(
             onDismissRequest = { showAddMenu = false },
-            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         ) {
             GlassSheetWindowBlur()
             Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 32.dp)) {
@@ -469,7 +472,7 @@ private fun SkillImportSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(
@@ -838,9 +841,9 @@ fun SkillDetailScreen(
                     is UpdateStatus.Done -> {
                         DetailDivider()
                         DetailRow {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ChatColors.ok, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = Color(0xFF34C759))
+                            Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = ChatColors.ok)
                         }
                     }
                     is UpdateStatus.Failed -> {
@@ -991,8 +994,7 @@ private fun DetailSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                .groupedCard(RoundedCornerShape(12.dp)),
         ) {
             content()
         }

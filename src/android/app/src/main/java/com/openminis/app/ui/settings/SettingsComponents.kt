@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.groupedCard
 
 /**
  * Shared primitives for settings pages. Grouped-card layout (iOS/ChatGPT style).
@@ -275,8 +276,7 @@ fun SettingsSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = SettingsMetrics.CardMarginHorizontal)
-                .clip(RoundedCornerShape(SettingsMetrics.SectionCorner))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                .groupedCard(RoundedCornerShape(SettingsMetrics.SectionCorner)),
             content = content,
         )
         if (footer != null) {

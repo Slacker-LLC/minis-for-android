@@ -142,16 +142,16 @@ internal fun FolderActionDialogs(
  * parent, so a bare SectionTextField renders as text jammed against its fill
  * with no visible boundary.
  *
- * Reuses the same tokens as the settings cards — [SectionDesign.CardShape] and
- * `cardColor()` — plus a hairline outline: the dialog's surface (now opaque
- * white) and the card fill (#F2F2F7) are close in luminance, and without the
- * outline the field edge is effectively invisible in dark mode.
+ * Uses [SectionDesign.CardShape] and the fill grey (`surfaceContainerLow`,
+ * #F2F2F7 in light), plus a hairline outline: the dialog's surface is opaque
+ * white, and without the outline the field edge is effectively invisible in
+ * dark mode.
  */
 @Composable
 private fun DialogTextFieldFrame(content: @Composable () -> Unit) {
     Surface(
         shape = SectionDesign.CardShape,
-        color = SectionDesign.cardColor(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         // Full-strength outlineVariant, not a faded one: anything dimmer reads
         // as no border at all in dark mode — verified on device.
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

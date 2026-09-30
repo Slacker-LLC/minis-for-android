@@ -998,7 +998,7 @@ internal fun ThinkingLevelPicker(
     // up-arrow, signalling "your setting is higher, this model caps here".
     val maxAvailable = availableLevels.lastOrNull { it != ThinkingLevel.OFF }
     val isClamped = current.isEnabled && maxAvailable != null && current.rank > maxAvailable.rank
-    val clampOrange = Color(0xFFFF9500)
+    val clampOrange = ChatColors.warn
     Row(
         modifier = Modifier
             .background(

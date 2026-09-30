@@ -247,7 +247,7 @@ internal fun WorkProcessRowView(
                                             Text(
                                                 text = "+" + change.addedLines,
                                                 style = MaterialTheme.typography.labelMedium,
-                                                color = Color(0xFF34C759),
+                                                color = ChatColors.ok,
                                             )
                                         }
                                         if (change.addedLines > 0 && change.removedLines > 0) {

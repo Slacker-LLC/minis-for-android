@@ -38,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
+import com.openminis.app.ui.components.SectionDesign
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * Settings → Shared Folders. Mirrors iOS SharedFoldersView.
@@ -77,8 +79,9 @@ fun SharedFoldersScreen(
             ) {
                 items(SharedFolderRegistry.entries, key = { it.id }) { folder ->
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = SectionDesign.cardColor(),
                         shape = RoundedCornerShape(12.dp),
+                        border = SectionDesign.cardBorder(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
@@ -94,11 +97,12 @@ fun SharedFoldersScreen(
 @Composable
 private fun InfoBanner() {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = SectionDesign.cardColor(),
+        shape = RoundedCornerShape(12.dp),
+        border = SectionDesign.cardBorder(),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .clip(RoundedCornerShape(12.dp)),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Text(
             text = stringResource(R.string.shared_folders_info_banner),
@@ -156,9 +160,9 @@ private fun SharedFolderRow(
 @Composable
 private fun AccessBadge(writable: Boolean) {
     val (textRes, color) = if (writable) {
-        R.string.mount_badge_rw to Color(0xFF34C759)
+        R.string.mount_badge_rw to ChatColors.ok
     } else {
-        R.string.mount_badge_readonly to Color(0xFFFF9500)
+        R.string.mount_badge_readonly to ChatColors.warn
     }
     Surface(
         shape = RoundedCornerShape(8.dp),

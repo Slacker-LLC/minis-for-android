@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.openminis.app.ui.theme.minisSheetColor
 import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
@@ -149,7 +150,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldDefaults
@@ -297,7 +297,7 @@ internal fun ToolDetailSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = null,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         contentWindowInsets = { WindowInsets(0) },
     ) {
         GlassSheetWindowBlur()
@@ -563,7 +563,7 @@ internal fun ToolDetailSheet(
                                                 text = linkified,
                                                 fontSize = 13.sp,
                                                 fontFamily = FontFamily.Monospace,
-                                                color = Color(0xFF34C759),  // iOS .green
+                                                color = ChatColors.ok,  // iOS .green
                                                 lineHeight = 18.sp,
                                             )
                                         }
@@ -590,14 +590,14 @@ internal fun ToolDetailSheet(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),  // iOS .green
+                                            color = ChatColors.ok,  // iOS .green
                                         )
                                         Text(
                                             text = sheetMonitor.formattedMem(),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),
+                                            color = ChatColors.ok,
                                         )
                                     }
                                 }
@@ -681,7 +681,7 @@ internal fun ToolDetailSheet(
                                     Icon(
                                         Icons.Default.EditNote,
                                         contentDescription = null,
-                                        tint = Color(0xFFFF9500),
+                                        tint = ChatColors.warn,
                                         modifier = Modifier.size(12.dp),
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -1064,7 +1064,7 @@ internal fun ToolDetailSheet(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(ChatColors.background)
+                                .background(minisSheetColor())
                                 .verticalScroll(outputScrollState)
                                 .padding(16.dp),
                         ) {
@@ -1108,7 +1108,7 @@ internal fun ToolDetailSheet(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(ChatColors.background)
+                                    .background(minisSheetColor())
                                     .verticalScroll(outputScrollState)
                                     .padding(16.dp),
                             ) {
@@ -1158,7 +1158,7 @@ internal fun ToolDetailSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ChatColors.background)
+                    .background(minisSheetColor())
                     .navigationBarsPadding(),
             ) {
                 HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
@@ -1276,7 +1276,7 @@ internal fun ToolDetailSheet(
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
-                                    .background(Color(0xFF34C759), CircleShape),
+                                    .background(ChatColors.ok, CircleShape),
                             )
                             Text(
                                 "Live",
@@ -1601,7 +1601,7 @@ private fun EditorCard(
                     Text(
                         text = if (isStreaming) stringResource(R.string.tool_size_received, sizeLabel) else "($sizeLabel)",
                         fontSize = 11.sp,
-                        color = if (isStreaming) Color(0xFFFF9500).copy(alpha = 0.8f) else sizeColor,
+                        color = if (isStreaming) ChatColors.warn.copy(alpha = 0.8f) else sizeColor,
                     )
                 }
             }

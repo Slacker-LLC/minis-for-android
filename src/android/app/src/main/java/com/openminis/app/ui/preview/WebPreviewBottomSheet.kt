@@ -65,6 +65,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.ui.theme.minisSheetColor
 
 /**
  * Immersive 90%-tall bottom sheet that hosts a [WebViewHolder] for a
@@ -145,7 +146,7 @@ fun WebPreviewBottomSheet(
         },
         sheetState = sheetState,
         dragHandle = null,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = minisSheetColor(),
         // Sheet is full-height so the scrim region above the sheet collapses
         // to nothing — avoids the grey scrim band above the sheet top.
         // Zero content insets so the sheet's surface paints all the way under
@@ -291,7 +292,7 @@ internal fun WebPreviewToolbar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(minisSheetColor())
             .let { if (topInsetPadding) it.windowInsetsPadding(WindowInsets.statusBars) else it }
             .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
