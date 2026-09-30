@@ -519,11 +519,7 @@ fun SessionListScreen(
     // [T-eta-character-cards] The session whose character is being chosen.
     var characterTarget by remember { mutableStateOf<ChatSessionEntity?>(null) }
     // [T-android-session-grouping] Group management dialogs.
-    var folderToRename by remember { mutableStateOf<FolderEntity?>(null) }
-    var folderToDissolve by remember { mutableStateOf<FolderEntity?>(null) }
-    // iOS "Delete Group & N Sessions" — pair carries the member count so the
-    // confirmation can restate the consequence.
-    var folderToDelete by remember { mutableStateOf<Pair<FolderEntity, Int>?>(null) }
+    val folderDialogs = rememberFolderDialogState()
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var editSession by remember { mutableStateOf<ChatSessionEntity?>(null) }
@@ -1007,8 +1003,8 @@ fun SessionListScreen(
                                             }
                                         },
                                         onTogglePin = { viewModel.toggleFolderPin(block.folder.id) },
-                                        onRename = { folderToRename = block.folder },
-                                        onDissolve = { folderToDissolve = block.folder },
+                                        onRename = { folderDialogs.rename = block.folder },
+                                        onDissolve = { folderDialogs.dissolve = block.folder },
                                         onNewChatInGroup = {
                                             // iOS newChatInFolder: auto-expand
                                             // first so the new session doesn't
@@ -1022,7 +1018,7 @@ fun SessionListScreen(
                                             if (sessionId != null) onNewChatGuarded(sessionId)
                                         },
                                         onDeleteWithSessions = {
-                                            folderToDelete = block.folder to block.totalCount
+                                            folderDialogs.delete = block.folder to block.totalCount
                                         },
                                     )
                                     }
@@ -1250,91 +1246,13 @@ fun SessionListScreen(
         )
     }
 
-    folderToRename?.let { folder ->
-        // Both fields are SEEDED from the current group. The rename always
-        // writes the description through, so an unseeded field would silently
-        // wipe a description the user never touched.
-        var name by remember(folder.id) { mutableStateOf(folder.name) }
-        var desc by remember(folder.id) { mutableStateOf(folder.description.orEmpty()) }
-        // A plain AlertDialog rather than MinisAlertDialog: this one needs two
-        // text fields, and MinisAlertDialog is a title/text/buttons component.
-        // Widening it for a single caller would push layout complexity into
-        // every other dialog in the app.
-        MinisAlertDialog(
-            onDismissRequest = { folderToRename = null },
-            title = { Text(stringResource(R.string.group_rename)) },
-            text = {
-                Column {
-                    // SectionTextField is built for settings screens: it draws
-                    // NO border and uses horizontal contentPadding = 0, because
-                    // there its parent (SettingsCardBlock) supplies both the
-                    // 16dp inset and the card surface that bounds it. A dialog
-                    // has neither, so used bare the glyphs sat flush against
-                    // the fill and the two fields read as one block. Wrap each
-                    // one the way a settings card would, plus a hairline border
-                    // so the input edge is visible on the dialog's own surface.
-                    DialogTextFieldFrame {
-                        SectionTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            placeholder = stringResource(R.string.group_name_hint),
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    DialogTextFieldFrame {
-                        SectionTextField(
-                            value = desc,
-                            onValueChange = { desc = it.take(FolderEntity.DESC_MAX_CHARS) },
-                            placeholder = stringResource(R.string.group_desc_hint),
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                MinisTextButton(onClick = {
-                    viewModel.renameFolder(folder.id, name, desc)
-                    folderToRename = null
-                }) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                MinisTextButton(onClick = { folderToRename = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
-
-    folderToDissolve?.let { folder ->
-        val count = folderMemberCounts[folder.id] ?: 0
-        MinisAlertDialog(
-            onDismissRequest = { folderToDissolve = null },
-            title = stringResource(R.string.group_dissolve_confirm_title),
-            // Spells out that nothing is deleted — dissolve is deliberately NOT
-            // styled destructive, because it touches no user data.
-            text = stringResource(R.string.group_dissolve_confirm_message, count),
-            confirmText = stringResource(R.string.group_dissolve),
-            onConfirm = {
-                viewModel.dissolveFolder(folder.id)
-                folderToDissolve = null
-            },
-        )
-    }
-
-    // iOS "Delete Group & N Sessions" confirmation — the one destructive
-    // folder action, so isDestructive here where dissolve deliberately isn't.
-    folderToDelete?.let { (folder, count) ->
-        MinisAlertDialog(
-            onDismissRequest = { folderToDelete = null },
-            title = stringResource(R.string.group_delete_confirm_title),
-            text = stringResource(R.string.group_delete_confirm_message, count),
-            confirmText = stringResource(R.string.delete),
-            isDestructive = true,
-            onConfirm = {
-                viewModel.deleteFolderWithSessions(folder.id)
-                folderToDelete = null
-            },
-        )
-    }
+    FolderActionDialogs(
+        state = folderDialogs,
+        memberCounts = folderMemberCounts,
+        onRename = { id, name, desc -> viewModel.renameFolder(id, name, desc) },
+        onDissolve = { viewModel.dissolveFolder(it) },
+        onDeleteWithSessions = { viewModel.deleteFolderWithSessions(it) },
+    )
 
     // Edit Title & Category sheet (matching iOS SessionEditSheet)
     editSession?.let { session ->
@@ -2635,41 +2553,6 @@ private fun SessionRow(
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.outline,
         )
-    }
-}
-
-/**
- * Card frame for a [SectionTextField] used inside a dialog.
- *
- * The settings screens get this for free from `SettingsCardBlock`: it supplies
- * the 16dp horizontal inset that SectionTextField deliberately omits (its
- * contentPadding is horizontal = 0 so glyphs align with sibling section rows —
- * T352) and the card surface that gives the input an edge. A dialog has no such
- * parent, so a bare SectionTextField renders as text jammed against its fill
- * with no visible boundary.
- *
- * Reuses the same tokens as the settings cards — [SectionDesign.CardShape] and
- * `cardColor()` — so a dialog input reads as the same control as the one on a
- * settings screen, plus a hairline outline: the dialog's surface sits close in
- * luminance to the card fill, and without the outline the field edge is
- * effectively invisible in dark mode.
- */
-@Composable
-private fun DialogTextFieldFrame(content: @Composable () -> Unit) {
-    Surface(
-        shape = SectionDesign.CardShape,
-        color = SectionDesign.cardColor(),
-        // Full-strength outlineVariant, not a faded one: the dialog's surface
-        // and the card fill are close in luminance (both are surfaceContainer
-        // shades), so anything dimmer than this reads as no border at all in
-        // dark mode — verified on device.
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Box(modifier = Modifier.padding(horizontal = 12.dp)) { content() }
     }
 }
 

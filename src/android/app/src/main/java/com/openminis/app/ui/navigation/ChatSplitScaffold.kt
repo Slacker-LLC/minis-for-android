@@ -951,6 +951,16 @@ private fun ChatPhoneDrawerScaffold(
 ) {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    // The drawer shares the session list's view model (groups, pins, multi-select).
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val sessionListViewModel: com.openminis.app.ui.sessions.SessionListViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel(
+            factory = com.openminis.app.ui.sessions.SessionListViewModel.factory(
+                chatRepository,
+                providerRepository,
+                appContext,
+            ),
+        )
 
     var currentSessionId by rememberSaveable(initialSessionId) {
         mutableStateOf(initialSessionId ?: newDraftSessionId())
@@ -987,6 +997,7 @@ private fun ChatPhoneDrawerScaffold(
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = true,
+        scrimColor = com.openminis.app.ui.theme.minisOverlayScrim(ChatColors.isDark),
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = ChatColors.background,
@@ -994,6 +1005,7 @@ private fun ChatPhoneDrawerScaffold(
                 modifier = Modifier.width(drawerWidth),
             ) {
                 SessionDrawerContent(
+                    viewModel = sessionListViewModel,
                     chatRepository = chatRepository,
                     selectedSessionId = currentSessionId,
                     onSelectSession = { sid ->
