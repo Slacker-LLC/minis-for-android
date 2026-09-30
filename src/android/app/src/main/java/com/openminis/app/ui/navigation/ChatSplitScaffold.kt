@@ -1034,7 +1034,11 @@ private fun ChatPhoneDrawerScaffold(
                     },
                     onOpenStorage = {
                         scope.launch { drawerState.close() }
-                        navController.safeNavigate(Routes.STORAGE)
+                        // The drawer's file entry opens the settings "Files" category (storage, shared
+                        // folders, mounts, backup) instead of one of its leaf screens.
+                        navController.safeNavigate(
+                            Routes.settingsCategory(com.openminis.app.ui.settings.SettingsCategory.FILES.key),
+                        )
                     },
                 )
             }

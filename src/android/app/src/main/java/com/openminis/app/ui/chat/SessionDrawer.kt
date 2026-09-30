@@ -247,7 +247,7 @@ fun SessionDrawerContent(
                 )
                 DrawerToolRow(
                     icon = Icons.Outlined.Folder,
-                    title = stringResource(R.string.drawer_storage),
+                    title = stringResource(R.string.settings_section_files),
                     onClick = onOpenStorage,
                 )
             }

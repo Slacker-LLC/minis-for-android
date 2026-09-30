@@ -67,7 +67,8 @@ enum class SettingsCategory(val key: String, val titleRes: Int, val subtitleRes:
     MODELS("models", R.string.settings_section_llm_providers, R.string.settings_category_models_sub),
     ASSISTANT("assistant", R.string.settings_section_agent_runtime, R.string.settings_category_agent_sub),
     APPEARANCE("appearance", R.string.settings_section_appearance, R.string.settings_category_appearance_sub),
-    RUNTIME("runtime", R.string.settings_section_runtime_storage, R.string.settings_category_runtime_sub),
+    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub),
+    RUNTIME("runtime", R.string.settings_section_runtime, R.string.settings_category_runtime_sub),
     SYSTEM("system", R.string.settings_section_system, R.string.settings_category_system_sub),
     ABOUT("about", R.string.settings_section_diagnostics, R.string.settings_category_about_sub),
     ;
@@ -82,7 +83,8 @@ fun SettingsCategory.icon(): ImageVector = when (this) {
     SettingsCategory.MODELS -> Icons.Outlined.BarChart
     SettingsCategory.ASSISTANT -> Icons.Outlined.AutoAwesome
     SettingsCategory.APPEARANCE -> Icons.Outlined.Palette
-    SettingsCategory.RUNTIME -> Icons.Outlined.Inventory2
+    SettingsCategory.FILES -> Icons.Outlined.Folder
+    SettingsCategory.RUNTIME -> Icons.Outlined.Terminal
     SettingsCategory.SYSTEM -> Icons.Outlined.Build
     SettingsCategory.ABOUT -> Icons.Outlined.Info
 }
@@ -91,6 +93,7 @@ fun SettingsCategory.iconColor(): Color = when (this) {
     SettingsCategory.MODELS -> Color(0xFF007AFF)
     SettingsCategory.ASSISTANT -> Color(0xFFAF52DE)
     SettingsCategory.APPEARANCE -> Color(0xFF5856D6)
+    SettingsCategory.FILES -> Color(0xFF007AFF)
     SettingsCategory.RUNTIME -> Color(0xFF34C759)
     SettingsCategory.SYSTEM -> Color(0xFFFF9F0A)
     SettingsCategory.ABOUT -> Color(0xFF007AFF)
@@ -285,23 +288,9 @@ fun SettingsCategoryScreen(
                 )
             }
 
-            SettingsCategory.RUNTIME -> SettingsSection(
-                header = stringResource(R.string.settings_section_runtime_storage),
+            SettingsCategory.FILES -> SettingsSection(
+                header = stringResource(R.string.settings_section_files),
             ) {
-                SettingsRow(
-                    icon = Icons.Outlined.Terminal,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.terminal_title),
-                    subtitle = stringResource(R.string.settings_terminal_subtitle),
-                    onClick = onTerminalClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Key,
-                    iconColor = Color(0xFF5856D6),
-                    title = stringResource(R.string.settings_env_vars),
-                    subtitle = stringResource(R.string.settings_env_vars_subtitle),
-                    onClick = onEnvVarsClick,
-                )
                 SettingsRow(
                     icon = Icons.Outlined.Inventory2,
                     iconColor = Color(0xFF007AFF),
@@ -329,6 +318,26 @@ fun SettingsCategoryScreen(
                     title = stringResource(R.string.settings_backup_restore),
                     subtitle = stringResource(R.string.settings_backup_restore_subtitle),
                     onClick = onBackupClick,
+                    showDivider = false,
+                )
+            }
+
+            SettingsCategory.RUNTIME -> SettingsSection(
+                header = stringResource(R.string.settings_section_runtime),
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.Terminal,
+                    iconColor = Color(0xFF34C759),
+                    title = stringResource(R.string.terminal_title),
+                    subtitle = stringResource(R.string.settings_terminal_subtitle),
+                    onClick = onTerminalClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Key,
+                    iconColor = Color(0xFF5856D6),
+                    title = stringResource(R.string.settings_env_vars),
+                    subtitle = stringResource(R.string.settings_env_vars_subtitle),
+                    onClick = onEnvVarsClick,
                     showDivider = false,
                 )
             }

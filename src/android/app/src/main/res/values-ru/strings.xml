@@ -1725,7 +1725,7 @@
 
     <string name="system_enhance_root_hidden">su не виден этому приложению; установлен %1$s — разрешите это приложение в нём (или отключите скрытие su)</string>
     <string name="settings_terminal_subtitle">Открыть оболочку Ubuntu (запускает среду Linux)</string>
-    <string name="settings_section_runtime_storage">Среда и хранилище</string>
+    <string name="settings_section_runtime">Среда выполнения</string>
     <string name="settings_section_system">Система и разрешения</string>
     <string name="settings_section_diagnostics">Диагностика и информация</string>
     <string name="settings_auto_compact">Автосжатие контекста</string>
@@ -1745,7 +1745,9 @@
     <string name="settings_category_models_sub">Провайдеры, слоты моделей, расход и автосжатие</string>
     <string name="settings_category_agent_sub">Навыки, персонажи, персона, промпт, память и MCP</string>
     <string name="settings_category_appearance_sub">Внешний вид и настольный питомец</string>
-    <string name="settings_category_runtime_sub">Терминал, окружение, хранилище и монтирования</string>
+    <string name="settings_category_runtime_sub">Терминал и переменные окружения</string>
+    <string name="settings_section_files">Файлы</string>
+    <string name="settings_category_files_sub">Хранилище, общие папки, монтирование и резервные копии</string>
     <string name="settings_category_system_sub">Root, модуль, разрешения и фон</string>
     <string name="settings_category_about_sub">Журналы, информация и отзывы</string>
     <string name="settings_permissions_category_sub">Специальные возможности, оверлей и доступ к уведомлениям</string>
@@ -1982,7 +1984,6 @@
     <string name="chat_feedback_down">Отмечено как бесполезное 👎</string>
     <string name="drawer_search_chats">Поиск бесед…</string>
     <string name="drawer_terminal">Терминал</string>
-    <string name="drawer_storage">Хранилище и песочница</string>
     <string name="drawer_recent">Недавние</string>
     <string name="drawer_no_search_match">Совпадений не найдено</string>
     <string name="drawer_no_history">Бесед пока нет</string>

@@ -1379,7 +1379,7 @@
 
     <string name="system_enhance_root_hidden">su n\'est pas visible pour cette application ; %1$s est installé – autorise cette application dans sa liste (ou désactive le masquage de su)</string>
     <string name="settings_terminal_subtitle">Ouvrir le shell Ubuntu (démarre l\'exécution Linux)</string>
-    <string name="settings_section_runtime_storage">Exécution et stockage</string>
+    <string name="settings_section_runtime">Exécution</string>
     <string name="settings_section_system">Système et autorisations</string>
     <string name="settings_section_diagnostics">Diagnostic et à propos</string>
     <string name="settings_auto_compact">Compresser le contexte automatiquement</string>
@@ -1399,7 +1399,9 @@
     <string name="settings_category_models_sub">Fournisseurs, emplacements de modèle, usage et compression auto</string>
     <string name="settings_category_agent_sub">Compétences, personnages, persona, prompt, mémoire et MCP</string>
     <string name="settings_category_appearance_sub">Apparence et compagnon de bureau</string>
-    <string name="settings_category_runtime_sub">Terminal, environnement, stockage et montages</string>
+    <string name="settings_category_runtime_sub">Terminal et variables d\'environnement</string>
+    <string name="settings_section_files">Fichiers</string>
+    <string name="settings_category_files_sub">Stockage, dossiers partagés, montages et sauvegarde</string>
     <string name="settings_category_system_sub">Root, module, autorisations et arrière-plan</string>
     <string name="settings_category_about_sub">Journaux, à propos et retours</string>
     <string name="settings_permissions_category_sub">Accessibilité, superposition et accès aux notifications</string>
@@ -1621,7 +1623,6 @@
     <string name="chat_feedback_down">Marqué comme peu utile 👎</string>
     <string name="drawer_search_chats">Rechercher des conversations…</string>
     <string name="drawer_terminal">Terminal</string>
-    <string name="drawer_storage">Stockage et bac à sable</string>
     <string name="drawer_recent">Récent</string>
     <string name="drawer_no_search_match">Aucune conversation correspondante</string>
     <string name="drawer_no_history">Aucune conversation</string>

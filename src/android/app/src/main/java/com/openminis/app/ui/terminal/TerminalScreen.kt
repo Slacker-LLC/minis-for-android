@@ -64,16 +64,49 @@ import com.openminis.app.ui.terminal.canvas.TerminalNativeViewCompose
 import com.openminis.app.ui.terminal.canvas.TerminalInputView
 import com.openminis.app.ui.terminal.canvas.rememberTerminalInputController
 import com.openminis.app.ui.terminal.emulator.TerminalEmulator
+import com.openminis.app.ui.terminal.emulator.TerminalPalette
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.launch
 
-// iOS-matched palette
-private val TerminalBg = Color(0xFF000000)
-private val TerminalFg = Color(0xFFD4D4D4)
-private val TerminalGreen = Color(0xFF34C759)
-private val AccessoryBg = Color(0xFF1F1F1F)
-private val AccButtonBg = Color(0xFF404040)
-private val AccButtonActive = Color(0xFF007AFF)
-private val TopButtonBg = Color(0xFF2C2C2E)
+// The terminal follows the app theme (docs/design/UI-DESIGN-LANGUAGE.md §3): dark keeps the
+// original iOS-matched palette, light is white page + black text. The emulator's own
+// default colours and ANSI palette switch with TerminalPalette.light (see TerminalTypes.kt).
+private class TerminalChrome(
+    val bg: Color,
+    val fg: Color,
+    val accent: Color,
+    val accessoryBg: Color,
+    val keyBg: Color,
+    val keyFg: Color,
+    val keyActiveBg: Color,
+    val topButtonBg: Color,
+)
+
+private val DarkTerminalChrome = TerminalChrome(
+    bg = Color(0xFF000000),
+    fg = Color(0xFFD4D4D4),
+    accent = Color(0xFF34C759),
+    accessoryBg = Color(0xFF1F1F1F),
+    keyBg = Color(0xFF404040),
+    keyFg = Color(0xFF34C759),
+    keyActiveBg = Color(0xFF007AFF),
+    topButtonBg = Color(0xFF2C2C2E),
+)
+
+private val LightTerminalChrome = TerminalChrome(
+    bg = Color(0xFFFFFFFF),
+    fg = Color(0xFF000000),
+    accent = Color(0xFF0068D6),
+    accessoryBg = Color(0xFFF2F2F7),
+    keyBg = Color(0xFFFFFFFF),
+    keyFg = Color(0xFF000000),
+    keyActiveBg = Color(0xFF0068D6),
+    topButtonBg = Color(0xFFF2F2F7),
+)
+
+@Composable
+private fun terminalChrome(): TerminalChrome =
+    if (ChatColors.isDark) DarkTerminalChrome else LightTerminalChrome
 
 @Composable
 fun TerminalScreen(
@@ -175,7 +208,12 @@ fun TerminalScreen(
     // imePadding does the right thing without any custom tracking.
     val accessoryBarHeightDp = 40.dp
 
-    Box(modifier = Modifier.fillMaxSize().background(TerminalBg)) {
+    val chrome = terminalChrome()
+    // Idempotent global: the emulator resolves default/ANSI colours at draw time, so
+    // flipping this recolours existing scrollback as well as new output.
+    TerminalPalette.light = !ChatColors.isDark
+
+    Box(modifier = Modifier.fillMaxSize().background(chrome.bg)) {
         // Main content: top bar + canvas. imePadding() lifts the canvas
         // above the keyboard so it's never covered.
         Column(
@@ -227,7 +265,7 @@ fun TerminalScreen(
                 .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .height(52.dp)
-                .background(TerminalBg),
+                .background(chrome.bg),
         ) {
             TerminalTopBar(
                 onClose = {
@@ -303,23 +341,24 @@ private fun TerminalTopBar(
     onClose: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val chrome = terminalChrome()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(TerminalBg)
+            .background(chrome.bg)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CircularIconButton(
             icon = Icons.Default.Close,
             contentDescription = stringResource(R.string.common_close),
-            tint = TerminalFg,
+            tint = chrome.fg,
             onClick = onClose,
         )
         Spacer(modifier = Modifier.weight(1f))
         Text(
             stringResource(R.string.terminal_title),
-            color = TerminalFg,
+            color = chrome.fg,
             style = TextStyle(
                 fontFamily = JetBrainsMonoFontFamily,
                 fontSize = 16.sp,
@@ -329,7 +368,7 @@ private fun TerminalTopBar(
         CircularIconButton(
             icon = Icons.Default.Brush,
             contentDescription = stringResource(R.string.terminal_clear),
-            tint = TerminalGreen,
+            tint = chrome.accent,
             onClick = onClear,
         )
     }
@@ -346,7 +385,7 @@ private fun CircularIconButton(
         modifier = Modifier
             .size(36.dp)
             .clip(CircleShape)
-            .background(TopButtonBg)
+            .background(terminalChrome().topButtonBg)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -376,7 +415,7 @@ private fun KeyboardAccessoryBar(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(AccessoryBg),
+            .background(terminalChrome().accessoryBg),
     ) {
         Row(
             modifier = Modifier
@@ -418,8 +457,9 @@ private fun QuickCommandButton(
     isActive: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val bg = if (isActive) AccButtonActive else AccButtonBg
-    val fg = if (isActive) Color.White else TerminalGreen
+    val chrome = terminalChrome()
+    val bg = if (isActive) chrome.keyActiveBg else chrome.keyBg
+    val fg = if (isActive) Color.White else chrome.keyFg
     Row(
         modifier = Modifier
             .height(28.dp)

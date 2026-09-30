@@ -11,7 +11,31 @@ sealed class TerminalColor {
 
 /** xterm-256 palette and default fg/bg, matching iOS TerminalPalette. */
 object TerminalPalette {
+    /**
+     * Light theme switch (docs/design/UI-DESIGN-LANGUAGE.md §3). When true the default colours are
+     * black on white and ANSI colours 0-15 use darker variants so "white" / "bright yellow" output
+     * written for dark terminals stays readable. Colours are resolved at draw time.
+     */
+    @Volatile
+    var light: Boolean = false
+
     private val palette: Array<Color> = buildPalette()
+
+    // ANSI 0-15 for the light theme; each is >= 4.5:1 on white (TerminalPaletteTest).
+    private val lightAnsi: Array<Color> = arrayOf(
+        Color(0, 0, 0), Color(178, 24, 24), Color(20, 116, 20), Color(125, 95, 0),
+        Color(0, 0, 205), Color(150, 0, 150), Color(0, 110, 120), Color(85, 85, 85),
+        Color(90, 90, 90), Color(200, 30, 30), Color(20, 120, 20), Color(130, 100, 0),
+        Color(30, 55, 225), Color(170, 0, 170), Color(0, 115, 130), Color(0, 0, 0),
+    )
+
+    internal fun ansiForTest(index: Int, light: Boolean): Color =
+        if (light) lightAnsi[index] else palette[index]
+
+    private fun indexed(index: Int): Color {
+        val i = index.coerceIn(0, 255)
+        return if (light && i < 16) lightAnsi[i] else palette[i]
+    }
 
     private fun buildPalette(): Array<Color> {
         val p = Array(256) { Color.Black }
@@ -49,14 +73,16 @@ object TerminalPalette {
         return p
     }
 
-    val defaultForeground: Color = Color(204, 204, 204)
-    val defaultBackground: Color = Color.Black
+    val defaultForeground: Color
+        get() = if (light) Color.Black else Color(204, 204, 204)
+    val defaultBackground: Color
+        get() = if (light) Color.White else Color.Black
 
     fun resolve(color: TerminalColor, isForeground: Boolean, bold: Boolean = false): Color = when (color) {
         is TerminalColor.Default -> if (isForeground) defaultForeground else defaultBackground
         is TerminalColor.Indexed -> {
-            if (bold && isForeground && color.index < 8) palette[color.index + 8]
-            else palette[color.index.coerceIn(0, 255)]
+            if (bold && isForeground && color.index < 8) indexed(color.index + 8)
+            else indexed(color.index)
         }
         is TerminalColor.Rgb -> Color(color.r, color.g, color.b)
     }

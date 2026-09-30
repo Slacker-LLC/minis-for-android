@@ -1493,7 +1493,7 @@
 
     <string name="system_enhance_root_hidden">su がこのアプリから見えません。%1$s が入っています——そのアプリ一覧で本アプリを許可してください（su の隠蔽をオフにしても可）</string>
     <string name="settings_terminal_subtitle">Ubuntu Shell を開く（Linux 実行環境を起動します）</string>
-    <string name="settings_section_runtime_storage">ランタイムとストレージ</string>
+    <string name="settings_section_runtime">ランタイム</string>
     <string name="settings_section_system">システムと権限</string>
     <string name="settings_section_diagnostics">診断と情報</string>
     <string name="settings_auto_compact">コンテキストの自動圧縮</string>
@@ -1513,7 +1513,9 @@
     <string name="settings_category_models_sub">プロバイダー、モデルスロット、使用量、自動圧縮</string>
     <string name="settings_category_agent_sub">スキル、キャラクター、人格、プロンプト、記憶、MCP</string>
     <string name="settings_category_appearance_sub">外観とデスクトップペット</string>
-    <string name="settings_category_runtime_sub">ターミナル、環境変数、ストレージとマウント</string>
+    <string name="settings_category_runtime_sub">ターミナルと環境変数</string>
+    <string name="settings_section_files">ファイル</string>
+    <string name="settings_category_files_sub">ストレージ、共有フォルダ、マウント、バックアップ</string>
     <string name="settings_category_system_sub">Root、モジュール、権限、バックグラウンド</string>
     <string name="settings_category_about_sub">ログ、情報、フィードバック</string>
     <string name="settings_permissions_category_sub">アクセシビリティ、オーバーレイ、通知アクセス</string>
@@ -1727,7 +1729,6 @@
     <string name="chat_feedback_down">役に立たないと記録しました 👎</string>
     <string name="drawer_search_chats">チャットを検索…</string>
     <string name="drawer_terminal">ターミナル</string>
-    <string name="drawer_storage">ストレージとサンドボックス</string>
     <string name="drawer_recent">最近</string>
     <string name="drawer_no_search_match">一致する会話がありません</string>
     <string name="drawer_no_history">まだ会話がありません</string>
