@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.browser.BrowserTabPool
 import com.openminis.app.data.AssistantHomePrefs
+import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.settings.SettingsSwitchRow
 import com.openminis.app.ui.theme.ChatColors
 import java.time.LocalTime
@@ -324,11 +325,8 @@ fun AssistantHomeScreen(
         }
     }
 
-    androidx.compose.runtime.LaunchedEffect(showBrowser) {
-        if (showBrowser) {
-            com.openminis.app.ui.browser.BrowserHolder.open(browserTabPool)
-            showBrowser = false
-        }
+    if (showBrowser) {
+        BrowserSheet(tabPool = browserTabPool, onDismiss = { showBrowser = false })
     }
 
     memorySnapshot?.let { snapshot ->

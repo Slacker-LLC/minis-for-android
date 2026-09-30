@@ -1274,18 +1274,20 @@ fun SessionListScreen(
         )
     }
 
-    // The browser and its settings are pages on the nav stack, not popups.
-    androidx.compose.runtime.LaunchedEffect(showBrowserSheet) {
-        if (showBrowserSheet) {
-            com.openminis.app.ui.browser.BrowserHolder.open(browserTabPool)
-            showBrowserSheet = false
-        }
+    // Browser sheet
+    if (showBrowserSheet) {
+        com.openminis.app.ui.browser.BrowserSheet(
+            tabPool = browserTabPool,
+            onDismiss = { showBrowserSheet = false },
+        )
     }
-    androidx.compose.runtime.LaunchedEffect(showBrowserSettings) {
-        if (showBrowserSettings) {
-            com.openminis.app.ui.browser.BrowserHolder.open(browserTabPool, settings = true)
-            showBrowserSettings = false
-        }
+
+    // Browser Settings sheet
+    if (showBrowserSettings) {
+        com.openminis.app.ui.browser.BrowserSettingsSheet(
+            tabPool = browserTabPool,
+            onDismiss = { showBrowserSettings = false },
+        )
     }
 }
 

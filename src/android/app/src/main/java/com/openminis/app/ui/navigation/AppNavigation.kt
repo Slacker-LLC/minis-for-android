@@ -111,8 +111,6 @@ object Routes {
     /** [T-android-provider-voice] Read-only shadow Voice Service detail. */
     const val SHADOW_VOICE_DETAIL = "voice_service/{instanceId}"
     const val MODELS = "models"
-    const val BROWSER = "browser"
-    const val BROWSER_SETTINGS = "browser_settings"
     const val THINKING_RULES = "thinking_rules"
     const val MODEL_SLOT_DETAIL = "model_slot/{slot}"
     fun modelSlotDetail(slot: ModelSlot) = "model_slot/${slot.name}"
@@ -500,13 +498,6 @@ fun AppNavigation(
         // breaker) is replaced — which is exactly what the user asked for.
         assistantHomeStartsApp -> Routes.ASSISTANT_HOME
         else -> Routes.SESSION_LIST
-    }
-    // The browser is a page on the nav stack; screens that own a tab pool park it in BrowserHolder.
-    androidx.compose.runtime.DisposableEffect(navController) {
-        com.openminis.app.ui.browser.BrowserHolder.opener = { settings ->
-            navController.safeNavigate(if (settings) Routes.BROWSER_SETTINGS else Routes.BROWSER)
-        }
-        onDispose { com.openminis.app.ui.browser.BrowserHolder.opener = null }
     }
     NavHost(
         navController = navController,
@@ -903,31 +894,6 @@ fun AppNavigation(
                     navController.safeNavigate(Routes.shadowVoiceDetail(id))
                 },
             )
-        }
-
-        composable(Routes.BROWSER) {
-            val pool = com.openminis.app.ui.browser.BrowserHolder.tabPool
-            if (pool == null) {
-                androidx.compose.runtime.LaunchedEffect(Unit) { navController.safePopBackStack() }
-            } else {
-                com.openminis.app.ui.browser.BrowserScreen(
-                    tabPool = pool,
-                    onDismiss = { navController.safePopBackStack() },
-                    onOpenSettings = { navController.safeNavigate(Routes.BROWSER_SETTINGS) },
-                )
-            }
-        }
-
-        composable(Routes.BROWSER_SETTINGS) {
-            val pool = com.openminis.app.ui.browser.BrowserHolder.tabPool
-            if (pool == null) {
-                androidx.compose.runtime.LaunchedEffect(Unit) { navController.safePopBackStack() }
-            } else {
-                com.openminis.app.ui.browser.BrowserSettingsScreen(
-                    tabPool = pool,
-                    onDismiss = { navController.safePopBackStack() },
-                )
-            }
         }
 
         composable(Routes.THINKING_RULES) {
