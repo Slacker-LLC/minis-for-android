@@ -115,25 +115,33 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCategory: (SettingsCategory) -> Unit,
 ) {
+    val readiness = rememberReadiness()
     SettingsScaffold(
         title = stringResource(R.string.settings_title),
         onBack = onBack,
     ) {
-        // [T-android-settings-hierarchy] Level 1 lists subjects, not screens: one row per
-        // category, each opening the level-2 page that owns those settings. The leaf screens
-        // stay one tap further. Before this the page carried twenty-six rows under nine headers,
-        // and four unrelated things (root and module, permissions, the assistant role, background
-        // access) shared a single "system" card with no place to grow.
-        SettingsSection {
-            SettingsCategory.entries.forEachIndexed { index, category ->
-                SettingsRow(
-                    icon = category.icon(),
-                    iconColor = category.iconColor(),
-                    title = stringResource(category.titleRes),
-                    subtitle = stringResource(category.subtitleRes),
-                    onClick = { onOpenCategory(category) },
-                    showDivider = index != SettingsCategory.entries.lastIndex,
-                )
+        // Level 1 lists subjects, not screens (design: Settings home): a readiness banner while
+        // something needs attention, then the seven categories in two cards. Terminal, files and
+        // scheduled tasks are daily entries in the session drawer, not settings.
+        ReadinessBanner(items = readiness, onClick = { onOpenCategory(SettingsCategory.SYSTEM) })
+        SettingsCategory.rootGroups.forEachIndexed { groupIndex, group ->
+            SettingsSection(
+                footer = if (groupIndex == SettingsCategory.rootGroups.lastIndex) {
+                    stringResource(R.string.settings_root_footer)
+                } else {
+                    null
+                },
+            ) {
+                group.forEachIndexed { index, category ->
+                    SettingsRow(
+                        icon = category.icon(),
+                        iconColor = category.iconColor(),
+                        title = stringResource(category.titleRes),
+                        subtitle = stringResource(category.subtitleRes),
+                        onClick = { onOpenCategory(category) },
+                        showDivider = index != group.lastIndex,
+                    )
+                }
             }
         }
     }

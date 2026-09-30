@@ -51,6 +51,7 @@ import com.openminis.app.ui.sandbox.FilePreviewScreen
 import com.openminis.app.ui.sandbox.RootfsManagementScreen
 import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
+import com.openminis.app.ui.settings.ChatInputSettingsScreen
 import com.openminis.app.ui.settings.SettingsCategory
 import com.openminis.app.ui.settings.SettingsCategoryScreen
 import com.openminis.app.ui.settings.SettingsScreen
@@ -631,6 +632,10 @@ fun AppNavigation(
             val category = SettingsCategory.parse(backStackEntry.arguments?.getString("category"))
             if (category == null) {
                 navController.safePopBackStack()
+            } else if (category == SettingsCategory.CHAT) {
+                ChatInputSettingsScreen(onBack = { navController.safePopBackStack() })
+            } else if (category == SettingsCategory.APPEARANCE) {
+                AppearanceScreen(onBack = { navController.safePopBackStack() })
             } else {
                 SettingsCategoryScreen(
                     category = category,
@@ -647,6 +652,13 @@ fun AppNavigation(
                     onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
                     onRootfsClick = { navController.safeNavigate(Routes.STORAGE) },
+                    onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
+                    // FILE_BROWSER needs a prepared view-model, so "Browse files" opens the Files
+                    // hub (the same page as the drawer's Files entry) until that page is reworked.
+                    onFileBrowserClick = {
+                        navController.safeNavigate(Routes.settingsCategory(SettingsCategory.FILES.key))
+                    },
+                    onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
                     onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
                     onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
