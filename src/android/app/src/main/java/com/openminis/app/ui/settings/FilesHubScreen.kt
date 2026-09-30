@@ -70,6 +70,8 @@ fun FilesHubScreen(
     mountedFoldersStore: MountedFoldersStore,
     onBack: () -> Unit,
     onOpenShared: () -> Unit,
+    onOpenSkills: () -> Unit,
+    onOpenMemory: () -> Unit,
     onOpenMounts: () -> Unit,
     onOpenSessionFiles: () -> Unit,
 ) {
@@ -90,6 +92,20 @@ fun FilesHubScreen(
                 title = stringResource(R.string.files_shared_title),
                 subtitle = "/var/minis/shared",
                 onClick = onOpenShared,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Folder,
+                iconColor = Color(0xFFAF52DE),
+                title = stringResource(R.string.settings_skills),
+                subtitle = "/var/minis/skills",
+                onClick = onOpenSkills,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Folder,
+                iconColor = Color(0xFFFF9F0A),
+                title = stringResource(R.string.settings_memory),
+                subtitle = "/var/minis/memory",
+                onClick = onOpenMemory,
                 showDivider = false,
             )
         }

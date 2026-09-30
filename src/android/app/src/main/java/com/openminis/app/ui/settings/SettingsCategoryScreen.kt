@@ -70,8 +70,8 @@ import com.openminis.app.ui.theme.minisSheetColor
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
  *
- * The Settings home lists seven categories in the order of the design board (Models, Agent, Chat &
- * input, Appearance, Runtime environment, System & permissions, Data & about). Files are not a
+ * The Settings home lists the categories in the order of the design board (Models, Agent, Chat &
+ * input, Appearance), then Files, Runtime environment, System & permissions, Data & about. Files are not a
  * settings category any more: they are a daily entry in the session drawer. [FILES] stays as a
  * hidden page only because that drawer entry still opens it.
  */
@@ -88,14 +88,14 @@ enum class SettingsCategory(
     RUNTIME("runtime", R.string.settings_cat_runtime, R.string.settings_cat_runtime_sub2),
     SYSTEM("system", R.string.settings_section_system, R.string.settings_cat_system_sub2),
     DATA("data", R.string.settings_cat_data, R.string.settings_cat_data_sub),
-    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub, inRoot = false),
+    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub),
     ;
 
     companion object {
         /** Cards on the Settings home, top to bottom, as the design groups them. */
         val rootGroups: List<List<SettingsCategory>> = listOf(
             listOf(MODELS, AGENT, CHAT, APPEARANCE),
-            listOf(RUNTIME, SYSTEM, DATA),
+            listOf(FILES, RUNTIME, SYSTEM, DATA),
         )
 
         /** Also accepts the keys the six- and seven-category layouts used to publish. */

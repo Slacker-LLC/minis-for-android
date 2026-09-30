@@ -85,6 +85,15 @@ import com.openminis.app.ui.components.groupedCard
  * and footer text, the choice rows and the hand-written rows all already sat at 16, so 14 was the
  * single odd value making a row's text and the header above it differ by 2dp.
  */
+/**
+ * The page colour behind settings cards: a light grey in light mode (cards are white and read as
+ * raised), black in dark mode (cards are the raised dark grey).
+ */
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun settingsPageBackground(): Color =
+    if (ChatColors.isDark) MaterialTheme.colorScheme.background else Color(0xFFF2F2F7)
+
 object SettingsMetrics {
     /** Distance from the screen edge to a section card. */
     val CardMarginHorizontal = 16.dp
@@ -133,6 +142,7 @@ fun MinisNavBar(
     navigation: (@Composable () -> Unit)?,
     actions: (@Composable () -> Unit)?,
     inlineTitle: Boolean,
+    background: Color = MaterialTheme.colorScheme.background,
 ) = MinisNavBar(
     titleSlot = if (inlineTitle) {
         {
@@ -151,6 +161,7 @@ fun MinisNavBar(
     backLabel = backLabel,
     navigation = navigation,
     actions = actions,
+    background = background,
 )
 
 /** Same bar with a composable title (two-line titles, tabs...). A null [titleSlot] leaves it empty. */
@@ -161,9 +172,10 @@ fun MinisNavBar(
     backLabel: String,
     navigation: (@Composable () -> Unit)?,
     actions: (@Composable () -> Unit)?,
+    background: Color = MaterialTheme.colorScheme.background,
 ) {
     val inlineTitle = titleSlot != null
-    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+    Column(modifier = Modifier.fillMaxWidth().background(background).statusBarsPadding()) {
         Box(modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Row(modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 when {
@@ -179,12 +191,13 @@ fun MinisNavBar(
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             contentDescription = stringResource(R.string.back),
-                            tint = MaterialTheme.colorScheme.primary,
+                            // Neutral, not the accent: the accent is for things to act on, not for chrome.
+                            tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(30.dp),
                         )
                         Text(
                             backLabel,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -262,11 +275,12 @@ fun SettingsScaffold(
                 navigation = navigation,
                 actions = actions,
                 inlineTitle = !largeTitle,
+                background = settingsPageBackground(),
             )
         },
         floatingActionButton = { floatingActionButton?.invoke() },
         bottomBar = { bottomBar?.invoke() },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = settingsPageBackground(),
     ) { padding ->
         // T183: imePadding() shrinks the scroll container by the IME's
         // height while the keyboard is up, giving Modifier.bringIntoView()
@@ -627,7 +641,6 @@ fun SettingsSwitchRow(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = enabled,
-                colors = SwitchDefaults.colors(),
             )
         },
     )

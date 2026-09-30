@@ -1,5 +1,6 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.ui.zIndex
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -5536,99 +5537,90 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier.weight(1f, fill = false),
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                // Model chip (plain chats): the model in use, tap to switch.
+                                // One chip for what answers and how hard it thinks: "model · level". Tap opens a
+                                // small menu — the model (full picker) and the thinking levels.
                                 if (currentBot == null) {
                                     val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
                                     val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
-                                    Surface(
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            0.5.dp,
-                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                        ),
-                                        modifier = Modifier
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(18.dp))
-                                            .clickable {
-                                                showAttachMenu = false
-                                                if (viewModel.showSlashMenu.value) {
-                                                    viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                                                }
-                                                showModelPicker = true
-                                            },
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(start = 12.dp, end = 6.dp),
-                                        ) {
-                                            Text(
-                                                text = chipModel,
-                                                fontSize = 12.sp,
-                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                                color = ChatColors.secondaryText,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 70.dp),
-                                            )
-                                            Icon(
-                                                Icons.Default.KeyboardArrowDown,
-                                                contentDescription = stringResource(R.string.settings_models_title),
-                                                tint = ChatColors.secondaryText,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    }
-                                }
-                                // Thinking strength (board: "Thinking · Medium"), only for models that can reason.
-                                if (viewModel.currentModelSupportsReasoning) {
                                     val composerThinking by viewModel.thinkingLevel.collectAsState()
-                                    Surface(
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            0.5.dp,
-                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                        ),
-                                        modifier = Modifier
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(18.dp))
-                                            .clickable {
-                                                showAttachMenu = false
-                                                if (viewModel.showSlashMenu.value) {
-                                                    viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                                                }
-                                                showThinkingLevelSheet = true
-                                            },
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                    val canThink = viewModel.currentModelSupportsReasoning
+                                    var chipMenu by remember { mutableStateOf(false) }
+                                    Box {
+                                        Surface(
+                                            shape = RoundedCornerShape(18.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                0.5.dp,
+                                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                            ),
+                                            modifier = Modifier
+                                                .height(36.dp)
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .clickable {
+                                                    showAttachMenu = false
+                                                    if (viewModel.showSlashMenu.value) {
+                                                        viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                                    }
+                                                    chipMenu = true
+                                                },
                                         ) {
-                                            Icon(
-                                                Icons.Default.AutoAwesome,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(14.dp),
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(start = 12.dp, end = 8.dp),
+                                            ) {
+                                                Text(
+                                                    text = chipModel,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.widthIn(max = 120.dp),
+                                                )
+                                                if (canThink && composerThinking.isEnabled) {
+                                                    Text(
+                                                        text = " · " + thinkingLevelLabel(composerThinking),
+                                                        fontSize = 13.sp,
+                                                        color = ChatColors.secondaryText,
+                                                        maxLines = 1,
+                                                    )
+                                                }
+                                                Icon(
+                                                    Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = stringResource(R.string.settings_models_title),
+                                                    tint = ChatColors.secondaryText,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            }
+                                        }
+                                        MinisMenu(
+                                            expanded = chipMenu,
+                                            onDismissRequest = { chipMenu = false },
+                                            shape = RoundedCornerShape(14.dp),
+                                            tonalElevation = 0.dp,
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(chipModelRaw, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                                trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                                                onClick = { chipMenu = false; showModelPicker = true },
                                             )
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.chat_thinking_chip,
-                                                    thinkingLevelLabel(composerThinking),
-                                                ),
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                maxLines = 1,
-                                            )
+                                            if (canThink) {
+                                                MinisMenuDivider()
+                                                val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
+                                                levels.forEach { level ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(thinkingLevelLabel(level)) },
+                                                        trailingIcon = {
+                                                            if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
+                                                                Icon(Icons.Default.Check, contentDescription = null)
+                                                            }
+                                                        },
+                                                        onClick = { chipMenu = false; viewModel.setThinkingLevel(level) },
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
-                                }
                                 }
                             }
 

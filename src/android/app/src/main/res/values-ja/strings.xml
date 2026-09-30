@@ -1514,8 +1514,8 @@
     <string name="settings_category_agent_sub">スキル、キャラクター、人格、プロンプト、記憶、MCP</string>
     <string name="settings_category_appearance_sub">外観とデスクトップペット</string>
     <string name="settings_category_runtime_sub">ターミナルと環境変数</string>
-    <string name="settings_section_files">ファイル</string>
-    <string name="settings_category_files_sub">ストレージ、共有フォルダ、マウント、バックアップ</string>
+    <string name="settings_section_files">ファイル管理</string>
+    <string name="settings_category_files_sub">ストレージ、共有フォルダ、マウント、セッションファイル</string>
     <string name="settings_category_system_sub">Root、モジュール、権限、バックグラウンド</string>
     <string name="settings_category_about_sub">ログ、情報、フィードバック</string>
     <string name="settings_cat_models">モデル</string>
@@ -1530,7 +1530,7 @@
     <string name="settings_cat_runtime_sub2">Rootfs、環境変数</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、エージェント権限、バックグラウンドと通知</string>
     <string name="settings_cat_data_sub">バックアップと復元、ログ、更新、プライバシー</string>
-    <string name="settings_root_footer">ターミナルとファイルはセッションドロワーに、チームと定期タスクは Agent にあります。</string>
+    <string name="settings_root_footer">ターミナルはセッションドロワーに、チームと定期タスクは Agent にあります。</string>
     <string name="settings_attention_count">%1$d 件の対応が必要です</string>
     <string name="settings_ready_header">準備状況</string>
     <string name="settings_ready_footer">Agent が正常に動くために必要なシステム条件をまとめています。任意の項目は未準備に数えません。</string>
@@ -2099,4 +2099,6 @@
     <string name="perm_tool_vscreen_close">仮想画面を閉じる</string>
     <string name="perm_tool_vscreen_status">端末の状態を読む</string>
     <string name="perm_tool_vscreen_ui">仮想画面を操作</string>
+    <string name="perm_vscreen_master_title">Agent に仮想画面の使用を許可</string>
+    <string name="perm_vscreen_master_sub">マスタースイッチ。以下は個別の権限</string>
 </resources>

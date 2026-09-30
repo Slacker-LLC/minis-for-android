@@ -324,24 +324,17 @@ fun SessionDrawerContent(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 thickness = 0.5.dp,
             )
-            // Files and Settings are the two "places" of the app, so they sit together at the bottom,
-            // apart from the agent's working tools (team, tasks, terminal) in the grid above.
+            // Settings at the bottom; files live under Settings → Files.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = bottomInset),
             ) {
                 DrawerDockEntry(
-                    icon = Icons.Outlined.Folder,
-                    title = stringResource(R.string.settings_section_files),
-                    onClick = onOpenStorage,
-                    modifier = Modifier.weight(1f),
-                )
-                DrawerDockEntry(
                     icon = Icons.Default.Settings,
                     title = stringResource(R.string.settings),
                     onClick = onOpenSettings,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

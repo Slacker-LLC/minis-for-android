@@ -1891,8 +1891,8 @@
     <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
     <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
     <string name="settings_category_runtime_sub">Terminal and environment variables</string>
-    <string name="settings_section_files">Files</string>
-    <string name="settings_category_files_sub">Storage, shared folders, mounts and backup</string>
+    <string name="settings_section_files">File management</string>
+    <string name="settings_category_files_sub">Storage, shared folders, mounts, session files</string>
     <string name="settings_category_system_sub">Root, the module, permissions and background access</string>
     <string name="settings_category_about_sub">Logs, about and feedback</string>
     <string name="settings_cat_models">Models</string>
@@ -1907,7 +1907,7 @@
     <string name="settings_cat_runtime_sub2">Rootfs, environment variables</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, agent permissions, background and notifications</string>
     <string name="settings_cat_data_sub">Backup and restore, logs, updates, privacy</string>
-    <string name="settings_root_footer">Terminal and files are in the session drawer; the team and scheduled tasks are under Agent.</string>
+    <string name="settings_root_footer">The terminal is in the session drawer; the team and scheduled tasks are under Agent.</string>
     <string name="settings_attention_count">%1$d need attention</string>
     <string name="settings_ready_header">Readiness check</string>
     <string name="settings_ready_footer">What the Agent needs to work normally is gathered here. Optional items are not counted as not ready.</string>
@@ -2480,4 +2480,6 @@
     <string name="perm_tool_vscreen_close">Close the virtual screen</string>
     <string name="perm_tool_vscreen_status">Read device status</string>
     <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
+    <string name="perm_vscreen_master_title">Let the agent use the virtual screen</string>
+    <string name="perm_vscreen_master_sub">Master switch; the items below are its permissions</string>
 </resources>

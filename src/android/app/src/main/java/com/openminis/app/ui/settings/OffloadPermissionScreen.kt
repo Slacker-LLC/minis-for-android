@@ -132,9 +132,32 @@ fun OffloadPermissionScreen(
             .orEmpty()
             .filter { it.toolName.startsWith("android.vscreen.") }
         if (vscreenTools.isNotEmpty()) {
+            // One master switch; the five tools are its sub-items and only show while it is on.
+            var vscreenOn by remember {
+                mutableStateOf(vscreenTools.any { OffloadPermissionManager.getLevel(it.toolName) != OffloadPermissionManager.PermissionLevel.NOT_ALLOWED })
+            }
             SettingsSection(header = stringResource(R.string.settings_vscreen_entry)) {
-                vscreenTools.forEachIndexed { idx, tool ->
-                    PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1)
+                SettingsSwitchRow(
+                    title = stringResource(R.string.perm_vscreen_master_title),
+                    subtitle = stringResource(R.string.perm_vscreen_master_sub),
+                    checked = vscreenOn,
+                    onCheckedChange = { on ->
+                        vscreenOn = on
+                        vscreenTools.forEach { tool ->
+                            val current = OffloadPermissionManager.getLevel(tool.toolName)
+                            if (on && current == OffloadPermissionManager.PermissionLevel.NOT_ALLOWED) {
+                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.ASK_ONCE)
+                            } else if (!on) {
+                                OffloadPermissionManager.setLevel(tool.toolName, OffloadPermissionManager.PermissionLevel.NOT_ALLOWED)
+                            }
+                        }
+                    },
+                    showDivider = vscreenOn,
+                )
+                if (vscreenOn) {
+                    vscreenTools.forEachIndexed { idx, tool ->
+                        PermissionRow(tool = tool, showDivider = idx < vscreenTools.size - 1)
+                    }
                 }
             }
         }
