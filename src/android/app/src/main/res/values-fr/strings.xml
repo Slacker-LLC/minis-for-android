@@ -1631,7 +1631,6 @@
     <string name="drawer_delete_session_confirm">Supprimer cette conversation ? Action irréversible.</string>
     <string name="drawer_new_session">Nouvelle conversation</string>
     <string name="drawer_rename">Renommer</string>
-    <string name="session_info_title">Infos de session</string>
     <string name="session_info_token_usage_footer">Voir la consommation de jetons de cette session</string>
     <string name="session_info_auto_compact_footer">Compacter la conversation à l\'approche de la limite</string>
     <string name="session_info_fast_mode">Mode rapide</string>

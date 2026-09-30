@@ -2029,7 +2029,6 @@
     <string name="drawer_delete_session_confirm">确定要删除此会话吗？此操作无法撤销。</string>
     <string name="drawer_new_session">新会话</string>
     <string name="drawer_rename">重命名</string>
-    <string name="session_info_title">会话信息</string>
     <string name="session_info_token_usage_footer">查看当前会话 Token 消耗详情</string>
     <string name="session_info_auto_compact_footer">长对话接近上限时自动压缩精简</string>
     <string name="session_info_fast_mode">快速模式</string>

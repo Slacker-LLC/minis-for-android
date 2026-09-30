@@ -1992,7 +1992,6 @@
     <string name="drawer_delete_session_confirm">Удалить эту беседу? Действие необратимо.</string>
     <string name="drawer_new_session">Новая беседа</string>
     <string name="drawer_rename">Переименовать</string>
-    <string name="session_info_title">О сеансе</string>
     <string name="session_info_token_usage_footer">Сколько токенов израсходовано в этом сеансе</string>
     <string name="session_info_auto_compact_footer">Сжимать диалог при приближении к лимиту</string>
     <string name="session_info_fast_mode">Быстрый режим</string>

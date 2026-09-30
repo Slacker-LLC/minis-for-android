@@ -139,7 +139,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.TextButton
@@ -765,7 +764,6 @@ fun ChatScreen(
     var showMcpsSheet by remember { mutableStateOf(false) }
     // GH#32/#35: session-local prompt/model/tool overrides.
     var showSessionConfigSheet by remember { mutableStateOf(false) }
-    var showSessionInfoSheet by remember { mutableStateOf(false) }
     var showSessionAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
@@ -2468,7 +2466,7 @@ fun ChatScreen(
                             onDismissRequest = { showChatMenu = false },
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            // 会话配置 (提示词、技能、MCP、记忆)
+                            // 会话设置 (提示词、技能、MCP、记忆、Token 用量、自动压缩、快速模式)
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.session_config_title)) },
                                 onClick = {
@@ -2477,17 +2475,6 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.Settings, contentDescription = null)
-                                },
-                            )
-                            // Token 用量 (直达 Token 用量面板)
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.settings_token_usage)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    showTokenUsageSheet = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Outlined.BarChart, contentDescription = null)
                                 },
                             )
                             // 打开浏览器
@@ -6418,19 +6405,12 @@ fun ChatScreen(
     // Session Config Sheet (grouping prompt, skills, mcps, memory)
     if (showSessionConfigSheet) {
         SessionConfigSheet(
+            viewModel = viewModel,
             onDismiss = { showSessionConfigSheet = false },
             onOpenPrompt = { showSessionAdvancedSettings = true },
             onOpenSkills = { showSkillsSheet = true },
             onOpenMcps = { showMcpsSheet = true },
             onOpenMemory = { viewModel.toggleMemorySheet() },
-        )
-    }
-
-    // Session Info Sheet (token usage, auto compact, fast mode)
-    if (showSessionInfoSheet) {
-        SessionInfoSheet(
-            viewModel = viewModel,
-            onDismiss = { showSessionInfoSheet = false },
             onOpenTokenUsage = { showTokenUsageSheet = true },
         )
     }

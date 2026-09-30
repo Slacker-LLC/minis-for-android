@@ -1737,7 +1737,6 @@
     <string name="drawer_delete_session_confirm">この会話を削除しますか？元に戻せません。</string>
     <string name="drawer_new_session">新しい会話</string>
     <string name="drawer_rename">名前を変更</string>
-    <string name="session_info_title">セッション情報</string>
     <string name="session_info_token_usage_footer">このセッションのトークン消費を確認</string>
     <string name="session_info_auto_compact_footer">上限に近づいたら会話を自動で圧縮</string>
     <string name="session_info_fast_mode">高速モード</string>

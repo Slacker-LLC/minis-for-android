@@ -1740,7 +1740,6 @@
     <string name="drawer_delete_session_confirm">Diese Unterhaltung löschen? Das kann nicht rückgängig gemacht werden.</string>
     <string name="drawer_new_session">Neue Unterhaltung</string>
     <string name="drawer_rename">Umbenennen</string>
-    <string name="session_info_title">Sitzungsinfo</string>
     <string name="session_info_token_usage_footer">Tokenverbrauch dieser Sitzung ansehen</string>
     <string name="session_info_auto_compact_footer">Gespräch automatisch verdichten, wenn es sich dem Limit nähert</string>
     <string name="session_info_fast_mode">Schnellmodus</string>

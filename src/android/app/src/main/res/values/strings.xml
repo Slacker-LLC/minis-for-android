@@ -2118,7 +2118,6 @@
     <string name="drawer_delete_session_confirm">Delete this conversation? This cannot be undone.</string>
     <string name="drawer_new_session">New conversation</string>
     <string name="drawer_rename">Rename</string>
-    <string name="session_info_title">Session info</string>
     <string name="session_info_token_usage_footer">See how many tokens this session has used</string>
     <string name="session_info_auto_compact_footer">Compress the conversation as it approaches the limit</string>
     <string name="session_info_fast_mode">Fast mode</string>
