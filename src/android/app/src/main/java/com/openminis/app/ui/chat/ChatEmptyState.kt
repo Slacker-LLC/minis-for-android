@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -114,11 +116,12 @@ fun ChatEmptyState(
     val seed = rememberSaveable { Random.nextInt() }
     var page by rememberSaveable { mutableIntStateOf(0) }
     val cards = suggestionWindow(SuggestionPool.size, seed, page).map { SuggestionPool[it] }
+    // Centered when it fits; scrolls when it does not (keyboard up, small screen, large font).
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
         Box(
             modifier = Modifier
@@ -174,6 +177,7 @@ fun ChatEmptyState(
                 }
             }
         }
+    }
     }
 }
 

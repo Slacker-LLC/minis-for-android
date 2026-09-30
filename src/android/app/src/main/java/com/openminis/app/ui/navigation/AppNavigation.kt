@@ -792,6 +792,9 @@ fun AppNavigation(
                 onMountClick = { mountId ->
                     navController.safeNavigate(Routes.mountedFoldersDetail(mountId))
                 },
+                onOpenSystemPermissions = {
+                    navController.safeNavigate(Routes.settingsCategory(SettingsCategory.SYSTEM.key))
+                },
             )
         }
 
@@ -1424,7 +1427,10 @@ fun AppNavigation(
         }
 
         composable(Routes.VIRTUAL_SCREEN_SETTINGS) {
-            VirtualScreenSettingsScreen(onBack = { navController.safePopBackStack() })
+            VirtualScreenSettingsScreen(
+                onBack = { navController.safePopBackStack() },
+                onOpenShizuku = { navController.safeNavigate(Routes.SHIZUKU) },
+            )
         }
 
         composable(Routes.SYSTEM_PERMISSIONS) {

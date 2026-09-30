@@ -85,9 +85,17 @@ CI/宿主测试不能替代以下证据：
 
 没有这些设备证据时，只能声称代码/CI 层通过，不能声称全部设备运行验收完成。
 
+## VScreen 真机记录（2026-10-01，小米 24129PN74C / Android 17 / 以 Root 启动的 Shizuku）
+
+- 此前设置页显示「Shizuku 授权失败」并不是授权问题：`network_security_config.xml` 里冗余的 `localhost`/`127.0.0.1` `domain-config` 会让 Shizuku 拉起的 UserService 进程在初始化时抛出 `Found multiple conflicting per-domain rules` 并退出，App 侧表现为 8 秒 Binder 超时。已删除该冗余配置（`base-config` 已允许明文，HTTP 仍由 `ProviderTransportPolicy` 限制）。
+- Root 启动的 Shizuku 使服务以 uid 0 运行，旧代码硬性拒绝（`root_user_service_refused`）；现按上文接受 root。Binder 身份是按进程而不是按线程的（实测线程内 `setuid` 后虚拟屏所有者仍为 uid 0），所以不能在进程内降为 shell。
+- 拉起应用改用 `cmd activity start-activity --display`：手工构造的 `ActivityThread` 不是系统认识的调用方进程，`Context.startActivity` 会得到 `Not allowed to start activity`。输入探测放在拉起之后（空显示屏上没有窗口可接收按键）。
+- 在该设备上探测 10 步全部通过（包括虚拟显示屏、UiAutomation、拉起设置页、输入、非黑屏截图）。**未验证**：智能体实际操作时实时查看器的画面帧、adb 启动的 Shizuku（shell 身份）路径、其它 OEM。
+- 探测与 UiAutomation 互斥：同一时刻系统只允许一个 UiAutomation 客户端，Maestro 等自动化驱动在后台时会让「UiAutomation」步骤报 `already registered`。
+
 ## VScreen capability pending hardware validation（2026-09-30）
 
-VScreen 使用 Shizuku **shell UID UserService** 和随 Android/OEM 版本变化的隐藏系统 API；能力默认关闭，只有当前系统/ROM 指纹下的设备自检全部通过才允许用户启用。指纹变化或自检失败会持久清除 enabled 状态，必须重新通过自检并由用户再次启用。UserService 仅接受非物理 display ID；Root UID、物理主屏输入/观察、未经限定的 socket、视频/OCR 路径均不属于本功能，本实现也不增加系统网络出口拦截。
+VScreen 使用 Shizuku 协议 **UserService**（shell 或 root 身份，见 05 合同）和随 Android/OEM 版本变化的隐藏系统 API；能力默认关闭，只有当前系统/ROM 指纹下的设备自检全部通过才允许用户启用。指纹变化或自检失败会持久清除 enabled 状态，必须重新通过自检并由用户再次启用。UserService 仅接受非物理 display ID；物理主屏输入/观察、未经限定的 socket、视频/OCR 路径均不属于本功能，本实现也不增加系统网络出口拦截。
 
 此工作区当前没有连接的 Android 真机或模拟器，因此没有声称隐藏 API 在目标 ROM 上通过真实运行探测。宿主编译与单测不能替代以下设备证据：
 

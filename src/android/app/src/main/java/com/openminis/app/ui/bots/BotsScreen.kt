@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Group
@@ -74,6 +75,10 @@ fun BotsScreen(
     onOpenProgress: (() -> Unit)? = null,
     onOpenRoutineEditor: (taskId: String?, botId: String?) -> Unit = { _, _ -> },
 ) {
+    var showVirtualScreenViewer by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (showVirtualScreenViewer) {
+        com.openminis.app.ui.settings.VirtualScreenViewerDialog(onDismiss = { showVirtualScreenViewer = false })
+    }
     val context = LocalContext.current
     val delegationRepository = remember(context) {
         (context.applicationContext as MinisApp).botDelegationRepository
@@ -233,6 +238,14 @@ fun BotsScreen(
             scrollable = false,
             actions = {
                 if (!showProgress) {
+                    // Watch what a member is doing on the virtual screen (only when it is switched on).
+                    if (com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
+                            .get(androidx.compose.ui.platform.LocalContext.current).isEnabled()
+                    ) {
+                        IconButton(onClick = { showVirtualScreenViewer = true }) {
+                            Icon(Icons.Outlined.Visibility, stringResource(R.string.vscreen_viewer_menu))
+                        }
+                    }
                     IconButton(onClick = { if (onOpenProgress != null) onOpenProgress() else { showProgress = true } }) {
                         Icon(Icons.AutoMirrored.Outlined.Assignment, stringResource(R.string.bots_progress))
                     }

@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,6 +43,7 @@ import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.runtime.ubuntu.RootAccess
+import com.openminis.app.ui.components.MinisAlertDialog
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 
@@ -155,91 +157,94 @@ private fun ReadinessId.titleRes(): Int = when (this) {
     ReadinessId.NOTIFICATIONS -> R.string.settings_ready_notif_title
 }
 
-/** The full checklist at the top of System & permissions. */
+/** Runs the action that fixes [item]: the system page for a grant, or the app's own page. */
+private fun fixReadiness(context: Context, item: ReadinessItem, onOpenBackground: () -> Unit) {
+    when (item.id) {
+        ReadinessId.ROOT -> RootAccess.request(context)
+        ReadinessId.ALL_FILES -> openAllFilesAccess(context)
+        ReadinessId.ACCESSIBILITY -> startSettings(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        ReadinessId.BACKGROUND -> onOpenBackground()
+        ReadinessId.NOTIFICATIONS -> startSettings(
+            context,
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+        )
+    }
+}
+
+/**
+ * System & permissions starts with one button, not a list of five rows. Tapping it checks everything
+ * the Agent needs and answers in a dialog: "Everything is ready" with Done, or only what is missing,
+ * each with the button that goes and fixes it.
+ */
 @Composable
-fun ReadinessSection(items: List<ReadinessItem>, onOpenBackground: () -> Unit) {
+fun ReadinessCheckSection(onOpenBackground: () -> Unit) {
     val context = LocalContext.current
+    val root by RootAccess.state.collectAsState()
+    var result by remember { mutableStateOf<List<ReadinessItem>?>(null) }
     SettingsSection(
         header = stringResource(R.string.settings_ready_header),
         footer = stringResource(R.string.settings_ready_footer),
     ) {
-        items.forEachIndexed { index, item ->
-            ReadinessRow(
-                item = item,
-                showDivider = index != items.lastIndex,
-                onAction = {
-                    when (item.id) {
-                        ReadinessId.ROOT -> RootAccess.request(context)
-                        ReadinessId.ALL_FILES -> openAllFilesAccess(context)
-                        ReadinessId.ACCESSIBILITY -> startSettings(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        ReadinessId.BACKGROUND -> onOpenBackground()
-                        ReadinessId.NOTIFICATIONS -> startSettings(
-                            context,
-                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-                        )
-                    }
-                },
-            )
+        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+            MinisTextButton(onClick = { result = SettingsReadiness.probe(context, root.isGranted) }) {
+                Text(stringResource(R.string.settings_ready_check), style = MaterialTheme.typography.bodyLarge)
+            }
         }
     }
-}
-
-@Composable
-private fun ReadinessRow(item: ReadinessItem, showDivider: Boolean, onAction: () -> Unit) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = SettingsMetrics.RowMinHeight)
-                .padding(
-                    horizontal = SettingsMetrics.RowPaddingHorizontal,
-                    vertical = SettingsMetrics.RowPaddingVertical,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = if (item.ok) Icons.Filled.Check else Icons.Filled.Warning,
-                contentDescription = null,
-                tint = if (item.ok) ChatColors.ok else ChatColors.warn,
-                modifier = Modifier.size(22.dp),
-            )
-            Spacer(Modifier.width(SettingsMetrics.IconGap))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
+    result?.let { items ->
+        val missing = items.filter { !it.ok }
+        // Only optional items missing still counts as ready (they are listed, not counted).
+        val needsAttention = SettingsReadiness.attention(items).isNotEmpty()
+        MinisAlertDialog(
+            onDismissRequest = { result = null },
+            title = {
                 Text(
-                    text = item.id.title(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    stringResource(
+                        if (needsAttention) R.string.settings_ready_fix_title else R.string.settings_ready_all_good,
+                    ),
                 )
-                Text(
-                    text = item.subtitle(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (!item.ok) {
-                Spacer(Modifier.width(8.dp))
-                MinisTextButton(onClick = onAction) {
-                    Text(
-                        text = stringResource(
-                            if (item.id == ReadinessId.BACKGROUND || item.id == ReadinessId.ACCESSIBILITY ||
-                                item.id == ReadinessId.NOTIFICATIONS
-                            ) {
-                                R.string.settings_ready_action_open
-                            } else {
-                                R.string.settings_ready_action_grant
-                            },
-                        ),
-                    )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (!needsAttention) Text(stringResource(R.string.settings_ready_all_good_body))
+                    run {
+                        missing.forEach { item ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.id.title() +
+                                            if (item.optional) " · " + stringResource(R.string.settings_ready_optional) else "",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                    Text(
+                                        text = item.subtitle(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                MinisTextButton(onClick = {
+                                    result = null
+                                    fixReadiness(context, item, onOpenBackground)
+                                }) {
+                                    Text(
+                                        stringResource(
+                                            if (item.id == ReadinessId.ROOT || item.id == ReadinessId.ALL_FILES) {
+                                                R.string.settings_ready_action_grant
+                                            } else {
+                                                R.string.settings_ready_action_open
+                                            },
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        }
-        if (showDivider) SettingsDivider(insetStart = SettingsMetrics.RowPaddingHorizontal)
+            },
+            confirmButton = {
+                MinisTextButton(onClick = { result = null }) { Text(stringResource(R.string.settings_ready_done)) }
+            },
+        )
     }
 }
 

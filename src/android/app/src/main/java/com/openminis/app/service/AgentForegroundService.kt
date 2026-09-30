@@ -665,10 +665,14 @@ class AgentForegroundService : Service() {
         if (overlayNudgePosted) return
         overlayNudgePosted = true
         try {
+            // Every grant is handled in System & permissions.
             val mgrIntent = Intent(
-                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:$packageName"),
-            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                Intent.ACTION_VIEW,
+                android.net.Uri.parse("minis://settings/system"),
+            ).apply {
+                setPackage(packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             val pi = PendingIntent.getActivity(
                 this,
                 2,
