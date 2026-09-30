@@ -4344,15 +4344,15 @@ fun ChatScreen(
                                 .padding(horizontal = 12.dp)
                                 // T240: keep a thin visible border instead of the
                                 // diffuse 8dp halo that bled out past the panel edge.
-                                .shadow(elevation = 3.dp, shape = RoundedCornerShape(10.dp))
-                                .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
-                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(14.dp))
+                                .background(ChatColors.inputBg, RoundedCornerShape(14.dp))
+                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(14.dp)),
                         ) {
                             androidx.compose.foundation.lazy.LazyColumn(
                                 state = slashListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 220.dp)
+                                    .heightIn(max = 264.dp)
                                     .verticalScrollbar(slashListState),
                             ) {
                             itemsIndexed(filteredSlashCommands, key = { _, c -> c.id }) { index, cmd ->
@@ -4412,10 +4412,12 @@ fun ChatScreen(
                                                 }
                                             } else it
                                         }
-                                        // [T-android-slash-menu-density] Tighter
-                                        // vertical padding (10→7) so slash rows
-                                        // read as compact as iOS, not sparse.
-                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                        // The first row is the one Enter runs: tint it so that is visible.
+                                        .background(
+                                            if (index == 0) ChatColors.sendButton.copy(alpha = 0.10f) else Color.Transparent,
+                                        )
+                                        // 44dp rows (board): easy to hit with a thumb.
+                                        .padding(horizontal = 14.dp, vertical = 11.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(
@@ -4425,29 +4427,24 @@ fun ChatScreen(
                                         modifier = Modifier.size(18.dp),
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "/${cmd.title.lowercase()}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = titleColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        // Cap to one line + ellipsis (mirrors
-                                        // iOS T-slash-picker-product-rules
-                                        // 051896e2). Long Skill descriptions
-                                        // would otherwise stretch the row,
-                                        // breaking the locked 4-row band and
-                                        // crowding the menu visually.
-                                        Text(
-                                            text = cmd.subtitle,
-                                            fontSize = 11.sp,
-                                            color = subtitleColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
+                                    Text(
+                                        text = "/${cmd.title.lowercase()}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        color = titleColor,
+                                        maxLines = 1,
+                                        modifier = Modifier.widthIn(min = 92.dp),
+                                    )
+                                    // One line, ellipsised: long Skill descriptions must not stretch the row.
+                                    Text(
+                                        text = cmd.subtitle,
+                                        fontSize = 13.sp,
+                                        color = subtitleColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
                                     if (cmd.id == "memory") {
                                         Icon(
                                             imageVector = if (memoryOnState) Icons.Default.CheckCircle else Icons.Default.Block,
@@ -4524,9 +4521,9 @@ fun ChatScreen(
                                     },
                                 )
                                 .padding(horizontal = 12.dp)
-                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp))
-                                .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
-                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(14.dp))
+                                .background(ChatColors.inputBg, RoundedCornerShape(14.dp))
+                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(14.dp)),
                         ) {
                             if (mentionEntries.isEmpty()) {
                                 Row(
@@ -4572,7 +4569,7 @@ fun ChatScreen(
                                    state = mentionListState,
                                    modifier = Modifier
                                        .fillMaxWidth()
-                                       .heightIn(max = 220.dp)
+                                       .heightIn(max = 264.dp)
                                        .verticalScrollbar(mentionListState),
                                ) {
                                     itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
@@ -4599,39 +4596,26 @@ fun ChatScreen(
                                                         selection = androidx.compose.ui.text.TextRange(newCaret),
                                                     )
                                                 }
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                .padding(horizontal = 14.dp, vertical = 11.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            // Single doc icon for every entry — the scope/mount
-                                            // capsule on the right already labels what bucket
-                                            // this is (workspace / skills / shared / memory /
-                                            // <mountName>). iOS varies the icon per scope but
-                                            // we keep it uniform here so the row stays
-                                            // visually consistent at small sizes on Pixel 4a.
                                             Icon(
-                                                imageVector = Icons.Default.Description,
+                                                imageVector = if (entry.isDirectory) Icons.Outlined.Folder else Icons.Default.Description,
                                                 contentDescription = null,
-                                                tint = ChatColors.secondaryText,
-                                                modifier = Modifier.size(16.dp),
+                                                tint = if (entry.isDirectory) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
+                                                modifier = Modifier.size(18.dp),
                                             )
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = entry.basename,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = ChatColors.primaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                                Text(
-                                                    text = entry.displayPath,
-                                                    fontSize = 11.sp,
-                                                    color = ChatColors.secondaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
+                                            // One line, the path the model will see (mono); the bucket is the badge.
+                                            Text(
+                                                text = entry.displayPath + if (entry.isDirectory) "/" else "",
+                                                fontSize = 13.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                color = ChatColors.primaryText,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f),
+                                            )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             // Scope / mount badge — matches iOS capsule.
                                             Text(
