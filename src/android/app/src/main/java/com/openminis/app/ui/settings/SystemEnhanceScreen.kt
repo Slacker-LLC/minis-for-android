@@ -178,9 +178,7 @@ fun SystemEnhanceScreen(
 
         SettingsSection(
             header = stringResource(R.string.module_settings_section_switches),
-            footer = stringResource(
-                if (connected) R.string.module_settings_footer else R.string.module_settings_not_connected,
-            ),
+            footer = if (connected) null else stringResource(R.string.module_settings_not_connected),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Search,
@@ -254,13 +252,6 @@ fun SystemEnhanceScreen(
             // permissions page; repeating it here as a second row made the same switch appear
             // twice with two different subtitles. What this page owns is the target choice, so the
             // role only shows up as the sentence that explains when the choice can take effect.
-            footer = stringResource(
-                if (roleHeld) {
-                    R.string.module_settings_assistant_footer
-                } else {
-                    R.string.module_settings_assistant_role_hint
-                },
-            ),
         ) {
             PowerAssistantTarget.entries.forEachIndexed { index, target ->
                 SettingsRow(
@@ -289,34 +280,7 @@ fun SystemEnhanceScreen(
                 )
             }
         }
-
-        SettingsSection(
-            header = stringResource(R.string.system_enhance_root_section),
-            footer = stringResource(R.string.system_enhance_root_footer),
-        ) {
-            CapabilityRow(R.string.system_enhance_root_feature_runtime)
-            CapabilityRow(R.string.system_enhance_root_feature_device)
-            CapabilityRow(R.string.system_enhance_root_feature_data, showDivider = false)
-        }
-
-        SettingsSection(
-            header = stringResource(R.string.system_enhance_module_section),
-            footer = stringResource(R.string.system_enhance_module_footer),
-        ) {
-            CapabilityRow(R.string.system_enhance_module_feature_entries)
-            CapabilityRow(R.string.system_enhance_module_feature_google)
-            CapabilityRow(R.string.system_enhance_module_feature_accessibility, showDivider = false)
-        }
     }
-}
-
-@Composable
-private fun CapabilityRow(titleRes: Int, showDivider: Boolean = true) {
-    SettingsRow(
-        title = stringResource(titleRes),
-        showChevron = false,
-        showDivider = showDivider,
-    )
 }
 
 private fun PowerAssistantTarget.labelRes(): Int = when (this) {

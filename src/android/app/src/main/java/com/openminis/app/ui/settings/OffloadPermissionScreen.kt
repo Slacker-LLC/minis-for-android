@@ -78,7 +78,6 @@ fun OffloadPermissionScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.perm_section_config_tool),
-            footer = stringResource(R.string.perm_minis_config_desc),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.perm_allow_minis_config),
@@ -105,7 +104,6 @@ fun OffloadPermissionScreen(
             iconVector = Icons.Outlined.Accessibility,
             iconTint = ChatColors.ok,
             sectionHeaderRes = R.string.perm_section_a11y,
-            sectionFooterRes = R.string.perm_a11y_section_footer,
             toolName = "a11y_cli",
             descriptionRes = R.string.perm_a11y_cli_description,
             systemReady = a11yEnabled,
@@ -120,7 +118,6 @@ fun OffloadPermissionScreen(
             iconVector = Icons.Outlined.Shield,
             iconTint = Color(0xFFAF52DE),
             sectionHeaderRes = R.string.perm_section_privileged_backend,
-            sectionFooterRes = R.string.perm_shizuku_section_footer,
             toolName = "shizuku_cli",
             descriptionRes = R.string.perm_privileged_cli_description,
             systemReady = ShizukuManager.isReady(),
@@ -134,7 +131,6 @@ fun OffloadPermissionScreen(
         // Agent permission model. Root authority is intentionally absent here.
         SettingsSection(
             header = "更多系统特权",
-            footer = "查看桌面宠物悬浮窗权限、系统无障碍守护与语音学习设置。",
         ) {
             SettingsRow(
                 icon = Icons.Outlined.Layers,
@@ -178,7 +174,6 @@ private fun IntegrationSection(
     iconVector: ImageVector,
     iconTint: Color,
     sectionHeaderRes: Int,
-    sectionFooterRes: Int,
     toolName: String,
     descriptionRes: Int,
     systemReady: Boolean,
@@ -189,7 +184,6 @@ private fun IntegrationSection(
 ) {
     SettingsSection(
         header = stringResource(sectionHeaderRes),
-        footer = stringResource(sectionFooterRes),
     ) {
         SettingsRow(
             icon = iconVector,
