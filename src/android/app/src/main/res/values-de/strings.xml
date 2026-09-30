@@ -319,7 +319,7 @@
     <string name="memory_delete_confirm_title">%1$s löschen?</string>
     <string name="memory_delete_confirm_text">Dieses Memory-Log wird dauerhaft entfernt.</string>
     <string name="memory_editor_placeholder">Inhalt eingeben…</string>
-    <string name="perm_title">Berechtigungen</string>
+    <string name="perm_title">Agent-Berechtigungen</string>
     <string name="perm_reset_all">Alles zurücksetzen</string>
     <string name="perm_reset_confirm_title">Alle Berechtigungen zurücksetzen?</string>
     <string name="perm_reset_confirm_text">Alle Berechtigungseinstellungen werden zurückgesetzt. Fortfahren?</string>
@@ -1458,8 +1458,8 @@
     <string name="hosted_tool_unknown">Anbieter-Werkzeug</string>
     <string name="hosted_tool_failed">fehlgeschlagen</string>
 
-    <string name="system_enhance_title">Systemerweiterungen</string>
-    <string name="system_enhance_row_subtitle">Root, Modul und was jedes davon freischaltet</string>
+    <string name="system_enhance_title">Module</string>
+    <string name="system_enhance_row_subtitle">LSPosed-Modulschalter</string>
     <string name="system_enhance_section_status">Status</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Prüfe…</string>
@@ -1522,10 +1522,10 @@
     <string name="settings_cat_agent_sub2">Skills, Gedächtnis, Persona, Prompt, MCP, Team, Aufgaben</string>
     <string name="settings_cat_chat_sub">Eingabetaste, Fokus nach Antwort, Denken, Gruppierung</string>
     <string name="settings_cat_appearance_sub2">Design, Schrift, Sprache, App-Symbol, Desktop-Pet</string>
-    <string name="settings_cat_runtime_sub2">Rootfs, Umgebungsvariablen, Werkzeuge</string>
+    <string name="settings_cat_runtime_sub2">Rootfs, Umgebungsvariablen</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, Agent-Rechte, Hintergrund und Benachrichtigungen</string>
     <string name="settings_cat_data_sub">Sicherung und Wiederherstellung, Protokolle, Updates, Datenschutz</string>
-    <string name="settings_root_footer">Terminal und Dateien findest du in der Sitzungsleiste und unter Laufzeitumgebung. Team und geplante Aufgaben sind unter Agent.</string>
+    <string name="settings_root_footer">Terminal und Dateien sind in der Seitenleiste; Team und geplante Aufgaben unter Agent.</string>
     <string name="settings_attention_count">%1$d Punkte brauchen Aufmerksamkeit</string>
     <string name="settings_ready_header">Bereitschaftsprüfung</string>
     <string name="settings_ready_footer">Hier stehen die Systembedingungen, die der Agent braucht. Optionale Punkte zählen nicht als nicht bereit.</string>
@@ -1565,9 +1565,9 @@
     <string name="settings_system_footer">Was diese App auf diesem Gerät darf und wo jede Freigabe geändert wird.</string>
     <string name="settings_assistant_role_footer">Die Assistenten-Geste (Home / Ein-/Aus-Taste) öffnet die App mit dieser Rolle.</string>
     <string name="module_settings_assistant_role_hint">Minis übernimmt die Ein-/Aus-Taste erst, wenn es unter „Berechtigungen“ als Standard-Assistent gesetzt ist.</string>
-    <string name="settings_tool_permissions">Werkzeug-Berechtigungen</string>
-    <string name="settings_tool_permissions_sub">Erlaubt Werkzeugen wie minis-config, die App-Konfiguration zu lesen und zu schreiben</string>
-    <string name="settings_shizuku_sub">Shizuku oder AXManager installieren und autorisieren</string>
+    <string name="settings_tool_permissions">Agent-Berechtigungen</string>
+    <string name="settings_tool_permissions_sub">Was der Agent selbst tun darf</string>
+    <string name="settings_shizuku_sub">Root-Status, Shizuku installieren und autorisieren</string>
     <string name="settings_bg_overlay">Aufgaben-Overlay in der App</string>
     <string name="system_permissions_overlay_section">Overlay-Berechtigung</string>
     <string name="system_permissions_overlay_row">Über anderen Apps anzeigen</string>
@@ -2090,4 +2090,11 @@
     <string name="chat_empty_prompt_d">Wo sollen wir anfangen?</string>
     <string name="chat_empty_prompt_e">Überlass es mir, erzähl mal.</string>
     <string name="chat_empty_prompt_f">Was steht heute an?</string>
+    <string name="appearance_ui_style_title">Oberflächenstil</string>
+    <string name="appearance_style_classic">Klassisch</string>
+    <string name="appearance_style_glass">Glas</string>
+    <string name="perm_more_privileges">Weitere Systemrechte</string>
+    <string name="session_prompt_title">Sitzungs-Prompt</string>
+    <string name="chat_agent_presets_hint">Gilt sofort für diese Sitzung.</string>
+    <string name="chat_agent_preset_applied">Auf %1$s umgestellt (gilt ab der nächsten Nachricht)</string>
 </resources>

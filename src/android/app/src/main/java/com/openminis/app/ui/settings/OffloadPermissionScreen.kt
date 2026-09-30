@@ -130,7 +130,7 @@ fun OffloadPermissionScreen(
         // Fork-only system grants remain reachable without creating a second
         // Agent permission model. Root authority is intentionally absent here.
         SettingsSection(
-            header = "更多系统特权",
+            header = stringResource(R.string.perm_more_privileges),
         ) {
             SettingsRow(
                 icon = Icons.Outlined.Layers,

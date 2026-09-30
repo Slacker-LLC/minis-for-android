@@ -183,7 +183,6 @@ fun ReadinessCheckSection(onOpenBackground: () -> Unit) {
     var result by remember { mutableStateOf<List<ReadinessItem>?>(null) }
     SettingsSection(
         header = stringResource(R.string.settings_ready_header),
-        footer = stringResource(R.string.settings_ready_footer),
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
             MinisTextButton(onClick = { result = SettingsReadiness.probe(context, root.isGranted) }) {

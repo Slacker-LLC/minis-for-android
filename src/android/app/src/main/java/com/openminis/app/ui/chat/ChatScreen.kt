@@ -6219,7 +6219,7 @@ fun ChatScreen(
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                "选择后立即应用于当前会话（与 Web 端同步同一份 Runtime 状态）",
+                                stringResource(R.string.chat_agent_presets_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -6232,7 +6232,7 @@ fun ChatScreen(
                                             .applyToSession(context, sessionId, preset.id)
                                         Toast.makeText(
                                             context,
-                                            "已切换为 ${preset.name}（下一条消息生效）",
+                                            context.getString(R.string.chat_agent_preset_applied, preset.name),
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                         showAgentPresetSheet = false

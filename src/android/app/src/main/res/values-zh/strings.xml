@@ -414,7 +414,7 @@
     <string name="memory_delete_confirm_title">删除 %1$s？</string>
     <string name="memory_delete_confirm_text">这将永久删除该记忆日志。</string>
     <string name="memory_editor_placeholder">输入内容…</string>
-    <string name="perm_title">权限</string>
+    <string name="perm_title">Agent 权限</string>
     <string name="perm_reset_all">全部重置</string>
     <string name="perm_reset_confirm_title">重置所有权限？</string>
     <string name="perm_reset_confirm_text">这将重置所有权限偏好。是否继续？</string>
@@ -451,7 +451,7 @@
     <string name="perm_tool_photos">照片</string>
 
     <!-- T322: Shizuku 权限引导 -->
-    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_title">Root 与 Shizuku</string>
     <string name="shizuku_settings_subtitle">通过 Shizuku 或 AXManager 调用 Android 高权限 API</string>
     <string name="shizuku_status_header">状态</string>
     <string name="shizuku_status_footer">Shizuku 通过无线 ADB 或 root 启动一个本地服务，让用户应用无需 root 即可调用 Android 系统隐藏 API。支持两款兼容的管理器：Shizuku（RikkaApps）和 AXManager（Axeron），任意安装一个即可。授权后，Minis 可使用 android-shizuku-cli 命令管理包、权限、设置、输入、Activity 等。</string>
@@ -1696,8 +1696,8 @@
     <string name="hosted_tool_unknown">服务商工具</string>
     <string name="hosted_tool_failed">失败</string>
 
-    <string name="system_enhance_title">系统增强</string>
-    <string name="system_enhance_row_subtitle">Root、模块，以及各自解锁什么</string>
+    <string name="system_enhance_title">模块</string>
+    <string name="system_enhance_row_subtitle">LSPosed 模块开关</string>
     <string name="system_enhance_section_status">状态</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">检测中…</string>
@@ -1760,10 +1760,10 @@
     <string name="settings_cat_agent_sub2">技能、记忆、人格、提示词、MCP、团队、定时任务</string>
     <string name="settings_cat_chat_sub">回车键、回复后聚焦、思考展开、自动归类</string>
     <string name="settings_cat_appearance_sub2">主题、字体、语言、应用图标、桌宠</string>
-    <string name="settings_cat_runtime_sub2">Rootfs、环境变量、工具</string>
+    <string name="settings_cat_runtime_sub2">Rootfs、环境变量</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、Agent 权限、后台与通知</string>
     <string name="settings_cat_data_sub">备份与恢复、日志、更新、隐私</string>
-    <string name="settings_root_footer">终端和文件在会话抽屉里，运行环境里也能进；团队和定时任务在 Agent 里。</string>
+    <string name="settings_root_footer">终端和文件在会话抽屉里；团队和定时任务在 Agent 里。</string>
     <string name="settings_attention_count">%1$d 项需要处理</string>
     <string name="settings_ready_header">就绪检查</string>
     <string name="settings_ready_footer">这里汇总 Agent 正常工作所需的系统条件。可选项不计入未就绪。</string>
@@ -1803,9 +1803,9 @@
     <string name="settings_system_footer">本 App 在这台设备上被允许做什么，以及每项授权在哪里改。</string>
     <string name="settings_assistant_role_footer">长按 Home / 电源键的助手手势会打开当前持有该角色的 App。</string>
     <string name="module_settings_assistant_role_hint">要让 Minis 接管电源键，先在「权限」里把它设为系统默认助手。</string>
-    <string name="settings_tool_permissions">工具权限</string>
-    <string name="settings_tool_permissions_sub">允许 minis-config 等工具读写应用配置</string>
-    <string name="settings_shizuku_sub">Shizuku / AXManager 的安装与授权</string>
+    <string name="settings_tool_permissions">Agent 权限</string>
+    <string name="settings_tool_permissions_sub">Agent 可以自己做哪些事</string>
+    <string name="settings_shizuku_sub">Root 状态、Shizuku 安装与授权</string>
     <string name="system_permissions_overlay_section">悬浮窗权限</string>
     <string name="system_permissions_overlay_row">显示在其他应用上层</string>
     <string name="system_permissions_overlay_granted">已授权</string>
@@ -2378,4 +2378,11 @@
     <string name="chat_empty_prompt_d">从哪里开始？</string>
     <string name="chat_empty_prompt_e">交给我吧，说说看。</string>
     <string name="chat_empty_prompt_f">今天有什么安排？</string>
+    <string name="appearance_ui_style_title">界面风格</string>
+    <string name="appearance_style_classic">经典</string>
+    <string name="appearance_style_glass">玻璃拟态</string>
+    <string name="perm_more_privileges">更多系统特权</string>
+    <string name="session_prompt_title">会话提示词</string>
+    <string name="chat_agent_presets_hint">选择后立即应用于当前会话。</string>
+    <string name="chat_agent_preset_applied">已切换为 %1$s（下一条消息生效）</string>
 </resources>

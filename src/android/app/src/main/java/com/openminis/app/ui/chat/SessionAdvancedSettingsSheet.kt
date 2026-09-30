@@ -165,7 +165,7 @@ fun SessionAdvancedSettingsSheet(
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {
                 SettingsSection(
-                    header = "会话提示词",
+                    header = stringResource(R.string.session_prompt_title),
                     footer = if (soulLocked) {
                         stringResource(R.string.session_advanced_soul_locked_help)
                     } else {

@@ -319,7 +319,7 @@
     <string name="memory_delete_confirm_title">%1$s を削除しますか？</string>
     <string name="memory_delete_confirm_text">このメモリログを完全に削除します。</string>
     <string name="memory_editor_placeholder">内容を入力…</string>
-    <string name="perm_title">アクセス許可</string>
+    <string name="perm_title">Agent の権限</string>
     <string name="perm_reset_all">すべてリセット</string>
     <string name="perm_reset_confirm_title">すべての権限をリセットしますか？</string>
     <string name="perm_reset_confirm_text">すべての権限設定がリセットされます。続行しますか？</string>
@@ -1463,8 +1463,8 @@
     <string name="hosted_tool_unknown">プロバイダーのツール</string>
     <string name="hosted_tool_failed">失敗</string>
 
-    <string name="system_enhance_title">システム拡張</string>
-    <string name="system_enhance_row_subtitle">Root、モジュール、それぞれが何を可能にするか</string>
+    <string name="system_enhance_title">モジュール</string>
+    <string name="system_enhance_row_subtitle">LSPosed モジュールのスイッチ</string>
     <string name="system_enhance_section_status">状態</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">確認中…</string>
@@ -1527,10 +1527,10 @@
     <string name="settings_cat_agent_sub2">スキル、メモリ、ペルソナ、プロンプト、MCP、チーム、タスク</string>
     <string name="settings_cat_chat_sub">改行キー、返信後のフォーカス、思考の展開、自動グループ</string>
     <string name="settings_cat_appearance_sub2">テーマ、フォント、言語、アプリアイコン、デスクトップペット</string>
-    <string name="settings_cat_runtime_sub2">Rootfs、環境変数、ツール</string>
+    <string name="settings_cat_runtime_sub2">Rootfs、環境変数</string>
     <string name="settings_cat_system_sub2">Root、Shizuku、エージェント権限、バックグラウンドと通知</string>
     <string name="settings_cat_data_sub">バックアップと復元、ログ、更新、プライバシー</string>
-    <string name="settings_root_footer">ターミナルとファイルはセッションドロワーにあり、実行環境からも開けます。チームとスケジュールタスクは Agent にあります。</string>
+    <string name="settings_root_footer">ターミナルとファイルはセッションドロワーに、チームと定期タスクは Agent にあります。</string>
     <string name="settings_attention_count">%1$d 件の対応が必要です</string>
     <string name="settings_ready_header">準備状況</string>
     <string name="settings_ready_footer">Agent が正常に動くために必要なシステム条件をまとめています。任意の項目は未準備に数えません。</string>
@@ -1570,9 +1570,9 @@
     <string name="settings_system_footer">この端末でこのアプリに許されること、および各許可の変更場所。</string>
     <string name="settings_assistant_role_footer">Home / 電源キーのアシスタント ジェスチャは、この役割を持つアプリを開きます。</string>
     <string name="module_settings_assistant_role_hint">Minis が電源キーを引き継ぐには、まず「権限」でシステム既定のアシスタントに設定してください。</string>
-    <string name="settings_tool_permissions">ツールの権限</string>
-    <string name="settings_tool_permissions_sub">minis-config などのツールに設定の読み書きを許可します</string>
-    <string name="settings_shizuku_sub">Shizuku / AXManager のインストールと認可</string>
+    <string name="settings_tool_permissions">Agent の権限</string>
+    <string name="settings_tool_permissions_sub">Agent が自分でできること</string>
+    <string name="settings_shizuku_sub">Root の状態、Shizuku のインストールと認可</string>
     <string name="settings_bg_overlay">アプリ内タスク オーバーレイ</string>
     <string name="system_permissions_overlay_section">オーバーレイ権限</string>
     <string name="system_permissions_overlay_row">他のアプリの上に重ねて表示</string>
@@ -2087,4 +2087,11 @@
     <string name="chat_empty_prompt_d">どこから始めますか？</string>
     <string name="chat_empty_prompt_e">任せてください、話してみて。</string>
     <string name="chat_empty_prompt_f">今日の予定は？</string>
+    <string name="appearance_ui_style_title">UI スタイル</string>
+    <string name="appearance_style_classic">クラシック</string>
+    <string name="appearance_style_glass">ガラス</string>
+    <string name="perm_more_privileges">その他のシステム権限</string>
+    <string name="session_prompt_title">セッションプロンプト</string>
+    <string name="chat_agent_presets_hint">選択すると現在のセッションにすぐ適用されます。</string>
+    <string name="chat_agent_preset_applied">%1$s に切り替えました（次のメッセージから有効）</string>
 </resources>

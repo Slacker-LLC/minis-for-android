@@ -61,6 +61,7 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
         title = stringResource(R.string.shizuku_title),
         onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
+        RootStatusSection()
         SettingsSection(
             header = stringResource(R.string.shizuku_status_header),
         ) {

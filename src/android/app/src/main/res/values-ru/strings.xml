@@ -570,7 +570,7 @@
     <string name="memory_delete_confirm_title">Удалить %1$s?</string>
     <string name="memory_delete_confirm_text">Это безвозвратно удалит этот журнал памяти.</string>
     <string name="memory_editor_placeholder">Введите содержимое…</string>
-    <string name="perm_title">Разрешения</string>
+    <string name="perm_title">Разрешения агента</string>
     <string name="perm_reset_all">Сбросить все</string>
     <string name="perm_reset_confirm_title">Сбросить все разрешения?</string>
     <string name="perm_reset_confirm_text">Это сбросит все настройки разрешений. Продолжить?</string>
@@ -602,7 +602,7 @@
     <string name="perm_tool_clipboard">Буфер обмена</string>
     <string name="perm_tool_contacts">Контакты</string>
     <string name="perm_tool_photos">Фото</string>
-    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_title">Root и Shizuku</string>
     <string name="shizuku_settings_subtitle">Привилегированное управление Android через Shizuku или AXManager</string>
     <string name="shizuku_status_header">Статус</string>
     <string name="shizuku_status_footer">Shizuku предоставляет приложениям пользователя привилегированные системные API без root, запуская небольшую службу через беспроводной ADB или root. Поддерживаются два совместимых менеджера — Shizuku (RikkaApps) и AXManager (Axeron); установите любой из них. После авторизации Minis может использовать CLI android-shizuku-cli для управления пакетами, разрешениями, настройками, вводом и активностями.</string>
@@ -1695,8 +1695,8 @@
     <string name="hosted_tool_unknown">Инструмент провайдера</string>
     <string name="hosted_tool_failed">ошибка</string>
 
-    <string name="system_enhance_title">Системные улучшения</string>
-    <string name="system_enhance_row_subtitle">Root, модуль и что каждый из них открывает</string>
+    <string name="system_enhance_title">Модули</string>
+    <string name="system_enhance_row_subtitle">Переключатели модуля LSPosed</string>
     <string name="system_enhance_section_status">Состояние</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Проверка…</string>
@@ -1759,10 +1759,10 @@
     <string name="settings_cat_agent_sub2">Навыки, память, персона, промпт, MCP, команда, задачи</string>
     <string name="settings_cat_chat_sub">Клавиша Enter, фокус после ответа, размышления, группировка</string>
     <string name="settings_cat_appearance_sub2">Тема, шрифты, язык, значок, питомец</string>
-    <string name="settings_cat_runtime_sub2">Rootfs, переменные среды, инструменты</string>
+    <string name="settings_cat_runtime_sub2">Rootfs, переменные окружения</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, права агента, фон и уведомления</string>
     <string name="settings_cat_data_sub">Резервные копии, журналы, обновления, конфиденциальность</string>
-    <string name="settings_root_footer">Терминал и файлы — в панели сеансов и в разделе «Среда выполнения». Команда и задачи по расписанию — в разделе Agent.</string>
+    <string name="settings_root_footer">Терминал и файлы — в боковой панели; команда и задачи по расписанию — в разделе Agent.</string>
     <string name="settings_attention_count">Требуют внимания: %1$d</string>
     <string name="settings_ready_header">Проверка готовности</string>
     <string name="settings_ready_footer">Здесь собраны системные условия, нужные агенту. Необязательные пункты не считаются неготовыми.</string>
@@ -1802,9 +1802,9 @@
     <string name="settings_system_footer">Что этому приложению разрешено на устройстве и где меняется каждое разрешение.</string>
     <string name="settings_assistant_role_footer">Жест ассистента (Home / кнопка питания) открывает приложение с этой ролью.</string>
     <string name="module_settings_assistant_role_hint">Minis перехватит кнопку питания только после того, как станет ассистентом системы — задайте это в «Разрешениях».</string>
-    <string name="settings_tool_permissions">Разрешения инструментов</string>
-    <string name="settings_tool_permissions_sub">Разрешить таким инструментам, как minis-config, читать и менять конфигурацию</string>
-    <string name="settings_shizuku_sub">Установка и авторизация Shizuku или AXManager</string>
+    <string name="settings_tool_permissions">Разрешения агента</string>
+    <string name="settings_tool_permissions_sub">Что агент может делать сам</string>
+    <string name="settings_shizuku_sub">Состояние root, установка и авторизация Shizuku</string>
     <string name="system_permissions_overlay_section">Разрешение на оверлей</string>
     <string name="system_permissions_overlay_row">Поверх других приложений</string>
     <string name="system_permissions_overlay_granted">Разрешено</string>
@@ -2344,4 +2344,11 @@
     <string name="chat_empty_prompt_d">Где начнём?</string>
     <string name="chat_empty_prompt_e">Доверьте это мне, рассказывайте.</string>
     <string name="chat_empty_prompt_f">Что сегодня в планах?</string>
+    <string name="appearance_ui_style_title">Стиль интерфейса</string>
+    <string name="appearance_style_classic">Классика</string>
+    <string name="appearance_style_glass">Стекло</string>
+    <string name="perm_more_privileges">Другие системные права</string>
+    <string name="session_prompt_title">Промпт сеанса</string>
+    <string name="chat_agent_presets_hint">Применяется к этому сеансу сразу.</string>
+    <string name="chat_agent_preset_applied">Переключено на %1$s (со следующего сообщения)</string>
 </resources>

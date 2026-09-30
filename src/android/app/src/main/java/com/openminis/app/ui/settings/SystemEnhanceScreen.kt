@@ -65,8 +65,6 @@ fun SystemEnhanceScreen(
     onOpenSystemPermissions: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val rootState by RootAccess.state.collectAsState()
-    var protection by remember { mutableStateOf(AccessibilityProtectionClient.isEnabled(context)) }
     var hooksOn by remember { mutableIntStateOf(enabledHookSwitchCount(context)) }
 
     // [T-eta-xposed-groups] The switches below are committed through the framework's service;
@@ -125,57 +123,6 @@ fun SystemEnhanceScreen(
         title = stringResource(R.string.system_enhance_title),
         onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
-        SettingsSection(header = stringResource(R.string.system_enhance_section_status)) {
-            SettingsRow(
-                icon = Icons.Outlined.Key,
-                iconColor = ChatColors.warn,
-                title = stringResource(R.string.system_enhance_root),
-                subtitle = rootStateSubtitle(rootState),
-                trailing = {
-                    MinisTextButton(
-                        onClick = { RootAccess.request(context) },
-                        enabled = !rootState.isChecking,
-                    ) {
-                        Text(
-                            if (rootState.isChecking) {
-                                stringResource(R.string.system_enhance_root_checking)
-                            } else {
-                                stringResource(R.string.system_enhance_root_action)
-                            },
-                        )
-                    }
-                },
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Accessibility,
-                iconColor = ChatColors.ok,
-                title = stringResource(R.string.system_enhance_protection),
-                subtitle = stringResource(
-                    if (protection) {
-                        R.string.system_enhance_protection_on
-                    } else {
-                        R.string.system_enhance_protection_off
-                    },
-                ),
-                onClick = onOpenSystemPermissions,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Extension,
-                iconColor = ChatColors.ok,
-                title = stringResource(R.string.system_enhance_hooks),
-                subtitle = stringResource(R.string.system_enhance_hooks_subtitle),
-                trailing = {
-                    Text(
-                        text = "$hooksOn/" + HOOK_SWITCH_KEYS.size,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                showChevron = false,
-                showDivider = false,
-            )
-        }
-
         SettingsSection(
             header = stringResource(R.string.module_settings_section_switches),
             footer = if (connected) null else stringResource(R.string.module_settings_not_connected),
@@ -306,7 +253,7 @@ private fun enabledHookSwitchCount(context: android.content.Context): Int =
  * stays listed. Only the second case can be fixed by the user, so it says how.
  */
 @Composable
-private fun rootStateSubtitle(state: RootAccessState): String = when {
+internal fun rootStateSubtitle(state: RootAccessState): String = when {
     state.isChecking -> stringResource(R.string.system_enhance_root_checking)
     state.status == RootAccessStatus.GRANTED -> stringResource(R.string.system_enhance_root_granted)
     state.status == RootAccessStatus.NOT_GRANTED ->
@@ -317,4 +264,34 @@ private fun rootStateSubtitle(state: RootAccessState): String = when {
         stringResource(R.string.system_enhance_root_hidden, state.rootManager)
     state.status == RootAccessStatus.UNAVAILABLE -> stringResource(R.string.system_enhance_root_absent)
     else -> stringResource(R.string.system_enhance_root_unknown)
+}
+
+/** The Root row: whether su works for this app, and a button to ask again. Shown on the Root & Shizuku page. */
+@Composable
+internal fun RootStatusSection() {
+    val context = LocalContext.current
+    val rootState by RootAccess.state.collectAsState()
+    SettingsSection(header = stringResource(R.string.system_enhance_root)) {
+        SettingsRow(
+            icon = Icons.Outlined.Key,
+            iconColor = ChatColors.warn,
+            title = stringResource(R.string.system_enhance_root),
+            subtitle = rootStateSubtitle(rootState),
+            showDivider = false,
+            trailing = {
+                MinisTextButton(
+                    onClick = { RootAccess.request(context) },
+                    enabled = !rootState.isChecking,
+                ) {
+                    Text(
+                        if (rootState.isChecking) {
+                            stringResource(R.string.system_enhance_root_checking)
+                        } else {
+                            stringResource(R.string.system_enhance_root_action)
+                        },
+                    )
+                }
+            },
+        )
+    }
 }

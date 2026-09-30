@@ -802,7 +802,7 @@
     <string name="memory_delete_confirm_title">Delete %1$s?</string>
     <string name="memory_delete_confirm_text">This will permanently remove this memory log.</string>
     <string name="memory_editor_placeholder">Enter content…</string>
-    <string name="perm_title">Permissions</string>
+    <string name="perm_title">Agent permissions</string>
     <string name="perm_reset_all">Reset All</string>
     <string name="perm_reset_confirm_title">Reset All Permissions?</string>
     <string name="perm_reset_confirm_text">This will reset all permission preferences. Continue?</string>
@@ -844,7 +844,7 @@
     <string name="perm_tool_photos">Photos</string>
 
     <!-- T322: Shizuku permission walkthrough -->
-    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_title">Root &amp; Shizuku</string>
     <string name="shizuku_settings_subtitle">Privileged Android control via Shizuku or AXManager</string>
     <string name="shizuku_status_header">Status</string>
     <string name="shizuku_status_footer">Shizuku exposes privileged system APIs to user apps without root, by running a small service started via wireless ADB or root. Three compatible providers are supported — Shizuku (RikkaApps), AXManager (Axeron), and Sui (a Magisk/KernelSU module for rooted devices); install any one. Once authorized, Minis can use the android-shizuku-cli CLI for package, permission, settings, input, and activity management.</string>
@@ -1840,8 +1840,8 @@
     <string name="hosted_tool_unknown">Provider tool</string>
     <string name="hosted_tool_failed">failed</string>
 
-    <string name="system_enhance_title">System enhancements</string>
-    <string name="system_enhance_row_subtitle">Root, the module, and what each one unlocks</string>
+    <string name="system_enhance_title">Modules</string>
+    <string name="system_enhance_row_subtitle">LSPosed module switches</string>
     <string name="system_enhance_section_status">Status</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Checking…</string>
@@ -1904,10 +1904,10 @@
     <string name="settings_cat_agent_sub2">Skills, memory, persona, prompt, MCP, team, tasks</string>
     <string name="settings_cat_chat_sub">Return key, focus after reply, thinking, grouping</string>
     <string name="settings_cat_appearance_sub2">Theme, fonts, language, app icon, desktop pet</string>
-    <string name="settings_cat_runtime_sub2">Rootfs, environment variables, tools</string>
+    <string name="settings_cat_runtime_sub2">Rootfs, environment variables</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, agent permissions, background and notifications</string>
     <string name="settings_cat_data_sub">Backup and restore, logs, updates, privacy</string>
-    <string name="settings_root_footer">Terminal and files are in the session drawer, and also under Runtime environment. The team and scheduled tasks are under Agent.</string>
+    <string name="settings_root_footer">Terminal and files are in the session drawer; the team and scheduled tasks are under Agent.</string>
     <string name="settings_attention_count">%1$d need attention</string>
     <string name="settings_ready_header">Readiness check</string>
     <string name="settings_ready_footer">What the Agent needs to work normally is gathered here. Optional items are not counted as not ready.</string>
@@ -1947,9 +1947,9 @@
     <string name="settings_system_footer">What this app may do on this device, and where each grant is changed.</string>
     <string name="settings_assistant_role_footer">The Home / power-key assistant gesture opens whichever app holds this role.</string>
     <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
-    <string name="settings_tool_permissions">Tool permissions</string>
-    <string name="settings_tool_permissions_sub">Let tools such as minis-config read and write app configuration</string>
-    <string name="settings_shizuku_sub">Install and authorise Shizuku or AXManager</string>
+    <string name="settings_tool_permissions">Agent permissions</string>
+    <string name="settings_tool_permissions_sub">What the agent may do on its own</string>
+    <string name="settings_shizuku_sub">Root status, Shizuku install and authorisation</string>
     <string name="system_permissions_overlay_section">Overlay permission</string>
     <string name="system_permissions_overlay_row">Display over other apps</string>
     <string name="system_permissions_overlay_granted">Granted</string>
@@ -2468,4 +2468,11 @@
     <string name="chat_empty_prompt_d">Where shall we begin?</string>
     <string name="chat_empty_prompt_e">Leave it to me, tell me more.</string>
     <string name="chat_empty_prompt_f">What\'s on your plate today?</string>
+    <string name="appearance_ui_style_title">Interface style</string>
+    <string name="appearance_style_classic">Classic</string>
+    <string name="appearance_style_glass">Glass</string>
+    <string name="perm_more_privileges">More system privileges</string>
+    <string name="session_prompt_title">Session prompt</string>
+    <string name="chat_agent_presets_hint">Applies to this session right away.</string>
+    <string name="chat_agent_preset_applied">Switched to %1$s (takes effect on the next message)</string>
 </resources>

@@ -319,7 +319,7 @@
     <string name="memory_delete_confirm_title">Supprimer %1$s ?</string>
     <string name="memory_delete_confirm_text">Cela supprimera définitivement ce log mémoire.</string>
     <string name="memory_editor_placeholder">Saisir le contenu…</string>
-    <string name="perm_title">Autorisations</string>
+    <string name="perm_title">Autorisations de l\'agent</string>
     <string name="perm_reset_all">Tout réinitialiser</string>
     <string name="perm_reset_confirm_title">Réinitialiser toutes les autorisations ?</string>
     <string name="perm_reset_confirm_text">Cela réinitialisera toutes les préférences d\'autorisation. Continuer ?</string>
@@ -1349,8 +1349,8 @@
     <string name="hosted_tool_unknown">Outil du fournisseur</string>
     <string name="hosted_tool_failed">échec</string>
 
-    <string name="system_enhance_title">Améliorations système</string>
-    <string name="system_enhance_row_subtitle">Root, module, et ce que chacun débloque</string>
+    <string name="system_enhance_title">Modules</string>
+    <string name="system_enhance_row_subtitle">Interrupteurs du module LSPosed</string>
     <string name="system_enhance_section_status">État</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Vérification…</string>
@@ -1413,10 +1413,10 @@
     <string name="settings_cat_agent_sub2">Compétences, mémoire, persona, prompt, MCP, équipe, tâches</string>
     <string name="settings_cat_chat_sub">Touche Entrée, focus après réponse, réflexion, regroupement</string>
     <string name="settings_cat_appearance_sub2">Thème, police, langue, icône, mascotte</string>
-    <string name="settings_cat_runtime_sub2">Rootfs, variables d’environnement, outils</string>
+    <string name="settings_cat_runtime_sub2">Rootfs, variables d\'environnement</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, autorisations de l’agent, arrière-plan et notifications</string>
     <string name="settings_cat_data_sub">Sauvegarde et restauration, journaux, mises à jour, confidentialité</string>
-    <string name="settings_root_footer">Le terminal et les fichiers sont dans le panneau des sessions et dans Environnement d’exécution. L’équipe et les tâches planifiées sont sous Agent.</string>
+    <string name="settings_root_footer">Le terminal et les fichiers sont dans le tiroir des sessions ; l\'équipe et les tâches planifiées sont dans Agent.</string>
     <string name="settings_attention_count">%1$d point(s) à traiter</string>
     <string name="settings_ready_header">Vérification de l’état</string>
     <string name="settings_ready_footer">Les conditions système dont l’agent a besoin sont regroupées ici. Les éléments facultatifs ne comptent pas comme non prêts.</string>
@@ -1456,9 +1456,9 @@
     <string name="settings_system_footer">Ce que cette app peut faire sur cet appareil, et où chaque autorisation se règle.</string>
     <string name="settings_assistant_role_footer">Le geste d\'assistant (Home / bouton d\'alimentation) ouvre l\'app qui détient ce rôle.</string>
     <string name="module_settings_assistant_role_hint">Minis ne reprend le bouton d\'alimentation qu\'une fois défini comme assistant système, dans « Autorisations ».</string>
-    <string name="settings_tool_permissions">Autorisations des outils</string>
-    <string name="settings_tool_permissions_sub">Autoriser des outils comme minis-config à lire et écrire la configuration</string>
-    <string name="settings_shizuku_sub">Installer et autoriser Shizuku ou AXManager</string>
+    <string name="settings_tool_permissions">Autorisations de l\'agent</string>
+    <string name="settings_tool_permissions_sub">Ce que l\'agent peut faire seul</string>
+    <string name="settings_shizuku_sub">État root, installation et autorisation de Shizuku</string>
     <string name="settings_bg_overlay">Superposition de tâches dans l\'app</string>
     <string name="system_permissions_overlay_section">Autorisation de superposition</string>
     <string name="system_permissions_overlay_row">Afficher par-dessus les autres apps</string>
@@ -1981,4 +1981,11 @@
     <string name="chat_empty_prompt_d">On commence où ?</string>
     <string name="chat_empty_prompt_e">Je m\'en occupe, dites-moi.</string>
     <string name="chat_empty_prompt_f">Au programme aujourd\'hui ?</string>
+    <string name="appearance_ui_style_title">Style d\'interface</string>
+    <string name="appearance_style_classic">Classique</string>
+    <string name="appearance_style_glass">Verre</string>
+    <string name="perm_more_privileges">Plus de privilèges système</string>
+    <string name="session_prompt_title">Invite de session</string>
+    <string name="chat_agent_presets_hint">S\'applique immédiatement à cette session.</string>
+    <string name="chat_agent_preset_applied">Passé à %1$s (effectif au prochain message)</string>
 </resources>

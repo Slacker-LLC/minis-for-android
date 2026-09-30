@@ -222,12 +222,20 @@ fun TerminalScreen(
 
     // Status-bar icons must be light on the black page, whatever the app theme says.
     val hostView = LocalView.current
-    DisposableEffect(hostView) {
-        val window = (hostView.context as? android.app.Activity)?.window
-        val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, hostView) }
-        val previous = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose { if (previous != null) controller.isAppearanceLightStatusBars = previous }
+    val hostWindow = (hostView.context as? android.app.Activity)?.window
+    val barController = remember(hostWindow, hostView) {
+        hostWindow?.let { androidx.core.view.WindowCompat.getInsetsController(it, hostView) }
+    }
+    // The activity re-applies its own bar style after a theme change, so set ours again one frame
+    // later as well as immediately; restore the page's setting when the terminal closes.
+    DisposableEffect(barController) {
+        val previous = barController?.isAppearanceLightStatusBars
+        barController?.isAppearanceLightStatusBars = false
+        onDispose { if (previous != null) barController.isAppearanceLightStatusBars = previous }
+    }
+    LaunchedEffect(barController) {
+        androidx.compose.runtime.withFrameNanos { }
+        barController?.isAppearanceLightStatusBars = false
     }
 
     Box(modifier = Modifier.fillMaxSize().background(chrome.bg)) {

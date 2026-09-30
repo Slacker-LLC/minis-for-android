@@ -188,13 +188,13 @@ fun MinisNavBar(
                             fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 110.dp),
+                            modifier = Modifier.widthIn(max = 78.dp),
                         )
                     }
                 }
             }
             if (titleSlot != null) {
-                Box(modifier = Modifier.align(Alignment.Center).padding(horizontal = 118.dp)) { titleSlot() }
+                Box(modifier = Modifier.align(Alignment.Center).padding(horizontal = 122.dp)) { titleSlot() }
             }
             Row(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 actions?.invoke()

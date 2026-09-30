@@ -311,7 +311,7 @@ fun SettingsCategoryScreen(
             SettingsCategory.CHAT, SettingsCategory.APPEARANCE, SettingsCategory.FILES -> Unit
 
             SettingsCategory.RUNTIME -> {
-                SettingsSection(footer = stringResource(R.string.settings_runtime_footer)) {
+                SettingsSection {
                     SettingsRow(
                         icon = Icons.Outlined.Dns,
                         iconColor = Color(0xFF636366),
@@ -334,15 +334,7 @@ fun SettingsCategoryScreen(
                 ReadinessCheckSection(onOpenBackground = onOpenBackground)
                 SettingsSection(
                     header = stringResource(R.string.settings_manage_header),
-                    footer = stringResource(R.string.settings_system_footer),
                 ) {
-                    SettingsRow(
-                        icon = Icons.Outlined.Shield,
-                        iconColor = Color(0xFFFF3B30),
-                        title = stringResource(R.string.system_enhance_title),
-                        subtitle = stringResource(R.string.system_enhance_row_subtitle),
-                        onClick = onSystemEnhanceClick,
-                    )
                     SettingsRow(
                         icon = Icons.Outlined.Terminal,
                         iconColor = Color(0xFF5856D6),
@@ -367,7 +359,7 @@ fun SettingsCategoryScreen(
                     SettingsRow(
                         icon = Icons.Outlined.Lock,
                         iconColor = Color(0xFF34C759),
-                        title = stringResource(R.string.settings_section_permissions),
+                        title = stringResource(R.string.system_permissions_title),
                         subtitle = stringResource(R.string.settings_permissions_category_sub),
                         onClick = onPermissionsClick,
                     )
@@ -377,8 +369,16 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.bg_section_header),
                         subtitle = stringResource(R.string.bg_section_subtitle),
                         onClick = onBackgroundClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.Shield,
+                        iconColor = Color(0xFFFF3B30),
+                        title = stringResource(R.string.system_enhance_title),
+                        subtitle = stringResource(R.string.system_enhance_row_subtitle),
+                        onClick = onSystemEnhanceClick,
                         showDivider = false,
                     )
+
                 }
             }
 

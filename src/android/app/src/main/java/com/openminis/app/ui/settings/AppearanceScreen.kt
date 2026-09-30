@@ -294,13 +294,11 @@ fun AppearanceScreen(
         // (liquid-glass surfaces over the page content). Switching applies
         // instantly via LocalUiStyle — no restart.
         SettingsSection(
-            header = "界面风格",
-            footer = "Android 12–15 启用原生模糊（Android 13–15 含折射）；" +
-                "Android 16 使用兼容磨砂效果，低版本自动降级。",
+            header = stringResource(R.string.appearance_ui_style_title),
         ) {
             SettingsCardBlock {
                 SettingsSegmented(
-                    options = listOf("经典", "玻璃拟态"),
+                    options = listOf(stringResource(R.string.appearance_style_classic), stringResource(R.string.appearance_style_glass)),
                     selectedIndex = uiStyle,
                     onSelect = { idx ->
                         uiStyle = idx
