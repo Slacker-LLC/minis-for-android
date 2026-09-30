@@ -1,5 +1,12 @@
 package com.openminis.app.ui.browser
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.openminis.app.ui.components.MinisTextButton
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
@@ -86,40 +93,56 @@ fun BrowserDownloadsSheet(
                 .fillMaxWidth()
                 .glassSheetSurface()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
+                .padding(bottom = 24.dp)
+                .fillMaxHeight(0.7f),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) {
+                    Text(stringResource(R.string.browser_history_done), fontSize = 17.sp)
+                }
                 Text(
                     stringResource(R.string.browser_downloads_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.align(Alignment.Center),
                 )
                 if (downloads.any { it.state != BrowserTabPool.DownloadState.DOWNLOADING }) {
-                    TextButton(onClick = { tabPool.clearFinishedDownloads() }) {
-                        Text(stringResource(R.string.browser_downloads_clear))
+                    MinisTextButton(
+                        onClick = { tabPool.clearFinishedDownloads() },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
+                        Text(stringResource(R.string.browser_downloads_clear), color = MaterialTheme.colorScheme.error, fontSize = 17.sp)
                     }
                 }
             }
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             if (downloads.isEmpty()) {
                 Text(
                     stringResource(R.string.browser_downloads_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp),
+                    modifier = Modifier.padding(vertical = 24.dp).align(Alignment.CenterHorizontally),
                 )
             } else {
-                LazyColumn {
-                    items(downloads, key = { it.id }) { entry ->
-                        DownloadRow(
-                            entry = entry,
-                            onCancel = { tabPool.cancelDownload(entry.id) },
-                            onOpen = { openDownloadedFile(context, entry) },
-                        )
-                        HorizontalDivider()
+                LazyColumn(modifier = Modifier.padding(top = 12.dp)) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.surface),
+                        ) {
+                            downloads.forEachIndexed { index, entry ->
+                                DownloadRow(
+                                    entry = entry,
+                                    onCancel = { tabPool.cancelDownload(entry.id) },
+                                    onOpen = { openDownloadedFile(context, entry) },
+                                )
+                                if (index < downloads.size - 1) {
+                                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                            }
+                        }
                     }
                 }
             }

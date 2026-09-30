@@ -1,5 +1,7 @@
 package com.openminis.app.ui.browser
 
+import com.openminis.app.ui.settings.SettingsSegmented
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import android.webkit.CookieManager
 import android.webkit.WebStorage
@@ -146,21 +148,20 @@ fun BrowserSettingsSheet(
                 .padding(bottom = 32.dp)
                 .navigationBarsPadding(),
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Header: title centered, Done on the right (board)
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
                     stringResource(R.string.browser_settings_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.align(Alignment.Center),
                 )
-                MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_settings_done)) }
+                MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd)) {
+                    Text(stringResource(R.string.browser_settings_done), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
 
             // ── User Agent ──
             Text(
@@ -171,42 +172,32 @@ fun BrowserSettingsSheet(
             Spacer(Modifier.height(8.dp))
 
             val notSetPlaceholder = stringResource(R.string.browser_settings_ua_not_set)
-            for (profile in UserAgentProfile.entries) {
-                val label = stringResource(when (profile) {
-                    UserAgentProfile.MOBILE_CHROME -> R.string.browser_settings_ua_mobile_chrome
-                    UserAgentProfile.DESKTOP_CHROME -> R.string.browser_settings_ua_desktop_chrome
-                    UserAgentProfile.CUSTOM -> R.string.browser_settings_ua_custom
-                })
-                val uaSubtitle = displayUA(profile, customUA, notSetPlaceholder)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = selectedProfile == profile,
-                        onClick = {
-                            selectedProfile = profile
-                            prefs.edit()
-                                .putString("user_agent_profile", profile.name)
-                                .apply()
-                            tabPool.setUserAgentFromUI(profile, if (profile == UserAgentProfile.CUSTOM) customUA else null)
-                        },
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            uaSubtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+            val profiles = UserAgentProfile.entries.toList()
+            SettingsSegmented(
+                options = profiles.map { profile ->
+                    stringResource(when (profile) {
+                        UserAgentProfile.MOBILE_CHROME -> R.string.browser_settings_ua_mobile_chrome
+                        UserAgentProfile.DESKTOP_CHROME -> R.string.browser_settings_ua_desktop_chrome
+                        UserAgentProfile.CUSTOM -> R.string.browser_settings_ua_custom
+                    }).substringBefore(" (").substringBefore("（")
+                },
+                selectedIndex = profiles.indexOf(selectedProfile),
+                onSelect = { i ->
+                    val profile = profiles[i]
+                    selectedProfile = profile
+                    prefs.edit().putString("user_agent_profile", profile.name).apply()
+                    tabPool.setUserAgentFromUI(profile, if (profile == UserAgentProfile.CUSTOM) customUA else null)
+                },
+            )
+            Text(
+                displayUA(selectedProfile, customUA, notSetPlaceholder),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+            )
 
             if (selectedProfile == UserAgentProfile.CUSTOM) {
                 OutlinedTextField(
