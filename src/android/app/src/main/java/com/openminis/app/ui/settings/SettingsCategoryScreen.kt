@@ -32,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +53,7 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
@@ -410,7 +410,7 @@ fun SettingsCategoryScreen(
     }
 
     if (showClearCorrectionConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearCorrectionConfirm = false },
             title = { Text(stringResource(R.string.voice_correction_clear_title)) },
             confirmButton = {

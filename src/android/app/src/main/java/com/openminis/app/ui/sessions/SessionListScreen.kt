@@ -107,7 +107,6 @@ import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.components.SectionTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Badge
@@ -190,6 +189,7 @@ import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.components.MinisOutlinedButton
 
 // FAB color — use shared theme values
 
@@ -1260,7 +1260,7 @@ fun SessionListScreen(
         // text fields, and MinisAlertDialog is a title/text/buttons component.
         // Widening it for a single caller would push layout complexity into
         // every other dialog in the app.
-        androidx.compose.material3.AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { folderToRename = null },
             title = { Text(stringResource(R.string.group_rename)) },
             text = {
@@ -3065,7 +3065,7 @@ internal fun SessionEditSheet(
             // matches iOS SessionEditSheet's dedicated section below Category.
             // Reuses SessionListViewModel.regenerateTitle; shows a spinner and
             // disables while running (regeneratingIds) to prevent double taps.
-            OutlinedButton(
+            MinisOutlinedButton(
                 onClick = onRegenerate,
                 enabled = !isRegenerating,
                 modifier = Modifier.fillMaxWidth(),

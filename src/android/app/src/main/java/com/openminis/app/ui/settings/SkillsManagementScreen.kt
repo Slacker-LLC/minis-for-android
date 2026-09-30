@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -103,6 +102,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Inline state for the three update actions on [SkillDetailScreen]
@@ -371,7 +371,7 @@ fun SkillsManagementScreen(
 
     if (deleteSkillId != null) {
         val skill = skills.find { it.id == deleteSkillId }
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteSkillId = null },
             title = { Text(stringResource(R.string.common_delete_confirm_title, skill?.name ?: stringResource(R.string.skill_fallback_name))) },
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
@@ -908,9 +908,7 @@ fun SkillDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
+                destructive = true,
             ) {
                 Text(stringResource(R.string.skill_detail_delete))
             }
@@ -920,7 +918,7 @@ fun SkillDetailScreen(
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(stringResource(R.string.common_delete_confirm_title, skill.name)) },
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
@@ -942,9 +940,8 @@ fun SkillDetailScreen(
     // the name or hasn't actually changed it — both would no-op the
     // repository call, so removing the affordance keeps the UX honest.
     if (showEditNameDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showEditNameDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = { Text(stringResource(R.string.skill_detail_edit_name_title)) },
             text = {
                 DialogTextField(

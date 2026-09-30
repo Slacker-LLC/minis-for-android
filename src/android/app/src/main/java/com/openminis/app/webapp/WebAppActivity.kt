@@ -37,7 +37,6 @@ import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -74,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.openminis.app.ui.components.MinisButton
 
 /**
  * T-pwa-1 (renamed Pwa → WebApp): immersive WebView host for a pinned
@@ -242,7 +242,7 @@ class WebAppActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Button(onClick = { openInMinis(sourceSessionId) }) {
+                                MinisButton(onClick = { openInMinis(sourceSessionId) }) {
                                     Text(stringResource(R.string.webapp_open_in_minis))
                                 }
                             }

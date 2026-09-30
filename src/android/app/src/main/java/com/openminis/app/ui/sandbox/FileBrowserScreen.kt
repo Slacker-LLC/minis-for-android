@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +69,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -199,7 +199,7 @@ fun FileBrowserScreen(
 
     // Delete confirmation
     deleteTarget?.let { item ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteTarget = null },
             title = { Text(stringResource(R.string.filebrowser_delete_title, item.name)) },
             text = { Text(stringResource(R.string.filebrowser_delete_message)) },
@@ -231,7 +231,7 @@ fun FileBrowserScreen(
 
     // Error dialog
     state.errorMessage?.let { msg ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { viewModel.dismissError() },
             title = { Text(stringResource(R.string.filebrowser_error_title)) },
             text = { Text(msg) },

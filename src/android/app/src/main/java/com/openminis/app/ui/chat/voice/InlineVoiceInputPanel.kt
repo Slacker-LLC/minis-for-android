@@ -82,6 +82,7 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-voice-panel] Inline voice input panel — Android port of iOS
@@ -493,7 +494,7 @@ fun InlineVoiceInputPanel(
             // correction runs regardless: consent governs whether we STORE the
             // learning data, not whether the feature works.
             if (showCorrectionConsent) {
-                androidx.compose.material3.AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = {
                         // Dismissing without choosing is not an answer; leave
                         // hasPrompted unset so the question can be asked again.

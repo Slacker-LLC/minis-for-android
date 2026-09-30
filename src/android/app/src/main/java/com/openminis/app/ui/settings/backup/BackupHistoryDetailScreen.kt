@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +44,7 @@ import com.openminis.app.backup.BackupHistory
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-backup-history-detail] One backup run, on its own screen.
@@ -197,7 +197,7 @@ fun BackupHistoryDetailScreen(
     }
 
     if (confirmRemove) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { confirmRemove = false },
             title = { Text(stringResource(R.string.backup_history_remove_title)) },
             // Spell out the difference. Removing a record looks like it could

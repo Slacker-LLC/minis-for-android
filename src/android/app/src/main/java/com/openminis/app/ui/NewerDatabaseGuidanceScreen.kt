@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.data.db.DatabaseVersionGuard
+import com.openminis.app.ui.components.MinisButton
 
 @Composable
 fun NewerDatabaseGuidanceScreen(onExit: () -> Unit) {
@@ -48,7 +48,7 @@ fun NewerDatabaseGuidanceScreen(onExit: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
-                    Button(onClick = onExit, modifier = Modifier.fillMaxWidth()) {
+                    MinisButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.newer_db_exit))
                     }
                 }

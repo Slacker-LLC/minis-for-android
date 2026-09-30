@@ -24,7 +24,6 @@ import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +60,7 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.MCPRepository
 import com.openminis.app.ui.components.DialogTextField
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * MCP Integrations management screen. Mirrors [SkillsManagementScreen]:
@@ -198,7 +198,7 @@ fun MCPIntegrationsScreen(
 
     if (deleteId != null) {
         val id = deleteId!!
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteId = null },
             title = { Text(stringResource(R.string.mcp_delete_title, id)) },
             text = { Text(stringResource(R.string.mcp_delete_message)) },
@@ -819,7 +819,7 @@ private fun MCPFormTab(
     // [T-mcp-env-var-delete-confirm-android] Confirm before wiping a non-empty
     // env field. Only reachable when env was non-blank at tap time.
     if (showClearEnvConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearEnvConfirm = false },
             title = { Text(stringResource(R.string.mcp_form_env_clear_confirm_title)) },
             text = { Text(stringResource(R.string.mcp_form_env_clear_confirm_message)) },

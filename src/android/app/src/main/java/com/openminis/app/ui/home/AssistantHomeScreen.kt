@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,6 +65,7 @@ import com.openminis.app.ui.browser.BrowserSheet
 import com.openminis.app.ui.settings.SettingsSwitchRow
 import com.openminis.app.ui.theme.ChatColors
 import java.time.LocalTime
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-assistant-home] The assistant home page: a greeting plus a 2×2
@@ -380,7 +380,7 @@ private fun MemoryPressureDialog(
     snapshot: MemoryPressureSnapshot,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(

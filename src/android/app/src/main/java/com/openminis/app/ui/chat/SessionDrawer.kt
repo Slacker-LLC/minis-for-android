@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -66,6 +65,7 @@ import com.openminis.app.data.repository.ChatRepository
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -292,7 +292,7 @@ fun SessionDrawerContent(
 
     // Rename Dialog
     sessionToRename?.let { session ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { sessionToRename = null },
             title = { Text(stringResource(R.string.drawer_rename_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
             text = {
@@ -329,7 +329,7 @@ fun SessionDrawerContent(
 
     // Delete Confirm Dialog
     sessionToDelete?.let { session ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { sessionToDelete = null },
             title = { Text(stringResource(R.string.drawer_delete_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
             text = { Text(stringResource(R.string.drawer_delete_session_confirm), fontSize = 14.sp) },

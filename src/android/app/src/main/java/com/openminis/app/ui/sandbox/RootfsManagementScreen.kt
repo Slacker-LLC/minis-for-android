@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.openminis.app.ui.components.SettingsRowDivider
 import com.openminis.app.ui.components.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -319,7 +319,7 @@ fun RootfsManagementScreen(
 
     // --- Dialogs ---
     if (showResetDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = { Text(stringResource(R.string.rootfs_reset_confirm_title)) },
             text = { Text(stringResource(R.string.rootfs_reset_confirm_message)) },
@@ -340,7 +340,7 @@ fun RootfsManagementScreen(
     }
 
     if (showResetBackupDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showResetBackupDialog = false },
             title = { Text(stringResource(R.string.rootfs_reset_backup_confirm_title)) },
             text = {

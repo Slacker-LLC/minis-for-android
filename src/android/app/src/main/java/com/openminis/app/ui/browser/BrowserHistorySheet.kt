@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -49,6 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -199,7 +199,7 @@ fun BrowserHistorySheet(
     }
 
     if (showClearConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearConfirm = false },
             title = { Text(stringResource(R.string.browser_history_clear_dialog_title)) },
             text = { Text(stringResource(R.string.browser_history_clear_dialog_message)) },

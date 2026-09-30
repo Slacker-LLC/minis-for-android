@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +33,7 @@ import com.openminis.app.provider.thinking.ThinkingResolveContext
 import com.openminis.app.provider.thinking.ThinkingRuleResolver
 import com.openminis.app.provider.thinking.ThinkingWireFormat
 import org.json.JSONObject
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /** What the section asks the editor to open with. */
 data class ThinkingRuleEditorRequest(
@@ -100,7 +100,7 @@ fun ThinkingRuleEditorDialog(
         (allModels || pattern.isNotBlank()) &&
         (choice != FormatChoice.CUSTOM_PATH || path.isNotBlank())
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(

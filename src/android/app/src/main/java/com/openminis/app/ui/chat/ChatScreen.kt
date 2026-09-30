@@ -142,7 +142,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import com.openminis.app.BuildConfig
@@ -6233,7 +6232,7 @@ fun ChatScreen(
             if (showAgentPresetSheet) {
                 val ActivePreset = com.openminis.app.remote.AgentPresetRegistry
                     .presetForSession(context, sessionId).id
-                androidx.compose.material3.AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = { showAgentPresetSheet = false },
                     title = { Text(stringResource(R.string.chat_agent_presets)) },
                     text = {

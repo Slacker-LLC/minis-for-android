@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,6 +67,7 @@ import com.openminis.app.logging.AppLogger
 import kotlinx.coroutines.launch
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.util.bringIntoViewOnFocus
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -420,7 +420,7 @@ fun BrowserSettingsSheet(
     }
 
     if (showClearConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearConfirm = false },
             title = { Text(stringResource(R.string.browser_settings_clear_all_dialog_title)) },
             text = { Text(stringResource(R.string.browser_settings_clear_all_dialog_message)) },

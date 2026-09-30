@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.width
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Settings-level memory file management.
@@ -145,7 +145,7 @@ fun MemoryManagementScreen(
 
     // Delete confirmation
     if (deleteFileName != null) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteFileName = null },
             title = { Text(stringResource(R.string.memory_delete_confirm_title, deleteFileName ?: "")) },
             text = { Text(stringResource(R.string.memory_delete_confirm_text)) },

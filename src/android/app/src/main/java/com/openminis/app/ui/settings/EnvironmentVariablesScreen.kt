@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +50,7 @@ import com.openminis.app.deeplink.DeepLinkCoordinator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Environment Variables \u2014 adopts the SettingsScaffold/SettingsSection
@@ -236,7 +236,7 @@ fun EnvironmentVariablesScreen(
     // Delete confirmation
     if (deleteEntryId != null) {
         val entry = entries.find { it.id == deleteEntryId }
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteEntryId = null },
             title = { Text(stringResource(R.string.common_delete_confirm_title, entry?.key ?: stringResource(R.string.env_variable_fallback_name))) },
             text = { Text(stringResource(R.string.env_var_delete_confirm_text)) },

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +36,7 @@ import com.openminis.app.backup.remote.RcloneRemoteStore
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-backup-destination-browse] What is actually stored on one destination.
@@ -121,7 +121,7 @@ fun BackupDestinationBrowseScreen(
     }
 
     pendingDelete?.let { pkg ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.backup_dest_delete_title)) },
             // A deleted package cannot be recovered, and this is the copy the

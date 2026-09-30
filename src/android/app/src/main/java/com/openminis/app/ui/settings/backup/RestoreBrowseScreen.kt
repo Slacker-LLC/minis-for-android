@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,6 +53,7 @@ import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-restore-browse] Walk a destination's folders and pick a backup.
@@ -162,7 +162,7 @@ fun RestoreBrowseScreen(
     // Size first, as on iOS: it is the fact that decides whether to proceed,
     // especially on a metered connection.
     confirming?.let { e ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { confirming = null },
             title = { Text(stringResource(R.string.restore_download_title)) },
             text = {

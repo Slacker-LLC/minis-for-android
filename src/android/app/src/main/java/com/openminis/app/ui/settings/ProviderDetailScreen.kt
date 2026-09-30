@@ -786,9 +786,7 @@ fun ProviderDetailScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .padding(top = 20.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-            ),
+            destructive = true,
         ) {
             Text(stringResource(R.string.provider_detail_delete_provider))
         }
@@ -920,10 +918,7 @@ private fun OAuthCredentialBlock(
                 displayedKey = ""
                 AppLogger.info(TAG, "OAuth signed out for ${instance.id} (tokens + apiKey cleared)")
             },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.error,
-            ),
+            destructive = true,
         ) {
             Text(stringResource(R.string.provider_detail_sign_out))
         }
@@ -1021,16 +1016,10 @@ private fun ApiKeyCredentialBlock(
             fieldModifier = Modifier.bringIntoViewOnFocus(),
         )
         Row(modifier = Modifier.padding(top = 8.dp)) {
-            // [T-android-settings-ui-md3] #4 + #12 Cancel is the SECONDARY action:
-            // a neutral outlined pill (onSurfaceVariant content/border), forming
-            // the standard MD3 outlined-vs-filled pair with the filled Save below.
-            // Previously a primary-teal text button — indistinguishable from Save.
+            // Cancel is the normal (regular-weight) action; Save is the primary
+            // (semi-bold) one. Both are text buttons (docs/design/UI-DESIGN-LANGUAGE.md §6).
             MinisSmallOutlinedButton(
                 onClick = onCancelEdit,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Text(stringResource(R.string.common_cancel))
             }
@@ -1140,10 +1129,6 @@ private fun ManualBearerTokenSection(
                     isEditing = false
                     draft = ""
                 },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Text(stringResource(R.string.common_cancel))
             }
@@ -1196,9 +1181,7 @@ private fun ManualBearerTokenSection(
                     AppLogger.info(TAG, "Manual bearer token removed for ${instance.id}")
                     reloadTick++
                 },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+                destructive = true,
             ) {
                 Text(stringResource(R.string.common_remove))
             }

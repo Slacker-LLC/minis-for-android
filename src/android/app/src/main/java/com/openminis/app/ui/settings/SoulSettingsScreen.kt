@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,6 +72,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-soul-md] Settings page for editing SOUL.md. Mirrors iOS
@@ -418,7 +418,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     // Dismissing the dialog by tapping outside keeps the edits — the
     // conservative reading of an ambiguous gesture.
     if (showDiscardDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showDiscardDialog = false },
             title = { Text(stringResource(R.string.soul_discard_confirm_title)) },
             text = { Text(stringResource(R.string.soul_discard_confirm_body)) },
@@ -437,7 +437,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     }
 
     if (showRestoreDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showRestoreDialog = false },
             title = { Text(stringResource(R.string.soul_restore_confirm_title)) },
             text = { Text(stringResource(R.string.soul_restore_confirm_body)) },
@@ -462,7 +462,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     }
 
     saveError?.let { err ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { saveError = null },
             title = { Text(stringResource(R.string.soul_save_error_title)) },
             text = { Text(err) },
@@ -478,7 +478,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     // remaining rejections are "couldn't be read" and "too large", neither of
     // which can be predicted before the user picks a file.
     iconError?.let { err ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { iconError = null },
             title = { Text(stringResource(R.string.soul_icon_error_title)) },
             text = { Text(err) },

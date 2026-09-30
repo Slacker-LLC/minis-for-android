@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderShared
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -80,6 +79,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Settings → Mount External Folders. Mirrors iOS MountedFoldersSettingsView.
@@ -342,7 +342,7 @@ fun MountedFoldersScreen(
             addError = null
             addErrorNeedsAllFilesAccess = false
         }
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { dismiss() },
             confirmButton = {
                 if (offersAccess) {
@@ -386,7 +386,7 @@ fun MountedFoldersScreen(
     // restriction in our own words before the user leaves our UI, and
     // (b) land them somewhere selectable (see initialPickerUri()).
     if (showPickerIntro) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showPickerIntro = false },
             title = { Text(stringResource(R.string.mount_picker_intro_title)) },
             text = { Text(stringResource(R.string.mount_picker_intro_message)) },

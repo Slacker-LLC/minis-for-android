@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-kimi-oauth] Device-code login dialog for Kimi Code (RFC 8628): shows the
@@ -62,7 +62,7 @@ fun KimiDeviceLoginDialog(
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.kimi_login_title)) },
         text = {

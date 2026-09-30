@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +34,7 @@ import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Stateless detail body composables used by [SessionMemorySheet] when a row
@@ -252,7 +252,7 @@ fun RevokeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.memory_revoke_dialog_title)) },
         text = { Text(stringResource(R.string.memory_revoke_dialog_message)) },
@@ -290,7 +290,7 @@ fun MutationResultDialog(
         is MemoryRepository.EntryMutationResult.IOError ->
             ctx.getString(R.string.memory_revoke_result_io_error, result.message)
     }
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         text = { Text(msg) },
         confirmButton = {

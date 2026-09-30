@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +45,7 @@ import com.openminis.app.roleplay.CharacterWorldbookDraftCodec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-eta-character-cards] One character, and the world book that decides what it remembers.
@@ -271,7 +271,7 @@ private fun EntryEditorDialog(
     var before by remember(entry) { mutableStateOf(entry.position == "before_char") }
     var constant by remember(entry) { mutableStateOf(entry.constant) }
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.characters_entry_edit)) },
         text = {

@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderShared
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Detail/edit screen for a single mounted folder. Mirrors iOS
@@ -211,7 +211,7 @@ fun MountDetailScreen(
     }
 
     if (showUnmountConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showUnmountConfirm = false },
             title = { Text(stringResource(R.string.mount_unmount_title)) },
             text = { Text(stringResource(R.string.mount_unmount_message)) },

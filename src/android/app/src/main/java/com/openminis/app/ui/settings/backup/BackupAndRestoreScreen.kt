@@ -46,7 +46,6 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.UnfoldMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -89,6 +88,7 @@ import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-backup-primary-action] Shared content for the two primary actions —
@@ -401,18 +401,11 @@ private fun BackupTab(
             enabled = running || (
                 selected.isNotEmpty() && passphraseValid && destinations.isNotEmpty()
                 ),
-            colors = if (running) {
-                androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                )
-            } else {
-                androidx.compose.material3.ButtonDefaults.buttonColors()
-            },
+            destructive = running,
             modifier = Modifier.fillMaxWidth(),
         ) {
             // Stop is the destructive counterpart, so it gets the stop glyph
-            // on the red container rather than the same cloud-upload icon in a
+            // in red rather than the same cloud-upload icon in a
             // different colour.
             PrimaryActionContent(
                 icon = if (running) Icons.Outlined.Stop else Icons.Outlined.CloudUpload,
@@ -1372,7 +1365,7 @@ private fun ServerPackagePicker(
     val running by vm.isRunning.collectAsState()
     val status by vm.statusText.collectAsState()
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(remote.name) },
         text = {

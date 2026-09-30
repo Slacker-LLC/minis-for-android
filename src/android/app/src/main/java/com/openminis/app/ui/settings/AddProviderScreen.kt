@@ -895,7 +895,6 @@ private fun ColumnScope.OAuthConfigSection(
                     if (isAuthenticating) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.dp,
                         )
                         Spacer(Modifier.width(8.dp))
