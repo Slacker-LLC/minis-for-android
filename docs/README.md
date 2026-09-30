@@ -27,6 +27,7 @@
 | [development/HANDOFF-2026-09-19.md](development/HANDOFF-2026-09-19.md) | 2026-09-19 的交接快照（过去/现在/将来）；查当前状态请回 PROGRESS.md |
 | [I18N.md](I18N.md) | 本地化：语言目录、硬规则、转义与复数坑、审计工具、当前覆盖与剩余 |
 | [REFERENCES.md](REFERENCES.md) | 资料索引：Eta 源码速查、上游链接、许可文本、工具链版本 |
+| [design/UI-DESIGN-LANGUAGE.md](design/UI-DESIGN-LANGUAGE.md) | UI 设计语言：纯白 iOS 风格的令牌、按钮/弹层/抽屉规则、信息架构调整与落地进度 |
 
 ## Eta 对照分析
 
