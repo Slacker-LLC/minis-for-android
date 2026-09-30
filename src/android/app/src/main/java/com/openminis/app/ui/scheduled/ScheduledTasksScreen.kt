@@ -59,6 +59,7 @@ import com.openminis.app.scheduled.ScheduledTaskPermissionTier
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-scheduled-tasks-design / T-android-scheduled-tasks-run-records]
@@ -136,7 +137,7 @@ fun ScheduledTasksScreen(
 
     val toDelete = pendingDelete
     if (toDelete != null) {
-        androidx.compose.material3.AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.scheduled_task_delete_title)) },
             text = { Text(stringResource(R.string.scheduled_task_delete_body, toDelete.label)) },

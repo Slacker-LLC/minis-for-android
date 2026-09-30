@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +44,8 @@ import com.openminis.app.backup.BackupHistory
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * [T-android-backup-history-detail] One backup run, on its own screen.
@@ -197,7 +198,7 @@ fun BackupHistoryDetailScreen(
     }
 
     if (confirmRemove) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { confirmRemove = false },
             title = { Text(stringResource(R.string.backup_history_remove_title)) },
             // Spell out the difference. Removing a record looks like it could
@@ -298,11 +299,11 @@ private fun StatusValue(status: BackupHistory.Status) {
         BackupHistory.Status.RUNNING ->
             Triple(null, MaterialTheme.colorScheme.onSurfaceVariant, R.string.backup_history_running)
         BackupHistory.Status.SUCCEEDED ->
-            Triple(Icons.Outlined.CheckCircle, Color(0xFF34C759), R.string.backup_status_succeeded)
+            Triple(Icons.Outlined.CheckCircle, ChatColors.ok, R.string.backup_status_succeeded)
         BackupHistory.Status.COMPLETED_WITH_ISSUES ->
-            Triple(Icons.Outlined.Warning, Color(0xFFFF9500), R.string.backup_status_issues)
+            Triple(Icons.Outlined.Warning, ChatColors.warn, R.string.backup_status_issues)
         BackupHistory.Status.FAILED ->
-            Triple(Icons.Outlined.ErrorOutline, Color(0xFFFF3B30), R.string.backup_status_failed)
+            Triple(Icons.Outlined.ErrorOutline, ChatColors.bad, R.string.backup_status_failed)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
@@ -334,7 +335,7 @@ private fun DestinationOutcomeRow(
             Icon(
                 if (outcome.succeeded) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline,
                 contentDescription = null,
-                tint = if (outcome.succeeded) Color(0xFF34C759) else Color(0xFFFF3B30),
+                tint = if (outcome.succeeded) ChatColors.ok else ChatColors.bad,
                 modifier = Modifier.size(22.dp),
             )
             Spacer(Modifier.width(12.dp))

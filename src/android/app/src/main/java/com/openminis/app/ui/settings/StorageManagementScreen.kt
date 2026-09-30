@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.openminis.app.ui.components.MinisAlertDialog
 
 private data class SessionStorageInfo(
     val id: String,
@@ -293,7 +293,7 @@ fun SessionStorageDetailScreen(
     }
 
     if (showClearDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearDialog = false },
             title = { Text(stringResource(R.string.storage_clear_confirm_title)) },
             text = {

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +25,7 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Dialog shown when an ASK_ONCE tool requests permission.
@@ -48,13 +48,10 @@ fun OffloadPermissionDialog() {
     val request by OffloadPermissionManager.pendingRequest.collectAsState()
     val req = request ?: return
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = {
             OffloadPermissionManager.respondToRequest(OffloadPermissionManager.Response.DENY_SESSION)
         },
-        containerColor = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(16.dp),
         title = {
             Text(
                 stringResource(R.string.offload_perm_dialog_title),
@@ -71,7 +68,7 @@ fun OffloadPermissionDialog() {
                 Spacer(Modifier.height(10.dp))
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F1EC),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.padding(10.dp)) {

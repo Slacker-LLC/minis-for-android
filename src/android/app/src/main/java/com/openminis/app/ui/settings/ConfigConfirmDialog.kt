@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -44,6 +43,7 @@ import com.openminis.app.config.confirm.ConfigConfirmationGate
 import com.openminis.app.config.confirm.PendingConfigChange
 import com.openminis.app.config.confirm.PendingConfigChangeItem
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Root-level confirmation dialog for every minis-config write.
@@ -75,7 +75,7 @@ private fun ConfigConfirmDialog(change: PendingConfigChange) {
 
     val approvedCount = workingItems.count { it.isApproved }
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = { /* force explicit Apply / Cancel */ },
         properties = DialogProperties(
             dismissOnBackPress = false,

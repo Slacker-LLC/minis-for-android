@@ -276,11 +276,7 @@ fun LazyListScope.modelEntryPickerItems(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            RoundedCornerShape(12.dp),
-                        )
-                        .clip(RoundedCornerShape(12.dp))
+                        .groupedCard(RoundedCornerShape(12.dp))
                         .clickable { onToggleSelection(firstEntry.id) }
                         .padding(horizontal = 16.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -313,10 +309,7 @@ fun LazyListScope.modelEntryPickerItems(
                 Column(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            RoundedCornerShape(12.dp),
-                        ),
+                        .groupedCard(RoundedCornerShape(12.dp)),
                 ) {
                     entries.forEachIndexed { index, entry ->
                         val isSelected = entry.id in selectedIds

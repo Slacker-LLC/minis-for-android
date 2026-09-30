@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -61,12 +60,14 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.theme.minisSheetColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import androidx.compose.material.icons.outlined.Add
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Bottom sheet listing all chat sessions except the current one. Tapping
@@ -97,10 +98,10 @@ fun MoveToSessionSheet(
         }
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 16.dp)) {

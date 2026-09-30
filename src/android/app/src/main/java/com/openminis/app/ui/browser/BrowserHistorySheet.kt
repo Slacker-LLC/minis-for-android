@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,7 +28,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -45,10 +43,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.browser.BrowserHistoryStore
+import com.openminis.app.ui.theme.minisSheetColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,10 +67,10 @@ fun BrowserHistorySheet(
         else mapOf("Results" to historyStore.search(searchQuery))
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(
@@ -199,7 +200,7 @@ fun BrowserHistorySheet(
     }
 
     if (showClearConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearConfirm = false },
             title = { Text(stringResource(R.string.browser_history_clear_dialog_title)) },
             text = { Text(stringResource(R.string.browser_history_clear_dialog_message)) },

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
+import com.openminis.app.ui.theme.minisSheetColor
 import java.io.File
 import com.openminis.app.runtime.files.WorkspaceFileClient
 import androidx.core.content.ContextCompat
@@ -139,10 +140,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import com.openminis.app.BuildConfig
@@ -156,7 +155,6 @@ import com.openminis.app.ui.settings.SettingsRow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -296,6 +294,7 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 // iOS ChatColors equivalent
 internal val ToolCheckColor = Color(0xFF34C759) // iOS .green
@@ -766,7 +765,6 @@ fun ChatScreen(
     var showMcpsSheet by remember { mutableStateOf(false) }
     // GH#32/#35: session-local prompt/model/tool overrides.
     var showSessionConfigSheet by remember { mutableStateOf(false) }
-    var showSessionInfoSheet by remember { mutableStateOf(false) }
     var showSessionAdvancedSettings by rememberSaveable { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
@@ -2469,7 +2467,7 @@ fun ChatScreen(
                             onDismissRequest = { showChatMenu = false },
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            // 会话配置 (提示词、技能、MCP、记忆)
+                            // 会话设置 (提示词、技能、MCP、记忆、Token 用量、自动压缩、快速模式)
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.session_config_title)) },
                                 onClick = {
@@ -2478,17 +2476,6 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.Settings, contentDescription = null)
-                                },
-                            )
-                            // Token 用量 (直达 Token 用量面板)
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.settings_token_usage)) },
-                                onClick = {
-                                    showChatMenu = false
-                                    showTokenUsageSheet = true
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Outlined.BarChart, contentDescription = null)
                                 },
                             )
                             // 打开浏览器
@@ -5552,7 +5539,7 @@ fun ChatScreen(
                                             modifier = Modifier
                                                 .size(7.dp)
                                                 .background(
-                                                    if (modelName.isNotEmpty()) Color(0xFF34C759) else Color(0xFFFF9500),
+                                                    if (modelName.isNotEmpty()) ChatColors.ok else ChatColors.warn,
                                                     CircleShape,
                                                 ),
                                         )
@@ -5606,7 +5593,7 @@ fun ChatScreen(
                                             Icon(
                                                 Icons.Default.AutoAwesome,
                                                 contentDescription = null,
-                                                tint = if (isEntrySelected) Color(0xFF34C759) else ChatColors.secondaryText,
+                                                tint = if (isEntrySelected) ChatColors.ok else ChatColors.secondaryText,
                                                 modifier = Modifier.size(18.dp),
                                             )
                                         },
@@ -6106,7 +6093,7 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
-                                    .background(Color(0xFFFF3B30), CircleShape)
+                                    .background(ChatColors.bad, CircleShape)
                                     .clip(CircleShape)
                                     .clickable { viewModel.cancelStream() },
                                 contentAlignment = Alignment.Center,
@@ -6233,7 +6220,7 @@ fun ChatScreen(
             if (showAgentPresetSheet) {
                 val ActivePreset = com.openminis.app.remote.AgentPresetRegistry
                     .presetForSession(context, sessionId).id
-                androidx.compose.material3.AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = { showAgentPresetSheet = false },
                     title = { Text(stringResource(R.string.chat_agent_presets)) },
                     text = {
@@ -6419,19 +6406,12 @@ fun ChatScreen(
     // Session Config Sheet (grouping prompt, skills, mcps, memory)
     if (showSessionConfigSheet) {
         SessionConfigSheet(
+            viewModel = viewModel,
             onDismiss = { showSessionConfigSheet = false },
             onOpenPrompt = { showSessionAdvancedSettings = true },
             onOpenSkills = { showSkillsSheet = true },
             onOpenMcps = { showMcpsSheet = true },
             onOpenMemory = { viewModel.toggleMemorySheet() },
-        )
-    }
-
-    // Session Info Sheet (token usage, auto compact, fast mode)
-    if (showSessionInfoSheet) {
-        SessionInfoSheet(
-            viewModel = viewModel,
-            onDismiss = { showSessionInfoSheet = false },
             onOpenTokenUsage = { showTokenUsageSheet = true },
         )
     }
@@ -6761,9 +6741,9 @@ private fun ThinkingLevelSheet(
         listOf(com.openminis.app.data.model.ThinkingLevel.OFF) +
             availableLevels.filter { it != com.openminis.app.data.model.ThinkingLevel.OFF }
     }
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 12.dp)) {

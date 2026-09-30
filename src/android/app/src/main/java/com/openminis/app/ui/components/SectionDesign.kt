@@ -1,5 +1,8 @@
 package com.openminis.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,9 +15,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * Single source of truth for Settings section-card visual rhythm.
@@ -79,19 +85,24 @@ object SectionDesign {
      *  than touching the card edge — matches iOS). */
     val DividerStartInset = 16.dp
 
-    /** Card background — match iOS pure surface (white in light, near-black in dark).
-     *  T313 follow-up: The app theme deliberately overrides Material3 semantics —
-     *  `surface` is the page-level grouped background (gray / black) while
-     *  `surfaceContainerLow` is the brighter card foreground. Using
-     *  `surfaceContainerLow` here gives us the card color iOS Settings expects. */
+    /** Grouped-card background (design language §3/§5): pure white in light —
+     *  the card is separated from the page only by [cardBorder]'s hairline —
+     *  and the raised `#1C1C1E` level in dark. This is deliberately NOT
+     *  `surfaceContainerLow`: that token is the single fill grey (`#F2F2F7`)
+     *  used by inputs, bubbles and tiles. */
     @Composable
     @ReadOnlyComposable
-    fun cardColor(): Color = MaterialTheme.colorScheme.surfaceContainerLow
+    fun cardColor(): Color =
+        if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceContainerLow
+        else MaterialTheme.colorScheme.surface
 
-    /** Section background (the gray behind the cards) — match iOS systemGroupedBackground.
-     *  Pairs with [cardColor]: this token is the dimmer page-level surface
-     *  (`background` = light gray / near-black), so cards painted in
-     *  `surfaceContainerLow` stand out against it. */
+    /** Card hairline (0.5dp `outlineVariant`: `#E5E5EA` light / `#38383A` dark). */
+    @Composable
+    @ReadOnlyComposable
+    fun cardBorder(): BorderStroke = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+
+    /** Page background behind the cards: pure white in light, near-black in dark.
+     *  Cards ([cardColor]) sit on it and are told apart by [cardBorder]. */
     @Composable
     @ReadOnlyComposable
     fun screenBackgroundColor(): Color = MaterialTheme.colorScheme.background
@@ -106,6 +117,14 @@ object SectionDesign {
     @ReadOnlyComposable
     fun footerColor(): Color = MaterialTheme.colorScheme.onSurfaceVariant
 }
+
+/** Grouped card for call sites that draw with modifiers instead of a
+ *  [Surface]: clip + [cardColor] + hairline, in that order. */
+@Composable
+fun Modifier.groupedCard(shape: Shape = SectionDesign.CardShape): Modifier =
+    this.clip(shape)
+        .background(SectionDesign.cardColor(), shape)
+        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, shape)
 
 /**
  * Section title above a card. iOS reference uses 17pt SemiBold sentence-case
@@ -152,7 +171,7 @@ fun SectionFooter(
 
 /**
  * Container for one or more rows in a settings section. Replaces ad-hoc
- * Surface(surfaceContainerLow, RoundedCornerShape(12.dp)) call sites that
+ * Surface(card colour, RoundedCornerShape(12.dp)) call sites that
  * each pick their own color / shape / padding. Pass child rows; they get
  * the card background + corner clipping and divide themselves with
  * [SectionDivider] when stacked.
@@ -165,6 +184,7 @@ fun SectionCard(
     Surface(
         color = SectionDesign.cardColor(),
         shape = SectionDesign.CardShape,
+        border = SectionDesign.cardBorder(),
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = SectionDesign.ScreenHorizontalPadding),

@@ -132,7 +132,7 @@ fun AskUserQuestionDialog(sessionId: String) {
                         onClick = {},
                     ),
                 shape = RoundedCornerShape(18.dp),
-                color = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                 shadowElevation = 10.dp,
@@ -279,7 +279,7 @@ fun DangerousOperationApprovalDialog(sessionId: String) {
                         onClick = {},
                     ),
                 shape = RoundedCornerShape(18.dp),
-                color = if (ChatColors.isDark) MaterialTheme.colorScheme.surface else Color(0xFFFAF9F6),
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                 shadowElevation = 10.dp,
@@ -299,7 +299,7 @@ fun DangerousOperationApprovalDialog(sessionId: String) {
                     Spacer(Modifier.height(14.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = if (ChatColors.isDark) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFF2F1EC),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(

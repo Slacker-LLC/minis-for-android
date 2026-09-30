@@ -29,7 +29,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,6 +48,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.key
+import com.openminis.app.ui.components.groupedCard
+import com.openminis.app.ui.theme.ChatColors
 import sh.calvin.reorderable.ReorderableColumn
 import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.repository.ProviderRepository
@@ -59,6 +60,7 @@ import com.openminis.app.ui.components.SwipeRowAction
 import com.openminis.app.ui.components.SwipeRowActions
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.R
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,8 +139,7 @@ fun ProviderListScreen(
                     .fillMaxWidth()
                     .padding(top = 20.dp)
                     .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .groupedCard(RoundedCornerShape(14.dp))
                     .padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -316,7 +317,7 @@ fun ProviderListScreen(
     }
 
     if (showMenu) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showMenu = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
@@ -406,7 +407,7 @@ private fun ProviderInstanceRow(
             modifier = Modifier
                 .size(8.dp)
                 .background(
-                    color = if (isActive) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                    color = if (isActive) ChatColors.ok else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
                     shape = CircleShape,
                 ),
         )

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -35,6 +34,7 @@ import com.openminis.app.ui.settings.SettingsValueRow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.components.MinisButton
 
 /**
  * First-class editor for GH#32 session-local agent configuration.
@@ -269,7 +269,7 @@ fun SessionAdvancedSettingsSheet(
                         Text(stringResource(R.string.session_advanced_reset_all))
                     }
 
-                    Button(
+                    MinisButton(
                         enabled = !isSaving && persistedSessionId != null && errorText != missingSessionMessage,
                         onClick = save@{
                             val sid = persistedSessionId ?: return@save

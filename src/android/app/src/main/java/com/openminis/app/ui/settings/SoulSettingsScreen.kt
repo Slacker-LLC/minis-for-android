@@ -25,13 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,10 +67,13 @@ import com.openminis.app.agent.SoulFile
 import com.openminis.app.agent.SoulMDParser
 import com.openminis.app.agent.SoulMetadata
 import com.openminis.app.agent.SoulStore
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.withContext
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * [T-soul-md] Settings page for editing SOUL.md. Mirrors iOS
@@ -365,7 +366,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 val isOverLimit = bodyLimitCheck.isOverLimit
                 val warnColor: Color =
-                    if (isOverLimit) Color(0xFFFF3B30)
+                    if (isOverLimit) ChatColors.bad
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 val indicatorText: String = when (val c = bodyLimitCheck) {
                     is SoulBodyLimitCheck.Ok -> {
@@ -418,7 +419,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     // Dismissing the dialog by tapping outside keeps the edits — the
     // conservative reading of an ambiguous gesture.
     if (showDiscardDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showDiscardDialog = false },
             title = { Text(stringResource(R.string.soul_discard_confirm_title)) },
             text = { Text(stringResource(R.string.soul_discard_confirm_body)) },
@@ -437,7 +438,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     }
 
     if (showRestoreDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showRestoreDialog = false },
             title = { Text(stringResource(R.string.soul_restore_confirm_title)) },
             text = { Text(stringResource(R.string.soul_restore_confirm_body)) },
@@ -462,7 +463,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     }
 
     saveError?.let { err ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { saveError = null },
             title = { Text(stringResource(R.string.soul_save_error_title)) },
             text = { Text(err) },
@@ -478,7 +479,7 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
     // remaining rejections are "couldn't be read" and "too large", neither of
     // which can be predicted before the user picks a file.
     iconError?.let { err ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { iconError = null },
             title = { Text(stringResource(R.string.soul_icon_error_title)) },
             text = { Text(err) },
@@ -597,7 +598,7 @@ private fun SoulEmojiPickerSheet(
     onPick: (String) -> Unit,
 ) {
     var draft by remember { mutableStateOf(current) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    MinisModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

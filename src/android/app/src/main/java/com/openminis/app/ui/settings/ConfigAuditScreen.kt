@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
@@ -50,6 +49,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Logs → Config Changes tab. Lists every config write attempt
@@ -142,7 +142,7 @@ fun ConfigAuditScreen(modifier: Modifier = Modifier) {
 
     // Confirm-revert dialog.
     revertCandidate?.let { entry ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { revertCandidate = null },
             title = { Text(stringResource(R.string.logs_config_revert_dialog_title)) },
             text = {
@@ -196,7 +196,7 @@ fun ConfigAuditScreen(modifier: Modifier = Modifier) {
 
     // Result alert.
     revertResult?.let { msg ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { revertResult = null },
             title = { Text(msg.title) },
             text = { Text(msg.body) },

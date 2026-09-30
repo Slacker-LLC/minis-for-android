@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -41,7 +40,9 @@ import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.theme.minisSheetColor
 import java.util.Locale
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Modal sheet listing the active recognizer's supported languages. Tapping a
@@ -69,10 +70,10 @@ fun SpeechLanguagePickerSheet(
         )
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.background,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(modifier = Modifier.fillMaxWidth().glassSheetSurface()) {

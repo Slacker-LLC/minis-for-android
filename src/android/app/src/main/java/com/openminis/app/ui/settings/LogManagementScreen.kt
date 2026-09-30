@@ -24,7 +24,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Log management screen — adopts the SettingsSection/SettingsRow toolkit
@@ -171,7 +171,7 @@ fun LogManagementScreen(
     }
 
     if (showDeleteAllConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showDeleteAllConfirm = false },
             title = { Text(stringResource(R.string.log_delete_confirm_title)) },
             text = {

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-eta-character-cards] Choose the character a session talks to, or clear the choice.
@@ -67,7 +67,7 @@ fun CharacterPickerDialog(
         }
     }
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.characters_pick_title)) },
         text = {

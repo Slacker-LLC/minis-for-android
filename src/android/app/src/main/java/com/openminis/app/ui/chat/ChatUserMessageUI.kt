@@ -145,7 +145,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -444,7 +443,7 @@ internal fun UserMessageBubble(
                                 Icon(
                                     imageVector = Icons.Filled.Cancel,
                                     contentDescription = stringResource(R.string.chat_withdraw_queued_message),
-                                    tint = Color(0xFFFF3B30),
+                                    tint = ChatColors.bad,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }

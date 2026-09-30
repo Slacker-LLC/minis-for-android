@@ -4,6 +4,9 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.SkillArchiveReader
 import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.groupedCard
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.minisSheetColor
 import com.openminis.app.util.BoundedStreams
 
 import android.net.Uri
@@ -51,7 +54,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Language
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,7 +63,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import com.openminis.app.ui.components.DialogTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -103,6 +104,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * Inline state for the three update actions on [SkillDetailScreen]
@@ -323,9 +326,9 @@ fun SkillsManagementScreen(
     }
 
     if (showAddMenu) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showAddMenu = false },
-            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         ) {
             GlassSheetWindowBlur()
             Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 32.dp)) {
@@ -371,7 +374,7 @@ fun SkillsManagementScreen(
 
     if (deleteSkillId != null) {
         val skill = skills.find { it.id == deleteSkillId }
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteSkillId = null },
             title = { Text(stringResource(R.string.common_delete_confirm_title, skill?.name ?: stringResource(R.string.skill_fallback_name))) },
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
@@ -466,10 +469,10 @@ private fun SkillImportSheet(
         }
     }
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(
@@ -838,9 +841,9 @@ fun SkillDetailScreen(
                     is UpdateStatus.Done -> {
                         DetailDivider()
                         DetailRow {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ChatColors.ok, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(10.dp))
-                            Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = Color(0xFF34C759))
+                            Text(stringResource(R.string.skill_detail_updated), style = MaterialTheme.typography.bodySmall, color = ChatColors.ok)
                         }
                     }
                     is UpdateStatus.Failed -> {
@@ -908,9 +911,7 @@ fun SkillDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
+                destructive = true,
             ) {
                 Text(stringResource(R.string.skill_detail_delete))
             }
@@ -920,7 +921,7 @@ fun SkillDetailScreen(
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(stringResource(R.string.common_delete_confirm_title, skill.name)) },
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
@@ -942,9 +943,8 @@ fun SkillDetailScreen(
     // the name or hasn't actually changed it — both would no-op the
     // repository call, so removing the affordance keeps the UX honest.
     if (showEditNameDialog) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showEditNameDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = { Text(stringResource(R.string.skill_detail_edit_name_title)) },
             text = {
                 DialogTextField(
@@ -994,8 +994,7 @@ private fun DetailSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                .groupedCard(RoundedCornerShape(12.dp)),
         ) {
             content()
         }

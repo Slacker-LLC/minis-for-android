@@ -15,17 +15,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,22 +43,34 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.ui.theme.ChatColors
 
+/**
+ * One session settings panel (docs/design/UI-DESIGN-LANGUAGE.md §9): what used to be split
+ * between this sheet (prompt, skills, MCPs, memory) and a separate session-info sheet (token
+ * usage, auto compact, fast mode — which had no entry point) now lives in a single place.
+ */
 @Composable
 fun SessionConfigSheet(
+    viewModel: ChatViewModel,
     onDismiss: () -> Unit,
     onOpenPrompt: () -> Unit,
     onOpenSkills: () -> Unit,
     onOpenMcps: () -> Unit,
     onOpenMemory: () -> Unit,
+    onOpenTokenUsage: () -> Unit,
 ) {
+    val autoCompactOn by viewModel.autoCompactEnabled.collectAsState()
+    val showFastMode by viewModel.showFastModeToggle.collectAsState()
+    val fastModeOn by viewModel.fastModeEnabled.collectAsState()
+
     StandardChatSheet(
         title = stringResource(R.string.session_config_title),
         onDismiss = onDismiss,
-        heightFraction = 0.52f,
+        heightFraction = 0.72f,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -90,6 +110,41 @@ fun SessionConfigSheet(
                     onOpenMemory()
                 },
             )
+            SessionConfigItem(
+                title = stringResource(R.string.settings_token_usage),
+                subtitle = stringResource(R.string.session_info_token_usage_footer),
+                icon = Icons.Default.DataUsage,
+                onClick = {
+                    onDismiss()
+                    onOpenTokenUsage()
+                },
+            )
+            SessionConfigItem(
+                title = stringResource(R.string.settings_auto_compact),
+                subtitle = stringResource(R.string.session_info_auto_compact_footer),
+                icon = Icons.Default.Compress,
+                onClick = { viewModel.setAutoCompactEnabled(!autoCompactOn) },
+                trailing = {
+                    Switch(
+                        checked = autoCompactOn,
+                        onCheckedChange = { viewModel.setAutoCompactEnabled(it) },
+                    )
+                },
+            )
+            if (showFastMode) {
+                SessionConfigItem(
+                    title = stringResource(R.string.session_info_fast_mode),
+                    subtitle = stringResource(R.string.session_info_fast_mode_footer),
+                    icon = Icons.Default.Bolt,
+                    onClick = { viewModel.setFastModeEnabled(!fastModeOn) },
+                    trailing = {
+                        Switch(
+                            checked = fastModeOn,
+                            onCheckedChange = { viewModel.setFastModeEnabled(it) },
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -100,6 +155,7 @@ private fun SessionConfigItem(
     subtitle: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -138,11 +194,15 @@ private fun SessionConfigItem(
                 color = ChatColors.secondaryText,
             )
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = ChatColors.tertiaryText,
-            modifier = Modifier.size(18.dp),
-        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = ChatColors.tertiaryText,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }

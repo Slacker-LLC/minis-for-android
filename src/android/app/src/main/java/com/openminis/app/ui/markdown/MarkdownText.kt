@@ -53,6 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.openminis.app.runtime.RuntimePathRegistry
 import com.openminis.app.runtime.files.WorkspaceFileClient
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -276,7 +277,7 @@ private fun BlockquoteView(
     // blockquote uses the app systemOrange (0xFFFF9500) at full opacity.
     // The previous primary @ 0.5 alpha disappeared into theme purple on the
     // dark palette and didn't read as a quote at all in some compositions.
-    val barColor = Color(0xFFFF9500)
+    val barColor = ChatColors.warn
     Box(
         modifier = Modifier
             .fillMaxWidth()

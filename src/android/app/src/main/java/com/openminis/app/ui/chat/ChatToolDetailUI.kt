@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.openminis.app.ui.theme.minisSheetColor
 import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
@@ -146,11 +147,9 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldDefaults
@@ -274,6 +273,7 @@ import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,11 +293,11 @@ internal fun ToolDetailSheet(
         block.toolStatus == ToolBlockStatus.PENDING
     val toolAccent = toolAccentColor(block.toolName)
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = null,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
         contentWindowInsets = { WindowInsets(0) },
     ) {
         GlassSheetWindowBlur()
@@ -563,7 +563,7 @@ internal fun ToolDetailSheet(
                                                 text = linkified,
                                                 fontSize = 13.sp,
                                                 fontFamily = FontFamily.Monospace,
-                                                color = Color(0xFF34C759),  // iOS .green
+                                                color = ChatColors.ok,  // iOS .green
                                                 lineHeight = 18.sp,
                                             )
                                         }
@@ -590,14 +590,14 @@ internal fun ToolDetailSheet(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),  // iOS .green
+                                            color = ChatColors.ok,  // iOS .green
                                         )
                                         Text(
                                             text = sheetMonitor.formattedMem(),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),
+                                            color = ChatColors.ok,
                                         )
                                     }
                                 }
@@ -623,7 +623,7 @@ internal fun ToolDetailSheet(
                         // T126-fix: ChatPalette.isDark follows the in-app theme
                         // override, isSystemInDarkTheme() doesn't.
                         val isDark = ChatColors.isDark
-                        val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+                        val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F7)
                         val cardBorder = if (isDark) Color(0xFF404040) else Color(0xFFD1D1D1)
                         val redBg = if (isDark) Color(0xFF4D1414) else Color(0xFFFFE5E5)
                         val redText = if (isDark) Color(0xFFFF6666) else Color(0xFFCC1A1A)
@@ -681,7 +681,7 @@ internal fun ToolDetailSheet(
                                     Icon(
                                         Icons.Default.EditNote,
                                         contentDescription = null,
-                                        tint = Color(0xFFFF9500),
+                                        tint = ChatColors.warn,
                                         modifier = Modifier.size(12.dp),
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -1064,7 +1064,7 @@ internal fun ToolDetailSheet(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(ChatColors.background)
+                                .background(minisSheetColor())
                                 .verticalScroll(outputScrollState)
                                 .padding(16.dp),
                         ) {
@@ -1108,7 +1108,7 @@ internal fun ToolDetailSheet(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(ChatColors.background)
+                                    .background(minisSheetColor())
                                     .verticalScroll(outputScrollState)
                                     .padding(16.dp),
                             ) {
@@ -1158,7 +1158,7 @@ internal fun ToolDetailSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ChatColors.background)
+                    .background(minisSheetColor())
                     .navigationBarsPadding(),
             ) {
                 HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
@@ -1276,7 +1276,7 @@ internal fun ToolDetailSheet(
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
-                                    .background(Color(0xFF34C759), CircleShape),
+                                    .background(ChatColors.ok, CircleShape),
                             )
                             Text(
                                 "Live",
@@ -1561,8 +1561,8 @@ private fun EditorCard(
     // Appearance) wins over the system setting. Otherwise users on Light system
     // + Dark in-app would see white card on black chat.
     val isDark = ChatColors.isDark
-    val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
-    val headerBg = if (isDark) Color(0xFF212121) else Color(0xFFEBEBEB)
+    val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F7)
+    val headerBg = if (isDark) Color(0xFF212121) else Color(0xFFF2F2F7)
     val cardBorder = if (isDark) Color(0xFF404040) else Color(0xFFD1D1D1)
 
     Column(
@@ -1601,7 +1601,7 @@ private fun EditorCard(
                     Text(
                         text = if (isStreaming) stringResource(R.string.tool_size_received, sizeLabel) else "($sizeLabel)",
                         fontSize = 11.sp,
-                        color = if (isStreaming) Color(0xFFFF9500).copy(alpha = 0.8f) else sizeColor,
+                        color = if (isStreaming) ChatColors.warn.copy(alpha = 0.8f) else sizeColor,
                     )
                 }
             }

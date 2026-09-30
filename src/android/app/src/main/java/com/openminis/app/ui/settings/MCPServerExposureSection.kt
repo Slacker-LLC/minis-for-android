@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.mcp.server.MCPServerManager
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /** Product surface for the existing local-only on-device MCP server. */
 @Composable
@@ -159,7 +159,7 @@ internal fun MCPServerExposureSection() {
     val token = managedToken
     if (showScopeDialog && token != null) {
         val available = remember(showScopeDialog) { MCPServerManager.availableToolsForManagedToken() }
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showScopeDialog = false },
             title = { Text(stringResource(R.string.mcp_exposed_tools_title)) },
             text = {

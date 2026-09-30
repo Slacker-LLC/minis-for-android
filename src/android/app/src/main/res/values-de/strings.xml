@@ -1488,7 +1488,7 @@
 
     <string name="system_enhance_root_hidden">su ist für diese App nicht sichtbar; %1$s ist installiert – erlaube diese App dort (oder schalte das Verstecken von su ab)</string>
     <string name="settings_terminal_subtitle">Ubuntu-Shell öffnen (startet die Linux-Laufzeit)</string>
-    <string name="settings_section_runtime_storage">Laufzeit &amp; Speicher</string>
+    <string name="settings_section_runtime">Laufzeit</string>
     <string name="settings_section_system">System &amp; Berechtigungen</string>
     <string name="settings_section_diagnostics">Diagnose &amp; Info</string>
     <string name="settings_auto_compact">Kontext automatisch komprimieren</string>
@@ -1508,7 +1508,9 @@
     <string name="settings_category_models_sub">Anbieter, Modell-Slots, Nutzung und Auto-Kompakt</string>
     <string name="settings_category_agent_sub">Skills, Charaktere, Persona, Prompt, Gedächtnis und MCP</string>
     <string name="settings_category_appearance_sub">Aussehen und Desktop-Haustier</string>
-    <string name="settings_category_runtime_sub">Terminal, Umgebung, Speicher und Einhängepunkte</string>
+    <string name="settings_category_runtime_sub">Terminal und Umgebungsvariablen</string>
+    <string name="settings_section_files">Dateien</string>
+    <string name="settings_category_files_sub">Speicher, geteilte Ordner, Einhängepunkte und Sicherung</string>
     <string name="settings_category_system_sub">Root, Modul, Berechtigungen und Hintergrund</string>
     <string name="settings_category_about_sub">Protokolle, Info und Feedback</string>
     <string name="settings_permissions_category_sub">Bedienungshilfen, Overlay und Benachrichtigungszugriff</string>
@@ -1730,7 +1732,6 @@
     <string name="chat_feedback_down">Als nicht hilfreich markiert 👎</string>
     <string name="drawer_search_chats">Chats durchsuchen…</string>
     <string name="drawer_terminal">Terminal</string>
-    <string name="drawer_storage">Speicher &amp; Sandbox</string>
     <string name="drawer_recent">Zuletzt</string>
     <string name="drawer_no_search_match">Keine passenden Unterhaltungen</string>
     <string name="drawer_no_history">Noch keine Unterhaltungen</string>
@@ -1739,7 +1740,6 @@
     <string name="drawer_delete_session_confirm">Diese Unterhaltung löschen? Das kann nicht rückgängig gemacht werden.</string>
     <string name="drawer_new_session">Neue Unterhaltung</string>
     <string name="drawer_rename">Umbenennen</string>
-    <string name="session_info_title">Sitzungsinfo</string>
     <string name="session_info_token_usage_footer">Tokenverbrauch dieser Sitzung ansehen</string>
     <string name="session_info_auto_compact_footer">Gespräch automatisch verdichten, wenn es sich dem Limit nähert</string>
     <string name="session_info_fast_mode">Schnellmodus</string>

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.delay
 
 /**
@@ -82,7 +83,7 @@ fun TextContentPreview(
                     Icon(
                         imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
                         contentDescription = stringResource(if (copied) R.string.image_copied_toast else R.string.common_copy),
-                        tint = if (copied) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        tint = if (copied) ChatColors.ok else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(16.dp),
                     )
                 }

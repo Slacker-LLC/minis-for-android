@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.NorthWest
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -49,6 +48,7 @@ import com.openminis.app.backup.remote.RcloneBackendCatalog
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-rclone-ui] Backup destinations — the Android peer of iOS
@@ -315,7 +315,6 @@ internal fun AddServerForm(
                 // overflows the button.
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp), strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
                 Text(
@@ -533,7 +532,7 @@ internal fun FolderBrowser(vm: RcloneDestinationsViewModel, onSaved: (String) ->
     }
 
     if (showNewFolder) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showNewFolder = false; newFolderName = "" },
             title = { Text(stringResource(R.string.backup_dest_new_folder_title)) },
             text = {

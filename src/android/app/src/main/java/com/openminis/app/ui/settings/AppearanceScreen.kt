@@ -77,6 +77,7 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import com.openminis.app.ui.theme.ChatColors
 import kotlin.math.roundToInt
 
 // -- Preference Keys --
@@ -234,8 +235,8 @@ fun AppearanceScreen(
 
     val tilePurple = Color(0xFF5856D6)
     val tileBlue = Color(0xFF007AFF)
-    val tileOrange = Color(0xFFFF9500)
-    val tileGreen = Color(0xFF34C759)
+    val tileOrange = ChatColors.warn
+    val tileGreen = ChatColors.ok
     val tileTeal = Color(0xFF5AC8FA)
 
     SettingsScaffold(title = stringResource(R.string.appearance_title), onBack = onBack) {

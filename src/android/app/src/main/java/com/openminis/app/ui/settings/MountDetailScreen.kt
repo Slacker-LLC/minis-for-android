@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderShared
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,11 +48,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
 import com.openminis.app.data.MountedFoldersStore
+import com.openminis.app.ui.components.SectionDesign
 import com.openminis.app.ui.components.SectionTextField
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * Detail/edit screen for a single mounted folder. Mirrors iOS
@@ -160,8 +162,9 @@ fun MountDetailScreen(
 
             Spacer(Modifier.height(20.dp))
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = SectionDesign.cardColor(),
                 shape = RoundedCornerShape(12.dp),
+                border = SectionDesign.cardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
@@ -211,7 +214,7 @@ fun MountDetailScreen(
     }
 
     if (showUnmountConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showUnmountConfirm = false },
             title = { Text(stringResource(R.string.mount_unmount_title)) },
             text = { Text(stringResource(R.string.mount_unmount_message)) },
@@ -241,8 +244,9 @@ fun MountDetailScreen(
 @Composable
 private fun HeaderCard(entry: MountedFoldersStore.Entry) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = SectionDesign.cardColor(),
         shape = RoundedCornerShape(12.dp),
+        border = SectionDesign.cardBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -253,7 +257,7 @@ private fun HeaderCard(entry: MountedFoldersStore.Entry) {
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFFF9500)),
+                    .background(ChatColors.warn),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -304,8 +308,9 @@ private fun ActionRow(
     onClick: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = SectionDesign.cardColor(),
         shape = RoundedCornerShape(12.dp),
+        border = SectionDesign.cardBorder(),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),

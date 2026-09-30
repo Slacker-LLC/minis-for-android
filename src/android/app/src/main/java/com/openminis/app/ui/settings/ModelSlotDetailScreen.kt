@@ -31,6 +31,7 @@ import com.openminis.app.data.model.hasAudioInput
 import com.openminis.app.data.model.hasAudioOutput
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.repository.ProviderRepository
+import com.openminis.app.ui.theme.ChatColors
 import sh.calvin.reorderable.ReorderableColumn
 
 @Composable
@@ -150,7 +151,7 @@ fun ModelSlotDetailScreen(
                             Icon(
                                 if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                 contentDescription = null,
-                                tint = if (isSelected) Color(0xFF34C759)
+                                tint = if (isSelected) ChatColors.ok
                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                             )
                         },

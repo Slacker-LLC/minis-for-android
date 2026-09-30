@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +59,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-eta-character-cards] The character library: import a card, see what is stored, share it back
@@ -173,7 +173,7 @@ fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     }
 
     pendingDelete?.let { target ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.characters_delete)) },
             text = { Text(stringResource(R.string.characters_delete_confirm, target.card.name)) },

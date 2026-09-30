@@ -30,9 +30,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,8 +50,12 @@ import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.components.openExternalUrl
 import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
+import com.openminis.app.ui.theme.minisSheetColor
 
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
@@ -67,7 +69,8 @@ enum class SettingsCategory(val key: String, val titleRes: Int, val subtitleRes:
     MODELS("models", R.string.settings_section_llm_providers, R.string.settings_category_models_sub),
     ASSISTANT("assistant", R.string.settings_section_agent_runtime, R.string.settings_category_agent_sub),
     APPEARANCE("appearance", R.string.settings_section_appearance, R.string.settings_category_appearance_sub),
-    RUNTIME("runtime", R.string.settings_section_runtime_storage, R.string.settings_category_runtime_sub),
+    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub),
+    RUNTIME("runtime", R.string.settings_section_runtime, R.string.settings_category_runtime_sub),
     SYSTEM("system", R.string.settings_section_system, R.string.settings_category_system_sub),
     ABOUT("about", R.string.settings_section_diagnostics, R.string.settings_category_about_sub),
     ;
@@ -82,7 +85,8 @@ fun SettingsCategory.icon(): ImageVector = when (this) {
     SettingsCategory.MODELS -> Icons.Outlined.BarChart
     SettingsCategory.ASSISTANT -> Icons.Outlined.AutoAwesome
     SettingsCategory.APPEARANCE -> Icons.Outlined.Palette
-    SettingsCategory.RUNTIME -> Icons.Outlined.Inventory2
+    SettingsCategory.FILES -> Icons.Outlined.Folder
+    SettingsCategory.RUNTIME -> Icons.Outlined.Terminal
     SettingsCategory.SYSTEM -> Icons.Outlined.Build
     SettingsCategory.ABOUT -> Icons.Outlined.Info
 }
@@ -91,6 +95,7 @@ fun SettingsCategory.iconColor(): Color = when (this) {
     SettingsCategory.MODELS -> Color(0xFF007AFF)
     SettingsCategory.ASSISTANT -> Color(0xFFAF52DE)
     SettingsCategory.APPEARANCE -> Color(0xFF5856D6)
+    SettingsCategory.FILES -> Color(0xFF007AFF)
     SettingsCategory.RUNTIME -> Color(0xFF34C759)
     SettingsCategory.SYSTEM -> Color(0xFFFF9F0A)
     SettingsCategory.ABOUT -> Color(0xFF007AFF)
@@ -199,14 +204,14 @@ fun SettingsCategoryScreen(
                 )
                 SettingsRow(
                     icon = Icons.Outlined.AutoAwesome,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.settings_soul),
                     subtitle = stringResource(R.string.settings_soul_subtitle),
                     onClick = onSoulClick,
                 )
                 SettingsRow(
                     icon = Icons.Outlined.Description,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.settings_system_prompt),
                     subtitle = stringResource(R.string.settings_system_prompt_subtitle),
                     onClick = onSystemPromptClick,
@@ -286,12 +291,46 @@ fun SettingsCategoryScreen(
                 )
             }
 
+            SettingsCategory.FILES -> SettingsSection(
+                header = stringResource(R.string.settings_section_files),
+            ) {
+                SettingsRow(
+                    icon = Icons.Outlined.Inventory2,
+                    iconColor = Color(0xFF007AFF),
+                    title = stringResource(R.string.settings_section_storage),
+                    subtitle = stringResource(R.string.settings_storage_subtitle),
+                    onClick = onRootfsClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Folder,
+                    iconColor = ChatColors.ok,
+                    title = stringResource(R.string.settings_shared_folders),
+                    subtitle = stringResource(R.string.settings_shared_folders_subtitle),
+                    onClick = onSharedFoldersClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.FolderShared,
+                    iconColor = ChatColors.warn,
+                    title = stringResource(R.string.settings_mount_external_folders),
+                    subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
+                    onClick = onMountedFoldersClick,
+                )
+                SettingsRow(
+                    icon = Icons.Outlined.Backup,
+                    iconColor = ChatColors.ok,
+                    title = stringResource(R.string.settings_backup_restore),
+                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
+                    onClick = onBackupClick,
+                    showDivider = false,
+                )
+            }
+
             SettingsCategory.RUNTIME -> SettingsSection(
-                header = stringResource(R.string.settings_section_runtime_storage),
+                header = stringResource(R.string.settings_section_runtime),
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Terminal,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.terminal_title),
                     subtitle = stringResource(R.string.settings_terminal_subtitle),
                     onClick = onTerminalClick,
@@ -302,34 +341,6 @@ fun SettingsCategoryScreen(
                     title = stringResource(R.string.settings_env_vars),
                     subtitle = stringResource(R.string.settings_env_vars_subtitle),
                     onClick = onEnvVarsClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Inventory2,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_section_storage),
-                    subtitle = stringResource(R.string.settings_storage_subtitle),
-                    onClick = onRootfsClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Folder,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_shared_folders),
-                    subtitle = stringResource(R.string.settings_shared_folders_subtitle),
-                    onClick = onSharedFoldersClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.FolderShared,
-                    iconColor = Color(0xFFFF9500),
-                    title = stringResource(R.string.settings_mount_external_folders),
-                    subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
-                    onClick = onMountedFoldersClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Backup,
-                    iconColor = Color(0xFF34C759),
-                    title = stringResource(R.string.settings_backup_restore),
-                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
-                    onClick = onBackupClick,
                     showDivider = false,
                 )
             }
@@ -340,7 +351,7 @@ fun SettingsCategoryScreen(
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Build,
-                    iconColor = Color(0xFFFF9F0A),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.system_enhance_title),
                     subtitle = stringResource(R.string.system_enhance_row_subtitle),
                     onClick = onSystemEnhanceClick,
@@ -375,7 +386,7 @@ fun SettingsCategoryScreen(
                 )
                 SettingsRow(
                     icon = Icons.Outlined.BatteryFull,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.bg_section_header),
                     subtitle = stringResource(R.string.bg_section_subtitle),
                     onClick = onBackgroundClick,
@@ -418,7 +429,7 @@ fun SettingsCategoryScreen(
     }
 
     if (showClearCorrectionConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearCorrectionConfirm = false },
             title = { Text(stringResource(R.string.voice_correction_clear_title)) },
             confirmButton = {
@@ -446,12 +457,12 @@ fun SettingsCategoryScreen(
     }
 
     if (showFeedbackSheet) {
-        ModalBottomSheet(
+        MinisModalBottomSheet(
             onDismissRequest = { showFeedbackSheet = false },
             containerColor = if (LocalUiStyle.current == UiStyle.GLASS) {
                 Color.Transparent
             } else {
-                MaterialTheme.colorScheme.surface
+                minisSheetColor()
             },
         ) {
             GlassSheetWindowBlur()

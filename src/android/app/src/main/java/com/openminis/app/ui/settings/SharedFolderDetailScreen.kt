@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openminis.app.R
+import com.openminis.app.ui.components.SectionDesign
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * Detail screen for a single shared folder. Mirrors the iOS Folder Details
@@ -86,8 +88,9 @@ fun SharedFolderDetailScreen(
 
             Spacer(Modifier.height(20.dp))
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = SectionDesign.cardColor(),
                 shape = RoundedCornerShape(12.dp),
+                border = SectionDesign.cardBorder(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onBrowseFiles),
@@ -118,8 +121,9 @@ fun SharedFolderDetailScreen(
 @Composable
 private fun HeaderCard(folder: SharedFolderEntry) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = SectionDesign.cardColor(),
         shape = RoundedCornerShape(12.dp),
+        border = SectionDesign.cardBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -169,9 +173,9 @@ private fun HeaderCard(folder: SharedFolderEntry) {
 @Composable
 private fun AccessBadge(writable: Boolean) {
     val (textRes, color) = if (writable) {
-        R.string.mount_badge_rw to Color(0xFF34C759)
+        R.string.mount_badge_rw to ChatColors.ok
     } else {
-        R.string.mount_badge_readonly to Color(0xFFFF9500)
+        R.string.mount_badge_readonly to ChatColors.warn
     }
     Surface(
         shape = RoundedCornerShape(8.dp),

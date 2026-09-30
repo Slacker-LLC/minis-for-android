@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.RestartAlt
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +55,7 @@ import com.openminis.app.accessibility.RestrictedSettingsManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.xposed.system.AccessibilityProtectionClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -181,7 +181,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Accessibility,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.system_permissions_a11y_row),
                     subtitle = if (a11yEnabled) {
                         stringResource(R.string.system_permissions_a11y_enabled)
@@ -208,7 +208,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             ) {
                 SettingsSwitchRow(
                     icon = Icons.Outlined.HealthAndSafety,
-                    iconColor = Color(0xFF34C759),
+                    iconColor = ChatColors.ok,
                     title = stringResource(R.string.system_permissions_module_a11y_toggle),
                     subtitle = if (moduleProtectionUnavailable) {
                         stringResource(R.string.system_permissions_module_a11y_unavailable)
@@ -235,7 +235,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     if (shizukuReady) {
                         SettingsRow(
                             icon = Icons.Outlined.LockOpen,
-                            iconColor = Color(0xFF34C759),
+                            iconColor = ChatColors.ok,
                             title = stringResource(R.string.system_permissions_a11y_restricted_shizuku),
                             subtitle = when {
                                 unrestricting ->
@@ -259,7 +259,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                     }
                     SettingsRow(
                         icon = Icons.Outlined.Info,
-                        iconColor = Color(0xFFFF9500),
+                        iconColor = ChatColors.warn,
                         title = stringResource(R.string.system_permissions_a11y_restricted_manual),
                         subtitle = stringResource(R.string.system_permissions_a11y_restricted_manual_sub),
                         onClick = {
@@ -279,7 +279,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Layers,
-                    iconColor = if (overlayGranted) Color(0xFF34C759) else Color(0xFFFF2D55),
+                    iconColor = if (overlayGranted) ChatColors.ok else Color(0xFFFF2D55),
                     // [T-android-settings-hierarchy] Name says "permission": the app's own
                     // in-app task overlay lives on "background & notifications", and the two
                     // used to read as the same thing.
@@ -315,7 +315,7 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
                 ) {
                     SettingsRow(
                         icon = Icons.Outlined.Build,
-                        iconColor = Color(0xFFFF3B30),
+                        iconColor = ChatColors.bad,
                         title = stringResource(
                             if (shizukuReady) R.string.a11y_repair_row_shizuku
                             else R.string.a11y_repair_row_manual,

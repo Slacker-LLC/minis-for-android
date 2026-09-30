@@ -1867,7 +1867,7 @@
 
     <string name="system_enhance_root_hidden">su is not visible to this app; %1$s is installed - allow this app there (or turn off su hiding)</string>
     <string name="settings_terminal_subtitle">Open the Ubuntu shell (starts the Linux runtime)</string>
-    <string name="settings_section_runtime_storage">Runtime &amp; storage</string>
+    <string name="settings_section_runtime">Runtime</string>
     <string name="settings_section_system">System &amp; permissions</string>
     <string name="settings_section_diagnostics">Diagnostics &amp; about</string>
     <string name="settings_auto_compact">Auto-compact context</string>
@@ -1887,7 +1887,9 @@
     <string name="settings_category_models_sub">Providers, model slots, usage and auto-compact</string>
     <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
     <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
-    <string name="settings_category_runtime_sub">Terminal, environment, storage and mounts</string>
+    <string name="settings_category_runtime_sub">Terminal and environment variables</string>
+    <string name="settings_section_files">Files</string>
+    <string name="settings_category_files_sub">Storage, shared folders, mounts and backup</string>
     <string name="settings_category_system_sub">Root, the module, permissions and background access</string>
     <string name="settings_category_about_sub">Logs, about and feedback</string>
     <string name="settings_permissions_category_sub">Accessibility, overlay and notification access</string>
@@ -2108,7 +2110,6 @@
     <string name="chat_feedback_down">Marked as not helpful 👎</string>
     <string name="drawer_search_chats">Search chats…</string>
     <string name="drawer_terminal">Terminal</string>
-    <string name="drawer_storage">Storage &amp; sandbox</string>
     <string name="drawer_recent">Recent</string>
     <string name="drawer_no_search_match">No matching conversations</string>
     <string name="drawer_no_history">No conversations yet</string>
@@ -2117,7 +2118,6 @@
     <string name="drawer_delete_session_confirm">Delete this conversation? This cannot be undone.</string>
     <string name="drawer_new_session">New conversation</string>
     <string name="drawer_rename">Rename</string>
-    <string name="session_info_title">Session info</string>
     <string name="session_info_token_usage_footer">See how many tokens this session has used</string>
     <string name="session_info_auto_compact_footer">Compress the conversation as it approaches the limit</string>
     <string name="session_info_fast_mode">Fast mode</string>

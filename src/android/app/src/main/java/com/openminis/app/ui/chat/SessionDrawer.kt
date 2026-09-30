@@ -2,8 +2,8 @@ package com.openminis.app.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,16 +23,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -53,23 +53,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.R
+import com.openminis.app.data.db.ChatSessionEntity
 import com.openminis.app.data.repository.ChatRepository
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.sessions.FolderActionDialogs
+import com.openminis.app.ui.sessions.FolderGroupBlock
+import com.openminis.app.ui.sessions.GroupPickerSheet
+import com.openminis.app.ui.sessions.SessionListViewModel
+import com.openminis.app.ui.sessions.partitionByFolder
+import com.openminis.app.ui.sessions.rememberFolderDialogState
 import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * Left-hand session drawer (docs/design/UI-DESIGN-LANGUAGE.md §8).
+ *
+ * Sessions, groups, pins and multi-select all come from [viewModel] — the same
+ * [SessionListViewModel] the session list page uses — so the drawer adds no
+ * second copy of grouping or selection state.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SessionDrawerContent(
+    viewModel: SessionListViewModel,
     chatRepository: ChatRepository,
     selectedSessionId: String?,
     onSelectSession: (String) -> Unit,
@@ -81,25 +99,42 @@ fun SessionDrawerContent(
     onOpenBots: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val sessions by chatRepository.dao.observeSessions().collectAsState(initial = emptyList())
+    val sessions by viewModel.displayedSessions.collectAsState()
+    val folders by viewModel.folders.collectAsState()
+    val collapsedFolderIds by viewModel.collapsedFolderIds.collectAsState()
+    val folderMemberCounts by viewModel.folderMemberCounts.collectAsState()
+    val isSelecting by viewModel.isSelecting.collectAsState()
+    val selectedIds by viewModel.selectedIds.collectAsState()
+    val groupPickerRequest by viewModel.groupPickerRequest.collectAsState()
+
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
 
-    // State for rename dialog
     var sessionToRename by remember { mutableStateOf<ChatSessionEntity?>(null) }
     var renameText by remember { mutableStateOf("") }
-
-    // State for delete confirm dialog
     var sessionToDelete by remember { mutableStateOf<ChatSessionEntity?>(null) }
+    var showBulkDelete by remember { mutableStateOf(false) }
+    val folderDialogs = rememberFolderDialogState()
 
+    val searchActive = isSearching && searchQuery.isNotBlank()
     val filteredSessions = remember(sessions, searchQuery, isSearching) {
-        if (isSearching && searchQuery.isNotBlank()) {
+        if (searchActive) {
             sessions.filter { (it.title ?: "").contains(searchQuery.trim(), ignoreCase = true) }
         } else {
             sessions
         }
     }
+
+    // Groups are shown only when not searching: a filtered flat list is what a
+    // search wants, and it avoids collapsing matches inside closed groups.
+    val (folderBlocks, ungrouped) = remember(filteredSessions, folders, collapsedFolderIds, searchActive) {
+        if (searchActive) emptyList<FolderGroupBlock>() to filteredSessions
+        else partitionByFolder(filteredSessions, folders, collapsedFolderIds)
+    }
+    val sessionsById = remember(filteredSessions) { filteredSessions.associateBy { it.id } }
+    val pinned = remember(ungrouped) { ungrouped.filter { it.pinnedAt != null } }
+    val recent = remember(ungrouped) { ungrouped.filter { it.pinnedAt == null } }
 
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -110,38 +145,54 @@ fun SessionDrawerContent(
             .background(ChatColors.background)
             .padding(top = topInset),
     ) {
-        // Top App Bar / Title Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "Minis",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = ChatColors.primaryText,
+        if (isSelecting) {
+            SelectionHeader(
+                count = selectedIds.size,
+                onCancel = { viewModel.clearSelection() },
+                onMove = { viewModel.requestGroupPickerForSelection() },
+                onDelete = { showBulkDelete = true },
             )
-            IconButton(
-                onClick = {
-                    isSearching = !isSearching
-                    if (!isSearching) searchQuery = ""
-                },
-                modifier = Modifier.size(36.dp),
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Icon(
-                    imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = ChatColors.primaryText,
-                    modifier = Modifier.size(20.dp),
+                Text(
+                    text = "Minis",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ChatColors.primaryText,
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            isSearching = !isSearching
+                            if (!isSearching) searchQuery = ""
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = ChatColors.primaryText,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    MinisTextButton(
+                        onClick = { viewModel.isSelecting.value = true },
+                        enabled = sessions.isNotEmpty(),
+                    ) {
+                        Text(stringResource(R.string.common_edit), fontSize = 15.sp)
+                    }
+                }
             }
         }
 
-        // Search Input (shown when search icon is tapped)
-        if (isSearching) {
+        // Search field (shown when the search icon is tapped)
+        if (isSearching && !isSelecting) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -161,138 +212,165 @@ fun SessionDrawerContent(
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // High-priority "新建聊天" Row directly below title
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 3.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                .clickable(onClick = onNewChat)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = stringResource(R.string.scheduled_task_target_new),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(19.dp),
-            )
+        if (!isSelecting) {
+            // New chat: a plain accent text row — no tinted pill (design language §6).
             Text(
                 text = stringResource(R.string.scheduled_task_target_new),
-                fontSize = 14.5.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onNewChat)
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
             )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+            ) {
+                DrawerToolRow(
+                    icon = Icons.Outlined.Group,
+                    title = stringResource(R.string.bots_team),
+                    onClick = onOpenBots,
+                )
+                DrawerToolRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.scheduled_tasks_title),
+                    onClick = onOpenScheduledTasks,
+                )
+                DrawerToolRow(
+                    icon = Icons.Default.Terminal,
+                    title = stringResource(R.string.drawer_terminal),
+                    onClick = onOpenTerminal,
+                )
+                DrawerToolRow(
+                    icon = Icons.Outlined.Folder,
+                    title = stringResource(R.string.settings_section_files),
+                    onClick = onOpenStorage,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // Quick Tools section (定时任务, 终端, 存储与沙箱)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 2.dp),
-        ) {
-            DrawerToolRow(
-                icon = Icons.Outlined.Group,
-                title = stringResource(R.string.bots_team),
-                onClick = onOpenBots,
-            )
-            DrawerToolRow(
-                icon = Icons.Outlined.Schedule,
-                title = stringResource(R.string.scheduled_tasks_title),
-                onClick = onOpenScheduledTasks,
-            )
-            DrawerToolRow(
-                icon = Icons.Default.Terminal,
-                title = stringResource(R.string.drawer_terminal),
-                onClick = onOpenTerminal,
-            )
-            DrawerToolRow(
-                icon = Icons.Outlined.Folder,
-                title = stringResource(R.string.drawer_storage),
-                onClick = onOpenStorage,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Section header: "最近"
-        Text(
-            text = stringResource(R.string.drawer_recent),
-            fontSize = 12.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = ChatColors.secondaryText,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-
-        // Session list
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
             contentPadding = PaddingValues(vertical = 2.dp),
         ) {
-            items(filteredSessions, key = { it.id }) { session ->
-                val isSelected = session.id == selectedSessionId
-                DrawerSessionItem(
+            if (pinned.isNotEmpty()) {
+                item(key = "hdr-pinned") { SectionLabel(stringResource(R.string.sessionlist_section_pinned)) }
+                items(pinned, key = { "p-${it.id}" }) { session ->
+                    DrawerSessionRow(
+                        session = session,
+                        viewModel = viewModel,
+                        isCurrent = session.id == selectedSessionId,
+                        isSelecting = isSelecting,
+                        isChecked = session.id in selectedIds,
+                        onOpen = { onSelectSession(session.id) },
+                        onRename = { sessionToRename = session; renameText = session.title ?: "" },
+                        onDelete = { sessionToDelete = session },
+                    )
+                }
+            }
+
+            if (folderBlocks.isNotEmpty()) {
+                item(key = "hdr-groups") { SectionLabel(stringResource(R.string.group_section_header)) }
+                folderBlocks.forEach { block ->
+                    item(key = "f-${block.folder.id}") {
+                        FolderHeaderRow(
+                            block = block,
+                            enabled = !isSelecting,
+                            onToggle = { viewModel.toggleFolderCollapsed(block.folder.id) },
+                            onNewChatInGroup = {
+                                if (block.isCollapsed) viewModel.toggleFolderCollapsed(block.folder.id)
+                                viewModel.createNewSession(folderId = block.folder.id)?.let(onSelectSession)
+                            },
+                            onTogglePin = { viewModel.toggleFolderPin(block.folder.id) },
+                            onRename = { folderDialogs.rename = block.folder },
+                            onDissolve = { folderDialogs.dissolve = block.folder },
+                            onDeleteWithSessions = { folderDialogs.delete = block.folder to block.totalCount },
+                        )
+                    }
+                    items(block.ids, key = { "m-${block.folder.id}-$it" }) { id ->
+                        val session = sessionsById[id] ?: return@items
+                        DrawerSessionRow(
+                            session = session,
+                            viewModel = viewModel,
+                            isCurrent = session.id == selectedSessionId,
+                            isSelecting = isSelecting,
+                            isChecked = session.id in selectedIds,
+                            indent = 16.dp,
+                            onOpen = { onSelectSession(session.id) },
+                            onRename = { sessionToRename = session; renameText = session.title ?: "" },
+                            onDelete = { sessionToDelete = session },
+                        )
+                    }
+                }
+            }
+
+            item(key = "hdr-recent") { SectionLabel(stringResource(R.string.drawer_recent)) }
+            items(recent, key = { "r-${it.id}" }) { session ->
+                DrawerSessionRow(
                     session = session,
-                    isSelected = isSelected,
-                    onClick = { onSelectSession(session.id) },
-                    onRename = {
-                        sessionToRename = session
-                        renameText = session.title ?: ""
-                    },
-                    onDelete = {
-                        sessionToDelete = session
-                    },
+                    viewModel = viewModel,
+                    isCurrent = session.id == selectedSessionId,
+                    isSelecting = isSelecting,
+                    isChecked = session.id in selectedIds,
+                    onOpen = { onSelectSession(session.id) },
+                    onRename = { sessionToRename = session; renameText = session.title ?: "" },
+                    onDelete = { sessionToDelete = session },
                 )
             }
 
             if (filteredSessions.isEmpty()) {
-                item {
+                item(key = "empty") {
                     Text(
-                        text = if (isSearching) stringResource(R.string.drawer_no_search_match) else stringResource(R.string.drawer_no_history),
+                        text = if (searchActive) stringResource(R.string.drawer_no_search_match) else stringResource(R.string.drawer_no_history),
                         fontSize = 13.5.sp,
-                        color = ChatColors.tertiaryText,
+                        color = ChatColors.secondaryText,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                     )
                 }
             }
         }
 
-        // Bottom Docked Settings Row: [⚙️ 设置] (Full width row, no floating circular button)
-        HorizontalDivider(
-            color = ChatColors.separator.copy(alpha = 0.2f),
-            thickness = 0.5.dp,
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenSettings)
-                .padding(horizontal = 16.dp, vertical = 13.dp)
-                .padding(bottom = bottomInset),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = stringResource(R.string.settings),
-                tint = ChatColors.secondaryText,
-                modifier = Modifier.size(20.dp),
+        // Bottom docked settings row (full width; no floating button).
+        if (!isSelecting) {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant,
+                thickness = 0.5.dp,
             )
-            Text(
-                text = stringResource(R.string.settings),
-                fontSize = 14.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = ChatColors.primaryText,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenSettings)
+                    .padding(horizontal = 16.dp, vertical = 13.dp)
+                    .padding(bottom = bottomInset),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = ChatColors.secondaryText,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = stringResource(R.string.settings),
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = ChatColors.primaryText,
+                )
+            }
         }
     }
 
-    // Rename Dialog
+    // Rename session
     sessionToRename?.let { session ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { sessionToRename = null },
             title = { Text(stringResource(R.string.drawer_rename_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
             text = {
@@ -327,35 +405,121 @@ fun SessionDrawerContent(
         )
     }
 
-    // Delete Confirm Dialog
+    // Delete one session (destructive → red confirm)
     sessionToDelete?.let { session ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { sessionToDelete = null },
-            title = { Text(stringResource(R.string.drawer_delete_session), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-            text = { Text(stringResource(R.string.drawer_delete_session_confirm), fontSize = 14.sp) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val deletedId = session.id
-                        scope.launch(Dispatchers.IO) {
-                            chatRepository.deleteSession(deletedId)
-                        }
-                        if (deletedId == selectedSessionId) {
-                            onNewChat()
-                        }
-                        sessionToDelete = null
-                    },
-                ) {
-                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { sessionToDelete = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
+            title = stringResource(R.string.drawer_delete_session),
+            text = stringResource(R.string.drawer_delete_session_confirm),
+            confirmText = stringResource(R.string.delete),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteSession(session.id)
+                if (session.id == selectedSessionId) onNewChat()
+                sessionToDelete = null
             },
         )
     }
+
+    // Delete the multi-selection
+    if (showBulkDelete) {
+        val n = selectedIds.size
+        MinisAlertDialog(
+            onDismissRequest = { showBulkDelete = false },
+            title = if (n == 1) {
+                stringResource(R.string.sessionlist_delete_one_title)
+            } else {
+                stringResource(R.string.sessionlist_delete_n_title, n)
+            },
+            text = stringResource(R.string.sessionlist_delete_message),
+            confirmText = stringResource(R.string.delete),
+            isDestructive = true,
+            onConfirm = {
+                val deletesCurrent = selectedSessionId != null && selectedSessionId in selectedIds
+                viewModel.deleteSelected()
+                if (deletesCurrent) onNewChat()
+                showBulkDelete = false
+            },
+        )
+    }
+
+    FolderActionDialogs(
+        state = folderDialogs,
+        memberCounts = folderMemberCounts,
+        onRename = { id, name, desc -> viewModel.renameFolder(id, name, desc) },
+        onDissolve = { viewModel.dissolveFolder(it) },
+        onDeleteWithSessions = { viewModel.deleteFolderWithSessions(it) },
+    )
+
+    groupPickerRequest?.let { request ->
+        val suggesting by viewModel.groupSuggesting.collectAsState()
+        val suggestFailed by viewModel.groupSuggestFailed.collectAsState()
+        val suggestion by viewModel.groupSuggestion.collectAsState()
+        GroupPickerSheet(
+            folders = folders,
+            memberCounts = folderMemberCounts,
+            sessionCount = request.sessionIds.size,
+            anyFiled = request.anyFiled,
+            onChoose = { viewModel.applyGroupChoice(it) },
+            onDismiss = { viewModel.dismissGroupPicker() },
+            suggesting = suggesting,
+            suggestFailed = suggestFailed,
+            suggestion = suggestion,
+            onSuggest = { viewModel.suggestGroup() },
+        )
+    }
+}
+
+@Composable
+private fun SelectionHeader(
+    count: Int,
+    onCancel: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        MinisTextButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel), fontSize = 15.sp)
+        }
+        Text(
+            text = stringResource(R.string.sessionlist_n_selected, count),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = ChatColors.primaryText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Row {
+            MinisTextButton(onClick = onMove, enabled = count > 0) {
+                Text(stringResource(R.string.group_move_action), fontSize = 15.sp)
+            }
+            MinisTextButton(onClick = onDelete, enabled = count > 0) {
+                Text(
+                    stringResource(R.string.delete),
+                    fontSize = 15.sp,
+                    color = if (count > 0) MaterialTheme.colorScheme.error else Color.Unspecified,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        fontSize = 12.5.sp,
+        fontWeight = FontWeight.Medium,
+        color = ChatColors.secondaryText,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -391,22 +555,17 @@ private fun DrawerToolRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DrawerSessionItem(
-    session: ChatSessionEntity,
-    isSelected: Boolean,
-    onClick: () -> Unit,
+private fun FolderHeaderRow(
+    block: FolderGroupBlock,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+    onNewChatInGroup: () -> Unit,
+    onTogglePin: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit,
+    onDissolve: () -> Unit,
+    onDeleteWithSessions: () -> Unit,
 ) {
-    val newSessionLabel = stringResource(R.string.drawer_new_session)
-                    val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
-    val bgColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-    } else {
-        Color.Transparent
-    }
     var showMenu by remember { mutableStateOf(false) }
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -417,19 +576,142 @@ private fun DrawerSessionItem(
                 .fillMaxWidth()
                 .height(42.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(bgColor)
                 .combinedClickable(
-                    onClick = onClick,
+                    enabled = enabled,
+                    onClick = onToggle,
                     onLongClick = { showMenu = true },
                 )
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            Icon(
+                imageVector = Icons.Outlined.Folder,
+                contentDescription = null,
+                tint = ChatColors.secondaryText,
+                modifier = Modifier.size(19.dp),
+            )
+            Text(
+                text = block.folder.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ChatColors.primaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(
+                text = if (block.totalCount == 0) {
+                    stringResource(R.string.group_empty)
+                } else {
+                    stringResource(R.string.group_n_chats, block.totalCount)
+                },
+                fontSize = 12.sp,
+                color = ChatColors.secondaryText,
+                maxLines = 1,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    if (block.isCollapsed) R.string.group_expand else R.string.group_collapse,
+                ),
+                tint = ChatColors.secondaryText,
+                modifier = Modifier
+                    .size(18.dp)
+                    .rotate(if (block.isCollapsed) -90f else 0f),
+            )
+        }
+
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.group_new_chat_in)) },
+                onClick = { showMenu = false; onNewChatInGroup() },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (block.folder.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
+                        ),
+                    )
+                },
+                onClick = { showMenu = false; onTogglePin() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.group_rename)) },
+                onClick = { showMenu = false; onRename() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.group_dissolve)) },
+                onClick = { showMenu = false; onDissolve() },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.group_delete_with_sessions, block.totalCount),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = { showMenu = false; onDeleteWithSessions() },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DrawerSessionRow(
+    session: ChatSessionEntity,
+    viewModel: SessionListViewModel,
+    isCurrent: Boolean,
+    isSelecting: Boolean,
+    isChecked: Boolean,
+    onOpen: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    indent: Dp = 0.dp,
+) {
+    val newSessionLabel = stringResource(R.string.drawer_new_session)
+    val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
+    // One accent, one grey: the open conversation gets the fill grey and an accent label.
+    val bgColor = if (isCurrent && !isSelecting) ChatColors.secondaryBg else Color.Transparent
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp + indent, end = 12.dp, top = 1.5.dp, bottom = 1.5.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(bgColor)
+                .combinedClickable(
+                    onClick = {
+                        if (isSelecting) viewModel.toggleSelect(session.id) else onOpen()
+                    },
+                    onLongClick = { if (!isSelecting) showMenu = true },
+                )
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (isSelecting) {
+                Icon(
+                    imageVector = if (isChecked) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = if (isChecked) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Text(
                 text = title,
                 fontSize = 14.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else ChatColors.primaryText,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else ChatColors.primaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -442,32 +724,29 @@ private fun DrawerSessionItem(
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.drawer_rename)) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                onClick = { showMenu = false; onRename() },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (session.pinnedAt != null) R.string.sessionlist_unpin else R.string.sessionlist_pin,
+                        ),
                     )
                 },
-                onClick = {
-                    showMenu = false
-                    onRename()
-                },
+                onClick = { showMenu = false; viewModel.togglePin(session.id) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.group_move_to)) },
+                onClick = { showMenu = false; viewModel.requestGroupPicker(session.id) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.sessionlist_select_action)) },
+                onClick = { showMenu = false; viewModel.enterSelection(session.id) },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                onClick = {
-                    showMenu = false
-                    onDelete()
-                },
+                onClick = { showMenu = false; onDelete() },
             )
         }
     }

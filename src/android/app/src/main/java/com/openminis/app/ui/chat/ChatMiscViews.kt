@@ -146,7 +146,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -669,7 +668,7 @@ private fun CompactSummarySheet(
                 Icon(
                     imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
                     contentDescription = stringResource(R.string.common_copy),
-                    tint = if (copied) Color(0xFF34C759) else ChatColors.secondaryText,
+                    tint = if (copied) ChatColors.ok else ChatColors.secondaryText,
                 )
             }
         },
@@ -900,7 +899,7 @@ internal fun rememberBrowserLiveSnapshot(
  */
 @Composable
 internal fun ResumeBanner(onResume: () -> Unit) {
-    val orange = Color(0xFFFF9500)
+    val orange = ChatColors.warn
     // [T-android-c3a-resume-one-tap] Crash-aware resume. When the previous app
     // cycle ended in crash_or_stall we surface a one-line warning as CONTEXT
     // (the user is about to re-enter the load that killed the last cycle), but

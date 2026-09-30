@@ -156,7 +156,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -476,7 +475,7 @@ internal fun InlineErrorBanner(
             .fillMaxWidth()
             .padding(top = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFF3B30).copy(alpha = 0.12f))
+            .background(ChatColors.bad.copy(alpha = 0.12f))
             .combinedClickable(
                 onClick = {},
                 onLongClick = {
@@ -489,13 +488,13 @@ internal fun InlineErrorBanner(
         Icon(
             imageVector = Icons.Default.Error,
             contentDescription = null,
-            tint = Color(0xFFFF3B30),
+            tint = ChatColors.bad,
             modifier = Modifier.size(14.dp),
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = error,
-            color = Color(0xFFFF3B30),
+            color = ChatColors.bad,
             fontSize = 12.sp,
             lineHeight = 16.sp,
             maxLines = 3,
@@ -507,7 +506,7 @@ internal fun InlineErrorBanner(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFFF3B30).copy(alpha = if (canRetry) 0.15f else 0.05f))
+                    .background(ChatColors.bad.copy(alpha = if (canRetry) 0.15f else 0.05f))
                     .clickable(enabled = canRetry) {
                         localRetrying = true
                         onRetry()
@@ -518,13 +517,13 @@ internal fun InlineErrorBanner(
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    tint = Color(0xFFFF3B30).copy(alpha = if (canRetry) 1f else 0.4f),
+                    tint = ChatColors.bad.copy(alpha = if (canRetry) 1f else 0.4f),
                     modifier = Modifier.size(10.dp),
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     stringResource(R.string.chat_longpress_retry),
-                    color = Color(0xFFFF3B30).copy(alpha = if (canRetry) 1f else 0.4f),
+                    color = ChatColors.bad.copy(alpha = if (canRetry) 1f else 0.4f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -572,7 +571,7 @@ private fun ToolStopButton(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0xFFFF3B30)),
+                    .background(ChatColors.bad),
             )
         }
     }
@@ -891,7 +890,7 @@ internal fun ThinkingBlock(block: AssistantBlock, isStreaming: Boolean, isLast: 
         // if the user hasn't taken control of its state yet.
         if (!isStreaming && !userTouched) expanded = false
     }
-    val thinkingBlue = Color(0xFF007AFF)
+    val thinkingBlue = ChatColors.thinking
     val charCount = block.content.length
     val charLabel = when {
         charCount >= 1000 -> "${charCount / 1000}K"
@@ -1121,7 +1120,7 @@ private fun ThinkingFullContentDialog(content: String, onDismiss: () -> Unit) {
                         text = stringResource(R.string.appearance_section_deep_thinking),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF007AFF),
+                        color = ChatColors.thinking,
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     MinisTextButton(onClick = onDismiss) {

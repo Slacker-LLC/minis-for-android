@@ -18,13 +18,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import com.openminis.app.ui.theme.minisSheetColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +34,6 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -61,6 +60,8 @@ import com.openminis.app.R
 import com.openminis.app.data.repository.MCPRepository
 import com.openminis.app.ui.components.DialogTextField
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.components.MinisModalBottomSheet
 
 /**
  * MCP Integrations management screen. Mirrors [SkillsManagementScreen]:
@@ -198,7 +199,7 @@ fun MCPIntegrationsScreen(
 
     if (deleteId != null) {
         val id = deleteId!!
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { deleteId = null },
             title = { Text(stringResource(R.string.mcp_delete_title, id)) },
             text = { Text(stringResource(R.string.mcp_delete_message)) },
@@ -242,10 +243,10 @@ private fun MCPAddSheet(
     var selectedTab by remember { mutableIntStateOf(0) }
     val isEdit = editServer != null
 
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         // [T-android-mcp-sheet-ime-occlusion] GH#44: verticalScroll + imePadding
@@ -819,7 +820,7 @@ private fun MCPFormTab(
     // [T-mcp-env-var-delete-confirm-android] Confirm before wiping a non-empty
     // env field. Only reachable when env was non-blank at tap time.
     if (showClearEnvConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showClearEnvConfirm = false },
             title = { Text(stringResource(R.string.mcp_form_env_clear_confirm_title)) },
             text = { Text(stringResource(R.string.mcp_form_env_clear_confirm_message)) },
@@ -850,9 +851,9 @@ private fun MCPEnvVarPickerSheet(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
+    MinisModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else MaterialTheme.colorScheme.surface,
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(

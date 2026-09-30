@@ -59,6 +59,8 @@ import com.openminis.app.MinisApp
 import com.openminis.app.R
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.components.groupedCard
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * T50 settings screen — surfaces the two pieces of background-keep-alive
@@ -207,7 +209,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
             Spacer(Modifier.size(8.dp))
             BgToggleRow(
                 icon = Icons.Outlined.Bolt,
-                iconColor = Color(0xFF34C759),
+                iconColor = ChatColors.ok,
                 title = stringResource(R.string.settings_dynamic_island),
                 checked = dynamicIslandEnabled && dynamicIslandCapable,
                 enabled = dynamicIslandCapable,
@@ -225,7 +227,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
             BgSectionTitle(stringResource(R.string.battery_opt_section_title))
             BgRow(
                 icon = Icons.Outlined.BatteryFull,
-                iconColor = if (ignoringOptimizations) Color(0xFF34C759) else Color(0xFFFF9500),
+                iconColor = if (ignoringOptimizations) ChatColors.ok else ChatColors.warn,
                 title = stringResource(R.string.battery_opt_row_title),
                 subtitle = if (ignoringOptimizations) {
                     stringResource(R.string.battery_opt_already_exempt)
@@ -245,7 +247,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                 BgSectionTitle(stringResource(R.string.rom_autostart_section_title))
                 BgRow(
                     icon = Icons.Outlined.PhoneAndroid,
-                    iconColor = Color(0xFFFF9500),
+                    iconColor = ChatColors.warn,
                     title = stringResource(R.string.rom_autostart_row_title),
                     subtitle = stringResource(
                         R.string.rom_autostart_row_subtitle,
@@ -303,8 +305,7 @@ private fun BgToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+            .groupedCard(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -351,8 +352,7 @@ private fun BgRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
+            .groupedCard(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

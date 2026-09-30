@@ -46,7 +46,6 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.UnfoldMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -89,6 +88,8 @@ import com.openminis.app.ui.components.MinisOutlinedButton
 import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.theme.ChatColors
 
 /**
  * [T-backup-primary-action] Shared content for the two primary actions —
@@ -320,7 +321,7 @@ private fun BackupTab(
         CategorySwitchRow(
             title = stringResource(R.string.backup_encrypt_backup),
             icon = Icons.Outlined.Lock,
-            iconColor = Color(0xFF34C759),
+            iconColor = ChatColors.ok,
             checked = encrypt,
             onCheckedChange = { vm.setEncrypt(it) },
             enabled = !running,
@@ -401,18 +402,11 @@ private fun BackupTab(
             enabled = running || (
                 selected.isNotEmpty() && passphraseValid && destinations.isNotEmpty()
                 ),
-            colors = if (running) {
-                androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                )
-            } else {
-                androidx.compose.material3.ButtonDefaults.buttonColors()
-            },
+            destructive = running,
             modifier = Modifier.fillMaxWidth(),
         ) {
             // Stop is the destructive counterpart, so it gets the stop glyph
-            // on the red container rather than the same cloud-upload icon in a
+            // in red rather than the same cloud-upload icon in a
             // different colour.
             PrimaryActionContent(
                 icon = if (running) Icons.Outlined.Stop else Icons.Outlined.CloudUpload,
@@ -561,9 +555,9 @@ private fun BackupHistoryRow(
 ) {
     val (icon, tint) = when (record.status) {
         BackupHistory.Status.RUNNING -> Icons.Outlined.Sync to Color(0xFF8E8E93)
-        BackupHistory.Status.SUCCEEDED -> Icons.Outlined.CheckCircle to Color(0xFF34C759)
-        BackupHistory.Status.COMPLETED_WITH_ISSUES -> Icons.Outlined.Warning to Color(0xFFFF9500)
-        BackupHistory.Status.FAILED -> Icons.Outlined.ErrorOutline to Color(0xFFFF3B30)
+        BackupHistory.Status.SUCCEEDED -> Icons.Outlined.CheckCircle to ChatColors.ok
+        BackupHistory.Status.COMPLETED_WITH_ISSUES -> Icons.Outlined.Warning to ChatColors.warn
+        BackupHistory.Status.FAILED -> Icons.Outlined.ErrorOutline to ChatColors.bad
     }
     Column {
         Row(
@@ -1134,7 +1128,7 @@ private fun DestinationsSection(
         // knew what either did.
         RestoreSourceRow(
             icon = Icons.Outlined.Add,
-            iconColor = Color(0xFF34C759),
+            iconColor = ChatColors.ok,
             label = stringResource(R.string.backup_manage_destinations),
             enabled = enabled,
             onClick = onManage,
@@ -1257,7 +1251,7 @@ private fun ResultDestinationRow(
             Icon(
                 if (outcome.succeeded) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                 contentDescription = null,
-                tint = if (outcome.succeeded) Color(0xFF34C759) else Color(0xFFFF9500),
+                tint = if (outcome.succeeded) ChatColors.ok else ChatColors.warn,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(10.dp))
@@ -1372,7 +1366,7 @@ private fun ServerPackagePicker(
     val running by vm.isRunning.collectAsState()
     val status by vm.statusText.collectAsState()
 
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(remote.name) },
         text = {

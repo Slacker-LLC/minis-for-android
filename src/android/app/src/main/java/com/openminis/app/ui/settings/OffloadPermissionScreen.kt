@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,8 +36,10 @@ import com.openminis.app.offload.OffloadPermissionManager
 import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.ui.components.MinisMenu
 import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.openminis.app.ui.components.MinisAlertDialog
 
 @Composable
 fun OffloadPermissionScreen(
@@ -106,7 +107,7 @@ fun OffloadPermissionScreen(
 
         IntegrationSection(
             iconVector = Icons.Outlined.Accessibility,
-            iconTint = Color(0xFF34C759),
+            iconTint = ChatColors.ok,
             sectionHeaderRes = R.string.perm_section_a11y,
             sectionFooterRes = R.string.perm_a11y_section_footer,
             toolName = "a11y_cli",
@@ -190,7 +191,7 @@ fun OffloadPermissionScreen(
     }
 
     if (showResetConfirm) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showResetConfirm = false },
             title = { Text(stringResource(R.string.perm_reset_confirm_title)) },
             text = { Text(stringResource(R.string.perm_reset_confirm_text)) },

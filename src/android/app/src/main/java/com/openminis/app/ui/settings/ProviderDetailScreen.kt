@@ -66,12 +66,11 @@ import com.openminis.app.data.model.ProviderType
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.logging.AppLogger
 import com.openminis.app.ui.components.MinisAlertDialog
+import com.openminis.app.ui.theme.ChatColors
 import com.openminis.app.ui.util.bringIntoViewOnFocus
 import com.openminis.app.R
 import kotlinx.coroutines.launch
-import com.openminis.app.ui.components.MinisButton
 import com.openminis.app.ui.components.MinisOutlinedButton
-import com.openminis.app.ui.components.MinisSmallButton
 import com.openminis.app.ui.components.MinisSmallOutlinedButton
 import com.openminis.app.ui.components.MinisSmallTextButton
 import com.openminis.app.ui.components.MinisTextButton
@@ -176,7 +175,7 @@ fun ProviderDetailScreen(
                     )
                     if (labelChanged) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        MinisSmallButton(onClick = {
+                        MinisSmallOutlinedButton(onClick = {
                             providerRepository.updateInstance(instance.copy(label = label))
                             AppLogger.info(TAG, "Updated label for ${instance.id}: '$label'")
                         }) {
@@ -780,15 +779,13 @@ fun ProviderDetailScreen(
         // above it for visual consistency (no explicit .height override). The
         // destructive intent is conveyed by the error container color, not by a
         // taller button.
-        MinisButton(
+        MinisOutlinedButton(
             onClick = { showDeleteDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .padding(top = 20.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-            ),
+            destructive = true,
         ) {
             Text(stringResource(R.string.provider_detail_delete_provider))
         }
@@ -891,7 +888,7 @@ private fun OAuthCredentialBlock(
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
                     .size(8.dp)
-                    .background(Color(0xFF34C759), CircleShape),
+                    .background(ChatColors.ok, CircleShape),
             )
         } else {
             Spacer(modifier = Modifier.weight(1f))
@@ -904,7 +901,7 @@ private fun OAuthCredentialBlock(
     }
     Spacer(modifier = Modifier.height(8.dp))
     if (displayedKey.isNotEmpty()) {
-        MinisSmallButton(
+        MinisSmallOutlinedButton(
             onClick = {
                 // [T-android-openai-oauth-signout-signin-stuck] A real sign-out
                 // must clear BOTH credential stores: (1) the persisted OAuth
@@ -920,10 +917,7 @@ private fun OAuthCredentialBlock(
                 displayedKey = ""
                 AppLogger.info(TAG, "OAuth signed out for ${instance.id} (tokens + apiKey cleared)")
             },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.error,
-            ),
+            destructive = true,
         ) {
             Text(stringResource(R.string.provider_detail_sign_out))
         }
@@ -936,9 +930,9 @@ private fun OAuthCredentialBlock(
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
-        MinisSmallButton(
+        MinisSmallOutlinedButton(
             onClick = {
-                if (isAuthenticating) return@MinisSmallButton
+                if (isAuthenticating) return@MinisSmallOutlinedButton
                 isAuthenticating = true
                 kimiLoginJob = scope.launch {
                     try {
@@ -1021,21 +1015,15 @@ private fun ApiKeyCredentialBlock(
             fieldModifier = Modifier.bringIntoViewOnFocus(),
         )
         Row(modifier = Modifier.padding(top = 8.dp)) {
-            // [T-android-settings-ui-md3] #4 + #12 Cancel is the SECONDARY action:
-            // a neutral outlined pill (onSurfaceVariant content/border), forming
-            // the standard MD3 outlined-vs-filled pair with the filled Save below.
-            // Previously a primary-teal text button — indistinguishable from Save.
+            // Cancel is the normal (regular-weight) action; Save is the primary
+            // (semi-bold) one. Both are text buttons (docs/design/UI-DESIGN-LANGUAGE.md §6).
             MinisSmallOutlinedButton(
                 onClick = onCancelEdit,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Text(stringResource(R.string.common_cancel))
             }
             Spacer(modifier = Modifier.width(8.dp))
-            MinisSmallButton(onClick = onSave, enabled = editValue.isNotBlank()) {
+            MinisSmallOutlinedButton(onClick = onSave, enabled = editValue.isNotBlank()) {
                 Text(stringResource(R.string.provider_detail_save_key))
             }
         }
@@ -1140,15 +1128,11 @@ private fun ManualBearerTokenSection(
                     isEditing = false
                     draft = ""
                 },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             ) {
                 Text(stringResource(R.string.common_cancel))
             }
             Spacer(modifier = Modifier.width(8.dp))
-            MinisSmallButton(
+            MinisSmallOutlinedButton(
                 onClick = {
                     val cleaned = draft.replace(Regex("\\s+"), "")
                     if (cleaned.isNotEmpty() && manager != null) {
@@ -1179,7 +1163,7 @@ private fun ManualBearerTokenSection(
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
                     .size(8.dp)
-                    .background(Color(0xFF34C759), CircleShape),
+                    .background(ChatColors.ok, CircleShape),
             )
         }
         Row(modifier = Modifier.padding(top = 8.dp)) {
@@ -1196,9 +1180,7 @@ private fun ManualBearerTokenSection(
                     AppLogger.info(TAG, "Manual bearer token removed for ${instance.id}")
                     reloadTick++
                 },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+                destructive = true,
             ) {
                 Text(stringResource(R.string.common_remove))
             }

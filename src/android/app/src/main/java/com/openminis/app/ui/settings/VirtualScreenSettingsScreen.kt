@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +42,8 @@ import com.openminis.app.tools.android.vscreen.VirtualScreenClientProvider
 import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettings
 import com.openminis.app.tools.android.vscreen.VirtualScreenDisplaySettingsPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenPreferences
+import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.ui.components.MinisOutlinedButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -176,7 +176,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
                 showDivider = false,
             )
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Button(
+                MinisButton(
                     onClick = { runCompatibilityCheck(enableWhenPassed = false) },
                     enabled = !probing,
                     modifier = Modifier.fillMaxWidth(),
@@ -267,7 +267,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
 
         SettingsSection(header = stringResource(R.string.vscreen_preview)) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                OutlinedButton(
+                MinisOutlinedButton(
                     onClick = {
                         previewBusy = true
                         previewMessage = ""
@@ -315,7 +315,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).padding(top = 12.dp),
                     )
                 }
-                OutlinedButton(
+                MinisOutlinedButton(
                     onClick = {
                         scope.launch {
                             val result = withContext(Dispatchers.IO) {

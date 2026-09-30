@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.repository.SkillRepository
+import com.openminis.app.ui.theme.ChatColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -214,12 +215,12 @@ fun MinisSkillsBrowserScreen(
                             Text(stringResource(R.string.skills_browser_hud_importing), color = Color.White, style = MaterialTheme.typography.labelLarge)
                         }
                         HudState.SUCCESS -> {
-                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ChatColors.ok, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(10.dp))
                             Text(hudMessage, color = Color.White, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                         }
                         HudState.ERROR -> {
-                            Icon(Icons.Filled.Error, contentDescription = null, tint = Color(0xFFFF3B30), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.Error, contentDescription = null, tint = ChatColors.bad, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(10.dp))
                             Text(hudMessage, color = Color.White, style = MaterialTheme.typography.labelLarge, maxLines = 2)
                         }

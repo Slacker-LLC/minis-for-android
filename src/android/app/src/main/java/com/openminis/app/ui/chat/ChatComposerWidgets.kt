@@ -146,7 +146,6 @@ import com.openminis.app.ui.components.MinisMenuDivider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -999,7 +998,7 @@ internal fun ThinkingLevelPicker(
     // up-arrow, signalling "your setting is higher, this model caps here".
     val maxAvailable = availableLevels.lastOrNull { it != ThinkingLevel.OFF }
     val isClamped = current.isEnabled && maxAvailable != null && current.rank > maxAvailable.rank
-    val clampOrange = Color(0xFFFF9500)
+    val clampOrange = ChatColors.warn
     Row(
         modifier = Modifier
             .background(

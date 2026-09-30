@@ -21,8 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -33,7 +31,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -72,6 +69,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.openminis.app.ui.components.MinisOutlinedButton
+import com.openminis.app.ui.components.MinisButton
+import com.openminis.app.ui.components.MinisAlertDialog
 
 /**
  * [T-android-scheduled-tasks-design / T-android-scheduled-tasks-full]
@@ -344,7 +344,7 @@ fun ScheduledTaskEditScreen(
     }
 
     saveError?.let { message ->
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { saveError = null },
             title = { Text(stringResource(R.string.scheduled_task_save)) },
             text = { Text(message) },
@@ -355,7 +355,7 @@ fun ScheduledTaskEditScreen(
     }
 
     if (showFullTierConfirmation) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = {
                 showFullTierConfirmation = false
                 saveAfterFullConfirmation = false
@@ -393,7 +393,7 @@ fun ScheduledTaskEditScreen(
     if (state != null) {
         when (state.status) {
             ScheduledTasksViewModel.RunStatus.RUNNING -> {
-                AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = { vm.clearRunNowState() },
                     title = { Text(stringResource(R.string.scheduled_task_run_now_starting)) },
                     text = {
@@ -411,7 +411,7 @@ fun ScheduledTaskEditScreen(
                 )
             }
             ScheduledTasksViewModel.RunStatus.STARTED -> {
-                AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = { vm.clearRunNowState() },
                     title = { Text(stringResource(R.string.scheduled_task_run_now_started)) },
                     text = { Text(stringResource(R.string.scheduled_task_run_now_started_body)) },
@@ -435,7 +435,7 @@ fun ScheduledTaskEditScreen(
                 )
             }
             ScheduledTasksViewModel.RunStatus.FAILED -> {
-                AlertDialog(
+                MinisAlertDialog(
                     onDismissRequest = { vm.clearRunNowState() },
                     title = { Text(stringResource(R.string.scheduled_task_run_now_failed)) },
                     text = {
@@ -732,18 +732,18 @@ private fun EditFormBody(
 
         HorizontalDivider()
 
-        OutlinedButton(onClick = onRunNow, enabled = canRunNow, modifier = Modifier.fillMaxWidth()) {
+        MinisOutlinedButton(onClick = onRunNow, enabled = canRunNow, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.scheduled_task_run_now))
         }
-        Button(onClick = onSave, enabled = canSave, modifier = Modifier.fillMaxWidth()) {
+        MinisButton(onClick = onSave, enabled = canSave, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.scheduled_task_save))
         }
         if (!isNew) {
-            OutlinedButton(
+            MinisOutlinedButton(
                 onClick = onDelete,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                destructive = true,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.scheduled_task_delete)) }
         }
@@ -755,7 +755,7 @@ private fun EditFormBody(
         }
     }
     if (showBotPicker) {
-        AlertDialog(
+        MinisAlertDialog(
             onDismissRequest = { showBotPicker = false },
             title = { Text(stringResource(R.string.scheduled_task_executor)) },
             text = {
@@ -870,7 +870,7 @@ private fun SessionPickerDialog(
 ) {
     var sessions by remember { mutableStateOf<List<ScheduledTasksViewModel.SessionOption>?>(null) }
     LaunchedEffect(Unit) { sessions = vm.listSessions() }
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.scheduled_task_pick_session)) },
         text = {
@@ -909,7 +909,7 @@ private fun MessagePickerDialog(
 ) {
     var messages by remember { mutableStateOf<List<ScheduledTasksViewModel.MessageOption>?>(null) }
     LaunchedEffect(sessionId) { messages = vm.listUserMessages(sessionId) }
-    AlertDialog(
+    MinisAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.scheduled_task_pick_message)) },
         text = {
