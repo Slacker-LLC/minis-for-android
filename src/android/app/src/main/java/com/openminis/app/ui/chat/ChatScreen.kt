@@ -41,6 +41,11 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.ViewSidebar
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.VerticalAlignTop
@@ -2393,8 +2398,50 @@ fun ChatScreen(
         containerColor = ChatColors.background,
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
+            androidx.compose.material3.CenterAlignedTopAppBar(
                 title = {
+                    if (currentBot == null) {
+                        // Board: session title over the model name (monospace, tap to change).
+                        val rawModel = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
+                        val topModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        ) {
+                            Text(
+                                // ChatViewModel's placeholder title is the English literal "New Chat";
+                                // show the localized label until a real title exists.
+                                text = sessionTitle.takeIf { it.isNotBlank() && it != "New Chat" }
+                                    ?: stringResource(R.string.drawer_new_session),
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { showModelPicker = true },
+                            ) {
+                                Text(
+                                    text = topModel,
+                                    fontSize = 12.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = ChatColors.secondaryText,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.settings_models_title),
+                                    tint = ChatColors.secondaryText,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                    }
                     currentBot?.let { bot ->
                         Column(
                             Modifier.clickable { onBotDetails(bot.id) }.padding(vertical = 6.dp),
@@ -2417,7 +2464,7 @@ fun ChatScreen(
                     if (!isTwoPane) {
                         if (onOpenDrawer != null) {
                             IconButton(onClick = onOpenDrawer) {
-                                Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.common_menu))
+                                Icon(Icons.Outlined.ViewSidebar, contentDescription = stringResource(R.string.common_menu))
                             }
                         } else {
                             IconButton(onClick = onBack) {
@@ -2444,60 +2491,65 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    // [T-chat-new-session-button] One tap to a fresh conversation. The action
-                    // already existed (onNewChat, the drawer's "new chat"); this is its entry
-                    // point on the chat itself: the drawer's pencil, as a plain icon button next
-                    // to the overflow so all three top-bar controls are the same size and sit on
-                    // the same line.
-                    if (!isTwoPane) {
-                        IconButton(onClick = onNewChat) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = stringResource(R.string.chat_new_session),
-                            )
-                        }
+                    // Board: session settings is the slider button; new chat lives in the "..." menu.
+                    IconButton(onClick = { showSessionConfigSheet = true }) {
+                        Icon(
+                            Icons.Outlined.Tune,
+                            contentDescription = stringResource(R.string.session_config_title),
+                        )
                     }
-                    // iOS: "..." circle button → dropdown menu
                     Box {
                         IconButton(onClick = { showChatMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
+                            Icon(Icons.Default.MoreHoriz, contentDescription = stringResource(R.string.common_more))
                         }
                         MinisMenu(
                             expanded = showChatMenu,
                             onDismissRequest = { showChatMenu = false },
                             shape = RoundedCornerShape(14.dp),
+                            tonalElevation = 0.dp,
                         ) {
-                            // 会话设置 (提示词、技能、MCP、记忆、Token 用量、自动压缩、快速模式)
+                            // Conversation actions only (board: settings-type entries live on the slider).
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.session_config_title)) },
+                                text = { Text(stringResource(R.string.chat_menu_new_chat)) },
                                 onClick = {
                                     showChatMenu = false
-                                    showSessionConfigSheet = true
+                                    onNewChat()
                                 },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Settings, contentDescription = null)
-                                },
+                                trailingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                             )
-                            // 打开浏览器
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_menu_open_terminal)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    onOpenTerminal()
+                                },
+                                trailingIcon = { Icon(Icons.Default.Terminal, contentDescription = null) },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_open_browser)) },
                                 onClick = {
                                     showChatMenu = false
                                     viewModel.toggleBrowserSheet()
                                 },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Language, contentDescription = null)
+                                trailingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_menu_browse_chat_files)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    onBrowseChatFiles()
                                 },
+                                trailingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
                             )
                             MinisMenuDivider()
-                            // 清空对话 (destructive, placed at bottom for safety)
+                            // Destructive, last, in red.
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_clear_chat), color = MaterialTheme.colorScheme.error) },
                                 onClick = {
                                     showChatMenu = false
                                     showClearChatDialog = true
                                 },
-                                leadingIcon = {
+                                trailingIcon = {
                                     Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                                 },
                             )
@@ -2579,6 +2631,16 @@ fun ChatScreen(
 
             // Messages + scroll-to-bottom button
             Box(modifier = Modifier.weight(1f)) {
+                // Empty conversation: greeting + quick actions (board). Held back briefly so an
+                // existing session whose history is still loading does not flash it.
+                var emptyStateSettled by remember(sessionId) { mutableStateOf(false) }
+                LaunchedEffect(sessionId) {
+                    kotlinx.coroutines.delay(400)
+                    emptyStateSettled = true
+                }
+                if (emptyStateSettled && messages.isEmpty() && !isStreaming) {
+                    ChatEmptyState(onPickPrompt = { viewModel.setInputText(it) })
+                }
                 var toolBarHeightPx by remember { mutableStateOf(0) }
                 val density = LocalDensity.current
                 val toolBarHeightDp = with(density) { toolBarHeightPx.toDp() }
