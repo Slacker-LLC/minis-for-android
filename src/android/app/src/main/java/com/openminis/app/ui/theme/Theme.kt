@@ -17,24 +17,19 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Accent: iOS blue, desaturated. [T-android-accent-blue-parity]
+// Accent: iOS-style blue that meets WCAG AA. [T-ui-white-accent-aa]
 //
-// Was a teal (#2E8B8B / #4DD9D9) that predated iOS settling on blue. The hue
-// now comes from iOS Assets.xcassets/AccentColor.colorset (sRGB components
-// r0.212 g0.525 b0.933 -> #3686EE light, r0.329 g0.565 b0.894 -> #5490E4 dark),
-// but iOS's saturation (84% / 73%) read as glaring on Android's darker
-// surfaces, so SATURATION is dialled back ~30% with hue and lightness kept:
-//   light  #3686EE  S84% L57%  ->  #528AD2  S59% L57%
-//   dark   #5490E4  S73% L61%  ->  #6A94CE  S51% L61%
-//
-// Lightness is deliberately NOT raised, which is the other way to "lighten".
-// It would have softened dark mode further but pushed light-mode contrast on
-// white from 3.62 to 2.62 — below WCAG AA's 4.5 for text. Desaturating keeps
-// dark mode at 5.93 (passing) and leaves light mode where it was.
+// The earlier desaturated blue (#528AD2 light / #6A94CE dark) measured 3.54:1
+// on white, below AA's 4.5:1 for text, and every action is now a text button
+// (docs/design/UI-DESIGN-LANGUAGE.md §6), so the accent carries the label.
+//   light  #0068D6  5.31:1 on #FFFFFF, 4.76:1 on #F2F2F7
+//   dark   #0A84FF  5.76:1 on #000000, 4.66:1 on #1C1C1E
+// Dark text on the lifted #26262A chat fill measures 4.13:1; keep text
+// buttons on page/sheet/card surfaces, not on that fill.
 //
 // Names keep the `Teal` prefix only to avoid churning 90+ call sites; the
 // value is the contract, not the name.
-private val TealPrimary = Color(0xFF528AD2)
+private val TealPrimary = Color(0xFF0068D6)
 private val TealOnPrimary = Color(0xFFFFFFFF)
 private val TealPrimaryContainer = Color(0xFFB2DFDB)
 private val TealOnPrimaryContainer = Color(0xFF00332F)
@@ -47,14 +42,14 @@ private val TealOnTertiary = Color(0xFFFFFFFF)
 private val TealTertiaryContainer = Color(0xFFCDE5FF)
 private val TealOnTertiaryContainer = Color(0xFF001D32)
 private val TealBackground = Color(0xFFF5FAFA)
-private val TealOnBackground = Color(0xFF171D1C)
+private val TealOnBackground = Color(0xFF000000)
 private val TealSurface = Color(0xFFF5FAFA)
-private val TealOnSurface = Color(0xFF171D1C)
+private val TealOnSurface = Color(0xFF000000)
 private val TealSurfaceVariant = Color(0xFFDAE5E2)
 private val TealOnSurfaceVariant = Color(0xFF3F4947)
 private val TealOutline = Color(0xFF6F7977)
 
-private val TealDarkPrimary = Color(0xFF6A94CE)
+private val TealDarkPrimary = Color(0xFF0A84FF)
 private val TealDarkOnPrimary = Color(0xFF003737)
 private val TealDarkPrimaryContainer = Color(0xFF1A6B6B)
 private val TealDarkOnPrimaryContainer = Color(0xFFB2DFDB)
@@ -73,11 +68,12 @@ private val TealDarkOutline = Color(0xFF899390)
 // Neutral grouped-card surfaces (iOS-style system-grouped background).
 // Override Material3's tonal `surfaceContainer*` so cards don't pick up the
 // teal primary tint.
-// Light: page = #FFFFFF milky white, card = soft light #F7F7F9
+// Light: page = #FFFFFF, every card/container level = the single fill grey #F2F2F7
+//        (docs/design/UI-DESIGN-LANGUAGE.md §2-3: one white, one grey).
 // Dark:  page = #000, card = #1C1C1E
 private val NeutralGroupedBg = Color(0xFFFFFFFF)
-private val NeutralGroupedCard = Color(0xFFF7F7F9)
-private val NeutralGroupedCardElevated = Color(0xFFEFEFF2)
+private val NeutralGroupedCard = Color(0xFFF2F2F7)
+private val NeutralGroupedCardElevated = Color(0xFFF2F2F7)
 private val NeutralOutline = Color(0xFFE5E5EA)
 
 private val NeutralDarkGroupedBg = Color(0xFF000000)
@@ -143,6 +139,11 @@ private val DarkColorScheme = darkColorScheme(
 fun minisPageBackground(darkTheme: Boolean): Color =
     if (darkTheme) Color(0xFF000000) else Color(0xFFFFFFFF)
 
+// Scrim behind dialogs / sheets / menus: black 18% on the white page, 55% on
+// the black page (docs/design/UI-DESIGN-LANGUAGE.md §3, §7).
+fun minisOverlayScrim(darkTheme: Boolean): Color =
+    Color.Black.copy(alpha = if (darkTheme) 0.55f else 0.18f)
+
 // Two parallel UI styles, switchable live in 设置 → 外观. Both share the same
 // palette and shapes; the difference lives in the surface treatment (glass
 // components sample the GlassHost backdrop instead of painting flat surfaces).
@@ -150,7 +151,7 @@ enum class UiStyle { CLASSIC, GLASS }
 
 val LocalUiStyle = staticCompositionLocalOf { UiStyle.CLASSIC }
 
-// App-wide FAB accent color (warm beige, matching iOS New Chat button).
+// App-wide FAB accent color (the app accent; see ChatPalette.fabAccent).
 // Reads from ChatPalette so it follows the in-app theme override (theme_mode pref),
 // not android.isSystemInDarkTheme(), which only tracks the system setting.
 @Composable
@@ -169,20 +170,21 @@ private val MinisShapes = Shapes(
 /**
  * [T-android-accent-color] The accent the user picked, applied through colorScheme.primary.
  *
- * Index 0 is the app's own accent (the desaturated iOS blue above) so an existing install looks
- * unchanged; the other six are X's accent palette (blue / yellow / pink / purple / orange /
- * green), which is what the picker offers. Each has a light and a dark value: the dark variants
- * are lifted so they keep contrast on dark surfaces, and the yellow is darkened in light mode
- * because the raw colour cannot carry white text on white surfaces.
+ * Index 0 is the app's own accent (an iOS-style blue chosen to meet WCAG AA, >= 4.5:1 on white and
+ * on black; see docs/design/UI-DESIGN-LANGUAGE.md §3); the other six keep the hues of X's accent
+ * palette (blue / yellow / pink / purple / orange / green), which is what the picker offers. Each
+ * has a light and a dark value: the dark variants are lifted so they keep contrast on dark
+ * surfaces, and the light variants are darkened (hue kept) to >= 4.5:1 on white and on #F2F2F7,
+ * because actions are text buttons and the accent is now the label colour.
  */
 enum class AccentColor(val index: Int, val light: Color, val dark: Color) {
-    DEFAULT(0, Color(0xFF528AD2), Color(0xFF6A94CE)),
-    BLUE(1, Color(0xFF1D9BF0), Color(0xFF4FB3F0)),
-    YELLOW(2, Color(0xFFC9A200), Color(0xFFFFD400)),
-    PINK(3, Color(0xFFF91880), Color(0xFFF95C9F)),
-    PURPLE(4, Color(0xFF7856FF), Color(0xFF957CFF)),
-    ORANGE(5, Color(0xFFFF7A00), Color(0xFFFF9A40)),
-    GREEN(6, Color(0xFF00A76B), Color(0xFF00BA7C)),
+    DEFAULT(0, Color(0xFF0068D6), Color(0xFF0A84FF)),
+    BLUE(1, Color(0xFF0C72B7), Color(0xFF4FB3F0)),
+    YELLOW(2, Color(0xFF846B00), Color(0xFFFFD400)),
+    PINK(3, Color(0xFFD80667), Color(0xFFF95C9F)),
+    PURPLE(4, Color(0xFF704CFF), Color(0xFF957CFF)),
+    ORANGE(5, Color(0xFFB05400), Color(0xFFFF9A40)),
+    GREEN(6, Color(0xFF007E51), Color(0xFF00BA7C)),
     ;
 
     companion object {

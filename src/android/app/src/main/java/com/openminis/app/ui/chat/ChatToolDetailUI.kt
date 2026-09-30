@@ -623,7 +623,7 @@ internal fun ToolDetailSheet(
                         // T126-fix: ChatPalette.isDark follows the in-app theme
                         // override, isSystemInDarkTheme() doesn't.
                         val isDark = ChatColors.isDark
-                        val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
+                        val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F7)
                         val cardBorder = if (isDark) Color(0xFF404040) else Color(0xFFD1D1D1)
                         val redBg = if (isDark) Color(0xFF4D1414) else Color(0xFFFFE5E5)
                         val redText = if (isDark) Color(0xFFFF6666) else Color(0xFFCC1A1A)
@@ -1561,8 +1561,8 @@ private fun EditorCard(
     // Appearance) wins over the system setting. Otherwise users on Light system
     // + Dark in-app would see white card on black chat.
     val isDark = ChatColors.isDark
-    val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF0F0F0)
-    val headerBg = if (isDark) Color(0xFF212121) else Color(0xFFEBEBEB)
+    val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F7)
+    val headerBg = if (isDark) Color(0xFF212121) else Color(0xFFF2F2F7)
     val cardBorder = if (isDark) Color(0xFF404040) else Color(0xFFD1D1D1)
 
     Column(

@@ -67,7 +67,7 @@ val LightChatPalette = ChatPalette(
     inputIconBorder = Color.Transparent,
     inputBorder = Color(0x4D3C3C43),
     primaryText = Color(0xFF000000),
-    secondaryText = Color(0x993C3C43),
+    secondaryText = Color(0xFF636369),
     tertiaryText = Color(0x4D3C3C43),
     disabledText = Color(0x2E3C3C43),
     userBubble = Color(0x1E787880),
@@ -77,13 +77,13 @@ val LightChatPalette = ChatPalette(
     separator = Color(0x4D3C3C43),
     sendButton = Color(0xFF000000),
     sendButtonDisabled = Color(0x2E3C3C43),
-    codeBlockBg = Color(0xFF000000),
-    codeBlockText = Color(0xFF34C759),
+    codeBlockBg = Color(0xFFF2F2F7),
+    codeBlockText = Color(0xFF000000),
     inlineCodeBg = Color(0xFFF2F2F7),
-    inlineCodeText = Color(0xFFFF9500),
-    link = Color(0xFF007AFF),
+    inlineCodeText = Color(0xFFA65100),
+    link = Color(0xFF0068D6),
     blockquoteBar = Color(0x80FF9500),
-    thinking = Color(0xFF007AFF),
+    thinking = Color(0xFF0068D6),
     warningBg = Color(0x14FF9500),
     warningText = Color(0x73000000),
     tableBorder = Color(0x1F000000),
@@ -92,7 +92,7 @@ val LightChatPalette = ChatPalette(
     thumbnailBorder = Color(0x33808080),
     sheetHeaderBg = Color(0xFFFFFFFF),
     sheetHeaderBorder = Color(0x1A000000),
-    fabAccent = Color(0xFFB7AF96),
+    fabAccent = Color(0xFF0068D6),
 )
 
 // T153: Android-specific dark palette tweaks. iOS borrows the system
@@ -150,7 +150,7 @@ val DarkChatPalette = ChatPalette(
     thumbnailBorder = Color(0x20545458),
     sheetHeaderBg = Color(0xFF2C2C2E),
     sheetHeaderBorder = Color(0x33FFFFFF),
-    fabAccent = Color(0xFF504C42),
+    fabAccent = Color(0xFF0A84FF),
 )
 
 val LocalChatPalette = compositionLocalOf { LightChatPalette }

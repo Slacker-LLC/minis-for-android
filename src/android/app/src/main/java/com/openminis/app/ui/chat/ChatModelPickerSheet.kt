@@ -711,7 +711,7 @@ internal fun ModelPickerSheet(
                                                     entries.size,
                                                 ),
                                                 style = MaterialTheme.typography.labelMedium,
-                                                color = Color(0xFF007AFF),
+                                                color = MaterialTheme.colorScheme.primary,
                                             )
                                         }
                                         }
