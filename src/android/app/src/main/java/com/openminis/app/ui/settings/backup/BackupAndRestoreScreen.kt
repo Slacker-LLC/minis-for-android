@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.openminis.app.ui.settings.SettingsSwitch
 import com.openminis.app.R
+import com.openminis.app.ui.settings.SettingsSegmented
 import com.openminis.app.backup.BackupCategory
 import com.openminis.app.backup.BackupFormat
 import com.openminis.app.backup.BackupHistory
@@ -156,23 +157,20 @@ fun BackupAndRestoreScreen(
     var backupConfirm by remember { mutableStateOf("") }
     var restorePassphrase by remember { mutableStateOf("") }
 
-    SettingsScaffold(title = stringResource(R.string.backup_title), onBack = onBack) {
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            SegmentedButton(
-                selected = tab == 0,
-                onClick = { tab = 0 },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            ) { Text(stringResource(R.string.backup_tab_backup)) }
-            SegmentedButton(
-                selected = tab == 1,
-                onClick = { tab = 1 },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            ) { Text(stringResource(R.string.backup_tab_restore)) }
-        }
+    SettingsScaffold(
+        title = stringResource(R.string.backup_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_cat_data),
+    ) {
+        SettingsSegmented(
+            options = listOf(
+                stringResource(R.string.backup_tab_backup),
+                stringResource(R.string.backup_tab_restore),
+            ),
+            selectedIndex = tab,
+            onSelect = { tab = it },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
 
         // [T-restore-keep-tab-state] Only ONE tab is composed at a time, so the
         // other leaves the tree and plain `remember` state dies with it. The
