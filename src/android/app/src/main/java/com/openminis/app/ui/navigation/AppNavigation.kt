@@ -111,6 +111,7 @@ object Routes {
     /** [T-android-provider-voice] Read-only shadow Voice Service detail. */
     const val SHADOW_VOICE_DETAIL = "voice_service/{instanceId}"
     const val MODELS = "models"
+    const val THINKING_RULES = "thinking_rules"
     const val MODEL_SLOT_DETAIL = "model_slot/{slot}"
     fun modelSlotDetail(slot: ModelSlot) = "model_slot/${slot.name}"
     /** T185: picker that adds model *entries* to the agent-loop set. */
@@ -664,6 +665,8 @@ fun AppNavigation(
                     onBack = { navController.safePopBackStack() },
                     onProvidersClick = { navController.safeNavigate(Routes.PROVIDER_LIST) },
                     onModelsClick = { navController.safeNavigate(Routes.MODELS) },
+                    onAgentLoopModelsClick = { navController.safeNavigate(Routes.ADD_MODELS_TO_AGENT_LOOP) },
+                    onThinkingRulesClick = { navController.safeNavigate(Routes.THINKING_RULES) },
                     onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                     onSkillsClick = { navController.safeNavigate(Routes.SKILLS) },
                     onCharactersClick = { navController.safeNavigate(Routes.CHARACTERS) },
@@ -881,6 +884,14 @@ fun AppNavigation(
                 onVoiceServiceClick = { id ->
                     navController.safeNavigate(Routes.shadowVoiceDetail(id))
                 },
+            )
+        }
+
+        composable(Routes.THINKING_RULES) {
+            com.openminis.app.ui.settings.ThinkingRulesHubScreen(
+                providerRepository = providerRepository,
+                onBack = { navController.safePopBackStack() },
+                onProviderClick = { navController.safeNavigate(Routes.providerDetail(it)) },
             )
         }
 

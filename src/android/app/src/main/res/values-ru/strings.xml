@@ -2321,4 +2321,11 @@
     <string name="first_run_step_chat">Начать чат</string>
     <string name="first_run_step_chat_locked">Сначала выполните шаги выше</string>
     <string name="first_run_done">Готово</string>
+    <string name="settings_agent_loop_models_subtitle">Выберите модели, доступные инструментам агента</string>
+    <string name="settings_thinking_rules">Правила рассуждения</string>
+    <string name="settings_thinking_rules_subtitle">Параметры рассуждения у провайдеров</string>
+    <string name="settings_models_stats_header">Статистика</string>
+    <string name="thinking_rules_hub_footer">Правила зависят от протокола и редактируются для каждого провайдера.</string>
+    <string name="thinking_rules_hub_custom">Поддерживаются свои правила</string>
+    <string name="thinking_rules_hub_official">Официальный протокол, правила не нужны</string>
 </resources>

@@ -2355,4 +2355,11 @@
     <string name="first_run_step_chat">开始对话</string>
     <string name="first_run_step_chat_locked">请先完成前两步</string>
     <string name="first_run_done">已完成</string>
+    <string name="settings_agent_loop_models_subtitle">选择 Agent 工具可用的模型</string>
+    <string name="settings_thinking_rules">思考规则</string>
+    <string name="settings_thinking_rules_subtitle">不同服务商的思考参数格式</string>
+    <string name="settings_models_stats_header">统计</string>
+    <string name="thinking_rules_hub_footer">思考规则依赖各服务商的协议，因此在各服务商内分别编辑。</string>
+    <string name="thinking_rules_hub_custom">支持自定义规则</string>
+    <string name="thinking_rules_hub_official">官方协议，无需自定义规则</string>
 </resources>

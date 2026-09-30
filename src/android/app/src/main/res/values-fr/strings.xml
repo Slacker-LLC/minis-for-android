@@ -1958,4 +1958,11 @@
     <string name="first_run_step_chat">Commencer à discuter</string>
     <string name="first_run_step_chat_locked">Terminez d\'abord les étapes ci-dessus</string>
     <string name="first_run_done">Terminé</string>
+    <string name="settings_agent_loop_models_subtitle">Choisir les modèles utilisables par les outils de l\'agent</string>
+    <string name="settings_thinking_rules">Règles de réflexion</string>
+    <string name="settings_thinking_rules_subtitle">Paramètres de réflexion par fournisseur</string>
+    <string name="settings_models_stats_header">Statistiques</string>
+    <string name="thinking_rules_hub_footer">Les règles dépendent du protocole et se modifient par fournisseur.</string>
+    <string name="thinking_rules_hub_custom">Règles personnalisées prises en charge</string>
+    <string name="thinking_rules_hub_official">Protocole officiel, pas de règles personnalisées</string>
 </resources>

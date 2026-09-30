@@ -2067,4 +2067,11 @@
     <string name="first_run_step_chat">Chat starten</string>
     <string name="first_run_step_chat_locked">Erst die Schritte oben abschließen</string>
     <string name="first_run_done">Erledigt</string>
+    <string name="settings_agent_loop_models_subtitle">Modelle wählen, die Agent-Werkzeuge nutzen dürfen</string>
+    <string name="settings_thinking_rules">Denkregeln</string>
+    <string name="settings_thinking_rules_subtitle">Denkparameter je Anbieter</string>
+    <string name="settings_models_stats_header">Statistik</string>
+    <string name="thinking_rules_hub_footer">Denkregeln hängen vom Protokoll ab und werden pro Anbieter bearbeitet.</string>
+    <string name="thinking_rules_hub_custom">Eigene Regeln möglich</string>
+    <string name="thinking_rules_hub_official">Offizielles Protokoll, keine eigenen Regeln</string>
 </resources>

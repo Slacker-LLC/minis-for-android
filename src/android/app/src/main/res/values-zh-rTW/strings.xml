@@ -2326,4 +2326,11 @@
     <string name="first_run_step_chat">開始對話</string>
     <string name="first_run_step_chat_locked">請先完成前兩步</string>
     <string name="first_run_done">已完成</string>
+    <string name="settings_agent_loop_models_subtitle">選擇 Agent 工具可用的模型</string>
+    <string name="settings_thinking_rules">思考規則</string>
+    <string name="settings_thinking_rules_subtitle">不同供應商的思考參數格式</string>
+    <string name="settings_models_stats_header">統計</string>
+    <string name="thinking_rules_hub_footer">思考規則依賴各供應商的協議，因此在各供應商內分別編輯。</string>
+    <string name="thinking_rules_hub_custom">支援自訂規則</string>
+    <string name="thinking_rules_hub_official">官方協議，無需自訂規則</string>
 </resources>

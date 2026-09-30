@@ -2064,4 +2064,11 @@
     <string name="first_run_step_chat">会話を始める</string>
     <string name="first_run_step_chat_locked">先に上の手順を完了してください</string>
     <string name="first_run_done">完了</string>
+    <string name="settings_agent_loop_models_subtitle">エージェントのツールが使えるモデルを選択</string>
+    <string name="settings_thinking_rules">思考ルール</string>
+    <string name="settings_thinking_rules_subtitle">プロバイダごとの思考パラメータ形式</string>
+    <string name="settings_models_stats_header">統計</string>
+    <string name="thinking_rules_hub_footer">思考ルールはプロバイダのプロトコルに依存するため、プロバイダごとに編集します。</string>
+    <string name="thinking_rules_hub_custom">カスタムルール対応</string>
+    <string name="thinking_rules_hub_official">公式プロトコル、カスタムルール不要</string>
 </resources>

@@ -136,6 +136,8 @@ fun SettingsCategoryScreen(
     onBack: () -> Unit,
     onProvidersClick: () -> Unit = {},
     onModelsClick: () -> Unit = {},
+    onAgentLoopModelsClick: () -> Unit = {},
+    onThinkingRulesClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onSkillsClick: () -> Unit = {},
     onCharactersClick: () -> Unit = {},
@@ -190,10 +192,24 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.model_slots_header),
                         subtitle = stringResource(R.string.model_slots_footer),
                         onClick = onModelsClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.AutoAwesome,
+                        iconColor = Color(0xFF34C759),
+                        title = stringResource(R.string.settings_agent_loop_models),
+                        subtitle = stringResource(R.string.settings_agent_loop_models_subtitle),
+                        onClick = onAgentLoopModelsClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.Psychology,
+                        iconColor = Color(0xFFAF52DE),
+                        title = stringResource(R.string.settings_thinking_rules),
+                        subtitle = stringResource(R.string.settings_thinking_rules_subtitle),
+                        onClick = onThinkingRulesClick,
                         showDivider = false,
                     )
                 }
-                SettingsSection {
+                SettingsSection(header = stringResource(R.string.settings_models_stats_header)) {
                     SettingsRow(
                         icon = Icons.Outlined.BarChart,
                         iconColor = Color(0xFFFF9500),

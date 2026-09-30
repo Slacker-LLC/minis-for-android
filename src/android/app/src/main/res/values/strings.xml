@@ -2445,4 +2445,11 @@
     <string name="first_run_step_chat">Start chatting</string>
     <string name="first_run_step_chat_locked">Finish the steps above first</string>
     <string name="first_run_done">Done</string>
+    <string name="settings_agent_loop_models_subtitle">Choose the models the agent\'s tools may use</string>
+    <string name="settings_thinking_rules">Thinking rules</string>
+    <string name="settings_thinking_rules_subtitle">How each provider\'s thinking parameters map</string>
+    <string name="settings_models_stats_header">Statistics</string>
+    <string name="thinking_rules_hub_footer">Thinking rules are edited per provider because they depend on its protocol.</string>
+    <string name="thinking_rules_hub_custom">Custom rules supported</string>
+    <string name="thinking_rules_hub_official">Official protocol, no custom rules</string>
 </resources>

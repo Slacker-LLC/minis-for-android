@@ -2056,4 +2056,11 @@
     <string name="first_run_step_chat">대화 시작</string>
     <string name="first_run_step_chat_locked">위 단계를 먼저 완료하세요</string>
     <string name="first_run_done">완료</string>
+    <string name="settings_agent_loop_models_subtitle">에이전트 도구가 쓸 수 있는 모델 선택</string>
+    <string name="settings_thinking_rules">사고 규칙</string>
+    <string name="settings_thinking_rules_subtitle">공급자별 사고 매개변수 형식</string>
+    <string name="settings_models_stats_header">통계</string>
+    <string name="thinking_rules_hub_footer">사고 규칙은 공급자의 프로토콜에 따라 달라 공급자별로 편집합니다.</string>
+    <string name="thinking_rules_hub_custom">사용자 규칙 지원</string>
+    <string name="thinking_rules_hub_official">공식 프로토콜, 사용자 규칙 불필요</string>
 </resources>
