@@ -123,25 +123,15 @@ fun LogManagementScreen(
     }
     fun refresh() { refreshTrigger.value++ }
 
+    val inAudit = tab == "config-audit"
+    // "Config changes" is a page under Logs (board), not a tab: back from it returns to the log list.
+    androidx.activity.compose.BackHandler(enabled = inAudit) { tab = "logs" }
     SettingsScaffold(
-        title = stringResource(R.string.log_title),
-        onBack = onBack, backLabel = stringResource(R.string.settings_cat_data),
+        title = stringResource(if (inAudit) R.string.logs_tab_config_changes else R.string.log_title),
+        onBack = if (inAudit) ({ tab = "logs" }) else onBack,
+        backLabel = stringResource(if (inAudit) R.string.log_title else R.string.settings_cat_data),
         scrollable = false,
     ) {
-        // Segmented selector lives outside the scrolling content so the
-        // tabs stay visible as the body scrolls.
-        SettingsSegmented(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                options = listOf(stringResource(R.string.log_title), stringResource(R.string.logs_tab_config_changes)),
-                selectedIndex = listOf(tab == "logs", tab == "config-audit").indexOfFirst { it }.coerceAtLeast(0),
-                onSelect = { index ->
-                    when (index) {
-                    0 -> run { tab = "logs" }
-                    1 -> run { tab = "config-audit" }
-                    }
-                },
-            )
-
         if (tab == "config-audit") {
             // Audit body. Owns its own scrolling.
             ConfigAuditScreen(modifier = Modifier.fillMaxSize())
@@ -161,6 +151,7 @@ fun LogManagementScreen(
                 },
                 onLogFileClick = onLogFileClick,
                 onDeleteAll = { showDeleteAllConfirm = true },
+                onOpenConfigChanges = { tab = "config-audit" },
             )
         }
     }
@@ -202,6 +193,7 @@ private fun LogsBody(
     onToggleLogging: (Boolean) -> Unit,
     onLogFileClick: (fileName: String) -> Unit,
     onDeleteAll: () -> Unit,
+    onOpenConfigChanges: () -> Unit,
 ) {
     val anyFiles = dailyLogs.isNotEmpty() || crashLogs.isNotEmpty()
     Column(
@@ -277,6 +269,14 @@ private fun LogsBody(
                     )
                 }
             }
+        }
+
+        SettingsSection {
+            SettingsRow(
+                title = stringResource(R.string.logs_tab_config_changes),
+                onClick = onOpenConfigChanges,
+                showDivider = false,
+            )
         }
 
         // ── Storage / Delete All (only when files exist) ───────────────

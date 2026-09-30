@@ -427,26 +427,15 @@ fun SettingsCategoryScreen(
     }
 
     if (showFeedbackSheet) {
-        MinisModalBottomSheet(
-            onDismissRequest = { showFeedbackSheet = false },
-            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) {
-                Color.Transparent
-            } else {
-                minisSheetColor()
-            },
-        ) {
-            GlassSheetWindowBlur()
-            Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 24.dp)) {
-                FeedbackSheetItem(
-                    icon = Icons.Outlined.BugReport,
-                    title = stringResource(R.string.settings_submit_github_issues),
-                    onClick = {
-                        showFeedbackSheet = false
-                        openExternalUrl(context, buildBugReportUrl())
-                    },
-                )
-            }
-        }
+        com.openminis.app.ui.components.MinisActionSheet(
+            onDismiss = { showFeedbackSheet = false },
+            title = stringResource(R.string.settings_feedback),
+            actions = listOf(
+                com.openminis.app.ui.components.MinisAction(stringResource(R.string.settings_submit_github_issues)) {
+                    openExternalUrl(context, buildBugReportUrl())
+                },
+            ),
+        )
     }
 
     if (showSubagentLimits) {
