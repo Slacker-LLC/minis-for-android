@@ -2427,4 +2427,5 @@
     <string name="browser_desktop_site">Desktop site</string>
     <string name="browser_tab_count_title">%1$d tabs</string>
     <string name="browser_share">Share</string>
+    <string name="mount_folders_header">Mounted</string>
 </resources>

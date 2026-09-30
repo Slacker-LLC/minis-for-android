@@ -138,7 +138,11 @@ fun StorageManagementScreen(
 
     val totalSessionSize = sessions.sumOf { it.totalSize }
 
-    SettingsScaffold(title = stringResource(R.string.storage_title), onBack = onBack) {
+    SettingsScaffold(
+        title = stringResource(R.string.storage_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_section_files),
+    ) {
         SettingsSection(header = stringResource(R.string.storage_section_overview)) {
             StorageOverviewRow(
                 color = Color(0xFF8E8E93),
@@ -232,7 +236,11 @@ fun SessionStorageDetailScreen(
     val totalSize = minisSize + mediaSize
     val hasFiles = totalSize > 0
 
-    SettingsScaffold(title = session?.title ?: stringResource(R.string.storage_session_fallback_title), onBack = onBack) {
+    SettingsScaffold(
+        title = session?.title ?: stringResource(R.string.storage_session_fallback_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.storage_title),
+    ) {
         SettingsSection(header = stringResource(R.string.storage_section_minis_files)) {
             if (minisSize > 0) {
                 SettingsValueRow(
@@ -293,15 +301,9 @@ fun SessionStorageDetailScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (hasFiles) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier.weight(1f),
                     )
-                    if (hasFiles) {
-                        Text(
-                            Formatter.formatFileSize(context, totalSize),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
         }

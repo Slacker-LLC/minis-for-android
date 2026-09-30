@@ -2046,4 +2046,5 @@
     <string name="browser_desktop_site">PC 版サイト</string>
     <string name="browser_tab_count_title">%1$d 個のタブ</string>
     <string name="browser_share">共有</string>
+    <string name="mount_folders_header">マウント済み</string>
 </resources>

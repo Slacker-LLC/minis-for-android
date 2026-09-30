@@ -2303,4 +2303,5 @@
     <string name="browser_desktop_site">Версия для ПК</string>
     <string name="browser_tab_count_title">Вкладок: %1$d</string>
     <string name="browser_share">Поделиться</string>
+    <string name="mount_folders_header">Подключено</string>
 </resources>

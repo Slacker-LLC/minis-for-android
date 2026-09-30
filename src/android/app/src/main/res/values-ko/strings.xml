@@ -2038,4 +2038,5 @@
     <string name="browser_desktop_site">데스크톱 사이트</string>
     <string name="browser_tab_count_title">탭 %1$d개</string>
     <string name="browser_share">공유</string>
+    <string name="mount_folders_header">마운트됨</string>
 </resources>

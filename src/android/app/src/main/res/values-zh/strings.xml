@@ -2337,4 +2337,5 @@
     <string name="browser_desktop_site">桌面版网页</string>
     <string name="browser_tab_count_title">%1$d 个标签页</string>
     <string name="browser_share">分享</string>
+    <string name="mount_folders_header">已挂载</string>
 </resources>

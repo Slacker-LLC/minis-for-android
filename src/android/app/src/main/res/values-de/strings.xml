@@ -2049,4 +2049,5 @@
     <string name="browser_desktop_site">Desktop-Version</string>
     <string name="browser_tab_count_title">%1$d Tabs</string>
     <string name="browser_share">Teilen</string>
+    <string name="mount_folders_header">Eingebunden</string>
 </resources>

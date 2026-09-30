@@ -1940,4 +1940,5 @@
     <string name="browser_desktop_site">Version ordinateur</string>
     <string name="browser_tab_count_title">%1$d onglets</string>
     <string name="browser_share">Partager</string>
+    <string name="mount_folders_header">Montés</string>
 </resources>

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -95,117 +96,97 @@ fun MountDetailScreen(
     val hasChanges = nameChanged || allowWriteChanged
     val canSave = hasChanges && (!nameChanged || nameValid)
 
-    Scaffold(
-        topBar = {
-            MinisTopBar(
-            title = { Text(stringResource(R.string.mount_detail_title)) },
-            onBack = onBack,
-            actions = {
-                    MinisTextButton(
-                        enabled = canSave,
-                        onClick = {
-                            scope.launch(Dispatchers.IO) {
-                                if (nameChanged) store.rename(entry.id, nameTrimmed)
-                                if (allowWriteChanged) store.setUserAllowWrite(entry.id, allowWrite)
-                                withContext(Dispatchers.Main.immediate) { onBack() }
-                            }
-                        },
-                    ) {
-                        Text(stringResource(R.string.save))
+    val source = entry.sourceDisplayName.ifEmpty { stringResource(R.string.mount_path_unavailable) }
+    SettingsScaffold(
+        title = stringResource(R.string.mount_detail_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.mount_folders_title),
+        actions = {
+            MinisTextButton(
+                enabled = canSave,
+                onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        if (nameChanged) store.rename(entry.id, nameTrimmed)
+                        if (allowWriteChanged) store.setUserAllowWrite(entry.id, allowWrite)
+                        withContext(Dispatchers.Main.immediate) { onBack() }
                     }
                 },
-        )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-        ) {
-            Spacer(Modifier.height(16.dp))
-            HeaderCard(entry = entry)
-
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = stringResource(R.string.mount_add_name_label),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            SectionTextField(
-                value = nameText,
-                onValueChange = { nameText = it },
-                singleLine = true,
-                isError = nameChanged && !nameValid,
-            )
-            if (nameChanged && !nameValid) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.mount_detail_name_invalid),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.mount_add_name_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-            Surface(
-                color = SectionDesign.cardColor(),
-                shape = RoundedCornerShape(12.dp),
-                border = SectionDesign.cardBorder(),
-                modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.mount_add_allow_writes),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = stringResource(R.string.mount_add_allow_writes_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    MinisSwitch(
-                        checked = allowWrite,
-                        onCheckedChange = { allowWrite = it },
-                        // Disable when the OS-level grant itself isn't writable.
-                        enabled = entry.isWritable,
-                    )
-                }
+                Text(stringResource(R.string.save), fontWeight = FontWeight.SemiBold)
             }
+        },
+    ) {
+        SettingsSection {
+            SettingsRow(
+                title = stringResource(R.string.mount_add_source_path),
+                showDivider = false,
+                trailing = {
+                    Text(
+                        source,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 200.dp),
+                    )
+                },
+            )
+        }
 
-            Spacer(Modifier.height(20.dp))
-            ActionRow(
+        SettingsSection(
+            header = stringResource(R.string.mount_folders_header),
+            footer = if (nameChanged && !nameValid) {
+                stringResource(R.string.mount_detail_name_invalid)
+            } else {
+                stringResource(R.string.mount_add_name_hint)
+            },
+        ) {
+            SettingsRow(
+                title = stringResource(R.string.mount_add_name_label),
+                trailing = {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = nameText,
+                        onValueChange = { nameText = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = if (nameChanged && !nameValid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.widthIn(min = 80.dp, max = 200.dp),
+                    )
+                },
+            )
+            SettingsSwitchRow(
+                title = stringResource(R.string.mount_add_allow_writes),
+                subtitle = stringResource(R.string.mount_add_allow_writes_desc),
+                checked = allowWrite,
+                onCheckedChange = { allowWrite = it },
+                // Disable when the OS-level grant itself isn't writable.
+                enabled = entry.isWritable,
+                showDivider = false,
+            )
+        }
+
+        SettingsSection {
+            SettingsRow(
+                title = stringResource(R.string.mount_detail_browse_files),
                 icon = Icons.Outlined.Folder,
-                tint = Color(0xFF007AFF),
-                label = stringResource(R.string.mount_detail_browse_files),
+                iconColor = Color(0xFF007AFF),
                 onClick = onBrowseFiles,
+                showDivider = false,
             )
+        }
 
-            Spacer(Modifier.height(12.dp))
-            ActionRow(
-                icon = Icons.Outlined.Folder,
-                tint = MaterialTheme.colorScheme.error,
-                label = stringResource(R.string.mount_unmount_confirm),
-                destructive = true,
+        SettingsSection(footer = stringResource(R.string.mount_unmount_message)) {
+            SettingsRow(
+                title = stringResource(R.string.mount_unmount_confirm),
+                titleColor = MaterialTheme.colorScheme.error,
                 onClick = { showUnmountConfirm = true },
+                showChevron = false,
+                showDivider = false,
             )
-
-            Spacer(Modifier.height(32.dp))
         }
     }
 
@@ -234,94 +215,5 @@ fun MountDetailScreen(
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun HeaderCard(entry: MountedFoldersStore.Entry) {
-    Surface(
-        color = SectionDesign.cardColor(),
-        shape = RoundedCornerShape(12.dp),
-        border = SectionDesign.cardBorder(),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(ChatColors.warn),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.FolderShared,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "/var/minis/mounts/${entry.name}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val source = entry.sourceDisplayName.ifEmpty {
-                    stringResource(R.string.mount_path_unavailable)
-                }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "← $source",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: Color,
-    label: String,
-    destructive: Boolean = false,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = SectionDesign.cardColor(),
-        shape = RoundedCornerShape(12.dp),
-        border = SectionDesign.cardBorder(),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = tint)
-            Text(
-                text = label,
-                color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-        }
     }
 }
