@@ -143,9 +143,6 @@ fun SettingsCategoryScreen(
     onMcpClick: () -> Unit = {},
     onTerminalClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
-    onRootfsClick: () -> Unit = {},
-    onSharedFoldersClick: () -> Unit = {},
-    onMountedFoldersClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
     onSystemEnhanceClick: () -> Unit = {},
@@ -278,43 +275,9 @@ fun SettingsCategoryScreen(
                 }
             }
 
-            // Chat & input and Appearance are leaf pages of their own; the navigation host renders
-            // ChatInputSettingsScreen / AppearanceScreen for these keys, so nothing is drawn here.
-            SettingsCategory.CHAT, SettingsCategory.APPEARANCE -> Unit
-
-            SettingsCategory.FILES -> SettingsSection(
-                header = stringResource(R.string.settings_section_files),
-            ) {
-                SettingsRow(
-                    icon = Icons.Outlined.Inventory2,
-                    iconColor = Color(0xFF007AFF),
-                    title = stringResource(R.string.settings_section_storage),
-                    subtitle = stringResource(R.string.settings_storage_subtitle),
-                    onClick = onRootfsClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Folder,
-                    iconColor = ChatColors.ok,
-                    title = stringResource(R.string.settings_shared_folders),
-                    subtitle = stringResource(R.string.settings_shared_folders_subtitle),
-                    onClick = onSharedFoldersClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.FolderShared,
-                    iconColor = ChatColors.warn,
-                    title = stringResource(R.string.settings_mount_external_folders),
-                    subtitle = stringResource(R.string.settings_mount_external_folders_subtitle),
-                    onClick = onMountedFoldersClick,
-                )
-                SettingsRow(
-                    icon = Icons.Outlined.Backup,
-                    iconColor = ChatColors.ok,
-                    title = stringResource(R.string.settings_backup_restore),
-                    subtitle = stringResource(R.string.settings_backup_restore_subtitle),
-                    onClick = onBackupClick,
-                    showDivider = false,
-                )
-            }
+            // Chat & input, Appearance and Files are pages of their own; the navigation host renders
+            // ChatInputSettingsScreen / AppearanceScreen / FilesHubScreen for these keys.
+            SettingsCategory.CHAT, SettingsCategory.APPEARANCE, SettingsCategory.FILES -> Unit
 
             SettingsCategory.RUNTIME -> {
                 SettingsSection {

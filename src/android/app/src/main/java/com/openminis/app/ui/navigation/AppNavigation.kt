@@ -52,6 +52,7 @@ import com.openminis.app.ui.sandbox.RootfsManagementScreen
 import com.openminis.app.ui.settings.EnvironmentVariablesScreen
 import com.openminis.app.ui.settings.AppearanceScreen
 import com.openminis.app.ui.settings.ChatInputSettingsScreen
+import com.openminis.app.ui.settings.FilesHubScreen
 import com.openminis.app.ui.settings.SettingsCategory
 import com.openminis.app.ui.settings.SettingsCategoryScreen
 import com.openminis.app.ui.settings.SettingsScreen
@@ -636,6 +637,27 @@ fun AppNavigation(
                 ChatInputSettingsScreen(onBack = { navController.safePopBackStack() })
             } else if (category == SettingsCategory.APPEARANCE) {
                 AppearanceScreen(onBack = { navController.safePopBackStack() })
+            } else if (category == SettingsCategory.FILES) {
+                val filesContext = androidx.compose.ui.platform.LocalContext.current
+                FilesHubScreen(
+                    chatDao = chatRepository.dao,
+                    mountedFoldersStore = mountedFoldersStore,
+                    onBack = { navController.safePopBackStack() },
+                    onOpenShared = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
+                    onOpenSkills = { navController.safeNavigate(Routes.SKILLS) },
+                    onOpenMemory = { navController.safeNavigate(Routes.MEMORY) },
+                    onOpenMounts = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
+                    onOpenSessionFiles = { navController.safeNavigate(Routes.STORAGE) },
+                    onBrowseRootfs = {
+                        val rootfs = RootfsManager.getInstance(filesContext.applicationContext)
+                        FilePreviewHolder.fileBrowserViewModel = FileBrowserViewModel(
+                            rootPath = rootfs.rootfsDir,
+                            rootLabel = "/",
+                        )
+                        navController.safeNavigate(Routes.FILE_BROWSER)
+                    },
+                    onOpenTerminal = { navController.safeNavigate(Routes.terminal()) },
+                )
             } else {
                 SettingsCategoryScreen(
                     category = category,
@@ -651,7 +673,6 @@ fun AppNavigation(
                     onMcpClick = { navController.safeNavigate(Routes.MCP) },
                     onTerminalClick = { navController.safeNavigate(Routes.terminal()) },
                     onEnvVarsClick = { navController.safeNavigate(Routes.ENV_VARS) },
-                    onRootfsClick = { navController.safeNavigate(Routes.STORAGE) },
                     onRootfsManagementClick = { navController.safeNavigate(Routes.ROOTFS_MANAGEMENT) },
                     // FILE_BROWSER needs a prepared view-model, so "Browse files" opens the Files
                     // hub (the same page as the drawer's Files entry) until that page is reworked.
@@ -659,8 +680,6 @@ fun AppNavigation(
                         navController.safeNavigate(Routes.settingsCategory(SettingsCategory.FILES.key))
                     },
                     onOpenBackground = { navController.safeNavigate(Routes.BACKGROUND) },
-                    onSharedFoldersClick = { navController.safeNavigate(Routes.SHARED_FOLDERS) },
-                    onMountedFoldersClick = { navController.safeNavigate(Routes.MOUNTED_FOLDERS) },
                     onBackupClick = { navController.safeNavigate(Routes.BACKUP) },
                     onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
                     onSystemEnhanceClick = { navController.safeNavigate(Routes.SYSTEM_ENHANCE) },
