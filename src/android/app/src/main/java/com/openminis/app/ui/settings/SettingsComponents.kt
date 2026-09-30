@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -727,4 +728,121 @@ fun SettingsCardBlock(
             .fillMaxWidth(),
         content = content,
     )
+}
+
+
+// ─── Text input ────────────────────────────────────────────────────────────────
+
+/** The board's search field: filled grey pill with a magnifier, no border. */
+@Composable
+fun SettingsSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(ChatColors.secondaryBg, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (value.isEmpty()) {
+                Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** A settings row whose value is typed in place: label on the left, editable text on the right. */
+@Composable
+fun SettingsInlineTextRow(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    showDivider: Boolean = true,
+) {
+    SettingsRow(
+        title = title,
+        showDivider = showDivider,
+        trailing = {
+            Box(modifier = modifier.widthIn(min = 80.dp, max = 220.dp), contentAlignment = Alignment.CenterEnd) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    ),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (value.isEmpty() && placeholder != null) {
+                    Text(
+                        placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** A borderless multi-line text area that sits inside a settings card. */
+@Composable
+fun SettingsTextArea(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    monospace: Boolean = false,
+    minHeight: Dp = 160.dp,
+    maxHeight: Dp = Dp.Unspecified,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight, max = maxHeight)
+            .padding(horizontal = SettingsMetrics.RowPaddingHorizontal, vertical = 12.dp),
+    ) {
+        androidx.compose.foundation.text.BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontFamily = if (monospace) androidx.compose.ui.text.font.FontFamily.Monospace else null,
+            ),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (value.isEmpty() && placeholder != null) {
+            Text(
+                placeholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+    }
 }

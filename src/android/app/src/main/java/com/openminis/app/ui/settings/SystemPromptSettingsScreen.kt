@@ -80,15 +80,13 @@ fun SystemPromptSettingsScreen(onBack: () -> Unit, onModulesClick: () -> Unit = 
             header = stringResource(R.string.system_prompt_custom_section),
             footer = stringResource(R.string.system_prompt_custom_footer),
         ) {
-            OutlinedTextField(
+            SettingsTextArea(
                 value = current,
                 onValueChange = { draft = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .heightIn(min = 240.dp, max = 420.dp),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                placeholder = { Text(stringResource(R.string.system_prompt_custom_hint)) },
+                placeholder = stringResource(R.string.system_prompt_custom_hint),
+                monospace = true,
+                minHeight = 240.dp,
+                maxHeight = 420.dp,
             )
             Row(
                 modifier = Modifier

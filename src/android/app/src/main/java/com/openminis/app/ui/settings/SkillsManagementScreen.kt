@@ -239,13 +239,11 @@ fun SkillsManagementScreen(
         // Search bar — filters by skill name + description. Sits above the
         // section so it's discoverable without scrolling on a long list.
         if (skills.isNotEmpty()) {
-            DialogTextField(
+            SettingsSearchField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = stringResource(R.string.skills_search_placeholder),
-                singleLine = true,
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .padding(top = 12.dp),
             )

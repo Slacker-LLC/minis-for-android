@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -324,27 +325,19 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
         SettingsSection(
             header = stringResource(R.string.soul_section_identity),
         ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.soul_field_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                // Emoji field intentionally removed — identity emoji is
-                // locked to ✨; only name / style / lang are editable.
-                OutlinedTextField(
-                    value = style,
-                    onValueChange = { style = it },
-                    label = { Text(stringResource(R.string.soul_field_style)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(8.dp))
-                LangPicker(lang = lang, onLangChange = { lang = it })
-            }
+            SettingsInlineTextRow(
+                title = stringResource(R.string.soul_field_name),
+                value = name,
+                onValueChange = { name = it },
+            )
+            // Emoji field intentionally removed — identity emoji is
+            // locked to ✨; only name / style / lang are editable.
+            SettingsInlineTextRow(
+                title = stringResource(R.string.soul_field_style),
+                value = style,
+                onValueChange = { style = it },
+            )
+            LangPicker(lang = lang, onLangChange = { lang = it })
         }
 
         SettingsSection(
@@ -352,16 +345,12 @@ fun SoulSettingsScreen(onBack: () -> Unit) {
             footer = stringResource(R.string.soul_personality_footer),
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                OutlinedTextField(
+                SettingsTextArea(
                     value = body,
                     onValueChange = { body = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 240.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Monospace,
-                    ),
-                    placeholder = { Text(stringResource(R.string.soul_body_placeholder)) },
+                    placeholder = stringResource(R.string.soul_body_placeholder),
+                    monospace = true,
+                    minHeight = 240.dp,
                 )
                 Spacer(Modifier.height(6.dp))
                 val isOverLimit = bodyLimitCheck.isOverLimit
@@ -718,34 +707,16 @@ private fun LangPicker(lang: String, onLangChange: (String) -> Unit) {
         "zh" to stringResource(R.string.soul_lang_zh),
         "en" to stringResource(R.string.soul_lang_en),
     )
-    val current = options.firstOrNull { it.first == lang } ?: options.first()
-    var expanded by remember { mutableStateOf(false) }
-    // Render the picker as a simple labeled row of buttons. Three options
-    // (auto / Chinese / English) fit comfortably without a dropdown — avoids
-    // depending on material3 ExposedDropdownMenu, which has a fragile
-    // alignment story across compose versions.
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.soul_field_lang),
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { (key, label) ->
-                if (key == current.first) {
-                    MinisButton(
-                        onClick = { onLangChange(key) },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(label) }
-                } else {
-                    MinisOutlinedButton(
-                        onClick = { onLangChange(key) },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(label) }
-                }
-            }
-        }
-    }
-    expanded // suppress unused-var warning
+    SettingsRow(
+        title = stringResource(R.string.soul_field_lang),
+        showDivider = false,
+        trailing = {
+            SettingsSegmented(
+                options = options.map { it.second },
+                selectedIndex = options.indexOfFirst { it.first == lang }.coerceAtLeast(0),
+                onSelect = { onLangChange(options[it].first) },
+                modifier = Modifier.widthIn(max = 220.dp),
+            )
+        },
+    )
 }
