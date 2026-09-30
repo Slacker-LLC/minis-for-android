@@ -2338,4 +2338,21 @@
     <string name="browser_tab_count_title">%1$d 个标签页</string>
     <string name="browser_share">分享</string>
     <string name="mount_folders_header">已挂载</string>
+    <string name="onboarding_feature_device_title">在设备上运行</string>
+    <string name="onboarding_feature_device_desc">Agent、工具与记忆都在本机，产品没有自建服务器。</string>
+    <string name="onboarding_feature_linux_title">自带 Linux 环境</string>
+    <string name="onboarding_feature_linux_desc">需要时进入 Ubuntu 24.04 chroot，与 Android 共用内核。</string>
+    <string name="onboarding_feature_models_title">用你自己的模型</string>
+    <string name="onboarding_feature_models_desc">请求只发往你配置的提供商，密钥与会话留在设备里。</string>
+    <string name="onboarding_root_required">需要已 Root 的 Android 8.0+ 设备（arm64-v8a 或 x86_64）。</string>
+    <string name="onboarding_main_model">主模型</string>
+    <string name="common_continue">继续</string>
+    <string name="first_run_subtitle">你的第一个端侧 Agent 即将就绪。</string>
+    <string name="first_run_step_provider">添加供应商</string>
+    <string name="first_run_step_provider_desc">至少为一个供应商填入 API 密钥</string>
+    <string name="first_run_step_model">选择模型</string>
+    <string name="first_run_step_model_desc">选择你想使用的模型</string>
+    <string name="first_run_step_chat">开始对话</string>
+    <string name="first_run_step_chat_locked">请先完成前两步</string>
+    <string name="first_run_done">已完成</string>
 </resources>

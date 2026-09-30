@@ -910,6 +910,9 @@ fun ChatSplitScaffoldRoute(
                     onOpenTerminal = {
                         navController.safeNavigate(Routes.terminal(sessionId = sessionId))
                     },
+                    onOpenSetupStep = { step ->
+                        navController.safeNavigate(if (step == 1) Routes.ADD_PROVIDER else Routes.MODELS)
+                    },
                     onOpenTerminalWithCommand = { command ->
                         navController.safeNavigate(
                             Routes.terminal(initCommand = command, sessionId = sessionId),
@@ -1076,6 +1079,9 @@ private fun ChatPhoneDrawerScaffold(
             },
             onOpenTerminal = {
                 navController.safeNavigate(Routes.terminal(sessionId = currentSessionId))
+            },
+            onOpenSetupStep = { step ->
+                navController.safeNavigate(if (step == 1) Routes.ADD_PROVIDER else Routes.MODELS)
             },
             onOpenTerminalWithCommand = { command ->
                 navController.safeNavigate(

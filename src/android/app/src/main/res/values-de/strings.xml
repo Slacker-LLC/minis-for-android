@@ -2050,4 +2050,21 @@
     <string name="browser_tab_count_title">%1$d Tabs</string>
     <string name="browser_share">Teilen</string>
     <string name="mount_folders_header">Eingebunden</string>
+    <string name="onboarding_feature_device_title">Läuft auf deinem Gerät</string>
+    <string name="onboarding_feature_device_desc">Agent, Werkzeuge und Gedächtnis liegen lokal; es gibt keinen Minis-Server.</string>
+    <string name="onboarding_feature_linux_title">Eingebaute Linux-Umgebung</string>
+    <string name="onboarding_feature_linux_desc">Nutzt bei Bedarf ein Ubuntu-24.04-chroot und teilt den Android-Kernel.</string>
+    <string name="onboarding_feature_models_title">Eigene Modelle nutzen</string>
+    <string name="onboarding_feature_models_desc">Anfragen gehen nur an deine Anbieter; Schlüssel und Chats bleiben auf dem Gerät.</string>
+    <string name="onboarding_root_required">Benötigt ein gerootetes Android-8.0+-Gerät (arm64-v8a oder x86_64).</string>
+    <string name="onboarding_main_model">Haupt</string>
+    <string name="common_continue">Weiter</string>
+    <string name="first_run_subtitle">Dein erster Agent auf dem Gerät ist fast bereit.</string>
+    <string name="first_run_step_provider">Anbieter hinzufügen</string>
+    <string name="first_run_step_provider_desc">Mindestens einen API-Schlüssel eintragen</string>
+    <string name="first_run_step_model">Modell wählen</string>
+    <string name="first_run_step_model_desc">Modelle auswählen, die du nutzen willst</string>
+    <string name="first_run_step_chat">Chat starten</string>
+    <string name="first_run_step_chat_locked">Erst die Schritte oben abschließen</string>
+    <string name="first_run_done">Erledigt</string>
 </resources>

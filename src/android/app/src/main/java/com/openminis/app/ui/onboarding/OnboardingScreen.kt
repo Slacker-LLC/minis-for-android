@@ -1,6 +1,24 @@
 package com.openminis.app.ui.onboarding
 
 import com.openminis.app.R
+import com.openminis.app.ui.bots.StatusPill
+import com.openminis.app.ui.settings.SettingsRow
+import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.settings.SettingsSegmented
+import com.openminis.app.ui.settings.MinisTopBar
+import com.openminis.app.ui.theme.ChatColors
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.VpnKey
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.border
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,44 +81,124 @@ fun OnboardingScreen(
 
     when (step) {
         0 -> WelcomeStep(onNext = { step = 1 })
-        1 -> ApiKeyStep(providerRepository = providerRepository, onNext = { step = 2 }, onSkip = onComplete)
-        2 -> ModelSelectionStep(providerRepository = providerRepository, onComplete = onComplete)
+        1 -> ApiKeyStep(
+            providerRepository = providerRepository,
+            onBack = { step = 0 },
+            onNext = { step = 2 },
+            onSkip = onComplete,
+        )
+        2 -> ModelSelectionStep(
+            providerRepository = providerRepository,
+            onBack = { step = 1 },
+            onComplete = onComplete,
+        )
     }
 }
 
 @Composable
 private fun WelcomeStep(onNext: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
+    val accent = MaterialTheme.colorScheme.primary
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 28.dp, vertical = 16.dp),
     ) {
         Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp),
         ) {
+            Spacer(Modifier.height(56.dp))
+            Box(
+                modifier = Modifier.size(84.dp).clip(RoundedCornerShape(22.dp)).background(accent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Terminal, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
+            }
+            Spacer(Modifier.height(20.dp))
             Text(
                 stringResource(R.string.onboarding_welcome_title),
-                style = MaterialTheme.typography.headlineLarge,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.onboarding_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(48.dp))
-            MinisButton(onClick = onNext, modifier = Modifier.fillMaxWidth(0.6f)) {
-                Text(stringResource(R.string.onboarding_get_started))
-            }
+            Spacer(Modifier.height(32.dp))
+            WelcomeFeature(Icons.Outlined.Memory, R.string.onboarding_feature_device_title, R.string.onboarding_feature_device_desc)
+            WelcomeFeature(Icons.Outlined.Terminal, R.string.onboarding_feature_linux_title, R.string.onboarding_feature_linux_desc)
+            WelcomeFeature(Icons.Outlined.VpnKey, R.string.onboarding_feature_models_title, R.string.onboarding_feature_models_desc)
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(ChatColors.warn.copy(alpha = 0.14f))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = ChatColors.warn, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(stringResource(R.string.onboarding_root_required), fontSize = 14.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        MinisButton(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.onboarding_get_started), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Text(
+            com.openminis.app.BuildConfig.VERSION_NAME,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun WelcomeFeature(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Int, desc: Int) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(stringResource(title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(desc), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+/** Shared top bar of the two setup steps: Back on the left, Skip on the right, large title below. */
+@Composable
+private fun OnboardingHeader(title: String, subtitle: String, onBack: () -> Unit, onSkip: () -> Unit) {
+    MinisTopBar(
+        title = {},
+        onBack = onBack,
+        actions = {
+            MinisTextButton(onClick = onSkip) { Text(stringResource(R.string.common_skip), fontSize = 17.sp) }
+        },
+    )
+    Text(
+        title,
+        fontSize = 34.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 2.dp),
+    )
+    Text(
+        subtitle,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp),
+    )
 }
 
 @Composable
 private fun ApiKeyStep(
     providerRepository: ProviderRepository,
+    onBack: () -> Unit,
     onNext: () -> Unit,
     onSkip: () -> Unit,
 ) {
@@ -108,65 +206,51 @@ private fun ApiKeyStep(
     var apiKey by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
 
-    Scaffold { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-        ) {
-            Text(
-                stringResource(R.string.onboarding_provider_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
+        OnboardingHeader(
+            title = stringResource(R.string.onboarding_provider_title),
+            subtitle = stringResource(R.string.onboarding_provider_subtitle),
+            onBack = onBack,
+            onSkip = onSkip,
+        )
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            // Provider choice: a segmented row keeps the four built-in providers one tap away.
+            val types = listOf(ProviderType.anthropic, ProviderType.gemini, ProviderType.openAI, ProviderType.openRouter)
+            SettingsSegmented(
+                options = types.map { it.displayName },
+                selectedIndex = types.indexOf(selectedType),
+                onSelect = { selectedType = types[it]; apiKey = ""; saved = false },
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.onboarding_provider_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(24.dp))
-
-            // Provider type selector
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                for (type in listOf(ProviderType.anthropic, ProviderType.gemini, ProviderType.openAI, ProviderType.openRouter)) {
-                    val isSelected = type == selectedType
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { selectedType = type; apiKey = ""; saved = false },
-                    ) {
-                        Text(
-                            type.displayName,
-                            modifier = Modifier.padding(8.dp),
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                        )
+            SettingsSection {
+                SettingsRow(
+                    title = selectedType.displayName,
+                    showDivider = false,
+                    trailing = {
+                        if (saved) StatusPill(stringResource(R.string.onboarding_saved), ChatColors.ok)
+                    },
+                )
+            }
+            SettingsSection(header = stringResource(R.string.onboarding_provider_api_key_label, selectedType.displayName)) {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it; saved = false },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (apiKey.isEmpty()) {
+                        Text("sk-…", color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
                     }
                 }
             }
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it; saved = false },
-                label = { Text(stringResource(R.string.onboarding_provider_api_key_label, selectedType.displayName)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            MinisButton(
+            MinisTextButton(
                 onClick = {
                     if (apiKey.isNotBlank()) {
                         val instance = ProviderInstance(
@@ -187,24 +271,18 @@ private fun ApiKeyStep(
                     }
                 },
                 enabled = apiKey.isNotBlank() && !saved,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
             ) {
-                Text(stringResource(if (saved) R.string.onboarding_saved else R.string.onboarding_save_api_key))
+                Text(stringResource(if (saved) R.string.onboarding_saved else R.string.onboarding_save_api_key), fontSize = 17.sp)
             }
-
-            Spacer(Modifier.weight(1f))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                MinisTextButton(onClick = onSkip) {
-                    Text(stringResource(R.string.common_skip))
-                }
-                MinisButton(onClick = onNext, enabled = saved) {
-                    Text(stringResource(R.string.common_next))
-                }
-            }
+        }
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        MinisTextButton(
+            onClick = onNext,
+            enabled = saved,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Text(stringResource(R.string.common_continue), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -212,6 +290,7 @@ private fun ApiKeyStep(
 @Composable
 private fun ModelSelectionStep(
     providerRepository: ProviderRepository,
+    onBack: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val config by providerRepository.config.collectAsState()
@@ -230,129 +309,145 @@ private fun ModelSelectionStep(
     // Group by instance
     val grouped = filteredEntries.groupBy { it.providerInstanceId }
 
-    Scaffold { padding ->
-        Column(
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        OnboardingHeader(
+            title = stringResource(R.string.onboarding_select_models_title),
+            subtitle = stringResource(R.string.onboarding_select_models_subtitle),
+            onBack = onBack,
+            onSkip = onComplete,
+        )
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(ChatColors.secondaryBg)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.onboarding_select_models_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                stringResource(R.string.onboarding_select_models_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
+            Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (searchText.isEmpty()) {
+                    Text(stringResource(R.string.onboarding_search_models), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                label = { Text(stringResource(R.string.onboarding_search_models)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(50),
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                for ((instanceId, entries) in grouped) {
-                    val instance = config.instances.find { it.id == instanceId }
-                    item {
-                        Text(
-                            instance?.label ?: instanceId,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
-                    }
-                    items(entries, key = { it.id }) { entry ->
-                        val isSelected = entry.id in selected
-                        val selectionIndex = selected.indexOf(entry.id)
-                        val canSelect = selected.size < 3 || isSelected
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = canSelect) {
-                                    if (isSelected) selected.remove(entry.id)
-                                    else if (selected.size < 3) selected.add(entry.id)
-                                }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (isSelected) {
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            for ((instanceId, entries) in grouped) {
+                val instance = config.instances.find { it.id == instanceId }
+                item(key = "h_$instanceId") {
+                    Text(
+                        (instance?.label ?: instanceId),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp),
+                    )
+                }
+                item(key = "c_$instanceId") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surface),
+                    ) {
+                        entries.forEachIndexed { idx, entry ->
+                            val isSelected = entry.id in selected
+                            val selectionIndex = selected.indexOf(entry.id)
+                            val canSelect = selected.size < 3 || isSelected
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = canSelect) {
+                                        if (isSelected) selected.remove(entry.id)
+                                        else if (selected.size < 3) selected.add(entry.id)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .size(24.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
+                                        .then(
+                                            if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary)
+                                            else Modifier.border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                                        ),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text(
-                                        "${selectionIndex + 1}",
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
+                                    if (isSelected) {
+                                        Text(
+                                            "${selectionIndex + 1}",
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
                                 }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(entry.model.displayName, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.width(12.dp))
                                 Text(
                                     entry.model.id,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (isSelected && selectionIndex == 0) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        stringResource(R.string.onboarding_main_model),
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                            if (idx < entries.size - 1) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 50.dp),
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
                                 )
                             }
                         }
-                        HorizontalDivider()
                     }
                 }
             }
+        }
 
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                MinisTextButton(onClick = onComplete) {
-                    Text(stringResource(R.string.common_skip))
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        MinisTextButton(
+            onClick = {
+                if (selected.isNotEmpty()) {
+                    val current = providerRepository.config.value.slots.main
+                    providerRepository.setSlotEntries(
+                        com.openminis.app.data.model.ModelSlot.main,
+                        (current + selected).distinct(),
+                    )
                 }
-                MinisButton(
-                    onClick = {
-                        if (selected.isNotEmpty()) {
-                            val current = providerRepository.config.value.slots.main
-                            providerRepository.setSlotEntries(
-                                com.openminis.app.data.model.ModelSlot.main,
-                                (current + selected).distinct(),
-                            )
-                        }
-                        onComplete()
-                    },
-                    enabled = selected.isNotEmpty(),
-                ) {
-                    Text(stringResource(R.string.onboarding_done_count, selected.size))
-                }
-            }
+                onComplete()
+            },
+            enabled = selected.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Text(stringResource(R.string.onboarding_done_count, selected.size), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

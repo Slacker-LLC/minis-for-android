@@ -1,5 +1,12 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -110,9 +117,14 @@ internal val SuggestionPoolSize: Int get() = SuggestionPool.size
 fun ChatEmptyState(
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    setup: FirstRunSetup? = null,
 ) {
     val slot = remember { greetingSlotFor(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
     val accent = MaterialTheme.colorScheme.primary
+    if (setup != null) {
+        FirstRunCard(setup, modifier)
+        return
+    }
     val seed = rememberSaveable { Random.nextInt() }
     var page by rememberSaveable { mutableIntStateOf(0) }
     val cards = suggestionWindow(SuggestionPool.size, seed, page).map { SuggestionPool[it] }
@@ -221,5 +233,150 @@ private fun QuickActionCard(card: QuickCard, onClick: () -> Unit, modifier: Modi
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+
+/**
+ * What the first-run card needs: which of the two setup steps are done, and where to go for the
+ * one that is not. The third step (start chatting) unlocks when both are.
+ */
+data class FirstRunSetup(
+    val providerDone: Boolean,
+    val modelDone: Boolean,
+    val onOpenProvider: () -> Unit,
+    val onOpenModel: () -> Unit,
+)
+
+/** The board's empty state for a fresh install: welcome, then three steps with the next one live. */
+@Composable
+private fun FirstRunCard(setup: FirstRunSetup, modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(
+                stringResource(R.string.onboarding_welcome_title),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = ChatColors.primaryText,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.first_run_subtitle),
+                fontSize = 16.sp,
+                color = ChatColors.secondaryText,
+            )
+            Spacer(Modifier.height(20.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ChatColors.secondaryBg),
+            ) {
+                SetupStepRow(
+                    number = 1,
+                    title = stringResource(R.string.first_run_step_provider),
+                    subtitle = stringResource(if (setup.providerDone) R.string.first_run_done else R.string.first_run_step_provider_desc),
+                    done = setup.providerDone,
+                    locked = false,
+                    onClick = setup.onOpenProvider,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SetupStepRow(
+                    number = 2,
+                    title = stringResource(R.string.first_run_step_model),
+                    subtitle = stringResource(if (setup.modelDone) R.string.first_run_done else R.string.first_run_step_model_desc),
+                    done = setup.modelDone,
+                    locked = !setup.providerDone,
+                    onClick = setup.onOpenModel,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SetupStepRow(
+                    number = 3,
+                    title = stringResource(R.string.first_run_step_chat),
+                    subtitle = stringResource(R.string.first_run_step_chat_locked),
+                    done = false,
+                    locked = !(setup.providerDone && setup.modelDone),
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupStepRow(
+    number: Int,
+    title: String,
+    subtitle: String,
+    done: Boolean,
+    locked: Boolean,
+    onClick: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (!done && !locked) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(
+                    when {
+                        done -> ChatColors.ok
+                        locked -> MaterialTheme.colorScheme.outlineVariant
+                        else -> accent
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (done) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            } else {
+                Text("$number", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (locked) ChatColors.secondaryText else ChatColors.primaryText,
+            )
+            Text(
+                subtitle,
+                fontSize = 13.sp,
+                color = if (done) ChatColors.ok else ChatColors.secondaryText,
+            )
+        }
+        if (!done && !locked) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = ChatColors.secondaryText,
+                modifier = Modifier.size(20.dp),
+            )
+        } else if (locked) {
+            Icon(Icons.Outlined.Lock, contentDescription = null, tint = ChatColors.secondaryText, modifier = Modifier.size(16.dp))
+        }
     }
 }

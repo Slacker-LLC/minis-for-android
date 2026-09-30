@@ -458,6 +458,8 @@ fun ChatScreen(
      */
     onProbeBlankDraft: ((() -> Boolean)) -> Unit = {},
     onOpenTerminal: () -> Unit = {},
+    /** First-run card: 1 = add a provider, 2 = choose a model. */
+    onOpenSetupStep: (step: Int) -> Unit = {},
     /** Open the in-app terminal with [command] pre-filled at the prompt
      *  (no trailing newline — the user reviews and presses Enter manually).
      *  Wired to the top-right Terminal button on a shell_execute ToolDetailSheet. */
@@ -2646,7 +2648,19 @@ fun ChatScreen(
                     emptyStateSettled = true
                 }
                 if (emptyStateSettled && messages.isEmpty() && !isStreaming) {
-                    ChatEmptyState(onPick = { viewModel.sendMessage(it) })
+                    val setupConfig by providerRepository.config.collectAsState()
+                    val activeEntry by viewModel.activeEntryId.collectAsState()
+                    val providerDone = setupConfig.instances.any { it.isEnabled } && setupConfig.modelEntries.isNotEmpty()
+                    val modelDone = activeEntry != null || setupConfig.slots.main.isNotEmpty()
+                    ChatEmptyState(
+                        onPick = { viewModel.sendMessage(it) },
+                        setup = if (providerDone && modelDone) null else FirstRunSetup(
+                            providerDone = providerDone,
+                            modelDone = modelDone,
+                            onOpenProvider = { onOpenSetupStep(1) },
+                            onOpenModel = { onOpenSetupStep(2) },
+                        ),
+                    )
                 }
                 var toolBarHeightPx by remember { mutableStateOf(0) }
                 val density = LocalDensity.current

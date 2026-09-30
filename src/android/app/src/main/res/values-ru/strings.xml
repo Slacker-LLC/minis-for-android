@@ -2304,4 +2304,21 @@
     <string name="browser_tab_count_title">Вкладок: %1$d</string>
     <string name="browser_share">Поделиться</string>
     <string name="mount_folders_header">Подключено</string>
+    <string name="onboarding_feature_device_title">Работает на устройстве</string>
+    <string name="onboarding_feature_device_desc">Агент, инструменты и память хранятся локально; сервера Minis нет.</string>
+    <string name="onboarding_feature_linux_title">Встроенная среда Linux</string>
+    <string name="onboarding_feature_linux_desc">При необходимости входит в chroot Ubuntu 24.04 с общим ядром Android.</string>
+    <string name="onboarding_feature_models_title">Свои модели</string>
+    <string name="onboarding_feature_models_desc">Запросы уходят только выбранным провайдерам; ключи и чаты остаются на устройстве.</string>
+    <string name="onboarding_root_required">Нужно устройство Android 8.0+ с root (arm64-v8a или x86_64).</string>
+    <string name="onboarding_main_model">Основная</string>
+    <string name="common_continue">Продолжить</string>
+    <string name="first_run_subtitle">Ваш первый агент на устройстве почти готов.</string>
+    <string name="first_run_step_provider">Добавить провайдера</string>
+    <string name="first_run_step_provider_desc">Введите хотя бы один ключ API</string>
+    <string name="first_run_step_model">Выбрать модель</string>
+    <string name="first_run_step_model_desc">Выберите нужные модели</string>
+    <string name="first_run_step_chat">Начать чат</string>
+    <string name="first_run_step_chat_locked">Сначала выполните шаги выше</string>
+    <string name="first_run_done">Готово</string>
 </resources>

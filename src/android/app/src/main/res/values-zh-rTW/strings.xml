@@ -2309,4 +2309,21 @@
     <string name="browser_tab_count_title">%1$d 個分頁</string>
     <string name="browser_share">分享</string>
     <string name="mount_folders_header">已掛載</string>
+    <string name="onboarding_feature_device_title">在裝置上執行</string>
+    <string name="onboarding_feature_device_desc">Agent、工具與記憶都在本機，產品沒有自建伺服器。</string>
+    <string name="onboarding_feature_linux_title">內建 Linux 環境</string>
+    <string name="onboarding_feature_linux_desc">需要時進入 Ubuntu 24.04 chroot，與 Android 共用核心。</string>
+    <string name="onboarding_feature_models_title">用你自己的模型</string>
+    <string name="onboarding_feature_models_desc">請求只會送往你設定的供應商，金鑰與對話留在裝置裡。</string>
+    <string name="onboarding_root_required">需要已 Root 的 Android 8.0+ 裝置（arm64-v8a 或 x86_64）。</string>
+    <string name="onboarding_main_model">主模型</string>
+    <string name="common_continue">繼續</string>
+    <string name="first_run_subtitle">你的第一個端側 Agent 即將就緒。</string>
+    <string name="first_run_step_provider">新增供應商</string>
+    <string name="first_run_step_provider_desc">至少為一個供應商填入 API 金鑰</string>
+    <string name="first_run_step_model">選擇模型</string>
+    <string name="first_run_step_model_desc">選擇你想使用的模型</string>
+    <string name="first_run_step_chat">開始對話</string>
+    <string name="first_run_step_chat_locked">請先完成前兩步</string>
+    <string name="first_run_done">已完成</string>
 </resources>

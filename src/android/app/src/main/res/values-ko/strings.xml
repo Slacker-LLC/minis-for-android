@@ -2039,4 +2039,21 @@
     <string name="browser_tab_count_title">탭 %1$d개</string>
     <string name="browser_share">공유</string>
     <string name="mount_folders_header">마운트됨</string>
+    <string name="onboarding_feature_device_title">기기에서 실행</string>
+    <string name="onboarding_feature_device_desc">에이전트, 도구, 메모리는 모두 기기에 있으며 Minis 서버는 없습니다.</string>
+    <string name="onboarding_feature_linux_title">내장 Linux 환경</string>
+    <string name="onboarding_feature_linux_desc">필요할 때 Ubuntu 24.04 chroot에 들어가며 Android와 커널을 공유합니다.</string>
+    <string name="onboarding_feature_models_title">내 모델 사용</string>
+    <string name="onboarding_feature_models_desc">요청은 설정한 제공업체로만 전송되며 키와 대화는 기기에 남습니다.</string>
+    <string name="onboarding_root_required">루팅된 Android 8.0 이상 기기(arm64-v8a 또는 x86_64)가 필요합니다.</string>
+    <string name="onboarding_main_model">주 모델</string>
+    <string name="common_continue">계속</string>
+    <string name="first_run_subtitle">첫 온디바이스 에이전트가 곧 준비됩니다.</string>
+    <string name="first_run_step_provider">공급자 추가</string>
+    <string name="first_run_step_provider_desc">공급자 한 곳 이상의 API 키 입력</string>
+    <string name="first_run_step_model">모델 선택</string>
+    <string name="first_run_step_model_desc">사용할 모델을 선택</string>
+    <string name="first_run_step_chat">대화 시작</string>
+    <string name="first_run_step_chat_locked">위 단계를 먼저 완료하세요</string>
+    <string name="first_run_done">완료</string>
 </resources>

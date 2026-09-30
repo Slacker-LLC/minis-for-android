@@ -2428,4 +2428,21 @@
     <string name="browser_tab_count_title">%1$d tabs</string>
     <string name="browser_share">Share</string>
     <string name="mount_folders_header">Mounted</string>
+    <string name="onboarding_feature_device_title">Runs on your device</string>
+    <string name="onboarding_feature_device_desc">Agent, tools and memory live locally; there is no Minis server.</string>
+    <string name="onboarding_feature_linux_title">Built-in Linux environment</string>
+    <string name="onboarding_feature_linux_desc">Needs an Ubuntu 24.04 chroot, sharing the Android kernel.</string>
+    <string name="onboarding_feature_models_title">Bring your own models</string>
+    <string name="onboarding_feature_models_desc">Requests go only to the providers you configure; keys and chats stay on the device.</string>
+    <string name="onboarding_root_required">Requires a rooted Android 8.0+ device (arm64-v8a or x86_64).</string>
+    <string name="onboarding_main_model">Main</string>
+    <string name="common_continue">Continue</string>
+    <string name="first_run_subtitle">Your first on-device Agent is almost ready.</string>
+    <string name="first_run_step_provider">Add a provider</string>
+    <string name="first_run_step_provider_desc">Enter an API key for at least one provider</string>
+    <string name="first_run_step_model">Choose a model</string>
+    <string name="first_run_step_model_desc">Pick the models you want to use</string>
+    <string name="first_run_step_chat">Start chatting</string>
+    <string name="first_run_step_chat_locked">Finish the steps above first</string>
+    <string name="first_run_done">Done</string>
 </resources>

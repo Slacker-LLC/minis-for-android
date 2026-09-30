@@ -2047,4 +2047,21 @@
     <string name="browser_tab_count_title">%1$d 個のタブ</string>
     <string name="browser_share">共有</string>
     <string name="mount_folders_header">マウント済み</string>
+    <string name="onboarding_feature_device_title">端末上で動作</string>
+    <string name="onboarding_feature_device_desc">エージェント、ツール、メモリはすべて端末内にあり、Minis のサーバーはありません。</string>
+    <string name="onboarding_feature_linux_title">Linux 環境を内蔵</string>
+    <string name="onboarding_feature_linux_desc">必要に応じて Ubuntu 24.04 の chroot に入り、Android とカーネルを共有します。</string>
+    <string name="onboarding_feature_models_title">自分のモデルを使う</string>
+    <string name="onboarding_feature_models_desc">リクエストは設定したプロバイダにのみ送られ、キーと会話は端末に残ります。</string>
+    <string name="onboarding_root_required">root 化された Android 8.0 以上の端末（arm64-v8a または x86_64）が必要です。</string>
+    <string name="onboarding_main_model">メイン</string>
+    <string name="common_continue">続ける</string>
+    <string name="first_run_subtitle">端末上の最初のエージェントがもうすぐ使えます。</string>
+    <string name="first_run_step_provider">プロバイダを追加</string>
+    <string name="first_run_step_provider_desc">少なくとも 1 つの API キーを入力</string>
+    <string name="first_run_step_model">モデルを選ぶ</string>
+    <string name="first_run_step_model_desc">使いたいモデルを選択</string>
+    <string name="first_run_step_chat">会話を始める</string>
+    <string name="first_run_step_chat_locked">先に上の手順を完了してください</string>
+    <string name="first_run_done">完了</string>
 </resources>

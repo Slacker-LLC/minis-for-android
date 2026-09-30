@@ -1941,4 +1941,21 @@
     <string name="browser_tab_count_title">%1$d onglets</string>
     <string name="browser_share">Partager</string>
     <string name="mount_folders_header">Montés</string>
+    <string name="onboarding_feature_device_title">S\'exécute sur l\'appareil</string>
+    <string name="onboarding_feature_device_desc">L\'agent, les outils et la mémoire restent en local ; il n\'y a pas de serveur Minis.</string>
+    <string name="onboarding_feature_linux_title">Environnement Linux intégré</string>
+    <string name="onboarding_feature_linux_desc">Utilise au besoin un chroot Ubuntu 24.04 et partage le noyau d\'Android.</string>
+    <string name="onboarding_feature_models_title">Vos propres modèles</string>
+    <string name="onboarding_feature_models_desc">Les requêtes ne vont qu\'aux fournisseurs configurés ; clés et conversations restent sur l\'appareil.</string>
+    <string name="onboarding_root_required">Nécessite un appareil Android 8.0+ rooté (arm64-v8a ou x86_64).</string>
+    <string name="onboarding_main_model">Principal</string>
+    <string name="common_continue">Continuer</string>
+    <string name="first_run_subtitle">Votre premier agent local est presque prêt.</string>
+    <string name="first_run_step_provider">Ajouter un fournisseur</string>
+    <string name="first_run_step_provider_desc">Saisir au moins une clé API</string>
+    <string name="first_run_step_model">Choisir un modèle</string>
+    <string name="first_run_step_model_desc">Choisir les modèles à utiliser</string>
+    <string name="first_run_step_chat">Commencer à discuter</string>
+    <string name="first_run_step_chat_locked">Terminez d\'abord les étapes ci-dessus</string>
+    <string name="first_run_done">Terminé</string>
 </resources>
