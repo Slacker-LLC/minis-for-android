@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.openminis.app.ui.components.MinisAlertDialog
 
-private data class SessionStorageInfo(
+internal data class SessionStorageInfo(
     val id: String,
     val title: String?,
     val minisSize: Long,
@@ -67,6 +67,45 @@ private val SESSION_GUEST_ROOTS = listOf(
     "/var/minis/offloads",
     "/var/minis/browser",
 )
+
+/** Sizes behind the storage overview: the Shell container, the database and per-session files. */
+internal data class StorageSnapshot(
+    val shellSize: Long,
+    val dbSize: Long,
+    val sessions: List<SessionStorageInfo>,
+) {
+    val sessionsTotal: Long get() = sessions.sumOf { it.totalSize }
+    val total: Long get() = shellSize + dbSize + sessionsTotal
+}
+
+/** Walks the guest and media trees, so callers show a placeholder until it returns. */
+internal suspend fun loadStorageSnapshot(context: Context, chatDao: ChatDao): StorageSnapshot =
+    withContext(Dispatchers.IO) {
+        val shellSize = runCatching {
+            RootfsManager.getInstance(context.applicationContext).getRootfsSize()
+        }.getOrDefault(0L)
+        val dbSize = databaseSize(context)
+
+        val allSessions = chatDao.listSessions()
+        val mediaDir = File(context.filesDir, "media")
+        val mediaSizes = mediaSizesBySession(mediaDir, allSessions.map { it.id }.toSet())
+
+        val sessions = allSessions.map { session ->
+            var minisSize = 0L
+            for (root in SESSION_GUEST_ROOTS) {
+                minisSize += runCatching {
+                    WorkspaceFileClient.treeSize(session.id, root)
+                }.getOrDefault(0L)
+            }
+            SessionStorageInfo(
+                id = session.id,
+                title = session.title,
+                minisSize = minisSize,
+                mediaSize = mediaSizes[session.id] ?: 0L,
+            )
+        }.sortedByDescending { it.totalSize }
+        StorageSnapshot(shellSize, dbSize, sessions)
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,32 +126,10 @@ fun StorageManagementScreen(
     fun reload() {
         scope.launch {
             isLoading = true
-            withContext(Dispatchers.IO) {
-                shellSize = runCatching {
-                    RootfsManager.getInstance(context.applicationContext).getRootfsSize()
-                }.getOrDefault(0L)
-                dbSize = databaseSize(context)
-
-                val allSessions = chatDao.listSessions()
-                val mediaDir = File(context.filesDir, "media")
-
-                val mediaSizes = mediaSizesBySession(mediaDir, allSessions.map { it.id }.toSet())
-
-                sessions = allSessions.map { session ->
-                    var minisSize = 0L
-                    for (root in SESSION_GUEST_ROOTS) {
-                        minisSize += runCatching {
-                            WorkspaceFileClient.treeSize(session.id, root)
-                        }.getOrDefault(0L)
-                    }
-                    SessionStorageInfo(
-                        id = session.id,
-                        title = session.title,
-                        minisSize = minisSize,
-                        mediaSize = mediaSizes[session.id] ?: 0L,
-                    )
-                }.sortedByDescending { it.totalSize }
-            }
+            val snapshot = loadStorageSnapshot(context, chatDao)
+            shellSize = snapshot.shellSize
+            dbSize = snapshot.dbSize
+            sessions = snapshot.sessions
             isLoading = false
         }
     }
