@@ -1,5 +1,7 @@
 package com.openminis.app.ui.onboarding
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.LaunchedEffect
 import com.openminis.app.R
 import com.openminis.app.ui.bots.StatusPill
 import com.openminis.app.ui.settings.SettingsRow
@@ -288,12 +290,19 @@ private fun ApiKeyStep(
 }
 
 @Composable
-private fun ModelSelectionStep(
+internal fun ModelSelectionStep(
     providerRepository: ProviderRepository,
     onBack: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val config by providerRepository.config.collectAsState()
+    // Refresh every enabled provider's model list when the page opens, so the user picks from the
+    // live catalog rather than only the built-in placeholder list seeded when the provider was added.
+    LaunchedEffect(Unit) {
+        for (instance in providerRepository.config.value.instances.filter { it.isEnabled }) {
+            launch(kotlinx.coroutines.Dispatchers.IO) { providerRepository.refreshModels(instance) }
+        }
+    }
     val selected = remember { mutableStateListOf<String>() } // entry UUIDs
     var searchText by remember { mutableStateOf("") }
 

@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -79,24 +80,13 @@ fun AddAgentLoopModelsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(R.string.agent_loop_section_add_models_title),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
+            MinisTopBar(
+                title = { Text(stringResource(R.string.agent_loop_section_add_models_title)) },
+                navigation = {
+                    MinisTextButton(onClick = onBack) { Text(stringResource(R.string.common_cancel), fontSize = 17.sp) }
                 },
                 actions = {
-                    MinisTextButton(onClick = onBack) { Text(stringResource(R.string.common_cancel)) }
-                    MinisButton(
+                    MinisTextButton(
                         onClick = {
                             // Add in stable order so the section renders
                             // pinned items in the order the user saw them
@@ -110,14 +100,14 @@ fun AddAgentLoopModelsScreen(
                             onBack()
                         },
                         enabled = selectedIds.isNotEmpty(),
-                        modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        Text(stringResource(R.string.agent_loop_add_models_count, selectedIds.size))
+                        Text(
+                            stringResource(R.string.agent_loop_add_models_count, selectedIds.size),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
