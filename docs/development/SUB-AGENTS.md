@@ -59,8 +59,30 @@ also take whatever the user has attached there.
 - The upstream app pins a sub agent to a model *group*; this app has fixed model slots instead, so the pin is a
   model entry.
 
-## Not implemented (yet)
+## Runs across restarts, cards, time budget, progress, backup
 
-The upstream app also has: resuming runs lost to a process kill (jobs here live in memory only), progress reports
-and a wrap-up turn before the time budget, chat cards with live status and Stop / steer controls, and
-restoring the roster from a backup. The tool block currently shows the tool's JSON reply.
+- **Persistence and resume.** The last 30 delegations are mirrored to app-private preferences (results and
+  briefs bounded). A run that was queued or running when the app was killed loads as `interrupted`;
+  `action=resume` (or the card's Resume button) restarts it — in the child it already has, with a notice that
+  live state (browser tabs, shell processes) is gone, or with its original brief if it never got a child.
+  Resume is scoped to the calling conversation and refused for anything that is not interrupted.
+- **Cards.** A `subagent` tool block that started a run opens a card: agent, model, job id, live status and
+  elapsed time (from the registry, falling back to what the call returned), the task, the result once it ends,
+  Stop / Steer while it runs, Resume when interrupted, and Open session to watch the child. The controls use the
+  same tool path as the model, so they can only act on this conversation's own runs.
+- **Time budget.** When `max_minutes` runs out the child is stopped and given a 90 s grace, tools off, to answer
+  with what it has; that message becomes the result (`status=timeout`), falling back to the partial output.
+- **Progress reports.** `progress_report` = `none` (default) | `frequent` (~15 s) | `moderate` (~60 s), background
+  runs only: while it runs, the current tool and the tail of the latest message are posted into the delegating
+  conversation whenever they changed. Each report costs the delegating model a turn, which the tool description says.
+- **Backup.** The user's custom agents are written to `data/sub_agents.jsonl` inside the Providers category (like
+  custom thinking rules, so the category set is unchanged) and merged on restore: a new id is added unless its
+  name clashes with a local agent, a known id is replaced only by a newer copy, the built-in is never touched.
+  A record from the upstream app restores too; its model-group pin is dropped (such an agent restores as Auto).
+
+## Known limits
+
+Jobs are mirrored for the last 30 only; a callback is held until the delegating conversation has settled (up to ~10
+minutes per attempt, 20 attempts) and is dropped if that conversation is deleted. A real end-to-end run against a live
+model has not been done on a device yet: the runtime is covered against a fake port, the card and Settings page were
+checked on an emulator with seeded data.

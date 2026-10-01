@@ -519,6 +519,10 @@ class BackupExporter(
         if (ruleCount > 0) {
             bytes += File(dataDir, "thinking_rules.jsonl").length()
         }
+        // The user's custom sub agents ride here too (see BackupSubAgentRecord).
+        if (exportSubAgents(dataDir) > 0) {
+            bytes += File(dataDir, "sub_agents.jsonl").length()
+        }
         // `entries` is PROVIDERS only. Custom thinking rules ride in this
         // category (they have no category of their own, and giving them one
         // would change the cross-platform category set), but adding them to
@@ -531,6 +535,26 @@ class BackupExporter(
             includesCredentials = includeCredentials,
             thinkingRules = ruleCount.takeIf { it > 0 },
         )
+    }
+
+    /** The user's custom sub agents → `data/sub_agents.jsonl`, one `SubAgentV1` line each. Returns the count. */
+    private fun exportSubAgents(dataDir: File): Int {
+        val agents = BackupSubAgentMapping.exportable(
+            com.openminis.app.agent.subagents.SubAgentStore.currentRoster(),
+        )
+        if (agents.isEmpty()) return 0
+        BackupJsonlWriter(dataDir, BackupSubAgentMapping.FILE_BASE).use { writer ->
+            for (def in agents) {
+                writer.write(
+                    BackupSubAgentMapping.RECORD_TYPE, 1,
+                    BackupFormat.json.encodeToJsonElement(
+                        BackupSubAgentRecord.serializer(), BackupSubAgentMapping.toRecord(def),
+                    ),
+                )
+            }
+        }
+        AppLogger.info(TAG, "[Backup] exported ${agents.size} custom sub agent(s)")
+        return agents.size
     }
 
     /**
