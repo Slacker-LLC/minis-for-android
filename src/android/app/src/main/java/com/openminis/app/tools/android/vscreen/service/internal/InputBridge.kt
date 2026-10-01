@@ -69,6 +69,10 @@ internal class InputBridge {
             send(displayId, KeyEvent(now, now + 20, KeyEvent.ACTION_UP, keyCode, 0))
     }
 
+    /** False for characters with no key-event mapping (CJK and most non-ASCII): those need a node-level write. */
+    fun canType(value: String): Boolean =
+        value.isEmpty() || KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(value.toCharArray()) != null
+
     fun text(displayId: Int, value: String): Boolean {
         if (value.isEmpty()) return true
         val events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(value.toCharArray())

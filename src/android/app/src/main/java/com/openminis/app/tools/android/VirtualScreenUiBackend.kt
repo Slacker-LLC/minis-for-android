@@ -2,6 +2,8 @@ package com.openminis.app.tools.android
 
 import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
+import com.openminis.app.logging.AppLogger
 import com.openminis.app.tools.android.vscreen.VirtualScreenClient
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
 import kotlinx.coroutines.Dispatchers
@@ -36,11 +38,11 @@ internal object VirtualScreenUiBackend {
                 "set_text" -> refAction(sessionId, displayId, args, client, action)
                 "input_text" -> refAction(sessionId, displayId, args, client, action)
                 "paste_text" -> error("VSCREEN_ACTION_UNSUPPORTED", "paste_text is not implemented on the virtual display; use set_text or input_text by ref")
+                "ime_enter" -> imeEnter(sessionId, displayId, args, client)
                 "scroll" -> scroll(sessionId, displayId, args, client)
                 "wait" -> waitForText(sessionId, displayId, args, client)
                 "wait_for_package" -> waitForPackage(displayId, args, client)
-                "back" -> actionResult(action, displayId, client.back(displayId), "display-targeted BACK key")
-                "home" -> actionResult(action, displayId, client.home(displayId), "display-targeted HOME key")
+                "back", "home" -> simpleAct(sessionId, displayId, client, action, JSONObject().put("action", action))
                 "recents", "notifications", "quick_settings" -> error(
                     "VSCREEN_ACTION_UNSUPPORTED",
                     "$action is not available on a virtual display; it will not fall back to the physical screen",
@@ -61,22 +63,27 @@ internal object VirtualScreenUiBackend {
         args: JSONObject,
         client: VirtualScreenClient,
     ): AndroidUiController.UiToolResult {
-        val mode = if (args.optBoolean("interactiveOnly", true)) "SIMPLE" else "FULL"
-        val raw = client.dump(displayId, mode)
-        val snapshot = VirtualScreenObservationRegistry.observe(sessionId, displayId, raw)
-        val packageFilter = args.optString("packageFilter").trim()
-        if (packageFilter.isNotEmpty()) {
-            val targets = snapshot.optJSONArray("targets") ?: JSONArray()
-            val filtered = JSONArray()
-            for (i in 0 until targets.length()) {
-                val target = targets.optJSONObject(i) ?: continue
-                if (target.optString("label").contains(packageFilter, ignoreCase = true) ||
-                    raw.contains(packageFilter, ignoreCase = true)
-                ) filtered.put(target)
-            }
-            snapshot.put("targets", filtered)
-        }
+        val interactiveOnly = args.optBoolean("interactiveOnly", true)
+        val dumpStart = SystemClock.elapsedRealtime()
+        val raw = client.dump(displayId, if (interactiveOnly) "SIMPLE" else "FULL")
+        val dumpMs = SystemClock.elapsedRealtime() - dumpStart
+        val serializeStart = SystemClock.elapsedRealtime()
+        val snapshot = VirtualScreenObservationRegistry.observe(
+            sessionId, displayId, raw,
+            VirtualScreenObserveOptions(
+                maxNodes = args.optInt("maxNodes", 120),
+                textFilter = args.optString("textFilter").takeIf { it.isNotBlank() },
+                packageFilter = args.optString("packageFilter").takeIf { it.isNotBlank() },
+                includeTree = !interactiveOnly,
+            ),
+        )
         snapshot.put("success", true).put("action", "observe")
+        snapshot.put(
+            "timing",
+            JSONObject().put("dumpMs", dumpMs).put("serializeMs", SystemClock.elapsedRealtime() - serializeStart)
+                .put("observationBytes", snapshot.toString().length),
+        )
+        logTiming("observe", snapshot.optJSONObject("timing"), snapshot)
         putDisplayGeometry(snapshot, client)
         return AndroidUiController.UiToolResult(snapshot, true)
     }
@@ -96,7 +103,7 @@ internal object VirtualScreenUiBackend {
             )
     }
 
-    private suspend fun refAction(
+    private fun refAction(
         sessionId: String,
         displayId: Int,
         args: JSONObject,
@@ -106,51 +113,161 @@ internal object VirtualScreenUiBackend {
         val generation = args.optLong("generation", -1L)
         val ref = args.optString("ref").trim()
         if (generation < 0 || ref.isBlank()) return error("INVALID_UI_REF", "$action requires generation and ref from a recent observe")
-        val before = client.dump(displayId, "SIMPLE")
-        val target = when (val resolution = VirtualScreenObservationRegistry.resolve(sessionId, displayId, generation, ref, before)) {
-            is VirtualScreenRefResolution.Found -> resolution.target
+        val found = when (val resolution = VirtualScreenObservationRegistry.locate(sessionId, displayId, generation, ref)) {
+            is VirtualScreenRefResolution.Found -> resolution
             is VirtualScreenRefResolution.Error -> return error(resolution.code, resolution.message)
         }
-        val succeeded = when (action) {
-            "click" -> {
-                if ("click" !in target.actions) return error("UI_ACTION_NOT_SUPPORTED", "The selected ref is not clickable")
-                client.clickTarget(displayId, target.index)
-            }
-            "long_press" -> {
-                val bounds = target.bounds ?: return error("UI_BOUNDS_UNAVAILABLE", "The selected ref has no usable display-local bounds")
-                client.longPress(displayId, bounds.centerX, bounds.centerY, args.optInt("durationMs", 700).coerceIn(300, 5_000))
-            }
+        val target = found.target
+        val request = JSONObject().put("action", action).put("locator", target.locator)
+            .put("scanTruncated", found.scanTruncated)
+        when (action) {
+            "click" -> if ("click" !in target.actions) return error("UI_ACTION_NOT_SUPPORTED", "The selected ref is not clickable")
+            "long_press" -> request.put("durationMs", args.optInt("durationMs", 700).coerceIn(300, 5_000))
             "set_text" -> {
                 if ("input" !in target.actions) return error("UI_TARGET_NOT_EDITABLE", "set_text requires an editable ref")
                 val text = args.optString("text")
                 if (text.length > 4_000) return error("TEXT_TOO_LONG", "set_text is limited to 4000 characters")
-                client.setTextTarget(displayId, target.index, text)
+                request.put("text", text)
             }
             "input_text" -> {
                 if ("input" !in target.actions) return error("UI_TARGET_NOT_EDITABLE", "input_text requires an editable ref")
                 val text = args.optString("text")
                 if (text.isEmpty() || text.length > 1_000) return error("INVALID_INPUT_TEXT", "input_text requires 1..1000 characters")
-                if (!client.focusTarget(displayId, target.index)) return error("UI_TARGET_FOCUS_FAILED", "Could not focus the selected editable ref")
-                client.inputText(displayId, text)
+                request.put("text", text)
             }
-            else -> false
         }
-        if (!succeeded) return actionResult(action, displayId, false, "the display-targeted operation was rejected")
-        delay(ACTION_EVIDENCE_SETTLE_MS)
-        if (action == "click" || action == "long_press") {
-            ensureAppRemains(sessionId, displayId, target.packageName, client)?.let { return it }
-        }
-        val after = runCatching { client.dump(displayId, "SIMPLE") }.getOrNull()
-        val changed = after != null && VirtualScreenObservationRegistry.fingerprint(after) != VirtualScreenObservationRegistry.fingerprint(before)
-        return actionResult(
-            action,
-            displayId,
-            true,
-            if (changed) "accepted_with_effect" else "accepted_without_evidence",
-        ).also { it.json.put("evidenceSource", "vscreen_uiautomation") }
+        return act(sessionId, displayId, client, action, request, generation, target.packageName)
     }
 
-    private suspend fun coordinateAction(
+    private fun imeEnter(
+        sessionId: String,
+        displayId: Int,
+        args: JSONObject,
+        client: VirtualScreenClient,
+    ): AndroidUiController.UiToolResult {
+        val request = JSONObject().put("action", "ime_enter")
+        var generation: Long? = null
+        var packageName = ""
+        val ref = args.optString("ref").trim()
+        if (ref.isNotEmpty()) {
+            val g = args.optLong("generation", -1L)
+            if (g < 0) return error("INVALID_UI_REF", "ime_enter with ref requires generation from a recent observe")
+            val found = when (val resolution = VirtualScreenObservationRegistry.locate(sessionId, displayId, g, ref)) {
+                is VirtualScreenRefResolution.Found -> resolution
+                is VirtualScreenRefResolution.Error -> return error(resolution.code, resolution.message)
+            }
+            request.put("locator", found.target.locator).put("scanTruncated", found.scanTruncated)
+            generation = g
+            packageName = found.target.packageName
+        }
+        // Without a ref the service presses the IME action of whatever field has input focus.
+        return act(sessionId, displayId, client, "ime_enter", request, generation, packageName)
+    }
+
+    private fun simpleAct(
+        sessionId: String,
+        displayId: Int,
+        client: VirtualScreenClient,
+        action: String,
+        request: JSONObject,
+    ): AndroidUiController.UiToolResult = act(sessionId, displayId, client, action, request, null, "")
+
+    /**
+     * One Binder call that locates, acts, waits for the screen to settle and returns the new screen.
+     * The new screen is registered as a fresh generation and attached, so the model does not need a
+     * separate observe before its next step.
+     */
+    private fun act(
+        sessionId: String,
+        displayId: Int,
+        client: VirtualScreenClient,
+        action: String,
+        request: JSONObject,
+        generationBefore: Long?,
+        targetPackage: String,
+    ): AndroidUiController.UiToolResult {
+        val packageName = client.foregroundPackageName?.takeIf(String::isNotBlank) ?: targetPackage.takeIf(String::isNotBlank).orEmpty()
+        if (packageName.isNotEmpty()) request.put("package", packageName)
+        val binderStart = SystemClock.elapsedRealtime()
+        val response = JSONObject(client.act(displayId, request.toString()))
+        val binderMs = SystemClock.elapsedRealtime() - binderStart
+
+        val serializeStart = SystemClock.elapsedRealtime()
+        val observed = response.optJSONObject("observation")?.let {
+            VirtualScreenObservationRegistry.observe(sessionId, displayId, it)
+        }
+        val ok = response.optBoolean("ok", false)
+        val timing = (response.optJSONObject("timing") ?: JSONObject())
+            .put("binderMs", binderMs).put("serializeMs", SystemClock.elapsedRealtime() - serializeStart)
+
+        if (!ok) {
+            val code = when (val serviceCode = response.optString("error")) {
+                "stale_target" -> "STALE_UI_REF"
+                "target_not_editable" -> "UI_TARGET_NOT_EDITABLE"
+                "target_not_actionable" -> "UI_NODE_NOT_ACTIONABLE"
+                "" -> "vscreen_call_failed"
+                else -> serviceCode
+            }
+            val result = JSONObject().put("success", false).put("action", action).put("displayId", displayId)
+                .put("error", code)
+                .put("message", (response.optString("detail").ifBlank { "the display-targeted operation was rejected" }).take(512))
+                .put("evidenceSource", "vscreen_uiautomation")
+            // A stale target comes with the screen as it is now: the next ref can be taken from it directly.
+            if (observed != null) result.put("observation", observed)
+            attachTiming(result, timing, observed)
+            return AndroidUiController.UiToolResult(result, false)
+        }
+
+        if (response.has("packagePresent")) {
+            val denial = VirtualScreenAppPresencePolicy.denialCode(packageName, response.optBoolean("packagePresent", true))
+            if (denial != null) {
+                VirtualScreenObservationRegistry.clearSession(sessionId)
+                return error(denial, "$packageName no longer has a window on display $displayId; do not fall back to the physical screen")
+            }
+        }
+        val changed = response.optBoolean("semanticSignal", false) || run {
+            val before = generationBefore?.let(VirtualScreenObservationRegistry::observedFingerprint)
+            val after = observed?.optLong("generation")?.let(VirtualScreenObservationRegistry::observedFingerprint)
+            before != null && after != null && before != after
+        }
+        val outcome = if (changed) "accepted_with_effect" else "accepted_without_evidence"
+        val result = actionResult(action, displayId, true, outcome).json
+            .put("outcome", outcome)
+            .put("settledBy", response.optString("settledBy"))
+            .put("resolvedBy", response.optString("resolvedBy"))
+        // grace_expired = nothing reacted inside the action's grace window; the screen may simply be slow.
+        if (response.optString("settledBy") == "grace_expired" && !changed) {
+            result.put("hint", "no visible change yet; use wait/wait_for_package if a page transition is expected")
+        }
+        if (observed != null) result.put("observation", observed)
+        attachTiming(result, timing, observed)
+        return AndroidUiController.UiToolResult(result, true)
+    }
+
+    private fun attachTiming(result: JSONObject, timing: JSONObject, observed: JSONObject?) {
+        observed?.let {
+            timing.put("observationBytes", it.toString().length)
+                .put("targetCount", it.optJSONArray("targets")?.length() ?: 0)
+                .put("scanNodes", it.optInt("scanNodes", 0))
+        }
+        result.put("timing", timing)
+        logTiming(result.optString("action"), timing, observed)
+    }
+
+    /** One line per UI action: where the time went. Read this on the device before tuning any threshold. */
+    private fun logTiming(action: String, timing: JSONObject?, observed: JSONObject?) {
+        if (timing == null) return
+        AppLogger.info(
+            "VScreenTiming",
+            "action=$action " + listOf(
+                "binderMs", "resolveMs", "actionMs", "firstChangeMs", "settleMs", "dumpMs", "serializeMs", "totalMs",
+                "observationBytes", "targetCount", "scanNodes",
+            ).filter(timing::has).joinToString(" ") { "$it=${timing.opt(it)}" } +
+                (observed?.optJSONArray("layoutWarnings")?.let { " layoutWarnings=${it.length()}" } ?: ""),
+        )
+    }
+
+    private fun coordinateAction(
         sessionId: String,
         displayId: Int,
         args: JSONObject,
@@ -173,33 +290,11 @@ internal object VirtualScreenUiBackend {
         )
         if (resolved is UiCoordinateResolution.Refused) return error(resolved.code, resolved.message)
         val point = resolved as UiCoordinateResolution.Resolved
-        val success = if (longPress) {
-            client.longPress(displayId, point.x.roundToInt(), point.y.roundToInt(), args.optInt("durationMs", 700).coerceIn(300, 5_000))
-        } else {
-            client.tap(displayId, point.x.roundToInt(), point.y.roundToInt())
-        }
-        if (!success) return actionResult(if (longPress) "long_press" else "click", displayId, false, "display-local input was rejected")
-        delay(ACTION_EVIDENCE_SETTLE_MS)
-        ensureAppRemains(sessionId, displayId, client.foregroundPackageName.orEmpty(), client)?.let { return it }
-        return actionResult(if (longPress) "long_press" else "click", displayId, true, "display-local input accepted")
-    }
-
-    private fun ensureAppRemains(
-        sessionId: String,
-        displayId: Int,
-        targetPackageName: String,
-        client: VirtualScreenClient,
-    ): AndroidUiController.UiToolResult? {
-        val packageName = client.foregroundPackageName?.takeIf(String::isNotBlank)
-            ?: targetPackageName.takeIf(String::isNotBlank)
-            ?: return null
-        val hasWindow = client.hasPackageWindow(displayId, packageName)
-        val denial = VirtualScreenAppPresencePolicy.denialCode(packageName, hasWindow) ?: return null
-        VirtualScreenObservationRegistry.clearSession(sessionId)
-        return error(
-            denial,
-            "$packageName no longer has a window on display $displayId; do not fall back to the physical screen",
-        )
+        val action = if (longPress) "long_press" else "click"
+        val request = JSONObject().put("action", if (longPress) "long_press" else "tap")
+            .put("x", point.x.roundToInt()).put("y", point.y.roundToInt())
+        if (longPress) request.put("durationMs", args.optInt("durationMs", 700).coerceIn(300, 5_000))
+        return act(sessionId, displayId, client, action, request, null, "")
     }
 
     private fun scroll(
@@ -221,11 +316,19 @@ internal object VirtualScreenUiBackend {
         val screenHeight = displaySize?.second ?: 0
         val coordinateSpace = UiCoordinateSpace.parse(args.optString("coordinateSpace", "screen"))
 
+        var locator: JSONObject? = null
+        var scanTruncated = false
+        var targetPackage = ""
         if (ref.isNotBlank()) {
             if (refGeneration < 0) return error("INVALID_UI_REF", "scroll with ref requires generation from a recent observe")
-            val before = client.dump(displayId, "SIMPLE")
-            val target = when (val resolved = VirtualScreenObservationRegistry.resolve(sessionId, displayId, refGeneration, ref, before)) {
-                is VirtualScreenRefResolution.Found -> resolved.target
+            val target = when (val resolved = VirtualScreenObservationRegistry.locate(sessionId, displayId, refGeneration, ref)) {
+                is VirtualScreenRefResolution.Found -> {
+                    // The service re-verifies the container in the same call as the swipe.
+                    locator = resolved.target.locator
+                    scanTruncated = resolved.scanTruncated
+                    targetPackage = resolved.target.packageName
+                    resolved.target
+                }
                 is VirtualScreenRefResolution.Error -> return error(resolved.code, resolved.message)
             }
             val bounds = target.bounds ?: return error("UI_BOUNDS_UNAVAILABLE", "The selected ref has no usable display-local bounds")
@@ -270,15 +373,14 @@ internal object VirtualScreenUiBackend {
         if (screenWidth <= 0 || screenHeight <= 0) return error("VSCREEN_DISPLAY_SIZE_UNKNOWN", "The current display geometry is unavailable; reopen the virtual display")
         val endX = (startX + deltaX).coerceIn(0.0, (screenWidth - 1).toDouble())
         val endY = (startY + deltaY).coerceIn(0.0, (screenHeight - 1).toDouble())
-        val success = client.swipe(
-            displayId,
-            startX.toInt().coerceIn(0, screenWidth - 1),
-            startY.toInt().coerceIn(0, screenHeight - 1),
-            endX.toInt(),
-            endY.toInt(),
-            args.optInt("durationMs", 300).coerceIn(100, 2_000),
-        )
-        return actionResult("scroll", displayId, success, if (success) "display-targeted swipe accepted" else "display-targeted swipe rejected")
+        val request = JSONObject().put("action", "swipe")
+            .put("startX", startX.toInt().coerceIn(0, screenWidth - 1))
+            .put("startY", startY.toInt().coerceIn(0, screenHeight - 1))
+            .put("endX", endX.toInt())
+            .put("endY", endY.toInt())
+            .put("durationMs", args.optInt("durationMs", 300).coerceIn(100, 2_000))
+        if (locator != null) request.put("locator", locator).put("scanTruncated", scanTruncated)
+        return act(sessionId, displayId, client, "scroll", request, if (ref.isNotBlank()) refGeneration else null, targetPackage)
     }
 
     private suspend fun waitForText(
@@ -400,7 +502,7 @@ internal object VirtualScreenUiBackend {
     private fun collectTextValues(value: Any?, includeDescription: Boolean): List<String> = buildList {
         when (value) {
             is JSONObject -> {
-                val keys = if (includeDescription) setOf("text", "contentDescription", "hint", "label", "title") else setOf("text", "label", "title")
+                val keys = if (includeDescription) setOf("text", "desc", "contentDescription", "hint", "label", "title") else setOf("text", "label", "title")
                 val iterator = value.keys()
                 while (iterator.hasNext()) {
                     val key = iterator.next()
@@ -432,6 +534,5 @@ internal object VirtualScreenUiBackend {
             false,
         )
 
-    private const val ACTION_EVIDENCE_SETTLE_MS = 250L
     private const val PACKAGE_WAIT_POLL_MS = 150L
 }

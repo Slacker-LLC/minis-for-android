@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import androidx.annotation.Keep
@@ -14,6 +15,8 @@ import com.openminis.app.tools.android.vscreen.IVirtualScreenService
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeFailure
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeRecorder
+import com.openminis.app.tools.android.vscreen.SettleTracker
+import com.openminis.app.tools.android.vscreen.service.internal.ActRunner
 import com.openminis.app.tools.android.vscreen.service.internal.DisplaySpec
 import com.openminis.app.tools.android.vscreen.service.internal.FocusBridge
 import com.openminis.app.tools.android.vscreen.service.internal.InputBridge
@@ -41,6 +44,8 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     private val contextError: String? = if (identityError == null) ShellContext.initialize() else identityError
     private var session: VirtualDisplaySession? = null
     private var uiBridge: UiBridge? = null
+    private val settle = SettleTracker()
+    private var inputBridge: InputBridge? = null
     private val destroyed = AtomicBoolean(false)
 
     override fun probe(): String = synchronized(lock) {
@@ -92,7 +97,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             if (active.localImeEnabled) recorder.record("ime", "pass", "display_ime_local", "Display-level IME LOCAL policy was set")
             else recorder.warning("ime", "ime_policy_unavailable", "Could not set display-level IME LOCAL policy")
 
-            val ui = UiBridge()
+            val ui = UiBridge(settle)
             uiBridge = ui
             recorder.check("uiautomation", "uiautomation_connected") {
                 if (!ui.connect()) throw VirtualScreenProbeFailure("uiautomation_unavailable", "UiAutomation connect returned false")
@@ -198,8 +203,22 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     override fun dump(displayId: Int, mode: String): String = synchronized(lock) {
-        checkDisplay(displayId)
-        ensureUi().dump(displayId, mode)
+        val active = checkDisplay(displayId)
+        ensureUi().dump(displayId, mode, active.width, active.height, active.rotation())
+    }
+
+    /** Locate + act + settle + observe in one call; see [ActRunner]. */
+    override fun act(displayId: Int, requestJson: String): String = synchronized(lock) {
+        val active = checkDisplay(displayId)
+        if (requestJson.length > MAX_ACT_REQUEST_CHARS) fail("act_request_too_large", "act request exceeds $MAX_ACT_REQUEST_CHARS characters")
+        val request = try {
+            JSONObject(requestJson)
+        } catch (error: org.json.JSONException) {
+            fail("invalid_act_request", "act request is not valid JSON")
+        }
+        val ui = ensureUi()
+        active.onFrame = { settle.onFrame(SystemClock.uptimeMillis()) }
+        ActRunner(ui, ::input, settle).run(active, request).toString().also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun hasPackageWindow(displayId: Int, packageName: String): Boolean = synchronized(lock) {
@@ -208,59 +227,41 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         ensureUi().hasWindowOnDisplay(displayId, packageName)
     }
 
-    override fun clickTarget(displayId: Int, targetIndex: Int): Boolean = synchronized(lock) {
-        checkDisplay(displayId)
-        ensureUi().clickTarget(displayId, targetIndex)
-    }
-
     override fun tap(displayId: Int, x: Int, y: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().tap(displayId, x, y).also { FocusBridge.restorePhysicalFocusSoon() }
+        input().tap(displayId, x, y).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun swipe(displayId: Int, startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, startX, startY)
         checkCoordinates(active, endX, endY)
-        InputBridge().swipe(displayId, startX, startY, endX, endY, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
+        input().swipe(displayId, startX, startY, endX, endY, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun longPress(displayId: Int, x: Int, y: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().longPress(displayId, x, y, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
+        input().longPress(displayId, x, y, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun key(displayId: Int, keyCode: Int): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         if (keyCode !in 0..KeyEvent.getMaxKeyCode()) fail("invalid_key_code", "keyCode is outside Android's key range")
-        InputBridge().key(displayId, keyCode).also { FocusBridge.restorePhysicalFocusSoon() }
+        input().key(displayId, keyCode).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun inputText(displayId: Int, text: String): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         if (text.length > MAX_TEXT_LENGTH) fail("text_too_long", "Input text exceeds $MAX_TEXT_LENGTH characters")
-        InputBridge().text(displayId, text)
+        input().text(displayId, text)
     }
 
     override fun setText(displayId: Int, text: String): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         if (text.length > MAX_TEXT_LENGTH) fail("text_too_long", "Input text exceeds $MAX_TEXT_LENGTH characters")
         ensureUi().setText(displayId, text)
-    }
-
-    override fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean = synchronized(lock) {
-        checkDisplay(displayId)
-        if (targetIndex < 1) fail("invalid_target", "targetIndex must be positive")
-        if (text.length > MAX_TEXT_LENGTH) fail("text_too_long", "Input text exceeds $MAX_TEXT_LENGTH characters")
-        ensureUi().setTextTarget(displayId, targetIndex, text)
-    }
-
-    override fun focusTarget(displayId: Int, targetIndex: Int): Boolean = synchronized(lock) {
-        checkDisplay(displayId)
-        if (targetIndex < 1) fail("invalid_target", "targetIndex must be positive")
-        ensureUi().focusTarget(displayId, targetIndex)
     }
 
     override fun getDisplayInfo(): IntArray = synchronized(lock) {
@@ -358,10 +359,13 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     private fun ensureUi(): UiBridge {
         requireShellIdentity()
         if (contextError != null) fail("shell_context_unavailable", contextError)
-        val ui = uiBridge ?: UiBridge().also { uiBridge = it }
+        val ui = uiBridge ?: UiBridge(settle).also { uiBridge = it }
         if (!ui.isConnected()) ui.connect()
         return ui
     }
+
+    /** One bridge per service: it resolves the input manager and two reflective methods, which used to happen on every tap. */
+    private fun input(): InputBridge = inputBridge ?: InputBridge().also { inputBridge = it }
 
     private fun launchInternal(packageName: String, activityOrNull: String?, displayId: Int): Boolean {
         if (!PACKAGE_PATTERN.matches(packageName)) fail("invalid_package", "Invalid package name")
@@ -459,6 +463,7 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         private const val DEFAULT_MAX_DIM = 1280
         private const val DEFAULT_JPEG_QUALITY = 85
         private const val MAX_TEXT_LENGTH = 4096
+        private const val MAX_ACT_REQUEST_CHARS = 16_384
         private const val MAX_PROBE_DIM = 2400
         private const val MAX_PROBE_PIXELS = 4_194_304L
         private const val PROBE_LAUNCH_WAIT_MS = 4_000L

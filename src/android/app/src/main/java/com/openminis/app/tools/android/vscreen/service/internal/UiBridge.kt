@@ -7,17 +7,28 @@ package com.openminis.app.tools.android.vscreen.service.internal
 
 import android.annotation.SuppressLint
 import android.app.UiAutomation
+import android.graphics.Rect
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.SparseArray
-import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityWindowInfo
+import com.openminis.app.tools.android.vscreen.LayoutDiagnostics
+import com.openminis.app.tools.android.vscreen.SettlePolicy
+import com.openminis.app.tools.android.vscreen.SettleTracker
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
+import com.openminis.app.tools.android.vscreen.WindowGeometry
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal class UiBridge {
+internal class UiBridge(private val settle: SettleTracker) {
     @Volatile private var automation: UiAutomation? = null
     private var thread: HandlerThread? = null
+
+    /** The one display whose window events count as "the screen reacted". */
+    @Volatile private var targetDisplayId: Int = 0
+    @Volatile private var windowDisplay: Map<Int, Int> = emptyMap()
+    @Volatile private var lastWindowRefreshAt = 0L
 
     /** This reflection executes only in Shizuku's separate shell UserService process. */
     @SuppressLint("SoonBlockedPrivateApi")
@@ -53,8 +64,12 @@ internal class UiBridge {
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                // Settle detection listens to these; ask for everything so a ROM default cannot silence it.
+                info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK
+                info.notificationTimeout = 0
                 instance.serviceInfo = info
             }
+            runCatching { instance.setOnAccessibilityEventListener { event -> onEvent(event) } }
             thread = worker
             automation = instance
             true
@@ -66,62 +81,179 @@ internal class UiBridge {
 
     fun isConnected(): Boolean = automation != null
 
-    fun dump(displayId: Int, mode: String): String {
+    /** Call right before an action: events from other displays must not count as the screen reacting. */
+    fun beginObserving(displayId: Int) {
+        targetDisplayId = displayId
+        refreshWindowMap()
+    }
+
+    /**
+     * Runs on the UiAutomation looper. Only a *semantic* event on a window that belongs to the
+     * target display counts; everything on the physical screen (the user using the phone) is dropped.
+     */
+    private fun onEvent(event: AccessibilityEvent) {
+        val type = event.eventType
+        if (!SettlePolicy.isSemantic(type)) return
+        val target = targetDisplayId
+        if (target <= 0) return
+        val now = SystemClock.uptimeMillis()
+        if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            // The event does not say which display changed; compare this display's window set.
+            val before = windowIdsOn(target)
+            refreshWindowMap()
+            if (before != windowIdsOn(target)) settle.onSemantic(now)
+            return
+        }
+        val windowId = event.windowId
+        var owner = windowDisplay[windowId]
+        if (owner == null && now - lastWindowRefreshAt >= WINDOW_REFRESH_MIN_GAP_MS) {
+            refreshWindowMap()
+            owner = windowDisplay[windowId]
+        }
+        when {
+            owner == target -> settle.onSemantic(now)
+            // A window that appeared between two refreshes and cannot be placed yet: count window-level
+            // events (it may be ours), ignore content noise.
+            owner == null && SettlePolicy.mayIntroduceUnknownWindow(type) -> settle.onSemantic(now)
+        }
+    }
+
+    private fun windowIdsOn(displayId: Int): Set<Int> =
+        windowDisplay.entries.filter { it.value == displayId }.map { it.key }.toSet()
+
+    private fun refreshWindowMap() {
+        val ui = automation ?: return
+        lastWindowRefreshAt = SystemClock.uptimeMillis()
+        runCatching {
+            val all = UiAutomation::class.java.getMethod("getWindowsOnAllDisplays").invoke(ui) as? SparseArray<*> ?: return
+            val fresh = HashMap<Int, Int>()
+            for (index in 0 until all.size()) {
+                val display = all.keyAt(index)
+                (all.valueAt(index) as? List<*>)?.filterIsInstance<AccessibilityWindowInfo>()?.forEach { fresh[it.id] = display }
+            }
+            windowDisplay = fresh
+        }
+    }
+
+    fun windows(displayId: Int): List<AccessibilityWindowInfo> {
+        val ui = automation ?: throw IllegalStateException("uiautomation_not_connected")
+        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
+        return windowsOnDisplay(ui, displayId).values
+    }
+
+    fun dump(displayId: Int, mode: String, displayWidth: Int, displayHeight: Int, rotation: Int = -1): String =
+        VirtualScreenPolicy.fitDumpJson(dumpObject(displayId, mode, displayWidth, displayHeight, rotation).toString())
+
+    /**
+     * Flat observation: windows (summary), targets, inputs and non-actionable texts. The node tree is
+     * only built for FULL; the model gets the same facts without the same facts repeated three times.
+     */
+    fun dumpObject(displayId: Int, mode: String, displayWidth: Int, displayHeight: Int, rotation: Int = -1): JSONObject {
         val ui = automation ?: throw IllegalStateException("uiautomation_not_connected")
         if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
         val result = windowsOnDisplay(ui, displayId)
+        val full = mode.equals("FULL", true)
         val windowArray = JSONArray()
         val targets = JSONArray()
         val inputs = JSONArray()
+        val texts = JSONArray()
+        val geometry = ArrayList<WindowGeometry>()
+        var scanned = 0
+        var scanTruncated = false
+        var outputTruncated = false
+
+        for ((windowIndex, window) in result.values.withIndex()) {
+            val budget = UiNodeUtils.SCAN_LIMIT - scanned
+            if (budget <= 0) {
+                scanTruncated = true
+                break
+            }
+            val collected = UiNodeUtils.collect(window, full, windowIndex, budget)
+            if (collected.scanned == 0) continue
+            scanned += collected.scanned
+            if (collected.scanTruncated) scanTruncated = true
+            if (collected.outputTruncated) outputTruncated = true
+            val targetOffset = targets.length()
+            val type = runCatching { window.type }.getOrDefault(-1)
+            val bounds = Rect().also { runCatching { window.getBoundsInScreen(it) } }
+            val entry = JSONObject().put("windowIndex", windowIndex)
+                .put("windowId", runCatching { window.id }.getOrDefault(-1))
+                .put("type", type)
+                .put("title", runCatching { window.title?.toString().orEmpty().take(128) }.getOrDefault(""))
+                .put("package", collected.rootPackage)
+                .put("bounds", "${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}")
+                .put("truncated", collected.scanTruncated)
+            if (full) {
+                UiNodeUtils.shiftTargetIndices(collected.root, targetOffset)
+                entry.put("root", collected.root)
+            }
+            windowArray.put(entry)
+            for (i in 0 until collected.targets.length()) {
+                val item = collected.targets.optJSONObject(i) ?: continue
+                if (targets.length() >= MAX_TARGETS_TOTAL) {
+                    outputTruncated = true
+                    break
+                }
+                targets.put(item.put("index", item.optInt("index", 0) + targetOffset))
+            }
+            for (i in 0 until collected.inputs.length()) inputs.put(collected.inputs.opt(i))
+            for (i in 0 until collected.texts.length()) texts.put(collected.texts.opt(i))
+            geometry.add(WindowGeometry(type, collected.rootPackage, bounds.left, bounds.top, bounds.right, bounds.bottom))
+        }
+
         val out = JSONObject()
+            .put("schema", 2)
             .put("displayId", displayId)
-            .put("mode", if (mode.equals("FULL", true)) "FULL" else "SIMPLE")
+            .put("mode", if (full) "FULL" else "SIMPLE")
             .put("coordinateSpace", "display-local")
             .put("windowSource", result.source)
             .put("windowError", result.error)
             .put("availableDisplays", result.availableDisplays)
-        var truncated = false
-
-        for ((windowIndex, window) in result.values.withIndex()) {
-            val collected = UiNodeUtils.collect(window, mode, windowIndex)
-            val root = collected.root ?: continue
-            val targetOffset = targets.length()
-            val inputOffset = inputs.length()
-            UiNodeUtils.shiftTargetIndices(root, targetOffset)
-            val entry = JSONObject().put("windowIndex", windowIndex)
-                .put("type", runCatching { window.type }.getOrDefault(-1))
-                .put("title", runCatching { window.title?.toString().orEmpty().take(128) }.getOrDefault(""))
-                .put("truncated", collected.truncated).put("root", root)
-            windowArray.put(entry)
-            appendTargets(targets, collected.targets, targetOffset)
-            appendArray(inputs, collected.inputs)
-            if (collected.truncated) truncated = true
-            out.put("windows", windowArray).put("targets", targets).put("inputs", inputs)
-            if (out.toString().toByteArray(Charsets.UTF_8).size > VirtualScreenPolicy.MAX_DUMP_BYTES) {
-                windowArray.remove(windowArray.length() - 1)
-                trimArray(targets, targetOffset)
-                trimArray(inputs, inputOffset)
-                truncated = true
-                break
-            }
-        }
-        out.put("windows", windowArray).put("targets", targets).put("inputs", inputs)
-        if (truncated) out.put("truncated", true)
-        return VirtualScreenPolicy.fitDumpJson(out.toString())
+            .put("display", JSONObject().put("width", displayWidth).put("height", displayHeight).put("rotation", rotation))
+            .put("windows", windowArray)
+            .put("targets", targets)
+            .put("inputs", inputs)
+            .put("texts", texts)
+            .put("scanNodes", scanned)
+            .put("truncated", scanTruncated)
+            .put("layoutWarnings", JSONArray(LayoutDiagnostics.warnings(displayWidth, displayHeight, geometry)))
+        outputTruncated = fitToBudget(out, full) || outputTruncated
+        out.put("outputTruncated", outputTruncated)
+        return out
     }
 
-    fun clickTarget(displayId: Int, targetIndex: Int): Boolean {
-        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
-        if (targetIndex < 1) return false
-        val windows = windowsOnDisplay(automation ?: return false, displayId).values
-        var remaining = targetIndex
-        for (window in windows) {
-            val root = runCatching { window.root }.getOrNull() ?: continue
-            val count = countTargets(root)
-            if (remaining <= count) return UiNodeUtils.clickTarget(root, remaining)
-            remaining -= count
+    /** Keeps the payload under the policy cap by dropping detail, never by invalidating the JSON. */
+    private fun fitToBudget(out: JSONObject, full: Boolean): Boolean {
+        var trimmed = false
+        fun size() = out.toString().toByteArray(Charsets.UTF_8).size
+        if (size() <= VirtualScreenPolicy.MAX_DUMP_BYTES) return false
+        if (full) {
+            val windows = out.getJSONArray("windows")
+            for (i in windows.length() - 1 downTo 0) {
+                windows.getJSONObject(i).remove("root")
+                trimmed = true
+                if (size() <= VirtualScreenPolicy.MAX_DUMP_BYTES) return true
+            }
         }
-        return false
+        val texts = out.getJSONArray("texts")
+        val targets = out.getJSONArray("targets")
+        while (size() > VirtualScreenPolicy.MAX_DUMP_BYTES && (texts.length() > 0 || targets.length() > 0)) {
+            val array = if (texts.length() > 0) texts else targets
+            repeat(maxOf(1, array.length() / 10)) { if (array.length() > 0) array.remove(array.length() - 1) }
+            trimmed = true
+        }
+        return trimmed
+    }
+
+    fun hasWindowOnDisplay(displayId: Int, packageName: String): Boolean {
+        if (displayId == 0) return false
+        return windowsOnDisplay(automation ?: return false, displayId).values.any { window ->
+            UiNodeUtils.containsPackage(runCatching { window.root }.getOrNull(), packageName)
+        }
+    }
+
+    fun findInputFocus(displayId: Int) = windows(displayId).firstNotNullOfOrNull { window ->
+        UiNodeUtils.findInputFocus(runCatching { window.root }.getOrNull())
     }
 
     fun setText(displayId: Int, text: String): Boolean {
@@ -132,86 +264,18 @@ internal class UiBridge {
         return false
     }
 
-    fun setTextTarget(displayId: Int, targetIndex: Int, text: String): Boolean {
-        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
-        if (targetIndex < 1) return false
-        val windows = windowsOnDisplay(automation ?: return false, displayId).values
-        var remaining = targetIndex
-        for (window in windows) {
-            val root = runCatching { window.root }.getOrNull() ?: continue
-            val count = countTargets(root)
-            if (remaining <= count) return UiNodeUtils.setTextTarget(root, remaining, text)
-            remaining -= count
-        }
-        return false
-    }
-
-    fun focusTarget(displayId: Int, targetIndex: Int): Boolean {
-        if (displayId == 0) throw IllegalArgumentException(VirtualScreenPolicy.PHYSICAL_DISPLAY_REFUSED)
-        if (targetIndex < 1) return false
-        val windows = windowsOnDisplay(automation ?: return false, displayId).values
-        var remaining = targetIndex
-        for (window in windows) {
-            val root = runCatching { window.root }.getOrNull() ?: continue
-            val count = countTargets(root)
-            if (remaining <= count) return UiNodeUtils.focusTarget(root, remaining)
-            remaining -= count
-        }
-        return false
-    }
-
-    fun hasWindowOnDisplay(displayId: Int, packageName: String): Boolean {
-        if (displayId == 0) return false
-        return windowsOnDisplay(automation ?: return false, displayId).values.any { window ->
-            UiNodeUtils.containsPackage(runCatching { window.root }.getOrNull(), packageName)
-        }
-    }
-
     /** This reflection executes only in Shizuku's separate shell UserService process. */
     @SuppressLint("SoonBlockedPrivateApi")
     @Synchronized
     fun disconnect() {
         val old = automation
         automation = null
+        targetDisplayId = 0
+        windowDisplay = emptyMap()
+        runCatching { old?.setOnAccessibilityEventListener(null) }
         runCatching { UiAutomation::class.java.getDeclaredMethod("disconnect").apply { isAccessible = true }.invoke(old) }
         thread?.quitSafely()
         thread = null
-    }
-
-    private fun appendTargets(destination: JSONArray, source: JSONArray, offset: Int) {
-        for (index in 0 until source.length()) {
-            val item = source.optJSONObject(index) ?: continue
-            item.put("index", item.optInt("index", 0) + offset)
-            destination.put(item)
-        }
-    }
-
-    private fun appendArray(destination: JSONArray, source: JSONArray) {
-        for (index in 0 until source.length()) destination.put(source.opt(index))
-    }
-
-    private fun trimArray(array: JSONArray, keep: Int) {
-        while (array.length() > keep) array.remove(array.length() - 1)
-    }
-
-    private fun countTargets(root: AccessibilityNodeInfo?): Int = countTargets(root, intArrayOf(0))
-
-    private fun countTargets(node: AccessibilityNodeInfo?, visited: IntArray): Int {
-        if (node == null || visited[0] >= MAX_NODES) return 0
-        visited[0]++
-        val visible = runCatching { node.isVisibleToUser && node.isEnabled }.getOrDefault(false)
-        val editable = runCatching { node.isEditable || node.className?.toString()?.contains("EditText", true) == true }
-            .getOrDefault(false)
-        val clickable = runCatching { node.isClickable || (node.actions and AccessibilityNodeInfo.ACTION_CLICK) != 0 }
-            .getOrDefault(false)
-        val longClickable = runCatching { node.isLongClickable }.getOrDefault(false)
-        var total = if (visible && (editable || clickable || longClickable)) 1 else 0
-        val childCount = runCatching { node.childCount }.getOrDefault(0).coerceIn(0, MAX_NODES)
-        for (index in 0 until childCount) {
-            if (visited[0] >= MAX_NODES) break
-            total += countTargets(runCatching { node.getChild(index) }.getOrNull(), visited)
-        }
-        return total
     }
 
     private fun windowsOnDisplay(ui: UiAutomation, displayId: Int): WindowResult {
@@ -248,6 +312,7 @@ internal class UiBridge {
     )
 
     companion object {
-        private const val MAX_NODES = 180
+        private const val MAX_TARGETS_TOTAL = 400
+        private const val WINDOW_REFRESH_MIN_GAP_MS = 50L
     }
 }
