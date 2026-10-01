@@ -27,7 +27,7 @@ class ThinkingLevelCatalogSnapshotTest {
         val expected = buildMap<String, ThinkingLevel> {
             listOf(
                 "claude-fable-5", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5",
-                "gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
+                "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
                 "gemini-2.5-flash-lite", "gpt-5.5", "gpt-5.3-codex", "gpt-5.2-codex",
                 "gpt-5.1-codex-max", "gpt-5.2", "gpt-4o", "gpt-4o-mini", "o3", "o4-mini",
                 "codex-mini-latest", "anthropic/claude-sonnet-4", "google/gemini-2.5-flash",
@@ -36,9 +36,15 @@ class ThinkingLevelCatalogSnapshotTest {
                 "grok-build-0.1", "grok-3-mini", "grok-3-mini-fast", "grok-composer-2.5-fast",
                 "grok-4-fast", "grok-4-fast-non-reasoning", "grok-code-fast-1", "kimi-k3", "kimi-k2",
                 "gpt-5.4", "gpt-5.4-mini", "gpt-image-2",
+                // Added when the catalogs were brought up to date (2026-10).
+                "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-5",
+                "gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.5-flash-lite",
+                "grok-4.7", "anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5",
+                "google/gemini-3.8-flash", "x-ai/grok-4.7",
             ).forEach { put(it, ThinkingLevel.XHIGH) }
             listOf("claude-opus-4-8", "claude-opus-4-6", "claude-opus-4.7", "gpt-6-astra",
-                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna").forEach { put(it, ThinkingLevel.MAX) }
+                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+                "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "openai/gpt-6.1-sol").forEach { put(it, ThinkingLevel.MAX) }
             listOf("mimo-v2.5", "mimo-v2.5-pro", "seed-2.0", "bytedance-seed/x").forEach {
                 put(it, ThinkingLevel.HIGH)
             }

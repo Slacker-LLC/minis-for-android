@@ -20,7 +20,7 @@ class ModelRulesParserTest {
         val document = ModelRulesParser.parse(ModelRulesTestFixtures.bundledDocumentText(), warnings::add)
         assertTrue("bad built-in rules: $warnings", warnings.isEmpty())
         assertEquals(1, document?.schemaVersion)
-        assertEquals(20, document?.rules?.size)
+        assertEquals(21, document?.rules?.size)
         assertEquals(setOf("anthropic", "gemini", "openAI", "openRouter", "xAI", "kimi", "codexOAuth"), document?.staticModels?.keys)
         assertTrue(document?.staticModels?.values?.flatten()?.isNotEmpty() == true)
     }
