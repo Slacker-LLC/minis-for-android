@@ -108,4 +108,84 @@ class SubAgentJobRegistryTest {
         }
         assertNull(r.finish("missing", SubAgentJobState.DONE, null))
     }
+
+    // ── Persistence and interrupted runs ───────────────────────────────────
+
+    private class MemStore(var saved: List<SubAgentJob> = emptyList()) : SubAgentJobStore {
+        override fun load() = saved
+        override fun save(jobs: List<SubAgentJob>) { saved = jobs }
+    }
+
+    @Test
+    fun `queued and running jobs come back as interrupted, finished ones as they were`() {
+        val store = MemStore()
+        val r = SubAgentJobRegistry(1, 5, clock = { 1_000L }, idFactory = { "job${++ids}-xxxxxx" }, store = store)
+        val done = (r.submit() as SubAgentAdmission.Started).job
+        r.finish(done.id, SubAgentJobState.DONE, "ok")
+        val running = (r.submit() as SubAgentAdmission.Started).job
+        val queued = (r.submit() as SubAgentAdmission.Queued).job
+
+        val reloaded = SubAgentJobRegistry(1, 5, clock = { 9_000L }, store = store)
+        assertEquals(SubAgentJobState.DONE, reloaded.get(done.id)!!.state)
+        assertEquals(SubAgentJobState.INTERRUPTED, reloaded.get(running.id)!!.state)
+        assertEquals(SubAgentJobState.INTERRUPTED, reloaded.get(queued.id)!!.state)
+        assertNull("nothing is waiting in a queue after a restart", reloaded.queuePosition(queued.id))
+    }
+
+    @Test
+    fun `resume restarts an interrupted job and marks it resumed`() {
+        val store = MemStore()
+        val r = SubAgentJobRegistry(2, 5, store = store)
+        val job = (r.submit() as SubAgentAdmission.Started).job
+        val reloaded = SubAgentJobRegistry(2, 5, store = store)
+        val admission = reloaded.resume(job.id) as SubAgentAdmission.Started
+        assertEquals(SubAgentJobState.RUNNING, admission.job.state)
+        assertTrue(admission.job.resumed)
+    }
+
+    @Test
+    fun `resume queues when no slot is free`() {
+        val store = MemStore()
+        val r = SubAgentJobRegistry(1, 5, store = store)
+        val lost = (r.submit() as SubAgentAdmission.Started).job
+        val reloaded = SubAgentJobRegistry(1, 5, store = store)
+        reloaded.submit() // takes the only slot
+        val admission = reloaded.resume(lost.id)
+        assertTrue(admission is SubAgentAdmission.Queued)
+    }
+
+    @Test
+    fun `only an interrupted job can be resumed`() {
+        val r = registry(maxConcurrent = 5)
+        val running = (r.submit() as SubAgentAdmission.Started).job
+        assertNull(r.resume(running.id))
+        assertNull(r.resume("missing"))
+        r.finish(running.id, SubAgentJobState.DONE, "x")
+        assertNull(r.resume(running.id))
+    }
+
+    @Test
+    fun `history is bounded and an active job is never dropped`() {
+        val r = SubAgentJobRegistry(maxConcurrent = 100, maxQueued = 100, clock = { 1L })
+        val active = (r.submit() as SubAgentAdmission.Started).job
+        repeat(SubAgentJobRegistry.MAX_KEPT + 10) {
+            val j = (r.submit() as SubAgentAdmission.Started).job
+            r.finish(j.id, SubAgentJobState.DONE, "x")
+        }
+        assertTrue(r.jobs.value.size <= SubAgentJobRegistry.MAX_KEPT)
+        assertNotNull("the still-running job survives the trimming", r.get(active.id))
+    }
+
+    @Test
+    fun `the brief is dropped once a job finishes`() {
+        val r = registry()
+        val job = (r.submit(brief = "the whole brief") as SubAgentAdmission.Started).job
+        assertEquals("the whole brief", r.get(job.id)!!.brief)
+        r.finish(job.id, SubAgentJobState.DONE, "x")
+        assertNull(r.get(job.id)!!.brief)
+    }
+
+    private fun SubAgentJobRegistry.submit(brief: String?): SubAgentAdmission =
+        submit("p1", "General Sub Agent", "t", wait = false, maxMinutes = 10, brief = brief)
 }
+

@@ -55,9 +55,15 @@ class SubAgentRuntimeTest {
             return id
         }
 
+        /** Children that were "restarted with the app": their next run gets a fresh gate. */
+        val freshGate = java.util.concurrent.CopyOnWriteArraySet<String>()
+        val messages = CopyOnWriteArrayList<Pair<String, String>>()
+
         override suspend fun runChild(childSessionId: String, brief: String, thinking: ThinkingLevel?, timeoutMs: Long): ChildOutcome {
             briefs[childSessionId] = brief
+            messages += childSessionId to brief
             this.thinking[childSessionId] = thinking
+            if (freshGate.remove(childSessionId)) gates[childSessionId] = CompletableDeferred()
             return gates.getValue(childSessionId).await()
         }
 
@@ -374,6 +380,108 @@ class SubAgentRuntimeTest {
         )
         assertEquals("steer_failed", json(failed).getString("error"))
         assertNotNull(port.steered.firstOrNull())
+        port.gates.values.forEach { it.complete(ChildOutcome(true, "x", false)) }
+    }
+
+    // ── Interrupted runs: a restart loses the coroutines, the stored jobs say what was lost ──
+
+    private class MemStore : SubAgentJobStore {
+        var saved: List<SubAgentJob> = emptyList()
+        override fun load() = saved
+        override fun save(jobs: List<SubAgentJob>) { saved = jobs }
+    }
+
+    /** "Restart the app": a new registry and runtime over the same stored jobs. */
+    private fun restarted(store: MemStore, port: FakePort) =
+        SubAgentRuntime(port, SubAgentJobRegistry(store = store), scope)
+
+    private suspend fun startAndLose(store: MemStore, port: FakePort): String {
+        val rt = SubAgentRuntime(port, SubAgentJobRegistry(store = store), scope)
+        val jobId = json(rt.execute(args(), "chat-A")).getString("job_id")
+        until("child attached") { rt.registry.get(jobId)?.childSessionId != null }
+        return jobId
+    }
+
+    @Test
+    fun `a run lost to a restart shows up as interrupted`() = runBlocking {
+        val store = MemStore()
+        val jobId = startAndLose(store, FakePort())
+        val rt = restarted(store, FakePort())
+        assertEquals(SubAgentJobState.INTERRUPTED, rt.registry.get(jobId)!!.state)
+        val status = json(rt.execute(JSONObject().put("action", "status").toString(), "chat-A"))
+        assertEquals("interrupted", status.getJSONArray("jobs").getJSONObject(0).getString("status"))
+    }
+
+    @Test
+    fun `resuming continues in the same child with the resume notice and reports back`() = runBlocking {
+        val store = MemStore()
+        val jobId = startAndLose(store, FakePort())
+        val port = FakePort().also { it.gates["child-1"] = CompletableDeferred() }
+        val rt = restarted(store, port)
+
+        val reply = rt.execute(JSONObject().put("action", "resume").put("job_id", jobId.take(8)).toString(), "chat-A")
+        assertTrue(reply.text, reply.ok)
+        until("resumed run started") { port.messages.isNotEmpty() }
+        assertEquals("child-1", port.messages.single().first)
+        assertTrue(port.messages.single().second.contains("interrupted and has been resumed"))
+        assertTrue("no new child", port.created.isEmpty())
+
+        port.finish("child-1", "carried on")
+        until("callback delivered") { port.delivered.isNotEmpty() }
+        assertTrue(port.delivered.single().second.contains("carried on"))
+        assertEquals(SubAgentJobState.DONE, rt.registry.get(jobId)!!.state)
+        assertTrue(rt.registry.get(jobId)!!.resumed)
+    }
+
+    @Test
+    fun `omitting the job id resumes every interrupted run of this conversation only`() = runBlocking {
+        val store = MemStore()
+        val first = FakePort()
+        val rtOld = SubAgentRuntime(first, SubAgentJobRegistry(store = store), scope)
+        val a = json(rtOld.execute(args(), "chat-A")).getString("job_id")
+        val b = json(rtOld.execute(args(), "chat-B")).getString("job_id")
+        until("both attached") { rtOld.registry.get(a)?.childSessionId != null && rtOld.registry.get(b)?.childSessionId != null }
+
+        val port = FakePort().also { p -> first.created.forEach { p.gates[it] = CompletableDeferred() } }
+        val rt = restarted(store, port)
+        rt.execute(JSONObject().put("action", "resume").toString(), "chat-A")
+        until("one run resumed") { port.messages.size == 1 }
+        delay(100)
+        assertEquals("chat-B's run was left interrupted", SubAgentJobState.INTERRUPTED, rt.registry.get(b)!!.state)
+        port.gates.values.forEach { it.complete(ChildOutcome(true, "x", false)) }
+    }
+
+    @Test
+    fun `a job that never got a child starts over with its brief when resumed`() = runBlocking {
+        val store = MemStore()
+        val port0 = FakePort().also { it.createFails = false }
+        val rtOld = SubAgentRuntime(port0, SubAgentJobRegistry(maxConcurrent = 0, store = store), scope)
+        val jobId = json(rtOld.execute(args("task" to "survey the repo"), "chat-A")).getString("job_id")
+        assertEquals("queued, never started", SubAgentJobState.QUEUED, rtOld.registry.get(jobId)!!.state)
+
+        val port = FakePort()
+        val rt = restarted(store, port)
+        assertEquals(SubAgentJobState.INTERRUPTED, rt.registry.get(jobId)!!.state)
+        rt.execute(JSONObject().put("action", "resume").put("job_id", jobId).toString(), "chat-A")
+        until("fresh child created") { port.created.isNotEmpty() }
+        until("brief sent") { port.messages.isNotEmpty() }
+        assertTrue(port.messages.single().second.contains("survey the repo"))
+        port.finish(port.created.single(), "done")
+    }
+
+    @Test
+    fun `resuming is refused for a job that is not interrupted, unknown, or another conversation's`() = runBlocking {
+        val store = MemStore()
+        val port = FakePort()
+        val rt = SubAgentRuntime(port, SubAgentJobRegistry(store = store), scope)
+        val live = json(rt.execute(args(), "chat-A")).getString("job_id")
+        until("attached") { rt.registry.get(live)?.childSessionId != null }
+
+        suspend fun resume(job: String, chat: String) =
+            json(rt.execute(JSONObject().put("action", "resume").put("job_id", job).toString(), chat))
+        assertEquals("not_interrupted", resume(live, "chat-A").getString("error"))
+        assertEquals("job_not_found", resume("ghost", "chat-A").getString("error"))
+        assertEquals("job_not_found", resume(live, "chat-B").getString("error"))
         port.gates.values.forEach { it.complete(ChildOutcome(true, "x", false)) }
     }
 }
