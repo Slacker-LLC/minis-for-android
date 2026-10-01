@@ -2426,4 +2426,23 @@
     <string name="sub_agent_thinking_footer">預設跟隨模型。強度越高，思考越久、成本越高。</string>
     <string name="sub_agent_delete">刪除子代理</string>
     <string name="sub_agent_delete_body">刪除「%1$s」？此操作無法復原。</string>
+    <string name="sub_agent_card_title">子代理</string>
+    <string name="sub_agent_card_task">任務</string>
+    <string name="sub_agent_card_result">結果</string>
+    <string name="sub_agent_card_working">處理中…</string>
+    <string name="sub_agent_card_queued_hint">正在等待空閒名額，有空位後會立即開始。</string>
+    <string name="sub_agent_card_interrupted_hint">執行時應用程式被關閉了。按「恢復」可從中斷處繼續。</string>
+    <string name="sub_agent_card_stop">停止</string>
+    <string name="sub_agent_card_steer">修正</string>
+    <string name="sub_agent_card_resume">恢復</string>
+    <string name="sub_agent_card_open_session">開啟對話</string>
+    <string name="sub_agent_card_steer_hint">告訴它要改什麼</string>
+    <string name="sub_agent_card_send">傳送</string>
+    <string name="sub_agent_state_queued">排隊中</string>
+    <string name="sub_agent_state_running">執行中</string>
+    <string name="sub_agent_state_completed">已完成</string>
+    <string name="sub_agent_state_cancelled">已停止</string>
+    <string name="sub_agent_state_failed">失敗</string>
+    <string name="sub_agent_state_timeout">逾時</string>
+    <string name="sub_agent_state_interrupted">已中斷</string>
 </resources>

@@ -283,6 +283,7 @@ internal fun ToolDetailSheet(
     onDismiss: () -> Unit,
     onOpenTerminalWithCommand: (String) -> Unit = {},
     onOpenBrowserForUrl: (String) -> Unit = {},
+    subAgentActions: SubAgentCardActions? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var currentIdx by remember { mutableStateOf(initialIndex.coerceIn(0, toolBlocks.lastIndex.coerceAtLeast(0))) }
@@ -1098,6 +1099,33 @@ internal fun ToolDetailSheet(
                                     color = ChatColors.primaryText,
                                     lineHeight = 18.sp,
                                 )
+                            }
+                        }
+                    }
+
+                    // ── Sub agent: who / which model / status / result, with Stop, Steer, Resume ──
+                    com.openminis.app.data.model.SubAgentDefinition.TOOL_NAME -> {
+                        val ref = parseSubAgentCardRef(block.toolArgs, block.content)
+                        if (ref != null) {
+                            SubAgentCard(ref = ref, actions = subAgentActions, scrollState = outputScrollState)
+                        } else {
+                            // Not the call that started a run (a status / steer / cancel call, an error,
+                            // or the older tool's plain answer): the ordinary output view.
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(minisSheetColor())
+                                    .verticalScroll(outputScrollState)
+                                    .padding(16.dp),
+                            ) {
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    LazyRevealToolText(
+                                        bodyText = block.content.ifEmpty { stringResource(R.string.tool_no_output) },
+                                        color = ChatColors.primaryText,
+                                        scrollState = outputScrollState,
+                                        linkify = true,
+                                    )
+                                }
                             }
                         }
                     }

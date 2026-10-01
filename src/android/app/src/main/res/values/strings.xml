@@ -2545,4 +2545,23 @@
     <string name="sub_agent_thinking_footer">Default follows the model. A higher level thinks longer and costs more.</string>
     <string name="sub_agent_delete">Delete Sub Agent</string>
     <string name="sub_agent_delete_body">Delete “%1$s”? This cannot be undone.</string>
+    <string name="sub_agent_card_title">Sub agent</string>
+    <string name="sub_agent_card_task">Task</string>
+    <string name="sub_agent_card_result">Result</string>
+    <string name="sub_agent_card_working">Working…</string>
+    <string name="sub_agent_card_queued_hint">Waiting for a free slot; it starts as soon as one opens.</string>
+    <string name="sub_agent_card_interrupted_hint">The app was closed while this was running. Resume continues where it left off.</string>
+    <string name="sub_agent_card_stop">Stop</string>
+    <string name="sub_agent_card_steer">Steer</string>
+    <string name="sub_agent_card_resume">Resume</string>
+    <string name="sub_agent_card_open_session">Open session</string>
+    <string name="sub_agent_card_steer_hint">Tell it what to change</string>
+    <string name="sub_agent_card_send">Send</string>
+    <string name="sub_agent_state_queued">Queued</string>
+    <string name="sub_agent_state_running">Running</string>
+    <string name="sub_agent_state_completed">Done</string>
+    <string name="sub_agent_state_cancelled">Stopped</string>
+    <string name="sub_agent_state_failed">Failed</string>
+    <string name="sub_agent_state_timeout">Timed out</string>
+    <string name="sub_agent_state_interrupted">Interrupted</string>
 </resources>
