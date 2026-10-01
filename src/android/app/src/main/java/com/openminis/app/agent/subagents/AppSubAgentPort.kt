@@ -1,0 +1,159 @@
+package com.openminis.app.agent.subagents
+
+import android.content.Context
+import com.openminis.app.MinisApp
+import com.openminis.app.agent.AgentRunner
+import com.openminis.app.data.db.ChatSessionEntity
+import com.openminis.app.data.model.ModelEntry
+import com.openminis.app.data.model.ModelSlot
+import com.openminis.app.data.model.SubAgentDefinition
+import com.openminis.app.data.model.ThinkingLevel
+import com.openminis.app.logging.AppLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
+/**
+ * The app side of [SubAgentPort]: child sessions are ordinary sessions driven through [AgentRunner]
+ * (the same loop the chat and the scheduled tasks use), so a sub agent gets the full tool set, its
+ * own session workspace and the app's permission gates without a second agent implementation.
+ */
+class AppSubAgentPort(private val context: Context) : SubAgentPort {
+    private val app: MinisApp get() = context.applicationContext as MinisApp
+
+    override fun roster(): List<SubAgentDefinition> = SubAgentStore.currentRoster()
+
+    override suspend fun resolveModel(
+        def: SubAgentDefinition,
+        choice: SubAgentModelChoice,
+        parentSessionId: String,
+    ): SubAgentModel? {
+        val repo = app.providerRepository
+        val usable = repo.allVisibleEntries().filter { it.model.isTextOutput && isUsable(it) }
+
+        // A pinned model must still exist; there is no silent fallback, because the user chose it.
+        def.pinnedEntryId?.let { pinned ->
+            return usable.firstOrNull { it.id == pinned }?.let { SubAgentModel(it.id, it.model.displayName, ORIGIN_AGENT) }
+        }
+
+        fun slot(slot: ModelSlot): ModelEntry? =
+            repo.availableEntries(slot).firstOrNull { it.model.isTextOutput && isUsable(it) }
+
+        val entry: ModelEntry? = when (choice) {
+            SubAgentModelChoice.SAME_AS_ME -> {
+                val parentEntryId = withContext(Dispatchers.Main) {
+                    AgentRunner.viewModelForCommand(context, parentSessionId).activeEntryId.value
+                }
+                usable.firstOrNull { it.id == parentEntryId } ?: slot(ModelSlot.main)
+            }
+            SubAgentModelChoice.DEFAULT_MODEL -> slot(ModelSlot.main)
+            SubAgentModelChoice.SUB_MODEL -> slot(ModelSlot.light) ?: slot(ModelSlot.main)
+        }
+        return entry?.let { SubAgentModel(it.id, it.model.displayName, choice.wire) }
+    }
+
+    private fun isUsable(entry: ModelEntry): Boolean {
+        val repo = app.providerRepository
+        val instance = repo.instance(entry.providerInstanceId) ?: return false
+        return instance.isEnabled && repo.hasAnyCredential(instance)
+    }
+
+    override suspend fun createChild(parentSessionId: String, title: String, model: SubAgentModel): String {
+        val childId = AgentRunner.ensureSession(context, null)
+        app.chatRepository.updateSessionTitle(childId, title)
+        app.chatRepository.dao.updateSource(childId, ChatSessionEntity.SOURCE_SUB_AGENT)
+        model.entryId?.let { AgentRunner.applyModelOverride(context, childId, it) }
+        AppLogger.info(TAG, "child ${childId.take(8)} for parent ${parentSessionId.take(8)} model=${model.label}")
+        return childId
+    }
+
+    override suspend fun runChild(
+        childSessionId: String,
+        brief: String,
+        thinking: ThinkingLevel?,
+        timeoutMs: Long,
+    ): ChildOutcome {
+        val result = AgentRunner.prompt(
+            context = context,
+            sessionId = childSessionId,
+            text = brief,
+            thinkingLevel = thinking,
+            wait = true,
+            timeoutMs = timeoutMs,
+        )
+        return ChildOutcome(
+            completed = result.status.equals("Completed", ignoreCase = true) && !result.timedOut,
+            text = result.responseText,
+            timedOut = result.timedOut,
+        )
+    }
+
+    override suspend fun cancelChild(childSessionId: String): Boolean = AgentRunner.cancel(context, childSessionId)
+
+    /**
+     * Queues the correction into the child's running loop (read at its next turn). The child has no
+     * composer, so unlike a user's own queued message it carries no attachments.
+     */
+    override suspend fun steerChild(childSessionId: String, message: String): Boolean =
+        withContext(Dispatchers.Main) {
+            val vm = AgentRunner.viewModelForCommand(context, childSessionId)
+            if (!vm.isStreaming.value) return@withContext false
+            vm.enqueuePrompt("[Correction from the delegating agent] $message")
+            true
+        }
+
+    /**
+     * Posts the result into the delegating conversation as a new user turn. A headless prompt is
+     * refused while the conversation is mid-turn, so this waits for it to settle first instead of
+     * interrupting it — and instead of queuing through the composer, which would also swallow
+     * whatever the user has attached there.
+     */
+    override suspend fun deliverToParent(parentSessionId: String, text: String) {
+        repeat(DELIVERY_ATTEMPTS) { attempt ->
+            if (app.chatRepository.getSession(parentSessionId) == null) {
+                AppLogger.warning(TAG, "parent ${parentSessionId.take(8)} is gone; dropping the callback")
+                return
+            }
+            AgentRunner.waitForSettle(context, parentSessionId, SETTLE_WAIT_MS)
+            val result = AgentRunner.prompt(
+                context = context,
+                sessionId = parentSessionId,
+                text = text,
+                wait = false,
+                timeoutMs = SETTLE_WAIT_MS,
+            )
+            val busy = result.status.equals("Busy", ignoreCase = true) ||
+                result.responseText == "session_busy" || result.responseText == "session_compacting"
+            if (!busy && result.status.let { it.equals("Running", true) || it.equals("Completed", true) }) return
+            AppLogger.info(TAG, "callback to ${parentSessionId.take(8)} not accepted (${result.status}/${result.responseText}); retry ${attempt + 1}")
+            delay(RETRY_DELAY_MS)
+        }
+        AppLogger.warning(TAG, "callback to ${parentSessionId.take(8)} could not be delivered")
+    }
+
+    companion object {
+        private const val TAG = "SubAgents"
+        private const val ORIGIN_AGENT = "agent"
+        private const val DELIVERY_ATTEMPTS = 20
+        private const val SETTLE_WAIT_MS = 10 * 60 * 1000L
+        private const val RETRY_DELAY_MS = 3_000L
+    }
+}
+
+/** Process-wide wiring: one registry and runtime shared by every conversation. */
+object SubAgents {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile private var runtime: SubAgentRuntime? = null
+
+    fun runtime(context: Context): SubAgentRuntime =
+        runtime ?: synchronized(this) {
+            runtime ?: SubAgentRuntime(AppSubAgentPort(context.applicationContext), SubAgentJobRegistry(), scope)
+                .also { runtime = it }
+        }
+
+    /** Whether the delegation tool is offered at all (Settings master switch). */
+    fun isEnabled(): Boolean = SubAgentStore.enabled.value
+}
