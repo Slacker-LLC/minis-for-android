@@ -1082,7 +1082,34 @@ class ChatViewModel(
             botEnabled = botRepository != null && sessionBotId != null &&
                 sessionSource != ChatSessionEntity.SOURCE_BOT_DELEGATION &&
                 sessionSource != ChatSessionEntity.LEGACY_SOURCE_BOT_DELEGATION,
+            subAgentRosterNames = subAgentRoster()?.map { it.name },
+            subAgentChild = sessionSource == ChatSessionEntity.SOURCE_SUB_AGENT,
         )
+
+    /**
+     * The sub agent roster this session may delegate to, or null when the roster tool is not offered:
+     * switched off in Settings (the older single-shot schema applies), or this session is itself a sub
+     * agent's child (delegation is one level deep, so naming the roster to a child would be pure cost).
+     */
+    private fun subAgentRoster(): List<com.openminis.app.data.model.SubAgentDefinition>? {
+        if (!com.openminis.app.agent.subagents.SubAgents.isEnabled()) return null
+        if (sessionSource == ChatSessionEntity.SOURCE_SUB_AGENT) return null
+        return com.openminis.app.agent.subagents.SubAgentStore.currentRoster()
+    }
+
+    /** The tool bullet plus the "which sub agent for which job" roster, or null when not offered. */
+    private fun subAgentPromptFragment(): String? {
+        val roster = subAgentRoster() ?: return null
+        val entries = providerRepository.allVisibleEntries()
+        val section = com.openminis.app.agent.subagents.SubAgentTask.rosterSection(roster) { def ->
+            val pinned = def.pinnedEntryId
+            when {
+                pinned == null -> "Auto — you choose with model_choice"
+                else -> "fixed — " + (entries.firstOrNull { it.id == pinned }?.model?.displayName ?: "unavailable model")
+            }
+        }
+        return com.openminis.app.agent.subagents.SubAgentTask.SYSTEM_PROMPT_BULLET + "\n" + section
+    }
 
     /**
      * Per-session loop detector. Reset alongside [agentHistory] whenever the
@@ -10578,6 +10605,10 @@ class ChatViewModel(
             if (mcpFragment != null) {
                 append("\n\n")
                 append(mcpFragment)
+            }
+            subAgentPromptFragment()?.let {
+                append("\n\n")
+                append(it.trimEnd())
             }
             if (globalMemoryFragment != null) {
                 append("\n\n")

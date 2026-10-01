@@ -36,6 +36,13 @@ object AgentTools {
         presetToolset: com.openminis.app.remote.AgentPresetRegistry.Toolset =
             com.openminis.app.remote.AgentPresetRegistry.Toolset.FULL,
         botEnabled: Boolean = false,
+        // Names of the enabled sub agents (the `subagent.agent` enum) while sub agents are allowed
+        // (Settings); null offers the older single-shot `subagent` schema instead. Same tool name
+        // either way, so transcripts and permissions stay valid.
+        subAgentRosterNames: List<String>? = null,
+        // True for a sub agent's own child session: delegation is one level deep, so no `subagent`
+        // tool is offered there in any form.
+        subAgentChild: Boolean = false,
     ): List<AgentToolDefinition> = buildList {
         add(shellExecuteDefinition())
         add(FileReadTool.definition())
@@ -62,7 +69,13 @@ object AgentTools {
             add(ReadImageTool.definition())
         }
         add(browserUseDefinition())
-        add(subagentDefinition())
+        if (subAgentChild) {
+            // no delegation tool
+        } else if (subAgentRosterNames != null) {
+            add(com.openminis.app.agent.subagents.SubAgentToolSchema.definition(subAgentRosterNames))
+        } else {
+            add(subagentDefinition())
+        }
         add(RalphTool.definition())
         add(askUserQuestionDefinition())
         add(getGoalDefinition())
@@ -85,7 +98,11 @@ object AgentTools {
         }.toSet()
         addAll(
             com.openminis.app.tools.runtime.ToolRegistry.definitions().filter {
-                it.name !in legacyCanonicals && (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES)
+                it.name !in legacyCanonicals && (botEnabled || it.name !in BOT_COORDINATION_TOOL_NAMES) &&
+                    // The registry's own copy of the delegation tool is never offered directly: the
+                    // definition above (roster or older schema) stands in for it, and a sub agent's
+                    // child gets none.
+                    !(subAgentChild && it.name == com.openminis.app.agent.subagents.SubAgentToolSchema.HANDLER_NAME)
             },
         )
     }

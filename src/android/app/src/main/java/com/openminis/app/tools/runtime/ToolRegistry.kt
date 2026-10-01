@@ -456,8 +456,29 @@ class AgentSubagentHandler : ToolHandler {
         required = listOf("tool_title", "prompt"),
         propertyOrdering = listOf("tool_title", "prompt"),
     )
-    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult =
-        com.openminis.app.tools.SubagentTool.execute(argsJson, sessionId, context)
+    override suspend fun execute(argsJson: String, sessionId: String, context: Context, toolId: String): ToolExecutionResult {
+        val title = runCatching { JSONObject(argsJson).optString("tool_title", "") }.getOrDefault("")
+        val app = context.applicationContext as? com.openminis.app.MinisApp
+        // Delegation is one level deep from a sub agent: its own session never delegates, whichever
+        // way the tool is configured.
+        val isSubAgentChild = app?.chatRepository?.getSession(sessionId)?.source ==
+            com.openminis.app.data.db.ChatSessionEntity.SOURCE_SUB_AGENT
+        if (isSubAgentChild) {
+            return ToolExecutionResult(
+                com.openminis.app.agent.subagents.SubAgentTask.error(
+                    "depth_limit", "A sub agent cannot delegate further. Do this work yourself.",
+                ),
+                false, toolTitle = title,
+            )
+        }
+        // While sub agents are allowed (Settings) the model was given the roster schema, so the call
+        // goes to the roster runtime; with the switch off the older single-shot behaviour is unchanged.
+        if (!com.openminis.app.agent.subagents.SubAgents.isEnabled()) {
+            return com.openminis.app.tools.SubagentTool.execute(argsJson, sessionId, context)
+        }
+        val reply = com.openminis.app.agent.subagents.SubAgents.runtime(context).execute(argsJson, sessionId)
+        return ToolExecutionResult(reply.text, reply.ok, toolTitle = title)
+    }
 }
 
 class AgentAskHandler : ToolHandler {
