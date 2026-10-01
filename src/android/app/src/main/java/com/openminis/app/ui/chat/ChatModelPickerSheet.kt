@@ -306,6 +306,12 @@ internal fun ModelPickerSheet(
 ) {
     val openTime = remember { System.nanoTime() }
 
+    // Stale-while-revalidate: show the stored list immediately, refresh any
+    // provider whose list is past its TTL in the background.
+    LaunchedEffect(Unit) {
+        providerRepository.triggerBackgroundRefreshIfStale(this)
+    }
+
     LaunchedEffect(Unit) {
         AppLogger.info("ModelPicker", "[ModelPicker] open triggered")
         withFrameNanos { frameTime ->

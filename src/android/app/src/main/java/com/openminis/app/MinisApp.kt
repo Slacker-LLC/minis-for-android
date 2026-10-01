@@ -997,7 +997,16 @@ class MinisApp : Application(), ImageLoaderFactory {
             override fun onActivityStarted(activity: Activity) {
                 val wasBackgrounded = foregroundActivityCount == 0
                 foregroundActivityCount++
-                if (wasBackgrounded) _isAppForegroundFlow.value = true
+                if (wasBackgrounded) {
+                    _isAppForegroundFlow.value = true
+                    // The daily refresh only runs at process start, and this app's
+                    // process routinely outlives a day — so also revalidate any
+                    // provider whose list is older than its TTL each time the app
+                    // comes back to the front.
+                    providerRepositoryOrNull?.triggerBackgroundRefreshIfStale(
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO),
+                    )
+                }
                 // T298: as soon as the app transitions background → foreground,
                 // clear any task-completed notifications still in the tray.
                 // The user is back in front of the app — there's no point

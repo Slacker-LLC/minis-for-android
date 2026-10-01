@@ -36,9 +36,15 @@ The previous Anthropic helper parsed arbitrary numeric Claude versions and compa
 4. Add/adjust parser, snapshot, matching-order, and negative tests. Validate that the JSON stays below the size limit and that every rule is accepted by the production parser.
 5. Update this document when the schema or provider maintenance guidance changes. A remote update is published through the repository's `main` asset URL; offline clients continue using cache or the bundled copy.
 
+### Keeping the catalogs current
+
+A refresh asks each provider for its live list first (OpenAI/Anthropic/xAI/Kimi/OpenRouter/custom endpoints via `/models`, Gemini via paged `models.list`, Codex OAuth via the ChatGPT backend), so new models appear without touching this file. The `staticModels` catalogs are what an instance shows before its first refresh and when a refresh fails, and `UsageStatsScreen` looks historical ids up in them — so add the current flagships on top and keep older ids. Check an id against the provider's own list (or the models.dev registry for that provider) before adding it, and drop an id only when the provider has retired it. Every non-`supportsReasoning: false` entry needs a thinking-ceiling rule; `ThinkingLevelCatalogSnapshotTest` pins that.
+
 ### Codex OAuth warning
 
-The Codex OAuth fallback list is a callable-ID allow-list, not a speculative provider catalog. The Codex backend returns HTTP 400 for unsupported IDs, which appears in the UI as an empty reply. Keep the existing IDs and order intact; do not add models or restore previously removed IDs without a live Codex-token verification. The trailing image-only model remains after text-model enrichment because it uses a different route.
+A refresh for a Codex OAuth instance first asks the ChatGPT backend for its own list (`GET chatgpt.com/backend-api/codex/models?client_version=…`, same client version and headers as chat requests) and shows the entries it marks `visibility: list` in its `priority` order. That list is authoritative for callable IDs, so a model OpenAI ships later appears without an app update. The `client_version` matters: the backend only lists models that version may call, so `CODEX_CLIENT_VERSION` in `OpenAIProvider` must follow the upstream Codex client.
+
+The `codexOAuth` entries in `model-rules.json` are only the fallback for when that request fails or returns nothing. They are a callable-ID allow-list, not a speculative provider catalog: the Codex backend returns HTTP 400 for unsupported IDs, which appears in the UI as an empty reply. Keep the existing IDs and order intact; do not add models or restore previously removed IDs without a live Codex-token verification. The trailing image-only model is kept from this list after a live refresh too, because it uses a different route the models endpoint does not describe.
 
 ## Loading and updates
 
