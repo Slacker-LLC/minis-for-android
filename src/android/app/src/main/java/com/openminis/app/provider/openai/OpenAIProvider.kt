@@ -168,6 +168,11 @@ class OpenAIProvider private constructor(
          */
         internal const val CODEX_CLIENT_VERSION = "0.159.3"
 
+        private const val CODEX_BACKEND_BASE = "https://chatgpt.com/backend-api/codex"
+
+        /** The image model the Codex backend serves; there is no client-side choice of a newer one. */
+        private const val CODEX_IMAGE_MODEL = "gpt-image-2"
+
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte
          * budget: response HEADERS must arrive within this window. Does NOT
@@ -633,6 +638,26 @@ class OpenAIProvider private constructor(
         thinkingLevel: ThinkingLevel,
     ): Flow<LLMStreamChunk> = callbackFlow {
         val requestMessages = replayGeneratedImages(messages)
+        if (isCodexImageModel) {
+            // Prefer the backend's image endpoint; the hosted-tool request below
+            // stays as the fallback for backends that do not serve it.
+            val image = generateCodexImageDirect(codexImagePrompt(requestMessages))
+            if (image != null) {
+                trySend(
+                    LLMStreamChunk.MediaAttachment(
+                        LLMMediaAttachment(
+                            type = LLMMediaAttachment.MediaType.IMAGE,
+                            mimeType = detectImageMime(image),
+                            data = image,
+                        ),
+                    ),
+                )
+                trySend(LLMStreamChunk.Finished("end_turn"))
+                channel.close()
+                awaitClose { }
+                return@callbackFlow
+            }
+        }
         val body = if (isCodexImageModel) {
             // [T-gpt-image2-codex-backend-route-android] gpt-image-2 on an
             // OpenAI OAuth (Codex) instance is driven through the Codex backend
@@ -2445,12 +2470,8 @@ class OpenAIProvider private constructor(
             val builder = Request.Builder()
                 .url("https://chatgpt.com/backend-api/codex/responses")
                 .post(requestBody)
-                .header("Authorization", "Bearer $token")
-                .header("Version", CODEX_CLIENT_VERSION)
                 .header("Openai-Beta", "responses=experimental")
-                .header("User-Agent", "codex_cli_rs/$CODEX_CLIENT_VERSION (Android; arm64)")
-                .header("Originator", "codex_cli_rs")
-            codexAccountId?.let { builder.header("Chatgpt-Account-Id", it) }
+            applyCodexHeaders(builder, token)
             // [T-provider-custom-user-agent] Applied last so a non-blank
             // override wins over the Codex default UA. In practice null on
             // this OAuth path (the UI only exposes it for custom-base
@@ -2653,13 +2674,89 @@ class OpenAIProvider private constructor(
      * instruction. The <prompt> is the latest user text — plain string content
      * or the concatenated text parts of the last user message.
      */
-    private fun buildCodexImageBody(messages: List<LLMMessage>): JSONObject {
+    private fun codexImagePrompt(messages: List<LLMMessage>): String {
         val lastUser = messages.lastOrNull { it.role == LLMMessage.Role.USER }
-        val prompt = lastUser?.let { m ->
+        return lastUser?.let { m ->
             m.content.takeIf { it.isNotBlank() }
                 ?: m.contentParts.filterIsInstance<AgentContentPart.Text>()
                     .joinToString(" ") { it.text }.trim()
         }.orEmpty()
+    }
+
+    /** The headers every Codex-backend request carries (login token, client identity, account). */
+    private fun applyCodexHeaders(builder: Request.Builder, token: String) {
+        builder
+            .header("Authorization", "Bearer $token")
+            .header("Version", CODEX_CLIENT_VERSION)
+            .header("User-Agent", "codex_cli_rs/$CODEX_CLIENT_VERSION (Android; arm64)")
+            .header("Originator", "codex_cli_rs")
+        codexAccountId?.let { builder.header("Chatgpt-Account-Id", it) }
+    }
+
+    /**
+     * Body of the Codex backend's own image endpoint, the one the upstream Codex
+     * client now calls for its image tool: the model is named directly rather
+     * than driven through a chat model's hosted tool.
+     */
+    internal fun buildCodexDirectImageBody(prompt: String): JSONObject = JSONObject()
+        .put("prompt", prompt)
+        .put("model", CODEX_IMAGE_MODEL)
+        .put("background", "auto")
+        .put("quality", "auto")
+        .put("size", "auto")
+
+    /** The first decoded image of an `{"data":[{"b64_json":…}]}` body; null when there is none. */
+    internal fun parseCodexImagesResponse(body: String): ByteArray? = try {
+        val data = JSONObject(body).optJSONArray("data")
+        val b64 = (0 until (data?.length() ?: 0))
+            .firstNotNullOfOrNull { data!!.optJSONObject(it)?.optString("b64_json")?.takeIf(String::isNotEmpty) }
+        // java.util's MIME decoder: tolerates line breaks like Base64.DEFAULT, and (API 26+) runs on the JVM unit tests too.
+        b64?.let { java.util.Base64.getMimeDecoder().decode(it) }?.takeIf { it.isNotEmpty() }
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * Generates through `POST …/codex/images/generations`. Returns null when this
+     * route is not usable (the backend does not serve it, or answered without an
+     * image) so the caller can fall back to the older hosted-tool route; throws
+     * for failures a second route cannot fix (expired login, rate limit, a
+     * moderation refusal, no network).
+     */
+    private suspend fun generateCodexImageDirect(prompt: String): ByteArray? = withContext(Dispatchers.IO) {
+        val bodyBytes = buildCodexDirectImageBody(prompt).toString().toByteArray(Charsets.UTF_8)
+        // The ChatGPT backend rejects "application/json; charset=utf-8".
+        val jsonMediaType = "application/json".toMediaType()
+        val builder = Request.Builder()
+            .url("$CODEX_BACKEND_BASE/images/generations")
+            .post(bodyBytes.toRequestBody(jsonMediaType))
+            .header("x-codex-image-turn-id", java.util.UUID.randomUUID().toString())
+        applyCodexHeaders(builder, getToken())
+        builder.applyUserAgentOverride(customUserAgent, defaultUserAgent = null)
+        client.newCall(builder.build()).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (response.isSuccessful) {
+                parseCodexImagesResponse(body).also {
+                    if (it == null) com.openminis.app.logging.AppLogger.warning(
+                        "OpenAIProvider", "[ModelUseRoute] codex images/generations 2xx without an image — falling back",
+                    )
+                }
+            } else if (response.code == 401 || response.code == 403 || response.code == 429 ||
+                body.contains("moderation", ignoreCase = true) || body.contains("content_policy", ignoreCase = true)
+            ) {
+                throw mapHttpError(response.code, body)
+            } else {
+                com.openminis.app.logging.AppLogger.warning(
+                    "OpenAIProvider",
+                    "[ModelUseRoute] codex images/generations HTTP ${response.code} — falling back: ${body.take(300)}",
+                )
+                null
+            }
+        }
+    }
+
+    private fun buildCodexImageBody(messages: List<LLMMessage>): JSONObject {
+        val prompt = codexImagePrompt(messages)
         return JSONObject().apply {
             put("model", "gpt-5.5")
             put("instructions", "You are a helpful assistant. Use tools when available.")
@@ -2786,7 +2883,7 @@ class OpenAIProvider private constructor(
         val b64 = b64Result
         if (b64 != null) {
             val bytes = try {
-                Base64.decode(b64, Base64.DEFAULT)
+                java.util.Base64.getMimeDecoder().decode(b64)
             } catch (e: Exception) {
                 throw LLMError.ProviderError("Failed to decode generated image: ${e.message}")
             }
