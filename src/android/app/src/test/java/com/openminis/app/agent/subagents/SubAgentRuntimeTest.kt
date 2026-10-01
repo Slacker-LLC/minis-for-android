@@ -78,6 +78,17 @@ class SubAgentRuntimeTest {
             return steerResult
         }
 
+        @Volatile var progress: ChildProgress? = null
+        @Volatile var wrapUp: String? = "wrapped up"
+        val wrapUps = CopyOnWriteArrayList<String>()
+
+        override suspend fun describeChild(childSessionId: String) = progress
+
+        override suspend fun wrapUpChild(childSessionId: String, graceMs: Long): String? {
+            wrapUps += childSessionId
+            return wrapUp
+        }
+
         override suspend fun deliverToParent(parentSessionId: String, text: String) {
             delivered += parentSessionId to text
         }
@@ -87,8 +98,9 @@ class SubAgentRuntimeTest {
         }
     }
 
-    private fun runtime(port: FakePort, maxConcurrent: Int = 3, maxQueued: Int = 10) =
-        SubAgentRuntime(port, SubAgentJobRegistry(maxConcurrent, maxQueued), scope)
+    private fun runtime(port: FakePort, maxConcurrent: Int = 3, maxQueued: Int = 10, progressMs: Long? = null) =
+        if (progressMs == null) SubAgentRuntime(port, SubAgentJobRegistry(maxConcurrent, maxQueued), scope)
+        else SubAgentRuntime(port, SubAgentJobRegistry(maxConcurrent, maxQueued), scope, progressIntervalMs = { if (it == "none") null else progressMs })
 
     private fun args(vararg kv: Pair<String, Any>) = JSONObject(mapOf<String, Any>("tool_title" to "t", "task" to "do it") + kv).toString()
 
@@ -482,6 +494,69 @@ class SubAgentRuntimeTest {
         assertEquals("not_interrupted", resume(live, "chat-A").getString("error"))
         assertEquals("job_not_found", resume("ghost", "chat-A").getString("error"))
         assertEquals("job_not_found", resume(live, "chat-B").getString("error"))
+        port.gates.values.forEach { it.complete(ChildOutcome(true, "x", false)) }
+    }
+
+    // ── Time budget: a wrap-up turn instead of an empty hand-over ──────────
+
+    @Test
+    fun `a run that ran out of time hands over its wrap-up message`() = runBlocking {
+        val port = FakePort().also { it.wrapUp = "Done: A and B. Left: C." }
+        val rt = runtime(port)
+        val jobId = json(rt.execute(args(), "chat-A")).getString("job_id")
+        until("child created") { port.created.isNotEmpty() }
+        port.finish("child-1", "so far", completed = false, timedOut = true)
+
+        until("callback delivered") { port.delivered.isNotEmpty() }
+        assertEquals(listOf("child-1"), port.wrapUps.toList())
+        assertEquals(SubAgentJobState.TIMEOUT, rt.registry.get(jobId)!!.state)
+        assertTrue(port.delivered.single().second.contains("Done: A and B. Left: C."))
+    }
+
+    @Test
+    fun `without a wrap-up the partial output is kept`() = runBlocking {
+        val port = FakePort().also { it.wrapUp = null }
+        val rt = runtime(port)
+        rt.execute(args(), "chat-A")
+        until("child created") { port.created.isNotEmpty() }
+        port.finish("child-1", "partial notes", completed = false, timedOut = true)
+        until("callback delivered") { port.delivered.isNotEmpty() }
+        assertTrue(port.delivered.single().second.contains("partial notes"))
+    }
+
+    // ── Progress reports ───────────────────────────────────────────────────
+
+    @Test
+    fun `a background run that asked for progress reports posts them only when something changed`() = runBlocking {
+        val port = FakePort().also { it.progress = ChildProgress("shell_execute", "reading files") }
+        val rt = runtime(port, progressMs = 30)
+        rt.execute(args("progress_report" to "frequent"), "chat-A")
+        until("first report") { port.delivered.isNotEmpty() }
+        assertTrue(port.delivered.first().second.startsWith("[Background task progress"))
+        assertTrue(port.delivered.first().second.contains("Current tool: shell_execute"))
+        assertTrue(port.delivered.first().second.contains("reading files"))
+
+        delay(150)
+        assertEquals("unchanged progress is not repeated", 1, port.delivered.size)
+        port.progress = ChildProgress("file_read", "now reading the tests")
+        until("second report") { port.delivered.size == 2 }
+        port.finish("child-1", "all done")
+        until("final callback") { port.delivered.any { it.second.startsWith("[Background task finished") } }
+        val before = port.delivered.size
+        delay(150)
+        assertEquals("no reports after the run ends", before, port.delivered.size)
+    }
+
+    @Test
+    fun `no progress reports by default, for a blocking call, or when the level is unknown`() = runBlocking {
+        val port = FakePort().also { it.progress = ChildProgress("t", "text") }
+        val rt = runtime(port, maxConcurrent = 5, progressMs = 30)
+        rt.execute(args(), "chat-A")                                              // default none
+        rt.execute(args("progress_report" to "chatty"), "chat-A")                // unknown -> none
+        scope.launch { rt.execute(args("wait" to true, "progress_report" to "frequent"), "chat-A") } // wait ignores it
+        until("three children") { port.created.size == 3 }
+        delay(200)
+        assertTrue("no progress message was posted", port.delivered.none { it.second.startsWith("[Background task progress") })
         port.gates.values.forEach { it.complete(ChildOutcome(true, "x", false)) }
     }
 }

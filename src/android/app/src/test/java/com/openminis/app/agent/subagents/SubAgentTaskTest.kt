@@ -87,7 +87,8 @@ class SubAgentTaskTest {
         assertEquals("subagent", def.name)
         assertEquals(listOf("General Sub Agent", "researcher"), def.parameters.getValue("agent").enumValues)
         assertEquals(listOf("delegate", "status", "steer", "cancel", "resume"), def.parameters.getValue("action").enumValues)
-        assertTrue(def.parameters.keys.none { it == "child_session_id" || it == "progress_report" })
+        assertTrue(def.parameters.keys.none { it == "child_session_id" })
+        assertEquals(listOf("none", "frequent", "moderate"), def.parameters.getValue("progress_report").enumValues)
     }
 
     // ── Negative cases ──────────────────────────────────────────────────────
@@ -108,6 +109,21 @@ class SubAgentTaskTest {
         assertTrue(capped.length < big.length)
         assertTrue(capped.contains("[truncated"))
         assertEquals("short", SubAgentTask.capResult("short"))
+    }
+
+    @Test
+    fun `the progress level defaults to none and an unknown level means none`() {
+        assertEquals("none", ok("""{"task":"x"}""").progressReport)
+        assertEquals("none", ok("""{"task":"x","progress_report":"chatty"}""").progressReport)
+        assertEquals("moderate", ok("""{"task":"x","progress_report":"MODERATE"}""").progressReport)
+    }
+
+    @Test
+    fun `a progress report names the status, the current tool and the tail of the latest message`() {
+        val text = SubAgentTask.progressText(job(SubAgentJobState.RUNNING), ChildProgress("shell_execute", "x".repeat(2000)), now = 9_000)
+        assertTrue(text.startsWith("[Background task progress"))
+        assertTrue(text.contains("Current tool: shell_execute"))
+        assertTrue(text.length < 1_000)
     }
 
     @Test
