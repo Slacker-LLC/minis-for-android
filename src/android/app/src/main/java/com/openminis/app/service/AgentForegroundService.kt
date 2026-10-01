@@ -10,7 +10,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
@@ -80,6 +82,7 @@ class AgentForegroundService : Service() {
                 putExtra(EXTRA_SESSION_COUNT, sessionCount)
                 putExtra(EXTRA_TOOL_STATUS, toolStatus)
             }
+            lastStartRequestMs = SystemClock.elapsedRealtime()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -91,9 +94,29 @@ class AgentForegroundService : Service() {
          * Stops the foreground service.
          */
         fun stopService(context: Context) {
-            val intent = Intent(context, AgentForegroundService::class.java)
-            context.stopService(intent)
+            // stopService() while a startForegroundService() is still pending (the service has not reached
+            // startForeground yet) makes Android kill the app with ForegroundServiceDidNotStartInTimeException.
+            // A short command starts and finishes a turn within milliseconds, so the stop can land right
+            // behind the start. Let the start settle first, then stop only if there is still no work.
+            val app = context.applicationContext
+            val wait = MIN_LIFETIME_BEFORE_STOP_MS - (SystemClock.elapsedRealtime() - lastStartRequestMs)
+            if (wait <= 0L) {
+                stopNow(app)
+            } else {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    val active = SessionActivityTracker.activeSessions.value.size
+                    val present = SessionActivityTracker.presentSessions.value.size
+                    if (!AgentForegroundServicePolicy.shouldRun(active, present)) stopNow(app)
+                }, wait)
+            }
         }
+
+        private fun stopNow(context: Context) {
+            runCatching { context.stopService(Intent(context, AgentForegroundService::class.java)) }
+        }
+
+        @Volatile private var lastStartRequestMs = 0L
+        private const val MIN_LIFETIME_BEFORE_STOP_MS = 2_000L
     }
 
     private var startTimeMs: Long = 0L

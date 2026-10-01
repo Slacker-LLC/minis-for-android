@@ -178,6 +178,8 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             fail("virtual_display_invalid_id", "Virtual display id must be non-zero")
         }
         session = created
+        // A new display starts on its home screen, not on nothing.
+        runCatching { showHome(created.displayId) }
         created.displayId
     }
 
@@ -291,7 +293,17 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     }
 
     override fun back(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_BACK)
-    override fun home(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_HOME)
+    /**
+     * Home on the virtual display is Minis's own desktop: the system's secondary launcher draws nothing there
+     * and a HOME key only brings some task forward. Starting it again while it runs just raises it.
+     */
+    override fun home(displayId: Int): Boolean = synchronized(lock) {
+        checkDisplay(displayId)
+        showHome(displayId)
+    }
+
+    private fun showHome(displayId: Int): Boolean =
+        startOnDisplay(ComponentName(com.openminis.app.BuildConfig.APPLICATION_ID, HOME_ACTIVITY), displayId, HOME_FLAGS)
 
     override fun screenshot(displayId: Int, maxDim: Int, jpegQuality: Int): ParcelFileDescriptor = synchronized(lock) {
         val active = checkDisplay(displayId)
@@ -364,10 +376,10 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
      * platform's own shell entry point for the same call and works for shell and root alike. The
      * argument vector is built here from a validated package and a component name, with no shell.
      */
-    private fun startOnDisplay(component: ComponentName, displayId: Int): Boolean {
+    private fun startOnDisplay(component: ComponentName, displayId: Int, flags: String = NEW_TASK_FLAG): Boolean {
         val command = listOf(
             "cmd", "activity", "start-activity", "--user", "0", "--display", displayId.toString(),
-            "-f", NEW_TASK_FLAG, "-n", component.flattenToShortString(),
+            "-f", flags, "-n", component.flattenToShortString(),
         )
         val process = ProcessBuilder(command).redirectErrorStream(true).start()
         val output = process.inputStream.bufferedReader().use { it.readText() }
@@ -442,7 +454,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         private const val MAX_PROBE_PIXELS = 4_194_304L
         private const val PROBE_LAUNCH_WAIT_MS = 4_000L
         private const val LAUNCH_TIMEOUT_SECONDS = 8L
-        private const val NEW_TASK_FLAG = "268435456" // Intent.FLAG_ACTIVITY_NEW_TASK
+        // The desktop is a single task: raising it again must not pile up copies.
+        private const val HOME_FLAGS = "268435456" // FLAG_ACTIVITY_NEW_TASK
+        private const val HOME_ACTIVITY = "com.openminis.app.ui.vscreen.VirtualScreenHomeActivity"
+        // NEW_TASK | MULTIPLE_TASK: always a task of its own on the virtual display. Without MULTIPLE_TASK an app that
+        // already runs on the physical screen is MOVED here, taking it away from the user.
+        private const val NEW_TASK_FLAG = "402653184" // FLAG_ACTIVITY_NEW_TASK (0x10000000) | FLAG_ACTIVITY_MULTIPLE_TASK (0x08000000)
         private val PACKAGE_PATTERN = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
     }
 }

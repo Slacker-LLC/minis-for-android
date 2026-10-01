@@ -296,6 +296,17 @@
                 android:resource="@xml/shortcuts" />
         </activity-alias>
 
+        <!-- Home screen of the virtual display (see VirtualScreenHomeActivity). Exported so the Shizuku
+             UserService (shell or root) can start it on the virtual display; it finishes at once on any
+             other display, so it is never a launcher for the physical screen. -->
+        <activity
+            android:name=".ui.vscreen.VirtualScreenHomeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="llc.slacker.minis.vscreen.home"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Minis" />
+
         <!-- Share receiver activity -->
         <activity
             android:name=".share.ShareReceiverActivity"

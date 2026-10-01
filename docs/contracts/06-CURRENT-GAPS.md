@@ -94,6 +94,9 @@ CI/宿主测试不能替代以下证据：
 - 实时查看器（2026-10-01 同一台设备）：查看器不再每秒截图，而是由 UserService 把虚拟屏的每一帧以 `HardwareBuffer` 经 Binder 推给 App，在自定义 View 里直接绘制（实测滚动时 85–122 帧/秒计数，虚拟屏本身的刷新率是 60 Hz，计数包含重复帧）；触摸按拖动实时转成 `MotionEvent` 注入虚拟屏；查看器可开启 / 关闭虚拟屏、返回 / 主页、在其上启动应用、向聚焦输入框填入文字。
 - UserService 改为 `daemon(true)`（版本号 2）：虚拟屏不再随 App 进程被杀而消失，实测强杀 App 后 display 仍在、重新打开查看器能接回。代价是：升级 App 后只有 `USER_SERVICE_VERSION` 变化时 Shizuku 才会换掉旧服务，改动 UserService 或 AIDL 必须同步加大这个数字。**未验证**：Release（R8）构建下的帧流（已补 `IVirtualScreenFrameSink` 的 keep 规则）、adb 启动的 Shizuku（shell 身份）下的帧流与触摸、长时间（数小时）保持。
 - 教 AI 知道坐标：`android.vscreen.open`、`status`、`observe`、`screenshot` 的结果都带 `displayWidth/displayHeight` 和坐标说明；虚拟屏上的 `x/y` 默认按显示屏像素（此前默认是「截图坐标」，没有截图就被拒绝，AI 只好先截一张图），截图默认按显示屏原分辨率输出（此前被缩到最长边 1280）。手机上的实际 AI 调用效果**未验证**。
+- 虚拟屏的桌面与互不干涉（2026-10-01，UserService 版本 4，**代码与模拟器验证，真机未验证**：写代码时手机上的 Shizuku 已不在运行，`state=NOT_RUNNING`，没法再开虚拟屏）：
+  - 小米自带的副屏桌面（`com.miui.home/.launcher.SecondaryDisplayLauncher`）在虚拟屏上只画出一片空白，所以 Minis 自带 `VirtualScreenHomeActivity`（应用网格 + 时间，导出但在非虚拟屏上立即 `finish()`，不会成为物理屏的桌面）。开启虚拟屏时和按「主页」都由 UserService 用 `cmd activity start-activity --display` 把它拉起；点图标在同一块屏上启动应用。用模拟器的 overlay 副屏验证过：桌面渲染正常、点击图标应用落在同一块屏、物理屏的前台不变。
+  - 对物理屏的干扰，改了两处：（1）`UiAutomation.connect()` 之前传 0，系统会在它存在期间**关掉所有其它无障碍服务**（包括 Minis 自己的和 TalkBack），现在传 `FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES`，并把它的事件订阅清零（不再把物理屏的每个界面事件推给服务进程）；（2）在虚拟屏拉起应用改成 `NEW_TASK | MULTIPLE_TASK`，原先如果这个应用已在物理屏运行，系统会把它的任务**移到虚拟屏**。**未验证**这两处在小米 / HyperOS 上的实际效果。
 - 用手机自己的 `am start`/`monkey` 启动应用时，没指定 `--display 0` 会落到拥有焦点的虚拟屏上（本 App 的主界面曾因此出现在虚拟屏里）；这是测试方法的问题，从桌面图标启动不受影响。
 - 探测与 UiAutomation 互斥：同一时刻系统只允许一个 UiAutomation 客户端，Maestro 等自动化驱动在后台时会让「UiAutomation」步骤报 `already registered`。
 

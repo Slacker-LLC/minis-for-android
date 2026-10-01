@@ -191,19 +191,19 @@ fun SessionDrawerContent(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 DrawerGridEntry(
-                    icon = Icons.Outlined.Group,
+                    icon = com.openminis.app.ui.components.MinisIcons.Users,
                     title = stringResource(R.string.bots_team),
                     onClick = onOpenBots,
                     modifier = Modifier.weight(1f),
                 )
                 DrawerGridEntry(
-                    icon = Icons.Outlined.Schedule,
+                    icon = com.openminis.app.ui.components.MinisIcons.Clock,
                     title = stringResource(R.string.scheduled_tasks_title),
                     onClick = onOpenScheduledTasks,
                     modifier = Modifier.weight(1f),
                 )
                 DrawerGridEntry(
-                    icon = Icons.Default.Terminal,
+                    icon = com.openminis.app.ui.components.MinisIcons.Terminal,
                     title = stringResource(R.string.drawer_terminal),
                     onClick = onOpenTerminal,
                     modifier = Modifier.weight(1f),
@@ -331,7 +331,7 @@ fun SessionDrawerContent(
                     .padding(bottom = bottomInset),
             ) {
                 DrawerDockEntry(
-                    icon = Icons.Default.Settings,
+                    icon = com.openminis.app.ui.components.MinisIcons.Settings,
                     title = stringResource(R.string.settings),
                     onClick = onOpenSettings,
                     modifier = Modifier.fillMaxWidth(),
@@ -539,7 +539,7 @@ private fun DrawerSearchField(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    imageVector = com.openminis.app.ui.components.MinisIcons.Search,
                     contentDescription = null,
                     tint = ChatColors.secondaryText,
                     modifier = Modifier.size(18.dp),
@@ -577,10 +577,10 @@ private fun DrawerNewChatRow(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.Edit,
+            imageVector = com.openminis.app.ui.components.MinisIcons.Compose,
             contentDescription = null,
             tint = ChatColors.primaryText,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(22.dp),
         )
         Text(
             text = stringResource(R.string.scheduled_task_target_new),
@@ -601,7 +601,7 @@ private fun DrawerDockEntry(icon: androidx.compose.ui.graphics.vector.ImageVecto
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(imageVector = icon, contentDescription = title, tint = ChatColors.secondaryText, modifier = Modifier.size(20.dp))
+        Icon(imageVector = icon, contentDescription = title, tint = ChatColors.primaryText, modifier = Modifier.size(22.dp))
         Text(text = title, fontSize = 14.5.sp, fontWeight = FontWeight.Medium, color = ChatColors.primaryText)
     }
 }

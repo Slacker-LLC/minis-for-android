@@ -1077,8 +1077,8 @@ fun AssistantMessageActionBar(
         label = "regenRotation",
     )
 
-    val active = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
-    val dim = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val active = ChatColors.primaryText.copy(alpha = 0.82f)
+    val dim = ChatColors.primaryText.copy(alpha = 0.28f)
     val canCopy = !isStreaming && rawText.isNotEmpty()
 
     @Composable
@@ -1123,10 +1123,10 @@ fun AssistantMessageActionBar(
             onLongClick = { copyMenuExpanded = true },
         ) {
             Icon(
-                if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                if (isCopied) com.openminis.app.ui.components.MinisIcons.Check else com.openminis.app.ui.components.MinisIcons.Copy,
                 contentDescription = stringResource(R.string.assistant_action_copy),
                 tint = if (canCopy) active else dim,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(21.dp),
             )
             MinisMenu(
                 expanded = copyMenuExpanded,
@@ -1140,7 +1140,7 @@ fun AssistantMessageActionBar(
                         isCopied = true
                         onCopy()
                     },
-                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Copy, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.assistant_menu_copy_markdown)) },
@@ -1149,7 +1149,7 @@ fun AssistantMessageActionBar(
                         isCopied = true
                         onCopyMarkdown()
                     },
-                    leadingIcon = { Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Code, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.assistant_menu_select_text)) },
@@ -1157,7 +1157,7 @@ fun AssistantMessageActionBar(
                         copyMenuExpanded = false
                         onSelectText()
                     },
-                    leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.TextSelect, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
             }
         }
@@ -1165,42 +1165,42 @@ fun AssistantMessageActionBar(
         // 2. Regenerate
         ActionButton(enabled = !isStreaming && !isGenerating, onClick = onRegenerate) {
             Icon(
-                Icons.Default.Refresh,
+                com.openminis.app.ui.components.MinisIcons.Refresh,
                 contentDescription = stringResource(R.string.assistant_action_regenerate),
                 tint = if (isStreaming || isGenerating) dim else active,
-                modifier = Modifier.size(20.dp).rotate(regenRotation),
+                modifier = Modifier.size(21.dp).rotate(regenRotation),
             )
         }
 
         // 3. Read aloud: start, and stop while this reply is being read.
         ActionButton(enabled = !isStreaming && rawText.isNotEmpty() || isSpeaking, onClick = onToggleSpeak) {
             Icon(
-                if (isSpeaking) Icons.Default.StopCircle else Icons.Default.VolumeUp,
+                if (isSpeaking) com.openminis.app.ui.components.MinisIcons.StopCircle else com.openminis.app.ui.components.MinisIcons.Volume,
                 contentDescription = stringResource(
                     if (isSpeaking) R.string.assistant_action_stop_reading else R.string.assistant_action_read_aloud,
                 ),
                 tint = if (isSpeaking) MaterialTheme.colorScheme.primary else if (canCopy) active else dim,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(21.dp),
             )
         }
 
         // 4. Branch
         ActionButton(enabled = !isStreaming, onClick = onBranch) {
             Icon(
-                Icons.Default.AccountTree,
+                com.openminis.app.ui.components.MinisIcons.Branch,
                 contentDescription = stringResource(R.string.assistant_action_branch),
                 tint = if (isStreaming) dim else active,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(21.dp),
             )
         }
 
         // 5. More: the actions that are not about the text.
         ActionButton(enabled = true, onClick = { moreMenuExpanded = true }) {
             Icon(
-                Icons.Outlined.MoreHoriz,
+                com.openminis.app.ui.components.MinisIcons.More,
                 contentDescription = stringResource(R.string.assistant_action_more),
                 tint = active,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(21.dp),
             )
             MinisMenu(
                 expanded = moreMenuExpanded,
@@ -1213,7 +1213,7 @@ fun AssistantMessageActionBar(
                         moreMenuExpanded = false
                         onShare()
                     },
-                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Share, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 DropdownMenuItem(
                     text = {
@@ -1228,7 +1228,7 @@ fun AssistantMessageActionBar(
                     },
                     leadingIcon = {
                         Icon(
-                            Icons.Default.Delete,
+                            com.openminis.app.ui.components.MinisIcons.Trash,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(18.dp),

@@ -2465,13 +2465,14 @@ fun ChatScreen(
                     // there is no second empty draft to open.
                     IconButton(onClick = { if (!viewModel.isBlankDraft) onNewChat() }) {
                         Icon(
-                            Icons.Outlined.Edit,
+                            com.openminis.app.ui.components.MinisIcons.Compose,
                             contentDescription = stringResource(R.string.chat_new_session),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     Box {
                         IconButton(onClick = { showChatMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = stringResource(R.string.common_more))
+                            Icon(com.openminis.app.ui.components.MinisIcons.More, contentDescription = stringResource(R.string.common_more), modifier = Modifier.size(24.dp))
                         }
                         MinisMenu(
                             expanded = showChatMenu,

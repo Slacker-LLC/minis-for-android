@@ -35,9 +35,15 @@ internal class UiBridge {
             val connect = runCatching { UiAutomation::class.java.getDeclaredMethod("connect") }
                 .getOrElse { UiAutomation::class.java.getDeclaredMethod("connect", Int::class.javaPrimitiveType) }
                 .apply { isAccessible = true }
-            if (connect.parameterTypes.isEmpty()) connect.invoke(instance) else connect.invoke(instance, 0)
+            // FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES: connecting with flags 0 makes the system switch OFF every
+            // other accessibility service (this app's own, TalkBack, other automation) for as long as this
+            // UiAutomation exists, which broke the physical screen whenever the virtual one was in use.
+            if (connect.parameterTypes.isEmpty()) connect.invoke(instance) else connect.invoke(instance, UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             runCatching {
                 val info = instance.serviceInfo
+                // No events: only window and node queries are used, and an event subscription would deliver every
+                // UI event of the physical screen to this process too.
+                info.eventTypes = 0
                 info.flags = info.flags or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
