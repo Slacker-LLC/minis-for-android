@@ -167,9 +167,14 @@ private fun BlurBehindDialog(radius: Int = 40) {
     DisposableEffect(provider) {
         val window = provider?.window ?: return@DisposableEffect onDispose {}
         window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-        runCatching { window.setBackgroundBlurRadius(radius) }
+        // blurAllowed above already means API 31+; the check is repeated where lint can see it.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            runCatching { window.setBackgroundBlurRadius(radius) }
+        }
         onDispose {
-            runCatching { window.setBackgroundBlurRadius(0) }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                runCatching { window.setBackgroundBlurRadius(0) }
+            }
             window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         }
     }

@@ -59,7 +59,14 @@ import java.util.Date
 class VirtualScreenHomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val displayId = display?.displayId ?: 0
+        // Activity.getDisplay() is API 30; before that the window manager's default display is the one this
+        // activity is on.
+        val displayId = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            display?.displayId ?: 0
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.displayId
+        }
         if (displayId == 0) {
             finish()
             return

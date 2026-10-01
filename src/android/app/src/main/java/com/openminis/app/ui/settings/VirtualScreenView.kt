@@ -96,6 +96,8 @@ internal class VirtualScreenView(
 
     /** Called from the binder thread for every frame; the buffer stays owned by the caller. */
     fun submit(buffer: HardwareBuffer) {
+        // Frames only come from the UserService, which needs API 29; HardwareBuffer bitmaps do too.
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return
         val next = runCatching { Bitmap.wrapHardwareBuffer(buffer, null) }.getOrNull() ?: return
         val previous = bitmap
         bitmap = next

@@ -52,6 +52,8 @@ internal class VirtualDisplaySession private constructor(
         captureReader.setOnImageAvailableListener({ reader -> onFrameAvailable(reader) }, Handler(frameThread.looper))
     }
 
+    // The service only runs on API 29+ (the probe refuses older systems), so Image.hardwareBuffer (API 28) is safe.
+    @SuppressLint("NewApi")
     private fun onFrameAvailable(reader: ImageReader) {
         val image = try {
             reader.acquireLatestImage()
@@ -86,6 +88,7 @@ internal class VirtualDisplaySession private constructor(
     }
 
     /** Start (or stop, with null) pushing frames; the current frame goes out at once. */
+    @SuppressLint("NewApi")
     fun setFrameSink(next: IVirtualScreenFrameSink?) {
         val previous = sink
         sink = next
