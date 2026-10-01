@@ -158,15 +158,31 @@ class OpenAIProvider private constructor(
     companion object {
         /**
          * [T-android-thinking-level-arch] Codex OAuth client version advertised
-         * in the Version / User-Agent headers. Keep this aligned with the
-         * current upstream Codex client: the Codex backend gates newer models
-         * (including gpt-6-astra) on this value before it validates the body.
-         * Shared constant so future bumps touch one place — the live model
-         * list ([OpenAIModelsApi.fetchModelsCodexOAuth]) sends the same value as
-         * `client_version`, and the backend only lists the models that version
-         * is allowed to call.
+         * in the Version / User-Agent headers, and the `client_version` of the
+         * live model list ([OpenAIModelsApi.fetchModelsCodexOAuth]) — discovery and
+         * inference must advertise the same number, because the backend gates
+         * which models a version may list and call.
+         *
+         * 0.155.0 is the value OpenMinis 1.14 ships: gpt-6-sol / gpt-6-luna are
+         * gated above 0.153.3, and OpenMinis validated discovery and inference
+         * for the gpt-6 / gpt-5.6 models on live ChatGPT accounts around it. It
+         * deliberately is not the newest Codex CLI: a newer number changes a
+         * fingerprint that is known to work, so raise it only on evidence — a
+         * model that is listed and then refused, or a wanted model that the list
+         * leaves out — and then verify against a live account.
          */
-        internal const val CODEX_CLIENT_VERSION = "0.159.3"
+        internal const val CODEX_CLIENT_VERSION = "0.155.0"
+
+        /**
+         * GPT Image 2.5 (released 2026-09-08). Unlike gpt-image-2, which the
+         * backend picks by default, these name themselves inside the
+         * image_generation tool object (aligned with OpenMinis 1.14,
+         * [T-codex-gpt-image25-android]; same shape as CLIProxyAPI PR #5642).
+         */
+        private val CODEX_IMAGE_25_MODEL_IDS = setOf("gpt-image-2.5-sunburst", "gpt-image-2.5-flare")
+
+        /** Every model driven through the Codex backend's hosted image tool. */
+        internal val CODEX_IMAGE_MODELS = setOf("gpt-image-2") + CODEX_IMAGE_25_MODEL_IDS
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte
@@ -382,7 +398,7 @@ class OpenAIProvider private constructor(
      * Only meaningful on the Codex OAuth path; everything else (the GPT-5.x
      * Codex models and their existing OAuth flow) is untouched by this gate.
      */
-    private val isCodexImageModel: Boolean get() = isOAuth && model.id == "gpt-image-2"
+    private val isCodexImageModel: Boolean get() = isOAuth && model.id in CODEX_IMAGE_MODELS
 
     private suspend fun getToken(): String {
         oauthTokenProvider?.let { return it() }
@@ -2668,7 +2684,12 @@ class OpenAIProvider private constructor(
                 put("content", "Use the image generation tool to create: $prompt")
             }))
             put("store", false)
-            put("tools", JSONArray().put(JSONObject().put("type", "image_generation")))
+            // A bare {type:image_generation} lets the backend choose its default image
+            // model (what gpt-image-2 has always relied on); only the 2.5 variants
+            // are named explicitly.
+            val imageTool = JSONObject().put("type", "image_generation")
+            if (model.id in CODEX_IMAGE_25_MODEL_IDS) imageTool.put("model", model.id)
+            put("tools", JSONArray().put(imageTool))
             put("reasoning", JSONObject().put("effort", "low"))
             put("include", JSONArray())
             put("tool_choice", "auto")
@@ -2786,7 +2807,8 @@ class OpenAIProvider private constructor(
         val b64 = b64Result
         if (b64 != null) {
             val bytes = try {
-                Base64.decode(b64, Base64.DEFAULT)
+                // JVM MIME decoder: same result as Base64.DEFAULT (tolerates line breaks) and runs under unit tests.
+                java.util.Base64.getMimeDecoder().decode(b64)
             } catch (e: Exception) {
                 throw LLMError.ProviderError("Failed to decode generated image: ${e.message}")
             }

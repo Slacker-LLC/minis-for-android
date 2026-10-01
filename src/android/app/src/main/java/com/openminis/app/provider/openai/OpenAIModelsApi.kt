@@ -58,40 +58,59 @@ object OpenAIModelsApi {
         return live + specialRoutes
     }
 
-    /** Empty on any failure: callers fall back to the bundled list rather than show nothing. */
-    suspend fun fetchModelsCodexOAuth(token: String, accountId: String?): List<LLMModel> =
-        withContext(Dispatchers.IO) {
-            val version = OpenAIProvider.CODEX_CLIENT_VERSION
-            val url = "$CODEX_BASE/models?client_version=$version"
-            try {
-                val builder = Request.Builder()
-                    .url(url)
-                    .get()
-                    .header("Authorization", "Bearer $token")
-                    .header("Version", version)
-                    .header("User-Agent", "codex_cli_rs/$version (Android; arm64)")
-                    .header("Originator", "codex_cli_rs")
-                accountId?.let { builder.header("Chatgpt-Account-Id", it) }
-                val client = com.openminis.app.provider.ProviderTransportPolicy
-                    .protectedHttpsBuilder(OkHttpClient.Builder())
-                    .build()
-                client.newCall(builder.build()).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) {
-                        AppLogger.warning(TAG, "Codex model list HTTP ${response.code}")
-                        return@withContext emptyList()
-                    }
-                    val parsed = parseCodexModels(body)
-                    AppLogger.info(TAG, "Codex live model list (${parsed.size}): ${parsed.joinToString { it.id }}")
-                    ModelsDevApi.enrichModels(
-                        parsed.map { com.openminis.app.provider.rules.ModelRulesProvider.applyCapabilities(it) },
-                    )
+    /**
+     * The account's live Codex list. Empty on a transport or server failure, so
+     * callers fall back to the bundled list rather than show nothing; a refused
+     * credential (401/403) is thrown instead, because showing the bundled list
+     * as if it were a fresh refresh would hide that the login needs renewing.
+     *
+     * The headers mirror the inference request (same client identity, version
+     * and `Openai-Beta`): the account must see one client, and a model listed
+     * under one version but refused under another is the worst outcome.
+     */
+    suspend fun fetchModelsCodexOAuth(
+        token: String,
+        accountId: String?,
+        client: OkHttpClient = com.openminis.app.provider.ProviderTransportPolicy
+            .protectedHttpsBuilder(OkHttpClient.Builder())
+            .build(),
+    ): List<LLMModel> = withContext(Dispatchers.IO) {
+        val version = OpenAIProvider.CODEX_CLIENT_VERSION
+        val url = "$CODEX_BASE/models?client_version=$version"
+        try {
+            val builder = Request.Builder()
+                .url(url)
+                .get()
+                .header("Authorization", "Bearer $token")
+                .header("Version", version)
+                .header("Openai-Beta", "responses=experimental")
+                .header("User-Agent", "codex_cli_rs/$version (Android; arm64)")
+                .header("Originator", "codex_cli_rs")
+                .header("Accept", "application/json")
+            accountId?.takeIf { it.isNotBlank() }?.let { builder.header("Chatgpt-Account-Id", it) }
+            client.newCall(builder.build()).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.code == 401 || response.code == 403) {
+                    AppLogger.warning(TAG, "Codex model list rejected the credential: HTTP ${response.code}")
+                    throw com.openminis.app.data.model.LLMError.InvalidApiKey()
                 }
-            } catch (e: Exception) {
-                AppLogger.warning(TAG, "Codex model list failed: ${e.message}")
-                emptyList()
+                if (!response.isSuccessful) {
+                    AppLogger.warning(TAG, "Codex model list HTTP ${response.code}")
+                    return@withContext emptyList()
+                }
+                val parsed = parseCodexModels(body)
+                AppLogger.info(TAG, "Codex live model list (${parsed.size}): ${parsed.joinToString { it.id }}")
+                ModelsDevApi.enrichModels(
+                    parsed.map { com.openminis.app.provider.rules.ModelRulesProvider.applyCapabilities(it) },
+                )
             }
+        } catch (e: com.openminis.app.data.model.LLMError) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.warning(TAG, "Codex model list failed: ${e.message}")
+            emptyList()
         }
+    }
 
     /**
      * Parses the `{"models":[…]}` body of the Codex models endpoint into text
