@@ -128,11 +128,10 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
     // bar, same scroll container, and the bottom spacing this page used to leave out.
     SettingsScaffold(
         title = stringResource(R.string.system_permissions_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
             SettingsSection(
                 header = stringResource(R.string.settings_assistant_role),
-                footer = stringResource(R.string.settings_assistant_role_footer),
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.RecordVoiceOver,
@@ -177,7 +176,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
 
             SettingsSection(
                 header = stringResource(R.string.system_permissions_section_a11y),
-                footer = stringResource(R.string.system_permissions_a11y_footer),
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Accessibility,
@@ -204,7 +202,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
 
             SettingsSection(
                 header = stringResource(R.string.system_permissions_module_a11y_header),
-                footer = stringResource(R.string.system_permissions_module_a11y_footer),
             ) {
                 SettingsSwitchRow(
                     icon = Icons.Outlined.HealthAndSafety,
@@ -230,7 +227,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             if (a11yRestricted) {
                 SettingsSection(
                     header = stringResource(R.string.system_permissions_a11y_restricted_header),
-                    footer = stringResource(R.string.system_permissions_a11y_restricted_footer),
                 ) {
                     if (shizukuReady) {
                         SettingsRow(
@@ -275,7 +271,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             // Fork-only system grant required by the floating desktop pet.
             SettingsSection(
                 header = stringResource(R.string.system_permissions_overlay_section),
-                footer = stringResource(R.string.system_permissions_overlay_footer),
             ) {
                 SettingsRow(
                     icon = Icons.Outlined.Layers,
@@ -308,10 +303,6 @@ fun SystemPermissionsScreen(onBack: () -> Unit) {
             if (a11yRevoked) {
                 SettingsSection(
                     header = stringResource(R.string.a11y_repair_section_header),
-                    footer = stringResource(
-                        if (shizukuReady) R.string.a11y_repair_footer_shizuku
-                        else R.string.a11y_repair_footer_manual,
-                    ),
                 ) {
                     SettingsRow(
                         icon = Icons.Outlined.Build,

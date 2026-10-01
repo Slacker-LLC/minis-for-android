@@ -61,6 +61,10 @@ fun StandardChatSheet(
     onDismiss: () -> Unit,
     leadingAction: (@Composable () -> Unit)? = null,
     heightFraction: Float = 0.9f,
+    /** False when the content draws its own top row (the browser does). */
+    header: Boolean = true,
+    /** Sheet colour; pass the settings grey when the body is white cards. */
+    containerColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -70,7 +74,7 @@ fun StandardChatSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else (containerColor ?: minisSheetColor()),
         dragHandle = { CompactDragHandle() },
     ) {
         // Glass style: the sheet lives in its own dialog window, so instead of
@@ -82,12 +86,14 @@ fun StandardChatSheet(
                 .height(sheetHeight)
                 .glassSheetSurface(),
         ) {
-            StandardChatSheetHeader(
-                title = title,
-                onDismiss = onDismiss,
-                leadingAction = leadingAction,
-            )
-            HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
+            if (header) {
+                StandardChatSheetHeader(
+                    title = title,
+                    onDismiss = onDismiss,
+                    leadingAction = leadingAction,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = ChatColors.separator)
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 content()
             }

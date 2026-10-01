@@ -127,6 +127,7 @@ fun SessionMemorySheet(
     }
 
     StandardChatSheet(
+        containerColor = com.openminis.app.ui.settings.settingsSheetColor(),
         title = title,
         onDismiss = onDismiss,
         leadingAction = if (mode != MemorySheetMode.List) {

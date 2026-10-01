@@ -1,6 +1,13 @@
 package com.openminis.app.ui.scheduled
 
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.bots.StatusPill
+import com.openminis.app.ui.components.MinisEmptyState
+import com.openminis.app.ui.settings.SettingsRow
+import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.ui.settings.SettingsScaffold
 import androidx.compose.foundation.clickable
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,120 +73,52 @@ fun ScheduledTaskRunsScreen(
     val task = tasks.firstOrNull { it.id == taskId }
     val runs = task?.runHistory ?: emptyList()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            stringResource(R.string.scheduled_task_runs_title),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                        )
-                        if (task != null && task.label.isNotBlank()) {
-                            Text(
-                                task.label,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
+    SettingsScaffold(
+        title = stringResource(R.string.scheduled_task_runs_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.scheduled_tasks_title),
+    ) {
+        if (task != null && task.label.isNotBlank()) {
+            Text(
+                task.label,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+        if (runs.isEmpty()) {
+            MinisEmptyState(
+                icon = Icons.Outlined.History,
+                title = stringResource(R.string.scheduled_task_runs_empty),
+                modifier = Modifier.padding(top = 48.dp),
+            )
+        } else {
+            SettingsSection {
+                runs.forEachIndexed { index, run ->
+                    RunRow(run = run, onOpenSession = onOpenSession, showDivider = index < runs.size - 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RunRow(run: ScheduledRun, onOpenSession: (String) -> Unit, showDivider: Boolean) {
+    val tappable = run.sessionId != null
+    SettingsRow(
+        title = formatRunTime(run.firedAt),
+        subtitle = run.preview?.takeIf { it.isNotBlank() },
+        onClick = if (tappable) ({ onOpenSession(run.sessionId!!) }) else null,
+        showDivider = showDivider,
+        trailing = {
+            StatusPill(
+                stringResource(if (run.ok) R.string.scheduled_run_ok else R.string.scheduled_run_failed),
+                if (run.ok) ChatColors.ok else ChatColors.bad,
             )
         },
-    ) { padding ->
-        if (runs.isEmpty()) {
-            EmptyRuns(padding)
-            return@Scaffold
-        }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            items(runs, key = { it.firedAt }) { run ->
-                RunRow(run = run, onOpenSession = onOpenSession)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyRuns(padding: PaddingValues) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Outlined.History,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.scheduled_task_runs_empty),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RunRow(run: ScheduledRun, onOpenSession: (String) -> Unit) {
-    val tappable = run.sessionId != null
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (tappable) Modifier.clickable { onOpenSession(run.sessionId!!) } else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = if (run.ok) Icons.Filled.CheckCircle else Icons.Filled.Error,
-            contentDescription = null,
-            tint = if (run.ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = formatRunTime(run.firedAt),
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-            )
-            val preview = run.preview
-            if (!preview.isNullOrBlank()) {
-                Text(
-                    text = preview,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (tappable) {
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.scheduled_task_runs_open_session),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
+    )
 }
 
 private fun formatRunTime(ms: Long): String =

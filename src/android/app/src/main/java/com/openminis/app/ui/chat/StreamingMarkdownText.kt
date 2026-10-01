@@ -215,11 +215,11 @@ private fun currentMdColors(): MdColors {
         blockquote = c.secondaryText,
         divider = c.separator,
         tableBorder = c.tableBorder,
-        tableHeaderBg = c.secondaryBg,
+        // The header is always the grey fill (the body is white on light), whatever the surface behind it.
+        tableHeaderBg = if (c.isDark) c.secondaryBg else Color(0xFFF2F2F7),
     )
 }
 
-private val MdCodeLangColor = Color.White.copy(alpha = 0.5f)
 
 val LocalMarkdownFontScale = compositionLocalOf { 1f }
 
@@ -253,8 +253,9 @@ val LocalMarkdownImageTapHandler =
  */
 val LocalMarkdownSessionId = compositionLocalOf<String?> { null }
 
-private val BaseFontSizeDefault = 16.sp
-private val BaseLineHeightDefault = 24.sp
+// The chat redesign's body text: 17 / 27.2.
+private val BaseFontSizeDefault = 17.sp
+private val BaseLineHeightDefault = 27.2.sp
 
 private val BaseFontSize: TextUnit
     @Composable get() = BaseFontSizeDefault * LocalMarkdownFontScale.current
@@ -383,7 +384,7 @@ private fun MdText(
                         clipboardManager.setText(AnnotatedString(snippet))
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         val preview = if (snippet.length > 40) snippet.take(37) + "…" else snippet
-                        Toast.makeText(context, "Copied: $preview", Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, "Copied: $preview")
                     }
                 }
             }
@@ -1367,6 +1368,31 @@ private fun splitParagraphOnWideMath(text: String): List<MdBlock> {
 }
 
 private data class ListItem(val text: String, val children: List<MdBlock> = emptyList())
+
+/**
+ * A line indented under a list item. A sub-list (or anything after one) is kept as raw lines for the item's
+ * children; a plain wrapped line just continues the item's own text, as before.
+ */
+private fun addListContinuation(items: MutableList<ListItem>, nested: MutableList<MutableList<String>>, line: String, trimmed: String) {
+    if (items.isEmpty()) return
+    val last = items.lastIndex
+    val startsSubList = trimmed.matches(bulletListItemRegex) || trimmed.matches(numberedListItemRegex) || trimmed.startsWith("```")
+    if (startsSubList || nested[last].isNotEmpty()) {
+        nested[last].add(line)
+    } else {
+        items[last] = items[last].copy(text = items[last].text + "\n" + trimmed)
+    }
+}
+
+/** Parse each item's collected sub-lines (de-indented together) into child blocks. */
+private suspend fun withNestedBlocks(items: List<ListItem>, nested: List<List<String>>): List<ListItem> =
+    items.mapIndexed { index, item ->
+        val sub = nested.getOrNull(index).orEmpty()
+        if (sub.isEmpty()) item else {
+            val strip = sub.minOf { it.length - it.trimStart().length }
+            item.copy(children = parseMarkdownBlocks(sub.joinToString("\n") { it.drop(strip) }))
+        }
+    }
 private data class TaskItem(val checked: Boolean, val text: String)
 
 // ─── Block parser ───────────────────────────────────────────────────────────
@@ -1625,6 +1651,7 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
             trimmed.matches(bulletListItemRegex) -> {
                 val items = mutableListOf<ListItem>()
                 val rawLines = mutableListOf<String>()
+                val nested = mutableListOf<MutableList<String>>()
                 val baseIndent = line.length - trimmed.length
                 while (i < lines.size) {
                     val l = lines[i]
@@ -1633,24 +1660,22 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                     if (t.isEmpty()) { i++; continue }
                     if (!t.matches(bulletListItemRegex) && indent <= baseIndent) break
                     if (indent > baseIndent) {
-                        // Continuation or nested — append to last item
-                        if (items.isNotEmpty()) {
-                            val last = items.last()
-                            items[items.lastIndex] = last.copy(text = last.text + "\n" + t)
-                        }
+                        addListContinuation(items, nested, l, t)
                     } else {
                         rawLines.add(l)
                         items.add(ListItem(t.replaceFirst(bulletListPrefixRegex, "")))
+                        nested.add(mutableListOf())
                     }
                     i++
                 }
-                blocks.add(MdBlock.UnorderedList(rawLines.joinToString("\n"), items))
+                blocks.add(MdBlock.UnorderedList(rawLines.joinToString("\n"), withNestedBlocks(items, nested)))
             }
 
             // Ordered list
             trimmed.matches(numberedListItemRegex) -> {
                 val items = mutableListOf<ListItem>()
                 val rawLines = mutableListOf<String>()
+                val nested = mutableListOf<MutableList<String>>()
                 val startMatch = numberedListStartRegex.find(trimmed)
                 val startNum = startMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
                 val baseIndent = line.length - trimmed.length
@@ -1661,17 +1686,15 @@ private suspend fun parseMarkdownBlocks(content: String): List<MdBlock> {
                     if (t.isEmpty()) { i++; continue }
                     if (!t.matches(numberedListItemRegex) && indent <= baseIndent) break
                     if (indent > baseIndent) {
-                        if (items.isNotEmpty()) {
-                            val last = items.last()
-                            items[items.lastIndex] = last.copy(text = last.text + "\n" + t)
-                        }
+                        addListContinuation(items, nested, l, t)
                     } else {
                         rawLines.add(l)
                         items.add(ListItem(t.replaceFirst(numberedListPrefixRegex, "")))
+                        nested.add(mutableListOf())
                     }
                     i++
                 }
-                blocks.add(MdBlock.OrderedList(rawLines.joinToString("\n"), items, startNum))
+                blocks.add(MdBlock.OrderedList(rawLines.joinToString("\n"), withNestedBlocks(items, nested), startNum))
             }
 
             // Empty line
@@ -1813,13 +1836,15 @@ private fun RenderBlock(block: MdBlock) {
                     Text(
                         text = block.language.ifEmpty { "code" },
                         fontSize = 11.sp,
-                        color = MdCodeLangColor,
+                        // The block's own palette: the label used to be white, which only reads on the dark
+                        // code block and vanished on the light one.
+                        color = ChatColors.secondaryText,
                         modifier = Modifier.weight(1f),
                     )
                     Icon(
-                        imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        imageVector = if (copied) com.openminis.app.ui.components.MinisIcons.Check else com.openminis.app.ui.components.MinisIcons.Copy,
                         contentDescription = if (copied) "Copied" else "Copy code",
-                        tint = if (copied) ChatColors.ok else Color.White.copy(alpha = 0.4f),
+                        tint = if (copied) ChatColors.ok else ChatColors.secondaryText,
                         modifier = Modifier
                             .size(16.dp)
                             .clickable {
@@ -1890,7 +1915,7 @@ private fun RenderBlock(block: MdBlock) {
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
                 block.items.forEach { item ->
                     Row(modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)) {
-                        Text("•  ", fontSize = BaseFontSize * 1.3f, color = colors.text)
+                        Text("•  ", fontSize = BaseFontSize * 1.3f, lineHeight = BaseLineHeight, color = colors.text)
                         MdText(
                             text = MarkdownParseCaches.inline(item.text, colors),
                             fontSize = BaseFontSize,
@@ -1899,6 +1924,9 @@ private fun RenderBlock(block: MdBlock) {
                             modifier = Modifier.weight(1f),
                             inlineContent = rememberKatexInlineContent(BaseFontSize, MarkdownParseCaches.mathLatex(item.text)),
                         )
+                    }
+                    item.children.forEach { child ->
+                        Box(modifier = Modifier.padding(start = 26.dp)) { RenderBlock(child) }
                     }
                 }
             }
@@ -1911,6 +1939,7 @@ private fun RenderBlock(block: MdBlock) {
                         Text(
                             "${block.startNum + index}.  ",
                             fontSize = BaseFontSize,
+                            lineHeight = BaseLineHeight,
                             color = colors.text,
                         )
                         MdText(
@@ -1921,6 +1950,9 @@ private fun RenderBlock(block: MdBlock) {
                             modifier = Modifier.weight(1f),
                             inlineContent = rememberKatexInlineContent(BaseFontSize, MarkdownParseCaches.mathLatex(item.text)),
                         )
+                    }
+                    item.children.forEach { child ->
+                        Box(modifier = Modifier.padding(start = 26.dp)) { RenderBlock(child) }
                     }
                 }
             }
@@ -2785,7 +2817,7 @@ private fun RenderTable(block: MdBlock.Table) {
                         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                             as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("table", md))
-                        Toast.makeText(context, tableCopiedToast, Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, tableCopiedToast)
                     }
                 },
                 copyTableImage = {
@@ -2814,11 +2846,11 @@ private fun RenderTable(block: MdBlock.Table) {
                                     val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                                         as android.content.ClipboardManager
                                     cm.setPrimaryClip(clip)
-                                    Toast.makeText(context, tableImageCopiedToast, Toast.LENGTH_SHORT).show()
+                                    com.openminis.app.ui.components.MinisToast.show(context, tableImageCopiedToast)
                                 }
                             }
                         } catch (e: Exception) {
-                            Toast.makeText(context, tableImageCopyFailedToast, Toast.LENGTH_SHORT).show()
+                            com.openminis.app.ui.components.MinisToast.show(context, tableImageCopyFailedToast)
                         }
                     }
                     Unit
@@ -2843,8 +2875,9 @@ private fun RenderTable(block: MdBlock.Table) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(6.dp))
-                .border(1.dp, colors.tableBorder, RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (ChatColors.isDark) Color.Transparent else Color.White)
+                .border(1.dp, colors.tableBorder, RoundedCornerShape(14.dp))
                 // Record this draw pass into the GraphicsLayer so Copy Table
                 // Image can materialise the styled table (cells, borders, header
                 // shading, inline code) via toImageBitmap() — drawLayer also
@@ -2872,15 +2905,7 @@ private fun RenderTable(block: MdBlock.Table) {
                             modifier = Modifier
                                 .then(if (isHeader) Modifier.background(colors.tableHeaderBg) else Modifier)
                                 .drawBehind {
-                                    // Right divider between columns
-                                    if (!isLastCol) {
-                                        drawLine(
-                                            color = lineColor,
-                                            start = androidx.compose.ui.geometry.Offset(size.width - lineStrokePx / 2, 0f),
-                                            end = androidx.compose.ui.geometry.Offset(size.width - lineStrokePx / 2, size.height),
-                                            strokeWidth = lineStrokePx,
-                                        )
-                                    }
+                                    // Rows are separated by hairlines only; columns are spaced, not ruled (the board's table).
                                     // Bottom divider between rows
                                     if (!isLastRow) {
                                         drawLine(
@@ -2891,7 +2916,7 @@ private fun RenderTable(block: MdBlock.Table) {
                                         )
                                     }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             val cellText = cells.getOrElse(colIndex) { "" }

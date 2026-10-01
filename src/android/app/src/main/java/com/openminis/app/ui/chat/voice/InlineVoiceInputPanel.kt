@@ -1237,12 +1237,9 @@ private fun VoiceEngineUnavailableNotice(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Text(
+        com.openminis.app.ui.components.MinisBanner(
             text = stringResource(R.string.voice_panel_no_engine_body),
-            style = TextStyle(fontSize = 12.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            icon = Icons.Default.Mic,
         )
 
         Spacer(modifier = Modifier.height(12.dp))

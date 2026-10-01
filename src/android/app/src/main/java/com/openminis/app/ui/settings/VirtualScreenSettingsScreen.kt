@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import com.openminis.app.ui.theme.ChatColors
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
@@ -19,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,8 +78,16 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
     var dpiText by remember { mutableStateOf(savedSpec.dpi.toString()) }
     var activeDisplayId by remember { mutableStateOf<Int?>(client.displayId) }
 
+    // The bitmap is captured when the effect starts: reading previewBitmap inside onDispose would return
+    // the NEW bitmap (the state has already changed by then) and recycle the picture about to be drawn.
     DisposableEffect(previewBitmap) {
-        onDispose { previewBitmap?.recycle() }
+        val shown = previewBitmap
+        onDispose { shown?.recycle() }
+    }
+    // A display opened earlier (by the agent, or before the app was restarted) is still held by the service.
+    LaunchedEffect(Unit) {
+        val info = withContext(Dispatchers.IO) { runCatching { client.displayInfo() }.getOrNull() }
+        if (info != null) activeDisplayId = info.id
     }
 
     fun refreshProbe(json: String) {
@@ -226,14 +236,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
         )
     }
 
-    SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack) {
-        Text(
-            text = stringResource(R.string.vscreen_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-        )
-
+    SettingsScaffold(title = stringResource(R.string.vscreen_title), onBack = onBack, backLabel = stringResource(R.string.settings_section_system)) {
         SettingsSection(header = stringResource(R.string.vscreen_title)) {
             SettingsSwitchRow(
                 title = stringResource(R.string.vscreen_enabled_label),
@@ -258,7 +261,7 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
                     Text(
                         text = stringResource(if (probePassed) R.string.vscreen_probe_passed else R.string.vscreen_probe_failed),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (probePassed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        color = if (probePassed) ChatColors.ok else MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
                     if (!probePassed) {
@@ -284,149 +287,139 @@ fun VirtualScreenSettingsScreen(onBack: () -> Unit, onOpenShizuku: () -> Unit = 
             }
         }
 
-        SettingsSection(header = stringResource(R.string.vscreen_resolution)) {
-            val sizeLocked = activeDisplayId != null
-            val currentSpec = VirtualScreenDisplaySettings(
-                width = widthText.toIntOrNull() ?: 0,
-                height = heightText.toIntOrNull() ?: 0,
-                dpi = dpiText.toIntOrNull() ?: 0,
-            )
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = widthText,
-                        onValueChange = { widthText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                        label = { Text(stringResource(R.string.vscreen_width)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = !sizeLocked,
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = heightText,
-                        onValueChange = { heightText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
-                        label = { Text(stringResource(R.string.vscreen_height)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        enabled = !sizeLocked,
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                OutlinedTextField(
+        // Everything below belongs to the master switch: it only shows while the feature is on.
+        if (enabled) {
+            SettingsSection(header = stringResource(R.string.vscreen_resolution)) {
+                val sizeLocked = activeDisplayId != null
+                val currentSpec = VirtualScreenDisplaySettings(
+                    width = widthText.toIntOrNull() ?: 0,
+                    height = heightText.toIntOrNull() ?: 0,
+                    dpi = dpiText.toIntOrNull() ?: 0,
+                )
+                SettingsInlineTextRow(
+                    title = stringResource(R.string.vscreen_width),
+                    value = widthText,
+                    onValueChange = { widthText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
+                    numeric = true,
+                    enabled = !sizeLocked,
+                )
+                SettingsInlineTextRow(
+                    title = stringResource(R.string.vscreen_height),
+                    value = heightText,
+                    onValueChange = { heightText = it.filter(Char::isDigit).take(4); saveDisplaySettingsIfValid() },
+                    numeric = true,
+                    enabled = !sizeLocked,
+                )
+                SettingsInlineTextRow(
+                    title = stringResource(R.string.vscreen_dpi),
                     value = dpiText,
                     onValueChange = { dpiText = it.filter(Char::isDigit).take(3); saveDisplaySettingsIfValid() },
-                    label = { Text(stringResource(R.string.vscreen_dpi)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    numeric = true,
                     enabled = !sizeLocked,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    showDivider = false,
                 )
-                if (!VirtualScreenDisplaySettingsPolicy.isValid(currentSpec)) {
-                    Text(
-                        stringResource(R.string.vscreen_resolution_bounds),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    if (!VirtualScreenDisplaySettingsPolicy.isValid(currentSpec)) {
+                        Text(
+                            stringResource(R.string.vscreen_resolution_bounds),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
-        }
 
-        SettingsSection(header = stringResource(R.string.vscreen_preview)) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                MinisOutlinedButton(
-                    onClick = {
-                        previewBusy = true
-                        previewMessage = ""
-                        previewBitmap = null
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                if (!client.isEnabled()) {
-                                    PreviewResult(null, null)
-                                } else {
-                                    val id = runCatching { client.queryActiveDisplayId() }.getOrNull()
-                                    if (id == null) PreviewResult(null, null) else {
-                                        PreviewResult(
-                                            id,
-                                            runCatching {
-                                                val descriptor = client.screenshot(id)
-                                                ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { stream ->
-                                                    BitmapFactory.decodeStream(stream)
-                                                }
-                                            }.getOrNull(),
-                                        )
+            SettingsSection(header = stringResource(R.string.vscreen_preview)) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    MinisOutlinedButton(
+                        onClick = {
+                            previewBusy = true
+                            previewMessage = ""
+                            previewBitmap = null
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    if (!client.isEnabled()) {
+                                        PreviewResult(null, null)
+                                    } else {
+                                        val id = runCatching { client.queryActiveDisplayId() }.getOrNull()
+                                        if (id == null) PreviewResult(null, null) else {
+                                            PreviewResult(
+                                                id,
+                                                runCatching {
+                                                    val descriptor = client.screenshot(id)
+                                                    ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { stream ->
+                                                        BitmapFactory.decodeStream(stream)
+                                                    }
+                                                }.getOrNull(),
+                                            )
+                                        }
+                                    }
+                                }
+                                previewBusy = false
+                                activeDisplayId = result.displayId
+                                previewBitmap = result.bitmap
+                                if (result.displayId == null) previewMessage = context.getString(R.string.vscreen_no_display)
+                                else if (result.bitmap == null) previewMessage = context.getString(R.string.vscreen_preview_failed)
+                            }
+                        },
+                        enabled = enabled && !previewBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (previewBusy) CircularProgressIndicator(modifier = Modifier.width(18.dp), strokeWidth = 2.dp)
+                        else Text(stringResource(R.string.vscreen_preview))
+                    }
+                    if (previewMessage.isNotBlank()) {
+                        Text(previewMessage, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    previewBitmap?.let { bitmap ->
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = stringResource(R.string.vscreen_preview),
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).padding(top = 12.dp),
+                        )
+                    }
+                    MinisOutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    val id = client.displayId ?: runCatching { client.queryActiveDisplayId() }.getOrNull()
+                                        ?: return@withContext null
+                                    runCatching {
+                                        client.releaseDisplay()
+                                        VirtualScreenObservationRegistry.clearDisplay(id)
+                                        ScreenshotFrameRegistry.clearDisplay(id)
+                                        id
+                                    }.getOrNull()
+                                }
+                                when (result) {
+                                    null -> previewMessage = context.getString(R.string.vscreen_no_display)
+                                    else -> {
+                                        activeDisplayId = null
+                                        previewBitmap = null
+                                        previewMessage = context.getString(R.string.vscreen_released)
                                     }
                                 }
                             }
-                            previewBusy = false
-                            activeDisplayId = result.displayId
-                            previewBitmap = result.bitmap
-                            if (result.displayId == null) previewMessage = context.getString(R.string.vscreen_no_display)
-                            else if (result.bitmap == null) previewMessage = context.getString(R.string.vscreen_preview_failed)
-                        }
-                    },
-                    enabled = enabled && !previewBusy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (previewBusy) CircularProgressIndicator(modifier = Modifier.width(18.dp), strokeWidth = 2.dp)
-                    else Text(stringResource(R.string.vscreen_preview))
+                        },
+                        enabled = activeDisplayId != null || enabled,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    ) { Text(stringResource(R.string.vscreen_release)) }
                 }
-                if (previewMessage.isNotBlank()) {
-                    Text(previewMessage, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-                }
-                previewBitmap?.let { bitmap ->
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = stringResource(R.string.vscreen_preview),
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).padding(top = 12.dp),
-                    )
-                }
-                MinisOutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                val id = client.displayId ?: runCatching { client.queryActiveDisplayId() }.getOrNull()
-                                    ?: return@withContext null
-                                if (DeviceScreenLease.shared.owner(id) != null) return@withContext false
-                                runCatching {
-                                    client.releaseDisplay()
-                                    VirtualScreenObservationRegistry.clearDisplay(id)
-                                    ScreenshotFrameRegistry.clearDisplay(id)
-                                    id
-                                }.getOrNull()
-                            }
-                            when (result) {
-                                null -> previewMessage = context.getString(R.string.vscreen_no_display)
-                                false -> operationMessage = context.getString(R.string.bots_routine_vscreen_busy)
-                                else -> {
-                                    activeDisplayId = null
-                                    previewBitmap?.recycle()
-                                    previewBitmap = null
-                                    previewMessage = context.getString(R.string.vscreen_released)
-                                }
-                            }
-                        }
-                    },
-                    enabled = activeDisplayId != null || enabled,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                ) { Text(stringResource(R.string.vscreen_release)) }
             }
-        }
 
-        SettingsSection(header = stringResource(R.string.vscreen_allow_physical_unattended)) {
-            SettingsSwitchRow(
-                title = stringResource(R.string.vscreen_allow_physical_unattended),
-                subtitle = stringResource(R.string.vscreen_allow_physical_unattended_risk),
-                checked = allowPhysicalUnattended,
-                onCheckedChange = {
-                    UnattendedAccessPrefs.setAllowPhysicalScreen(context, it)
-                    allowPhysicalUnattended = it
-                },
-                showDivider = false,
-            )
+            SettingsSection(header = stringResource(R.string.vscreen_allow_physical_unattended)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.vscreen_allow_physical_unattended),
+                    subtitle = stringResource(R.string.vscreen_allow_physical_unattended_risk),
+                    checked = allowPhysicalUnattended,
+                    onCheckedChange = {
+                        UnattendedAccessPrefs.setAllowPhysicalScreen(context, it)
+                        allowPhysicalUnattended = it
+                    },
+                    showDivider = false,
+                )
+            }
         }
     }
 }

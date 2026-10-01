@@ -77,7 +77,23 @@ internal object VirtualScreenUiBackend {
             snapshot.put("targets", filtered)
         }
         snapshot.put("success", true).put("action", "observe")
+        putDisplayGeometry(snapshot, client)
         return AndroidUiController.UiToolResult(snapshot, true)
+    }
+
+    /**
+     * Tell the model the display it is working on: size and the coordinate rule. Without this it had to
+     * take a screenshot just to learn where things are, and then guessed which pixel space x/y meant.
+     */
+    internal fun putDisplayGeometry(into: JSONObject, client: VirtualScreenClient) {
+        val size = client.displaySize() ?: return
+        into.put("displayWidth", size.first).put("displayHeight", size.second)
+            .put(
+                "coordinates",
+                "x/y and node bounds are pixels of this " + size.first + "x" + size.second +
+                    " display, origin top-left (x 0.." + (size.first - 1) + ", y 0.." + (size.second - 1) +
+                    "); click/scroll x,y use this space by default. A screenshot is at this resolution too.",
+            )
     }
 
     private suspend fun refAction(
@@ -150,7 +166,7 @@ internal object VirtualScreenUiBackend {
         val resolved = UiCoordinateSpacePolicy.resolvePoint(
             x,
             y,
-            UiCoordinateSpace.parse(args.optString("coordinateSpace", "screenshot")),
+            UiCoordinateSpace.parse(args.optString("coordinateSpace", "screen")),
             frame,
             size?.first ?: 0,
             size?.second ?: 0,
@@ -203,7 +219,7 @@ internal object VirtualScreenUiBackend {
         val displaySize = client.displaySize()
         val screenWidth = displaySize?.first ?: 0
         val screenHeight = displaySize?.second ?: 0
-        val coordinateSpace = UiCoordinateSpace.parse(args.optString("coordinateSpace", "screenshot"))
+        val coordinateSpace = UiCoordinateSpace.parse(args.optString("coordinateSpace", "screen"))
 
         if (ref.isNotBlank()) {
             if (refGeneration < 0) return error("INVALID_UI_REF", "scroll with ref requires generation from a recent observe")
@@ -327,7 +343,7 @@ internal object VirtualScreenUiBackend {
         val size = client.displaySize()
         val maxDim = if (size == null) 1_280 else {
             val scale = args.optDouble("scale", 1.0).takeIf { it.isFinite() }?.coerceIn(0.1, 1.0) ?: 1.0
-            (maxOf(size.first, size.second) * scale).toInt().coerceIn(256, 1_280)
+            (maxOf(size.first, size.second) * scale).toInt().coerceIn(256, 2_560)
         }
         val pfd = client.screenshot(displayId, maxDim, 85)
         val bytes = readBoundedScreenshot(pfd)
@@ -350,6 +366,7 @@ internal object VirtualScreenUiBackend {
             .put("originalWidth", size?.first ?: JSONObject.NULL)
             .put("originalHeight", size?.second ?: JSONObject.NULL)
             .put("mimeType", "image/jpeg")
+        putDisplayGeometry(result, client)
         return AndroidUiController.UiToolResult(result, true, imageData = bytes, imageMimeType = "image/jpeg")
     }
 

@@ -30,6 +30,7 @@ internal object UbuntuKernel {
     private const val TAG = "UbuntuKernel"
     private const val ROOTFS_ASSET = "minis-runtime/ubuntu-arm64-rootfs.tar.gz"
     private const val ROOT_TIMEOUT_MS = 15_000L
+    private const val SIZE_PROBE_TIMEOUT_MS = 60_000L
     private const val ROOTFS_TIMEOUT_MS = 600_000L
 
     data class Status(
@@ -215,6 +216,20 @@ internal object UbuntuKernel {
             )
         }
         return RootfsManager.evaluateProbeOutput(result.stdout)
+    }
+
+    /**
+     * Disk usage of the Root-owned rootfs, which the app UID cannot walk itself. Runs the fixed
+     * read-only `du` probe through [DirectRootRunner]; 0 when root or the probe is unavailable.
+     */
+    suspend fun measureRootfsSize(): Long {
+        if (appContext == null) return 0L
+        val result = DirectRootRunner.runScript(
+            RootfsManager.buildSizeProbeCommand(UbuntuPaths.HOST_ROOTFS),
+            SIZE_PROBE_TIMEOUT_MS,
+        )
+        if (result.error != null || result.timedOut || result.exitCode != 0) return 0L
+        return RootfsManager.parseSizeProbeOutput(result.stdout) ?: 0L
     }
 
     suspend fun ensureRootfs(): RootfsHealth = lock.withLock {

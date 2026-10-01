@@ -191,27 +191,21 @@ fun SessionDrawerContent(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 DrawerGridEntry(
-                    icon = Icons.Outlined.Group,
+                    icon = com.openminis.app.ui.components.MinisIcons.Users,
                     title = stringResource(R.string.bots_team),
                     onClick = onOpenBots,
                     modifier = Modifier.weight(1f),
                 )
                 DrawerGridEntry(
-                    icon = Icons.Outlined.Schedule,
+                    icon = com.openminis.app.ui.components.MinisIcons.Clock,
                     title = stringResource(R.string.scheduled_tasks_title),
                     onClick = onOpenScheduledTasks,
                     modifier = Modifier.weight(1f),
                 )
                 DrawerGridEntry(
-                    icon = Icons.Default.Terminal,
+                    icon = com.openminis.app.ui.components.MinisIcons.Terminal,
                     title = stringResource(R.string.drawer_terminal),
                     onClick = onOpenTerminal,
-                    modifier = Modifier.weight(1f),
-                )
-                DrawerGridEntry(
-                    icon = Icons.Outlined.Folder,
-                    title = stringResource(R.string.settings_section_files),
-                    onClick = onOpenStorage,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -330,26 +324,17 @@ fun SessionDrawerContent(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 thickness = 0.5.dp,
             )
+            // Settings at the bottom; files live under Settings → Files.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onOpenSettings)
-                    .padding(horizontal = 16.dp, vertical = 13.dp)
                     .padding(bottom = bottomInset),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = stringResource(R.string.settings),
-                    tint = ChatColors.secondaryText,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    text = stringResource(R.string.settings),
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = ChatColors.primaryText,
+                DrawerDockEntry(
+                    icon = com.openminis.app.ui.components.MinisIcons.Settings,
+                    title = stringResource(R.string.settings),
+                    onClick = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -554,7 +539,7 @@ private fun DrawerSearchField(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    imageVector = com.openminis.app.ui.components.MinisIcons.Search,
                     contentDescription = null,
                     tint = ChatColors.secondaryText,
                     modifier = Modifier.size(18.dp),
@@ -592,21 +577,35 @@ private fun DrawerNewChatRow(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
-            imageVector = Icons.Outlined.Edit,
+            imageVector = com.openminis.app.ui.components.MinisIcons.Compose,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
+            tint = ChatColors.primaryText,
+            modifier = Modifier.size(22.dp),
         )
         Text(
             text = stringResource(R.string.scheduled_task_target_new),
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
+            color = ChatColors.primaryText,
         )
     }
 }
 
 /** One of the four daily entries: glyph over a short label, both in the accent. */
+@Composable
+private fun DrawerDockEntry(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = title, tint = ChatColors.primaryText, modifier = Modifier.size(22.dp))
+        Text(text = title, fontSize = 14.5.sp, fontWeight = FontWeight.Medium, color = ChatColors.primaryText)
+    }
+}
+
 @Composable
 private fun DrawerGridEntry(
     icon: ImageVector,
@@ -625,13 +624,13 @@ private fun DrawerGridEntry(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = ChatColors.primaryText,
             modifier = Modifier.size(22.dp),
         )
         Text(
             text = title,
             fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.primary,
+            color = ChatColors.primaryText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -811,7 +810,7 @@ private fun DrawerSessionRow(
     val title = session.title?.ifBlank { newSessionLabel } ?: newSessionLabel
     // One accent, one wash: the open conversation gets a light accent fill and an accent label.
     val accent = MaterialTheme.colorScheme.primary
-    val bgColor = if (isCurrent && !isSelecting) accent.copy(alpha = 0.10f) else Color.Transparent
+    val bgColor = if (isCurrent && !isSelecting) ChatColors.secondaryBg else Color.Transparent
     var showMenu by remember { mutableStateOf(false) }
 
     Box(
@@ -847,7 +846,7 @@ private fun DrawerSessionRow(
                 text = title,
                 fontSize = 15.sp,
                 fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
-                color = if (isCurrent) accent else ChatColors.primaryText,
+                color = ChatColors.primaryText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),

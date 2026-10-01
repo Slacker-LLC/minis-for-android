@@ -56,15 +56,12 @@ fun SharedFoldersScreen(
     onFolderClick: (folderId: String) -> Unit,
 ) {
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.shared_folders_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
+            MinisTopBar(
+            title = { Text(stringResource(R.string.shared_folders_title)) },
+            onBack = onBack,
+        )
         },
     ) { padding ->
         Column(

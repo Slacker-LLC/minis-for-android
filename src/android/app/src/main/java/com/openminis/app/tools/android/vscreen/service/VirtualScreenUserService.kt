@@ -9,11 +9,13 @@ import android.os.Process
 import android.util.Log
 import android.view.KeyEvent
 import androidx.annotation.Keep
+import com.openminis.app.tools.android.vscreen.IVirtualScreenFrameSink
 import com.openminis.app.tools.android.vscreen.IVirtualScreenService
 import com.openminis.app.tools.android.vscreen.VirtualScreenPolicy
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeFailure
 import com.openminis.app.tools.android.vscreen.VirtualScreenProbeRecorder
 import com.openminis.app.tools.android.vscreen.service.internal.DisplaySpec
+import com.openminis.app.tools.android.vscreen.service.internal.FocusBridge
 import com.openminis.app.tools.android.vscreen.service.internal.InputBridge
 import com.openminis.app.tools.android.vscreen.service.internal.ScreenCapture
 import com.openminis.app.tools.android.vscreen.service.internal.ShellContext
@@ -177,6 +179,8 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
             fail("virtual_display_invalid_id", "Virtual display id must be non-zero")
         }
         session = created
+        // A new display starts on its home screen, not on nothing.
+        runCatching { showHome(created.displayId) }
         created.displayId
     }
 
@@ -212,26 +216,26 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
     override fun tap(displayId: Int, x: Int, y: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().tap(displayId, x, y)
+        InputBridge().tap(displayId, x, y).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun swipe(displayId: Int, startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, startX, startY)
         checkCoordinates(active, endX, endY)
-        InputBridge().swipe(displayId, startX, startY, endX, endY, durationMs)
+        InputBridge().swipe(displayId, startX, startY, endX, endY, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun longPress(displayId: Int, x: Int, y: Int, durationMs: Int): Boolean = synchronized(lock) {
         val active = checkDisplay(displayId)
         checkCoordinates(active, x, y)
-        InputBridge().longPress(displayId, x, y, durationMs)
+        InputBridge().longPress(displayId, x, y, durationMs).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun key(displayId: Int, keyCode: Int): Boolean = synchronized(lock) {
         checkDisplay(displayId)
         if (keyCode !in 0..KeyEvent.getMaxKeyCode()) fail("invalid_key_code", "keyCode is outside Android's key range")
-        InputBridge().key(displayId, keyCode)
+        InputBridge().key(displayId, keyCode).also { FocusBridge.restorePhysicalFocusSoon() }
     }
 
     override fun inputText(displayId: Int, text: String): Boolean = synchronized(lock) {
@@ -259,8 +263,53 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         ensureUi().focusTarget(displayId, targetIndex)
     }
 
+    override fun getDisplayInfo(): IntArray = synchronized(lock) {
+        checkNotDestroyed()
+        requireShellIdentity()
+        session?.let { intArrayOf(it.displayId, it.width, it.height, it.dpi) } ?: IntArray(0)
+    }
+
+    override fun startFrameStream(sink: IVirtualScreenFrameSink?) = synchronized(lock) {
+        checkNotDestroyed()
+        requireShellIdentity()
+        val active = session ?: fail(VirtualScreenPolicy.DISPLAY_GONE, "No virtual display is open")
+        active.setFrameSink(sink)
+    }
+
+    override fun stopFrameStream() = synchronized(lock) {
+        session?.setFrameSink(null)
+        Unit
+    }
+
+    /** Touch events arrive at drag rate; the bridge is built once and the call does not take the big lock. */
+    private val touchBridge by lazy { InputBridge() }
+
+    override fun touch(displayId: Int, action: Int, x: Int, y: Int, downTimeMs: Long): Boolean {
+        val active: VirtualDisplaySession
+        synchronized(lock) {
+            active = checkDisplay(displayId)
+            checkCoordinates(active, x, y)
+        }
+        val ok = touchBridge.touch(displayId, action, x, y, downTimeMs)
+        // A finger going down on the virtual display focuses it; hand focus back once the gesture is over.
+        if (action == android.view.MotionEvent.ACTION_DOWN || action == android.view.MotionEvent.ACTION_UP) {
+            FocusBridge.restorePhysicalFocusSoon()
+        }
+        return ok
+    }
+
     override fun back(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_BACK)
-    override fun home(displayId: Int): Boolean = key(displayId, KeyEvent.KEYCODE_HOME)
+    /**
+     * Home on the virtual display is Minis's own desktop: the system's secondary launcher draws nothing there
+     * and a HOME key only brings some task forward. Starting it again while it runs just raises it.
+     */
+    override fun home(displayId: Int): Boolean = synchronized(lock) {
+        checkDisplay(displayId)
+        showHome(displayId)
+    }
+
+    private fun showHome(displayId: Int): Boolean =
+        startOnDisplay(ComponentName(com.openminis.app.BuildConfig.APPLICATION_ID, HOME_ACTIVITY), displayId, HOME_FLAGS)
 
     override fun screenshot(displayId: Int, maxDim: Int, jpegQuality: Int): ParcelFileDescriptor = synchronized(lock) {
         val active = checkDisplay(displayId)
@@ -333,10 +382,10 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
      * platform's own shell entry point for the same call and works for shell and root alike. The
      * argument vector is built here from a validated package and a component name, with no shell.
      */
-    private fun startOnDisplay(component: ComponentName, displayId: Int): Boolean {
+    private fun startOnDisplay(component: ComponentName, displayId: Int, flags: String = NEW_TASK_FLAG): Boolean {
         val command = listOf(
             "cmd", "activity", "start-activity", "--user", "0", "--display", displayId.toString(),
-            "-f", NEW_TASK_FLAG, "-n", component.flattenToShortString(),
+            "-f", flags, "-n", component.flattenToShortString(),
         )
         val process = ProcessBuilder(command).redirectErrorStream(true).start()
         val output = process.inputStream.bufferedReader().use { it.readText() }
@@ -347,6 +396,9 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         if (process.exitValue() != 0 || output.contains("Error", ignoreCase = true)) {
             fail("app_launch_failed", output.trim().take(300).ifEmpty { "Launch request was rejected" })
         }
+        // The new window takes the system's top focus; give it back to the physical screen.
+        Thread.sleep(250)
+        FocusBridge.restorePhysicalFocusSoon()
         return true
     }
 
@@ -411,7 +463,12 @@ class VirtualScreenUserService : IVirtualScreenService.Stub() {
         private const val MAX_PROBE_PIXELS = 4_194_304L
         private const val PROBE_LAUNCH_WAIT_MS = 4_000L
         private const val LAUNCH_TIMEOUT_SECONDS = 8L
-        private const val NEW_TASK_FLAG = "268435456" // Intent.FLAG_ACTIVITY_NEW_TASK
+        // The desktop is a single task: raising it again must not pile up copies.
+        private const val HOME_FLAGS = "268435456" // FLAG_ACTIVITY_NEW_TASK
+        private const val HOME_ACTIVITY = "com.openminis.app.ui.vscreen.VirtualScreenHomeActivity"
+        // NEW_TASK | MULTIPLE_TASK: always a task of its own on the virtual display. Without MULTIPLE_TASK an app that
+        // already runs on the physical screen is MOVED here, taking it away from the user.
+        private const val NEW_TASK_FLAG = "402653184" // FLAG_ACTIVITY_NEW_TASK (0x10000000) | FLAG_ACTIVITY_MULTIPLE_TASK (0x08000000)
         private val PACKAGE_PATTERN = Regex("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+")
     }
 }

@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,7 +40,7 @@ fun AboutScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val tileBlue = Color(0xFF007AFF)
 
-    SettingsScaffold(title = stringResource(R.string.about_title), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.about_title), onBack = onBack, backLabel = stringResource(R.string.settings_cat_data)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -56,12 +57,12 @@ fun AboutScreen(onBack: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     .border(
                         width = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant,
-                        shape = CircleShape,
+                        shape = RoundedCornerShape(20.dp),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -70,7 +71,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     contentDescription = null,
                     modifier = Modifier
                         .size(80.dp)
-                        .clip(CircleShape),
+                        .clip(RoundedCornerShape(20.dp)),
                 )
             }
             Text(

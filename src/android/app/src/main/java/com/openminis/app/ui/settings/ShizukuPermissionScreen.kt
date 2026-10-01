@@ -59,11 +59,11 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
 
     SettingsScaffold(
         title = stringResource(R.string.shizuku_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
+        RootStatusSection()
         SettingsSection(
             header = stringResource(R.string.shizuku_status_header),
-            footer = stringResource(R.string.shizuku_status_footer),
         ) {
             SettingsRow(
                 title = stringResource(stateTitle(snap.state)),
@@ -97,7 +97,6 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
             // keeps the option set symmetrical).
             ShizukuManager.State.NOT_INSTALLED -> SettingsSection(
                 header = stringResource(R.string.shizuku_actions_header),
-                footer = stringResource(R.string.shizuku_install_footer),
             ) {
                 SettingsRow(
                     title = stringResource(R.string.shizuku_install_btn),
@@ -122,7 +121,6 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
 
             ShizukuManager.State.NOT_RUNNING -> SettingsSection(
                 header = stringResource(R.string.shizuku_actions_header),
-                footer = stringResource(R.string.shizuku_start_footer),
             ) {
                 SettingsRow(
                     title = stringResource(R.string.shizuku_open_btn),
@@ -139,10 +137,6 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
 
             ShizukuManager.State.NEED_PERMISSION -> SettingsSection(
                 header = stringResource(R.string.shizuku_actions_header),
-                footer = stringResource(
-                    if (snap.isSui) R.string.shizuku_grant_footer_sui
-                    else R.string.shizuku_grant_footer,
-                ),
             ) {
                 SettingsRow(
                     title = stringResource(R.string.shizuku_grant_btn),
@@ -175,7 +169,6 @@ fun ShizukuPermissionScreen(onBack: () -> Unit) {
             // Now it renders as a real list on every provider.
             ShizukuManager.State.READY -> SettingsSection(
                 header = stringResource(R.string.shizuku_capabilities_header),
-                footer = stringResource(R.string.shizuku_capabilities_footer),
             ) {
                 // Sui has no manager app to open, so that row stays hidden — but
                 // the list below is now the section's content regardless.

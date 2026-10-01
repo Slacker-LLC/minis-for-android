@@ -1,5 +1,14 @@
 package com.openminis.app.ui.browser
 
+import com.openminis.app.ui.settings.settingsSheetColor
+import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.settings.SettingsSearchField
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.History
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import com.openminis.app.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
@@ -70,7 +79,7 @@ fun BrowserHistorySheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else settingsSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(
@@ -80,44 +89,37 @@ fun BrowserHistorySheet(
                 .fillMaxHeight(0.8f)
                 .navigationBarsPadding(),
         ) {
-            // Header
-            Row(
+            // Header: Done on the left, title centered, Clear on the right (board)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
+                MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) {
+                    Text(stringResource(R.string.browser_history_done), fontSize = 17.sp)
+                }
                 Text(
                     stringResource(R.string.browser_history_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.align(Alignment.Center),
                 )
                 MinisTextButton(
                     onClick = { showClearConfirm = true },
                     enabled = historyStore.getEntries().isNotEmpty(),
+                    modifier = Modifier.align(Alignment.CenterEnd),
                 ) {
-                    Text(stringResource(R.string.browser_history_clear), color = MaterialTheme.colorScheme.error)
-                }
-                MinisTextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.browser_history_done))
+                    Text(stringResource(R.string.browser_history_clear), color = MaterialTheme.colorScheme.error, fontSize = 17.sp)
                 }
             }
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Search bar
-            OutlinedTextField(
+            SettingsSearchField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(stringResource(R.string.browser_history_search)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp),
-                textStyle = MaterialTheme.typography.bodySmall,
+                placeholder = stringResource(R.string.browser_history_search),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
-
-            Spacer(Modifier.height(8.dp))
 
             if (entries.values.flatten().isEmpty()) {
                 Box(
@@ -127,71 +129,87 @@ fun BrowserHistorySheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier.size(56.dp).background(ChatColors.secondaryBg, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(Modifier.height(12.dp))
                         Text(
                             stringResource(R.string.browser_history_empty_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             stringResource(R.string.browser_history_empty_subtitle),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                ) {
+                LazyColumn(modifier = Modifier.weight(1f)) {
                     for ((dayLabel, dayEntries) in entries) {
                         if (dayEntries.isEmpty()) continue
                         item(key = "header_$dayLabel") {
                             Text(
-                                dayLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                dayLabel.uppercaseForDisplay(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                                modifier = Modifier.padding(start = 28.dp, top = 12.dp, bottom = 6.dp),
                             )
                         }
-                        items(dayEntries, key = { it.id }) { entry ->
-                            Row(
+                        item(key = "card_$dayLabel") {
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onNavigate(entry.url) }
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    .padding(horizontal = 16.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surface),
                             ) {
-                                Icon(
-                                    Icons.Default.Language,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        entry.title.ifEmpty { entry.domain },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        entry.url,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                dayEntries.forEachIndexed { index, entry ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onNavigate(entry.url) }
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                entry.title.ifEmpty { entry.domain },
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Text(
+                                                entry.url.removePrefix("https://").removePrefix("http://"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(entry.timestamp)),
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (index < dayEntries.size - 1) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(start = 14.dp),
+                                            thickness = 0.5.dp,
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                        )
+                                    }
                                 }
-                                Text(
-                                    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(entry.timestamp)),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                )
                             }
-                            HorizontalDivider(modifier = Modifier.padding(start = 46.dp))
                         }
                     }
                 }

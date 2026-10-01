@@ -202,7 +202,6 @@ fun ModelEntryDetailScreen(
         // ── Capabilities ────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.modeldetail_section_capabilities),
-            footer = stringResource(R.string.modeldetail_capabilities_footer),
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.modeldetail_context_window))
@@ -329,7 +328,6 @@ fun ModelEntryDetailScreen(
         // ── Input Modality ──────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.modeldetail_section_input_modality),
-            footer = stringResource(R.string.modeldetail_input_modality_footer),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.modeldetail_image_input),
@@ -357,7 +355,6 @@ fun ModelEntryDetailScreen(
         // ── Output Modality ─────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.modeldetail_section_output_modality),
-            footer = stringResource(R.string.modeldetail_output_modality_footer),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.modeldetail_image_output),
@@ -388,7 +385,6 @@ fun ModelEntryDetailScreen(
         // ── Reset (only for built-in models that have been customized) ──
         if (!entry.isCustom && entry.isUserModified) {
             SettingsSection(
-                footer = stringResource(R.string.model_entry_restores_the_provider_reported_display_n),
             ) {
                 SettingsRow(
                     title = stringResource(R.string.model_entry_reset_to_default),

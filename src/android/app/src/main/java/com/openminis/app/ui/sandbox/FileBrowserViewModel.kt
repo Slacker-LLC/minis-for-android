@@ -485,7 +485,17 @@ class FileBrowserViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val showHidden = _uiState.value.showHidden
-                val entries = WorkspaceFileClient.listAll(guestSessionId.orEmpty(), directory)
+                val entries = if (guestSessionId != null && directory == SESSION_GUEST_ROOT) {
+                    // The guest API refuses the bare /var/minis, so a chat's files root is a
+                    // synthetic listing of the per-session folders that exist.
+                    SESSION_GUEST_FOLDERS.mapNotNull { name ->
+                        val ok = runCatching { WorkspaceFileClient.info(guestSessionId, "$SESSION_GUEST_ROOT/$name") }
+                            .getOrNull()?.optString("type") == "dir"
+                        if (ok) JSONObject().put("name", name).put("type", "dir").put("size", 0).put("modified", 0) else null
+                    }
+                } else {
+                    WorkspaceFileClient.listAll(guestSessionId.orEmpty(), directory)
+                }
                 val files = entries.mapNotNull { entry ->
                     guestItem(directory, entry, showHidden)
                 }
@@ -589,3 +599,6 @@ class FileBrowserViewModel(
         }
     }
 }
+
+private const val SESSION_GUEST_ROOT = "/var/minis"
+private val SESSION_GUEST_FOLDERS = listOf("workspace", "attachments", "offloads", "browser")

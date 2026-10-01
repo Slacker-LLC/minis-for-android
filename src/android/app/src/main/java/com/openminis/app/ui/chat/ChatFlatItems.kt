@@ -303,11 +303,6 @@ internal sealed class FlatChatItem {
         override fun hashCode(): Int = message.hashCode() * 31 + precededByUser.hashCode()
     }
 
-    data class AssistantHeader(val messageId: String) : FlatChatItem() {
-        override val key = "header:$messageId"
-        override val contentType = "header"
-    }
-
     /**
      * Equality on this class previously compared every field including
      * `messageMarkdown` — a CONCATENATED markdown of the entire parent
@@ -505,6 +500,12 @@ internal sealed class FlatChatItem {
         override val contentType = "info"
     }
 
+    /** Centred time line above a message that opens the conversation or follows a long pause. */
+    data class TimeDivider(val messageId: String, val epochMs: Long) : FlatChatItem() {
+        override val key = "time:$messageId"
+        override val contentType = "time"
+    }
+
     data class AssistantTyping(val messageId: String) : FlatChatItem() {
         override val key = "typing:$messageId"
         override val contentType = "typing"
@@ -619,7 +620,6 @@ internal fun buildFlatChatItems(
         while (!usedKeys.add("${item.key}#$n")) n++
         return when (item) {
             is FlatChatItem.UserBubble -> FlatChatItem.UserBubble(item.message.copy(id = "${item.message.id}#$n"), item.precededByUser)
-            is FlatChatItem.AssistantHeader -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantText -> FlatChatItem.AssistantText(
                 messageId = "${item.messageId}#$n",
                 block = item.block,
@@ -645,6 +645,7 @@ internal fun buildFlatChatItems(
             is FlatChatItem.AssistantMedia -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantInfo -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantTyping -> item.copy(messageId = "${item.messageId}#$n")
+            is FlatChatItem.TimeDivider -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantError -> item.copy(messageId = "${item.messageId}#$n")
             is FlatChatItem.AssistantLegacyContent -> FlatChatItem.AssistantLegacyContent(
                 messageId = "${item.messageId}#$n",
@@ -670,6 +671,14 @@ internal fun buildFlatChatItems(
                 "buildFlatChatItems.progress",
                 "msgIdx=$idx of=${messages.size} rowsSoFar=${out.size}",
             )
+        }
+        // A time line before the first message and after a pause of an hour or more (system rows have none).
+        if (message.role != "system" && message.createdAtMs > 0L) {
+            val previousStamp = (idx - 1 downTo 0).asSequence().map { messages[it] }
+                .firstOrNull { it.role != "system" && it.createdAtMs > 0L }?.createdAtMs
+            if (previousStamp == null || message.createdAtMs - previousStamp >= TIME_DIVIDER_GAP_MS) {
+                out.add(dedupe(FlatChatItem.TimeDivider(message.id, message.createdAtMs)))
+            }
         }
         if (message.role == "user") {
             // [T-android-candidate-bubble-gap] Flag when the previous message
@@ -710,13 +719,6 @@ internal fun buildFlatChatItems(
         // dividers, not as separate speaker turns. iOS achieves this by
         // reusing the existing ChatMessage in runAgentLoop(resumingAt:);
         // we reach the same end-result at the render layer.
-        val prevNonSystem = (idx - 1 downTo 0).asSequence()
-            .map { messages[it] }
-            .firstOrNull { it.role != "system" }
-        val isResumeContinuation = prevNonSystem?.role == "assistant"
-        if (!isSystem && !isResumeContinuation) {
-            out.add(dedupe(FlatChatItem.AssistantHeader(message.id)))
-        }
 
         val blocks = message.toolBlocks
         val toolPillBlocks = blocks.filter { it.kind == "tool_use" }
@@ -930,3 +932,6 @@ internal fun buildFlatChatItems(
    }
    return out
 }
+
+/** A time line is shown again after a pause this long. */
+internal const val TIME_DIVIDER_GAP_MS = 60L * 60L * 1000L

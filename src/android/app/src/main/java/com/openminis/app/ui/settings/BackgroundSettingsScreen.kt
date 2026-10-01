@@ -138,7 +138,7 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
     // by that much, so this page's cards sat 16dp narrower than the same cards elsewhere.
     SettingsScaffold(
         title = stringResource(R.string.bg_section_header),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_section_system),
     ) {
             Spacer(Modifier.size(8.dp))
             // T180-bg-notif: Task Notifications toggle. Mirrors iOS
@@ -153,7 +153,6 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                 checked = taskNotificationsEnabled,
                 onCheckedChange = { backgroundRepo.setTaskNotificationsEnabled(it) },
             )
-            BgFooter(stringResource(R.string.settings_task_notifications_footer))
 
             // T-bg-overlay phase 2: floating tool-status overlay toggle.
             // Tapping ON without SYSTEM_ALERT_WINDOW deep-links the user to
@@ -192,13 +191,9 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                     }
                 },
             )
-            BgFooter(
-                if (!canDrawOverlays && backgroundOverlayEnabled) {
-                    stringResource(R.string.settings_bg_overlay_permission_needed)
-                } else {
-                    stringResource(R.string.settings_bg_overlay_footer)
-                },
-            )
+            if (!canDrawOverlays && backgroundOverlayEnabled) {
+                BgFooter(stringResource(R.string.settings_bg_overlay_permission_needed))
+            }
 
             // [T-android-dynamic-island] Live Updates / "dynamic island" toggle.
             // Only interactive when the device is capable (Android 16+ with the
@@ -215,13 +210,9 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                 enabled = dynamicIslandCapable,
                 onCheckedChange = { backgroundRepo.setDynamicIslandEnabled(it) },
             )
-            BgFooter(
-                if (!dynamicIslandCapable) {
-                    stringResource(R.string.settings_dynamic_island_unsupported)
-                } else {
-                    stringResource(R.string.settings_dynamic_island_footer)
-                },
-            )
+            if (!dynamicIslandCapable) {
+                BgFooter(stringResource(R.string.settings_dynamic_island_unsupported))
+            }
 
             Spacer(Modifier.size(16.dp))
             BgSectionTitle(stringResource(R.string.battery_opt_section_title))
@@ -240,7 +231,6 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                     }
                 },
             )
-            BgFooter(stringResource(R.string.battery_opt_section_footer))
 
             if (needsOemGuidance) {
                 Spacer(Modifier.size(16.dp))
@@ -259,9 +249,6 @@ fun BackgroundSettingsScreen(onBack: () -> Unit) {
                             if (!ok) PowerOptimizationManager.openAppDetailsSettings(activity)
                         }
                     },
-                )
-                BgFooter(
-                    stringResource(R.string.rom_autostart_section_footer, vendor.displayName),
                 )
             }
 
@@ -332,7 +319,7 @@ private fun BgToggleRow(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        MinisSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,

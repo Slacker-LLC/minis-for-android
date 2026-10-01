@@ -608,11 +608,9 @@
     <string name="read_aloud_unavailable">Read aloud failed: no usable voice engine. Check Voice Output settings or install a system speech engine.</string>
     <string name="chat_error_stream_dropped_partial">The connection dropped — this reply may be incomplete. Tap Retry to continue.</string>
    <!-- Composer placeholder. %1$s is the Soul-customized assistant name (default "Minis"). The parenthetical is an inline hint reminding the user that typing '@' opens the file-mention picker. T-android-placeholder-single-line collapses the prior two-row (title + hint) layout into a single line, matching iOS 19e1d61f. -->
-   <string name="chat_input_placeholder">Message %1$s (@ to mention files)</string>
     <string name="chat_input_placeholder_hint_1">Try @ to mention files for %1$s to read</string>
     <string name="chat_input_placeholder_hint_2">Type / for SKILLs and quick commands</string>
     <string name="chat_input_placeholder_hint_3">Try dragging text into the chat to send it</string>
-    <string name="chat_input_placeholder_hint_4">Long-press anywhere in a reply to select and copy it all</string>
     <string name="chat_input_placeholder_hint_5">Minis can make the Return key send or insert a newline</string>
    <string name="browser_takeover">Takeover</string>
     <string name="browser_settings_done">Done</string>
@@ -802,17 +800,14 @@
     <string name="memory_delete_confirm_title">Delete %1$s?</string>
     <string name="memory_delete_confirm_text">This will permanently remove this memory log.</string>
     <string name="memory_editor_placeholder">Enter content…</string>
-    <string name="perm_title">Permissions</string>
+    <string name="perm_title">Agent permissions</string>
     <string name="perm_reset_all">Reset All</string>
     <string name="perm_reset_confirm_title">Reset All Permissions?</string>
     <string name="perm_reset_confirm_text">This will reset all permission preferences. Continue?</string>
     <string name="perm_reset_confirm">Reset</string>
-    <string name="perm_level_bypass">Bypass</string>
     <!-- T336 follow-up: ASK_ONCE actually grants for the whole app process
          lifetime (until next cold start), not for each individual call.
          Label rewritten to match the real behavior. -->
-    <string name="perm_level_ask_once">Once per launch</string>
-    <string name="perm_level_not_allowed">Not Allowed</string>
     <!-- T296: Permissions screen — section headers, minis-config switch, tool titles -->
     <string name="perm_section_config_tool">Configuration Tool</string>
     <!-- T336: dedicated SectionCard per integration CLI. Each surfaces
@@ -844,7 +839,7 @@
     <string name="perm_tool_photos">Photos</string>
 
     <!-- T322: Shizuku permission walkthrough -->
-    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_title">Root &amp; Shizuku</string>
     <string name="shizuku_settings_subtitle">Privileged Android control via Shizuku or AXManager</string>
     <string name="shizuku_status_header">Status</string>
     <string name="shizuku_status_footer">Shizuku exposes privileged system APIs to user apps without root, by running a small service started via wireless ADB or root. Three compatible providers are supported — Shizuku (RikkaApps), AXManager (Axeron), and Sui (a Magisk/KernelSU module for rooted devices); install any one. Once authorized, Minis can use the android-shizuku-cli CLI for package, permission, settings, input, and activity management.</string>
@@ -1634,6 +1629,9 @@
     <string name="scheduled_task_menu_edit">Edit</string>
     <string name="scheduled_task_menu_runs">Run records</string>
     <string name="scheduled_task_menu_delete">Delete</string>
+    <string name="scheduled_task_next_run">Next run %1$s</string>
+    <string name="scheduled_task_no_next_run">No next run scheduled</string>
+    <string name="scheduled_tasks_footer">Each trigger creates a new chat and sends a notification when it finishes. Tap the notification to see the result.</string>
     <string name="scheduled_task_runs_title">Run records</string>
     <string name="scheduled_task_runs_empty">No runs yet. This task hasn\'t fired — runs will appear here after it does.</string>
     <string name="scheduled_task_runs_open_session">Open session</string>
@@ -1652,7 +1650,6 @@
     <string name="file_share_chooser_title">Share file</string>
     <string name="file_share_failed_toast">Share failed: %1$s</string>
     <string name="file_print_failed_toast">Print failed: %1$s</string>
-    <string name="debug_trigger_crash_menu">Trigger crash (Debug)</string>
     <!-- [T-android-larky-longsession-followup] Tappable header at the top of the chat list, shown only when more older messages exist behind the windowed slice. -->
     <string name="chat_load_older_messages">↑ Load older messages</string>
     <!-- [T-error-persist-android] Shown when the model returns an empty reply (no text, no tools). -->
@@ -1837,8 +1834,8 @@
     <string name="hosted_tool_unknown">Provider tool</string>
     <string name="hosted_tool_failed">failed</string>
 
-    <string name="system_enhance_title">System enhancements</string>
-    <string name="system_enhance_row_subtitle">Root, the module, and what each one unlocks</string>
+    <string name="system_enhance_title">Modules</string>
+    <string name="system_enhance_row_subtitle">LSPosed module switches</string>
     <string name="system_enhance_section_status">Status</string>
     <string name="system_enhance_root">Root</string>
     <string name="system_enhance_root_checking">Checking…</string>
@@ -1888,8 +1885,8 @@
     <string name="settings_category_agent_sub">Skills, characters, persona, prompt, memory and MCP</string>
     <string name="settings_category_appearance_sub">Appearance and the desktop pet</string>
     <string name="settings_category_runtime_sub">Terminal and environment variables</string>
-    <string name="settings_section_files">Files</string>
-    <string name="settings_category_files_sub">Storage, shared folders, mounts and backup</string>
+    <string name="settings_section_files">File management</string>
+    <string name="settings_category_files_sub">Storage, shared folders, mounts, session files</string>
     <string name="settings_category_system_sub">Root, the module, permissions and background access</string>
     <string name="settings_category_about_sub">Logs, about and feedback</string>
     <string name="settings_cat_models">Models</string>
@@ -1901,10 +1898,10 @@
     <string name="settings_cat_agent_sub2">Skills, memory, persona, prompt, MCP, team, tasks</string>
     <string name="settings_cat_chat_sub">Return key, focus after reply, thinking, grouping</string>
     <string name="settings_cat_appearance_sub2">Theme, fonts, language, app icon, desktop pet</string>
-    <string name="settings_cat_runtime_sub2">Rootfs, environment variables, tools</string>
+    <string name="settings_cat_runtime_sub2">Rootfs, environment variables</string>
     <string name="settings_cat_system_sub2">Root, Shizuku, agent permissions, background and notifications</string>
     <string name="settings_cat_data_sub">Backup and restore, logs, updates, privacy</string>
-    <string name="settings_root_footer">Terminal and files are in the session drawer, and also under Runtime environment. The team and scheduled tasks are under Agent.</string>
+    <string name="settings_root_footer">The terminal is in the session drawer; the team and scheduled tasks are under Agent.</string>
     <string name="settings_attention_count">%1$d need attention</string>
     <string name="settings_ready_header">Readiness check</string>
     <string name="settings_ready_footer">What the Agent needs to work normally is gathered here. Optional items are not counted as not ready.</string>
@@ -1928,7 +1925,6 @@
     <string name="settings_ready_action_open">Open</string>
     <string name="settings_ready_check">Check readiness</string>
     <string name="settings_ready_all_good">Everything is ready</string>
-    <string name="settings_ready_all_good_body">Root, file access, background running and notifications are in place.</string>
     <string name="settings_ready_fix_title">These need your attention</string>
     <string name="settings_ready_done">Done</string>
     <string name="settings_ready_optional">Optional</string>
@@ -1944,9 +1940,9 @@
     <string name="settings_system_footer">What this app may do on this device, and where each grant is changed.</string>
     <string name="settings_assistant_role_footer">The Home / power-key assistant gesture opens whichever app holds this role.</string>
     <string name="module_settings_assistant_role_hint">Minis takes over the power key only once it is the default assistant of the system - set that under Permissions.</string>
-    <string name="settings_tool_permissions">Tool permissions</string>
-    <string name="settings_tool_permissions_sub">Let tools such as minis-config read and write app configuration</string>
-    <string name="settings_shizuku_sub">Install and authorise Shizuku or AXManager</string>
+    <string name="settings_tool_permissions">Agent permissions</string>
+    <string name="settings_tool_permissions_sub">What the agent may do on its own</string>
+    <string name="settings_shizuku_sub">Root status, Shizuku install and authorisation</string>
     <string name="system_permissions_overlay_section">Overlay permission</string>
     <string name="system_permissions_overlay_row">Display over other apps</string>
     <string name="system_permissions_overlay_granted">Granted</string>
@@ -2191,7 +2187,6 @@
     <string name="chat_quick_recap_title">Summarize recent chats</string>
     <string name="chat_quick_recap_sub">What you worked on lately</string>
     <string name="chat_quick_recap_prompt">Summarize what we worked on in my recent conversations.</string>
-    <string name="chat_quick_shuffle">Shuffle</string>
     <string name="chat_thinking_chip">Thinking · %1$s</string>
     <string name="files_hub_used_by">Minis usage</string>
     <string name="files_section_sandbox">Directories in the sandbox</string>
@@ -2349,7 +2344,6 @@
     <string name="vscreen_fail_action_devopts">Developer options</string>
     <string name="vscreen_view_failures">See what failed</string>
     <string name="vscreen_viewer_title">Virtual screen</string>
-    <string name="vscreen_viewer_idle">Nothing is using the virtual screen right now.</string>
     <string name="vscreen_viewer_disabled">The virtual screen is off. Turn it on under Settings → System &amp; permissions.</string>
     <string name="vscreen_viewer_menu">View virtual screen</string>
     <string name="vscreen_viewer_app">In front: %1$s</string>
@@ -2418,4 +2412,105 @@
 <string name="scheduled_task_tier_full_confirmation_body">FULL lets this unattended routine run arbitrary shell commands, write files beyond its temporary folder and call connected MCP tools, subject to existing app permissions. Select it only if you trust the prompt and configured tools. Network access remains unrestricted.</string>
 <string name="scheduled_task_tier_full_confirm">Confirm Full</string>
 <string name="scheduled_task_readonly_denied_preview">READ_ONLY blocked %1$s: %2$s</string>
+    <string name="bots_progress_running">%1$d delegated tasks in progress</string>
+    <string name="bots_progress_none">Nothing in progress</string>
+    <string name="bots_members_header">Members</string>
+    <string name="browser_desktop_site">Desktop site</string>
+    <string name="browser_tab_count_title">%1$d tabs</string>
+    <string name="browser_share">Share</string>
+    <string name="mount_folders_header">Mounted</string>
+    <string name="onboarding_feature_device_title">Runs on your device</string>
+    <string name="onboarding_feature_device_desc">Agent, tools and memory live locally; there is no Minis server.</string>
+    <string name="onboarding_feature_linux_title">Built-in Linux environment</string>
+    <string name="onboarding_feature_linux_desc">Needs an Ubuntu 24.04 chroot, sharing the Android kernel.</string>
+    <string name="onboarding_feature_models_title">Bring your own models</string>
+    <string name="onboarding_feature_models_desc">Requests go only to the providers you configure; keys and chats stay on the device.</string>
+    <string name="onboarding_root_required">Requires a rooted Android 8.0+ device (arm64-v8a or x86_64).</string>
+    <string name="onboarding_main_model">Main</string>
+    <string name="common_continue">Continue</string>
+    <string name="first_run_subtitle">Your first on-device Agent is almost ready.</string>
+    <string name="first_run_step_provider">Add a provider</string>
+    <string name="first_run_step_provider_desc">Enter an API key for at least one provider</string>
+    <string name="first_run_step_model">Choose a model</string>
+    <string name="first_run_step_model_desc">Pick the models you want to use</string>
+    <string name="first_run_step_chat">Start chatting</string>
+    <string name="first_run_step_chat_locked">Finish the steps above first</string>
+    <string name="first_run_done">Done</string>
+    <string name="settings_agent_loop_models_subtitle">Choose the models the agent\'s tools may use</string>
+    <string name="settings_thinking_rules">Thinking rules</string>
+    <string name="settings_thinking_rules_subtitle">How each provider\'s thinking parameters map</string>
+    <string name="settings_models_stats_header">Statistics</string>
+    <string name="thinking_rules_hub_footer">Thinking rules are edited per provider because they depend on its protocol.</string>
+    <string name="thinking_rules_hub_custom">Custom rules supported</string>
+    <string name="thinking_rules_hub_official">Official protocol, no custom rules</string>
+    <string name="scheduled_tasks_empty_title">No scheduled tasks</string>
+    <string name="scheduled_run_ok">Succeeded</string>
+    <string name="scheduled_run_failed">Failed</string>
+    <string name="chat_empty_greeting_dawn">Good early morning</string>
+    <string name="chat_empty_greeting_dawn_b">Up before the sun?</string>
+    <string name="chat_empty_greeting_morning_b">Rise and shine</string>
+    <string name="chat_empty_greeting_noon">Good noon</string>
+    <string name="chat_empty_greeting_noon_b">Lunch time</string>
+    <string name="chat_empty_greeting_afternoon_b">Hope your afternoon is going well</string>
+    <string name="chat_empty_greeting_evening_b">Evening already</string>
+    <string name="chat_empty_greeting_night">It\'s getting late</string>
+    <string name="chat_empty_greeting_night_b">Still up?</string>
+    <string name="chat_empty_prompt_b">How can I help?</string>
+    <string name="chat_empty_prompt_c">What should we start with?</string>
+    <string name="chat_empty_prompt_d">Where shall we begin?</string>
+    <string name="chat_empty_prompt_e">Leave it to me, tell me more.</string>
+    <string name="chat_empty_prompt_f">What\'s on your plate today?</string>
+    <string name="appearance_ui_style_title">Interface style</string>
+    <string name="appearance_style_classic">Classic</string>
+    <string name="appearance_style_glass">Glass</string>
+    <string name="perm_more_privileges">More system privileges</string>
+    <string name="session_prompt_title">Session prompt</string>
+    <string name="chat_agent_presets_hint">Applies to this session right away.</string>
+    <string name="chat_agent_preset_applied">Switched to %1$s (takes effect on the next message)</string>
+    <string name="perm_tool_vscreen_open">Open the virtual screen</string>
+    <string name="perm_tool_vscreen_launch">Launch an app on it</string>
+    <string name="perm_tool_vscreen_close">Close the virtual screen</string>
+    <string name="perm_tool_vscreen_status">Read device status</string>
+    <string name="perm_tool_vscreen_ui">Operate the virtual screen</string>
+    <string name="perm_vscreen_master_title">Let the agent use the virtual screen</string>
+    <string name="perm_vscreen_master_sub">Master switch; the items below are its permissions</string>
+    <string name="settings_ready_shizuku_title">Shizuku</string>
+    <string name="settings_ready_shizuku_ok">Connected · used by the virtual screen and Agent tools</string>
+    <string name="settings_ready_shizuku_bad">Not ready · install, start or authorize Shizuku</string>
+    <string name="settings_ready_overlay_title">Display over other apps</string>
+    <string name="settings_ready_overlay_ok">Allowed</string>
+    <string name="settings_ready_overlay_bad">Off · the desktop pet and floating controls need it</string>
+    <string name="settings_ready_role_ok">Set as the default assistant</string>
+    <string name="settings_ready_role_bad">Not set · needed to start Minis with the power key</string>
+    <string name="settings_ready_tool_ok">Granted in Android</string>
+    <string name="settings_ready_tool_bad">Not granted in Android · the Agent’s calls to this tool will fail</string>
+    <string name="settings_ready_all_good_body">Everything the Agent needs is ready.</string>
+    <string name="assistant_menu_copy_text">Copy text</string>
+    <string name="assistant_action_stop_reading">Stop reading</string>
+    <string name="assistant_regenerate_unavailable">Can’t regenerate this reply: the question before it has no text, or no model is set up.</string>
+    <string name="assistant_regenerate_confirm_title">Regenerate this reply?</string>
+    <string name="assistant_regenerate_confirm_body">The %1$d message(s) after it will be deleted and can’t be restored. To keep them, use Branch first.</string>
+    <string name="assistant_regenerate_confirm_action">Regenerate</string>
+    <string name="rootfs_not_installed_label">Not installed</string>
+    <string name="vscreen_viewer_idle">The virtual screen is not open. Open it here, or let the agent open it.</string>
+    <string name="vscreen_viewer_open">Open virtual screen</string>
+    <string name="vscreen_viewer_close">Close virtual screen</string>
+    <string name="vscreen_viewer_close_ai">The agent is using this screen. Closing it interrupts what it is doing.</string>
+    <string name="vscreen_viewer_back">Back</string>
+    <string name="vscreen_viewer_home">Home</string>
+    <string name="vscreen_viewer_launch">Open app</string>
+    <string name="vscreen_viewer_type">Type text</string>
+    <string name="vscreen_viewer_type_hint">Fills the field that has focus on the virtual screen, replacing what is there.</string>
+    <string name="vscreen_viewer_type_send">Fill in</string>
+    <string name="vscreen_viewer_search_apps">Search apps</string>
+    <string name="vscreen_viewer_launch_failed">Could not start that app on the virtual screen.</string>
+    <string name="vscreen_viewer_open_failed">Could not open the virtual screen: %1$s</string>
+    <string name="vscreen_viewer_fps">%1$d fps</string>
+    <string name="work_status_running">Working</string>
+    <string name="work_status_done">Done</string>
+    <string name="assistant_menu_branch_here">Branch from here</string>
+    <string name="chat_input_placeholder">Message, or type / for skills</string>
+    <string name="chat_input_placeholder_hint_4">Long-press a reply to open its menu: copy, select text, read aloud</string>
+    <string name="chat_time_today">Today %1$s</string>
+    <string name="chat_time_yesterday">Yesterday %1$s</string>
 </resources>

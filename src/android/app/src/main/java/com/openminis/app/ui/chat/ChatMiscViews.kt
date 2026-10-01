@@ -442,7 +442,7 @@ private fun BorderedMarkdownTable(
                         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                             as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("table", md))
-                        android.widget.Toast.makeText(context, copiedToast, android.widget.Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, copiedToast)
                     }
                 },
             )
@@ -899,7 +899,6 @@ internal fun rememberBrowserLiveSnapshot(
  */
 @Composable
 internal fun ResumeBanner(onResume: () -> Unit) {
-    val orange = ChatColors.warn
     // [T-android-c3a-resume-one-tap] Crash-aware resume. When the previous app
     // cycle ended in crash_or_stall we surface a one-line warning as CONTEXT
     // (the user is about to re-enter the load that killed the last cycle), but
@@ -908,59 +907,21 @@ internal fun ResumeBanner(onResume: () -> Unit) {
     // the first tap only armed the warning and a second tap was required; that
     // extra confirm was friction on an already-explicit gesture.)
     val showCrashWarning = com.openminis.app.diagnostics.LaunchCycleBeacon.lastCycleWasCrash
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(orange.copy(alpha = 0.08f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f),
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = orange,
-                modifier = Modifier.size(12.dp),
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (showCrashWarning) {
-                    stringResource(R.string.chat_resume_crash_warning)
-                } else {
-                    stringResource(R.string.resume_banner_title)
-                },
-                fontSize = 11.sp,
-                color = if (showCrashWarning) MaterialTheme.colorScheme.error else ChatColors.secondaryText,
-            )
-        }
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(orange)
-                .clickable(onClick = { onResume() })
-                .padding(horizontal = 10.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(10.dp),
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = stringResource(R.string.resume_action),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
-    }
+    com.openminis.app.ui.components.MinisBanner(
+        text = if (showCrashWarning) {
+            stringResource(R.string.chat_resume_crash_warning)
+        } else {
+            stringResource(R.string.resume_banner_title)
+        },
+        modifier = Modifier.padding(vertical = 4.dp),
+        kind = if (showCrashWarning) {
+            com.openminis.app.ui.components.BannerKind.ERROR
+        } else {
+            com.openminis.app.ui.components.BannerKind.WARNING
+        },
+        actionLabel = stringResource(R.string.resume_action),
+        onAction = onResume,
+    )
 }
 
 /// Floating "send arrow + Release to send capsule" hint shown while the

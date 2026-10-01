@@ -70,8 +70,8 @@ import com.openminis.app.ui.theme.minisSheetColor
 /**
  * [T-android-settings-hierarchy] One level-2 page: the settings that belong to a single category.
  *
- * The Settings home lists seven categories in the order of the design board (Models, Agent, Chat &
- * input, Appearance, Runtime environment, System & permissions, Data & about). Files are not a
+ * The Settings home lists the categories in the order of the design board (Models, Agent, Chat &
+ * input, Appearance), then Files, Runtime environment, System & permissions, Data & about. Files are not a
  * settings category any more: they are a daily entry in the session drawer. [FILES] stays as a
  * hidden page only because that drawer entry still opens it.
  */
@@ -88,14 +88,14 @@ enum class SettingsCategory(
     RUNTIME("runtime", R.string.settings_cat_runtime, R.string.settings_cat_runtime_sub2),
     SYSTEM("system", R.string.settings_section_system, R.string.settings_cat_system_sub2),
     DATA("data", R.string.settings_cat_data, R.string.settings_cat_data_sub),
-    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub, inRoot = false),
+    FILES("files", R.string.settings_section_files, R.string.settings_category_files_sub),
     ;
 
     companion object {
         /** Cards on the Settings home, top to bottom, as the design groups them. */
         val rootGroups: List<List<SettingsCategory>> = listOf(
             listOf(MODELS, AGENT, CHAT, APPEARANCE),
-            listOf(RUNTIME, SYSTEM, DATA),
+            listOf(FILES, RUNTIME, SYSTEM, DATA),
         )
 
         /** Also accepts the keys the six- and seven-category layouts used to publish. */
@@ -136,6 +136,7 @@ fun SettingsCategoryScreen(
     onBack: () -> Unit,
     onProvidersClick: () -> Unit = {},
     onModelsClick: () -> Unit = {},
+    onAgentLoopModelsClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onSkillsClick: () -> Unit = {},
     onCharactersClick: () -> Unit = {},
@@ -143,7 +144,6 @@ fun SettingsCategoryScreen(
     onSystemPromptClick: () -> Unit = {},
     onMemoryClick: () -> Unit = {},
     onMcpClick: () -> Unit = {},
-    onTerminalClick: () -> Unit = {},
     onEnvVarsClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
@@ -157,7 +157,6 @@ fun SettingsCategoryScreen(
     onAboutClick: () -> Unit = {},
     onTeamClick: () -> Unit = {},
     onScheduledTasksClick: () -> Unit = {},
-    onFileBrowserClick: () -> Unit = {},
     onRootfsManagementClick: () -> Unit = {},
     onOpenBackground: () -> Unit = {},
 ) {
@@ -169,6 +168,8 @@ fun SettingsCategoryScreen(
     SettingsScaffold(
         title = stringResource(category.titleRes),
         onBack = onBack,
+        backLabel = stringResource(R.string.settings_title),
+        largeTitle = true,
     ) {
         when (category) {
             SettingsCategory.MODELS -> {
@@ -188,10 +189,17 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.model_slots_header),
                         subtitle = stringResource(R.string.model_slots_footer),
                         onClick = onModelsClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.AutoAwesome,
+                        iconColor = Color(0xFF34C759),
+                        title = stringResource(R.string.settings_agent_loop_models),
+                        subtitle = stringResource(R.string.settings_agent_loop_models_subtitle),
+                        onClick = onAgentLoopModelsClick,
                         showDivider = false,
                     )
                 }
-                SettingsSection {
+                SettingsSection(header = stringResource(R.string.settings_models_stats_header)) {
                     SettingsRow(
                         icon = Icons.Outlined.BarChart,
                         iconColor = Color(0xFFFF9500),
@@ -320,40 +328,13 @@ fun SettingsCategoryScreen(
                         showDivider = false,
                     )
                 }
-                SettingsSection(
-                    header = stringResource(R.string.settings_runtime_section_tools),
-                    footer = stringResource(R.string.settings_runtime_footer),
-                ) {
-                    SettingsRow(
-                        icon = Icons.Outlined.Terminal,
-                        iconColor = Color(0xFF1C1C1E),
-                        title = stringResource(R.string.terminal_title),
-                        subtitle = stringResource(R.string.settings_terminal_subtitle),
-                        onClick = onTerminalClick,
-                    )
-                    SettingsRow(
-                        icon = Icons.Outlined.Folder,
-                        iconColor = Color(0xFF007AFF),
-                        title = stringResource(R.string.settings_runtime_browse_files),
-                        onClick = onFileBrowserClick,
-                        showDivider = false,
-                    )
-                }
             }
 
             SettingsCategory.SYSTEM -> {
                 ReadinessCheckSection(onOpenBackground = onOpenBackground)
                 SettingsSection(
                     header = stringResource(R.string.settings_manage_header),
-                    footer = stringResource(R.string.settings_system_footer),
                 ) {
-                    SettingsRow(
-                        icon = Icons.Outlined.Shield,
-                        iconColor = Color(0xFFFF3B30),
-                        title = stringResource(R.string.system_enhance_title),
-                        subtitle = stringResource(R.string.system_enhance_row_subtitle),
-                        onClick = onSystemEnhanceClick,
-                    )
                     SettingsRow(
                         icon = Icons.Outlined.Terminal,
                         iconColor = Color(0xFF5856D6),
@@ -378,7 +359,7 @@ fun SettingsCategoryScreen(
                     SettingsRow(
                         icon = Icons.Outlined.Lock,
                         iconColor = Color(0xFF34C759),
-                        title = stringResource(R.string.settings_section_permissions),
+                        title = stringResource(R.string.system_permissions_title),
                         subtitle = stringResource(R.string.settings_permissions_category_sub),
                         onClick = onPermissionsClick,
                     )
@@ -388,8 +369,16 @@ fun SettingsCategoryScreen(
                         title = stringResource(R.string.bg_section_header),
                         subtitle = stringResource(R.string.bg_section_subtitle),
                         onClick = onBackgroundClick,
+                    )
+                    SettingsRow(
+                        icon = Icons.Outlined.Shield,
+                        iconColor = Color(0xFFFF3B30),
+                        title = stringResource(R.string.system_enhance_title),
+                        subtitle = stringResource(R.string.system_enhance_row_subtitle),
+                        onClick = onSystemEnhanceClick,
                         showDivider = false,
                     )
+
                 }
             }
 
@@ -438,26 +427,15 @@ fun SettingsCategoryScreen(
     }
 
     if (showFeedbackSheet) {
-        MinisModalBottomSheet(
-            onDismissRequest = { showFeedbackSheet = false },
-            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) {
-                Color.Transparent
-            } else {
-                minisSheetColor()
-            },
-        ) {
-            GlassSheetWindowBlur()
-            Column(modifier = Modifier.fillMaxWidth().glassSheetSurface().padding(bottom = 24.dp)) {
-                FeedbackSheetItem(
-                    icon = Icons.Outlined.BugReport,
-                    title = stringResource(R.string.settings_submit_github_issues),
-                    onClick = {
-                        showFeedbackSheet = false
-                        openExternalUrl(context, buildBugReportUrl())
-                    },
-                )
-            }
-        }
+        com.openminis.app.ui.components.MinisActionSheet(
+            onDismiss = { showFeedbackSheet = false },
+            title = stringResource(R.string.settings_feedback),
+            actions = listOf(
+                com.openminis.app.ui.components.MinisAction(stringResource(R.string.settings_submit_github_issues)) {
+                    openExternalUrl(context, buildBugReportUrl())
+                },
+            ),
+        )
     }
 
     if (showSubagentLimits) {

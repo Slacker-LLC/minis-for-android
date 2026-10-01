@@ -1,5 +1,15 @@
 package com.openminis.app.ui.browser
 
+import com.openminis.app.ui.settings.settingsSheetColor
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import com.openminis.app.ui.settings.SettingsSearchField
+import com.openminis.app.ui.settings.SettingsRow
+import com.openminis.app.ui.settings.SettingsSection
+import com.openminis.app.i18n.uppercaseForDisplay
+import com.openminis.app.ui.settings.SettingsSegmented
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import android.webkit.CookieManager
 import android.webkit.WebStorage
@@ -125,13 +135,16 @@ fun BrowserSettingsSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else settingsSheetColor(),
     ) {
         GlassSheetWindowBlur()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // A sheet, not a page: about 83% of the screen, scrolling inside.
+                .height((LocalConfiguration.current.screenHeightDp * 0.83f).dp)
                 .glassSheetSurface()
+                .imePadding()
                 // [T-android-browser-settings-keyboard-overlap] imePadding
                 // shrinks the sheet's content frame when the keyboard
                 // opens; verticalScroll lets the user (or the focused-
@@ -140,73 +153,57 @@ fun BrowserSettingsSheet(
                 // Previously the Column was a fixed Column with no
                 // scroll, so Width/Height/idle-timeout fields below the
                 // viewport stayed glued and the keyboard ate them.
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
                 .navigationBarsPadding(),
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // Header: title centered, Done on the right (board)
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
                     stringResource(R.string.browser_settings_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.align(Alignment.Center),
                 )
-                MinisTextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_settings_done)) }
+                MinisTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd)) {
+                    Text(stringResource(R.string.browser_settings_done), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
 
             // ── User Agent ──
-            Text(
-                stringResource(R.string.browser_settings_user_agent),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            BrowserSectionHeader(stringResource(R.string.browser_settings_user_agent))
             Spacer(Modifier.height(8.dp))
 
             val notSetPlaceholder = stringResource(R.string.browser_settings_ua_not_set)
-            for (profile in UserAgentProfile.entries) {
-                val label = stringResource(when (profile) {
-                    UserAgentProfile.MOBILE_CHROME -> R.string.browser_settings_ua_mobile_chrome
-                    UserAgentProfile.DESKTOP_CHROME -> R.string.browser_settings_ua_desktop_chrome
-                    UserAgentProfile.CUSTOM -> R.string.browser_settings_ua_custom
-                })
-                val uaSubtitle = displayUA(profile, customUA, notSetPlaceholder)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = selectedProfile == profile,
-                        onClick = {
-                            selectedProfile = profile
-                            prefs.edit()
-                                .putString("user_agent_profile", profile.name)
-                                .apply()
-                            tabPool.setUserAgentFromUI(profile, if (profile == UserAgentProfile.CUSTOM) customUA else null)
-                        },
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            uaSubtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+            val profiles = UserAgentProfile.entries.toList()
+            SettingsSegmented(
+                options = profiles.map { profile ->
+                    stringResource(when (profile) {
+                        UserAgentProfile.MOBILE_CHROME -> R.string.browser_settings_ua_mobile_chrome
+                        UserAgentProfile.DESKTOP_CHROME -> R.string.browser_settings_ua_desktop_chrome
+                        UserAgentProfile.CUSTOM -> R.string.browser_settings_ua_custom
+                    }).substringBefore(" (").substringBefore("（")
+                },
+                selectedIndex = profiles.indexOf(selectedProfile),
+                onSelect = { i ->
+                    val profile = profiles[i]
+                    selectedProfile = profile
+                    prefs.edit().putString("user_agent_profile", profile.name).apply()
+                    tabPool.setUserAgentFromUI(profile, if (profile == UserAgentProfile.CUSTOM) customUA else null)
+                },
+            )
+            Text(
+                displayUA(selectedProfile, customUA, notSetPlaceholder),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+            )
 
             if (selectedProfile == UserAgentProfile.CUSTOM) {
                 OutlinedTextField(
@@ -297,11 +294,7 @@ fun BrowserSettingsSheet(
             Spacer(Modifier.height(16.dp))
 
             // ── Idle Tab Eviction ──
-            Text(
-                stringResource(R.string.browser_settings_idle_timeout),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            BrowserSectionHeader(stringResource(R.string.browser_settings_idle_timeout))
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.browser_settings_idle_timeout_desc) + " " +
@@ -311,41 +304,46 @@ fun BrowserSettingsSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = idleTimeoutText,
-                    onValueChange = { new -> idleTimeoutText = new.filter { it.isDigit() }.take(3) },
-                    label = { Text(stringResource(R.string.browser_settings_minutes_label)) },
-                    singleLine = true,
-                    // [T-android-browser-settings-keyboard-overlap] this
-                    // field sits near the bottom of the sheet — without
-                    // scroll-into-view it sits behind the soft keyboard
-                    // every time the user taps it.
-                    modifier = Modifier.weight(1f).bringIntoViewOnFocus(),
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.size(8.dp))
-                MinisTextButton(
-                    onClick = {
-                        val minutes = idleTimeoutText.toIntOrNull()
-                            ?: BrowserTabPool.DEFAULT_IDLE_TIMEOUT_MINUTES
-                        tabPool.setIdleTimeoutMinutes(minutes)
-                        // Reflect clamping back into the field.
-                        idleTimeoutText = tabPool.idleTimeoutMinutes.toString()
+            SettingsSection(modifier = Modifier.padding(top = 0.dp)) {
+                SettingsRow(
+                    title = stringResource(R.string.browser_settings_minutes_label),
+                    showDivider = false,
+                    trailing = {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = idleTimeoutText,
+                            onValueChange = { new -> idleTimeoutText = new.filter { it.isDigit() }.take(3) },
+                            singleLine = true,
+                            // [T-android-browser-settings-keyboard-overlap] this
+                            // field sits near the bottom of the sheet — without
+                            // scroll-into-view it sits behind the soft keyboard
+                            // every time the user taps it.
+                            modifier = Modifier.widthIn(min = 48.dp, max = 80.dp).bringIntoViewOnFocus(),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            ),
+                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                        )
                     },
-                ) { Text(stringResource(R.string.browser_settings_apply)) }
+                )
             }
+            MinisTextButton(
+                onClick = {
+                    val minutes = idleTimeoutText.toIntOrNull()
+                        ?: BrowserTabPool.DEFAULT_IDLE_TIMEOUT_MINUTES
+                    tabPool.setIdleTimeoutMinutes(minutes)
+                    // Reflect clamping back into the field.
+                    idleTimeoutText = tabPool.idleTimeoutMinutes.toString()
+                },
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { Text(stringResource(R.string.browser_settings_apply)) }
 
             Spacer(Modifier.height(20.dp))
             HorizontalDivider()
             Spacer(Modifier.height(16.dp))
 
             // ── Cookies & Website Data ──
-            Text(
-                stringResource(R.string.browser_settings_cookies_title),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            BrowserSectionHeader(stringResource(R.string.browser_settings_cookies_title))
             Spacer(Modifier.height(8.dp))
 
             val hasCookies = CookieManager.getInstance().hasCookies()
@@ -357,13 +355,11 @@ fun BrowserSettingsSheet(
             }
 
             if (allDomains.isNotEmpty()) {
-                OutlinedTextField(
+                SettingsSearchField(
                     value = cookieFilterText,
                     onValueChange = { cookieFilterText = it },
-                    label = { Text(stringResource(R.string.browser_settings_filter_by_domain)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    textStyle = MaterialTheme.typography.bodySmall,
+                    placeholder = stringResource(R.string.browser_settings_filter_by_domain),
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
 
@@ -414,6 +410,7 @@ fun BrowserSettingsSheet(
             MinisTextButton(
                 onClick = { showClearConfirm = true },
                 enabled = hasCookies,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
             ) {
                 Text(stringResource(R.string.browser_settings_clear_all_cookies), color = MaterialTheme.colorScheme.error)
             }
@@ -677,25 +674,17 @@ private fun uaMismatchWarning(profile: UserAgentProfile, widthText: String): Str
 
 @Composable
 private fun UaMismatchBanner(message: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
-            .padding(8.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            Icons.Filled.Warning,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.tertiary,
-        )
-        Spacer(Modifier.size(8.dp))
-        Text(
-            message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
+    com.openminis.app.ui.components.MinisBanner(text = message)
+}
+
+/** Small grey section label above a settings block (board). */
+@Composable
+private fun BrowserSectionHeader(text: String) {
+    Text(
+        text.uppercaseForDisplay(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
 }

@@ -1,6 +1,8 @@
 package com.openminis.app.ui.settings
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -16,6 +18,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Warning
@@ -37,10 +41,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
+import com.openminis.app.offload.OffloadPermissionManager
+import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.power.PowerOptimizationManager
 import com.openminis.app.runtime.ubuntu.RootAccess
 import com.openminis.app.ui.components.MinisAlertDialog
@@ -48,18 +55,25 @@ import com.openminis.app.ui.components.MinisTextButton
 import com.openminis.app.ui.theme.ChatColors
 
 /**
- * The system conditions the Agent needs to work, in the order the design lists them
- * (Settings > System & permissions > Readiness check).
+ * Everything System & permissions manages, in the order the page lists it. The first four are what a
+ * normal task needs; the rest are optional and only serve a feature (screen reading, desktop pet,
+ * the assistant role, a tool the Agent is allowed to use).
  */
-enum class ReadinessId { ROOT, ALL_FILES, ACCESSIBILITY, BACKGROUND, NOTIFICATIONS }
+enum class ReadinessId {
+    ROOT, SHIZUKU, ALL_FILES, ACCESSIBILITY, OVERLAY, ASSISTANT_ROLE, BACKGROUND, NOTIFICATIONS,
+    CALENDAR, LOCATION, CONTACTS, PHOTOS,
+}
 
 data class ReadinessItem(val id: ReadinessId, val ok: Boolean) {
     /**
-     * Accessibility only serves the screen-reading tools; the Ubuntu runtime, file access,
-     * background running and notifications are what a normal task needs. Optional items are shown
-     * but never counted as "needs attention" (design: "可选项不计入未就绪").
+     * Optional items are shown but never counted as "needs attention" (design: "可选项不计入未就绪").
+     * Only Root, all-files access, background running and notifications are required.
      */
-    val optional: Boolean get() = id == ReadinessId.ACCESSIBILITY
+    val optional: Boolean get() = id !in REQUIRED
+
+    companion object {
+        val REQUIRED = setOf(ReadinessId.ROOT, ReadinessId.ALL_FILES, ReadinessId.BACKGROUND, ReadinessId.NOTIFICATIONS)
+    }
 }
 
 object SettingsReadiness {
@@ -67,34 +81,65 @@ object SettingsReadiness {
     fun attention(items: List<ReadinessItem>): List<ReadinessItem> = items.filter { !it.ok && !it.optional }
 
     /**
-     * Pure assembly so the counting rule is testable without Android: [rootGranted], [allFiles],
-     * [accessibility], [backgroundUnrestricted] and [notifications] are the raw probe results.
+     * Pure assembly so the counting rule is testable without Android. [results] holds the raw probe
+     * result of every item that applies on this device; an item with no entry is left out (the
+     * assistant role on a device without it, a tool the Agent may not use), and the rest keep the
+     * declared order.
      */
-    fun assemble(
-        rootGranted: Boolean,
-        allFiles: Boolean,
-        accessibility: Boolean,
-        backgroundUnrestricted: Boolean,
-        notifications: Boolean,
-    ): List<ReadinessItem> = listOf(
-        ReadinessItem(ReadinessId.ROOT, rootGranted),
-        ReadinessItem(ReadinessId.ALL_FILES, allFiles),
-        ReadinessItem(ReadinessId.ACCESSIBILITY, accessibility),
-        ReadinessItem(ReadinessId.BACKGROUND, backgroundUnrestricted),
-        ReadinessItem(ReadinessId.NOTIFICATIONS, notifications),
-    )
+    fun assemble(results: Map<ReadinessId, Boolean>): List<ReadinessItem> =
+        ReadinessId.entries.mapNotNull { id -> results[id]?.let { ReadinessItem(id, it) } }
 
     /** Below Android 11 there is no all-files switch; the legacy storage grant is not this item. */
     internal fun hasAllFilesAccess(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
-    internal fun probe(context: Context, rootGranted: Boolean): List<ReadinessItem> = assemble(
-        rootGranted = rootGranted,
-        allFiles = hasAllFilesAccess(),
-        accessibility = MinisAccessibilityService.isEnabled(context),
-        backgroundUnrestricted = PowerOptimizationManager.isIgnoringBatteryOptimizations(context),
-        notifications = NotificationManagerCompat.from(context).areNotificationsEnabled(),
-    )
+    /** The Android grants each Agent tool needs; one granted is enough for location and photos. */
+    internal fun toolGrants(id: ReadinessId): List<String> = when (id) {
+        ReadinessId.CALENDAR -> listOf(Manifest.permission.READ_CALENDAR)
+        ReadinessId.LOCATION -> listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        ReadinessId.CONTACTS -> listOf(Manifest.permission.READ_CONTACTS)
+        ReadinessId.PHOTOS ->
+            if (Build.VERSION.SDK_INT >= 33) {
+                listOf(Manifest.permission.READ_MEDIA_IMAGES, "android.permission.READ_MEDIA_VISUAL_USER_SELECTED")
+            } else {
+                listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        else -> emptyList()
+    }
+
+    /** Agent tool (Settings > Agent permissions) behind each runtime-grant item. */
+    internal fun toolNameFor(id: ReadinessId): String? = when (id) {
+        ReadinessId.CALENDAR -> "calendar"
+        ReadinessId.LOCATION -> "location"
+        ReadinessId.CONTACTS -> "contacts"
+        ReadinessId.PHOTOS -> "photos"
+        else -> null
+    }
+
+    internal fun probe(context: Context, rootGranted: Boolean): List<ReadinessItem> {
+        val results = linkedMapOf(
+            ReadinessId.ROOT to rootGranted,
+            ReadinessId.SHIZUKU to ShizukuManager.isReady(),
+            ReadinessId.ALL_FILES to hasAllFilesAccess(),
+            ReadinessId.ACCESSIBILITY to MinisAccessibilityService.isEnabled(context),
+            ReadinessId.OVERLAY to Settings.canDrawOverlays(context),
+            ReadinessId.BACKGROUND to PowerOptimizationManager.isIgnoringBatteryOptimizations(context),
+            ReadinessId.NOTIFICATIONS to NotificationManagerCompat.from(context).areNotificationsEnabled(),
+        )
+        val roleManager = context.assistantRoleManagerOrNull()
+        if (roleManager != null && runCatching { roleManager.assistantRoleAvailable() }.getOrDefault(false)) {
+            results[ReadinessId.ASSISTANT_ROLE] = runCatching { roleManager.assistantRoleHeld() }.getOrDefault(false)
+        }
+        // A tool the user has switched off in Agent permissions has no use for the Android grant.
+        for (id in listOf(ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS)) {
+            val tool = toolNameFor(id) ?: continue
+            if (!OffloadPermissionManager.isAllowed(tool)) continue
+            results[id] = toolGrants(id).any {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        return assemble(results)
+    }
 }
 
 /**
@@ -125,10 +170,15 @@ private fun ReadinessId.title(): String = stringResource(titleRes())
 private fun ReadinessItem.subtitle(): String = stringResource(
     when (id) {
         ReadinessId.ROOT -> if (ok) R.string.settings_ready_root_ok else R.string.settings_ready_root_bad
+        ReadinessId.SHIZUKU -> if (ok) R.string.settings_ready_shizuku_ok else R.string.settings_ready_shizuku_bad
         ReadinessId.ALL_FILES -> if (ok) R.string.settings_ready_files_ok else R.string.settings_ready_files_bad
         ReadinessId.ACCESSIBILITY -> if (ok) R.string.settings_ready_a11y_ok else R.string.settings_ready_a11y_bad
+        ReadinessId.OVERLAY -> if (ok) R.string.settings_ready_overlay_ok else R.string.settings_ready_overlay_bad
+        ReadinessId.ASSISTANT_ROLE -> if (ok) R.string.settings_ready_role_ok else R.string.settings_ready_role_bad
         ReadinessId.BACKGROUND -> if (ok) R.string.settings_ready_bg_ok else R.string.settings_ready_bg_bad
         ReadinessId.NOTIFICATIONS -> if (ok) R.string.settings_ready_notif_ok else R.string.settings_ready_notif_bad
+        ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS ->
+            if (ok) R.string.settings_ready_tool_ok else R.string.settings_ready_tool_bad
     },
 )
 
@@ -151,22 +201,50 @@ fun ReadinessBanner(items: List<ReadinessItem>, onClick: () -> Unit) {
 
 private fun ReadinessId.titleRes(): Int = when (this) {
     ReadinessId.ROOT -> R.string.settings_ready_root_title
+    ReadinessId.SHIZUKU -> R.string.settings_ready_shizuku_title
     ReadinessId.ALL_FILES -> R.string.settings_ready_files_title
     ReadinessId.ACCESSIBILITY -> R.string.settings_ready_a11y_title
+    ReadinessId.OVERLAY -> R.string.settings_ready_overlay_title
+    ReadinessId.ASSISTANT_ROLE -> R.string.settings_assistant_role
     ReadinessId.BACKGROUND -> R.string.settings_ready_bg_title
     ReadinessId.NOTIFICATIONS -> R.string.settings_ready_notif_title
+    ReadinessId.CALENDAR -> R.string.perm_tool_calendar
+    ReadinessId.LOCATION -> R.string.perm_tool_location
+    ReadinessId.CONTACTS -> R.string.perm_tool_contacts
+    ReadinessId.PHOTOS -> R.string.perm_tool_photos
 }
+
+/** Items whose button reads "Grant" (they ask for a permission); the rest send the user to a settings page. */
+private val GRANT_LABEL = setOf(
+    ReadinessId.ROOT, ReadinessId.ALL_FILES, ReadinessId.OVERLAY, ReadinessId.ASSISTANT_ROLE,
+    ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS,
+)
 
 /** Runs the action that fixes [item]: the system page for a grant, or the app's own page. */
 private fun fixReadiness(context: Context, item: ReadinessItem, onOpenBackground: () -> Unit) {
     when (item.id) {
         ReadinessId.ROOT -> RootAccess.request(context)
+        ReadinessId.SHIZUKU -> when (ShizukuManager.snapshot.value.state) {
+            ShizukuManager.State.NOT_INSTALLED -> ShizukuManager.openInstallPage(context)
+            ShizukuManager.State.NOT_RUNNING -> ShizukuManager.openShizukuApp(context)
+            ShizukuManager.State.NEED_PERMISSION -> ShizukuManager.requestPermission()
+            ShizukuManager.State.READY -> Unit
+        }
         ReadinessId.ALL_FILES -> openAllFilesAccess(context)
         ReadinessId.ACCESSIBILITY -> startSettings(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        ReadinessId.OVERLAY -> startSettings(
+            context,
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
+        )
+        ReadinessId.ASSISTANT_ROLE -> startSettings(context, Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
         ReadinessId.BACKGROUND -> onOpenBackground()
         ReadinessId.NOTIFICATIONS -> startSettings(
             context,
             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+        )
+        ReadinessId.CALENDAR, ReadinessId.LOCATION, ReadinessId.CONTACTS, ReadinessId.PHOTOS -> startSettings(
+            context,
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
         )
     }
 }
@@ -183,7 +261,6 @@ fun ReadinessCheckSection(onOpenBackground: () -> Unit) {
     var result by remember { mutableStateOf<List<ReadinessItem>?>(null) }
     SettingsSection(
         header = stringResource(R.string.settings_ready_header),
-        footer = stringResource(R.string.settings_ready_footer),
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
             MinisTextButton(onClick = { result = SettingsReadiness.probe(context, root.isGranted) }) {
@@ -205,7 +282,10 @@ fun ReadinessCheckSection(onOpenBackground: () -> Unit) {
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     if (!needsAttention) Text(stringResource(R.string.settings_ready_all_good_body))
                     run {
                         missing.forEach { item ->
@@ -228,7 +308,7 @@ fun ReadinessCheckSection(onOpenBackground: () -> Unit) {
                                 }) {
                                     Text(
                                         stringResource(
-                                            if (item.id == ReadinessId.ROOT || item.id == ReadinessId.ALL_FILES) {
+                                            if (item.id in GRANT_LABEL) {
                                                 R.string.settings_ready_action_grant
                                             } else {
                                                 R.string.settings_ready_action_open

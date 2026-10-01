@@ -85,7 +85,6 @@ import com.openminis.app.ui.components.SectionTextField
 
 private enum class AddProviderStep {
     CHOOSE_TYPE,
-    CHOOSE_CREDENTIAL,
     CONFIGURE,
 }
 
@@ -110,26 +109,11 @@ fun AddProviderScreen(
     val handleBack: () -> Unit = {
         when (step) {
             AddProviderStep.CHOOSE_TYPE -> onBack()
-            AddProviderStep.CHOOSE_CREDENTIAL -> {
+            // The type list goes straight to the form; back from it returns to the list.
+            AddProviderStep.CONFIGURE -> {
                 step = AddProviderStep.CHOOSE_TYPE
                 selectedType = null
-            }
-            AddProviderStep.CONFIGURE -> {
-                // Voice-template entry skipped the credential step entirely —
-                // back returns straight to the type/template list.
-                if (selectedVoiceTemplate != null) {
-                    step = AddProviderStep.CHOOSE_TYPE
-                    selectedType = null
-                    selectedVoiceTemplate = null
-                } else {
-                    val creds = availableCredentials(selectedType!!)
-                    if (creds.size == 1) {
-                        step = AddProviderStep.CHOOSE_TYPE
-                        selectedType = null
-                    } else {
-                        step = AddProviderStep.CHOOSE_CREDENTIAL
-                    }
-                }
+                selectedVoiceTemplate = null
                 selectedCredential = null
             }
         }
@@ -143,14 +127,9 @@ fun AddProviderScreen(
             onBack = handleBack,
             onSelect = { type ->
                 selectedType = type
-                val creds = availableCredentials(type)
-                if (creds.size == 1) {
-                    // Skip credential picker if only one option
-                    selectedCredential = creds.first()
-                    step = AddProviderStep.CONFIGURE
-                } else {
-                    step = AddProviderStep.CHOOSE_CREDENTIAL
-                }
+                // Straight to the form; providers with more than one way to sign in get a switch there.
+                selectedCredential = availableCredentials(type).first()
+                step = AddProviderStep.CONFIGURE
             },
             onSelectVoiceTemplate = { template ->
                 // Mirror iOS applyVoiceTemplate: pick the underlying protocol,
@@ -161,17 +140,10 @@ fun AddProviderScreen(
                 step = AddProviderStep.CONFIGURE
             },
         )
-        AddProviderStep.CHOOSE_CREDENTIAL -> ChooseCredentialScreen(
-            providerType = selectedType!!,
-            onBack = handleBack,
-            onSelect = { credential ->
-                selectedCredential = credential
-                step = AddProviderStep.CONFIGURE
-            },
-        )
         AddProviderStep.CONFIGURE -> ConfigureProviderScreen(
             providerType = selectedType!!,
             credentialType = selectedCredential!!,
+            onCredentialChange = { selectedCredential = it },
             providerRepository = providerRepository,
             voiceTemplate = selectedVoiceTemplate,
             onBack = handleBack,
@@ -247,7 +219,6 @@ private fun ChooseProviderScreen(
     ) {
         SettingsSection(
             header = stringResource(R.string.add_provider_choose_provider),
-            footer = stringResource(R.string.add_provider_you_can_add_multiple_instances_of_the_sa),
         ) {
             providerDisplayOrder.forEachIndexed { index, type ->
                 val displayTitle = when (type) {
@@ -298,9 +269,6 @@ private fun ChooseProviderScreen(
         val templateNotes = templates.mapNotNull { it.note }
         SettingsSection(
             header = stringResource(R.string.add_provider_voice_chat_providers),
-            footer = (
-                listOf(stringResource(R.string.add_provider_voice_templates_footer)) + templateNotes
-                ).joinToString("\n"),
         ) {
             templates.forEachIndexed { index, template ->
                 val capabilityRes = when (template.capability) {
@@ -324,75 +292,6 @@ private fun ChooseProviderScreen(
     }
 }
 
-// -- Step 2: Choose Credential Type --
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChooseCredentialScreen(
-    providerType: ProviderType,
-    onBack: () -> Unit,
-    onSelect: (ProviderCredential) -> Unit,
-) {
-    val credentials = availableCredentials(providerType)
-
-    SettingsScaffold(
-        title = stringResource(R.string.add_provider_auth_method),
-        onBack = onBack,
-    ) {
-        SettingsSection(
-            header = stringResource(R.string.add_provider_choose_authentication),
-            footer = stringResource(R.string.add_provider_pick_the_auth_method_that_matches_your_a),
-        ) {
-            credentials.forEachIndexed { index, credential ->
-                val (title, description, icon) = when (credential) {
-                    ProviderCredential.apiKey -> Triple(
-                        stringResource(R.string.provider_list_api_key),
-                        apiKeyDescription(providerType),
-                        Icons.Default.Key,
-                    )
-                    ProviderCredential.oauth -> Triple(
-                        "OAuth",
-                        oauthDescription(providerType),
-                        Icons.Default.Person,
-                    )
-                }
-                SettingsRow(
-                    title = title,
-                    subtitle = description,
-                    icon = icon,
-                    onClick = { onSelect(credential) },
-                    showDivider = index < credentials.size - 1,
-                )
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-}
-
-private fun apiKeyDescription(type: ProviderType): String = when (type) {
-    ProviderType.openAI -> "Supports OpenAI official API and compatible third-party endpoints"
-    ProviderType.anthropic -> "Use an API key from your Anthropic account"
-    ProviderType.gemini -> "Use an API key from your Google Gemini account"
-    ProviderType.openRouter -> "Use an API key from your OpenRouter account"
-    ProviderType.xAI -> "Use an API key from your xAI Console (api.x.ai)"
-    ProviderType.kimiCode -> "Use an API key from your Moonshot account"
-    ProviderType.openAIResponses -> "Supports the OpenAI Responses API and compatible endpoints"
-    ProviderType.antigravity,
-    ProviderType.unsupported -> "This provider type is not supported on Android"
-}
-
-private fun oauthDescription(type: ProviderType): String = when (type) {
-    ProviderType.anthropic -> "Sign in with your Claude account"
-    ProviderType.gemini -> "Sign in with Google for Cloud Code Assist"
-    ProviderType.openAI -> "Sign in with OpenAI Codex"
-    ProviderType.xAI -> "Sign in with xAI (requires SuperGrok or X Premium+)"
-    ProviderType.openRouter -> "Sign in with OpenRouter"
-    ProviderType.kimiCode -> "Sign in with your Kimi account (Coding Plan)"
-    ProviderType.openAIResponses -> "Sign in with OpenAI Codex"
-    ProviderType.antigravity,
-    ProviderType.unsupported -> "This provider type is not supported on Android"
-}
-
 // -- Step 3: Configure & Save --
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -400,6 +299,7 @@ private fun oauthDescription(type: ProviderType): String = when (type) {
 private fun ConfigureProviderScreen(
     providerType: ProviderType,
     credentialType: ProviderCredential,
+    onCredentialChange: (ProviderCredential) -> Unit,
     providerRepository: ProviderRepository,
     voiceTemplate: com.openminis.app.data.model.VoiceProviderTemplate? = null,
     onBack: () -> Unit,
@@ -442,7 +342,18 @@ private fun ConfigureProviderScreen(
     SettingsScaffold(
         title = stringResource(R.string.add_provider_configure_provider, providerType.displayName),
         onBack = onBack,
+        backLabel = stringResource(R.string.provider_list_add_provider),
     ) {
+        // More than one way to sign in (API key / OAuth): a switch on the form, not a page of its own.
+        val credentials = availableCredentials(providerType)
+        if (voiceTemplate == null && credentials.size > 1) {
+            SettingsSegmented(
+                options = credentials.map { if (it == ProviderCredential.apiKey) stringResource(R.string.provider_list_api_key) else "OAuth" },
+                selectedIndex = credentials.indexOf(credentialType).coerceAtLeast(0),
+                onSelect = { onCredentialChange(credentials[it]) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         // Identity section — Label only. Each provider auto-suggests a
         // unique label so users don't have to type one for the common case.
         SettingsSection(
@@ -532,7 +443,6 @@ private fun ColumnScope.ApiKeyConfigSection(
     }
     SettingsSection(
         header = stringResource(R.string.add_provider_credential),
-        footer = stringResource(R.string.add_provider_your_key_is_stored_securely_in_encrypted),
     ) {
         SettingsCardBlock {
             RowLabel(text = stringResource(R.string.provider_list_api_key))
@@ -607,18 +517,16 @@ private fun ColumnScope.ApiKeyConfigSection(
                         },
                         showDivider = false,
                     )
-                    Text(
+                    com.openminis.app.ui.components.MinisBanner(
                         text = stringResource(R.string.provider_insecure_http_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        kind = com.openminis.app.ui.components.BannerKind.WARNING,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 } else {
-                    Text(
+                    com.openminis.app.ui.components.MinisBanner(
                         text = stringResource(R.string.provider_cleartext_local_only),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        kind = com.openminis.app.ui.components.BannerKind.ERROR,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
             }
@@ -645,18 +553,16 @@ private fun ColumnScope.ApiKeyConfigSection(
             },
         ) {
             SettingsCardBlock {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !useResponsesAPI,
-                        onClick = { useResponsesAPI = false },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) { Text(stringResource(R.string.provider_detail_chat_completions)) }
-                    SegmentedButton(
-                        selected = useResponsesAPI,
-                        onClick = { useResponsesAPI = true },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) { Text(stringResource(R.string.provider_detail_responses_api)) }
-                }
+                SettingsSegmented(
+                options = listOf(stringResource(R.string.provider_detail_chat_completions), stringResource(R.string.provider_detail_responses_api)),
+                selectedIndex = listOf(!useResponsesAPI, useResponsesAPI).indexOfFirst { it }.coerceAtLeast(0),
+                onSelect = { index ->
+                    when (index) {
+                    0 -> run { useResponsesAPI = false }
+                    1 -> run { useResponsesAPI = true }
+                    }
+                },
+            )
             }
         }
     }
@@ -769,7 +675,6 @@ private fun ColumnScope.OAuthConfigSection(
         // ── Authenticated state — Token + Save ─────────────────────────
         SettingsSection(
             header = stringResource(R.string.add_provider_authentication),
-            footer = stringResource(R.string.add_provider_sign_in_succeeded_the_token_is_stored_in),
         ) {
             SettingsCardBlock {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -817,11 +722,6 @@ private fun ColumnScope.OAuthConfigSection(
         // ── Sign In ────────────────────────────────────────────────────
         SettingsSection(
             header = stringResource(R.string.provider_detail_sign_in),
-            footer = if (oauthAvailableInThisBuild) {
-                stringResource(R.string.add_provider_opens_the_provider_s_web_sign_in_flow_af)
-            } else {
-                stringResource(R.string.provider_oauth_not_available_in_this_build)
-            },
         ) {
             SettingsCardBlock {
                 MinisOutlinedButton(
@@ -931,7 +831,6 @@ private fun ColumnScope.OAuthConfigSection(
         }
         SettingsSection(
             header = stringResource(R.string.add_provider_or_configure_manually),
-            footer = stringResource(R.string.add_provider_for_third_party_coding_plans_e_g_minimax),
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))

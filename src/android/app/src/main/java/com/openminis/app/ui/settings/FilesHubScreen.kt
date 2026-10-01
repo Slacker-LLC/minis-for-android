@@ -74,20 +74,17 @@ fun FilesHubScreen(
     onOpenMemory: () -> Unit,
     onOpenMounts: () -> Unit,
     onOpenSessionFiles: () -> Unit,
-    onBrowseRootfs: () -> Unit,
-    onOpenTerminal: () -> Unit,
 ) {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf<StorageSnapshot?>(null) }
     LaunchedEffect(Unit) { snapshot = loadStorageSnapshot(context, chatDao) }
     val mounts by mountedFoldersStore.entries.collectAsState()
 
-    SettingsScaffold(title = stringResource(R.string.settings_section_files), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.settings_section_files), onBack = onBack, largeTitle = true) {
         UsageHeader(snapshot)
 
         SettingsSection(
             header = stringResource(R.string.files_section_sandbox),
-            footer = stringResource(R.string.files_sandbox_footer),
         ) {
             SettingsRow(
                 icon = Icons.Outlined.Folder,
@@ -148,25 +145,6 @@ fun FilesHubScreen(
                         )
                     }
                 },
-            )
-        }
-
-        SettingsSection(
-            header = stringResource(R.string.files_section_advanced),
-            footer = stringResource(R.string.files_advanced_footer),
-        ) {
-            SettingsRow(
-                icon = Icons.Outlined.Dns,
-                iconColor = Color(0xFF636366),
-                title = stringResource(R.string.files_browse_rootfs),
-                onClick = onBrowseRootfs,
-            )
-            SettingsRow(
-                icon = Icons.Outlined.Terminal,
-                iconColor = Color(0xFF1C1C1E),
-                title = stringResource(R.string.files_open_in_terminal),
-                onClick = onOpenTerminal,
-                showDivider = false,
             )
         }
 

@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.material.icons.filled.Person
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -78,7 +79,6 @@ fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var characters by remember { mutableStateOf<List<CharacterProfile>>(emptyList()) }
-    var pendingDelete by remember { mutableStateOf<CharacterProfile?>(null) }
 
     suspend fun refresh() {
         characters = withContext(Dispatchers.IO) {
@@ -110,26 +110,19 @@ fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.characters_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.characters_import))
-                    }
-                },
-            )
+    SettingsScaffold(
+        title = stringResource(R.string.characters_title),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_cat_agent),
+        actions = {
+            IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.characters_import), tint = MaterialTheme.colorScheme.primary)
+            }
         },
-    ) { padding ->
+    ) {
         if (characters.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(24.dp).padding(top = 48.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -139,97 +132,37 @@ fun CharactersScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}) {
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
-            ) {
-                items(characters, key = { it.id }) { profile ->
+            SettingsSection {
+                characters.forEachIndexed { index, profile ->
+                    val imported = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                        .format(Date(profile.updatedAt))
                     CharacterRow(
                         profile = profile,
-                        onShare = {
-                            scope.launch {
-                                val uri = withContext(Dispatchers.IO) { shareCard(context, profile) }
-                                if (uri == null) {
-                                    Toast.makeText(context, R.string.characters_export_failed, Toast.LENGTH_LONG).show()
-                                } else {
-                                    val send = Intent(Intent.ACTION_SEND).apply {
-                                        type = if (profile.avatarPath != null) "image/png" else "application/json"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(
-                                        Intent.createChooser(send, context.getString(R.string.characters_export))
-                                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-                                    )
-                                }
-                            }
-                        },
-                        onDelete = { pendingDelete = profile },
+                        subtitle = imported,
+                        showDivider = index < characters.size - 1,
                         onOpen = { onOpen(profile.id) },
                     )
                 }
             }
         }
     }
-
-    pendingDelete?.let { target ->
-        MinisAlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.characters_delete)) },
-            text = { Text(stringResource(R.string.characters_delete_confirm, target.card.name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDelete = null
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            runCatching { CharacterRepository.delete(target.id) }
-                        }
-                        refresh()
-                    }
-                }) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
-            },
-        )
-    }
 }
 
 @Composable
 private fun CharacterRow(
     profile: CharacterProfile,
-    onShare: () -> Unit,
-    onDelete: () -> Unit,
+    subtitle: String,
+    showDivider: Boolean,
     onOpen: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AvatarThumbnail(profile)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = profile.card.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val imported = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                .format(Date(profile.updatedAt))
-            Text(
-                text = imported,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onShare) {
-            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.characters_export))
-        }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.characters_delete))
-        }
-    }
+    SettingsRow(
+        title = profile.card.name,
+        subtitle = subtitle,
+        onClick = onOpen,
+        showDivider = showDivider,
+        trailing = { AvatarThumbnail(profile) },
+        minHeight = 64.dp,
+    )
 }
 
 @Composable
@@ -240,18 +173,36 @@ private fun AvatarThumbnail(profile: CharacterProfile) {
         }
     }
     Box(
-        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
             Image(bitmap = bitmap.asImageBitmap(), contentDescription = null)
         } else {
             Icon(
-                Icons.Default.Add,
+                Icons.Default.Person,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Builds the export and opens the system share sheet; a toast says so when the export fails. */
+internal suspend fun shareCharacter(context: android.content.Context, profile: CharacterProfile) {
+    val uri = withContext(Dispatchers.IO) { shareCard(context, profile) }
+    if (uri == null) {
+        com.openminis.app.ui.components.MinisToast.show(context, R.string.characters_export_failed)
+    } else {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = if (profile.avatarPath != null) "image/png" else "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            Intent.createChooser(send, context.getString(R.string.characters_export))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
     }
 }
 

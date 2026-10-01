@@ -1641,12 +1641,6 @@ class ChatViewModel(
             subtitle = "",
         ),
         SlashCommand(
-            id = "clear",
-            icon = Icons.Default.Delete,
-            title = "Clear",
-            subtitle = "",
-        ),
-        SlashCommand(
             id = "compact",
             icon = Icons.Default.Compress,
             title = "Compact",
@@ -1674,6 +1668,12 @@ class ChatViewModel(
             id = "export",
             icon = Icons.Outlined.FileDownload,
             title = "Export",
+            subtitle = "",
+        ),
+        SlashCommand(
+            id = "clear",
+            icon = Icons.Default.Delete,
+            title = "Clear",
             subtitle = "",
         ),
     )
@@ -5520,16 +5520,16 @@ class ChatViewModel(
      * preceding user turn and trigger retryFromMessage, reusing the entire
      * existing Agent retry / truncation / streaming execution pipeline.
      */
-    fun regenerateAssistantMessage(messageId: String) {
-        if (_isStreaming.value || _generatingMessageId.value != null) return
+    fun regenerateAssistantMessage(messageId: String): Boolean {
+        if (_isStreaming.value || _generatingMessageId.value != null) return false
         val messages = _messages.value
         val asstIndex = messages.indexOfFirst { it.id == messageId }
-        if (asstIndex < 0) return
+        if (asstIndex < 0) return false
         val asstMsg = messages[asstIndex]
-        if (asstMsg.role != "assistant") return
+        if (asstMsg.role != "assistant") return false
 
         val userIndex = messages.subList(0, asstIndex).indexOfLast { it.role == "user" }
-        if (userIndex < 0) return
+        if (userIndex < 0) return false
         val userMsg = messages[userIndex]
 
         _generatingMessageId.value = messageId
@@ -5539,7 +5539,16 @@ class ChatViewModel(
             // providers before streaming starts. No streaming transition will
             // arrive to clear this marker, so clear it at the rejection site.
             _generatingMessageId.value = null
+            return false
         }
+        return true
+    }
+
+    /** How many messages follow [messageId]; regenerating it would discard all of them. */
+    fun messagesAfter(messageId: String): Int {
+        val messages = _messages.value
+        val index = messages.indexOfFirst { it.id == messageId }
+        return if (index < 0) 0 else messages.size - index - 1
     }
 
     val replySpeechState: StateFlow<com.openminis.app.speech.ReplySpeechState> =
@@ -5554,28 +5563,17 @@ class ChatViewModel(
             ?: com.openminis.app.speech.ReadAloudPlayer(context).also { replyPlayer = it }
     }
 
+    /**
+     * The reply's read-aloud button: start reading it, or stop while it is the one being read.
+     * Pausing belongs to the reading bar ([toggleReplySpeechPause]).
+     */
     fun toggleReplySpeech(messageId: String, displayIndex: Int, rawMarkdown: String) {
         val cur = com.openminis.app.speech.VoiceOutputState.replySpeechState.value
-        if (cur.activeMessageId == messageId) {
-            when (cur.status) {
-                com.openminis.app.speech.ReplySpeechState.Status.READING -> {
-                    (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
-                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
-                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.PAUSED)
-                }
-                com.openminis.app.speech.ReplySpeechState.Status.PAUSED -> {
-                    (com.openminis.app.speech.VoiceOutputState.activePlayer ?: replyPlayer)?.togglePause()
-                    com.openminis.app.speech.VoiceOutputState.replySpeechState.value =
-                        cur.copy(status = com.openminis.app.speech.ReplySpeechState.Status.READING)
-                }
-                com.openminis.app.speech.ReplySpeechState.Status.COMPLETED,
-                com.openminis.app.speech.ReplySpeechState.Status.IDLE -> {
-                    startReplySpeech(messageId, displayIndex, rawMarkdown)
-                }
-            }
-        } else {
-            startReplySpeech(messageId, displayIndex, rawMarkdown)
-        }
+        val readingThis = cur.activeMessageId == messageId && (
+            cur.status == com.openminis.app.speech.ReplySpeechState.Status.READING ||
+                cur.status == com.openminis.app.speech.ReplySpeechState.Status.PAUSED
+            )
+        if (readingThis) stopReplySpeech() else startReplySpeech(messageId, displayIndex, rawMarkdown)
     }
 
     fun toggleReplySpeechPause() {
@@ -6167,13 +6165,13 @@ class ChatViewModel(
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
+                        com.openminis.app.ui.components.MinisToast.show(context, context.getString(com.openminis.app.R.string.chat_branch_failed))
                     }
                 }
             } catch (e: Exception) {
                 com.openminis.app.logging.AppLogger.warning("ChatViewModel", "forkSessionAtMessage failed: ${e.message}")
                 withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(context, context.getString(com.openminis.app.R.string.chat_branch_failed), android.widget.Toast.LENGTH_SHORT).show()
+                    com.openminis.app.ui.components.MinisToast.show(context, context.getString(com.openminis.app.R.string.chat_branch_failed))
                 }
             }
         }

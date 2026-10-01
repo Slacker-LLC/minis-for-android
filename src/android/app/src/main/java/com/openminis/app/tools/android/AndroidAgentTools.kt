@@ -64,7 +64,7 @@ object AndroidAgentTools {
             description = "Observe and operate Android UI through the existing MinisAccessibilityService on displayId=0, or the Shizuku VScreen UiAutomation backend on the exact active non-zero displayId; unknown ids fail closed and never fall back to the physical screen. No second Accessibility implementation is installed in the app process. " +
                 "Prefer observe (compact interactive nodes) then actions by generation+ref. Refs are bound to a UI fingerprint and return STALE_UI_REF after a screen change; the tool never guesses old coordinates. " +
                 "Every action reports evidence plus its evidenceSource instead of a bare boolean: accepted-with-effect, accepted-without-evidence, direction-mismatch, timed-out and rejected are different outcomes, and a truncated snapshot refuses ref actions. " +
-                "Coordinates are screenshot-space by default: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. " +
+                "Coordinates are screenshot-space by default on the physical screen: x/y read off the returned screenshot image are converted through that capture's scale, and an action in that space is refused rather than misclicked when there is no capture or the screen changed; send coordinateSpace=screen for real device pixels. On a virtual display (displayId != 0) the default is display pixels (coordinateSpace=screen) and its size comes with open, observe and screenshot, so no screenshot is needed before a coordinate click. " +
                 "Screenshot uses the existing API-30 Accessibility route and returns structured FLAG_SECURE/OEM failures. wait_for_package waits for a package to become (or stop being) the foreground app and reports an unreadable foreground as unknown rather than as a miss. " +
                 "set_text writes the whole value (at most 4000 characters, empty clears); input_text types into what is already there, at the field's own selection (at most 1000 characters, never empty), and refuses (TEXT_CONTENT_UNAVAILABLE/TEXT_SELECTION_UNAVAILABLE) when the field does not hand over enough to reconstruct it - then send the full value with set_text. paste_text is the same selection-aware write with a clipboard fallback for editors that refuse the direct write. ime_enter presses the field's own IME action (search/done/send) on whatever has input focus, or on ref. Actions: observe, screenshot, click, long_press, set_text, input_text, paste_text, ime_enter, scroll, back, home, recents, notifications, quick_settings, wait, wait_for_package.",
             parameters = commonParams() + mapOf(
@@ -137,7 +137,7 @@ object AndroidAgentTools {
         ),
         AgentToolDefinition(
             name = VSCREEN_CLOSE,
-            description = "Release the active VScreen virtual display and screen lease; it does not change the physical display or foreground app.",
+            description = "Release the active VScreen virtual display and screen lease; it does not change the physical display or foreground app. The user can watch and use this display, so leave it open after finishing a task and close it only when the user asks or no further use is expected: closing throws away the apps running on it.",
             parameters = commonParams(), required = listOf("tool_title"), propertyOrdering = listOf("tool_title"), timeoutMs = 30_000L,
         ),
         AgentToolDefinition(
@@ -360,6 +360,7 @@ object AndroidAgentTools {
                         .put("probePassed", probe?.passed == true)
                         .put("probe", probe?.let { JSONObject(it.json) } ?: JSONObject.NULL)
                         .put("displayId", displayId ?: JSONObject.NULL)
+                    if (displayId != null) VirtualScreenUiBackend.putDisplayGeometry(result, client)
                     if (displayId != null) {
                         val owner = DeviceScreenLease.shared.owner(displayId)
                         result.put("screenLease", owner?.let {
@@ -377,7 +378,13 @@ object AndroidAgentTools {
                     jsonResult(
                         JSONObject().put("success", true).put("displayId", displayId)
                             .put("width", size?.first ?: JSONObject.NULL).put("height", size?.second ?: JSONObject.NULL)
-                            .put("coordinateSpace", "display-local"),
+                            .put("coordinateSpace", "display-local")
+                            .also { VirtualScreenUiBackend.putDisplayGeometry(it, client) }
+                            .put(
+                                "hint",
+                                "The display stays open until you close it (android.vscreen.close) or the user does. " +
+                                    "android_ui observe lists tappable refs without a screenshot; use a screenshot only when an app exposes no nodes.",
+                            ),
                         true,
                         title,
                     )

@@ -167,7 +167,7 @@ fun SkillsManagementScreen(
 
     SettingsScaffold(
         title = stringResource(R.string.skill_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_agent),
         // T75-part1 already moved Add off the FAB onto the top-bar action
         // slot; kept here for visual continuity with the rest of Settings.
         actions = {
@@ -239,13 +239,11 @@ fun SkillsManagementScreen(
         // Search bar — filters by skill name + description. Sits above the
         // section so it's discoverable without scrolling on a long list.
         if (skills.isNotEmpty()) {
-            DialogTextField(
+            SettingsSearchField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = stringResource(R.string.skills_search_placeholder),
-                singleLine = true,
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .padding(top = 12.dp),
             )
@@ -253,7 +251,6 @@ fun SkillsManagementScreen(
 
         SettingsSection(
             header = stringResource(R.string.skill_section_installed),
-            footer = stringResource(R.string.skill_section_footer),
         ) {
             if (skills.isEmpty()) {
                 // Centred empty-state inside the section card so the empty
@@ -311,7 +308,7 @@ fun SkillsManagementScreen(
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Switch(
+                                MinisSwitch(
                                     checked = skill.isEnabled,
                                     onCheckedChange = { skillRepository.setEnabled(skill.id, it) },
                                 )
@@ -683,14 +680,10 @@ fun SkillDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(skill.name) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(skill.name) },
+            onBack = onBack,
+            actions = {
                     // [T-android-skill-export] Export the skill as a .zip and
                     // hand it to the system share sheet — the round-trip
                     // partner of the existing zip import, and the Android
@@ -722,7 +715,7 @@ fun SkillDetailScreen(
                         )
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(
@@ -1046,7 +1039,7 @@ private fun shareSkillZip(context: android.content.Context, zip: java.io.File) {
             context, "${context.packageName}.fileprovider", zip,
         )
     } catch (t: Throwable) {
-        Toast.makeText(context, context.getString(R.string.skill_export_failed), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.skill_export_failed))
         return
     }
     val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -1060,7 +1053,7 @@ private fun shareSkillZip(context: android.content.Context, zip: java.io.File) {
         context.getString(R.string.skill_export_share),
     ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
     runCatching { context.startActivity(chooser) }.onFailure {
-        Toast.makeText(context, context.getString(R.string.skill_export_failed), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.skill_export_failed))
     }
 }
 
@@ -1196,14 +1189,10 @@ fun SkillFileViewerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     if (isEditing) {
                         MinisTextButton(onClick = {
                             val pending = editContent
@@ -1228,7 +1217,7 @@ fun SkillFileViewerScreen(
                         }) { Text(stringResource(R.string.skill_file_edit)) }
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         if (isEditing) {

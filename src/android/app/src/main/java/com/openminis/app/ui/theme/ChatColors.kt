@@ -67,20 +67,22 @@ val LightChatPalette = ChatPalette(
     background = Color.White,
     secondaryBg = Color(0xFFF2F2F7),
     inputBg = Color.White,
-    inputIconBg = Color(0xFFF2F2F7),
+    inputIconBg = Color.Transparent,
     inputIconBorder = Color.Transparent,
-    inputBorder = Color(0x4D3C3C43),
-    primaryText = Color(0xFF000000),
-    secondaryText = Color(0xFF636369),
+    inputBorder = Color(0xFFE3E3E8),
+    // The chat redesign's tokens (Minis 聊天页重设计): body #111111, secondary #6E6E73, stroke #E3E3E8,
+    // user bubble #F2F2F7 on a white page.
+    primaryText = Color(0xFF111111),
+    secondaryText = Color(0xFF6E6E73),
     tertiaryText = Color(0x4D3C3C43),
     disabledText = Color(0x2E3C3C43),
-    userBubble = Color(0x1E787880),
+    userBubble = Color(0xFFF2F2F7),
     toolBg = Color(0xFFF2F2F7),
     toolBorder = Color(0x14000000),
     toolCapsuleBg = Color(0xFFF2F2F7),
     separator = Color(0x4D3C3C43),
     sendButton = Color(0xFF000000),
-    sendButtonDisabled = Color(0x2E3C3C43),
+    sendButtonDisabled = Color(0x4D101010),
     codeBlockBg = Color(0xFFF2F2F7),
     codeBlockText = Color(0xFF000000),
     inlineCodeBg = Color(0xFFF2F2F7),
@@ -116,8 +118,8 @@ val DarkChatPalette = ChatPalette(
     background = Color(0xFF000000),
     secondaryBg = Color(0xFF26262A),
     inputBg = Color(0xFF2C2C30),
-    inputIconBg = Color(0xFF1C1C1E),
-    inputIconBorder = Color(0xFF595959),
+    inputIconBg = Color.Transparent,
+    inputIconBorder = Color.Transparent,
     inputBorder = Color(0x40545458),
     primaryText = Color(0xFFFFFFFF),
     secondaryText = Color(0x99EBEBF5),
@@ -170,3 +172,30 @@ val ChatColors: ChatPalette
     @Composable
     @ReadOnlyComposable
     get() = LocalChatPalette.current
+
+/**
+ * The chat's own layering: the page is the grey of the settings pages, and what sits on it (the
+ * user's bubble, tool and code surfaces, the quick cards) is white. Dark mode already layers on
+ * black, so it is returned unchanged. Applied to the message area and the top bar only; sheets and
+ * dialogs keep the plain palette.
+ */
+@Composable
+fun chatPagePalette(): ChatPalette {
+    val base = LocalChatPalette.current
+    return androidx.compose.runtime.remember(base) { layeredChatPalette(base) }
+}
+
+private fun layeredChatPalette(base: ChatPalette): ChatPalette {
+    if (base.isDark) return base
+    return base.copy(
+        background = ChatPageGrey,
+        secondaryBg = Color.White,
+        userBubble = Color.White,
+        toolBg = Color.White,
+        toolCapsuleBg = Color.White,
+        codeBlockBg = Color.White,
+        inlineCodeBg = Color.White,
+    )
+}
+
+val ChatPageGrey = Color(0xFFF2F2F7)

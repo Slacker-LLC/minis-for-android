@@ -32,12 +32,23 @@ internal class UiBridge {
             val constructor = UiAutomation::class.java.getDeclaredConstructor(android.os.Looper::class.java, binderInterface)
                 .apply { isAccessible = true }
             val instance = constructor.newInstance(worker.looper, connection) as UiAutomation
-            val connect = runCatching { UiAutomation::class.java.getDeclaredMethod("connect") }
-                .getOrElse { UiAutomation::class.java.getDeclaredMethod("connect", Int::class.javaPrimitiveType) }
-                .apply { isAccessible = true }
-            if (connect.parameterTypes.isEmpty()) connect.invoke(instance) else connect.invoke(instance, 0)
+            // connect(int flags) exists since API 24 and is the one that takes the flag; the no-argument connect() is
+            // flags = 0. FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES: with flags 0 the system unbinds every other
+            // accessibility service (this app's own, TalkBack, other automation) for as long as this UiAutomation
+            // exists (the log shows "unbindService ... MinisAccessibilityService" right after the registration), which
+            // broke the physical screen whenever the virtual one was in use.
+            val connectWithFlags = runCatching { UiAutomation::class.java.getDeclaredMethod("connect", Int::class.javaPrimitiveType) }.getOrNull()
+            if (connectWithFlags != null) {
+                connectWithFlags.isAccessible = true
+                connectWithFlags.invoke(instance, UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+            } else {
+                UiAutomation::class.java.getDeclaredMethod("connect").apply { isAccessible = true }.invoke(instance)
+            }
             runCatching {
                 val info = instance.serviceInfo
+                // No events: only window and node queries are used, and an event subscription would deliver every
+                // UI event of the physical screen to this process too.
+                info.eventTypes = 0
                 info.flags = info.flags or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or

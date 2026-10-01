@@ -1,6 +1,9 @@
 package com.openminis.app.ui.sandbox
 
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.SwapVert
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -66,6 +69,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openminis.app.ui.components.MinisTextButton
@@ -99,30 +104,28 @@ fun FileBrowserScreen(
     BackHandler(enabled = true, onBack = handleBack)
 
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.filebrowser_title)) },
-                navigationIcon = {
-                    IconButton(onClick = handleBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    // T-hidden-files a3e7f1d0: trailing toolbar collapsed
-                    // to a single ⋯ menu (was a Sort-only IconButton). All
-                    // functional actions now live under one entry point.
-                    MoreMenu(
+            MinisTopBar(
+            title = { Text(stringResource(R.string.filebrowser_title)) },
+            onBack = handleBack,
+            backLabel = stringResource(R.string.settings_section_files),
+            actions = {
+                    // Board: a sort icon with the ordering choices and a ⋯ menu for view options.
+                    SortMenu(
                         sortKey = state.sortKey,
                         ascending = state.sortAscending,
                         foldersFirst = state.foldersFirst,
-                        showHidden = state.showHidden,
                         onSelectKey = { viewModel.setSort(key = it) },
                         onToggleDirection = { viewModel.setSort(ascending = !state.sortAscending) },
                         onToggleFoldersFirst = { viewModel.setSort(foldersFirst = !state.foldersFirst) },
+                    )
+                    MoreMenu(
+                        showHidden = state.showHidden,
                         onToggleShowHidden = { viewModel.setShowHidden(!state.showHidden) },
                     )
                 },
-            )
+        )
         },
     ) { padding ->
         Column(
@@ -135,8 +138,6 @@ fun FileBrowserScreen(
                 pathComponents = state.pathComponents,
                 onNavigate = { index -> viewModel.navigateToPathComponent(index) },
             )
-
-            HorizontalDivider()
 
             // Content
             when {
@@ -171,8 +172,14 @@ fun FileBrowserScreen(
                 }
 
                 else -> {
+                    // The list is one white card on the grey page, like the settings lists.
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                            .background(com.openminis.app.ui.components.SectionDesign.cardColor()),
                         contentPadding = PaddingValues(vertical = 4.dp),
                     ) {
                         items(state.items, key = { it.file.absolutePath }) { item ->
@@ -189,7 +196,7 @@ fun FileBrowserScreen(
                                 onDelete = { deleteTarget = item },
                                 onAddToHome = { source -> webAppSheetSource = source },
                             )
-                            HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+                            HorizontalDivider(modifier = Modifier.padding(start = 66.dp), thickness = 0.5.dp)
                         }
                     }
                 }
@@ -244,6 +251,7 @@ fun FileBrowserScreen(
     }
 }
 
+/** The path as a row of chips: each ancestor is tappable, the current folder is tinted. */
 @Composable
 private fun BreadcrumbBar(
     pathComponents: List<String>,
@@ -254,25 +262,48 @@ private fun BreadcrumbBar(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         pathComponents.forEachIndexed { index, component ->
+            val current = index == pathComponents.lastIndex
             Text(
                 text = component,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { onNavigate(index) },
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (current) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
+                color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .background(
+                        if (current) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    )
+                    .clickable { onNavigate(index) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             )
-            if (index < pathComponents.lastIndex) {
+            if (!current) {
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
+    }
+}
+
+/** Icon chip colour by kind, as on the board: folders blue, images green, PDF red, archives orange... */
+private fun fileChipColor(item: FileItem): androidx.compose.ui.graphics.Color = when {
+    item.isDirectory -> androidx.compose.ui.graphics.Color(0xFF0A84FF)
+    else -> when (fileCategoryFor(item.name)) {
+        FileCategory.IMAGE, FileCategory.GIF -> androidx.compose.ui.graphics.Color(0xFF34C759)
+        FileCategory.PDF -> androidx.compose.ui.graphics.Color(0xFFFF3B30)
+        FileCategory.ARCHIVE -> androidx.compose.ui.graphics.Color(0xFFFF9F0A)
+        FileCategory.CODE, FileCategory.JSON -> androidx.compose.ui.graphics.Color(0xFF636366)
+        FileCategory.AUDIO, FileCategory.VIDEO -> androidx.compose.ui.graphics.Color(0xFFAF52DE)
+        FileCategory.HTML -> androidx.compose.ui.graphics.Color(0xFF0A84FF)
+        else -> androidx.compose.ui.graphics.Color(0xFF8E8E93)
     }
 }
 
@@ -314,18 +345,23 @@ private fun FileItemRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Icon
-        Icon(
-            imageVector = fileIcon(item),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = if (item.isDirectory)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // Icon chip
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                .background(fileChipColor(item)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = fileIcon(item),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = androidx.compose.ui.graphics.Color.White,
+            )
+        }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         // Name and size
         Column(modifier = Modifier.weight(1f)) {
@@ -362,18 +398,6 @@ private fun FileItemRow(
             }
         }
 
-        // Delete button for non-directory items
-        if (!item.isDirectory) {
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
         // Chevron for directories
         if (item.isDirectory) {
             Icon(
@@ -397,7 +421,7 @@ private fun FileItemRow(
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.filebrowser_copy_abs_path)) },
-                leadingIcon = {
+                trailingIcon = {
                     Icon(Icons.Filled.ContentCopy, contentDescription = null)
                 },
                 onClick = {
@@ -416,6 +440,19 @@ private fun FileItemRow(
                     ).show()
                 },
             )
+            if (!item.isDirectory) {
+                com.openminis.app.ui.components.MinisMenuDivider()
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+                    trailingIcon = {
+                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onDelete()
+                    },
+                )
+            }
             // TODO(webapp-hidden): WebApp / "Add to Home Screen" item temporarily
             // hidden — feature not yet validated/complete. Re-enable by removing
             // `false &&` from the guard below.
@@ -452,24 +489,20 @@ private fun FileItemRow(
 }
 
 @Composable
-private fun MoreMenu(
+private fun SortMenu(
     sortKey: FileSortKey,
     ascending: Boolean,
     foldersFirst: Boolean,
-    showHidden: Boolean,
     onSelectKey: (FileSortKey) -> Unit,
     onToggleDirection: () -> Unit,
     onToggleFoldersFirst: () -> Unit,
-    onToggleShowHidden: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.filebrowser_more_action))
+            Icon(Icons.Filled.SwapVert, contentDescription = stringResource(R.string.filebrowser_sort_name), tint = MaterialTheme.colorScheme.primary)
         }
         com.openminis.app.ui.components.MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            // Display options — sort key choices first so the most
-            // frequent toggle (sort) is the closest tap.
             for (key in FileSortKey.entries) {
                 DropdownMenuItem(
                     text = { Text(stringResource(when (key) {
@@ -478,47 +511,42 @@ private fun MoreMenu(
                         FileSortKey.SIZE -> R.string.filebrowser_sort_size
                         FileSortKey.KIND -> R.string.filebrowser_sort_kind
                     })) },
-                    leadingIcon = {
-                        if (key == sortKey) {
-                            Icon(Icons.Filled.Check, contentDescription = null)
-                        } else {
-                            Spacer(modifier = Modifier.size(24.dp))
-                        }
-                    },
-                    onClick = {
-                        onSelectKey(key)
-                        expanded = false
-                    },
+                    trailingIcon = { if (key == sortKey) Icon(Icons.Filled.Check, contentDescription = null) },
+                    onClick = { onSelectKey(key); expanded = false },
                 )
             }
-            HorizontalDivider()
+            com.openminis.app.ui.components.MinisMenuDivider()
             DropdownMenuItem(
-                text = { Text(stringResource(if (ascending) R.string.filebrowser_sort_ascending else R.string.filebrowser_sort_descending)) },
-                leadingIcon = {
-                    Icon(
-                        if (ascending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    onToggleDirection()
-                    expanded = false
-                },
+                text = { Text(stringResource(R.string.filebrowser_sort_ascending)) },
+                trailingIcon = { if (ascending) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { if (!ascending) onToggleDirection(); expanded = false },
             )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.filebrowser_sort_descending)) },
+                trailingIcon = { if (!ascending) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { if (ascending) onToggleDirection(); expanded = false },
+            )
+            com.openminis.app.ui.components.MinisMenuDivider()
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.filebrowser_sort_folders_first)) },
-                leadingIcon = {
-                    if (foldersFirst) {
-                        Icon(Icons.Filled.Check, contentDescription = null)
-                    } else {
-                        Spacer(modifier = Modifier.size(24.dp))
-                    }
-                },
-                onClick = {
-                    onToggleFoldersFirst()
-                    expanded = false
-                },
+                trailingIcon = { if (foldersFirst) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = { onToggleFoldersFirst(); expanded = false },
             )
+        }
+    }
+}
+
+@Composable
+private fun MoreMenu(
+    showHidden: Boolean,
+    onToggleShowHidden: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Filled.MoreHoriz, contentDescription = stringResource(R.string.filebrowser_more_action), tint = MaterialTheme.colorScheme.primary)
+        }
+        com.openminis.app.ui.components.MinisMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = {
                     Text(stringResource(
@@ -526,16 +554,10 @@ private fun MoreMenu(
                         else R.string.filebrowser_show_hidden
                     ))
                 },
-                leadingIcon = {
-                    Icon(
-                        if (showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = null,
-                    )
+                trailingIcon = {
+                    Icon(if (showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
                 },
-                onClick = {
-                    onToggleShowHidden()
-                    expanded = false
-                },
+                onClick = { onToggleShowHidden(); expanded = false },
             )
         }
     }

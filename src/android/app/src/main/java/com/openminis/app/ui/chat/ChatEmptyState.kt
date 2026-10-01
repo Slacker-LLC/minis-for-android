@@ -1,5 +1,12 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,30 +64,92 @@ import com.openminis.app.ui.theme.ChatColors
 import java.util.Calendar
 import kotlin.random.Random
 
-/** Time-of-day slot for the empty-chat greeting (board: "早上好" + "今天想做点什么？"). */
-enum class GreetingSlot { MORNING, AFTERNOON, EVENING }
+/** Time-of-day slot for the empty-chat greeting. */
+enum class GreetingSlot { DAWN, MORNING, NOON, AFTERNOON, EVENING, NIGHT }
 
-/** 00:00-11:59 morning, 12:00-17:59 afternoon, 18:00-23:59 evening. */
+/** 00-04 dawn, 05-10 morning, 11-13 noon, 14-17 afternoon, 18-22 evening, 23 late night. */
 fun greetingSlotFor(hourOfDay: Int): GreetingSlot = when (hourOfDay) {
-    in 0..11 -> GreetingSlot.MORNING
-    in 12..17 -> GreetingSlot.AFTERNOON
-    else -> GreetingSlot.EVENING
+    in 0..4 -> GreetingSlot.DAWN
+    in 5..10 -> GreetingSlot.MORNING
+    in 11..13 -> GreetingSlot.NOON
+    in 14..17 -> GreetingSlot.AFTERNOON
+    in 18..22 -> GreetingSlot.EVENING
+    else -> GreetingSlot.NIGHT
 }
+
+/** Two wordings per time of day; [variant] (any int, e.g. a per-chat seed) picks one. */
+internal fun greetingRes(slot: GreetingSlot, variant: Int): Int {
+    val pair = when (slot) {
+        GreetingSlot.DAWN -> R.string.chat_empty_greeting_dawn to R.string.chat_empty_greeting_dawn_b
+        GreetingSlot.MORNING -> R.string.chat_empty_greeting_morning to R.string.chat_empty_greeting_morning_b
+        GreetingSlot.NOON -> R.string.chat_empty_greeting_noon to R.string.chat_empty_greeting_noon_b
+        GreetingSlot.AFTERNOON -> R.string.chat_empty_greeting_afternoon to R.string.chat_empty_greeting_afternoon_b
+        GreetingSlot.EVENING -> R.string.chat_empty_greeting_evening to R.string.chat_empty_greeting_evening_b
+        GreetingSlot.NIGHT -> R.string.chat_empty_greeting_night to R.string.chat_empty_greeting_night_b
+    }
+    return if (Math.floorMod(variant, 2) == 0) pair.first else pair.second
+}
+
+private val PromptVariants = listOf(
+    R.string.chat_empty_prompt,
+    R.string.chat_empty_prompt_b,
+    R.string.chat_empty_prompt_c,
+    R.string.chat_empty_prompt_d,
+    R.string.chat_empty_prompt_e,
+    R.string.chat_empty_prompt_f,
+)
+
+/** The line under the greeting; [variant] picks one of several wordings. */
+internal fun promptRes(variant: Int): Int = PromptVariants[Math.floorMod(variant, PromptVariants.size)]
 
 /** Cards shown per screen. */
 private const val VISIBLE_SUGGESTIONS = 4
 
+/** How many of the cards come from what the user taps most; the rest are random. */
+private const val HABIT_SLOTS = 2
+
 /**
- * Which suggestions to show: a window of [count] from a pool of [poolSize], ordered by a shuffle
- * that depends only on [seed]. Each [page] moves to the next window and wraps, so "Shuffle" walks
- * through the whole pool before repeating, and a given chat keeps the same cards while it is open.
+ * Which suggestions to show: up to [HABIT_SLOTS] of the ones used most ([uses] = taps per pool
+ * index), then random ones to fill [count]. The random part depends only on [seed], so a chat keeps
+ * the same cards while it is open and a new chat starts on a different set. Nothing the user has
+ * not used is ever ranked, so with no history it is simply a random set.
  */
-internal fun suggestionWindow(poolSize: Int, seed: Int, page: Int, count: Int = VISIBLE_SUGGESTIONS): List<Int> {
+internal fun pickSuggestions(poolSize: Int, seed: Int, uses: Map<Int, Int>, count: Int = VISIBLE_SUGGESTIONS): List<Int> {
     if (poolSize <= 0) return emptyList()
-    val order = (0 until poolSize).shuffled(Random(seed))
     val take = minOf(count, poolSize)
-    val start = Math.floorMod(page * take, poolSize)
-    return List(take) { order[(start + it) % poolSize] }
+    val order = (0 until poolSize).shuffled(Random(seed))
+    val favourites = order
+        .filter { (uses[it] ?: 0) > 0 }
+        .sortedByDescending { uses[it] ?: 0 }   // stable: ties keep the seeded order
+        .take(minOf(HABIT_SLOTS, take))
+    val rest = order.filter { it !in favourites }.take(take - favourites.size)
+    return (favourites + rest).shuffled(Random(seed + 1))
+}
+
+private const val QUICK_PREFS = "chat_quick_actions"
+private const val QUICK_USES_KEY = "uses"
+
+/** Stored as "index:count,index:count"; anything malformed is ignored. */
+internal fun parseUses(raw: String?): Map<Int, Int> = raw.orEmpty().split(',').mapNotNull { part ->
+    val (i, n) = part.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
+    val index = i.toIntOrNull() ?: return@mapNotNull null
+    val count = n.toIntOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+    index to count
+}.toMap()
+
+internal fun formatUses(uses: Map<Int, Int>): String = uses.entries.joinToString(",") { "${it.key}:${it.value}" }
+
+private fun readUses(context: android.content.Context): Map<Int, Int> = runCatching {
+    parseUses(context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE).getString(QUICK_USES_KEY, null))
+}.getOrDefault(emptyMap())
+
+private fun recordUse(context: android.content.Context, index: Int) {
+    runCatching {
+        val prefs = context.getSharedPreferences(QUICK_PREFS, android.content.Context.MODE_PRIVATE)
+        val uses = parseUses(prefs.getString(QUICK_USES_KEY, null)).toMutableMap()
+        uses[index] = (uses[index] ?: 0) + 1
+        prefs.edit().putString(QUICK_USES_KEY, formatUses(uses)).apply()
+    }
 }
 
 private val SuggestionPool = listOf(
@@ -98,24 +167,31 @@ private val SuggestionPool = listOf(
     QuickCard(Icons.Outlined.History, R.string.chat_quick_recap_title, R.string.chat_quick_recap_sub, R.string.chat_quick_recap_prompt),
 )
 
-/** Size of the pool, for the tests that keep it and [suggestionWindow] consistent. */
+/** Size of the pool, for the tests that keep it and [pickSuggestions] consistent. */
 internal val SuggestionPoolSize: Int get() = SuggestionPool.size
 
 /**
  * The empty conversation: a greeting and a few things the agent can do right now. Tapping a card
- * sends its prompt. The cards come from a pool of [SuggestionPool] entries, four at a time, and a
- * new chat starts on a different window, so the screen is not the same four tiles every time.
+ * sends its prompt. The four cards are chosen automatically from [SuggestionPool]: what the user
+ * taps most, plus random ones, so there is nothing to shuffle or configure.
  */
 @Composable
 fun ChatEmptyState(
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    setup: FirstRunSetup? = null,
 ) {
     val slot = remember { greetingSlotFor(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
     val accent = MaterialTheme.colorScheme.primary
+    if (setup != null) {
+        FirstRunCard(setup, modifier)
+        return
+    }
     val seed = rememberSaveable { Random.nextInt() }
-    var page by rememberSaveable { mutableIntStateOf(0) }
-    val cards = suggestionWindow(SuggestionPool.size, seed, page).map { SuggestionPool[it] }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val uses = remember { readUses(context) }
+    val picks = remember(seed) { pickSuggestions(SuggestionPool.size, seed, uses) }
+    val cards = picks.map { it to SuggestionPool[it] }
     // Centered when it fits; scrolls when it does not (keyboard up, small screen, large font).
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Column(
@@ -134,44 +210,28 @@ fun ChatEmptyState(
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            text = stringResource(
-                when (slot) {
-                    GreetingSlot.MORNING -> R.string.chat_empty_greeting_morning
-                    GreetingSlot.AFTERNOON -> R.string.chat_empty_greeting_afternoon
-                    GreetingSlot.EVENING -> R.string.chat_empty_greeting_evening
-                },
-            ),
+            text = stringResource(greetingRes(slot, seed / 7)),
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = ChatColors.primaryText,
         )
         Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.chat_empty_prompt),
-                fontSize = 16.sp,
-                color = ChatColors.secondaryText,
-                modifier = Modifier.weight(1f),
-            )
-            MinisTextButton(onClick = { page += 1 }) {
-                Text(stringResource(R.string.chat_quick_shuffle), fontSize = 15.sp)
-            }
-        }
+        Text(
+            text = stringResource(promptRes(seed / 3)),
+            fontSize = 16.sp,
+            color = ChatColors.secondaryText,
+        )
         Spacer(Modifier.height(16.dp))
         cards.chunked(2).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                row.forEach { card ->
+                row.forEach { (index, card) ->
                     val prompt = stringResource(card.prompt)
                     QuickActionCard(
                         card = card,
-                        onClick = { onPick(prompt) },
+                        onClick = { recordUse(context, index); onPick(prompt) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -221,5 +281,150 @@ private fun QuickActionCard(card: QuickCard, onClick: () -> Unit, modifier: Modi
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+
+/**
+ * What the first-run card needs: which of the two setup steps are done, and where to go for the
+ * one that is not. The third step (start chatting) unlocks when both are.
+ */
+data class FirstRunSetup(
+    val providerDone: Boolean,
+    val modelDone: Boolean,
+    val onOpenProvider: () -> Unit,
+    val onOpenModel: () -> Unit,
+)
+
+/** The board's empty state for a fresh install: welcome, then three steps with the next one live. */
+@Composable
+private fun FirstRunCard(setup: FirstRunSetup, modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(accent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(
+                stringResource(R.string.onboarding_welcome_title),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = ChatColors.primaryText,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.first_run_subtitle),
+                fontSize = 16.sp,
+                color = ChatColors.secondaryText,
+            )
+            Spacer(Modifier.height(20.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(ChatColors.secondaryBg),
+            ) {
+                SetupStepRow(
+                    number = 1,
+                    title = stringResource(R.string.first_run_step_provider),
+                    subtitle = stringResource(if (setup.providerDone) R.string.first_run_done else R.string.first_run_step_provider_desc),
+                    done = setup.providerDone,
+                    locked = false,
+                    onClick = setup.onOpenProvider,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SetupStepRow(
+                    number = 2,
+                    title = stringResource(R.string.first_run_step_model),
+                    subtitle = stringResource(if (setup.modelDone) R.string.first_run_done else R.string.first_run_step_model_desc),
+                    done = setup.modelDone,
+                    locked = !setup.providerDone,
+                    onClick = setup.onOpenModel,
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SetupStepRow(
+                    number = 3,
+                    title = stringResource(R.string.first_run_step_chat),
+                    subtitle = stringResource(R.string.first_run_step_chat_locked),
+                    done = false,
+                    locked = !(setup.providerDone && setup.modelDone),
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupStepRow(
+    number: Int,
+    title: String,
+    subtitle: String,
+    done: Boolean,
+    locked: Boolean,
+    onClick: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (!done && !locked) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(
+                    when {
+                        done -> ChatColors.ok
+                        locked -> MaterialTheme.colorScheme.outlineVariant
+                        else -> accent
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (done) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            } else {
+                Text("$number", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (locked) ChatColors.secondaryText else ChatColors.primaryText,
+            )
+            Text(
+                subtitle,
+                fontSize = 13.sp,
+                color = if (done) ChatColors.ok else ChatColors.secondaryText,
+            )
+        }
+        if (!done && !locked) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = ChatColors.secondaryText,
+                modifier = Modifier.size(20.dp),
+            )
+        } else if (locked) {
+            Icon(Icons.Outlined.Lock, contentDescription = null, tint = ChatColors.secondaryText, modifier = Modifier.size(16.dp))
+        }
     }
 }

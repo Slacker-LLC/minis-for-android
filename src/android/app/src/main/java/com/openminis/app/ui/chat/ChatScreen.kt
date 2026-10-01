@@ -1,5 +1,7 @@
 package com.openminis.app.ui.chat
 
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.zIndex
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -298,6 +300,7 @@ import com.openminis.app.ui.glass.GlassSheetWindowBlur
 import com.openminis.app.ui.glass.glassSheetSurface
 import com.openminis.app.ui.glass.glassSurface
 import com.openminis.app.ui.theme.ChatColors
+import com.openminis.app.ui.theme.LocalChatPalette
 import com.openminis.app.ui.theme.LocalUiStyle
 import com.openminis.app.ui.theme.UiStyle
 import com.openminis.app.ui.components.MinisTextButton
@@ -310,8 +313,6 @@ internal val ToolCancelColor = Color(0xFFFFCC00) // iOS .yellow
 // Memory tool accent — matches iOS `.pink` on SF Symbols.
 internal val ToolMemoryAccent = Color(0xFFFF2D55)
 // Sparkle gradient colors (iOS uses linear gradient)
-internal val SparkleColor1 = Color(0xFFB8B096) // rgb(0.72, 0.69, 0.59)
-internal val SparkleColor2 = Color(0xFF99998C) // rgb(0.6, 0.6, 0.55)
 
 // T129: cap photo/video and file pickers at 50 items per launch. Above this
 // count Android's PickMultipleVisualMedia silently truncates anyway, but our
@@ -350,6 +351,8 @@ private val SLASH_PICKER_FIXED_HEIGHT: Dp = 176.dp
 private val SLASH_PICKER_MAX_HEIGHT: Dp = 280.dp
 private const val SLASH_PICKER_VISIBLE_ROWS = 4
 
+internal val SparkleColor1 = Color(0xFFB8B096) // rgb(0.72, 0.69, 0.59)
+internal val SparkleColor2 = Color(0xFF99998C) // rgb(0.6, 0.6, 0.55)
 private val CHAT_MAX_CONTENT_WIDTH = 900.dp
 
 @Composable
@@ -458,6 +461,8 @@ fun ChatScreen(
      */
     onProbeBlankDraft: ((() -> Boolean)) -> Unit = {},
     onOpenTerminal: () -> Unit = {},
+    /** First-run card: 1 = add a provider, 2 = choose a model. */
+    onOpenSetupStep: (step: Int) -> Unit = {},
     /** Open the in-app terminal with [command] pre-filled at the prompt
      *  (no trailing newline — the user reviews and presses Enter manually).
      *  Wired to the top-right Terminal button on a shell_execute ToolDetailSheet. */
@@ -790,6 +795,10 @@ fun ChatScreen(
     var showMoveSheet by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
     var deleteSingleMessageTargetId by remember { mutableStateOf<String?>(null) }
+    // Assistant reply the user asked to regenerate while later messages exist, with how many would go.
+    var regenerateTarget by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    // Reply whose long-press menu is open.
+    var messageMenuTarget by remember { mutableStateOf<String?>(null) }
     var deleteFromHereTargetId by remember { mutableStateOf<String?>(null) }
     // [T-new-chat-menu-entry] Confirmation gate for "New Chat" while the
     // current session is still streaming — stopping the running task needs
@@ -2148,7 +2157,7 @@ fun ChatScreen(
     var chatInputLevel by remember { mutableStateOf(appearancePrefs.getInt(com.openminis.app.ui.settings.KEY_FONT_CHAT_INPUT, 0)) }
     var toolPreviewEnabled by remember { mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_TOOL_PREVIEW, true)) }
     var toolStatusBarEnabled by remember {
-        mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_TOOL_STATUS_BAR, true))
+        mutableStateOf(appearancePrefs.getBoolean(com.openminis.app.ui.settings.KEY_TOOL_STATUS_BAR, false))
     }
     // T-chat-title-pill: live-toggled by Settings → Appearance and by
     // `minis-config set appearance.show_chat_title …`. Default ON.
@@ -2165,7 +2174,7 @@ fun ChatScreen(
                 com.openminis.app.ui.settings.KEY_FONT_CHAT_INPUT -> chatInputLevel = sp.getInt(key, 0)
                 com.openminis.app.ui.settings.KEY_TOOL_PREVIEW -> toolPreviewEnabled = sp.getBoolean(key, true)
                 com.openminis.app.ui.settings.KEY_TOOL_STATUS_BAR ->
-                    toolStatusBarEnabled = sp.getBoolean(key, true)
+                    toolStatusBarEnabled = sp.getBoolean(key, false)
                 com.openminis.app.ui.settings.KEY_SHOW_CHAT_TITLE -> showChatTitlePill = sp.getBoolean(key, true)
             }
         }
@@ -2405,54 +2414,17 @@ fun ChatScreen(
         // map (which is last-writer-wins across sessions).
         LocalMarkdownSessionId provides sessionId,
     ) {
+    // The chat page is white (the redesign); only the drawer keeps the grey page.
+    val pagePalette = LocalChatPalette.current
     Scaffold(
-        containerColor = ChatColors.background,
+        containerColor = pagePalette.background,
         contentWindowInsets = WindowInsets(0),
         topBar = {
+            Column {
             androidx.compose.material3.CenterAlignedTopAppBar(
                 title = {
-                    if (currentBot == null) {
-                        // Board: session title over the model name (monospace, tap to change).
-                        val rawModel = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
-                        val topModel = if (rawModel.contains("/")) rawModel.substringAfterLast("/") else rawModel
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(vertical = 6.dp),
-                        ) {
-                            Text(
-                                // ChatViewModel's placeholder title is the English literal "New Chat";
-                                // show the localized label until a real title exists.
-                                text = sessionTitle.takeIf { it.isNotBlank() && it != "New Chat" }
-                                    ?: stringResource(R.string.drawer_new_session),
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { showModelPicker = true },
-                            ) {
-                                Text(
-                                    text = topModel,
-                                    fontSize = 12.sp,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    color = ChatColors.secondaryText,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.settings_models_title),
-                                    tint = ChatColors.secondaryText,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                        }
-                    }
+                    // Plain chats have no title here (the model and thinking strength live in the
+                    // composer); a team member keeps its name and status.
                     currentBot?.let { bot ->
                         Column(
                             Modifier.clickable { onBotDetails(bot.id) }.padding(vertical = 6.dp),
@@ -2475,7 +2447,7 @@ fun ChatScreen(
                     if (!isTwoPane) {
                         if (onOpenDrawer != null) {
                             IconButton(onClick = onOpenDrawer) {
-                                Icon(Icons.Outlined.ViewSidebar, contentDescription = stringResource(R.string.common_menu))
+                                com.openminis.app.ui.components.SidebarPanelIcon()
                             }
                         } else {
                             IconButton(onClick = onBack) {
@@ -2487,17 +2459,7 @@ fun ChatScreen(
                             onClick = onToggleSidebar,
                             modifier = Modifier.offset(y = (-2).dp),
                         ) {
-                            Icon(
-                                Icons.Filled.Menu,
-                                contentDescription = stringResource(
-                                    if (sidebarCollapsed) {
-                                        R.string.chat_show_sidebar
-                                    } else {
-                                        R.string.chat_hide_sidebar
-                                    },
-                                ),
-                                modifier = Modifier.size(28.dp),
-                            )
+                            com.openminis.app.ui.components.SidebarPanelIcon(size = 26.dp)
                         }
                     }
                 },
@@ -2506,13 +2468,14 @@ fun ChatScreen(
                     // there is no second empty draft to open.
                     IconButton(onClick = { if (!viewModel.isBlankDraft) onNewChat() }) {
                         Icon(
-                            Icons.Outlined.Edit,
+                            com.openminis.app.ui.components.MinisIcons.Compose,
                             contentDescription = stringResource(R.string.chat_new_session),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     Box {
                         IconButton(onClick = { showChatMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = stringResource(R.string.common_more))
+                            Icon(com.openminis.app.ui.components.MinisIcons.More, contentDescription = stringResource(R.string.common_more), modifier = Modifier.size(24.dp))
                         }
                         MinisMenu(
                             expanded = showChatMenu,
@@ -2528,7 +2491,7 @@ fun ChatScreen(
                                     showChatMenu = false
                                     viewModel.toggleBrowserSheet()
                                 },
-                                trailingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                                trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Globe, contentDescription = null, modifier = Modifier.size(22.dp)) },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.chat_menu_browse_chat_files)) },
@@ -2536,7 +2499,7 @@ fun ChatScreen(
                                     showChatMenu = false
                                     onBrowseChatFiles()
                                 },
-                                trailingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+                                trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Folder, contentDescription = null, modifier = Modifier.size(22.dp)) },
                             )
                             if (VirtualScreenClientProvider.get(context).isEnabled()) {
                                 DropdownMenuItem(
@@ -2545,7 +2508,7 @@ fun ChatScreen(
                                         showChatMenu = false
                                         showVirtualScreenViewer = true
                                     },
-                                    trailingIcon = { Icon(Icons.Outlined.Visibility, contentDescription = null) },
+                                    trailingIcon = { Icon(com.openminis.app.ui.components.MinisIcons.Eye, contentDescription = null, modifier = Modifier.size(22.dp)) },
                                 )
                             }
                             MinisMenuDivider()
@@ -2557,41 +2520,16 @@ fun ChatScreen(
                                     showClearChatDialog = true
                                 },
                                 trailingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    Icon(com.openminis.app.ui.components.MinisIcons.Trash, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                                 },
                             )
-                            // T287: debug-only crash trigger
-                            if (BuildConfig.DEBUG) {
-                                MinisMenuDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            stringResource(R.string.debug_trigger_crash_menu),
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    onClick = {
-                                        showChatMenu = false
-                                        throw RuntimeException(
-                                            "Debug crash triggered by user (T287)",
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            Icons.Default.BugReport,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                )
-                            }
                         }
                     }
                 },
                 windowInsets = WindowInsets.statusBars,
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = ChatColors.background.copy(alpha = 0.92f),
-                    scrolledContainerColor = ChatColors.background.copy(alpha = 0.92f),
+                    containerColor = pagePalette.background.copy(alpha = 0.92f),
+                    scrolledContainerColor = pagePalette.background.copy(alpha = 0.92f),
                 ),
                 // [T-android-topbar-shrink] 76dp → 68dp. The earlier
                 // T-topbar-model-row-clip fix bumped 60dp → 76dp to give the
@@ -2606,8 +2544,13 @@ fun ChatScreen(
                 // user-configured font scale on xhdpi/xxhdpi without
                 // re-clipping (T-topbar-model-row-clip regression check).
                 // Font sizes + lineHeights stay untouched per spec.
-                expandedHeight = 68.dp,
+                expandedHeight = if (currentBot == null) 60.dp else 68.dp,
             )
+            // A hairline under the bar only while there is older content scrolled beneath it.
+            if (listState.canScrollForward) {
+                androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = ChatColors.inputBorder)
+            }
+            }
         },
        snackbarHost = { SnackbarHost(snackbarHostState) },
    ) { padding ->
@@ -2638,6 +2581,7 @@ fun ChatScreen(
 
             // Messages + scroll-to-bottom button
             Box(modifier = Modifier.weight(1f)) {
+                CompositionLocalProvider(LocalChatPalette provides LocalChatPalette.current) {
                 // Empty conversation: greeting + quick actions (board). Held back briefly so an
                 // existing session whose history is still loading does not flash it.
                 var emptyStateSettled by remember(sessionId) { mutableStateOf(false) }
@@ -2646,7 +2590,22 @@ fun ChatScreen(
                     emptyStateSettled = true
                 }
                 if (emptyStateSettled && messages.isEmpty() && !isStreaming) {
-                    ChatEmptyState(onPick = { viewModel.sendMessage(it) })
+                    val setupConfig by providerRepository.config.collectAsState()
+                    val activeEntry by viewModel.activeEntryId.collectAsState()
+                    val providerDone = setupConfig.instances.any { it.isEnabled } && setupConfig.modelEntries.isNotEmpty()
+                    val modelDone = activeEntry != null || setupConfig.slots.main.isNotEmpty()
+                    // zIndex: the (empty) message list is declared after this and its gesture handlers
+                    // would otherwise block every tap on the cards, Shuffle and Edit.
+                    ChatEmptyState(
+                        modifier = Modifier.zIndex(1f),
+                        onPick = { viewModel.sendMessage(it) },
+                        setup = if (providerDone && modelDone) null else FirstRunSetup(
+                            providerDone = providerDone,
+                            modelDone = modelDone,
+                            onOpenProvider = { onOpenSetupStep(1) },
+                            onOpenModel = { onOpenSetupStep(2) },
+                        ),
+                    )
                 }
                 var toolBarHeightPx by remember { mutableStateOf(0) }
                 val density = LocalDensity.current
@@ -2707,7 +2666,8 @@ fun ChatScreen(
                 // view; we mirror that semantically by checking the same
                 // filter on both sources.
                 val streamingById by viewModel.streamingById.collectAsState()
-                val hasFloatingTools = remember(messages, streamingById) {
+                val hasFloatingTools = remember(messages, streamingById, toolStatusBarEnabled) {
+                    if (!toolStatusBarEnabled) return@remember false
                     val merged = if (streamingById.isEmpty()) messages
                                  else mergeStreamingOverlay(messages, streamingById)
                     merged.any { msg ->
@@ -2739,7 +2699,7 @@ fun ChatScreen(
                 // already reserves visualOverlayHeight (65dp) + buffer and
                 // was not part of the report; keep its +14 buffer.
                 val bottomReserve =
-                    if (hasFloatingTools) visualOverlayHeight + 14.dp else 20.dp
+                    if (hasFloatingTools) visualOverlayHeight + 34.dp else 20.dp
                 // T174: when bottomReserve changes (toolbar appearing /
                 // disappearing or thumbnail height shift), re-pin to bottom
                 // if we are currently following. Without this, the new
@@ -3119,7 +3079,6 @@ fun ChatScreen(
                     id.substringBefore('#')
                 fun FlatChatItem.isCompacted(): Boolean = when (this) {
                     is FlatChatItem.UserBubble -> grayedMap[originalMessageId(message.id)] == true
-                    is FlatChatItem.AssistantHeader -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantText -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantMarkdownBlock -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantThinking -> grayedMap[originalMessageId(messageId)] == true
@@ -3128,6 +3087,7 @@ fun ChatScreen(
                     is FlatChatItem.AssistantMedia -> grayedMap[originalMessageId(messageId)] == true
                     is FlatChatItem.AssistantInfo -> false  // system rows never grayed
                      is FlatChatItem.AssistantTyping -> false
+                     is FlatChatItem.TimeDivider -> false
                      is FlatChatItem.AssistantError -> grayedMap[originalMessageId(messageId)] == true
                      is FlatChatItem.AssistantLegacyContent -> grayedMap[originalMessageId(messageId)] == true
                       is FlatChatItem.AssistantActions -> grayedMap[originalMessageId(messageId)] == true
@@ -3248,6 +3208,83 @@ fun ChatScreen(
                 val perfFirstLayoutFired = remember(sessionId) { java.util.concurrent.atomic.AtomicBoolean(false) }
                 Box {
                 AlwaysStretchOverscrollBox { sharedEffect ->
+                val lastAssistantMessageId = remember(messages) { messages.lastOrNull { it.role == "assistant" }?.id }
+                // What a reply can do. The newest reply's action row and every reply's long-press menu share it.
+                val actionsFor: (String, String) -> AssistantActionSet = { messageId, markdown ->
+                    AssistantActionSet(
+                        onCopy = {
+                            val plain = MarkdownClipboard.markdownToPlainText(markdown)
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
+                        },
+                        onCopyMarkdown = { MarkdownClipboard.copyMarkdown(context, markdown) },
+                        onSelectText = { selectionController.selectMessage(messageId) },
+                        onToggleSpeak = {
+                            val index = messages.filter { it.role == "assistant" }.indexOfFirst { it.id == messageId } + 1
+                            viewModel.toggleReplySpeech(messageId, index, markdown)
+                        },
+                        onRegenerate = {
+                            // Regenerating cuts the chat back to this reply, so anything after it is asked
+                            // about first instead of vanishing.
+                            val later = viewModel.messagesAfter(messageId)
+                            if (later > 0) {
+                                regenerateTarget = messageId to later
+                            } else if (!viewModel.regenerateAssistantMessage(messageId)) {
+                                com.openminis.app.ui.components.MinisToast.show(
+                                    context,
+                                    context.getString(R.string.assistant_regenerate_unavailable),
+                                )
+                            }
+                        },
+                        onBranch = {
+                            viewModel.forkSessionAtMessage(messageId) { newId ->
+                                com.openminis.app.ui.components.MinisToast.show(context, context.getString(R.string.chat_branch_created))
+                                onMoveToSession(newId)
+                            }
+                        },
+                        onShare = {
+                            val plain = MarkdownClipboard.markdownToPlainText(markdown)
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, plain)
+                                putExtra(Intent.EXTRA_TITLE, sessionTitle)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, null))
+                        },
+                        onDelete = { deleteSingleMessageTargetId = messageId },
+                    )
+                }
+                messageMenuTarget?.let { targetId ->
+                    val message = messages.firstOrNull { it.id == targetId }
+                    if (message == null) {
+                        messageMenuTarget = null
+                    } else {
+                        val markdown = message.toolBlocks.filter { it.kind == "text" && it.content.isNotEmpty() }
+                            .joinToString("\n\n") { it.content }.ifEmpty { message.content }
+                        AssistantMessageMenu(
+                            previewText = MarkdownClipboard.markdownToPlainText(markdown),
+                            isSpeaking = replySpeechState.activeMessageId == targetId &&
+                                replySpeechState.status == com.openminis.app.speech.ReplySpeechState.Status.READING,
+                            actions = actionsFor(targetId, markdown),
+                            onDismiss = { messageMenuTarget = null },
+                        )
+                    }
+                }
+                // A long press on a reply's text opens its menu (the redesign) instead of selecting a word.
+                val currentMessages by androidx.compose.runtime.rememberUpdatedState(messages)
+                val longPressOnText = remember {
+                    { shard: TextShardId ->
+                        val id = originalMessageId(shard.messageId)
+                        val message = currentMessages.firstOrNull { it.id == id }
+                        if (message != null && message.role == "assistant" && !message.isStreaming) {
+                            messageMenuTarget = id
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
                 LazyColumn(
                     state = listState,
                     reverseLayout = true,
@@ -3273,7 +3310,7 @@ fun ChatScreen(
                        .fillMaxWidth()
                         .wrapContentWidth(Alignment.CenterHorizontally)
                         .widthIn(max = CHAT_MAX_CONTENT_WIDTH)
-                       .padding(horizontal = 16.dp)
+                       .padding(horizontal = 20.dp)
                        .onGloballyPositioned {
                             listRootCoords = it
                             if (perfFirstLayoutFired.compareAndSet(false, true)) {
@@ -3294,6 +3331,7 @@ fun ChatScreen(
                             // the bottom edge reveals NEWER messages (lower
                             // index) rather than jumping backward.
                             reverseLayout = true,
+                            onLongPressOnText = longPressOnText,
                         )
                         // T29 dismiss-on-tap spy. Only active while the slash
                         // popup is showing. awaitFirstDown(requireUnconsumed=false,
@@ -3303,14 +3341,19 @@ fun ChatScreen(
                         // handler. We close the menu on the very first finger
                         // down anywhere inside the chat list, exactly like
                         // tapping outside an iOS popover.
-                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy, showAttachMenu) {
+                        .pointerInput(slashMenuOpen, mentionMenuOpenForSpy, showAttachMenu, messages.isEmpty()) {
                             awaitEachGesture {
                                 awaitFirstDown(
                                     requireUnconsumed = false,
                                     pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial,
                                 )
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
+                                // Not while the empty-state cards are showing: hiding the keyboard on
+                                // finger-down re-lays the page out under the finger, so the tap on a
+                                // card / Shuffle / Edit lands on nothing and never fires.
+                                if (messages.isNotEmpty()) {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
+                                }
                                 if (slashMenuOpen) {
                                     viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
                                 }
@@ -3331,7 +3374,7 @@ fun ChatScreen(
                     // hits ~1300 px while listState still reports
                     // firstVisible=0, firstOffset=0 (logged as the "tool on
                     // screen but not pushed into view" repro on Pixel 4a).
-                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.Bottom),
+                    verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Bottom),
                     overscrollEffect = sharedEffect,
                 ) {
                     // T13 Resume banner — placed BEFORE items() so reverseLayout
@@ -3559,7 +3602,6 @@ fun ChatScreen(
                                 },
                             )
                             } // close UserBubble SideEffect + UserMessageBubble block
-                            is FlatChatItem.AssistantHeader -> AssistantHeader()
                             is FlatChatItem.AssistantText -> BoundsTrackedBlock(
                                 messageId = item.messageId,
                                 slotKey = "text:${item.block.id}",
@@ -3753,7 +3795,8 @@ fun ChatScreen(
                                     { viewModel.revertCompact() }
                                 } else null,
                             )
-                            is FlatChatItem.AssistantTyping -> TypingIndicator()
+                            is FlatChatItem.AssistantTyping -> WorkingStatusLine()
+                            is FlatChatItem.TimeDivider -> TimeDividerLine(item.epochMs)
                             is FlatChatItem.AssistantError -> InlineErrorBanner(
                                 error = item.error,
                                 onRetry = {
@@ -3786,53 +3829,26 @@ fun ChatScreen(
                                 }
                             }
                             is FlatChatItem.AssistantActions -> {
-                                val assistantDisplayIndex = remember(item.messageId, messages) {
-                                    messages.filter { it.role == "assistant" }.indexOfFirst { it.id == item.messageId } + 1
-                                }
+                                // Only the newest reply carries the action row (the redesign); every earlier
+                                // reply gets the same actions from a long press on it.
+                                if (item.messageId != lastAssistantMessageId) return@Box
                                 val isSpeakingThis = replySpeechState.activeMessageId == item.messageId &&
                                     replySpeechState.status == com.openminis.app.speech.ReplySpeechState.Status.READING
+                                val actions = actionsFor(item.messageId, item.messageMarkdown)
                                 AssistantMessageActionBar(
                                     messageId = item.messageId,
                                     rawText = item.messageMarkdown,
                                     isStreaming = item.isStreaming,
                                     isGenerating = generatingMessageId == item.messageId,
                                     isSpeaking = isSpeakingThis,
-                                    onCopy = {
-                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
-                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("assistant", plain))
-                                    },
-                                    onRegenerate = {
-                                        viewModel.regenerateAssistantMessage(item.messageId)
-                                    },
-                                    onToggleSpeak = {
-                                        viewModel.toggleReplySpeech(item.messageId, assistantDisplayIndex, item.messageMarkdown)
-                                    },
-                                    onCopyMarkdown = {
-                                        MarkdownClipboard.copyMarkdown(context, item.messageMarkdown)
-                                    },
-                                    onBranch = {
-                                        viewModel.forkSessionAtMessage(item.messageId) { newId ->
-                                            android.widget.Toast.makeText(context, context.getString(R.string.chat_branch_created), android.widget.Toast.LENGTH_SHORT).show()
-                                            onMoveToSession(newId)
-                                        }
-                                    },
-                                    onSelectText = {
-                                        selectionController.selectMessage(item.messageId)
-                                    },
-                                    onShare = {
-                                        val plain = MarkdownClipboard.markdownToPlainText(item.messageMarkdown)
-                                        val sendIntent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            putExtra(Intent.EXTRA_TEXT, plain)
-                                            putExtra(Intent.EXTRA_TITLE, sessionTitle)
-                                            type = "text/plain"
-                                        }
-                                        context.startActivity(Intent.createChooser(sendIntent, null))
-                                    },
-                                    onDelete = {
-                                        deleteSingleMessageTargetId = item.messageId
-                                    },
+                                    onCopy = actions.onCopy,
+                                    onRegenerate = actions.onRegenerate,
+                                    onToggleSpeak = actions.onToggleSpeak,
+                                    onCopyMarkdown = actions.onCopyMarkdown,
+                                    onBranch = actions.onBranch,
+                                    onSelectText = actions.onSelectText,
+                                    onShare = actions.onShare,
+                                    onDelete = actions.onDelete,
                                 )
                             }
                         }
@@ -4085,56 +4101,6 @@ fun ChatScreen(
                     if (leftover > 0.dp) leftover / 2 else 0.dp
                 }
 
-                if (messages.isNotEmpty() && !isNearBottom.value) {
-                    val upBaseBottom = if (lastToolBlocks.isNotEmpty()) 80.dp else 8.dp
-                    androidx.compose.material3.FilledIconButton(
-                        onClick = {
-                            // [T-android-updown-fab-asymmetry] Arm the same flag a
-                            // finger-drag would. The down-button is gated on
-                            // `userScrolledAway`, which ONLY the drag handlers set
-                            // — and `scrollToPreviousUserTurn` moves the viewport
-                            // with `listState.scrollToItem` (instant, not
-                            // animated), so `isScrollInProgress` never toggles and
-                            // the fling-settle re-arm below never runs either.
-                            // Result: walking up with this button left the user
-                            // far from the bottom with NO way back except a manual
-                            // drag. Measured (ScrollFAB2 trace):
-                            //   up=true down=false | nearBottom=false scrolledAway=false
-                            // The down-button already does the symmetric reset
-                            // (`userScrolledAway = false`); this is its mirror.
-                            userScrolledAway = true
-                            coroutineScope.launch { scrollToPreviousUserTurn() }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 12.dp + fabEndInset, bottom = upBaseBottom + 46.dp)
-                            .then(
-                                if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
-                                    shape = CircleShape,
-                                    glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.5f),
-                                    fallbackScrim = ChatColors.inputBg,
-                                    blurRadius = 16.dp,
-                                    refraction = 12.dp,
-                                ) else Modifier.shadow(4.dp, CircleShape),
-                            )
-                            .size(36.dp),
-                        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                            containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else ChatColors.inputBg,
-                            contentColor = ChatColors.primaryText,
-                        ),
-                    ) {
-                        Icon(
-                            // Matches iOS's `arrow.up.to.line` (AIChatView.swift:2501):
-                            // an arrow pointing at a top line reads as "jump to a top
-                            // anchor" for the turn-walk, and keeps this button visually
-                            // distinct from the down button's plain chevron.
-                            imageVector = Icons.Default.VerticalAlignTop,
-                            contentDescription = stringResource(R.string.chat_scroll_to_previous),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-
                 if (userScrolledAway && contentOverflows.value && messages.isNotEmpty()) {
                     val fabBottomPadding = if (lastToolBlocks.isNotEmpty()) 80.dp else 8.dp
                     androidx.compose.material3.FilledIconButton(
@@ -4166,8 +4132,8 @@ fun ChatScreen(
                             }
                         },
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 12.dp + fabEndInset, bottom = fabBottomPadding)
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = fabBottomPadding)
                             .then(
                                 if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
                                     shape = CircleShape,
@@ -4175,7 +4141,7 @@ fun ChatScreen(
                                     fallbackScrim = ChatColors.inputBg,
                                     blurRadius = 16.dp,
                                     refraction = 12.dp,
-                                ) else Modifier.shadow(4.dp, CircleShape),
+                                ) else Modifier.shadow(3.dp, CircleShape).border(0.8.dp, ChatColors.inputBorder, CircleShape),
                             )
                             .size(36.dp),
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
@@ -4184,7 +4150,7 @@ fun ChatScreen(
                         ),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
+                            imageVector = com.openminis.app.ui.components.MinisIcons.ArrowDown,
                             contentDescription = stringResource(R.string.chat_scroll_to_bottom),
                             modifier = Modifier.size(20.dp),
                         )
@@ -4201,7 +4167,8 @@ fun ChatScreen(
 
                 // T-chat-title-pill: sticky session title overlay. Sits
                 // above the LazyColumn (top-center), animates in once the
-            }
+                } // chat page palette
+}
 
             // T-chat-title-pill-edit: reuse SessionEditSheet from the session
             // list (same composable, exposed `internal`) so title + category
@@ -4321,15 +4288,15 @@ fun ChatScreen(
                                 .padding(horizontal = 12.dp)
                                 // T240: keep a thin visible border instead of the
                                 // diffuse 8dp halo that bled out past the panel edge.
-                                .shadow(elevation = 3.dp, shape = RoundedCornerShape(10.dp))
-                                .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
-                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(14.dp))
+                                .background(ChatColors.inputBg, RoundedCornerShape(14.dp))
+                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(14.dp)),
                         ) {
                             androidx.compose.foundation.lazy.LazyColumn(
                                 state = slashListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 220.dp)
+                                    .heightIn(max = 264.dp)
                                     .verticalScrollbar(slashListState),
                             ) {
                             itemsIndexed(filteredSlashCommands, key = { _, c -> c.id }) { index, cmd ->
@@ -4389,10 +4356,12 @@ fun ChatScreen(
                                                 }
                                             } else it
                                         }
-                                        // [T-android-slash-menu-density] Tighter
-                                        // vertical padding (10→7) so slash rows
-                                        // read as compact as iOS, not sparse.
-                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                        // The first row is the one Enter runs: tint it so that is visible.
+                                        .background(
+                                            if (index == 0) ChatColors.sendButton.copy(alpha = 0.10f) else Color.Transparent,
+                                        )
+                                        // 44dp rows (board): easy to hit with a thumb.
+                                        .padding(horizontal = 14.dp, vertical = 11.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(
@@ -4402,29 +4371,24 @@ fun ChatScreen(
                                         modifier = Modifier.size(18.dp),
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "/${cmd.title.lowercase()}",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = titleColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        // Cap to one line + ellipsis (mirrors
-                                        // iOS T-slash-picker-product-rules
-                                        // 051896e2). Long Skill descriptions
-                                        // would otherwise stretch the row,
-                                        // breaking the locked 4-row band and
-                                        // crowding the menu visually.
-                                        Text(
-                                            text = cmd.subtitle,
-                                            fontSize = 11.sp,
-                                            color = subtitleColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
+                                    Text(
+                                        text = "/${cmd.title.lowercase()}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        color = titleColor,
+                                        maxLines = 1,
+                                        modifier = Modifier.widthIn(min = 108.dp),
+                                    )
+                                    // One line, ellipsised: long Skill descriptions must not stretch the row.
+                                    Text(
+                                        text = cmd.subtitle,
+                                        fontSize = 13.sp,
+                                        color = subtitleColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
                                     if (cmd.id == "memory") {
                                         Icon(
                                             imageVector = if (memoryOnState) Icons.Default.CheckCircle else Icons.Default.Block,
@@ -4501,9 +4465,9 @@ fun ChatScreen(
                                     },
                                 )
                                 .padding(horizontal = 12.dp)
-                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(10.dp))
-                                .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
-                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(14.dp))
+                                .background(ChatColors.inputBg, RoundedCornerShape(14.dp))
+                                .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(14.dp)),
                         ) {
                             if (mentionEntries.isEmpty()) {
                                 Row(
@@ -4549,7 +4513,7 @@ fun ChatScreen(
                                    state = mentionListState,
                                    modifier = Modifier
                                        .fillMaxWidth()
-                                       .heightIn(max = 220.dp)
+                                       .heightIn(max = 264.dp)
                                        .verticalScrollbar(mentionListState),
                                ) {
                                     itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
@@ -4576,39 +4540,26 @@ fun ChatScreen(
                                                         selection = androidx.compose.ui.text.TextRange(newCaret),
                                                     )
                                                 }
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                .padding(horizontal = 14.dp, vertical = 11.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            // Single doc icon for every entry — the scope/mount
-                                            // capsule on the right already labels what bucket
-                                            // this is (workspace / skills / shared / memory /
-                                            // <mountName>). iOS varies the icon per scope but
-                                            // we keep it uniform here so the row stays
-                                            // visually consistent at small sizes on Pixel 4a.
                                             Icon(
-                                                imageVector = Icons.Default.Description,
+                                                imageVector = if (entry.isDirectory) Icons.Outlined.Folder else Icons.Default.Description,
                                                 contentDescription = null,
-                                                tint = ChatColors.secondaryText,
-                                                modifier = Modifier.size(16.dp),
+                                                tint = if (entry.isDirectory) MaterialTheme.colorScheme.primary else ChatColors.secondaryText,
+                                                modifier = Modifier.size(18.dp),
                                             )
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = entry.basename,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = ChatColors.primaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                                Text(
-                                                    text = entry.displayPath,
-                                                    fontSize = 11.sp,
-                                                    color = ChatColors.secondaryText,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
+                                            // One line, the path the model will see (mono); the bucket is the badge.
+                                            Text(
+                                                text = entry.displayPath + if (entry.isDirectory) "/" else "",
+                                                fontSize = 13.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                color = ChatColors.primaryText,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f),
+                                            )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             // Scope / mount badge — matches iOS capsule.
                                             Text(
@@ -4635,6 +4586,7 @@ fun ChatScreen(
                 // from the backdrop by a symmetric soft shadow painted by hand
                 // (Android's Modifier.shadow only casts downward).
                 val inputBgArgb = ChatColors.inputBg.toArgb()
+                val cardEdge = ChatColors.inputBorder
                 val shadowPaint = remember(inputBgArgb) {
                     android.graphics.Paint().apply {
                         color = inputBgArgb
@@ -4747,16 +4699,16 @@ fun ChatScreen(
                             // subtle shadow + inner shadow). Classic style keeps
                             // the hand-painted two-pass shadow untouched.
                             if (LocalUiStyle.current == UiStyle.GLASS) Modifier.glassSurface(
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(24.dp),
                                 glassScrim = if (ChatColors.isDark) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.55f),
                                 fallbackScrim = ChatColors.inputBg,
                             ) else Modifier.drawBehind {
-                                val radiusPx = 20.dp.toPx()
+                                val radiusPx = 24.dp.toPx()
                                 val canvas = drawContext.canvas.nativeCanvas
                                 // Pass 1: symmetric ambient halo — small blur, low alpha.
                                 shadowPaint.setShadowLayer(
                                     6.dp.toPx(), 0f, 0f,
-                                    android.graphics.Color.argb(22, 0, 0, 0),
+                                    android.graphics.Color.argb(14, 0, 0, 0),
                                 )
                                 canvas.drawRoundRect(
                                     0f, 0f, size.width, size.height,
@@ -4765,13 +4717,19 @@ fun ChatScreen(
                                 )
                                 // Pass 2: soft downward shadow (spot light).
                                 shadowPaint.setShadowLayer(
-                                    10.dp.toPx(), 0f, 3.dp.toPx(),
-                                    android.graphics.Color.argb(24, 0, 0, 0),
+                                    6.dp.toPx(), 0f, 2.dp.toPx(),
+                                    android.graphics.Color.argb(16, 0, 0, 0),
                                 )
                                 canvas.drawRoundRect(
                                     0f, 0f, size.width, size.height,
                                     radiusPx, radiusPx,
                                     shadowPaint,
+                                )
+                                // The redesign's card edge: a 0.8dp #E3E3E8 line.
+                                drawRoundRect(
+                                    color = cardEdge,
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(radiusPx, radiusPx),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()),
                                 )
                             },
                         )
@@ -5579,50 +5537,84 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier.weight(1f, fill = false),
                             ) {
-                                // The model is chosen from the top bar; the composer only carries the
-                                // thinking strength (board: "Thinking · Medium"), and only for models that
-                                // can reason.
-                                if (viewModel.currentModelSupportsReasoning) {
+                                // One chip for what answers and how hard it thinks: "model · level". Tap opens a
+                                // small menu — the model (full picker) and the thinking levels.
+                                if (currentBot == null) {
+                                    val chipModelRaw = modelName.ifEmpty { stringResource(R.string.model_slot_main) }
+                                    val chipModel = if (chipModelRaw.contains("/")) chipModelRaw.substringAfterLast("/") else chipModelRaw
                                     val composerThinking by viewModel.thinkingLevel.collectAsState()
-                                    Surface(
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            0.5.dp,
-                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                        ),
-                                        modifier = Modifier
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(18.dp))
-                                            .clickable {
-                                                showAttachMenu = false
-                                                if (viewModel.showSlashMenu.value) {
-                                                    viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
-                                                }
-                                                showThinkingLevelSheet = true
-                                            },
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                            modifier = Modifier.padding(horizontal = 12.dp),
+                                    val canThink = viewModel.currentModelSupportsReasoning
+                                    var chipMenu by remember { mutableStateOf(false) }
+                                    Box {
+                                        Surface(
+                                            shape = RoundedCornerShape(18.dp),
+                                            // Plain text on the card, no pill: "mimo-v2.5 · 高 v".
+                                            color = Color.Transparent,
+                                            modifier = Modifier
+                                                .height(44.dp)
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .clickable {
+                                                    showAttachMenu = false
+                                                    if (viewModel.showSlashMenu.value) {
+                                                        viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                                                    }
+                                                    chipMenu = true
+                                                },
                                         ) {
-                                            Icon(
-                                                Icons.Default.AutoAwesome,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(14.dp),
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(start = 12.dp, end = 8.dp),
+                                            ) {
+                                                Text(
+                                                    text = chipModel,
+                                                    fontSize = 15.sp,
+                                                    color = ChatColors.primaryText,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.widthIn(max = 190.dp),
+                                                )
+                                                if (canThink && composerThinking.isEnabled) {
+                                                    Text(
+                                                        text = " · " + thinkingLevelLabel(composerThinking),
+                                                        fontSize = 15.sp,
+                                                        color = ChatColors.primaryText,
+                                                        maxLines = 1,
+                                                    )
+                                                }
+                                                Icon(
+                                                    Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = stringResource(R.string.settings_models_title),
+                                                    tint = ChatColors.secondaryText,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            }
+                                        }
+                                        MinisMenu(
+                                            expanded = chipMenu,
+                                            onDismissRequest = { chipMenu = false },
+                                            shape = RoundedCornerShape(14.dp),
+                                            tonalElevation = 0.dp,
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(chipModelRaw, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                                trailingIcon = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                                                onClick = { chipMenu = false; showModelPicker = true },
                                             )
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.chat_thinking_chip,
-                                                    thinkingLevelLabel(composerThinking),
-                                                ),
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                maxLines = 1,
-                                            )
+                                            if (canThink) {
+                                                MinisMenuDivider()
+                                                val levels = listOf(ThinkingLevel.OFF) + viewModel.availableThinkingLevels
+                                                levels.forEach { level ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(thinkingLevelLabel(level)) },
+                                                        trailingIcon = {
+                                                            if (level == composerThinking || (level == ThinkingLevel.OFF && !composerThinking.isEnabled)) {
+                                                                Icon(Icons.Default.Check, contentDescription = null)
+                                                            }
+                                                        },
+                                                        onClick = { chipMenu = false; viewModel.setThinkingLevel(level) },
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -6078,8 +6070,8 @@ fun ChatScreen(
                         if (showStop) {
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .background(ChatColors.bad, CircleShape)
+                                    .size(36.dp)
+                                    .background(ChatColors.sendButton, CircleShape)
                                     .clip(CircleShape)
                                     .clickable { viewModel.cancelStream() },
                                 contentAlignment = Alignment.Center,
@@ -6087,7 +6079,7 @@ fun ChatScreen(
                                 Icon(
                                     Icons.Default.Stop,
                                     contentDescription = stringResource(R.string.common_stop),
-                                    tint = Color.White,
+                                    tint = ChatColors.background,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -6122,8 +6114,7 @@ fun ChatScreen(
                                 Icon(
                                     Icons.Default.ArrowUpward,
                                     contentDescription = stringResource(R.string.send),
-                                    tint = if (canActivate) ChatColors.background
-                                    else ChatColors.primaryText.copy(alpha = 0.5f),
+                                    tint = ChatColors.background,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -6212,7 +6203,7 @@ fun ChatScreen(
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                "选择后立即应用于当前会话（与 Web 端同步同一份 Runtime 状态）",
+                                stringResource(R.string.chat_agent_presets_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -6225,7 +6216,7 @@ fun ChatScreen(
                                             .applyToSession(context, sessionId, preset.id)
                                         Toast.makeText(
                                             context,
-                                            "已切换为 ${preset.name}（下一条消息生效）",
+                                            context.getString(R.string.chat_agent_preset_applied, preset.name),
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                         showAgentPresetSheet = false
@@ -6265,6 +6256,24 @@ fun ChatScreen(
                         viewModel.clearChat()
                         viewModel.setInputText("")
                         showClearChatDialog = false
+                    },
+                )
+            }
+            regenerateTarget?.let { (targetId, later) ->
+                MinisAlertDialog(
+                    onDismissRequest = { regenerateTarget = null },
+                    title = stringResource(R.string.assistant_regenerate_confirm_title),
+                    text = stringResource(R.string.assistant_regenerate_confirm_body, later),
+                    confirmText = stringResource(R.string.assistant_regenerate_confirm_action),
+                    isDestructive = true,
+                    onConfirm = {
+                        regenerateTarget = null
+                        if (!viewModel.regenerateAssistantMessage(targetId)) {
+                            com.openminis.app.ui.components.MinisToast.show(
+                                context,
+                                context.getString(R.string.assistant_regenerate_unavailable),
+                            )
+                        }
                     },
                 )
             }
@@ -6343,10 +6352,9 @@ fun ChatScreen(
                 .height(6.dp)
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(
-                            ChatColors.background,
-                            ChatColors.background.copy(alpha = 0f),
-                        ),
+                        colors = LocalChatPalette.current.background.let { page ->
+                            listOf(page, page.copy(alpha = 0f))
+                        },
                     )
                 )
         )

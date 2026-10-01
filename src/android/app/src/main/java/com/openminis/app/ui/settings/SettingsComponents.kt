@@ -1,5 +1,6 @@
 package com.openminis.app.ui.settings
 
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,8 +8,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import com.openminis.app.ui.theme.ChatColors
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.shadow
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -75,6 +85,25 @@ import com.openminis.app.ui.components.groupedCard
  * and footer text, the choice rows and the hand-written rows all already sat at 16, so 14 was the
  * single odd value making a row's text and the header above it differ by 2dp.
  */
+/**
+ * The page colour behind settings cards: a light grey in light mode (cards are white and read as
+ * raised), black in dark mode (cards are the raised dark grey).
+ */
+/** Fill for a control that sits directly on the grey page (search field, segmented track): a step darker than the page. */
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun fillOnGrey(): Color = if (ChatColors.isDark) Color(0xFF2C2C2E) else Color(0xFFE3E3E8)
+
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun settingsSheetColor(): Color =
+    if (ChatColors.isDark) Color(0xFF111113) else Color(0xFFF2F2F7)
+
+@Composable
+@androidx.compose.runtime.ReadOnlyComposable
+fun settingsPageBackground(): Color =
+    if (ChatColors.isDark) MaterialTheme.colorScheme.background else Color(0xFFF2F2F7)
+
 object SettingsMetrics {
     /** Distance from the screen edge to a section card. */
     val CardMarginHorizontal = 16.dp
@@ -109,6 +138,120 @@ object SettingsMetrics {
 
 // ─── Scaffold ──────────────────────────────────────────────────────────────────
 
+/**
+ * The navigation bar every settings-style page shares (design: iOS-style bar): a back chevron with
+ * the label of the page it returns to on the left, the page title centered, actions on the right, and a
+ * hairline underneath. A page that shows a large title (see [SettingsScaffold]) leaves the bar's own
+ * title empty and has no hairline.
+ */
+@Composable
+fun MinisNavBar(
+    title: String,
+    onBack: (() -> Unit)?,
+    backLabel: String,
+    navigation: (@Composable () -> Unit)?,
+    actions: (@Composable () -> Unit)?,
+    inlineTitle: Boolean,
+    background: Color = Color.Unspecified,
+) = MinisNavBar(
+    titleSlot = if (inlineTitle) {
+        {
+            Text(
+                title,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else {
+        null
+    },
+    onBack = onBack,
+    backLabel = backLabel,
+    navigation = navigation,
+    actions = actions,
+    background = background,
+)
+
+/** Same bar with a composable title (two-line titles, tabs...). A null [titleSlot] leaves it empty. */
+@Composable
+fun MinisNavBar(
+    titleSlot: (@Composable () -> Unit)?,
+    onBack: (() -> Unit)?,
+    backLabel: String,
+    navigation: (@Composable () -> Unit)?,
+    actions: (@Composable () -> Unit)?,
+    background: Color = Color.Unspecified,
+) {
+    val inlineTitle = titleSlot != null
+    val barBackground = if (background == Color.Unspecified) settingsPageBackground() else background
+    Column(modifier = Modifier.fillMaxWidth().background(barBackground).statusBarsPadding()) {
+        Box(modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            Row(modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    navigation != null -> navigation()
+                    onBack != null -> Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onBack)
+                            .heightIn(min = 44.dp)
+                            .padding(start = 4.dp, end = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = stringResource(R.string.back),
+                            // Neutral, not the accent: the accent is for things to act on, not for chrome.
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(30.dp),
+                        )
+                        Text(
+                            backLabel,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 17.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 78.dp),
+                        )
+                    }
+                }
+            }
+            if (titleSlot != null) {
+                Box(modifier = Modifier.align(Alignment.Center).padding(horizontal = 122.dp)) { titleSlot() }
+            }
+            Row(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                actions?.invoke()
+            }
+        }
+        if (inlineTitle) HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/**
+ * Drop-in for Material's TopAppBar on pages that run their own Scaffold: the same title, back and
+ * actions slots, drawn as the board's bar (chevron + "Back", centered title, hairline).
+ */
+@Composable
+fun MinisTopBar(
+    title: @Composable () -> Unit,
+    onBack: (() -> Unit)? = null,
+    backLabel: String? = null,
+    navigation: (@Composable () -> Unit)? = null,
+    /** The bar's colour; the settings page grey unless the page under it is plain white. */
+    background: Color = Color.Unspecified,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    MinisNavBar(
+        titleSlot = title,
+        onBack = onBack,
+        backLabel = backLabel ?: stringResource(R.string.back),
+        navigation = navigation,
+        actions = { Row(verticalAlignment = Alignment.CenterVertically) { actions() } },
+        background = background,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScaffold(
@@ -117,60 +260,41 @@ fun SettingsScaffold(
     // suppress the back arrow and use an explicit Cancel/Save action pair instead
     // (a back arrow + a "Cancel" action that both pop the screen is redundant and
     // semantically muddy). Non-edit screens keep passing a non-null onBack and get
-    // the usual back arrow — unchanged.
+    // the usual back button.
     onBack: (() -> Unit)? = null,
     actions: @Composable (() -> Unit)? = null,
     // [T-android-modeldetail-savecancel-ios-parity] Optional custom
     // navigation slot — e.g. a leading Cancel text action on modal-style
-    // edit screens. When null, the slot falls back to the back arrow iff
+    // edit screens. When null, the slot falls back to the back button iff
     // onBack is set, so every existing caller renders unchanged.
     navigation: @Composable (() -> Unit)? = null,
-    // [T-android-modeldetail-savecancel-ios-parity] Center the title
-    // (CenterAlignedTopAppBar) for iOS-modal-style edit screens. Default
-    // keeps the start-aligned TopAppBar.
-    centerTitle: Boolean = false,
+    // Kept for source compatibility: every title is centered in the iOS-style bar now.
+    @Suppress("UNUSED_PARAMETER") centerTitle: Boolean = false,
     floatingActionButton: @Composable (() -> Unit)? = null,
+    /** A bar pinned under the scrolling content (e.g. the team member page's Continue / New topic). */
+    bottomBar: @Composable (() -> Unit)? = null,
     scrollable: Boolean = true,
+    /** Name of the page the back button returns to; "Back" when the caller does not know it. */
+    backLabel: String? = null,
+    /** Top-level pages (Settings, its categories, Files) show the title large under the bar. */
+    largeTitle: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Scaffold(
         topBar = {
-            val titleSlot: @Composable () -> Unit = {
-                Text(
-                    title,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            val navigationSlot: @Composable () -> Unit = {
-                when {
-                    navigation != null -> navigation()
-                    onBack != null -> IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                }
-            }
-            if (centerTitle) {
-                CenterAlignedTopAppBar(
-                    title = titleSlot,
-                    navigationIcon = navigationSlot,
-                    actions = { actions?.invoke() },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-            } else {
-                TopAppBar(
-                    title = titleSlot,
-                    navigationIcon = navigationSlot,
-                    actions = { actions?.invoke() },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-            }
+            MinisNavBar(
+                title = title,
+                onBack = onBack,
+                backLabel = backLabel ?: stringResource(R.string.back),
+                navigation = navigation,
+                actions = actions,
+                inlineTitle = !largeTitle,
+                background = settingsPageBackground(),
+            )
         },
         floatingActionButton = { floatingActionButton?.invoke() },
-        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = { bottomBar?.invoke() },
+        containerColor = settingsPageBackground(),
     ) { padding ->
         // T183: imePadding() shrinks the scroll container by the IME's
         // height while the keyboard is up, giving Modifier.bringIntoView()
@@ -185,6 +309,14 @@ fun SettingsScaffold(
         Column(
             modifier = if (scrollable) baseMod.verticalScroll(rememberScrollState()) else baseMod,
         ) {
+            if (largeTitle) {
+                Text(
+                    text = title,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = SettingsMetrics.CardMarginHorizontal + 4.dp, end = 16.dp, top = 2.dp, bottom = 4.dp),
+                )
+            }
             content()
             // [T-android-settings-metrics] The scroll container owns the bottom breathing room;
             // screens used to add 24 or 32dp of their own, and the ones that forgot ended flush
@@ -195,6 +327,77 @@ fun SettingsScaffold(
 }
 
 // ─── Switch ────────────────────────────────────────────────────────────────────
+
+/** The app's switch (board look). Use this instead of Material's Switch anywhere outside a settings row. */
+@Composable
+fun MinisSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: androidx.compose.material3.SwitchColors = minisSwitchColors(),
+) {
+    Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = modifier, enabled = enabled, colors = colors)
+}
+
+
+/** The board's switch: the user's accent when on, the fill grey when off, a white thumb either way. */
+@Composable
+fun minisSwitchColors(): androidx.compose.material3.SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = Color.White,
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    checkedBorderColor = Color.Transparent,
+    uncheckedThumbColor = Color.White,
+    uncheckedTrackColor = if (ChatColors.isDark) Color(0xFF39393D) else Color(0xFFE5E5EA),
+    uncheckedBorderColor = Color.Transparent,
+)
+
+/**
+ * A segmented control (design: theme, launch target, schedule type...). One row of labels on the fill
+ * grey; the selected one sits on a raised white pill. Text only, no icons.
+ */
+@Composable
+fun SettingsSegmented(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val track = fillOnGrey()
+    val raised = if (ChatColors.isDark) Color(0xFF636366) else Color.White
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(track)
+            .padding(2.dp),
+    ) {
+        options.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            val pill = RoundedCornerShape(7.dp)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(if (selected) Modifier.shadow(1.dp, pill).background(raised, pill) else Modifier)
+                    .clip(pill)
+                    .clickable(role = Role.Tab) { onSelect(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 
 /**
  * Match the upstream settings-row switch measurement. The whole row is the
@@ -207,7 +410,7 @@ fun SettingsSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: androidx.compose.material3.SwitchColors = SwitchDefaults.colors(),
+    colors: androidx.compose.material3.SwitchColors = minisSwitchColors(),
 ) {
     CompositionLocalProvider(
         LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
@@ -452,7 +655,6 @@ fun SettingsSwitchRow(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = enabled,
-                colors = SwitchDefaults.colors(),
             )
         },
     )
@@ -556,4 +758,129 @@ fun SettingsCardBlock(
             .fillMaxWidth(),
         content = content,
     )
+}
+
+
+// ─── Text input ────────────────────────────────────────────────────────────────
+
+/** The board's search field: filled grey pill with a magnifier, no border. */
+@Composable
+fun SettingsSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(fillOnGrey(), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (value.isEmpty()) {
+                Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** A settings row whose value is typed in place: label on the left, editable text on the right. */
+@Composable
+fun SettingsInlineTextRow(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    showDivider: Boolean = true,
+    numeric: Boolean = false,
+    enabled: Boolean = true,
+) {
+    SettingsRow(
+        title = title,
+        showDivider = showDivider,
+        trailing = {
+            Box(modifier = modifier.widthIn(min = if (numeric) 56.dp else 80.dp, max = if (numeric) 96.dp else 220.dp), contentAlignment = Alignment.CenterEnd) {
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    keyboardOptions = if (numeric) {
+                        androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    } else {
+                        androidx.compose.foundation.text.KeyboardOptions.Default
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    ),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (value.isEmpty() && placeholder != null) {
+                    Text(
+                        placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** A borderless multi-line text area that sits inside a settings card. */
+@Composable
+fun SettingsTextArea(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    monospace: Boolean = false,
+    minHeight: Dp = 160.dp,
+    maxHeight: Dp = Dp.Unspecified,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = minHeight, max = maxHeight)
+            .padding(horizontal = SettingsMetrics.RowPaddingHorizontal, vertical = 12.dp),
+    ) {
+        androidx.compose.foundation.text.BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontFamily = if (monospace) androidx.compose.ui.text.font.FontFamily.Monospace else null,
+            ),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (value.isEmpty() && placeholder != null) {
+            Text(
+                placeholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+    }
 }

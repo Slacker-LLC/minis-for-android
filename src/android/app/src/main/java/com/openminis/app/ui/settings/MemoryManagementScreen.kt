@@ -84,12 +84,11 @@ fun MemoryManagementScreen(
         files = withContext(Dispatchers.IO) { memoryRepository.listAllFiles() }
     }
 
-    SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack) {
+    SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack, backLabel = stringResource(R.string.settings_cat_agent)) {
         // Always-visible global toggle — sits above the file list so the
         // user finds it whether or not any memory files exist yet.
         SettingsSection(
             header = stringResource(R.string.settings_memory_global_header),
-            footer = stringResource(R.string.settings_memory_global_footer),
         ) {
             SettingsSwitchRow(
                 title = stringResource(R.string.settings_memory_global_enabled_title),
@@ -123,7 +122,6 @@ fun MemoryManagementScreen(
         } else {
             SettingsSection(
                 header = stringResource(R.string.memory_section_files),
-                footer = stringResource(R.string.memory_section_footer),
             ) {
                 files.forEachIndexed { index, file ->
                     MemoryFileRow(
@@ -300,14 +298,10 @@ fun MemoryFileEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     // [T-global-memory-save-always-visible] Always render Save —
                     // no hasChanges gate (see KDoc above).
                     MinisTextButton(onClick = {
@@ -331,7 +325,7 @@ fun MemoryFileEditScreen(
                         Text("Save")
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         Column(

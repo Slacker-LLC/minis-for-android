@@ -366,7 +366,7 @@ internal fun ModelPickerSheet(
     MinisModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else minisSheetColor(),
+        containerColor = if (LocalUiStyle.current == UiStyle.GLASS) Color.Transparent else com.openminis.app.ui.settings.settingsSheetColor(),
         // Match the slim drag handle used by StandardChatSheet (6dp top / 4dp
         // bottom) so the title sits flush with the indicator instead of the
         // Material default's ~44dp whitespace gap above it.
@@ -445,7 +445,8 @@ internal fun ModelPickerSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .height(42.dp),
+                    .height(42.dp)
+                    .background(com.openminis.app.ui.components.SectionDesign.cardColor(), RoundedCornerShape(50)),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface,
@@ -529,7 +530,7 @@ internal fun ModelPickerSheet(
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
                                     .background(
-                                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        com.openminis.app.ui.components.SectionDesign.cardColor(),
                                         RoundedCornerShape(14.dp),
                                     ),
                             ) {

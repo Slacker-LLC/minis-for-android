@@ -1,5 +1,7 @@
 package com.openminis.app.ui.terminal
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import com.openminis.app.R
 import androidx.compose.ui.res.stringResource
 
@@ -104,9 +106,11 @@ private val LightTerminalChrome = TerminalChrome(
     topButtonBg = Color(0xFFF2F2F7),
 )
 
+// A terminal reads best light-on-dark, so it does not follow a light app theme (the board's white
+// terminal was a poor fit for long output). LightTerminalChrome stays only as an unused fallback
+// for the palette switch below.
 @Composable
-private fun terminalChrome(): TerminalChrome =
-    if (ChatColors.isDark) DarkTerminalChrome else LightTerminalChrome
+private fun terminalChrome(): TerminalChrome = DarkTerminalChrome
 
 @Composable
 fun TerminalScreen(
@@ -124,6 +128,7 @@ fun TerminalScreen(
     val inputController = rememberTerminalInputController()
     val scope = rememberCoroutineScope()
     var ctrlActive by remember { mutableStateOf(false) }
+    var altActive by remember { mutableStateOf(false) }
 
     // Pipe PTY output → emulator.
     LaunchedEffect(terminalSession) {
@@ -137,6 +142,8 @@ fun TerminalScreen(
         emulator.onResponse = { data -> terminalSession.sendRawBytes(data) }
         onDispose { emulator.onResponse = null }
     }
+
+    var showClearSheet by remember { mutableStateOf(false) }
 
     // Clear emulator when session clearOutput() ticks.
     val clearVersion by terminalSession.clearVersion.collectAsStateEffect()
@@ -206,12 +213,30 @@ fun TerminalScreen(
     // already set in the manifest, edge-to-edge enabled, and modern Pixel
     // builds reporting WindowInsets.ime correctly, a plain in-window Box +
     // imePadding does the right thing without any custom tracking.
-    val accessoryBarHeightDp = 40.dp
+    val accessoryBarHeightDp = 104.dp
 
     val chrome = terminalChrome()
     // Idempotent global: the emulator resolves default/ANSI colours at draw time, so
     // flipping this recolours existing scrollback as well as new output.
-    TerminalPalette.light = !ChatColors.isDark
+    TerminalPalette.light = false
+
+    // Status-bar icons must be light on the black page, whatever the app theme says.
+    val hostView = LocalView.current
+    val hostWindow = (hostView.context as? android.app.Activity)?.window
+    val barController = remember(hostWindow, hostView) {
+        hostWindow?.let { androidx.core.view.WindowCompat.getInsetsController(it, hostView) }
+    }
+    // The activity re-applies its own bar style after a theme change, so set ours again one frame
+    // later as well as immediately; restore the page's setting when the terminal closes.
+    DisposableEffect(barController) {
+        val previous = barController?.isAppearanceLightStatusBars
+        barController?.isAppearanceLightStatusBars = false
+        onDispose { if (previous != null) barController.isAppearanceLightStatusBars = previous }
+    }
+    LaunchedEffect(barController) {
+        androidx.compose.runtime.withFrameNanos { }
+        barController?.isAppearanceLightStatusBars = false
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(chrome.bg)) {
         // Main content: top bar + canvas. imePadding() lifts the canvas
@@ -241,14 +266,11 @@ fun TerminalScreen(
                     onInput = { bytes ->
                         // Any user input snaps back to live tail so typing is visible.
                         emulator.scrollOffset = 0
-                        if (ctrlActive && bytes.size == 1) {
-                            val ch = bytes[0].toInt().toChar().uppercaseChar()
-                            if (ch in 'A'..'Z') {
-                                terminalSession.sendRawBytes(byteArrayOf((ch - 'A' + 1).toByte()))
-                                ctrlActive = false
-                                return@TerminalInputView
-                            }
-                        }
+                        val modified = applyTerminalModifiers(bytes, ctrlActive, altActive)
+                        if (modified.ctrlUsed) ctrlActive = false
+                        if (modified.altUsed) altActive = false
+                        terminalSession.sendRawBytes(modified.bytes)
+                        return@TerminalInputView
                         terminalSession.sendRawBytes(bytes)
                     },
                     applicationCursorKeys = emulator.applicationCursorKeys,
@@ -272,15 +294,7 @@ fun TerminalScreen(
                     terminalSession.stop()
                     onBack()
                 },
-                onClear = {
-                    // T310: send Ctrl+U (NAK, 0x15) so readline kills any
-                    // half-typed line in the shell. Otherwise those chars
-                    // stay in the line buffer and get prepended to the
-                    // user's next command after the visual clear.
-                    terminalSession.sendRawBytes(byteArrayOf(0x15))
-                    terminalSession.clearOutput()
-                    emulator.feed("\u001Bc".toByteArray())
-                },
+                onClear = { showClearSheet = true },
             )
         }
 
@@ -297,15 +311,20 @@ fun TerminalScreen(
         ) {
             KeyboardAccessoryBar(
                 ctrlActive = ctrlActive,
+                altActive = altActive,
                 keyboardVisible = inputController.isFocused,
                 onCtrlToggle = { ctrlActive = !ctrlActive },
+                onAltToggle = { altActive = !altActive },
                 onToggleKeyboard = {
                     if (inputController.isFocused) inputController.clearFocus()
                     else inputController.requestFocus()
                 },
                 onSendRaw = { bytes ->
                     emulator.scrollOffset = 0
-                    terminalSession.sendRawBytes(bytes)
+                    val modified = applyTerminalModifiers(bytes, ctrlActive, altActive)
+                    if (modified.ctrlUsed) ctrlActive = false
+                    if (modified.altUsed) altActive = false
+                    terminalSession.sendRawBytes(modified.bytes)
                 },
                 onArrow = { dir ->
                     emulator.scrollOffset = 0
@@ -314,6 +333,27 @@ fun TerminalScreen(
                     else byteArrayOf(0x1B, '['.code.toByte())
                     terminalSession.sendRawBytes(prefix + byteArrayOf(dir.code.toByte()))
                 },
+            )
+        }
+
+        if (showClearSheet) {
+            com.openminis.app.ui.components.MinisActionSheet(
+                onDismiss = { showClearSheet = false },
+                actions = listOf(
+                    com.openminis.app.ui.components.MinisAction(
+                        label = stringResource(R.string.terminal_clear),
+                        destructive = true,
+                        onClick = {
+                            // T310: send Ctrl+U (NAK, 0x15) so readline kills any
+                            // half-typed line in the shell. Otherwise those chars
+                            // stay in the line buffer and get prepended to the
+                            // user's next command after the visual clear.
+                            terminalSession.sendRawBytes(byteArrayOf(0x15))
+                            terminalSession.clearOutput()
+                            emulator.feed("\u001Bc".toByteArray())
+                        },
+                    ),
+                ),
             )
         }
 
@@ -336,40 +376,52 @@ private fun <T> kotlinx.coroutines.flow.StateFlow<T>.collectAsStateEffect(): and
 
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 
+/** The board's bar: back chevron and label on the left, "Minis Shell" centered, Clear on the right. */
 @Composable
 private fun TerminalTopBar(
     onClose: () -> Unit,
     onClear: () -> Unit,
 ) {
     val chrome = terminalChrome()
-    Row(
+    androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(chrome.bg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 4.dp),
     ) {
-        CircularIconButton(
-            icon = Icons.Default.Close,
-            contentDescription = stringResource(R.string.common_close),
-            tint = chrome.fg,
-            onClick = onClose,
-        )
-        Spacer(modifier = Modifier.weight(1f))
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable(onClick = onClose)
+                .padding(vertical = 10.dp)
+                .padding(start = 4.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                contentDescription = stringResource(R.string.common_close),
+                tint = chrome.accent,
+                modifier = Modifier.size(30.dp),
+            )
+            Text(stringResource(R.string.back), color = chrome.accent, fontSize = 17.sp, maxLines = 1)
+        }
         Text(
             stringResource(R.string.terminal_title),
             color = chrome.fg,
-            style = TextStyle(
-                fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 16.sp,
-            ),
+            fontSize = 17.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.Center),
         )
-        Spacer(modifier = Modifier.weight(1f))
-        CircularIconButton(
-            icon = Icons.Default.Brush,
-            contentDescription = stringResource(R.string.terminal_clear),
-            tint = chrome.accent,
-            onClick = onClear,
+        Text(
+            stringResource(R.string.terminal_clear),
+            color = chrome.accent,
+            fontSize = 17.sp,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable(onClick = onClear)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         )
     }
 }
@@ -400,80 +452,116 @@ private fun CircularIconButton(
 
 // ─── Keyboard accessory bar ───────────────────────────────────────────────────
 
+/**
+ * Two rows of equal, thumb-sized keys. Top: Esc Tab Ctrl Alt and the arrows (Ctrl and Alt stay lit
+ * until the next key, and the arrows repeat while held). Bottom: the characters that are a chore on
+ * a phone keyboard, Enter, Ctrl-C, and the keyboard toggle.
+ */
 @Composable
 private fun KeyboardAccessoryBar(
     ctrlActive: Boolean,
+    altActive: Boolean,
     keyboardVisible: Boolean,
     onCtrlToggle: () -> Unit,
+    onAltToggle: () -> Unit,
     onToggleKeyboard: () -> Unit,
     onSendRaw: (ByteArray) -> Unit,
     onArrow: (Char) -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    Box(
+    val chrome = terminalChrome()
+    fun text(s: String) = onSendRaw(s.toByteArray())
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(terminalChrome().accessoryBg),
+            .background(chrome.accessoryBg)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-        QuickCommandButton(
-            label = stringResource(if (keyboardVisible) R.string.terminal_hide_keyboard else R.string.terminal_show_keyboard),
-            icon = if (keyboardVisible) Icons.Default.KeyboardHide else Icons.Outlined.Keyboard,
-            onClick = onToggleKeyboard,
-        )
-        QuickCommandButton("Esc", iconText = "⎋") { onSendRaw(byteArrayOf(0x1B)) }
-        QuickCommandButton("Tab", icon = Icons.AutoMirrored.Filled.KeyboardTab) { onSendRaw(byteArrayOf(0x09)) }
-        // [T-android-shell-toolbar-enter-key] The soft keyboard's Return
-        // inserts a newline inside the terminal, so it can't send a real
-        // carriage return to run a command line / trigger an in-CLI prompt.
-        // This writes CR (0x0D) on the same raw-PTY path as Esc/Tab/C-c.
-        // Placed right after Tab, mirroring iOS fa3d2f8c.
-        QuickCommandButton("⏎", iconText = "⏎") { onSendRaw(byteArrayOf(0x0D)) }
-        QuickCommandButton("Ctrl", iconText = "^", isActive = ctrlActive, onClick = onCtrlToggle)
-        QuickCommandButton("\u2191", icon = Icons.Default.KeyboardArrowUp) { onArrow('A') }
-        QuickCommandButton("\u2193", icon = Icons.Default.KeyboardArrowDown) { onArrow('B') }
-        QuickCommandButton("\u2190", icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft) { onArrow('D') }
-        QuickCommandButton("\u2192", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight) { onArrow('C') }
-        QuickCommandButton("C-c", icon = Icons.Outlined.Cancel) { onSendRaw(byteArrayOf(0x03)) }
-        QuickCommandButton("C-d", icon = Icons.Default.Eject) { onSendRaw(byteArrayOf(0x04)) }
-        QuickCommandButton("C-z", icon = Icons.Outlined.PauseCircle) { onSendRaw(byteArrayOf(0x1A)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TermKey("Esc", Modifier.weight(1f)) { onSendRaw(byteArrayOf(0x1B)) }
+            TermKey("Tab", Modifier.weight(1f)) { onSendRaw(byteArrayOf(0x09)) }
+            TermKey("Ctrl", Modifier.weight(1f), active = ctrlActive, onClick = onCtrlToggle)
+            TermKey("Alt", Modifier.weight(1f), active = altActive, onClick = onAltToggle)
+            TermKey("\u2190", Modifier.weight(1f), repeat = true) { onArrow('D') }
+            TermKey("\u2193", Modifier.weight(1f), repeat = true) { onArrow('B') }
+            TermKey("\u2191", Modifier.weight(1f), repeat = true) { onArrow('A') }
+            TermKey("\u2192", Modifier.weight(1f), repeat = true) { onArrow('C') }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TermKey("/", Modifier.weight(1f), plain = true) { text("/") }
+            TermKey("-", Modifier.weight(1f), plain = true) { text("-") }
+            TermKey("|", Modifier.weight(1f), plain = true) { text("|") }
+            TermKey("~", Modifier.weight(1f), plain = true) { text("~") }
+            TermKey("_", Modifier.weight(1f), plain = true) { text("_") }
+            TermKey("\u23CE", Modifier.weight(1f)) { onSendRaw(byteArrayOf(0x0D)) }
+            TermKey("^C", Modifier.weight(1f), danger = true) { onSendRaw(byteArrayOf(0x03)) }
+            TermKey(
+                if (keyboardVisible) "\u2328\u2193" else "\u2328",
+                Modifier.weight(1f),
+                onClick = onToggleKeyboard,
+            )
         }
     }
 }
 
+/** One 44dp key. [repeat] keeps firing while the finger stays down; [active] is a lit sticky modifier. */
 @Composable
-private fun QuickCommandButton(
+private fun TermKey(
     label: String,
-    icon: ImageVector? = null,
-    iconText: String? = null,
-    isActive: Boolean = false,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    plain: Boolean = false,
+    danger: Boolean = false,
+    repeat: Boolean = false,
     onClick: () -> Unit,
 ) {
     val chrome = terminalChrome()
-    val bg = if (isActive) chrome.keyActiveBg else chrome.keyBg
-    val fg = if (isActive) Color.White else chrome.keyFg
-    Row(
-        modifier = Modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(6.dp))
+    val bg = when {
+        active -> chrome.keyActiveBg
+        plain -> Color(0xFF2A2A2E)
+        else -> Color(0xFF3A3A3F)
+    }
+    val fg = when {
+        active -> Color.White
+        danger -> Color(0xFFFF6961)
+        else -> Color(0xFFE8E8EA)
+    }
+    val currentClick = androidx.compose.runtime.rememberUpdatedState(onClick)
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(10.dp))
             .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .then(
+                if (repeat) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                currentClick.value()
+                                kotlinx.coroutines.coroutineScope {
+                                    val job = launch {
+                                        kotlinx.coroutines.delay(350)
+                                        while (true) {
+                                            currentClick.value()
+                                            kotlinx.coroutines.delay(70)
+                                        }
+                                    }
+                                    try { tryAwaitRelease() } finally { job.cancel() }
+                                }
+                            },
+                        )
+                    }
+                } else {
+                    Modifier.clickable { currentClick.value() }
+                },
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        when {
-            icon != null -> Icon(icon, null, tint = fg, modifier = Modifier.size(12.dp))
-            iconText != null -> Text(iconText, color = fg, style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp))
-        }
-        Text(label, color = fg, style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 11.sp), maxLines = 1)
+        Text(
+            label,
+            color = fg,
+            style = TextStyle(fontFamily = JetBrainsMonoFontFamily, fontSize = 16.sp),
+            maxLines = 1,
+        )
     }
 }

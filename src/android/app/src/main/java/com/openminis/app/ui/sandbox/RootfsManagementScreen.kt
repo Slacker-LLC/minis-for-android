@@ -1,6 +1,7 @@
 package com.openminis.app.ui.sandbox
 
 import com.openminis.app.R
+import com.openminis.app.ui.settings.MinisTopBar
 import com.openminis.app.ui.components.MinisTextButton
 
 import android.text.format.Formatter
@@ -60,7 +61,6 @@ import com.openminis.app.ui.components.MinisAlertDialog
 @Composable
 fun RootfsManagementScreen(
     onBack: () -> Unit,
-    onBrowseFiles: () -> Unit,
     onMirrorCategoryClick: (MirrorCategory) -> Unit = {},
     viewModel: RootfsManagementViewModel = viewModel(),
 ) {
@@ -77,20 +77,15 @@ fun RootfsManagementScreen(
     // T168: iOS-style inset-grouped background. surfaceContainerLowest sits
     // a hair below `surface`, so the rounded section cards (which use
     // `surface`) read as raised pads against the page bg.
-    val groupedBg = MaterialTheme.colorScheme.surfaceContainerLowest
+    val groupedBg = com.openminis.app.ui.settings.settingsPageBackground()
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.rootfs_management_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = groupedBg),
-            )
+            MinisTopBar(
+            title = { Text(stringResource(R.string.rootfs_management_title)) },
+            onBack = onBack,
+        )
         },
-        containerColor = groupedBg,
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
     ) { padding ->
         Column(
             modifier = Modifier
@@ -104,7 +99,13 @@ fun RootfsManagementScreen(
             // --- Status section ---
             SettingsSection(title = stringResource(R.string.rootfs_status_section)) {
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.rootfs_installed_label)) },
+                    headlineContent = {
+                        Text(
+                            stringResource(
+                                if (state.isInstalled) R.string.rootfs_installed_label else R.string.rootfs_not_installed_label,
+                            ),
+                        )
+                    },
                     supportingContent = {
                         Text(
                             buildString {
@@ -122,7 +123,7 @@ fun RootfsManagementScreen(
                             if (state.isInstalled) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
                             contentDescription = null,
                             tint = if (state.isInstalled)
-                                MaterialTheme.colorScheme.primary
+                                com.openminis.app.ui.theme.ChatColors.ok
                             else
                                 MaterialTheme.colorScheme.error,
                         )
@@ -162,27 +163,6 @@ fun RootfsManagementScreen(
             }
 
             if (state.isInstalled) {
-                // --- Browse section ---
-                SettingsSection(title = stringResource(R.string.rootfs_browse_section)) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.rootfs_browse_files_label)) },
-                        leadingContent = {
-                            Icon(
-                                Icons.Filled.Folder,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        trailingContent = {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickableListItem(onClick = onBrowseFiles),
-                        colors = transparentListItemColors(),
-                    )
-                }
-
                 // --- Mirrors section ---
                 SettingsSection(title = stringResource(R.string.rootfs_mirrors_section)) {
                     MirrorsSectionView(onNavigate = onMirrorCategoryClick)
@@ -283,7 +263,7 @@ fun RootfsManagementScreen(
                         text = msg,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (state.lastOperationSuccess)
-                            MaterialTheme.colorScheme.primary
+                            com.openminis.app.ui.theme.ChatColors.ok
                         else
                             MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(16.dp),

@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -185,3 +187,57 @@ internal fun CompactProgressIndicator(
 }
 
 // ─── Typing Indicator (three dots pulsing) ────────────────────────────────────
+
+
+/**
+ * "正在工作 ..." before the first block of a reply arrives: the same small grey status line a running turn
+ * shows, so the page does not change shape when the first step lands.
+ */
+@Composable
+internal fun WorkingStatusLine() {
+    androidx.compose.foundation.layout.Row(
+        modifier = androidx.compose.ui.Modifier.padding(bottom = 6.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Text(
+            text = androidx.compose.ui.res.stringResource(com.openminis.app.R.string.work_status_running),
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = com.openminis.app.ui.theme.ChatColors.secondaryText,
+        )
+        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(6.dp))
+        BouncingDots(com.openminis.app.ui.theme.ChatColors.secondaryText)
+    }
+}
+
+/** The centred "今天 9:56" line (12 / 16, secondary grey). */
+@Composable
+internal fun TimeDividerLine(epochMs: Long) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val text = androidx.compose.runtime.remember(epochMs) { formatChatTimestamp(context, epochMs) }
+    androidx.compose.foundation.layout.Box(
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        androidx.compose.material3.Text(
+            text = text,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = com.openminis.app.ui.theme.ChatColors.secondaryText,
+        )
+    }
+}
+
+/** Today / yesterday with the time, an older date with the time otherwise. */
+internal fun formatChatTimestamp(context: android.content.Context, epochMs: Long, now: Long = System.currentTimeMillis()): String {
+    val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(epochMs))
+    val day = java.util.Calendar.getInstance().apply { timeInMillis = epochMs }
+    val today = java.util.Calendar.getInstance().apply { timeInMillis = now }
+    fun sameDay(a: java.util.Calendar, b: java.util.Calendar) =
+        a.get(java.util.Calendar.YEAR) == b.get(java.util.Calendar.YEAR) && a.get(java.util.Calendar.DAY_OF_YEAR) == b.get(java.util.Calendar.DAY_OF_YEAR)
+    if (sameDay(day, today)) return context.getString(com.openminis.app.R.string.chat_time_today, time)
+    val yesterday = (today.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, -1) }
+    if (sameDay(day, yesterday)) return context.getString(com.openminis.app.R.string.chat_time_yesterday, time)
+    val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(epochMs))
+    return "$date $time"
+}

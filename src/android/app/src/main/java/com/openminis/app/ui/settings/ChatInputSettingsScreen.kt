@@ -56,7 +56,7 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
     var returnKeyBehavior by remember { mutableIntStateOf(prefs.getInt(KEY_RETURN_KEY_BEHAVIOR, 0)) }
     var keepScreenAwake by remember { mutableStateOf(prefs.getBoolean(KEY_KEEP_SCREEN_AWAKE, false)) }
     var toolPreview by remember { mutableStateOf(prefs.getBoolean(KEY_TOOL_PREVIEW, true)) }
-    var toolStatusBar by remember { mutableStateOf(prefs.getBoolean(KEY_TOOL_STATUS_BAR, true)) }
+    var toolStatusBar by remember { mutableStateOf(prefs.getBoolean(KEY_TOOL_STATUS_BAR, false)) }
     var autoFocusAfterReply by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_FOCUS_AFTER_REPLY, true)) }
     var autoExpandThinking by remember { mutableStateOf(prefs.getBoolean(KEY_AUTO_EXPAND_THINKING, true)) }
     var showChatTitle by remember { mutableStateOf(prefs.getBoolean(KEY_SHOW_CHAT_TITLE, true)) }
@@ -76,7 +76,12 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
     val tileGreen = ChatColors.ok
     val tileTeal = Color(0xFF5AC8FA)
 
-    SettingsScaffold(title = stringResource(R.string.settings_cat_chat), onBack = onBack) {
+    SettingsScaffold(
+        title = stringResource(R.string.settings_cat_chat),
+        onBack = onBack,
+        backLabel = stringResource(R.string.settings_title),
+        largeTitle = true,
+    ) {
 
         // -- Return Key (mirrors iOS AppearanceSettingsView stringResource(R.string.appearance_section_return_key) section) --
         // 0=Newline (default), 1=Send. Hardware Shift+Enter always inserts a
@@ -84,7 +89,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // overrides the read in ChatScreen's onKeyEvent handler.
         SettingsSection(
             header = stringResource(R.string.appearance_section_return_key),
-            footer = stringResource(R.string.appearance_return_key_footer),
         ) {
             data class ReturnRow(val label: String, val value: Int)
             val returnRows = listOf(
@@ -124,7 +128,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // immediately after the model finishes.
         SettingsSection(
             header = stringResource(R.string.appearance_section_auto_focus_after_reply),
-            footer = stringResource(R.string.appearance_auto_focus_after_reply_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Keyboard,
@@ -146,7 +149,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // AppearanceSettingsView "Deep Thinking" section.
         SettingsSection(
             header = stringResource(R.string.appearance_section_deep_thinking),
-            footer = stringResource(R.string.appearance_auto_expand_thinking_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Psychology,
@@ -167,7 +169,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // also reachable via `minis-config set appearance.show_chat_title`.
         SettingsSection(
             header = stringResource(R.string.appearance_section_chat_title),
-            footer = stringResource(R.string.appearance_show_chat_title_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.ChatBubbleOutline,
@@ -186,7 +187,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // -- Tool Status Bar --
         SettingsSection(
             header = stringResource(R.string.appearance_section_tool_preview),
-            footer = stringResource(R.string.appearance_tool_preview_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Visibility,
@@ -218,7 +218,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // historical one-row-per-step layout with its long-press menus.
         SettingsSection(
             header = stringResource(R.string.appearance_section_work_process),
-            footer = stringResource(R.string.appearance_steps_presentation_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Build,
@@ -252,7 +251,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // New Chat (compose), Home = Home screen.
         SettingsSection(
             header = stringResource(R.string.appearance_section_launch),
-            footer = stringResource(R.string.appearance_launch_footer),
         ) {
             data class LaunchRow(val label: String, val icon: ImageVector, val tint: Color)
             val launchRows = listOf(
@@ -286,7 +284,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // request. Port of iOS ContentView's "Grouping" section.
         SettingsSection(
             header = stringResource(R.string.appearance_section_grouping),
-            footer = stringResource(R.string.appearance_auto_grouping_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.Folder,
@@ -309,7 +306,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // is real and most users don't need it.
         SettingsSection(
             header = stringResource(R.string.appearance_section_keep_awake),
-            footer = stringResource(R.string.appearance_keep_awake_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.ScreenLockPortrait,
@@ -328,7 +324,6 @@ fun ChatInputSettingsScreen(onBack: () -> Unit) {
         // [T-android-settings-hierarchy] Voice-correction learning is a chat-input behaviour.
         SettingsSection(
             header = stringResource(R.string.voice_correction_section),
-            footer = stringResource(R.string.voice_correction_footer),
         ) {
             SettingsSwitchRow(
                 icon = Icons.Outlined.RecordVoiceOver,

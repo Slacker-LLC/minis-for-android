@@ -123,30 +123,15 @@ fun LogManagementScreen(
     }
     fun refresh() { refreshTrigger.value++ }
 
+    val inAudit = tab == "config-audit"
+    // "Config changes" is a page under Logs (board), not a tab: back from it returns to the log list.
+    androidx.activity.compose.BackHandler(enabled = inAudit) { tab = "logs" }
     SettingsScaffold(
-        title = stringResource(R.string.log_title),
-        onBack = onBack,
+        title = stringResource(if (inAudit) R.string.logs_tab_config_changes else R.string.log_title),
+        onBack = if (inAudit) ({ tab = "logs" }) else onBack,
+        backLabel = stringResource(if (inAudit) R.string.log_title else R.string.settings_cat_data),
         scrollable = false,
     ) {
-        // Segmented selector lives outside the scrolling content so the
-        // tabs stay visible as the body scrolls.
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            SegmentedButton(
-                selected = tab == "logs",
-                onClick = { tab = "logs" },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            ) { Text(stringResource(R.string.log_title)) }
-            SegmentedButton(
-                selected = tab == "config-audit",
-                onClick = { tab = "config-audit" },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            ) { Text(stringResource(R.string.logs_tab_config_changes)) }
-        }
-
         if (tab == "config-audit") {
             // Audit body. Owns its own scrolling.
             ConfigAuditScreen(modifier = Modifier.fillMaxSize())
@@ -166,6 +151,7 @@ fun LogManagementScreen(
                 },
                 onLogFileClick = onLogFileClick,
                 onDeleteAll = { showDeleteAllConfirm = true },
+                onOpenConfigChanges = { tab = "config-audit" },
             )
         }
     }
@@ -207,6 +193,7 @@ private fun LogsBody(
     onToggleLogging: (Boolean) -> Unit,
     onLogFileClick: (fileName: String) -> Unit,
     onDeleteAll: () -> Unit,
+    onOpenConfigChanges: () -> Unit,
 ) {
     val anyFiles = dailyLogs.isNotEmpty() || crashLogs.isNotEmpty()
     Column(
@@ -282,6 +269,14 @@ private fun LogsBody(
                     )
                 }
             }
+        }
+
+        SettingsSection {
+            SettingsRow(
+                title = stringResource(R.string.logs_tab_config_changes),
+                onClick = onOpenConfigChanges,
+                showDivider = false,
+            )
         }
 
         // ── Storage / Delete All (only when files exist) ───────────────
@@ -445,14 +440,10 @@ fun LogDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(fileName) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+            MinisTopBar(
+            title = { Text(fileName) },
+            onBack = onBack,
+            actions = {
                     IconButton(onClick = {
                         val file = File(File(context.filesDir, "logs"), fileName)
                         if (file.exists()) shareLogFile(context, file)
@@ -460,7 +451,7 @@ fun LogDetailScreen(
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share))
                     }
                 },
-            )
+        )
         },
     ) { padding ->
         when {

@@ -1,7 +1,14 @@
 package com.openminis.app.ui.scheduled
 
 import androidx.compose.foundation.clickable
+import com.openminis.app.ui.settings.MinisTopBar
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.widthIn
+import com.openminis.app.ui.components.MinisTextButton
+import com.openminis.app.ui.settings.SettingsRow
+import com.openminis.app.ui.settings.SettingsSegmented
+import com.openminis.app.ui.settings.SettingsCardBlock
+import com.openminis.app.ui.settings.SettingsSection
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -244,24 +251,36 @@ fun ScheduledTaskEditScreen(
         }
     }
 
+    val requestSave: () -> Unit = {
+        if (ScheduledTaskTierMutationPolicy.requiresFullConfirmation(permissionTier, fullTierConfirmed)) {
+            saveAfterFullConfirmation = true
+            showFullTierConfirmation = true
+        } else {
+            persistTask()
+        }
+    }
+
     Scaffold(
+        containerColor = com.openminis.app.ui.settings.settingsPageBackground(),
         topBar = {
-            TopAppBar(
+            MinisTopBar(
                 title = {
                     Text(
                         stringResource(
                             if (isNew) R.string.scheduled_task_new
                             else R.string.scheduled_task_edit,
                         ),
-                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
+                navigation = {
+                    MinisTextButton(onClick = onBack) { Text(stringResource(R.string.cancel), fontSize = 17.sp) }
+                },
+                actions = {
+                    MinisTextButton(onClick = requestSave, enabled = canSave) {
+                        Text(stringResource(R.string.scheduled_task_save), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                 },
             )
@@ -329,14 +348,7 @@ fun ScheduledTaskEditScreen(
             canRunNow = canRunNow,
             canSave = canSave,
             onRunNow = { vm.runNow(currentTask()) },
-            onSave = {
-                if (ScheduledTaskTierMutationPolicy.requiresFullConfirmation(permissionTier, fullTierConfirmed)) {
-                    saveAfterFullConfirmation = true
-                    showFullTierConfirmation = true
-                } else {
-                    persistTask()
-                }
-            },
+            onSave = requestSave,
             onDelete = {
                 if (taskId != null) scope.launch { vm.delete(taskId); onBack() }
             },
@@ -508,17 +520,121 @@ private fun EditFormBody(
             .fillMaxSize()
             .padding(padding)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .padding(bottom = 24.dp),
     ) {
-        OutlinedTextField(
-            value = label,
-            onValueChange = onLabelChange,
-            label = { Text(stringResource(R.string.scheduled_task_field_label)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        SettingsSection(header = stringResource(R.string.scheduled_task_field_label)) {
+            SettingsCardBlock {
+                CardTextField(value = label, onValueChange = onLabelChange, singleLine = true)
+            }
+        }
 
+        // ── Target mode ──
+        SettingsSection(header = stringResource(R.string.scheduled_task_field_target)) {
+            val targetOpts = listOf(
+                TargetKind.NEW to R.string.scheduled_task_target_new,
+                TargetKind.FOLLOW_UP to R.string.scheduled_task_target_followup,
+                TargetKind.RERUN to R.string.scheduled_task_target_rerun,
+            )
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = targetOpts.map { stringResource(it.second) },
+                    selectedIndex = targetOpts.indexOfFirst { it.first == targetKind }.coerceAtLeast(0),
+                    onSelect = { onTargetKindChange(targetOpts[it].first) },
+                )
+            }
+            if (targetKind != TargetKind.NEW) {
+                PickerRow(
+                    title = stringResource(R.string.scheduled_task_field_session),
+                    value = targetSessionTitle ?: stringResource(R.string.scheduled_task_pick_session),
+                    onClick = { showSessionPicker = true },
+                    showDivider = targetKind == TargetKind.RERUN,
+                )
+            }
+            if (targetKind == TargetKind.RERUN) {
+                PickerRow(
+                    title = stringResource(R.string.scheduled_task_field_message),
+                    value = targetMessagePreview ?: stringResource(R.string.scheduled_task_pick_message),
+                    enabled = targetSessionId != null,
+                    onClick = { if (targetSessionId != null) showMessagePicker = true },
+                    showDivider = false,
+                )
+            }
+        }
+
+        // ── Time, repeat, active window ──
+        SettingsSection(header = stringResource(R.string.scheduled_task_field_time)) {
+            SettingsCardBlock {
+                TimeInput(state = timeState)
+                Spacer(Modifier.height(8.dp))
+                val options = listOf(
+                    ScheduledRepeatMode.ONCE to R.string.scheduled_task_repeat_once,
+                    ScheduledRepeatMode.DAILY to R.string.scheduled_task_repeat_daily,
+                    ScheduledRepeatMode.WEEKDAYS to R.string.scheduled_task_repeat_weekdays,
+                    ScheduledRepeatMode.CUSTOM to R.string.scheduled_task_repeat_custom,
+                )
+                SettingsSegmented(
+                    options = options.map { stringResource(it.second) },
+                    selectedIndex = options.indexOfFirst { it.first == repeatMode }.coerceAtLeast(0),
+                    onSelect = { onRepeatModeChange(options[it].first) },
+                )
+                if (repeatMode == ScheduledRepeatMode.CUSTOM) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        val names = java.text.DateFormatSymbols.getInstance().shortWeekdays
+                        val days = listOf(
+                            Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.THURSDAY,
+                            Calendar.FRIDAY, Calendar.SATURDAY, Calendar.SUNDAY,
+                        )
+                        days.forEach { dow ->
+                            FilterChip(
+                                selected = dow in customDays,
+                                onClick = {
+                                    val next = customDays.toMutableSet().apply {
+                                        if (dow in this) remove(dow) else add(dow)
+                                    }
+                                    onCustomDaysChange(next)
+                                },
+                                label = { Text(names.getOrNull(dow).orEmpty(), fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+            PickerRow(
+                title = stringResource(R.string.scheduled_task_field_start_date),
+                value = startDateMs?.let { dateLabel(it) } ?: stringResource(R.string.scheduled_task_date_any),
+                onClick = { showStartPicker = true },
+                onClear = if (startDateMs != null) ({ onStartDateChange(null) }) else null,
+            )
+            PickerRow(
+                title = stringResource(R.string.scheduled_task_field_end_date),
+                value = endDateMs?.let { dateLabel(it) } ?: stringResource(R.string.scheduled_task_date_any),
+                onClick = { showEndPicker = true },
+                onClear = if (endDateMs != null) ({ onEndDateChange(null) }) else null,
+                showDivider = false,
+            )
+        }
+
+        // ── Prompt ──
+        SettingsSection(
+            header = stringResource(R.string.scheduled_task_field_prompt),
+            footer = if (needsPrompt) null else stringResource(R.string.scheduled_task_rerun_note),
+        ) {
+            if (needsPrompt) {
+                SettingsCardBlock {
+                    CardTextField(
+                        value = prompt,
+                        onValueChange = onPromptChange,
+                        placeholder = stringResource(R.string.scheduled_task_field_prompt_hint),
+                        singleLine = false,
+                        minLines = 4,
+                    )
+                }
+            }
+        }
+
+        // ── Who runs it, and with which model ──
         val selectedBot = bots.firstOrNull { it.id == botId }
         val executorName = selectedBot?.name ?: botId
         val executorValue = if (targetKind == TargetKind.NEW) {
@@ -532,221 +648,80 @@ private fun EditFormBody(
             else if (targetBotId == null) stringResource(R.string.scheduled_task_executor_regular)
             else targetBot?.name ?: targetBotId
         }
-        PickerRow(
-            title = stringResource(R.string.scheduled_task_executor),
-            value = executorValue,
-            enabled = targetKind == TargetKind.NEW,
-            onClick = { showBotPicker = true },
-        )
-
-        // ── Target mode ──
-        Column {
-            SectionLabel(stringResource(R.string.scheduled_task_field_target))
-            Spacer(Modifier.height(8.dp))
-            val targetOpts = listOf(
-                TargetKind.NEW to R.string.scheduled_task_target_new,
-                TargetKind.FOLLOW_UP to R.string.scheduled_task_target_followup,
-                TargetKind.RERUN to R.string.scheduled_task_target_rerun,
+        SettingsSection(header = stringResource(R.string.scheduled_task_executor)) {
+            PickerRow(
+                title = stringResource(R.string.scheduled_task_executor),
+                value = executorValue,
+                enabled = targetKind == TargetKind.NEW,
+                onClick = { showBotPicker = true },
             )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                targetOpts.forEachIndexed { idx, (kind, resId) ->
-                    SegmentedButton(
-                        selected = targetKind == kind,
-                onClick = { onTargetKindChange(kind) },
-                        shape = SegmentedButtonDefaults.itemShape(idx, targetOpts.size),
-                    ) { Text(stringResource(resId), fontSize = 13.sp) }
-                }
-            }
-            if (targetKind != TargetKind.NEW) {
-                Spacer(Modifier.height(8.dp))
-                PickerRow(
-                    title = stringResource(R.string.scheduled_task_field_session),
-                    value = targetSessionTitle ?: stringResource(R.string.scheduled_task_pick_session),
-                    onClick = { showSessionPicker = true },
-                )
-            }
-            if (targetKind == TargetKind.RERUN) {
-                Spacer(Modifier.height(8.dp))
-                PickerRow(
-                    title = stringResource(R.string.scheduled_task_field_message),
-                    value = targetMessagePreview
-                        ?: stringResource(R.string.scheduled_task_pick_message),
-                    enabled = targetSessionId != null,
-                    onClick = { if (targetSessionId != null) showMessagePicker = true },
-                )
-            }
+            PickerRow(
+                title = stringResource(R.string.scheduled_task_field_model),
+                value = modelDisplay ?: stringResource(
+                    if (botId != null) R.string.scheduled_task_model_bot_default
+                    else R.string.scheduled_task_model_default,
+                ),
+                onClick = { showModelPicker = true },
+                onClear = if (modelDisplay != null) ({ onPickModel(null, null) }) else null,
+                showDivider = false,
+            )
         }
 
         // ── Routine privilege tier ──
-        Column {
-            SectionLabel(stringResource(R.string.scheduled_task_permission_tier))
-            Spacer(Modifier.height(8.dp))
+        SettingsSection(
+            header = stringResource(R.string.scheduled_task_permission_tier),
+            footer = stringResource(
+                if (permissionTier == ScheduledTaskPermissionTier.READ_ONLY) {
+                    R.string.scheduled_task_tier_read_only_detail
+                } else {
+                    R.string.scheduled_task_tier_full_detail
+                },
+            ),
+        ) {
             val tierOptions = listOf(
                 ScheduledTaskPermissionTier.READ_ONLY to R.string.scheduled_task_tier_read_only,
                 ScheduledTaskPermissionTier.FULL to R.string.scheduled_task_tier_full,
             )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                tierOptions.forEachIndexed { index, (tier, labelRes) ->
-                    SegmentedButton(
-                        selected = permissionTier == tier,
-                        onClick = { onPermissionTierChange(tier) },
-                        shape = SegmentedButtonDefaults.itemShape(index, tierOptions.size),
-                    ) { Text(stringResource(labelRes), fontSize = 13.sp) }
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(
-                    if (permissionTier == ScheduledTaskPermissionTier.READ_ONLY) {
-                        R.string.scheduled_task_tier_read_only_detail
-                    } else {
-                        R.string.scheduled_task_tier_full_detail
-                    },
-                ),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        // ── Time (compact) ──
-        Column {
-            SectionLabel(stringResource(R.string.scheduled_task_field_time))
-            Spacer(Modifier.height(8.dp))
-            TimeInput(state = timeState)
-        }
-
-        // ── Repeat ──
-        Column {
-            SectionLabel(stringResource(R.string.scheduled_task_field_repeat))
-            Spacer(Modifier.height(8.dp))
-            val options = listOf(
-                ScheduledRepeatMode.ONCE to R.string.scheduled_task_repeat_once,
-                ScheduledRepeatMode.DAILY to R.string.scheduled_task_repeat_daily,
-                ScheduledRepeatMode.WEEKDAYS to R.string.scheduled_task_repeat_weekdays,
-                ScheduledRepeatMode.CUSTOM to R.string.scheduled_task_repeat_custom,
-            )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                options.forEachIndexed { idx, (mode, resId) ->
-                    SegmentedButton(
-                        selected = repeatMode == mode,
-                        onClick = { onRepeatModeChange(mode) },
-                        shape = SegmentedButtonDefaults.itemShape(idx, options.size),
-                    ) { Text(stringResource(resId), fontSize = 13.sp) }
-                }
-            }
-            if (repeatMode == ScheduledRepeatMode.CUSTOM) {
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    val days = listOf(
-                        Calendar.MONDAY to "Mon", Calendar.TUESDAY to "Tue",
-                        Calendar.WEDNESDAY to "Wed", Calendar.THURSDAY to "Thu",
-                        Calendar.FRIDAY to "Fri", Calendar.SATURDAY to "Sat",
-                        Calendar.SUNDAY to "Sun",
-                    )
-                    days.forEach { (dow, name) ->
-                        FilterChip(
-                            selected = dow in customDays,
-                            onClick = {
-                                val next = customDays.toMutableSet().apply {
-                                    if (dow in this) remove(dow) else add(dow)
-                                }
-                                onCustomDaysChange(next)
-                            },
-                            label = { Text(name, fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
+            SettingsCardBlock {
+                SettingsSegmented(
+                    options = tierOptions.map { stringResource(it.second) },
+                    selectedIndex = tierOptions.indexOfFirst { it.first == permissionTier }.coerceAtLeast(0),
+                    onSelect = { onPermissionTierChange(tierOptions[it].first) },
+                )
             }
         }
 
-        // ── Active window (start / end date) ──
-        Column {
-            SectionLabel(stringResource(R.string.scheduled_task_field_active_window))
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) {
-                    PickerRow(
-                        title = stringResource(R.string.scheduled_task_field_start_date),
-                        value = startDateMs?.let { dateLabel(it) }
-                            ?: stringResource(R.string.scheduled_task_date_any),
-                        onClick = { showStartPicker = true },
-                        onClear = if (startDateMs != null) ({ onStartDateChange(null) }) else null,
-                    )
-                }
-                Box(Modifier.weight(1f)) {
-                    PickerRow(
-                        title = stringResource(R.string.scheduled_task_field_end_date),
-                        value = endDateMs?.let { dateLabel(it) }
-                            ?: stringResource(R.string.scheduled_task_date_any),
-                        onClick = { showEndPicker = true },
-                        onClear = if (endDateMs != null) ({ onEndDateChange(null) }) else null,
-                    )
-                }
-            }
-        }
-
-        // ── Prompt ──
-        if (needsPrompt) {
-            OutlinedTextField(
-                value = prompt,
-                onValueChange = onPromptChange,
-                label = { Text(stringResource(R.string.scheduled_task_field_prompt)) },
-                placeholder = { Text(stringResource(R.string.scheduled_task_field_prompt_hint)) },
-                minLines = 4,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            Text(
-                stringResource(R.string.scheduled_task_rerun_note),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         Text(
             text = stringResource(R.string.scheduled_vscreen_unattended_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
         if (!virtualScreenAvailable) {
             Text(
                 text = stringResource(R.string.scheduled_vscreen_unavailable_warning),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
         }
 
-        // ── Model (optional) ──
-        PickerRow(
-            title = stringResource(R.string.scheduled_task_field_model),
-            value = modelDisplay ?: stringResource(
-                if (botId != null) R.string.scheduled_task_model_bot_default
-                else R.string.scheduled_task_model_default,
-            ),
-            onClick = { showModelPicker = true },
-            onClear = if (modelDisplay != null) ({ onPickModel(null, null) }) else null,
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            MinisTextButton(onClick = onRunNow, enabled = canRunNow) {
+                Text(stringResource(R.string.scheduled_task_run_now), fontSize = 17.sp)
+            }
+            if (!isNew) {
+                MinisTextButton(onClick = onDelete) {
+                    Text(stringResource(R.string.scheduled_task_delete), fontSize = 17.sp, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.scheduled_task_target_new_session_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
-
-        HorizontalDivider()
-
-        MinisOutlinedButton(onClick = onRunNow, enabled = canRunNow, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.scheduled_task_run_now))
-        }
-        MinisButton(onClick = onSave, enabled = canSave, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.scheduled_task_save))
-        }
-        if (!isNew) {
-            MinisOutlinedButton(
-                onClick = onDelete,
-                destructive = true,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.scheduled_task_delete)) }
-        }
     }
 
     if (showSessionPicker) {
@@ -833,6 +808,7 @@ private fun SectionLabel(text: String) {
     Text(text, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
 }
 
+/** A picker as a settings row: title on the left, the chosen value (and a clear "x") on the right. */
 @Composable
 private fun PickerRow(
     title: String,
@@ -840,24 +816,58 @@ private fun PickerRow(
     enabled: Boolean = true,
     onClick: () -> Unit,
     onClear: (() -> Unit)? = null,
+    showDivider: Boolean = true,
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        readOnly = true,
-        enabled = false,
-        label = { Text(title) },
-        trailingIcon = if (onClear != null) {
-            {
-                IconButton(onClick = onClear) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(0.dp))
-                    Text("✕", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SettingsRow(
+        title = title,
+        onClick = if (enabled) onClick else null,
+        showDivider = showDivider,
+        titleColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        trailing = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 180.dp),
+                )
+                if (onClear != null) {
+                    Text(
+                        "✕",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable(onClick = onClear).padding(start = 10.dp, end = 4.dp),
+                    )
                 }
             }
-        } else null,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        },
+    )
+}
+
+/** A borderless text field for use inside a settings card. */
+@Composable
+private fun CardTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String? = null,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+) {
+    androidx.compose.material3.TextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = placeholder?.let { { Text(it) } },
+        singleLine = singleLine,
+        minLines = minLines,
+        colors = androidx.compose.material3.TextFieldDefaults.colors(
+            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+        ),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 

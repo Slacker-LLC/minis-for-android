@@ -34,7 +34,7 @@ fun ModelsScreen(
     var pickerSlot by remember { mutableStateOf<ModelSlot?>(null) }
     SettingsScaffold(
         title = stringResource(R.string.settings_models_title),
-        onBack = onBack,
+        onBack = onBack, backLabel = stringResource(R.string.settings_cat_models),
     ) {
         SettingsSection(
             header = stringResource(R.string.model_slots_header),
@@ -81,7 +81,6 @@ fun ModelsScreen(
         if (config.slots.main.size > 1) {
             SettingsSection(
                 header = stringResource(R.string.model_slot_main_options),
-                footer = stringResource(R.string.model_slot_fallback_help),
             ) {
                 val always = config.fallbackTrigger == FallbackStrategy.always
                 SettingsRow(

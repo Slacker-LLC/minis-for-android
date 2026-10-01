@@ -451,6 +451,36 @@ object OffloadPermissionManager {
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences("offload_permissions", Context.MODE_PRIVATE)
+        migrateLegacyAskOnce()
+    }
+
+    /**
+     * Settings now offers a plain allow / deny switch. A stored ASK_ONCE choice from an older
+     * build has no switch position, so it fails closed to NOT_ALLOWED; the user can switch it on.
+     */
+    internal fun migrateLegacyLevel(stored: String?): String? =
+        if (stored == PermissionLevel.ASK_ONCE.name) PermissionLevel.NOT_ALLOWED.name else stored
+
+    private fun migrateLegacyAskOnce() {
+        val editor = prefs.edit()
+        var changed = false
+        for (tool in toolRegistry) {
+            val key = "level_${tool.toolName}"
+            val stored = prefs.getString(key, null)
+            val migrated = migrateLegacyLevel(stored)
+            if (migrated != stored) {
+                editor.putString(key, migrated)
+                changed = true
+            }
+        }
+        if (changed) editor.apply()
+    }
+
+    /** The two positions Settings exposes: anything but NOT_ALLOWED counts as on. */
+    fun isAllowed(toolName: String): Boolean = getLevel(toolName) != PermissionLevel.NOT_ALLOWED
+
+    fun setAllowed(toolName: String, allowed: Boolean) {
+        setLevel(toolName, if (allowed) PermissionLevel.BYPASS else PermissionLevel.NOT_ALLOWED)
     }
 
     fun getLevel(toolName: String): PermissionLevel {

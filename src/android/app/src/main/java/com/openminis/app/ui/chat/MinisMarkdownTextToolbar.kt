@@ -244,7 +244,7 @@ internal class MinisMarkdownTextToolbar(
     }
 
     private fun toast(resId: Int) {
-        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+        com.openminis.app.ui.components.MinisToast.show(context, context.getString(resId))
     }
 
     internal data class ToolbarState(
