@@ -1562,6 +1562,7 @@
     <string name="provider_image_mode_images_api">API Images</string>
     <string name="provider_refresh_models">Actualiser la liste des modèles</string>
     <string name="provider_refreshing">Actualisation…</string>
+    <string name="provider_refresh_failed">Impossible de récupérer la liste des modèles. La liste existante a été conservée.</string>
     <string name="provider_imported_toast">Fournisseur « %1$s » importé</string>
     <string name="browser_ua_default">Par défaut (auto via UA)</string>
     <string name="browser_viewport_custom_subtitle">Définir votre propre largeur × hauteur</string>

@@ -51,6 +51,8 @@ import com.openminis.app.scheduled.ScheduledTaskManager
 import com.openminis.app.scheduled.ScheduledTaskBindingUpdate
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -130,6 +132,9 @@ class ProviderRepository(private val context: Context) {
          * stale-while-revalidate refresh should fire.
          */
         private const val MODEL_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
+
+        /** Minimum gap between stale-triggered retries of one instance (per process). */
+        private const val STALE_RETRY_INTERVAL_MS = 30 * 60 * 1000L
 
         /** Per-instance `lastFetchAt` pref key. */
         private fun lastFetchKey(instanceId: String) = "modelsLastFetchAt_$instanceId"
@@ -2102,7 +2107,14 @@ class ProviderRepository(private val context: Context) {
     }
 
 
-    suspend fun refreshModels(instance: ProviderInstance) {
+    /**
+     * Fetches the instance's model list and replaces its entries. Returns whether
+     * entries were actually replaced: `false` means nothing usable came back
+     * (no credential and no models.dev match, or a failed call against a private
+     * host whose existing list is deliberately kept), so callers can tell the
+     * user instead of showing an unchanged list as if it had been refreshed.
+     */
+    suspend fun refreshModels(instance: ProviderInstance): Boolean {
         com.openminis.app.provider.ProviderTransportPolicy
             .requireAllowedInstanceBase(instance, instance.effectiveBaseURL)
         var apiKey = loadApiKey(instance.id)
@@ -2124,14 +2136,26 @@ class ProviderRepository(private val context: Context) {
 
         android.util.Log.i("ProviderRepo", "refreshModels: id=${instance.id} type=${instance.providerType} credential=${instance.credentialType} hasKey=${apiKey != null} keyLen=${apiKey?.length ?: 0} baseURL=${instance.effectiveBaseURL}")
 
-        // OpenAI Codex OAuth: use static model list (OAuth tokens can't call /v1/models)
+        // OpenAI Codex OAuth: the token cannot call /v1/models, but the ChatGPT
+        // backend serves its own per-account list. Ask it first; the bundled
+        // allow-list is only the fallback. A manual bearer is not a ChatGPT
+        // session token, so it never goes to the Codex backend.
         if (instance.providerType == ProviderType.openAI
             && instance.credentialType == ProviderCredential.oauth
         ) {
-            val models = OpenAIModelsApi.fetchModelsOAuth()
+            val manualBearer = com.openminis.app.auth.OAuthManager.forInstance(context, instance)
+                ?.loadManualBearerToken()
+            val models = if (apiKey != null && manualBearer.isNullOrEmpty()) {
+                OpenAIModelsApi.fetchCodexCatalog(
+                    apiKey,
+                    com.openminis.app.auth.OpenAIOAuthManager(context, instance.id).accountId,
+                )
+            } else {
+                OpenAIModelsApi.fetchModelsOAuth()
+            }
             if (models.isNotEmpty()) {
                 replaceEntries(instance.id, models)
-                return
+                return true
             }
         }
 
@@ -2152,7 +2176,12 @@ class ProviderRepository(private val context: Context) {
                         // [T-provider-custom-user-agent] models-list UA override.
                         customUserAgent = instance.customUserAgent,
                     )
-                    ProviderType.gemini -> GeminiModelsApi.fetchModels(apiKey)
+                    // An OAuth token goes in the Authorization header; sent as `?key=`
+                    // it is rejected and the list silently becomes the bundled one.
+                    ProviderType.gemini -> GeminiModelsApi.fetchModels(
+                        apiKey,
+                        isOAuth = instance.credentialType == ProviderCredential.oauth,
+                    )
                     // [T-provider-custom-user-agent] models-list UA override.
                     // [T-android-provider-type-parity] openAIResponses lists
                     // models from the same /v1/models endpoint — only the
@@ -2193,7 +2222,7 @@ class ProviderRepository(private val context: Context) {
             // Step 2: If API returned results, use them
             if (models.isNotEmpty()) {
                 replaceEntries(instance.id, models)
-                return
+                return true
             }
         }
 
@@ -2207,25 +2236,42 @@ class ProviderRepository(private val context: Context) {
         if (fallbackModels.isNotEmpty()) {
             android.util.Log.i("ProviderRepo", "models.dev fallback returned ${fallbackModels.size} models for ${instance.label}")
             replaceEntries(instance.id, fallbackModels)
+            return true
         } else if (isThirdParty) {
             android.util.Log.i("ProviderRepo", "Third-party endpoint, no models.dev match — preserving existing models for ${instance.label}")
         }
+        return false
     }
 
     /**
      * Auto-refresh variant: skips instances where the user has added custom models,
      * so we never overwrite hand-edited entries. Mirrors iOS `autoRefreshModels(for:)`.
      */
-    private suspend fun autoRefreshModels(instance: ProviderInstance) {
+    private suspend fun autoRefreshModels(instance: ProviderInstance): Boolean {
         val hasCustom = _config.value.modelEntries.any {
             it.providerInstanceId == instance.id && it.isCustom
         }
         if (hasCustom) {
             android.util.Log.i("ProviderRepo", "[ModelList] autoRefresh SKIP ${instance.label} — has custom models")
-            return
+            return true
         }
-        refreshModels(instance)
+        // The cold-start fan-out and the foreground check can both reach the same
+        // instance; one fetch is enough.
+        if (!refreshesInFlight.add(instance.id)) return true
+        return try {
+            refreshModels(instance)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("ProviderRepo", "[ModelList] autoRefresh failed for ${instance.label}: ${e.message}")
+            false
+        } finally {
+            refreshesInFlight.remove(instance.id)
+        }
     }
+
+    private val refreshesInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val lastStaleAttemptAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /**
      * Stale-while-revalidate helper for UI code. Callers (e.g. the model
@@ -2241,8 +2287,15 @@ class ProviderRepository(private val context: Context) {
      * meant for targeted "user is looking at this picker now" revalidation.
      */
     fun triggerBackgroundRefreshIfStale(scope: kotlinx.coroutines.CoroutineScope) {
-        val stale = _config.value.instances.filter { it.isEnabled && isInstanceStale(it.id) }
+        val now = System.currentTimeMillis()
+        // An instance that cannot be refreshed (private host down, no credential)
+        // stays stale forever, so without this every foreground would retry it.
+        val stale = _config.value.instances.filter {
+            it.isEnabled && isInstanceStale(it.id) &&
+                now - (lastStaleAttemptAt[it.id] ?: 0L) >= STALE_RETRY_INTERVAL_MS
+        }
         if (stale.isEmpty()) return
+        stale.forEach { lastStaleAttemptAt[it.id] = now }
         android.util.Log.i("ProviderRepo", "[ModelList] SWR refresh — ${stale.size} stale instance(s)")
         for (instance in stale) {
             scope.launch { autoRefreshModels(instance) }
@@ -2278,11 +2331,13 @@ class ProviderRepository(private val context: Context) {
             }
 
             android.util.Log.i("ProviderRepo", "[ModelList] refreshAllModelsIfNeeded FIRE — ${enabled.size} instances")
-            prefs.edit().putLong(key, now).apply()
 
-            for (instance in enabled) {
-                scope.launch { autoRefreshModels(instance) }
-            }
+            // Stamp the day only after every instance refreshed: a cold start
+            // with no network used to spend the whole day's attempt, so the
+            // lists stayed stale until tomorrow. Instances that failed stay
+            // stale (no per-instance stamp) and the foreground check retries them.
+            val results = enabled.map { instance -> async { autoRefreshModels(instance) } }.awaitAll()
+            if (results.all { it }) prefs.edit().putLong(key, now).apply()
         }
     }
 

@@ -161,9 +161,12 @@ class OpenAIProvider private constructor(
          * in the Version / User-Agent headers. Keep this aligned with the
          * current upstream Codex client: the Codex backend gates newer models
          * (including gpt-6-astra) on this value before it validates the body.
-         * Shared constant so future bumps touch one place.
+         * Shared constant so future bumps touch one place — the live model
+         * list ([OpenAIModelsApi.fetchModelsCodexOAuth]) sends the same value as
+         * `client_version`, and the backend only lists the models that version
+         * is allowed to call.
          */
-        private const val CODEX_CLIENT_VERSION = "0.153.4"
+        internal const val CODEX_CLIENT_VERSION = "0.159.3"
 
         /**
          * [T-android-stale-conn-retry-hang] Streaming time-to-first-byte

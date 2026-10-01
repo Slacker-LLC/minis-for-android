@@ -1930,6 +1930,7 @@
     <string name="provider_image_mode_images_api">影像 API</string>
     <string name="provider_refresh_models">重新整理模型列表</string>
     <string name="provider_refreshing">正在重新整理…</string>
+    <string name="provider_refresh_failed">未能取得模型列表，已保留現有列表。</string>
     <string name="provider_imported_toast">已匯入提供商「%1$s」</string>
     <string name="browser_ua_default">預設（按 UA 自動）</string>
     <string name="browser_viewport_custom_subtitle">自定義寬 × 高</string>

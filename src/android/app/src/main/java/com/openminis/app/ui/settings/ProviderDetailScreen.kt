@@ -584,11 +584,24 @@ fun ProviderDetailScreen(
                     {
                         isRefreshing = true
                         scope.launch {
-                            try {
-                                providerRepository.refreshModels(instance)
-                                AppLogger.info(TAG, "Refreshed models for ${instance.id}")
+                            val updated = try {
+                                providerRepository.refreshModels(instance).also {
+                                    AppLogger.info(TAG, "Refreshed models for ${instance.id} (updated=$it)")
+                                }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                AppLogger.warning(TAG, "Model refresh failed for ${instance.id}: ${e.message}")
+                                false
                             } finally {
                                 isRefreshing = false
+                            }
+                            if (!updated) {
+                                android.widget.Toast.makeText(
+                                    exportContext,
+                                    R.string.provider_refresh_failed,
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
                             }
                         }
                     }

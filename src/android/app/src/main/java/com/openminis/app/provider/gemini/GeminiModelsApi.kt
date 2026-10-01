@@ -46,33 +46,68 @@ object GeminiModelsApi {
             cache.load(context, cacheKey)?.let { return@withContext it }
         }
 
-        val builder = Request.Builder()
-        if (isOAuth) {
-            builder.url("https://generativelanguage.googleapis.com/v1beta/models")
-            builder.header("Authorization", "Bearer $apiKey")
-        } else {
-            builder.url("https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey")
-        }
-
-        // [T-android-default-ua] brand outbound /v1beta/models request.
-        builder.applyUserAgentOverride(null)
-        val response = client.newCall(builder.build()).execute()
-        val body = response.body?.string() ?: return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
-
-        if (!response.isSuccessful) {
-            // 403 on OAuth almost always means the token lacks the
-            // generative-language scope. Falling back to the built-in list
-            // matches iOS and keeps Cloud Code Assist users functional.
-            if (isOAuth && response.code == 403) return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
-            if (context != null && (response.code == 401 || response.code == 403)) {
-                cache.invalidate(context, cacheKey)
+        val staticModels = com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
+        val collected = mutableListOf<LLMModel>()
+        var pageToken: String? = null
+        // The endpoint pages (50 by default), so asking for one page can leave
+        // the newest models off the list. A later page that fails keeps what
+        // the earlier pages returned; only a failed first page falls back.
+        for (page in 0 until MAX_PAGES) {
+            val builder = Request.Builder()
+            val tokenParam = pageToken?.let { "&pageToken=" + java.net.URLEncoder.encode(it, "UTF-8") }.orEmpty()
+            if (isOAuth) {
+                builder.url("$MODELS_URL?pageSize=$PAGE_SIZE$tokenParam")
+                builder.header("Authorization", "Bearer $apiKey")
+            } else {
+                builder.url("$MODELS_URL?key=$apiKey&pageSize=$PAGE_SIZE$tokenParam")
             }
-            return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
-        }
 
-        val models = try {
-            val json = JSONObject(body)
-            val arr = json.optJSONArray("models") ?: return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
+            // [T-android-default-ua] brand outbound /v1beta/models request.
+            builder.applyUserAgentOverride(null)
+            val response = try {
+                client.newCall(builder.build()).execute()
+            } catch (e: Exception) {
+                if (page == 0) throw e
+                break
+            }
+            val body = response.use { it.body?.string() }
+            if (!response.isSuccessful || body == null) {
+                if (page > 0) break
+                // 403 on OAuth almost always means the token lacks the
+                // generative-language scope. Falling back to the built-in list
+                // matches iOS and keeps Cloud Code Assist users functional.
+                if (context != null && !(isOAuth && response.code == 403) &&
+                    (response.code == 401 || response.code == 403)
+                ) {
+                    cache.invalidate(context, cacheKey)
+                }
+                return@withContext staticModels
+            }
+            val parsed = parseModelsPage(body)
+            if (parsed == null) {
+                if (page > 0) break
+                return@withContext staticModels
+            }
+            collected += parsed.models
+            pageToken = parsed.nextPageToken
+            if (pageToken == null) break
+        }
+        if (collected.isEmpty()) return@withContext staticModels
+        val models = ModelsDevApi.enrichModels(collected.distinctBy { it.id })
+
+        if (context != null) cache.save(context, cacheKey, models)
+        models
+    }
+
+    internal class ModelsPage(val models: List<LLMModel>, val nextPageToken: String?)
+
+    /** One `models.list` page; null when the body is not a models page at all. */
+    internal fun parseModelsPage(body: String): ModelsPage? = try {
+        val json = JSONObject(body)
+        val arr = json.optJSONArray("models")
+        if (arr == null) {
+            null
+        } else {
             val result = mutableListOf<LLMModel>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
@@ -89,13 +124,13 @@ object GeminiModelsApi {
                     result.add(LLMModel(name, displayName, "Google"))
                 }
             }
-            if (result.isEmpty()) return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
-            ModelsDevApi.enrichModels(result)
-        } catch (_: Exception) {
-            return@withContext com.openminis.app.provider.rules.ModelRulesProvider.staticModels("gemini")
+            ModelsPage(result, json.optString("nextPageToken", "").ifEmpty { null })
         }
-
-        if (context != null) cache.save(context, cacheKey, models)
-        models
+    } catch (_: Exception) {
+        null
     }
+
+    private const val MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+    private const val PAGE_SIZE = 1000
+    private const val MAX_PAGES = 5
 }
